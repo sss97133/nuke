@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import BuyerAgencyAgreement from './BuyerAgencyAgreement';
+import {
+  calculateCommissionCents,
+  formatCommissionRate,
+  getCommissionRate,
+  getCommissionTier,
+} from '../utils/commission';
 import '../design-system.css';
 
 interface ProxyBidModalProps {
@@ -39,8 +45,17 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
 
   const currentBid = listing.current_bid_cents ? listing.current_bid_cents / 100 : 0;
   const minBid = currentBid > 0 ? currentBid + 100 : 1000; // Minimum $100 increment or $1000 start
-  const depositAmount = maxBid ? Math.round(parseFloat(maxBid) * 0.1) : 0;
-  const commissionAmount = maxBid ? Math.round(parseFloat(maxBid) * 0.04) : 0;
+  const parsedMaxBid = maxBid ? parseFloat(maxBid) : 0;
+  const maxBidAmount = Number.isFinite(parsedMaxBid) ? parsedMaxBid : 0;
+  const maxBidCents = maxBidAmount > 0 ? Math.round(maxBidAmount * 100) : 0;
+  const depositCents = maxBidCents ? Math.round(maxBidCents * 0.1) : 0;
+  const depositAmount = depositCents / 100;
+  const commissionRate = getCommissionRate(maxBidCents);
+  const commissionRateDisplay = formatCommissionRate(commissionRate);
+  const commissionTier = getCommissionTier(maxBidCents);
+  const commissionCents = calculateCommissionCents(maxBidCents);
+  const commissionAmount = commissionCents / 100;
+  const commissionRateRounded = Number(commissionRate.toFixed(2));
 
   // Check for existing agreement
   useEffect(() => {
@@ -121,7 +136,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
           deposit_amount_cents: depositCents,
           deposit_status: 'pending',
           status: 'pending',
-          commission_rate: 4.00,
+          commission_rate: commissionRateRounded,
         })
         .select()
         .single();
@@ -387,8 +402,11 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                     <span>${depositAmount.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '6px' }}>
-                    <span>Commission if won (4%):</span>
+                    <span>Risk-adjusted commission ({commissionRateDisplay}%):</span>
                     <span>${commissionAmount.toLocaleString()}</span>
+                  </div>
+                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    Risk tier: {commissionTier.label}. Final commission is based on the winning price.
                   </div>
                 </div>
               )}

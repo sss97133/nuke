@@ -393,6 +393,55 @@ function extractDescriptionData(description: string): {
   return result;
 }
 
+type EventMention = {
+  name: string;
+  year: number;
+  event_date: string;
+  context: string;
+};
+
+function extractEventMentionsFromText(text: string): EventMention[] {
+  const normalized = (text || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+
+  const patterns: Array<{ name: string; pattern: RegExp }> = [
+    { name: "Pebble Beach Concours d'Elegance", pattern: /Pebble Beach Concours d[’']Elegance/i },
+    { name: 'Colorado Grand 1000', pattern: /Colorado\s+(?:Grand\s+)?1000/i },
+    { name: 'Quail Motorsports Gathering', pattern: /Quail Motorsports Gathering/i },
+    { name: 'Concorso Italiano', pattern: /Concorso Italiano/i },
+    { name: "Villa d'Este Concorso d'Eleganza", pattern: /Villa d[’']Este Concorso d[’']Eleganza/i },
+    { name: "St. James Concours d'Elegance", pattern: /St\.\s*James Concours d[’']Elegance/i },
+    { name: 'Geneva Salon', pattern: /Geneva Salon/i },
+    { name: 'Paris Salon', pattern: /Paris Salon/i },
+    { name: '24 Hours of Le Mans', pattern: /24\s*Hours?\s+of\s+Le\s+Mans/i },
+    { name: 'Mille Miglia Storica', pattern: /Mille Miglia Storica/i },
+    { name: 'Mille Miglia', pattern: /Mille Miglia(?! Storica)/i },
+  ];
+
+  const results: EventMention[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of patterns) {
+    const regex = new RegExp(`\\b((?:19|20)\\d{2})\\b[^.]{0,120}?${entry.pattern.source}`, 'gi');
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(normalized)) !== null) {
+      const year = parseInt(match[1], 10);
+      if (!Number.isFinite(year)) continue;
+      const key = `${year}:${entry.name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push({
+        name: entry.name,
+        year,
+        event_date: `${year}-01-01`,
+        context: match[0].trim(),
+      });
+    }
+  }
+
+  return results;
+}
+
 /**
  * Extract data from table-based listings (Cantech Automotive, etc.)
  * Handles: .table.table-striped with th/td pairs in Details and Specifications tabs
@@ -1369,6 +1418,18 @@ serve(async (req) => {
       }
     }
 
+    if (!doc && html) {
+      try {
+        doc = new DOMParser().parseFromString(html, 'text/html')
+        if (!doc) {
+          console.warn('Failed to parse HTML document');
+        }
+      } catch (parseError: any) {
+        console.warn('HTML parsing error:', parseError?.message);
+        doc = null;
+      }
+    }
+
     // Check for registered extraction patterns for this domain
     let domain = '';
     let registeredSchema = null;
@@ -1409,8 +1470,24 @@ serve(async (req) => {
     }
     
     try {
-      const descriptionEl = doc?.querySelector('.description, [class*="description"], .listing-description, .vehicle-description');
-      descriptionText = descriptionEl?.textContent?.trim() || '';
+      if (doc) {
+        if (url.includes('rmsothebys.com')) {
+          const rmBlocks = Array.from(doc.querySelectorAll('.body-text--copy'));
+          const rmText = rmBlocks
+            .map((block: any) => (block.textContent || '').replace(/\s+/g, ' ').trim())
+            .filter(Boolean)
+            .join('\n\n');
+          if (rmText) {
+            descriptionText = rmText;
+          }
+        }
+
+        if (!descriptionText) {
+          const descriptionEl = doc.querySelector('.description, [class*="description"], .listing-description, .vehicle-description');
+          descriptionText = descriptionEl?.textContent?.trim() || '';
+        }
+      }
+
       descriptionData = descriptionText ? extractDescriptionData(descriptionText) : null;
     } catch (e: any) {
       console.warn('Error extracting description:', e?.message);
@@ -1482,6 +1559,7 @@ serve(async (req) => {
     }
 
     const isBatListing = url.includes('bringatrailer.com/listing/')
+    const isRmsothebys = url.includes('rmsothebys.com')
 
     // BaT: never scan arbitrary <img> tags (sidebar ads/CTAs contaminate galleries).
     // Prefer the canonical gallery JSON embedded in #bat_listing_page_photo_gallery[data-gallery-items].
@@ -1500,24 +1578,29 @@ serve(async (req) => {
     // NOTE: For BaT listings, this is intentionally bypassed in favor of canonical gallery extraction above.
     // For KSL, ALWAYS try HTML extraction (critical - Firecrawl extract misses gallery images)
     // Even if Firecrawl was blocked, HTML might still have image references
-    const shouldExtractFromHtml = (!data.images || data.images.length === 0) || (url.includes('ksl.com') && html && html.length > 200)
+    const shouldExtractFromHtml = (!data.images || data.images.length === 0)
+      || (url.includes('ksl.com') && html && html.length > 200)
+      || (isRmsothebys && html && html.length > 200)
     if (shouldExtractFromHtml && html) {
       try {
-        console.log(`Extracting images from HTML (${html.length} chars) for ${url.includes('ksl.com') ? 'KSL' : 'non-KSL'} URL...`)
+        console.log(`Extracting images from HTML (${html.length} chars) for ${url.includes('ksl.com') ? 'KSL' : isRmsothebys ? 'RM Sothebys' : 'non-KSL'} URL...`)
         // Pass the original URL for KSL so we can resolve relative paths and filter properly
         const extractedImages = extractImageURLs(html, url)
         console.log(`Extracted ${extractedImages?.length || 0} images from HTML`)
         if (extractedImages && extractedImages.length > 0) {
           const normalized = normalizeImageUrls(extractedImages)
           console.log(`After normalization: ${normalized.length} images`)
-          // For KSL, always prefer HTML-extracted images (they capture the full gallery)
-          if (url.includes('ksl.com')) {
-            // Merge but prioritize HTML-extracted images (they capture the full gallery)
+          // For KSL and RM Sothebys, merge HTML images with extracted images (HTML usually has the full gallery).
+          if (url.includes('ksl.com') || isRmsothebys) {
             const combined = [...new Set([...normalized, ...(data.images || [])])]
             data.images = combined
-            console.log(`KSL: Final image count: ${combined.length} (${normalized.length} from HTML + ${(data.images || []).length} from extract)`)
+            console.log(`Merged HTML images: ${combined.length} (${normalized.length} from HTML + ${(data.images || []).length} from extract)`)
           } else {
             data.images = normalized
+          }
+
+          if (!data.thumbnail_url && data.images.length > 0) {
+            data.thumbnail_url = data.images[0]
           }
         }
       } catch (e: any) {
@@ -2002,6 +2085,11 @@ serve(async (req) => {
     }
     data.make = cleanMakeName(data.make) || data.make
     data.model = cleanModelName(data.model) || data.model
+
+    const eventMentions = extractEventMentionsFromText(data.description || '')
+    if (eventMentions.length > 0) {
+      data.event_mentions = eventMentions
+    }
 
     console.log(`✅ Final data structure being returned:`, data)
 

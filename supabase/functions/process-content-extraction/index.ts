@@ -48,6 +48,17 @@ const clampToToday = (ymd: string): string => {
 
 const safeEventDate = (raw: any): string => clampToToday(toDateOnly(raw));
 
+const shortUrl = (raw: string): string => {
+  try {
+    const u = new URL(raw);
+    const base = u.hostname.replace(/^www\./, '');
+    const path = u.pathname && u.pathname !== '/' ? u.pathname : '';
+    return `${base}${path}`;
+  } catch {
+    return raw;
+  }
+};
+
 async function insertTimelineEvent(
   supabase: any,
   payload: {
@@ -77,6 +88,55 @@ async function insertTimelineEvent(
     });
 
   return error;
+}
+
+async function upsertResearchItem(
+  supabase: any,
+  payload: {
+    vehicle_id: string;
+    created_by?: string | null;
+    item_type: string;
+    status?: string;
+    title: string;
+    summary?: string | null;
+    source_url?: string | null;
+    source_type?: string | null;
+    event_date?: string | null;
+    date_precision?: string;
+    confidence?: number | null;
+    metadata?: Record<string, any>;
+  }
+) {
+  try {
+    const { error } = await supabase
+      .from('vehicle_research_items')
+      .upsert(
+        {
+          vehicle_id: payload.vehicle_id,
+          created_by: payload.created_by || null,
+          item_type: payload.item_type,
+          status: payload.status || 'open',
+          title: payload.title,
+          summary: payload.summary || null,
+          source_url: payload.source_url || null,
+          source_type: payload.source_type || null,
+          event_date: payload.event_date || null,
+          date_precision: payload.date_precision || 'unknown',
+          confidence: payload.confidence ?? null,
+          metadata: payload.metadata || {}
+        },
+        { onConflict: 'vehicle_id,source_url' }
+      );
+    if (error) {
+      const msg = String(error.message || '').toLowerCase();
+      const missing = msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache');
+      if (!missing) {
+        console.warn(`vehicle_research_items upsert failed: ${error.message}`);
+      }
+    }
+  } catch (err) {
+    console.warn('vehicle_research_items upsert exception:', err);
+  }
 }
 
 serve(async (req) => {
@@ -363,6 +423,23 @@ async function processListingURL(supabase: any, item: QueueItem) {
         listing_url: item.raw_content,
         images_imported: imageCount,
         fields_updated: Object.keys(updates),
+        comment_id: item.comment_id
+      }
+    });
+
+    await upsertResearchItem(supabase, {
+      vehicle_id: item.vehicle_id,
+      created_by: item.user_id,
+      item_type: 'source',
+      status: 'open',
+      title: `Source discovered: ${shortUrl(item.raw_content)}`,
+      summary: 'Listing URL discovered during comment extraction.',
+      source_url: item.raw_content,
+      source_type: 'listing_url',
+      date_precision: scrapedData.sold_date || scrapedData.listing_date ? 'day' : 'unknown',
+      confidence: 70,
+      metadata: {
+        kind: 'listing_discovered',
         comment_id: item.comment_id
       }
     });
@@ -677,6 +754,23 @@ async function processDocumentURL(supabase: any, item: QueueItem) {
   if (error) {
     return { success: false, error: error.message };
   }
+
+  await upsertResearchItem(supabase, {
+    vehicle_id: item.vehicle_id,
+    created_by: item.user_id,
+    item_type: 'source',
+    status: 'open',
+    title: `Document source discovered: ${shortUrl(item.raw_content)}`,
+    summary: item.context ? `Document discovered: ${item.context}` : 'Document URL discovered during comment extraction.',
+    source_url: item.raw_content,
+    source_type: 'document_url',
+    date_precision: 'unknown',
+    confidence: 60,
+    metadata: {
+      kind: 'document_added',
+      comment_id: item.comment_id
+    }
+  });
 
   return {
     success: true,

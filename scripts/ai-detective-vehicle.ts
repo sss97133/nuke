@@ -64,18 +64,44 @@ function normalizeUrl(raw: string): string {
   return raw.trim().replace(/[),.;]+$/, '');
 }
 
+function shortUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const base = u.hostname.replace(/^www\./, '');
+    const path = u.pathname && u.pathname !== '/' ? u.pathname : '';
+    return `${base}${path}`;
+  } catch {
+    return url;
+  }
+}
+
 function extractUrls(text: string): string[] {
   if (!text) return [];
   const matches = text.match(/https?:\/\/[^\s"')\]]+/gi) || [];
   return matches.map(normalizeUrl);
 }
 
-function classifyUrl(url: string): string {
+function classifyUrl(url: string): { contentType: string; sourceType: string } {
   const lower = url.toLowerCase();
-  if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube_video';
-  if (lower.endsWith('.pdf') || lower.includes('.pdf?') || lower.includes('.pdf#')) return 'document_url';
-  if (lower.match(/\.(png|jpg|jpeg|gif|webp)(\?|#|$)/)) return 'image_url';
-  return 'listing_url';
+  const isInstagram = lower.includes('instagram.com');
+  const isInstagramPost = /\/(p|reel|tv)\//i.test(lower);
+
+  if (isInstagram) {
+    return {
+      contentType: 'listing_url',
+      sourceType: isInstagramPost ? 'instagram_post' : 'instagram_profile'
+    };
+  }
+  if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
+    return { contentType: 'youtube_video', sourceType: 'youtube_video' };
+  }
+  if (lower.endsWith('.pdf') || lower.includes('.pdf?') || lower.includes('.pdf#')) {
+    return { contentType: 'document_url', sourceType: 'document_url' };
+  }
+  if (lower.match(/\.(png|jpg|jpeg|gif|webp)(\?|#|$)/)) {
+    return { contentType: 'image_url', sourceType: 'image_url' };
+  }
+  return { contentType: 'listing_url', sourceType: 'listing_url' };
 }
 
 function collectUrls(value: any, output: Set<string>, depth = 0): void {
@@ -179,15 +205,46 @@ async function main() {
     return;
   }
 
-  const rows = urlList.map((url) => ({
-    vehicle_id: vehicle.id,
-    user_id: userId,
-    content_type: classifyUrl(url),
-    raw_content: url,
-    context: 'ai_detective_seed',
-    confidence_score: 0.85,
-    detection_method: 'ai_detective'
-  }));
+  const researchRows = urlList.map((url) => {
+    const classification = classifyUrl(url);
+    return {
+      vehicle_id: vehicle.id,
+      created_by: userId,
+      item_type: 'source',
+      status: 'open',
+      title: `Source discovered: ${shortUrl(url)}`,
+      summary: 'AI detective seed',
+      source_url: url,
+      source_type: classification.sourceType,
+      date_precision: 'unknown',
+      confidence: 70,
+      metadata: {
+        seeded_by: 'ai_detective',
+        content_type: classification.contentType,
+        source_type: classification.sourceType
+      }
+    };
+  });
+
+  const { error: researchError } = await supabase
+    .from('vehicle_research_items')
+    .upsert(researchRows, { onConflict: 'vehicle_id,source_url' });
+  if (researchError) {
+    console.warn(`vehicle_research_items insert failed: ${researchError.message}`);
+  }
+
+  const rows = urlList.map((url) => {
+    const classification = classifyUrl(url);
+    return {
+      vehicle_id: vehicle.id,
+      user_id: userId,
+      content_type: classification.contentType,
+      raw_content: url,
+      context: 'ai_detective_seed',
+      confidence_score: 0.85,
+      detection_method: 'ai_detective'
+    };
+  });
 
   console.log(`AI detective seed: ${rows.length} URL(s) queued for vehicle ${vehicle.id}`);
   if (opts.dryRun) {
