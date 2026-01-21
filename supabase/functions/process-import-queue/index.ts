@@ -3666,6 +3666,55 @@ serve(async (req) => {
           console.error(`⚠️ Timeline event creation error: ${timelineErr.message}`);
         }
 
+        // Create timeline events for event mentions in listing narratives (best-effort).
+        try {
+          const eventMentions = Array.isArray((scrapeData as any)?.data?.event_mentions)
+            ? (scrapeData as any).data.event_mentions
+            : [];
+          if (eventMentions.length > 0) {
+            for (const mention of eventMentions.slice(0, 25)) {
+              const name = String(mention?.name || '').trim();
+              const year = Number(mention?.year);
+              const eventDate = String(mention?.event_date || '').trim();
+              if (!name || !Number.isFinite(year) || !eventDate) continue;
+
+              const dedupeSignature = {
+                source_url: item.listing_url,
+                event_name: name,
+                event_year: year
+              };
+
+              const { data: existing } = await supabase
+                .from('timeline_events')
+                .select('id')
+                .eq('vehicle_id', newVehicle.id)
+                .contains('metadata', dedupeSignature)
+                .maybeSingle();
+
+              if (existing?.id) continue;
+
+              await supabase
+                .from('timeline_events')
+                .insert({
+                  vehicle_id: newVehicle.id,
+                  event_type: 'other',
+                  event_date: eventDate,
+                  title: 'Event appearance',
+                  description: `${name} (${year})`,
+                  source: listingHost || 'listing_event',
+                  metadata: {
+                    ...dedupeSignature,
+                    context: mention?.context || null,
+                    date_precision: 'year',
+                    provenance: 'listing_event_mention'
+                  }
+                });
+            }
+          }
+        } catch (eventErr: any) {
+          console.warn(`⚠️ Failed to create listing event timeline entries (non-blocking): ${eventErr.message}`);
+        }
+
         // L'Art: create breadcrumb service-record timeline events from the listing (best-effort).
         // These are not verified invoices; we store provenance and mark date confidence as unknown.
         try {

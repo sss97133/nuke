@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { calculateCommissionCents, getCommissionRate } from '../../utils/commission';
 import '../../design-system.css';
 
 interface ProxyBidRequest {
@@ -12,6 +13,7 @@ interface ProxyBidRequest {
   bid_strategy: string;
   status: string;
   current_bid_cents: number | null;
+  commission_rate?: number | null;
   created_at: string;
   vehicle: {
     id: string;
@@ -247,11 +249,13 @@ export default function ProxyBidOperations() {
       const updateData: Record<string, any> = { status: newStatus };
 
       if (newStatus === 'won') {
+        const finalBidCents = bid.current_bid_cents ?? bid.max_bid_cents;
+        const commissionRate = getCommissionRate(finalBidCents);
+
         updateData.won_at = new Date().toISOString();
-        updateData.final_bid_cents = bid.current_bid_cents;
-        updateData.commission_cents = bid.current_bid_cents
-          ? Math.round(bid.current_bid_cents * 0.04)
-          : null;
+        updateData.final_bid_cents = finalBidCents;
+        updateData.commission_rate = Number(commissionRate.toFixed(2));
+        updateData.commission_cents = finalBidCents ? calculateCommissionCents(finalBidCents) : null;
       }
 
       await supabase

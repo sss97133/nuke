@@ -24,6 +24,13 @@ Output format (what to produce)
   - confidence: 0-100
   - metadata: { date_precision, chassis, lot_number, venue, organization, notes }
 
+Landing points (where to store things)
+- Dated events → `timeline_events`
+- Undated facts or loose ends → `vehicle_research_items`
+- Sources/PDFs → `vehicle_research_items` + `reference_documents`/`library_documents`
+- Missing core fields → `data_gaps` (proof tasks)
+- Missing reference knowledge → `knowledge_gaps` (wiki gaps)
+
 Date precision rules
 - If only year known: use YYYY-01-01 + metadata.date_precision = "year".
 - If month known: use YYYY-MM-01 + metadata.date_precision = "month".

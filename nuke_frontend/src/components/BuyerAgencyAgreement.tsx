@@ -1,6 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import {
+  COMMISSION_TIERS,
+  CommissionTier,
+  formatCommissionRate,
+  formatCurrencyFromCents,
+  getCommissionRate,
+  getCommissionTier,
+} from '../utils/commission';
 import '../design-system.css';
 
 interface BuyerAgencyAgreementProps {
@@ -43,11 +51,45 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
   const [country, setCountry] = useState('United States');
   const [maxBidAmount, setMaxBidAmount] = useState<string>('');
 
+  const parsedMaxBidAmount = maxBidAmount.trim() ? parseFloat(maxBidAmount) : 0;
+  const maxBidCents =
+    Number.isFinite(parsedMaxBidAmount) && parsedMaxBidAmount > 0
+      ? Math.round(parsedMaxBidAmount * 100)
+      : null;
+  const commissionTier = getCommissionTier(maxBidCents);
+  const commissionRate = getCommissionRate(maxBidCents);
+  const commissionRateDisplay = formatCommissionRate(commissionRate);
+  const commissionRateRounded = Number(commissionRate.toFixed(2));
+
+  const formatTierRange = (tier: CommissionTier, index: number) => {
+    if (index === 0 && tier.maxCents !== null) {
+      return `Up to ${formatCurrencyFromCents(tier.maxCents)}`;
+    }
+
+    const previousMax = COMMISSION_TIERS[index - 1]?.maxCents ?? null;
+    if (tier.maxCents === null) {
+      return `Over ${formatCurrencyFromCents(previousMax || 0)}`;
+    }
+
+    return `Over ${formatCurrencyFromCents(previousMax || 0)} up to ${formatCurrencyFromCents(
+      tier.maxCents,
+    )}`;
+  };
+
   // Signature state
   const [isDrawing, setIsDrawing] = useState(false);
   const [signatureExists, setSignatureExists] = useState(false);
   const [lastX, setLastX] = useState(0);
   const [lastY, setLastY] = useState(0);
+
+  const formatError = (err: any, fallback: string) => {
+    if (!err) return fallback;
+    if (typeof err === 'string') return err;
+    const message = err.message || err.error_description || fallback;
+    const details = err.details ? ` (${err.details})` : '';
+    const hint = err.hint ? ` ${err.hint}` : '';
+    return `${message}${details}${hint}`.trim();
+  };
 
   // Load existing agreement
   useEffect(() => {
@@ -58,29 +100,36 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
         .from('buyer_agency_agreements')
         .select('*')
         .eq('user_id', user.id)
-        .in('status', ['draft', 'active'])
+        .in('status', ['draft', 'pending_signature', 'active'])
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
 
       if (data && !error) {
-        setExistingAgreement(data);
         if (data.status === 'active') {
           // Already have active agreement
           onComplete?.(data.id);
+          return;
+        }
+
+        setExistingAgreement(data);
+        setLegalName(data.legal_name || '');
+        if (data.legal_address) {
+          setStreet(data.legal_address.street || '');
+          setCity(data.legal_address.city || '');
+          setState(data.legal_address.state || '');
+          setZip(data.legal_address.zip || '');
+          setCountry(data.legal_address.country || 'United States');
+        }
+        if (data.max_authorized_bid_cents) {
+          setMaxBidAmount((data.max_authorized_bid_cents / 100).toString());
+        }
+
+        setTermsAccepted(true);
+        if (data.status === 'pending_signature') {
+          setStep('sign');
         } else if (data.status === 'draft') {
-          // Resume draft
-          setLegalName(data.legal_name || '');
-          if (data.legal_address) {
-            setStreet(data.legal_address.street || '');
-            setCity(data.legal_address.city || '');
-            setState(data.legal_address.state || '');
-            setZip(data.legal_address.zip || '');
-            setCountry(data.legal_address.country || 'United States');
-          }
-          if (data.max_authorized_bid_cents) {
-            setMaxBidAmount((data.max_authorized_bid_cents / 100).toString());
-          }
+          setStep('details');
         }
       }
     };
@@ -192,23 +241,32 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
       return;
     }
 
+    const trimmedMaxBidAmount = maxBidAmount.trim();
+    if (trimmedMaxBidAmount && maxBidCents === null) {
+      setError('Maximum bid must be a positive number or left blank');
+      return;
+    }
+
+    const hasAddress = [street, city, state, zip].some((value) => value.trim());
+    const legalAddress = hasAddress ? {
+      street: street.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      zip: zip.trim(),
+      country: country.trim(),
+    } : null;
+
     setLoading(true);
     setError(null);
 
     try {
       const agreementData = {
         user_id: user.id,
-        status: 'draft',
+        status: 'pending_signature',
         legal_name: legalName.trim(),
-        legal_address: {
-          street: street.trim(),
-          city: city.trim(),
-          state: state.trim(),
-          zip: zip.trim(),
-          country: country.trim(),
-        },
-        max_authorized_bid_cents: maxBidAmount ? Math.round(parseFloat(maxBidAmount) * 100) : null,
-        commission_rate: 4.00,
+        legal_address: legalAddress,
+        max_authorized_bid_cents: maxBidCents,
+        commission_rate: commissionRateRounded,
       };
 
       let result;
@@ -232,7 +290,8 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
       setExistingAgreement(result.data);
       setStep('sign');
     } catch (err: any) {
-      setError(err.message || 'Failed to save agreement');
+      console.error('Failed to save agreement:', err);
+      setError(formatError(err, 'Failed to save agreement'));
     } finally {
       setLoading(false);
     }
@@ -267,7 +326,8 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
 
       onComplete?.(existingAgreement.id);
     } catch (err: any) {
-      setError(err.message || 'Failed to sign agreement');
+      console.error('Failed to sign agreement:', err);
+      setError(formatError(err, 'Failed to sign agreement'));
     } finally {
       setLoading(false);
     }
@@ -362,11 +422,24 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 Buyer's maximum bid amounts and bidding strategy.
               </p>
 
-              <p><strong>3. Commission</strong></p>
+              <p><strong>3. Commission (Risk-Adjusted)</strong></p>
               <p style={{ marginBottom: '12px' }}>
-                Buyer agrees to pay Agent a commission of <strong>4% (four percent)</strong> of the
-                final hammer price for any vehicle successfully purchased through Agent's services.
-                Commission is due upon successful completion of the purchase transaction.
+                Buyer agrees to pay Agent a risk-adjusted commission based on the final hammer price
+                for any vehicle successfully purchased through Agent's services. Rates are tiered by
+                value to reflect handling risk and required coverage:
+              </p>
+              <ul style={{ paddingLeft: '18px', marginBottom: '12px' }}>
+                {COMMISSION_TIERS.map((tier, index) => (
+                  <li key={tier.label} style={{ marginBottom: '6px' }}>
+                    <strong>{tier.label}</strong> ({formatTierRange(tier, index)}):{' '}
+                    {formatCommissionRate(tier.rate)}%
+                    <span style={{ color: 'var(--text-muted)' }}> — {tier.description}</span>
+                  </li>
+                ))}
+              </ul>
+              <p style={{ marginBottom: '12px' }}>
+                Commission is due upon successful completion of the purchase transaction. The exact
+                rate is determined by the final hammer price if the bid is successful.
               </p>
 
               <p><strong>4. Deposit Authorization</strong></p>
@@ -421,7 +494,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
               <span style={{ fontSize: '9pt' }}>
                 I have read and agree to the terms and conditions of this Buyer Agency Agreement.
                 I understand that N-Zero will act as my agent for bidding on external auctions
-                and that I am responsible for a 4% commission on successful purchases.
+                and that I am responsible for a risk-adjusted commission based on the schedule above.
               </span>
             </label>
 
@@ -611,7 +684,13 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
               fontSize: '8pt'
             }}>
               <p><strong>Signer:</strong> {legalName}</p>
-              <p><strong>Commission Rate:</strong> 4%</p>
+              <p><strong>Commission Schedule:</strong> Risk-adjusted by value tier</p>
+              {maxBidAmount && (
+                <p>
+                  <strong>Estimated Rate (based on max authorized bid):</strong>{' '}
+                  {commissionRateDisplay}% ({commissionTier.label})
+                </p>
+              )}
               {maxBidAmount && (
                 <p><strong>Max Authorized Bid:</strong> ${parseFloat(maxBidAmount).toLocaleString()}</p>
               )}

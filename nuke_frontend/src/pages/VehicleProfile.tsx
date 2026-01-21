@@ -58,6 +58,7 @@ import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import ImageGallery from '../components/images/ImageGallery';
 import { VehicleDataGapsCard } from '../components/vehicle/VehicleDataGapsCard';
+import VehicleResearchItemsCard from '../components/vehicle/VehicleResearchItemsCard';
 import { VehicleLedgerDocumentsCard } from '../components/vehicle/VehicleLedgerDocumentsCard';
 
 const WORKSPACE_TABS = [
@@ -3517,6 +3518,9 @@ const VehicleProfile: React.FC = () => {
 
               {/* Proof tasks / public scrutiny (data gaps) */}
               <VehicleDataGapsCard vehicleId={vehicle.id} />
+
+              {/* Research notes / open questions */}
+              <VehicleResearchItemsCard vehicleId={vehicle.id} />
 
               {/* Investment Summary */}
               <VehicleROISummaryCard vehicleId={vehicle.id} />
