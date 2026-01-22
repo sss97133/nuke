@@ -408,7 +408,7 @@ const CursorHomepage: React.FC = () => {
   // Some environments may not have `vehicles.listing_kind` yet (migration not applied).
   // We optimistically use it, but fall back automatically if PostgREST reports it missing.
   // HOTFIX: Default to false until migration 20260120_vehicle_listing_kind.sql is applied to production
-  const listingKindSupportedRef = useRef<boolean>(false);
+  const listingKindSupportedRef = useRef<boolean>(true);
   const isMissingListingKindColumn = useCallback((err: any) => {
     const code = String((err as any)?.code || '').toUpperCase();
     const message = String(err?.message || '').toLowerCase();
