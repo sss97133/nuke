@@ -21,11 +21,28 @@ async function checkStatus() {
   // 2. Vehicle count and image coverage
   const { count: totalVehicles } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
 
-  // Get distinct vehicle_ids with images
-  const { data: vehicleIdsWithImages } = await supabase
-    .from('vehicle_images')
-    .select('vehicle_id');
-  const uniqueVehicleIds = new Set(vehicleIdsWithImages?.map(v => v.vehicle_id) || []);
+  // Get distinct vehicle_ids with images (paginated to handle large datasets)
+  const uniqueVehicleIds = new Set<string>();
+  let offset = 0;
+  const batchSize = 1000;
+
+  while (true) {
+    const { data: batch } = await supabase
+      .from('vehicle_images')
+      .select('vehicle_id')
+      .not('vehicle_id', 'is', null)
+      .range(offset, offset + batchSize - 1);
+
+    if (!batch || batch.length === 0) break;
+
+    for (const row of batch) {
+      if (row.vehicle_id) uniqueVehicleIds.add(row.vehicle_id);
+    }
+
+    offset += batchSize;
+    // Limit to 200k images for speed
+    if (offset >= 200000) break;
+  }
   const vehiclesWithImagesCount = uniqueVehicleIds.size;
 
   const { count: totalImages } = await supabase.from('vehicle_images').select('*', { count: 'exact', head: true });

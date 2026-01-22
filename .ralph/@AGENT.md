@@ -117,3 +117,68 @@ node check-recent-vehicles.js
 - Firecrawl: $0.002/page
 - Target: $0.003/profile total
 - Budget: $500 total
+
+---
+
+## Loop Validation (REQUIRED)
+
+After completing each task, validate using these CLI tools:
+
+### Supabase CLI Validation
+```bash
+# Check function deployment status
+supabase functions list
+
+# Verify database state
+supabase db dump --schema public --data-only | head -50
+
+# Check edge function logs
+supabase functions logs extract-bat-core --limit 20
+
+# Run SQL validation query
+npx tsx -e "
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const { count } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
+console.log('Total vehicles:', count);
+"
+```
+
+### GitHub CLI Validation
+```bash
+# Check repo status
+gh repo view --json name,defaultBranchRef
+
+# Check recent commits
+gh api repos/{owner}/{repo}/commits --jq '.[0:3] | .[] | .commit.message'
+
+# Check workflow runs
+gh run list --limit 5
+
+# Check for open issues
+gh issue list --limit 5
+```
+
+### Vercel CLI Validation (if frontend deployed)
+```bash
+# Check deployment status
+vercel list --limit 5
+
+# Check production deployment
+vercel inspect <deployment-url>
+```
+
+### Status Check Script (Primary Validation)
+```bash
+# ALWAYS run this after making changes
+npx tsx scripts/ralph-status-check.ts
+```
+
+### Validation Checklist
+Before marking a task complete, verify:
+- [ ] `npx tsx scripts/ralph-status-check.ts` shows improvement
+- [ ] No new errors in `supabase functions logs`
+- [ ] Queue processing continues (`pending` count decreasing)
+- [ ] No TypeScript errors: `npx tsc --noEmit`

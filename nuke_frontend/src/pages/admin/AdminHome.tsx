@@ -18,6 +18,7 @@ const cards: Card[] = [
   { title: 'Price Tools', description: 'Bulk edit and CSV import', to: '/admin/price-editor' },
   { title: 'Scrapers', description: 'KSL import and other ingestion tools', to: '/admin/ksl-scraper' },
   { title: 'Catalog', description: 'Browse extracted catalog data', to: '/admin/catalog' },
+  { title: 'NL Query', description: 'Ask questions and see live SQL results', to: '/admin/query-console' },
 ];
 
 export default function AdminHome() {
