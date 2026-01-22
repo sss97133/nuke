@@ -205,6 +205,26 @@ export default function AdminShell() {
     }
   }, [isAdmin, loading, location.pathname, navigate]);
 
+  const allItems = React.useMemo(() => {
+    return [
+      ...primary.map((i) => ({ ...i, _section: 'Primary' })),
+      ...operations.map((i) => ({ ...i, _section: 'Operations' })),
+      ...tools.map((i) => ({ ...i, _section: 'Tools' })),
+      ...experimental.map((i) => ({ ...i, _section: 'Experimental' })),
+    ];
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const matchItem = (item: AdminNavItem) => {
+    if (!q) return true;
+    const hay = `${item.label} ${item.description || ''} ${item.to}`.toLowerCase();
+    return hay.includes(q);
+  };
+
+  const searchResults = q
+    ? allItems.filter((i: any) => matchItem(i)).slice(0, 40)
+    : [];
+
   if (loading) {
     return <div style={{ padding: 'var(--space-6)', fontSize: '8pt', color: 'var(--text-muted)' }}>Loading admin…</div>;
   }
@@ -233,26 +253,6 @@ export default function AdminShell() {
       </div>
     );
   }
-
-  const q = query.trim().toLowerCase();
-  const matchItem = (item: AdminNavItem) => {
-    if (!q) return true;
-    const hay = `${item.label} ${item.description || ''} ${item.to}`.toLowerCase();
-    return hay.includes(q);
-  };
-
-  const allItems = React.useMemo(() => {
-    return [
-      ...primary.map((i) => ({ ...i, _section: 'Primary' })),
-      ...operations.map((i) => ({ ...i, _section: 'Operations' })),
-      ...tools.map((i) => ({ ...i, _section: 'Tools' })),
-      ...experimental.map((i) => ({ ...i, _section: 'Experimental' })),
-    ];
-  }, []);
-
-  const searchResults = q
-    ? allItems.filter((i: any) => matchItem(i)).slice(0, 40)
-    : [];
 
   return (
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
