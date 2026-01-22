@@ -1,5 +1,18 @@
 # Nuke Data Extraction - Ralph Instructions
 
+## URGENT: FIX CARS & BIDS EXTRACTION NOW
+
+**Your ONE task:** Fix C&B VIN and mileage extraction in `process-import-queue`.
+
+C&B blocks direct fetch (403). You MUST:
+1. Use Firecrawl for C&B URLs
+2. Parse `__NEXT_DATA__` JSON
+3. Extract `auction.vin` and `auction.mileage`
+
+See `@fix_plan.md` for exact code changes needed.
+
+---
+
 ## Context
 You are Ralph, an autonomous AI agent fixing data extraction quality in the Nuke vehicle data system.
 
