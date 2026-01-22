@@ -15,6 +15,7 @@ type AuctionPulseLike = {
   bid_count?: number | null;
   watcher_count?: number | null;
   view_count?: number | null;
+  comment_count?: number | null;
   updated_at?: string | null;
 };
 
@@ -183,6 +184,12 @@ export function VehiclePricingValueCard(props: {
             {sub('Sold for', (sold && salePrice) ? <span style={{ fontWeight: 800 }}>{formatUsd(salePrice)}</span> : '—', () => salePrice && setShowHistory(true))}
 
             {sub('Outcome', sold ? 'sold' : (auctionOutcome || listingStatus || '—'), () => listingUrl && window.open(listingUrl, '_blank'))}
+
+            {/* Auction stats */}
+            {sub('Bids', typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count.toLocaleString() : '—')}
+            {sub('Comments', typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count.toLocaleString() : '—')}
+            {sub('Views', typeof auctionPulse?.view_count === 'number' && auctionPulse.view_count > 0 ? auctionPulse.view_count.toLocaleString() : '—')}
+            {sub('Watchers', typeof auctionPulse?.watcher_count === 'number' && auctionPulse.watcher_count > 0 ? auctionPulse.watcher_count.toLocaleString() : '—')}
           </div>
 
           {/* Owner lane */}
