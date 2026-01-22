@@ -182,9 +182,9 @@ async function updateVehicle(vehicleId: string, data: CABData): Promise<boolean>
     if (data.vin) updateData.vin = data.vin;
     if (data.mileage) updateData.mileage = data.mileage;
     if (data.location) updateData.location = data.location;
-    if (data.exteriorColor) updateData.exterior_color = data.exteriorColor;
+    if (data.exteriorColor) updateData.color = data.exteriorColor;
     if (data.interiorColor) updateData.interior_color = data.interiorColor;
-    if (data.engine) updateData.engine = data.engine;
+    if (data.engine) updateData.engine_type = data.engine;
     if (data.transmission) updateData.transmission = data.transmission;
     if (data.drivetrain) updateData.drivetrain = data.drivetrain;
     if (data.bodyStyle) updateData.body_style = data.bodyStyle;
@@ -234,11 +234,11 @@ async function updateVehicle(vehicleId: string, data: CABData): Promise<boolean>
       const auctionData: any = {
         vehicle_id: vehicleId,
         source: 'cars_and_bids',
-        sale_price: data.soldPrice || data.currentBid,
-        bid_count: data.bidCount,
+        winning_bid: data.soldPrice || data.currentBid,
+        total_bids: data.bidCount,
         watch_count: data.watchCount,
-        comment_count: data.commentCount,
-        status: data.status,
+        comments_count: data.commentCount,
+        outcome: data.status,
         updated_at: new Date().toISOString(),
       };
 
@@ -248,12 +248,19 @@ async function updateVehicle(vehicleId: string, data: CABData): Promise<boolean>
         } catch {}
       }
 
-      const { error: aeError } = await supabase
+      // Check if auction event exists
+      const { data: existing } = await supabase
         .from('auction_events')
-        .upsert(auctionData, { onConflict: 'vehicle_id,source' });
+        .select('id')
+        .eq('vehicle_id', vehicleId)
+        .eq('source', 'cars_and_bids')
+        .single();
 
-      if (aeError) {
-        console.log('  ⚠️ Auction event error:', aeError.message);
+      if (existing) {
+        await supabase.from('auction_events').update(auctionData).eq('id', existing.id);
+      } else {
+        auctionData.created_at = new Date().toISOString();
+        await supabase.from('auction_events').insert(auctionData);
       }
     }
 
