@@ -10,6 +10,7 @@ interface VehicleStatsProps {
     platform: string;
     stream_url: string;
     title: string;
+    stream_provider?: string | null;
   } | null;
   totalComments?: number;
   totalImages?: number;

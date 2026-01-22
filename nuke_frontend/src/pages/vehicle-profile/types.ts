@@ -89,6 +89,7 @@ export interface LiveSession {
   platform: string;
   stream_url: string | null;
   title: string | null;
+  stream_provider?: string | null;
 }
 
 export interface VehicleBaseProps {

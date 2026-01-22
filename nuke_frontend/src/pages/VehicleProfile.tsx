@@ -60,6 +60,7 @@ import ImageGallery from '../components/images/ImageGallery';
 import { VehicleDataGapsCard } from '../components/vehicle/VehicleDataGapsCard';
 import VehicleResearchItemsCard from '../components/vehicle/VehicleResearchItemsCard';
 import { VehicleLedgerDocumentsCard } from '../components/vehicle/VehicleLedgerDocumentsCard';
+import VehicleStreamingCard from '../components/vehicle/VehicleStreamingCard';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -1454,7 +1455,7 @@ const VehicleProfile: React.FC = () => {
       if (!vehicle?.id) return;
       const { data, error } = await supabase
         .from('live_streaming_sessions')
-        .select('id, platform, stream_url, title, ended_at')
+        .select('id, platform, stream_url, title, ended_at, stream_provider')
         .eq('vehicle_id', vehicle.id)
         .is('ended_at', null)
         .order('started_at', { ascending: false })
@@ -1465,7 +1466,13 @@ const VehicleProfile: React.FC = () => {
         liveAvailableRef.current = false;
         return;
       }
-      if (data) setLiveSession({ id: data.id, platform: data.platform, stream_url: data.stream_url, title: data.title });
+      if (data) setLiveSession({
+        id: data.id,
+        platform: data.platform,
+        stream_url: data.stream_url,
+        title: data.title,
+        stream_provider: data.stream_provider
+      });
       else setLiveSession(null);
     } catch (err) {
       liveAvailableRef.current = false;
@@ -3482,6 +3489,15 @@ const VehicleProfile: React.FC = () => {
                   onEditClick={handleEditClick}
                 />
               </React.Suspense>
+
+              <VehicleStreamingCard
+                vehicleId={vehicle.id}
+                vehicleName={getVehicleTitle(vehicle)}
+                session={session}
+                canManage={Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess)}
+                liveSession={liveSession}
+                onSessionUpdated={loadLiveSession}
+              />
 
               {/* Investment ledger documents */}
               {(isVerifiedOwner || hasContributorAccess) && (
