@@ -270,7 +270,60 @@ async function saveVehicle(data: CABData): Promise<string | null> {
       vehicleId = newV.id;
     }
 
-    // Save auction event
+    // Save to external_listings (this is what the frontend reads!)
+    const listingIdMatch = data.url.match(/\/auctions\/([^/]+)/);
+    const listingId = listingIdMatch?.[1] || null;
+
+    if (listingId) {
+      // Determine listing status
+      let listingStatus = 'ended';
+      if (data.status === 'sold') listingStatus = 'sold';
+      else if (data.status === 'live') listingStatus = 'active';
+      else if (data.status === 'no_reserve') listingStatus = 'active';
+
+      const externalListingData: any = {
+        vehicle_id: vehicleId,
+        organization_id: '822cae29-f80e-4859-9c48-a1485a543152', // Cars & Bids org ID
+        platform: 'cars_and_bids',
+        listing_url: data.url,
+        listing_id: listingId,
+        listing_status: listingStatus,
+        current_bid: data.soldPrice,
+        bid_count: data.bidCount,
+        final_price: data.status === 'sold' ? data.soldPrice : null,
+        metadata: {
+          source: 'cab_dom_scraper',
+          seller: data.seller,
+          location: data.location,
+          engine: data.engine,
+          transmission: data.transmission,
+          drivetrain: data.drivetrain,
+          exterior_color: data.exteriorColor,
+          interior_color: data.interiorColor,
+          title_status: data.titleStatus,
+          body_style: data.bodyStyle,
+          comment_count: data.commentCount,
+        },
+        updated_at: new Date().toISOString(),
+      };
+
+      // Check if external listing exists
+      const { data: existingListing } = await supabase
+        .from('external_listings')
+        .select('id')
+        .eq('vehicle_id', vehicleId)
+        .eq('platform', 'cars_and_bids')
+        .single();
+
+      if (existingListing) {
+        await supabase.from('external_listings').update(externalListingData).eq('id', existingListing.id);
+      } else {
+        externalListingData.created_at = new Date().toISOString();
+        await supabase.from('external_listings').insert(externalListingData);
+      }
+    }
+
+    // Also save to auction_events for historical tracking
     if (data.soldPrice || data.bidCount) {
       const auctionData: any = {
         vehicle_id: vehicleId,
