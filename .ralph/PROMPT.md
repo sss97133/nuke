@@ -81,6 +81,34 @@ Before starting work, read these IN ORDER:
 - `bat-extract-complete-v*` (all versions)
 - `bat-simple-extract` (old)
 
+## CRITICAL CONSTRAINT: ONE TOOL PER SOURCE
+
+**DO NOT CREATE NEW EXTRACTION FUNCTIONS OR SCRIPTS.**
+
+We have too many tools already. Use ONLY these:
+
+| Source | Extractor | Status |
+|--------|-----------|--------|
+| BaT | `extract-bat-core` + `extract-auction-comments` | ✅ Working |
+| Cars & Bids | `process-import-queue` | ⚠️ Needs fix |
+| Classic.com | `process-import-queue` | ⚠️ Needs fix |
+| Craigslist | `process-import-queue` | ✅ Working |
+| Mecum | `process-import-queue` | ⚠️ Needs fix |
+
+**Your job is to FIX these existing functions, not create new ones.**
+
+If you need a diagnostic script, use one that already exists in `scripts/ralph-*.ts`.
+
+## FOCUS: RESULTS, NOT MORE CODE
+
+Stop creating scripts. Start fixing profiles.
+
+1. **Run existing backfill** - Use `backfill-images`, `process-import-queue`
+2. **Fix broken extractors** - Edit existing functions in `supabase/functions/`
+3. **Measure completeness** - Track how many profiles are fixed
+
+**Success = profiles with data, not lines of code written.**
+
 ## Priority Tasks (in order)
 
 ### 1. Understand Current State (FIRST)

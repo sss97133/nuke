@@ -33,6 +33,7 @@ import VehicleMakeLogosCatalog from '../../../pages/admin/VehicleMakeLogosCatalo
 import MarketDataTools from '../../../pages/MarketDataTools';
 import BotTestDashboard from '../../../pages/admin/BotTestDashboard';
 import AdminRalphBrief from '../../../pages/admin/AdminRalphBrief';
+import NLQueryConsole from '../../../pages/admin/NLQueryConsole';
 
 const AdminModuleRoutes = () => {
   return (
@@ -75,6 +76,7 @@ const AdminModuleRoutes = () => {
         <Route path="database-audit" element={<DatabaseAudit />} />
         <Route path="data-diagnostic" element={<DataDiagnostic />} />
         <Route path="test-contributions" element={<TestContributions />} />
+        <Route path="query-console" element={<NLQueryConsole />} />
         <Route path="hover-demo" element={<HoverCardDemo />} />
         <Route path="bot-testing" element={<BotTestDashboard />} />
       </Route>

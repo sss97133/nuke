@@ -42,6 +42,7 @@ const tools: AdminNavItem[] = [
   { label: 'Make Logos Catalog', to: '/admin/make-logos-catalog', description: 'Vehicle makes + logo links (Wikidata/Commons)' },
   { label: 'Database Audit', to: '/admin/database-audit' },
   { label: 'Data Diagnostic', to: '/admin/data-diagnostic' },
+  { label: 'NL Query', to: '/admin/query-console', description: 'Natural language SQL for vehicles' },
 ];
 
 const experimental: AdminNavItem[] = [
