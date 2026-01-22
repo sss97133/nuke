@@ -48,7 +48,7 @@ fi
 echo "Date threshold: $DATE_THRESHOLD"
 
 # Find BaT vehicles imported recently that have bat_comments > 0
-VEHICLES_JSON=$(curl -sS "${SUPABASE_URL}/rest/v1/vehicles?select=id,bat_auction_url,bat_comments,created_at&bat_auction_url=not.is.null&bat_comments=gt.0&created_at=gte.${DATE_THRESHOLD}&order=created_at.desc&limit=100" \
+VEHICLES_JSON=$(curl -sS "${SUPABASE_URL}/rest/v1/vehicles?select=id,bat_auction_url,bat_comments,created_at&bat_auction_url=not.is.null&bat_comments=gt.0&created_at=gte.${DATE_THRESHOLD}&order=created_at.desc&limit=600" \
   -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
   -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
   -H "Content-Type: application/json")

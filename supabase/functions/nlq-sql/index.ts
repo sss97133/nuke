@@ -106,35 +106,37 @@ function extractJson(text: string): any | null {
 }
 
 function buildPrompt(params: {
-  question: string
   limit: number
   includeMerged: boolean
+  today: string
 }) {
-  const { question, limit, includeMerged } = params
+  const { limit, includeMerged, today } = params
   return `
-You are a Postgres SQL generator. Return JSON only.
+You are a Postgres SQL assistant with a clarification loop. Return JSON only.
 
 Output JSON schema:
 {
+  "action": "clarify" | "run" | "reject",
+  "question": "string",
   "sql": "string",
   "explanation": "short string",
   "confidence": 0.0
 }
 
 Rules:
+- If the request is ambiguous or missing key constraints, use action="clarify" and ask ONE concise question.
+- If the request is out of scope for public.vehicles, use action="reject" and explain why.
+- Otherwise use action="run" and return SQL.
 - Only SELECT statements. Do not use WITH, INSERT, UPDATE, DELETE, or DDL.
 - Use only the table public.vehicles (alias ok).
 - Allowed columns: id, year, make, model, status, created_at, updated_at, vin.
-- If the question cannot be answered from public.vehicles, set sql="" and explain why.
 - Prefer aggregated answers (COUNT, GROUP BY) when the user asks for totals/top/most.
 - Use btrim/coalesce for make/model:
   COALESCE(NULLIF(btrim(make), ''), '[unknown]')
   COALESCE(NULLIF(btrim(model), ''), '[unknown]')
 - ${includeMerged ? "Include" : "Exclude"} vehicles with status = 'merged' by default.
 - If returning rows (not just a single scalar), include LIMIT ${limit}.
-
-Question:
-${question}
+- Today's date (UTC): ${today}
 `.trim()
 }
 
@@ -217,7 +219,6 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({} as Record<string, unknown>))
     const question = String((body as any)?.query ?? "").trim()
-    if (!question) return json(400, { error: "Missing query" })
 
     const requestedLimit = Number((body as any)?.limit ?? DEFAULT_LIMIT)
     const limit = Math.max(1, Math.min(MAX_LIMIT, Number.isFinite(requestedLimit) ? requestedLimit : DEFAULT_LIMIT))
@@ -230,15 +231,32 @@ serve(async (req) => {
       auth: { persistSession: false, detectSessionInUrl: false },
     })
 
+    const rawHistory = Array.isArray((body as any)?.history) ? (body as any).history : []
+    const normalizedHistory = rawHistory
+      .filter((m: any) => m && (m.role === "user" || m.role === "assistant"))
+      .map((m: any) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: String(m.content || "").trim(),
+      }))
+      .filter((m: any) => m.content)
+      .slice(-12)
+
+    const history = normalizedHistory.length > 0
+      ? (question ? [...normalizedHistory, { role: "user", content: question }] : normalizedHistory)
+      : (question ? [{ role: "user", content: question }] : [])
+
+    if (!history.length) return json(400, { error: "Missing query" })
+
     const provider = normalizeProvider((body as any)?.provider)
     const model = (body as any)?.model ? String((body as any)?.model) : undefined
     const tier = normalizeTier((body as any)?.tier) ?? "tier2"
 
     const config = await getLLMConfig(supabaseAdmin, userId, provider, model, tier)
-    const prompt = buildPrompt({ question, limit, includeMerged })
+    const prompt = buildPrompt({ limit, includeMerged, today: new Date().toISOString().slice(0, 10) })
     const messages = [
       { role: "system", content: "Return only valid JSON. No markdown. No extra text." },
-      { role: "user", content: prompt },
+      { role: "system", content: prompt },
+      ...history,
     ]
 
     const resp = await callLLM(config, messages, { temperature: 0.1, maxTokens: 900 })
@@ -247,10 +265,38 @@ serve(async (req) => {
       return json(422, { error: "LLM returned invalid JSON", raw: resp?.content || "" })
     }
 
-    const sqlRaw = normalizeSql(String((parsed as any).sql || ""))
+    const actionRaw = String((parsed as any).action || "").toLowerCase().trim()
     const explanation = String((parsed as any).explanation || "")
     const confidence = Number((parsed as any).confidence ?? 0)
 
+    if (actionRaw === "clarify") {
+      const clarification = String((parsed as any).question || (parsed as any).clarification || "").trim()
+      if (!clarification) {
+        return json(422, { error: "Clarification required but no question provided", explanation, confidence })
+      }
+      return json(200, {
+        action: "clarify",
+        clarification,
+        explanation,
+        confidence: Number.isFinite(confidence) ? confidence : 0,
+        provider: config.provider,
+        model: config.model,
+        source: config.source,
+      })
+    }
+
+    if (actionRaw === "reject") {
+      return json(200, {
+        action: "reject",
+        explanation: explanation || "Request is out of scope for public.vehicles.",
+        confidence: Number.isFinite(confidence) ? confidence : 0,
+        provider: config.provider,
+        model: config.model,
+        source: config.source,
+      })
+    }
+
+    const sqlRaw = normalizeSql(String((parsed as any).sql || ""))
     if (!sqlRaw) {
       return json(422, { error: "No SQL produced", explanation, confidence })
     }
@@ -265,7 +311,8 @@ serve(async (req) => {
     if (error) return json(500, { error, sql, explanation })
 
     return json(200, {
-      query: question,
+      action: "run",
+      query: question || history[history.length - 1]?.content || "",
       sql,
       explanation,
       confidence: Number.isFinite(confidence) ? confidence : 0,

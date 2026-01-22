@@ -3,16 +3,16 @@
  *
  * Core extractor for Cars & Bids listings:
  * - Uses Firecrawl to fetch HTML (C&B blocks direct fetch with 403)
- * - Parses __NEXT_DATA__ JSON for VIN, mileage, and vehicle data
+ * - C&B is a React SPA - main data comes from meta tags (og:title)
+ * - VIN requires full JS rendering which may not always be available
  * - Saves HTML evidence to listing_page_snapshots
  * - Upserts vehicles + vehicle_images + external_listings + auction_events
- *
- * Comments/bids are handled separately by extract-cars-and-bids-comments.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
+import { firecrawlScrape } from "../_shared/firecrawl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,17 +52,7 @@ function canonicalUrl(raw: string): string {
   }
 }
 
-function titleCaseToken(s: string): string {
-  const t = String(s || "").trim();
-  if (!t) return t;
-  if (t.length <= 2) return t.toUpperCase();
-  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-}
-
-/**
- * Extract auction data from __NEXT_DATA__ JSON embedded in C&B HTML
- */
-function extractFromNextData(html: string): {
+interface CabExtractedData {
   vin: string | null;
   mileage: number | null;
   title: string | null;
@@ -82,148 +72,156 @@ function extractFromNextData(html: string): {
   sellerName: string | null;
   description: string | null;
   lotNumber: string | null;
-} | null {
-  try {
-    const match = html.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (!match) {
-      console.log('⚠️ C&B: No __NEXT_DATA__ found in HTML');
-      return null;
-    }
-    const data = JSON.parse(match[1]);
-
-    // Try multiple paths to find auction data
-    const auction = data?.props?.pageProps?.auction ||
-                   data?.props?.pageProps?.data?.auction ||
-                   data?.props?.auction ||
-                   data?.auction;
-
-    if (!auction) {
-      console.log('⚠️ C&B: No auction data in __NEXT_DATA__');
-      console.log('  Available pageProps keys:', Object.keys(data?.props?.pageProps || {}));
-      return null;
-    }
-
-    console.log('✅ C&B: Found auction data, keys:', Object.keys(auction).slice(0, 20));
-
-    // Extract images from photos array
-    const images: string[] = [];
-    if (auction.photos && Array.isArray(auction.photos)) {
-      for (const photo of auction.photos) {
-        if (photo.large) images.push(photo.large);
-        else if (photo.medium) images.push(photo.medium);
-        else if (photo.small) images.push(photo.small);
-        else if (photo.url) images.push(photo.url);
-      }
-    }
-
-    // Parse mileage - handle both number and string formats
-    let mileage: number | null = null;
-    const rawMileage = auction.mileage || auction.odometer || auction.miles;
-    if (rawMileage) {
-      const mileageStr = String(rawMileage).replace(/[^0-9]/g, '');
-      mileage = mileageStr ? parseInt(mileageStr, 10) : null;
-      if (mileage && !Number.isFinite(mileage)) mileage = null;
-    }
-
-    // Parse year
-    let year: number | null = auction.year || null;
-    if (year && typeof year === 'string') {
-      year = parseInt(year, 10);
-      if (!Number.isFinite(year)) year = null;
-    }
-
-    // Parse current bid
-    let currentBid: number | null = null;
-    const rawBid = auction.currentBid || auction.current_bid || auction.highBid || auction.high_bid;
-    if (rawBid) {
-      if (typeof rawBid === 'number') {
-        currentBid = rawBid;
-      } else {
-        const bidStr = String(rawBid).replace(/[^0-9]/g, '');
-        currentBid = bidStr ? parseInt(bidStr, 10) : null;
-      }
-    }
-
-    // Seller info
-    const seller = auction.seller || auction.user || {};
-
-    return {
-      vin: auction.vin || null,
-      mileage,
-      title: auction.title || null,
-      year,
-      make: auction.make || null,
-      model: auction.model || null,
-      images,
-      engine: auction.engine || auction.engineDescription || null,
-      transmission: auction.transmission || null,
-      exteriorColor: auction.exteriorColor || auction.exterior_color || auction.color || null,
-      interiorColor: auction.interiorColor || auction.interior_color || null,
-      location: auction.location || auction.sellerLocation || null,
-      currentBid,
-      endDate: auction.endDate || auction.end_date || auction.endTime || null,
-      auctionStatus: auction.status || auction.auctionStatus || null,
-      sellerId: seller.id ? String(seller.id) : null,
-      sellerName: seller.username || seller.name || null,
-      description: auction.description || auction.summary || null,
-      lotNumber: auction.id ? String(auction.id) : null,
-    };
-  } catch (e) {
-    console.error('⚠️ C&B: Error parsing __NEXT_DATA__:', e);
-    return null;
-  }
 }
 
 /**
- * Parse year/make/model from title if not provided in auction data
+ * Extract auction data from C&B HTML
+ * C&B is a React SPA - data comes from:
+ * 1. Meta tags (og:title contains year/make/model/mileage/transmission/color)
+ * 2. Image URLs from the page
+ * 3. VIN may be in DOM if JS rendered (requires waitFor)
  */
-function parseYearMakeModelFromTitle(title: string): { year: number | null; make: string | null; model: string | null } {
-  if (!title) return { year: null, make: null, model: null };
-
-  // Pattern: "YEAR MAKE MODEL..."
-  const match = title.match(/^(\d{4})\s+(\S+)\s+(.+)$/i);
-  if (!match) return { year: null, make: null, model: null };
-
-  const year = parseInt(match[1], 10);
-  if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 2) {
-    return { year: null, make: null, model: null };
-  }
-
-  return {
-    year,
-    make: titleCaseToken(match[2]),
-    model: match[3].trim(),
+function extractFromCarsAndBidsHtml(html: string): CabExtractedData {
+  const result: CabExtractedData = {
+    vin: null,
+    mileage: null,
+    title: null,
+    year: null,
+    make: null,
+    model: null,
+    images: [],
+    engine: null,
+    transmission: null,
+    exteriorColor: null,
+    interiorColor: null,
+    location: null,
+    currentBid: null,
+    endDate: null,
+    auctionStatus: null,
+    sellerId: null,
+    sellerName: null,
+    description: null,
+    lotNumber: null,
   };
-}
 
-async function fetchWithFirecrawl(url: string, apiKey: string): Promise<{ html: string; status: number }> {
-  console.log(`🔥 C&B: Fetching ${url} with Firecrawl...`);
+  try {
+    // 1. Extract from og:title meta tag
+    // Format: "2008 Honda S2000 CR - ~22,500 Miles, 6-Speed Manual, Rio Yellow Pearl, Unmodified"
+    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+    if (ogTitleMatch) {
+      const ogTitle = ogTitleMatch[1];
+      console.log('✅ C&B: Found og:title:', ogTitle);
 
-  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      url,
-      formats: ['html'],
-      waitFor: 2000, // Wait for JS to render
-    }),
-  });
+      // Parse year/make/model from beginning
+      const ymmMatch = ogTitle.match(/^(\d{4})\s+(\S+)\s+([^-]+)/);
+      if (ymmMatch) {
+        result.year = parseInt(ymmMatch[1], 10);
+        result.make = ymmMatch[2].trim();
+        result.model = ymmMatch[3].trim();
+        result.title = `${result.year} ${result.make} ${result.model}`;
+      }
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`Firecrawl error: ${response.status} - ${errorText.substring(0, 200)}`);
+      // Parse mileage from "~22,500 Miles" or "22,500 Miles"
+      const mileageMatch = ogTitle.match(/~?([\d,]+)\s*Miles/i);
+      if (mileageMatch) {
+        const mileageStr = mileageMatch[1].replace(/,/g, '');
+        result.mileage = parseInt(mileageStr, 10);
+        if (!Number.isFinite(result.mileage)) result.mileage = null;
+        console.log('✅ C&B: Extracted mileage from og:title:', result.mileage);
+      }
+
+      // Parse transmission from "6-Speed Manual" or "Automatic"
+      const transMatch = ogTitle.match(/(\d+-Speed\s+(?:Manual|Automatic)|Manual|Automatic)/i);
+      if (transMatch) {
+        result.transmission = transMatch[1];
+      }
+
+      // Parse color - usually after transmission, before last comma-separated item
+      const colorPatterns = [
+        /,\s*([A-Za-z\s]+(?:Pearl|Metallic|White|Black|Blue|Red|Green|Yellow|Silver|Gray|Grey|Orange|Purple|Brown|Beige|Maroon|Gold|Bronze))\s*,/i,
+        /,\s*([A-Za-z\s]+(?:Pearl|Metallic))/i,
+      ];
+      for (const pattern of colorPatterns) {
+        const colorMatch = ogTitle.match(pattern);
+        if (colorMatch) {
+          result.exteriorColor = colorMatch[1].trim();
+          break;
+        }
+      }
+    }
+
+    // 2. Extract description from og:description
+    const ogDescMatch = html.match(/<meta[^>]*(?:property|name)=["'](?:og:)?description["'][^>]*content=["']([^"']+)["']/i);
+    if (ogDescMatch) {
+      result.description = ogDescMatch[1];
+    }
+
+    // 3. Extract images from media.carsandbids.com URLs
+    const imageMatches = html.matchAll(/https:\/\/media\.carsandbids\.com[^"'\s)]+\.(jpg|jpeg|png|webp)[^"'\s)]*/gi);
+    const seenImages = new Set<string>();
+    for (const match of imageMatches) {
+      const imgUrl = match[0].split('?')[0]; // Remove query params for dedup
+      if (!seenImages.has(imgUrl) && !imgUrl.includes('width=80')) {
+        seenImages.add(imgUrl);
+        result.images.push(match[0]); // Keep full URL with CDN params
+      }
+    }
+    console.log(`✅ C&B: Found ${result.images.length} images`);
+
+    // 4. Try to find VIN in rendered HTML (may require waitFor)
+    const vinPatterns = [
+      /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+      /data-vin=["']([A-HJ-NPR-Z0-9]{17})["']/i,
+      /"vin"[:\s]*["']([A-HJ-NPR-Z0-9]{17})["']/i,
+    ];
+    for (const pattern of vinPatterns) {
+      const vinMatch = html.match(pattern);
+      if (vinMatch && vinMatch[1].length === 17) {
+        result.vin = vinMatch[1].toUpperCase();
+        console.log('✅ C&B: Found VIN:', result.vin);
+        break;
+      }
+    }
+
+    // 5. Try to extract auction ID from URL in HTML for lot number
+    const lotMatch = html.match(/carsandbids\.com\/auctions\/([A-Za-z0-9]+)/i);
+    if (lotMatch) {
+      result.lotNumber = lotMatch[1];
+    }
+
+    // 6. Try __NEXT_DATA__ as fallback (in case C&B changes to Next.js SSR)
+    const nextDataMatch = html.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (nextDataMatch) {
+      try {
+        const data = JSON.parse(nextDataMatch[1]);
+        const auction = data?.props?.pageProps?.auction;
+        if (auction) {
+          console.log('✅ C&B: Found __NEXT_DATA__ auction data');
+          if (!result.vin && auction.vin) result.vin = auction.vin;
+          if (!result.mileage && auction.mileage) {
+            const m = parseInt(String(auction.mileage).replace(/[^0-9]/g, ''), 10);
+            if (Number.isFinite(m)) result.mileage = m;
+          }
+          if (!result.year && auction.year) result.year = auction.year;
+          if (!result.make && auction.make) result.make = auction.make;
+          if (!result.model && auction.model) result.model = auction.model;
+          if (!result.transmission && auction.transmission) result.transmission = auction.transmission;
+          if (!result.exteriorColor && (auction.exteriorColor || auction.color)) {
+            result.exteriorColor = auction.exteriorColor || auction.color;
+          }
+          if (!result.location && auction.location) result.location = auction.location;
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+  } catch (e) {
+    console.error('⚠️ C&B: Error extracting data:', e);
   }
 
-  const data = await response.json();
-  if (!data.success || !data.data?.html) {
-    throw new Error(`Firecrawl returned no HTML: ${JSON.stringify(data).substring(0, 200)}`);
-  }
-
-  console.log(`✅ C&B: Firecrawl returned ${data.data.html.length} chars of HTML`);
-  return { html: data.data.html, status: 200 };
+  return result;
 }
 
 async function trySaveHtmlSnapshot(args: {
@@ -297,25 +295,38 @@ serve(async (req) => {
     console.log(`extract-cars-and-bids-core: Processing ${listingUrlCanonical}`);
 
     // Fetch HTML using Firecrawl (C&B blocks direct fetch)
-    let html = "";
-    let httpStatus: number = 200;
+    // Use longer waitFor to allow React app to render
+    const firecrawlResult = await firecrawlScrape(
+      {
+        url: listingUrlNorm,
+        formats: ['html'],
+        onlyMainContent: false,
+        waitFor: 5000, // Wait 5 seconds for React to render
+      },
+      {
+        apiKey: firecrawlApiKey,
+        timeoutMs: 60000,
+        maxAttempts: 2,
+      }
+    );
 
-    try {
-      const fetched = await fetchWithFirecrawl(listingUrlNorm, firecrawlApiKey);
-      html = fetched.html;
-      httpStatus = fetched.status;
-    } catch (e: any) {
+    const html = firecrawlResult.data?.html || '';
+    const httpStatus = firecrawlResult.httpStatus;
+
+    if (!html || html.length < 1000) {
       await trySaveHtmlSnapshot({
         supabase,
         listingUrl: listingUrlNorm,
-        httpStatus: null,
+        httpStatus,
         success: false,
-        errorMessage: e?.message || "Firecrawl fetch failed",
-        html: null,
+        errorMessage: firecrawlResult.error || "Firecrawl returned insufficient HTML",
+        html: html || null,
         metadata: { extractor: "extract-cars-and-bids-core" },
       });
-      throw e;
+      throw new Error(firecrawlResult.error || `Firecrawl returned insufficient HTML (${html?.length || 0} chars)`);
     }
+
+    console.log(`✅ C&B: Firecrawl returned ${html.length} chars of HTML`);
 
     // Save successful snapshot
     await trySaveHtmlSnapshot({
@@ -328,35 +339,44 @@ serve(async (req) => {
       metadata: { extractor: "extract-cars-and-bids-core" },
     });
 
-    // Extract data from __NEXT_DATA__
-    const extracted = extractFromNextData(html);
-    if (!extracted) {
+    // Extract data from HTML
+    const extracted = extractFromCarsAndBidsHtml(html);
+
+    // Check if we got minimum required data (year/make/model)
+    if (!extracted.year || !extracted.make || !extracted.model) {
+      console.warn('⚠️ C&B: Could not extract year/make/model');
+      // Try to parse from URL as fallback
+      const urlMatch = listingUrlCanonical.match(/\/(\d{4})-([^/]+)$/i);
+      if (urlMatch) {
+        extracted.year = parseInt(urlMatch[1], 10);
+        const slugParts = urlMatch[2].split('-');
+        if (slugParts.length >= 2) {
+          extracted.make = slugParts[0].charAt(0).toUpperCase() + slugParts[0].slice(1);
+          extracted.model = slugParts.slice(1).join(' ');
+        }
+      }
+    }
+
+    // Still no year/make? Return error
+    if (!extracted.year || !extracted.make) {
       return new Response(JSON.stringify({
         success: false,
-        error: "Could not extract data from __NEXT_DATA__",
+        error: "Could not extract vehicle identity (year/make/model)",
         listing_url: listingUrlCanonical,
+        html_length: html.length,
       }), {
         status: 422,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fill in year/make/model from title if not present
-    let { year, make, model } = extracted;
-    if ((!year || !make || !model) && extracted.title) {
-      const parsed = parseYearMakeModelFromTitle(extracted.title);
-      year = year || parsed.year;
-      make = make || parsed.make;
-      model = model || parsed.model;
-    }
-
-    console.log(`✅ C&B: Extracted - Year: ${year}, Make: ${make}, Model: ${model}, VIN: ${extracted.vin || 'N/A'}, Mileage: ${extracted.mileage || 'N/A'}`);
+    console.log(`✅ C&B: Extracted - Year: ${extracted.year}, Make: ${extracted.make}, Model: ${extracted.model}, VIN: ${extracted.vin || 'N/A'}, Mileage: ${extracted.mileage || 'N/A'}`);
 
     // Prepare vehicle data
     const vehicleData: Record<string, any> = {
-      year,
-      make,
-      model,
+      year: extracted.year,
+      make: extracted.make,
+      model: extracted.model,
       vin: extracted.vin,
       mileage: extracted.mileage,
       exterior_color: extracted.exteriorColor,
@@ -441,7 +461,7 @@ serve(async (req) => {
     // Upsert images
     let imagesInserted = 0;
     if (vehicleId && extracted.images.length > 0) {
-      const imageRows = extracted.images.map((url, idx) => ({
+      const imageRows = extracted.images.slice(0, 50).map((url, idx) => ({
         vehicle_id: vehicleId,
         image_url: url,
         display_order: idx,
@@ -530,9 +550,9 @@ serve(async (req) => {
       vehicle_id: vehicleId,
       created,
       extracted: {
-        year,
-        make,
-        model,
+        year: extracted.year,
+        make: extracted.make,
+        model: extracted.model,
         vin: extracted.vin,
         mileage: extracted.mileage,
         exterior_color: extracted.exteriorColor,
