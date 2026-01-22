@@ -264,8 +264,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const currentBid = parseMoneyNumber(v.current_bid);
     
     // Asking price (only if for sale)
-    const asking = (typeof v.asking_price === 'number' && v.asking_price > 0 && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale'))
-      ? v.asking_price
+    const saleStatus = String(v.sale_status || '').toLowerCase();
+    const askingPrice = parseMoneyNumber(v.asking_price);
+    const isForSaleStatus = saleStatus === 'for_sale' || saleStatus === 'available';
+    const asking = (askingPrice !== null && (v.is_for_sale === true || isForSaleStatus))
+      ? askingPrice
       : null;
 
     // PRIORITY ORDER (pro semantics):

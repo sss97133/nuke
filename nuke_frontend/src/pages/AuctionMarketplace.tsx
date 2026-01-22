@@ -136,6 +136,7 @@ export default function AuctionMarketplace() {
     const nowMsLocal = Date.now();
     const maxReasonableEndMs = 60 * 24 * 60 * 60 * 1000; // 60 days
     const externalStaleMs = 6 * 60 * 60 * 1000; // 6 hours
+    const externalEndPastGraceMs = 10 * 60 * 1000; // 10 minutes
     const allListings: AuctionListing[] = [];
     let hiddenNoBids = 0;
     let hiddenBadData = 0;
@@ -163,11 +164,12 @@ export default function AuctionMarketplace() {
             stale = nowMsLocal - updatedAt.getTime() > externalStaleMs;
           }
           const status = String(params.status || '').toLowerCase();
-          if (['active', 'live'].includes(status) && diff < 0) {
-            return { endTime: null, isStale: stale };
+          const isLiveStatus = ['active', 'live'].includes(status);
+          if (isLiveStatus && diff < -externalEndPastGraceMs) {
+            return { endTime: null, isStale: true };
           }
-          if (status && !['active', 'live'].includes(status) && diff < 0) {
-            return { endTime: null, isStale: stale };
+          if (status && !isLiveStatus && diff < 0) {
+            return { endTime: null, isStale: true };
           }
           // If telemetry is stale and the end time is already in the past, hide it.
           if (stale && diff < -5 * 60 * 1000) {
@@ -280,6 +282,37 @@ export default function AuctionMarketplace() {
         return Number.isFinite(bidCents) && bidCents > 0;
       };
 
+      const parseNumeric = (value: any): number => {
+        if (typeof value === 'number') return value;
+        const s = String(value ?? '').trim();
+        if (!s) return NaN;
+        return Number(s.replace(/[$,]/g, ''));
+      };
+
+      const isExternalSoldListing = (listing: any): boolean => {
+        const status = String(listing?.listing_status || '').toLowerCase();
+        const inactiveStatuses = new Set([
+          'sold',
+          'ended',
+          'cancelled',
+          'no_sale',
+          'reserve_not_met',
+          'withdrawn',
+          'expired',
+          'closed',
+          'archived',
+        ]);
+        if (inactiveStatuses.has(status)) return true;
+
+        const finalPrice = parseNumeric(listing?.final_price);
+        if (Number.isFinite(finalPrice) && finalPrice > 0) return true;
+
+        const soldAt = listing?.sold_at ? new Date(listing.sold_at) : null;
+        if (soldAt && Number.isFinite(soldAt.getTime())) return true;
+
+        return false;
+      };
+
       const nowYear = new Date().getFullYear();
       const isNonVehicleListing = (vehicle: AuctionListing['vehicle']) => {
         const kind = String(vehicle?.listing_kind || '').trim().toLowerCase();
@@ -330,15 +363,15 @@ export default function AuctionMarketplace() {
             trim,
             mileage,
             primary_image_url,
-            body_style,
-            bat_comments,
-            bat_views
+            body_style
           `;
       const extendedVehicleSelect = `
             ${baseVehicleSelect},
             canonical_vehicle_type,
             canonical_body_style,
-            listing_kind
+            listing_kind,
+            bat_comments,
+            bat_views
           `;
       const getMissingColumn = (err: any): string | null => {
         const message = String(err?.message || '');
@@ -351,7 +384,12 @@ export default function AuctionMarketplace() {
         let result = await runner(extendedVehicleSelect);
         if (result.error) {
           const missing = getMissingColumn(result.error);
-          if (missing && ['canonical_vehicle_type', 'canonical_body_style', 'listing_kind'].includes(missing)) {
+          if (
+            missing &&
+            ['canonical_vehicle_type', 'canonical_body_style', 'listing_kind', 'bat_comments', 'bat_views'].includes(
+              missing
+            )
+          ) {
             result = await runner(baseVehicleSelect);
           }
         }
@@ -456,6 +494,11 @@ export default function AuctionMarketplace() {
       if (!externalError && externalListings) {
         for (const listing of externalListings) {
           const currentHighBidCents = listing.current_bid ? Math.round(Number(listing.current_bid) * 100) : null;
+
+          // Always hide sold/ended external listings regardless of status.
+          if (isExternalSoldListing(listing)) {
+            continue;
+          }
 
           // Marketplace rule: don't show auctions with no bids.
           if (

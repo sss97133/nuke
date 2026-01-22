@@ -188,21 +188,52 @@ async function insertTimelineEvent(
     image_urls?: string[] | null;
   }
 ) {
-  const { error } = await supabase
-    .from('timeline_events')
-    .insert({
-      vehicle_id: payload.vehicle_id,
-      user_id: payload.user_id || null,
-      event_type: payload.event_type || 'other',
-      event_date: safeEventDate(payload.event_date),
-      title: payload.title,
-      description: payload.description || null,
-      source: payload.source || 'comment_extraction',
-      metadata: payload.metadata || {},
-      image_urls: payload.image_urls || null
-    });
+  const record = {
+    vehicle_id: payload.vehicle_id,
+    user_id: payload.user_id || null,
+    event_type: payload.event_type || 'other',
+    event_date: safeEventDate(payload.event_date),
+    title: payload.title,
+    description: payload.description || null,
+    source: payload.source || 'comment_extraction',
+    metadata: payload.metadata || {},
+    image_urls: payload.image_urls || null
+  };
 
-  return error;
+  let primaryError: any = null;
+  let secondaryError: any = null;
+  let secondaryOk = false;
+
+  try {
+    const primary = await supabase.from('timeline_events').insert(record);
+    primaryError = primary.error;
+  } catch (err) {
+    primaryError = err;
+  }
+
+  try {
+    const secondary = await supabase.from('vehicle_timeline_events').insert(record);
+    secondaryError = secondary.error;
+    secondaryOk = !secondaryError;
+  } catch (err) {
+    secondaryError = err;
+  }
+
+  if (!primaryError || secondaryOk) return null;
+
+  const msg = String(secondaryError?.message || secondaryError || '').toLowerCase();
+  const ignorableSecondary =
+    msg.includes('view') ||
+    msg.includes('read-only') ||
+    msg.includes('schema cache') ||
+    msg.includes('does not exist') ||
+    msg.includes('relation') ||
+    msg.includes('not found');
+
+  if (ignorableSecondary) return primaryError;
+
+  console.warn(`vehicle_timeline_events insert failed: ${secondaryError?.message || secondaryError}`);
+  return primaryError;
 }
 
 async function upsertResearchItem(
