@@ -252,12 +252,16 @@ async function trySaveHtmlSnapshot(args: {
       ...(metadata || {}),
     };
 
+    // Use insert (not upsert) - constraint name differs from expected
     const { error } = await supabase
       .from("listing_page_snapshots")
-      .upsert(payload, { onConflict: "platform,listing_url" });
+      .insert(payload);
 
     if (error) {
-      console.warn(`⚠️ C&B: Failed to save snapshot: ${error.message}`);
+      // Ignore duplicate key errors (just means we already have a snapshot)
+      if (!error.message?.includes('duplicate key')) {
+        console.warn(`⚠️ C&B: Failed to save snapshot: ${error.message}`);
+      }
     }
   } catch (e: any) {
     console.warn(`⚠️ C&B: Snapshot save failed: ${e?.message}`);
@@ -398,7 +402,6 @@ serve(async (req) => {
 
     // Check for existing vehicle by URL
     let vehicleId = providedVehicleId;
-    const urlKey = normalizeListingUrlKey(listingUrlCanonical);
 
     const { data: existingByUrl } = await supabase
       .from("vehicles")
