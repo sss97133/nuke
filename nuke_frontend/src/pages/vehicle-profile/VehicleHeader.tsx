@@ -50,6 +50,15 @@ const parseMoneyNumber = (val: any): number | null => {
   return null;
 };
 
+const formatLivePlatformLabel = (provider?: string | null, platform?: string | null) => {
+  if (provider === 'mux') return 'Nuke Live';
+  if (!platform) return 'Live';
+  if (platform === 'twitch') return 'Twitch';
+  if (platform === 'youtube') return 'YouTube';
+  if (platform === 'custom') return 'Live';
+  return platform;
+};
+
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
   isOwner,
@@ -4136,6 +4145,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       {(() => {
         const v: any = vehicle as any;
         const streamUrl = liveSession?.stream_url ? String(liveSession.stream_url).trim() : '';
+        const streamProvider = liveSession?.stream_provider ? String(liveSession.stream_provider).trim() : '';
+        const platformLabel = formatLivePlatformLabel(streamProvider || undefined, liveSession?.platform || undefined);
         const hasStream = Boolean(streamUrl);
 
         const pulseUrl = auctionPulse?.listing_url ? String(auctionPulse.listing_url).trim() : '';
@@ -4268,7 +4279,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   rel="noopener noreferrer"
                   className="button button-small"
                   style={{ fontSize: '8pt', fontWeight: 800, fontFamily: 'monospace', whiteSpace: 'nowrap' }}
-                  title={liveSession?.platform ? `Watch live (${liveSession.platform})` : 'Watch live'}
+                  title={platformLabel ? `Watch live (${platformLabel})` : 'Watch live'}
                   onClick={(e) => e.stopPropagation()}
                 >
                   WATCH
