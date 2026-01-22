@@ -144,7 +144,178 @@ Classic.com            |     51  (NEW - was Unknown)
 
 ---
 
-### Loop 4 - [PENDING]
+### Loop 4 - Aggregator Hierarchy Fix
+**Task**: Properly model aggregators like Classic.com as "source of sources"
+
+**Problem**:
+- Classic.com had 103 entries all named "Classic.com"
+- Each was actually a different dealer ON Classic.com
+- `parent_aggregator` field existed but was unused
+
+**Solution**:
+1. Created master Classic.com marketplace entry
+2. Extracted dealer names from URLs (e.g., `/s/atomic-motors-hash/` → "Atomic Motors")
+3. Set `parent_aggregator = 'Classic.com'` for all 97 dealers
+
+**New Hierarchy**:
+```
+AGGREGATORS (marketplaces hosting dealers)
+├── Classic.com → 97 dealers
+├── Hemmings → 1 dealer
+
+DIRECT SOURCES
+├── Auctions (15): BaT, C&B, Mecum...
+├── Marketplaces (17): Classic.com, Hemmings...
+├── Dealers (246): Beverly Hills Car Club...
+└── Classifieds (3): Craigslist, KSL Cars...
+```
+
+---
+
+## SESSION SUMMARY - 2026-01-22
+
+### What We Fixed
+
+| Area | Before | After |
+|------|--------|-------|
+| Unknown Source vehicles | 3,888 | 196 (95% ↓) |
+| scrape_sources.listing_url_pattern | 0% populated | 100% populated |
+| import_queue.source_id | 8,791 missing | 0 missing |
+| Aggregator hierarchy | Not modeled | parent_aggregator in use |
+| Auto-classification triggers | None | 2 installed |
+
+### Architecture Now In Place
+
+```
+URL ingested
+    ↓
+import_queue trigger matches against scrape_sources.listing_url_pattern
+    ↓
+source_id FK set automatically
+    ↓
+Vehicle created
+    ↓
+auction_source set via get_auction_source_from_url()
+    ↓
+Aggregator relationship tracked via parent_aggregator
+```
+
+### Remaining Work
+
+1. **Dedupe scrape_sources** - Can't delete due to FK constraints, need migration strategy
+2. **Clean up garbage names** - Some entries still have URL-like names
+3. **Normalize BaT entries** - Multiple entries for same auction site
+4. **Extraction accuracy** - VIN, mileage, images still need improvement
+
+---
+
+### Loop 5 - SBX Cars Extraction Gap Analysis
+**Task**: 2.1-2.3 - Diagnose extraction gaps by reading extractor code
+
+**Extractor Analyzed**: `/supabase/functions/scrape-sbxcars/index.ts` (1,267 lines)
+
+**CRITICAL FINDING**: SBX Cars extractor is **completely missing VIN and mileage extraction**.
+
+The `SBXCarsListing` interface (line 13-52) has these fields:
+- ✅ url, title, year, make, model
+- ✅ price, current_bid, reserve_price
+- ✅ images[], description, highlights[]
+- ✅ lot_number, location, seller info
+- ✅ bidder_usernames[] (live auction data!)
+- ❌ **VIN - NOT PRESENT**
+- ❌ **mileage - NOT PRESENT**
+
+**HTML Evidence from User's Sample** (SBX Cars Ferrari F430):
+```
+VIN: ZFFEW59A960147070
+Mileage: 26,266 Miles
+Current bid: $75,000 (12 bids)
+Bid history with usernames: vollgaser5, jgr_pdk, SportsCarAffair, etc.
+Images: 99 photos
+```
+
+**Comparison with Other Extractors**:
+| Extractor | VIN | Mileage | Bid History |
+|-----------|-----|---------|-------------|
+| BaT Core | ✅ Line 296, 542-564 | ✅ Line 297, 543 | ✅ |
+| C&B Core | ✅ Line 56, 243-253 | ✅ Line 57, 125-131 | ✅ |
+| SBX Cars | ❌ **MISSING** | ❌ **MISSING** | ✅ (has bidder_usernames) |
+
+**Extraction Accuracy Impact** (from Loop 1 baseline):
+```
+SBX Cars: 32 vehicles
+- VIN:     0.0%  ← Extractor doesn't try to extract it
+- Mileage: 0.0%  ← Extractor doesn't try to extract it
+- Price:  59.4%  ← Works but incomplete
+```
+
+**Root Cause**: The SBX Cars extractor was built to capture auction/bid data but VIN and mileage fields were never added to the interface or extraction logic.
+
+**Fix Required**:
+1. Add `vin: string | null` to SBXCarsListing interface
+2. Add `mileage: number | null` to SBXCarsListing interface
+3. Add VIN extraction patterns (similar to BaT/C&B):
+   ```typescript
+   const vinPatterns = [
+     /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+     /data-vin=["']([A-HJ-NPR-Z0-9]{17})["']/i,
+   ];
+   ```
+4. Add mileage extraction:
+   ```typescript
+   const mileageMatch = text.match(/~?([\d,]+)\s*(?:Miles|mi)/i);
+   ```
+5. Deploy updated function: `supabase functions deploy scrape-sbxcars`
+
+---
+
+### Loop 6 - SBX Cars VIN/Mileage Fix
+**Task**: 3.0a-d - Add VIN and mileage extraction to SBX Cars extractor
+
+**Changes Made** to `/supabase/functions/scrape-sbxcars/index.ts`:
+
+1. **Added fields to interface** (lines 19-20):
+```typescript
+vin: string | null // VIN/chassis number (17 chars)
+mileage: number | null // Odometer reading
+```
+
+2. **Added VIN extraction** (lines 517-533):
+```typescript
+const vinPatterns = [
+  /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+  /Chassis[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+  /data-vin=["']([A-HJ-NPR-Z0-9]{17})["']/i,
+  /"vin"[:\s]*["']([A-HJ-NPR-Z0-9]{17})["']/i,
+  /Serial[:\s#]*([A-HJ-NPR-Z0-9]{17})/i,
+]
+```
+
+3. **Added mileage extraction** (lines 535-548):
+```typescript
+const mileagePatterns = [
+  /~?([\d,]+)\s*(?:Miles|mi)\b/i,
+  /Mileage[:\s]*([\d,]+)/i,
+  /Odometer[:\s]*([\d,]+)/i,
+  /"mileage"[:\s]*([\d,]+)/i,
+]
+```
+
+4. **Added to listing object** (lines 566-567):
+```typescript
+vin,
+mileage,
+```
+
+**Expected Impact**:
+- SBX Cars VIN: 0% → should improve significantly
+- SBX Cars mileage: 0% → should improve significantly
+
+**Next Step**: Deploy and test with `supabase functions deploy scrape-sbxcars`
+
+---
+
+### Loop 7 - [PENDING]
 *Next loop will start here*
 
 ---
