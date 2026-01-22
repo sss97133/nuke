@@ -92,6 +92,44 @@ export function getAuctionMode(vehicle: any): AuctionMode {
     }
   }
   
+  // Priority 1.5: sale_status fallback (some ingestion paths only set sale_status)
+  const saleStatus = String(vehicle?.sale_status || '').toLowerCase();
+  if (saleStatus) {
+    if (saleStatus === 'sold') {
+      return 'sold';
+    }
+    if (saleStatus === 'auction_live') {
+      const endDate = vehicle?.auction_end_date || vehicle?.origin_metadata?.auction_times?.auction_end_date;
+      if (endDate) {
+        const end = new Date(endDate).getTime();
+        if (Number.isFinite(end)) {
+          const secondsRemaining = (end - now) / 1000;
+          if (secondsRemaining > 0 && secondsRemaining < 60) {
+            return 'ending_soon';
+          }
+          if (end > now) {
+            return 'active_timer';
+          }
+          // If the end date already passed but status is still live, treat as ended.
+          return 'ended';
+        }
+      }
+      return 'active_live';
+    }
+    if (saleStatus === 'auction_pending' || saleStatus === 'auction_upcoming' || saleStatus === 'auction_scheduled') {
+      return 'scheduled';
+    }
+    if (saleStatus === 'auction_ended') {
+      const outcome = String(vehicle?.auction_outcome || '').toLowerCase();
+      if (outcome === 'sold') return 'sold';
+      if (outcome === 'reserve_not_met' || outcome === 'no_sale' || outcome === 'ended') return 'unsold';
+      return 'ended';
+    }
+    if (saleStatus === 'reserve_not_met' || saleStatus === 'no_sale') {
+      return 'unsold';
+    }
+  }
+  
   // Priority 2: Check vehicle-level auction data (fallback)
   const endDate = vehicle?.auction_end_date || vehicle?.origin_metadata?.auction_times?.auction_end_date;
   if (endDate) {

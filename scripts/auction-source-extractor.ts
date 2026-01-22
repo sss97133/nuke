@@ -55,8 +55,8 @@ interface DetailedAuctionProfile extends AuctionProfile {
   description: string | null;
 }
 
-// Target: 50 profiles per source for full extraction
-const TARGET_COUNT = 50;
+// Target: 500 profiles per source for full extraction
+const TARGET_COUNT = 500;
 
 // Whether to fetch full details from individual listing pages
 const FETCH_DETAILS = true;

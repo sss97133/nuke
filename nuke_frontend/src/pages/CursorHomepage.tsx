@@ -2640,6 +2640,7 @@ const CursorHomepage: React.FC = () => {
         const highBid = v.high_bid ? Number(v.high_bid) : null;
         const listing = auctionByVehicleId.get(String(v?.id || '')) || null;
         const listingStatus = String((listing as any)?.listing_status || '').toLowerCase();
+        const saleStatus = String(v.sale_status || '').toLowerCase();
         const isLive = listingStatus === 'active' || listingStatus === 'live';
         const listingLiveBid = typeof (listing as any)?.current_bid === 'number' ? (listing as any).current_bid : Number((listing as any)?.current_bid || 0);
         const finalPrice = typeof (listing as any)?.final_price === 'number' ? (listing as any).final_price : Number((listing as any)?.final_price || 0);
@@ -2658,7 +2659,7 @@ const CursorHomepage: React.FC = () => {
           (highBid && highBid > 0) ? highBid :
           (isLive && Number.isFinite(listingLiveBid) && listingLiveBid > 0) ? listingLiveBid :
           (Number.isFinite(finalPrice) && finalPrice > 0) ? finalPrice :
-          ((askingPrice && askingPrice > 0) && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale')) ? askingPrice :
+          ((askingPrice && askingPrice > 0) && (v.is_for_sale === true || saleStatus === 'for_sale' || saleStatus === 'available')) ? askingPrice :
           null; // Don't show a price if we don't have actual pricing data
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 

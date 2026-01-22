@@ -398,12 +398,30 @@ const VehicleTimeline: React.FC<{
       setLoading(true);
 
       // Load timeline events (actual work/events only, not photos)
-      const { data: timelineData, error: timelineError } = await supabase
+      let timelineData: any[] = [];
+      let timelineError: any = null;
+      const primaryResult = await supabase
         .from('vehicle_timeline_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('event_date', { ascending: false })
         .limit(200);
+      timelineData = primaryResult.data || [];
+      timelineError = primaryResult.error;
+
+      // Fallback to timeline_events if the view/table is missing or empty.
+      if (timelineError || (timelineData || []).length === 0) {
+        const fallbackResult = await supabase
+          .from('timeline_events')
+          .select('*')
+          .eq('vehicle_id', vehicleId)
+          .order('event_date', { ascending: false })
+          .limit(200);
+        if (!fallbackResult.error) {
+          timelineData = fallbackResult.data || [];
+          timelineError = null;
+        }
+      }
 
       // Load auction activity dates (comments and events)
       const { data: auctionDataRaw, error: auctionErr } = await supabase

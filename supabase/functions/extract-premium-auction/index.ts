@@ -223,6 +223,8 @@ function parseBatIdentityFromUrl(listingUrl: string): { year: number | null; mak
 function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   const h = String(html || "");
   const urls = new Set<string>();
+  const nextDataUrls = new Set<string>();
+  const minNextDataImages = 10;
   
   // Upgrade thumbnail/small URLs to full resolution
   const upgradeToFullRes = (url: string): string => {
@@ -262,7 +264,8 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     
     // CRITICAL: Exclude edit/preview/draft images - these are NOT final vehicle photos
     // Pattern: filename contains "(edit)", "(preview)", "(draft)", "edit)" without opening paren, etc.
-    if (lower.includes('(edit)') || lower.includes('(preview)') || lower.includes('(draft)') || 
+    if (lower.includes('(edit)') || lower.includes('(preview)') || lower.includes('(draft)') ||
+        lower.includes('%28edit%29') || lower.includes('%28preview%29') || lower.includes('%28draft%29') ||
         lower.includes('edit).') || lower.includes('preview).') || lower.includes('draft).') ||
         lower.match(/\(edit/i) || lower.match(/edit\)/i)) {
       return true;
@@ -335,6 +338,7 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     // Examples: 3vpGQDzR.O-8lX-AMW-(edit).jpg, 3vpGQDzR.m870SuvV7-(edit).jpg
     // Valid images typically have paths like: /photos/s-1pEmzwg32wR.jpg or /photos/exterior/...
     if (lower.includes('(edit)') || lower.includes('-(edit)') || lower.includes('(preview)') || lower.includes('(draft)') ||
+        lower.includes('%28edit%29') || lower.includes('%28preview%29') || lower.includes('%28draft%29') ||
         lower.includes('edit).') || lower.includes('preview).') || lower.includes('draft).') ||
         lower.match(/\(edit/i) || lower.match(/edit\)/i) || lower.match(/[\.\-]edit\)/i) || lower.match(/\(edit[\.\-]/i)) {
       return false;
@@ -542,8 +546,8 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   
   // Method 5: Extract from __NEXT_DATA__ (PRIORITY - Cars & Bids uses Next.js)
   try {
-    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
-    const nextDataMatch = h.match(nextDataPattern);
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/is;
+    const nextDataMatch = nextDataPattern.exec(h);
     if (nextDataMatch && nextDataMatch[1]) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]);
@@ -665,12 +669,17 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
                   const upgraded = upgradeToFullRes(url);
                   if (upgraded) {
                     urls.add(upgraded);
+                    nextDataUrls.add(upgraded);
                     // Also add variants
                     if (img && typeof img === 'object') {
                       const variants = [img.full, img.original, img.large, img.medium, img.highRes, img.high_res];
                       for (const variant of variants) {
                         if (variant && typeof variant === 'string' && isVehicleImage(variant)) {
-                          urls.add(upgradeToFullRes(variant));
+                          const upgradedVariant = upgradeToFullRes(variant);
+                          if (upgradedVariant) {
+                            urls.add(upgradedVariant);
+                            nextDataUrls.add(upgradedVariant);
+                          }
                         }
                       }
                     }
@@ -685,7 +694,10 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
         // Cars & Bids may store images in nested structures that direct paths miss
         const nextDataImages = findImagesInObject(auction || nextData);
         for (const img of nextDataImages) {
-          if (img) urls.add(img);
+          if (img) {
+            urls.add(img);
+            nextDataUrls.add(img);
+          }
         }
         
         if (urls.size > 0) {
@@ -785,7 +797,8 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   
   // CRITICAL: Prioritize exterior images over interior/engine bay shots
   // Sort URLs to put exterior shots first (they typically come first in gallery)
-  const sortedUrls = Array.from(urls);
+  const baseUrls = nextDataUrls.size >= minNextDataImages ? Array.from(nextDataUrls) : Array.from(urls);
+  const sortedUrls = baseUrls;
   
   // Filter and prioritize: exterior shots first, then others
   const exteriorUrls: string[] = [];
@@ -1165,8 +1178,8 @@ function extractCarsAndBidsBidHistory(html: string): Array<{ amount: number; tim
   
   // PRIORITY: Extract from __NEXT_DATA__ (Next.js embeds all data here)
   try {
-    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
-    const nextDataMatch = h.match(nextDataPattern);
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/is;
+    const nextDataMatch = nextDataPattern.exec(h);
     if (nextDataMatch && nextDataMatch[1]) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]);
@@ -1177,29 +1190,35 @@ function extractCarsAndBidsBidHistory(html: string): Array<{ amount: number; tim
                        nextData?.auction;
         
         if (auction) {
+          const bidArrays: any[] = [];
+          if (Array.isArray(auction.bids)) bidArrays.push(auction.bids);
+          if (Array.isArray(auction.bid_history)) bidArrays.push(auction.bid_history);
+          if (Array.isArray(auction.bidHistory)) bidArrays.push(auction.bidHistory);
+
+          const bidEdges =
+            auction.bids?.edges ||
+            auction.bid_history?.edges ||
+            auction.bidHistory?.edges;
+          if (Array.isArray(bidEdges)) bidArrays.push(bidEdges);
+
+          const bidNodes =
+            auction.bids?.nodes ||
+            auction.bid_history?.nodes ||
+            auction.bidHistory?.nodes;
+          if (Array.isArray(bidNodes)) bidArrays.push(bidNodes);
+
           // Extract bids from Next.js data
-          if (Array.isArray(auction.bids)) {
-            for (const bid of auction.bids) {
-              if (bid.amount && typeof bid.amount === 'number') {
-                bids.push({
-                  amount: bid.amount,
-                  timestamp: bid.timestamp || bid.created_at || bid.date,
-                  bidder: bid.bidder || bid.username || bid.user?.username,
-                });
-              }
-            }
-          }
-          
-          // Also check bid_history
-          if (Array.isArray(auction.bid_history)) {
-            for (const bid of auction.bid_history) {
-              if (bid.amount && typeof bid.amount === 'number') {
-                bids.push({
-                  amount: bid.amount,
-                  timestamp: bid.timestamp || bid.created_at || bid.date,
-                  bidder: bid.bidder || bid.username || bid.user?.username,
-                });
-              }
+          for (const arr of bidArrays) {
+            for (const raw of arr) {
+              const bid = raw?.node || raw;
+              const amountRaw = bid?.amount ?? bid?.bid_amount ?? bid?.value;
+              const amount = typeof amountRaw === 'number' ? amountRaw : parseInt(String(amountRaw || '').replace(/,/g, ''), 10);
+              if (!Number.isFinite(amount) || amount <= 0) continue;
+              bids.push({
+                amount,
+                timestamp: bid?.timestamp || bid?.created_at || bid?.date,
+                bidder: bid?.bidder || bid?.username || bid?.user?.username,
+              });
             }
           }
         }
@@ -1338,8 +1357,8 @@ function extractCarsAndBidsStructuredSections(html: string): {
   
   // PRIORITY: Extract from __NEXT_DATA__ (Next.js embeds all data here)
   try {
-    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
-    const nextDataMatch = h.match(nextDataPattern);
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/is;
+    const nextDataMatch = nextDataPattern.exec(h);
     if (nextDataMatch && nextDataMatch[1]) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]);
@@ -1540,8 +1559,8 @@ function extractCarsAndBidsBidders(html: string): Array<{ username: string; prof
   
   // PRIORITY: Extract from __NEXT_DATA__ (Next.js embeds all data here)
   try {
-    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
-    const nextDataMatch = h.match(nextDataPattern);
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/is;
+    const nextDataMatch = nextDataPattern.exec(h);
     if (nextDataMatch && nextDataMatch[1]) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]);
@@ -1695,6 +1714,14 @@ function extractCarsAndBidsComments(html: string): Array<{ author: string; text:
   };
 
   const findCommentsArray = (root: any): any[] | null => {
+    const looksLikeCommentsArray = (arr: any[]): boolean => {
+      if (!Array.isArray(arr) || arr.length === 0) return false;
+      const first = arr[0];
+      if (!first || typeof first !== 'object') return false;
+      const node = (first as any).node || first;
+      return Boolean(node?.text || node?.body || node?.content || node?.message);
+    };
+
     const seen = new Set<any>();
     const stack: Array<{ v: any; depth: number }> = [{ v: root, depth: 0 }];
     while (stack.length) {
@@ -1709,14 +1736,20 @@ function extractCarsAndBidsComments(html: string): Array<{ author: string; text:
         (v as any)?.comments,
         (v as any)?.commentThreads,
         (v as any)?.comment_threads,
+        (v as any)?.items,
+        (v as any)?.results,
+        (v as any)?.nodes,
       ];
       for (const arr of candidateArrays) {
-        if (Array.isArray(arr) && arr.length > 0) return arr;
+        if (looksLikeCommentsArray(arr)) return arr;
       }
 
       // Sometimes comments are in GraphQL relay structure
-      const edges = (v as any)?.comments?.edges;
-      if (Array.isArray(edges) && edges.length > 0) return edges;
+      const edges = (v as any)?.comments?.edges || (v as any)?.commentThreads?.edges || (v as any)?.comment_threads?.edges || (v as any)?.edges;
+      if (Array.isArray(edges) && edges.length > 0 && looksLikeCommentsArray(edges)) return edges;
+
+      const nodes = (v as any)?.comments?.nodes || (v as any)?.commentThreads?.nodes || (v as any)?.comment_threads?.nodes || (v as any)?.nodes;
+      if (Array.isArray(nodes) && nodes.length > 0 && looksLikeCommentsArray(nodes)) return nodes;
 
       // Traverse
       if (Array.isArray(v)) {
@@ -3211,8 +3244,8 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
           // Extract vehicle data from __NEXT_DATA__ (if not already extracted by Firecrawl)
           if (!vehicle || Object.keys(vehicle).length === 0) {
             try {
-              const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
-              const nextDataMatch = html.match(nextDataPattern);
+              const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/is;
+              const nextDataMatch = nextDataPattern.exec(html);
               if (nextDataMatch && nextDataMatch[1]) {
                 const nextData = JSON.parse(nextDataMatch[1]);
                 const auction = nextData?.props?.pageProps?.auction || 
@@ -5539,6 +5572,7 @@ async function insertVehicleImages(
     //   /photos/3vpGQDzR.m870SuvV7-(edit).jpg (editing preview - NOT a final photo)
     // Valid images typically have paths like: /photos/s-1pEmzwg32wR.jpg or /photos/exterior/...
     if (lower.includes('(edit)') || lower.includes('-(edit)') || lower.includes('(preview)') || lower.includes('(draft)') ||
+        lower.includes('%28edit%29') || lower.includes('%28preview%29') || lower.includes('%28draft%29') ||
         lower.includes('edit).') || lower.includes('preview).') || lower.includes('draft).') ||
         lower.match(/\(edit/i) || lower.match(/edit\)/i) || lower.match(/\(.*edit/i) ||
         lower.match(/[\.\-]edit\)/i) || lower.match(/\(edit[\.\-]/i)) {

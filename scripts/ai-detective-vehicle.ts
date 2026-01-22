@@ -154,7 +154,34 @@ async function main() {
     throw new Error(`Vehicle not found: ${vehicleError?.message || opts.vehicleId}`);
   }
 
-  const userId = opts.userId || vehicle.user_id || vehicle.uploaded_by || null;
+  let userId = opts.userId || vehicle.user_id || vehicle.uploaded_by || process.env.SERVICE_USER_ID || null;
+  const ensureUserId = async () => {
+    if (userId) {
+      try {
+        const { data } = await supabase.auth.admin.getUserById(userId);
+        if (data?.user?.id) return data.user.id;
+      } catch {
+        // fall through to lookup
+      }
+    }
+
+    try {
+      const { data: users } = await supabase.auth.admin.listUsers({ perPage: 1 });
+      if (users?.users?.[0]?.id) return users.users[0].id;
+    } catch {
+      // fall through
+    }
+
+    const { data: fallbackProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return fallbackProfile?.id || null;
+  };
+
+  userId = await ensureUserId();
   if (!userId) {
     throw new Error('No user_id available. Provide --user-id to seed the extraction queue.');
   }
@@ -205,6 +232,41 @@ async function main() {
     return;
   }
 
+  const explainError = (label: string, error: any) => {
+    const details = error
+      ? JSON.stringify(error, Object.getOwnPropertyNames(error))
+      : 'unknown';
+    console.warn(`${label}: ${details}`);
+    if (error) {
+      console.warn(label, {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+        status: error?.status,
+        statusCode: error?.statusCode
+      });
+    }
+  };
+
+  const { error: researchTableCheck } = await supabase
+    .from('vehicle_research_items')
+    .select('id', { count: 'exact', head: true })
+    .limit(1);
+  const researchTableAvailable = !researchTableCheck;
+  if (researchTableCheck) {
+    explainError('vehicle_research_items check failed', researchTableCheck);
+  }
+
+  const { error: queueCheckError } = await supabase
+    .from('content_extraction_queue')
+    .select('id', { count: 'exact', head: true })
+    .limit(1);
+  if (queueCheckError) {
+    explainError('content_extraction_queue check failed', queueCheckError);
+    throw new Error('content_extraction_queue not available; aborting seed.');
+  }
+
   const researchRows = urlList.map((url) => {
     const classification = classifyUrl(url);
     return {
@@ -226,11 +288,13 @@ async function main() {
     };
   });
 
-  const { error: researchError } = await supabase
-    .from('vehicle_research_items')
-    .upsert(researchRows, { onConflict: 'vehicle_id,source_url' });
-  if (researchError) {
-    console.warn(`vehicle_research_items insert failed: ${researchError.message}`);
+  if (researchTableAvailable) {
+    const { error: researchError } = await supabase
+      .from('vehicle_research_items')
+      .upsert(researchRows, { onConflict: 'vehicle_id,source_url' });
+    if (researchError) {
+      explainError('vehicle_research_items insert failed', researchError);
+    }
   }
 
   const rows = urlList.map((url) => {
@@ -257,7 +321,8 @@ async function main() {
     const chunk = rows.slice(i, i + chunkSize);
     const { error } = await supabase.from('content_extraction_queue').insert(chunk);
     if (error) {
-      throw new Error(`Failed to insert content_extraction_queue rows: ${error.message}`);
+      explainError('content_extraction_queue insert failed', error);
+      throw new Error('Failed to insert content_extraction_queue rows');
     }
   }
 
