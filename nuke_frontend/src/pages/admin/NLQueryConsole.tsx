@@ -4,8 +4,10 @@ import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useNavigate } from 'react-router-dom';
 
 type NLQResponse = {
-  query: string;
-  sql: string;
+  action?: 'clarify' | 'run' | 'reject';
+  clarification?: string;
+  query?: string;
+  sql?: string;
   explanation?: string;
   confidence?: number;
   rows?: Array<Record<string, any>>;
@@ -16,13 +18,19 @@ type NLQResponse = {
   error?: string;
 };
 
-type QueryTurn = {
+type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+  kind?: 'clarify' | 'result' | 'status';
+  resultId?: string;
+};
+
+type QueryResult = {
   id: string;
   question: string;
-  createdAt: string;
-  status: 'running' | 'done' | 'error';
-  response?: NLQResponse;
-  error?: string;
+  response: NLQResponse;
 };
 
 const EXAMPLES = [
@@ -39,22 +47,28 @@ export default function NLQueryConsole() {
   const [limit, setLimit] = useState(20);
   const [includeMerged, setIncludeMerged] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [turns, setTurns] = useState<QueryTurn[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [results, setResults] = useState<QueryResult[]>([]);
+  const [activeResultId, setActiveResultId] = useState<string | null>(null);
   const [showRaw, setShowRaw] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
 
-  const activeTurn = useMemo(() => {
-    if (!turns.length) return null;
-    if (activeId) {
-      const found = turns.find((t) => t.id === activeId);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const activeResult = useMemo(() => {
+    if (!results.length) return null;
+    if (activeResultId) {
+      const found = results.find((r) => r.id === activeResultId);
       if (found) return found;
     }
-    return turns[turns.length - 1];
-  }, [activeId, turns]);
+    return results[results.length - 1];
+  }, [activeResultId, results]);
 
-  const rows = activeTurn?.response?.rows || [];
+  const rows = activeResult?.response?.rows || [];
   const columns = useMemo(() => {
     if (!rows.length) return [];
     return Object.keys(rows[0]);
@@ -62,37 +76,46 @@ export default function NLQueryConsole() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [turns, loading]);
+  }, [messages, loading]);
 
   useEffect(() => {
     setShowRaw(false);
-  }, [activeId]);
+  }, [activeResultId]);
 
-  const summarizeTurn = (turn: QueryTurn) => {
-    if (turn.status === 'running') return 'Running query...';
-    if (turn.status === 'error') return turn.error || 'Query failed';
-    const rowCount = turn.response?.row_count ?? turn.response?.rows?.length ?? 0;
-    const explanation = turn.response?.explanation ? ` ${turn.response.explanation}` : '';
-    return `Returned ${rowCount} rows.${explanation}`;
+  const buildHistory = (nextMessages: ChatMessage[]) => {
+    return nextMessages
+      .filter((m) => m.role === 'user' || (m.role === 'assistant' && m.kind === 'clarify'))
+      .map((m) => ({ role: m.role, content: m.content }))
+      .slice(-12);
   };
 
   const runQuery = async (overrideQuery?: string) => {
     const question = (overrideQuery ?? query).trim();
     if (!question || loading) return;
     setLoading(true);
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const nextTurn: QueryTurn = {
-      id,
-      question,
-      createdAt: new Date().toISOString(),
-      status: 'running',
+    const now = new Date().toISOString();
+    const userId = `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const assistantId = `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const userMessage: ChatMessage = {
+      id: userId,
+      role: 'user',
+      content: question,
+      createdAt: now,
     };
-    setTurns((prev) => [...prev, nextTurn]);
-    setActiveId(id);
+    const pendingMessage: ChatMessage = {
+      id: assistantId,
+      role: 'assistant',
+      content: 'Running query...',
+      createdAt: now,
+      kind: 'status',
+    };
+    const nextMessages = [...messagesRef.current, userMessage];
+    setMessages((prev) => [...prev, userMessage, pendingMessage]);
     try {
       const { data, error: fnError } = await supabase.functions.invoke('nlq-sql', {
         body: {
           query: question,
+          history: buildHistory(nextMessages),
           limit,
           include_merged: includeMerged,
         },
@@ -100,20 +123,56 @@ export default function NLQueryConsole() {
 
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
-      setTurns((prev) =>
-        prev.map((t) =>
-          t.id === id
-            ? { ...t, status: 'done', response: data as NLQResponse }
-            : t
+      const action = String(data?.action || 'run').toLowerCase();
+      if (action === 'clarify') {
+        const clarification =
+          String(data?.clarification || data?.question || data?.explanation || '').trim() ||
+          'Could you clarify?';
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: clarification, kind: 'clarify' }
+              : m
+          )
+        );
+        setQuery('');
+        return;
+      }
+      if (action === 'reject') {
+        const reason = String(data?.explanation || 'Request is out of scope.').trim();
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: reason, kind: 'clarify' }
+              : m
+          )
+        );
+        setQuery('');
+        return;
+      }
+
+      const resultId = `r-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const response = data as NLQResponse;
+      const rowCount = response.row_count ?? response.rows?.length ?? 0;
+      const explanation = response.explanation ? ` ${response.explanation}` : '';
+      const summary = `Returned ${rowCount} rows.${explanation}`;
+
+      setResults((prev) => [...prev, { id: resultId, question, response }]);
+      setActiveResultId(resultId);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: summary, kind: 'result', resultId }
+            : m
         )
       );
       setQuery('');
     } catch (e: any) {
-      setTurns((prev) =>
-        prev.map((t) =>
-          t.id === id
-            ? { ...t, status: 'error', error: e?.message || 'Query failed' }
-            : t
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: e?.message || 'Query failed', kind: 'clarify' }
+            : m
         )
       );
     } finally {
@@ -122,11 +181,11 @@ export default function NLQueryConsole() {
   };
 
   const handleCopySql = async () => {
-    const sql = activeTurn?.response?.sql;
+    const sql = activeResult?.response?.sql;
     if (!sql) return;
     try {
       await navigator.clipboard.writeText(sql);
-      setCopiedId(activeTurn?.id || null);
+      setCopiedId(activeResult?.id || null);
       setTimeout(() => setCopiedId(null), 1200);
     } catch {
       // ignore copy errors
@@ -181,40 +240,31 @@ export default function NLQueryConsole() {
             Chat
           </div>
           <div className="card-body" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {turns.length === 0 && (
+            {messages.length === 0 && (
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                 Ask a question to start. You can keep multiple queries in this thread.
               </div>
             )}
-            {turns.map((turn) => (
-              <div key={turn.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
+            {messages.map((message) => (
+              <div key={message.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
                   <div style={{
-                    background: 'var(--accent)',
-                    color: 'var(--white)',
+                    background: message.role === 'user' ? 'var(--accent)' : 'var(--grey-50)',
+                    color: message.role === 'user' ? 'var(--white)' : 'var(--text)',
                     padding: '8px 10px',
                     borderRadius: '10px',
                     fontSize: '8pt',
+                    border: message.role === 'assistant' ? '1px solid var(--border-light)' : 'none',
                   }}>
-                    {turn.question}
+                    {message.content}
                   </div>
                 </div>
-                <div style={{ alignSelf: 'flex-start', maxWidth: '88%' }}>
-                  <div style={{
-                    background: 'var(--grey-50)',
-                    color: 'var(--text)',
-                    padding: '8px 10px',
-                    borderRadius: '10px',
-                    fontSize: '8pt',
-                    border: turn.id === activeId ? '1px solid var(--accent)' : '1px solid var(--border-light)',
-                  }}>
-                    {summarizeTurn(turn)}
-                  </div>
+                {message.role === 'assistant' && message.kind === 'result' && message.resultId && (
                   <button
                     type="button"
-                    onClick={() => setActiveId(turn.id)}
+                    onClick={() => setActiveResultId(message.resultId || null)}
                     style={{
-                      marginTop: '6px',
+                      marginLeft: message.role === 'user' ? 'auto' : 0,
                       border: 'none',
                       background: 'transparent',
                       color: 'var(--accent)',
@@ -225,7 +275,7 @@ export default function NLQueryConsole() {
                   >
                     View details →
                   </button>
-                </div>
+                )}
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -295,7 +345,11 @@ export default function NLQueryConsole() {
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
                 <button
                   className="button button-secondary"
-                  onClick={() => setTurns([])}
+                  onClick={() => {
+                    setMessages([]);
+                    setResults([]);
+                    setActiveResultId(null);
+                  }}
                   disabled={loading}
                   style={{ fontSize: '8pt', padding: '8px 12px' }}
                 >
@@ -319,32 +373,24 @@ export default function NLQueryConsole() {
             Research View
           </div>
           <div className="card-body" style={{ display: 'grid', gap: '12px' }}>
-            {!activeTurn && (
+            {!activeResult && (
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                 Ask a question to see SQL and results here.
               </div>
             )}
-            {activeTurn && (
+            {activeResult && (
               <>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                  <div><b>Question</b>: {activeTurn.question}</div>
-                  <div><b>Status</b>: {activeTurn.status}</div>
-                  {activeTurn.response && (
-                    <>
-                      <div><b>Rows</b>: {activeTurn.response.row_count ?? rows.length}</div>
-                      <div><b>Provider</b>: {activeTurn.response.provider || 'unknown'} {activeTurn.response.model ? `(${activeTurn.response.model})` : ''}</div>
-                      {activeTurn.response.explanation && <div><b>Explanation</b>: {activeTurn.response.explanation}</div>}
-                      {typeof activeTurn.response.confidence === 'number' && (
-                        <div><b>Confidence</b>: {activeTurn.response.confidence.toFixed(2)}</div>
-                      )}
-                    </>
-                  )}
-                  {activeTurn.status === 'error' && activeTurn.error && (
-                    <div style={{ color: '#b91c1c' }}>{activeTurn.error}</div>
+                  <div><b>Question</b>: {activeResult.question}</div>
+                  <div><b>Rows</b>: {activeResult.response.row_count ?? rows.length}</div>
+                  <div><b>Provider</b>: {activeResult.response.provider || 'unknown'} {activeResult.response.model ? `(${activeResult.response.model})` : ''}</div>
+                  {activeResult.response.explanation && <div><b>Explanation</b>: {activeResult.response.explanation}</div>}
+                  {typeof activeResult.response.confidence === 'number' && (
+                    <div><b>Confidence</b>: {activeResult.response.confidence.toFixed(2)}</div>
                   )}
                 </div>
 
-                {activeTurn.response?.sql && (
+                {activeResult.response?.sql && (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                       <div style={{ fontSize: '8pt', fontWeight: 600 }}>SQL</div>
@@ -353,7 +399,7 @@ export default function NLQueryConsole() {
                         onClick={handleCopySql}
                         style={{ fontSize: '8pt', padding: '6px 10px' }}
                       >
-                        {copiedId === activeTurn.id ? 'Copied' : 'Copy SQL'}
+                        {copiedId === activeResult.id ? 'Copied' : 'Copy SQL'}
                       </button>
                     </div>
                     <pre style={{
@@ -364,7 +410,7 @@ export default function NLQueryConsole() {
                       fontSize: '8pt',
                       border: '1px solid var(--border)',
                     }}>
-                      {activeTurn.response.sql}
+                      {activeResult.response.sql}
                     </pre>
                   </div>
                 )}
@@ -398,12 +444,12 @@ export default function NLQueryConsole() {
                     </div>
                   </div>
                 ) : (
-                  activeTurn.response && (
+                  activeResult.response && (
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>No rows returned.</div>
                   )
                 )}
 
-                {activeTurn.response && (
+                {activeResult.response && (
                   <div>
                     <button
                       className="button button-secondary"
@@ -422,7 +468,7 @@ export default function NLQueryConsole() {
                         fontSize: '8pt',
                         border: '1px solid var(--border)',
                       }}>
-                        {JSON.stringify(activeTurn.response, null, 2)}
+                        {JSON.stringify(activeResult.response, null, 2)}
                       </pre>
                     )}
                   </div>
