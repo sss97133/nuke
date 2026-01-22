@@ -19,8 +19,16 @@ Target: 5+ hours autonomous work
 
 ## PHASE 2: DIAGNOSE EXTRACTION GAPS (Loops 6-15)
 
-- [ ] **2.1** Read `extract-bat-core/index.ts` - document what fields it extracts
-- [ ] **2.2** Read `extract-cars-and-bids-core/index.ts` - document extraction patterns
+- [x] **2.1** Read `extract-bat-core/index.ts` - document what fields it extracts
+  - VIN: Line 296, 542-564 (regex patterns)
+  - Mileage: Line 297, 543 (parsed from listing details)
+- [x] **2.2** Read `extract-cars-and-bids-core/index.ts` - document extraction patterns
+  - VIN: Line 56, 243-253 (from __NEXT_DATA__ + regex)
+  - Mileage: Line 57, 125-131 (from og:title)
+- [x] **2.2b** Read `scrape-sbxcars/index.ts` - **CRITICAL GAP FOUND**
+  - ❌ VIN: NOT EXTRACTED (field doesn't exist in interface)
+  - ❌ Mileage: NOT EXTRACTED (field doesn't exist)
+  - ✅ Bidder usernames: Works
 - [ ] **2.3** Check C&B lazy-loading status - is it still broken?
 - [ ] **2.4** Read `process-import-queue/index.ts` - understand routing logic
 - [ ] **2.5** Identify which extractor handles Craigslist URLs
@@ -34,13 +42,27 @@ Target: 5+ hours autonomous work
 
 ## PHASE 3: FIX HIGHEST-IMPACT GAPS (Loops 16-30)
 
+### SBX Cars (CRITICAL - 0% VIN, 0% mileage)
+- [x] **3.0a** SBX: Add `vin: string | null` to SBXCarsListing interface (line 19)
+- [x] **3.0b** SBX: Add `mileage: number | null` to SBXCarsListing interface (line 20)
+- [x] **3.0c** SBX: Add VIN extraction patterns (regex + data attributes) (lines 517-533)
+- [x] **3.0d** SBX: Add mileage extraction from page text (lines 535-548)
+- [ ] **3.0e** SBX: Deploy and test: `supabase functions deploy scrape-sbxcars`
+
+### BaT (already high accuracy - 96.9% VIN, 96.8% mileage)
 - [ ] **3.1** BaT: Fix VIN extraction if missing (check __NEXT_DATA__ parsing)
 - [ ] **3.2** BaT: Fix mileage extraction if missing
 - [ ] **3.3** BaT: Ensure all gallery images are captured (not just first)
+
+### Cars & Bids (51% VIN, 49.5% mileage - needs improvement)
 - [ ] **3.4** C&B: Fix lazy-loading image extraction (use Playwright or Firecrawl)
 - [ ] **3.5** C&B: Extract VIN from __NEXT_DATA__ JSON
+
+### Craigslist (21.3% VIN, 10.6% mileage)
 - [ ] **3.6** Craigslist: Ensure location is extracted
 - [ ] **3.7** Craigslist: Ensure all images are captured
+
+### Validation
 - [ ] **3.8** Deploy updated extractors: `supabase functions deploy [name]`
 - [ ] **3.9** Test extraction on 3 sample URLs per source
 - [ ] **3.10** Validate improvements with accuracy query

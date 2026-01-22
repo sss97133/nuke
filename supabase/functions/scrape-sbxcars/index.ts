@@ -16,6 +16,8 @@ interface SBXCarsListing {
   year: number | null
   make: string | null
   model: string | null
+  vin: string | null // VIN/chassis number (17 chars)
+  mileage: number | null // Odometer reading
   amg_nomenclature: string | null // AMG, AMG Line, etc. (high signal field)
   transmission: string | null // 4matic+, etc.
   price: number | null
@@ -511,6 +513,44 @@ async function scrapeSBXCarsListing(
     const locationSection = doc?.querySelector('[class*="location"]')
     const location = locationSection?.textContent?.trim() || null
 
+    // Extract VIN - check multiple patterns common in auction sites
+    let vin: string | null = null
+    const vinPatterns = [
+      /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+      /Chassis[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+      /data-vin=["']([A-HJ-NPR-Z0-9]{17})["']/i,
+      /"vin"[:\s]*["']([A-HJ-NPR-Z0-9]{17})["']/i,
+      /Serial[:\s#]*([A-HJ-NPR-Z0-9]{17})/i,
+    ]
+    for (const pattern of vinPatterns) {
+      const vinMatch = html.match(pattern)
+      if (vinMatch && vinMatch[1] && vinMatch[1].length === 17) {
+        vin = vinMatch[1].toUpperCase()
+        console.log(`✅ SBX: Found VIN: ${vin}`)
+        break
+      }
+    }
+
+    // Extract mileage - check multiple patterns
+    let mileage: number | null = null
+    const mileagePatterns = [
+      /~?([\d,]+)\s*(?:Miles|mi)\b/i,
+      /Mileage[:\s]*([\d,]+)/i,
+      /Odometer[:\s]*([\d,]+)/i,
+      /"mileage"[:\s]*([\d,]+)/i,
+    ]
+    for (const pattern of mileagePatterns) {
+      const mileageMatch = html.match(pattern)
+      if (mileageMatch && mileageMatch[1]) {
+        const parsed = parseInt(mileageMatch[1].replace(/,/g, ''), 10)
+        if (Number.isFinite(parsed) && parsed > 0 && parsed < 1000000) {
+          mileage = parsed
+          console.log(`✅ SBX: Found mileage: ${mileage}`)
+          break
+        }
+      }
+    }
+
     // Extract images
     const images = extractImages(doc, url)
 
@@ -523,6 +563,8 @@ async function scrapeSBXCarsListing(
       year,
       make,
       model,
+      vin,
+      mileage,
       amg_nomenclature,
       transmission,
       price: currentBid,
