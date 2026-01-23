@@ -53,12 +53,12 @@ defmodule NukeApi.Bidding.Platforms.Behaviour do
 
   Returns {:ok, session} on success.
   Returns {:error, :invalid_credentials} if login fails.
-  Returns {:error, {:2fa_required, challenge}} if 2FA is needed.
+  Returns {:error, {:twofa_required, challenge}} if 2FA is needed.
   """
   @callback login(credentials :: credentials()) ::
     {:ok, session()} |
     {:error, :invalid_credentials} |
-    {:error, {:2fa_required, two_fa_challenge()}} |
+    {:error, {:twofa_required, two_fa_challenge()}} |
     {:error, term()}
 
   @doc """

@@ -76,7 +76,7 @@ defmodule NukeApi.Bidding.Platforms.Bat do
         cond do
           String.contains?(body, "two-factor") or String.contains?(body, "2fa") ->
             Logger.info("[BaT] 2FA required for: #{username}")
-            {:error, {:2fa_required, %{
+            {:error, {:twofa_required, %{
               method: "totp",
               challenge_data: %{},
               expires_at: DateTime.add(DateTime.utc_now(), 300, :second)
@@ -226,14 +226,14 @@ defmodule NukeApi.Bidding.Platforms.Bat do
         if valid_session_cookies?(merged_cookies) do
           {:ok, %{session | cookies: merged_cookies}}
         else
-          {:error, :2fa_failed}
+          {:error, :twofa_failed}
         end
 
       {:ok, %{status: 200, body: body}} ->
         if String.contains?(body, "invalid") or String.contains?(body, "incorrect") do
           {:error, :invalid_code}
         else
-          {:error, :2fa_failed}
+          {:error, :twofa_failed}
         end
 
       {:error, reason} ->

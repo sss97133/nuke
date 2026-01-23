@@ -705,8 +705,10 @@ defmodule NukeApiWeb.ScraperController do
             Map.put(row_acc, :drivetrain, String.downcase(td))
             
           th == "year" ->
+            max_year = Date.utc_today().year + 1
             case Integer.parse(td) do
-              {y, _} when y >= 1885 and y <= Date.utc_today().year + 1 -> Map.put(row_acc, :year, y)
+              {y, _} when y >= 1885 ->
+                if y <= max_year, do: Map.put(row_acc, :year, y), else: row_acc
               _ -> row_acc
             end
             

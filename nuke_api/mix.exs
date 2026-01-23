@@ -47,6 +47,9 @@ defmodule NukeApi.MixProject do
       {:bandit, "~> 1.5"},
       {:cors_plug, "~> 3.0"},
       {:httpoison, "~> 2.0"},
+      {:req, "~> 0.4"},                  # HTTP client for bidding
+      {:timex, "~> 3.7"},                # Date/time parsing
+      {:nimble_totp, "~> 1.0"},          # TOTP generation for 2FA
       {:floki, "~> 0.35"},
       {:joken, "~> 2.5"},               # JWT token handling
       {:jose, "~> 1.11"},               # Needed for JWKS (ES256/RS256) verification
