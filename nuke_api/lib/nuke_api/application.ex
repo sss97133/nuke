@@ -16,6 +16,8 @@ defmodule NukeApi.Application do
       {Finch, name: NukeApi.Finch},
       # Start AI-powered pricing analyst
       NukeApi.Pricing.AutomatedAnalyst,
+      # Start automated bidding system
+      NukeApi.Bidding.Supervisor,
       # Start to serve requests, typically the last entry
       NukeApiWeb.Endpoint
     ]
