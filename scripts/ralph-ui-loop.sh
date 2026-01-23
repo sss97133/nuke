@@ -68,8 +68,8 @@ Remember: ONE task per loop. Build. Deploy. Verify. Persist everything to files.
 IMPORTANT: Follow the design standards in UI_PROMPT.md for consistent typography and patterns."
 
     # Run Claude Code with the prompt
-    # Using --print to avoid interactive mode
-    claude --print "$ITERATION_PROMPT" 2>&1 | tee -a "$ACTIVITY_FILE"
+    # Using --print with --dangerously-skip-permissions for autonomous operation
+    claude --print --dangerously-skip-permissions "$ITERATION_PROMPT" 2>&1 | tee -a "$ACTIVITY_FILE"
 
     EXIT_CODE=$?
 

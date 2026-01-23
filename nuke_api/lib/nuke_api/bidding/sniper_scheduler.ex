@@ -222,12 +222,12 @@ defmodule NukeApi.Bidding.SniperScheduler do
     # Load proxy bid requests with snipe strategy
     query = """
       SELECT pbr.id, pbr.external_listing_id, pbr.max_bid_cents, pbr.platform,
-             el.auction_end_date
+             el.end_date
       FROM proxy_bid_requests pbr
       LEFT JOIN external_listings el ON el.id = pbr.external_listing_id
       WHERE pbr.bid_strategy = 'snipe_last_minute'
       AND pbr.status IN ('active', 'pending')
-      AND (el.auction_end_date IS NULL OR el.auction_end_date > NOW())
+      AND (el.end_date IS NULL OR el.end_date > NOW())
     """
 
     case Repo.query(query, []) do
@@ -298,7 +298,7 @@ defmodule NukeApi.Bidding.SniperScheduler do
     query = """
       SELECT pbr.id, pbr.user_id, pbr.external_listing_id, pbr.platform,
              pbr.external_auction_url, pbr.max_bid_cents, pbr.status,
-             el.auction_end_date
+             el.end_date
       FROM proxy_bid_requests pbr
       LEFT JOIN external_listings el ON el.id = pbr.external_listing_id
       WHERE pbr.id = $1
@@ -314,7 +314,7 @@ defmodule NukeApi.Bidding.SniperScheduler do
           external_auction_url: url,
           max_bid_cents: max_bid,
           status: status,
-          auction_end_date: end_date
+          end_date: end_date
         }}
 
       {:ok, %{rows: []}} ->

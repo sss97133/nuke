@@ -779,31 +779,13 @@ export default function AuctionMarketplace() {
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Live auctions across the network.
                 </div>
-                {!loading && debugCounts && (
+                {!loading && debugCounts && debugCounts.total > 0 && (
                   <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    Showing {debugCounts.total} (native {debugCounts.native} · external {debugCounts.external} · BaT {debugCounts.bat})
+                    {debugCounts.total} live auctions
                   </div>
                 )}
-                {!loading && hiddenNoBidCount > 0 && !includeNoBidAuctions && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {hiddenNoBidCount} live auctions hidden (0 bids). Enable "Include 0-bid" to show them.
-                  </div>
-                )}
-                {!loading && hiddenBadDataCount > 0 && !includeBadDataListings && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {hiddenBadDataCount} listings hidden due to incomplete profiles. Enable "Include incomplete" to review.
-                  </div>
-                )}
-                {!loading && hiddenExcludedTypeCount > 0 && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {hiddenExcludedTypeCount} listings hidden (motorcycles or non-vehicle items).
-                  </div>
-                )}
-                {!loading && hiddenStaleCount > 0 && !includeStaleAuctions && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {hiddenStaleCount} stale listings hidden. Enable "Include stale" to show them.
-                  </div>
-                )}
+{/* Hidden counts removed from UI for cleaner look */}
+{/* Stale count hidden from UI - internal metric only */}
               </div>
               {user && (
                 <button

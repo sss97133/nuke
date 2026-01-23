@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import ImageLightbox from '../image/ImageLightbox';
 import { ReferenceDocumentService, type ReferenceDocument } from '../../services/referenceDocumentService';
 import { useToast } from '../ui/Toast';
+import { CollapsibleWidget } from '../ui/CollapsibleWidget';
 
 interface ReferenceBook {
   id: string;
@@ -558,9 +559,11 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
   return (
     <>
       <section className="section" id="reference-library-section">
-        <div className="card">
-          <div className="card-header">Reference Documents</div>
-          <div className="card-body">
+        <CollapsibleWidget
+          title="Reference Documents"
+          defaultCollapsed={books.length === 0}
+          badge={books.length > 0 ? <span className="badge badge-secondary">{books.length}</span> : undefined}
+        >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* Upload Section - Only show if user is logged in */}
               {userId && (
@@ -892,11 +895,9 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                 </div>
               )}
             </div>
-            
-          </div>
-        </div>
+        </CollapsibleWidget>
       </section>
-      
+
       {/* ImageLightbox for flipping through pages */}
       {currentPage && (
         <ImageLightbox

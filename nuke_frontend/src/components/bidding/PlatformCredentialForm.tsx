@@ -287,11 +287,14 @@ export default function PlatformCredentialForm({
 
               {/* Username */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                <label htmlFor="platform-username" style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
                   Username / Email *
                 </label>
                 <input
+                  id="platform-username"
+                  name="username"
                   type="text"
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Your login username"
@@ -308,11 +311,14 @@ export default function PlatformCredentialForm({
 
               {/* Password */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                <label htmlFor="platform-password" style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
                   Password *
                 </label>
                 <input
+                  id="platform-password"
+                  name="password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Your login password"

@@ -12,7 +12,7 @@ Target: 5+ hours autonomous work (~75 loops)
 Make all left-column widgets collapsible with consistent design.
 
 ### Basic Pattern Setup
-- [ ] **1.1** Create reusable `CollapsibleWidget` component in `/components/ui/CollapsibleWidget.tsx`
+- [x] **1.1** Create reusable `CollapsibleWidget` component in `/components/ui/CollapsibleWidget.tsx`
 - [ ] **1.2** Export from components/ui/index.ts
 
 ### Widget Conversions (keep Basic Info as-is, it's fine)

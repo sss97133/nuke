@@ -70,7 +70,7 @@ async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing |
   try {
     // Use Firecrawl if available, otherwise direct fetch
     const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-    
+
     let html: string;
     if (FIRECRAWL_API_KEY) {
       const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
@@ -104,7 +104,7 @@ async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing |
 
     // Parse HTML using regex (basic extraction)
     // In production, you'd want to use a proper HTML parser or the scrape-vehicle function
-    
+
     const listing: PCarMarketListing = {
       url: normalizeUrl(url),
       title: '',
@@ -112,7 +112,7 @@ async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing |
     };
 
     // Extract title
-    const titleMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/i) || 
+    const titleMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/i) ||
                       html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (titleMatch) {
       listing.title = titleMatch[1].trim();
@@ -141,11 +141,15 @@ async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing |
     // Extract sale price (look for "Final bid: $X" or "High bid: $X")
     const finalBidMatch = html.match(/Final bid:\s*\$?([\d,]+)/i);
     const highBidMatch = html.match(/High bid:\s*\$?([\d,]+)/i);
+    const currentBidMatch = html.match(/Current bid:\s*\$?([\d,]+)/i);
     if (finalBidMatch) {
       listing.salePrice = parseInt(finalBidMatch[1].replace(/,/g, ''));
       listing.auctionOutcome = 'sold';
     } else if (highBidMatch) {
       listing.salePrice = parseInt(highBidMatch[1].replace(/,/g, ''));
+      listing.auctionOutcome = null;
+    } else if (currentBidMatch) {
+      listing.salePrice = parseInt(currentBidMatch[1].replace(/,/g, ''));
       listing.auctionOutcome = null;
     }
 
@@ -154,6 +158,74 @@ async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing |
     if (slugMatch) {
       listing.slug = slugMatch[1];
       listing.auctionId = slugMatch[1].split('-').pop() || undefined;
+    }
+
+    // Extract bid count
+    const bidCountMatch = html.match(/([\d,]+)\s+bids?/i) ||
+                          html.match(/bid(?:s)?[:\s]*([\d,]+)/i);
+    if (bidCountMatch) {
+      listing.bidCount = parseInt(bidCountMatch[1].replace(/,/g, ''));
+    }
+
+    // Extract view count
+    const viewCountMatch = html.match(/([\d,]+)\s+views?/i);
+    if (viewCountMatch) {
+      listing.viewCount = parseInt(viewCountMatch[1].replace(/,/g, ''));
+    }
+
+    // Extract auction end date - multiple patterns
+    // Pattern 1: data-countdown or data-end attributes (Unix timestamp)
+    const countdownMatch = html.match(/data-countdown\s*=\s*["'](\d+)["']/i) ||
+                          html.match(/data-end-time\s*=\s*["'](\d+)["']/i) ||
+                          html.match(/data-end\s*=\s*["'](\d+)["']/i);
+    if (countdownMatch) {
+      const ts = parseInt(countdownMatch[1], 10);
+      // Check if seconds or milliseconds
+      const timestamp = ts > 9999999999 ? ts : ts * 1000;
+      listing.auctionEndDate = new Date(timestamp).toISOString();
+    }
+
+    // Pattern 2: ISO date string in JSON or attributes
+    if (!listing.auctionEndDate) {
+      const isoDateMatch = html.match(/"endDate"\s*:\s*"([^"]+)"/i) ||
+                          html.match(/"end_date"\s*:\s*"([^"]+)"/i) ||
+                          html.match(/data-end-date\s*=\s*["']([^"']+)["']/i) ||
+                          html.match(/auction\s+ends?[:\s]+(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})/i);
+      if (isoDateMatch) {
+        try {
+          const parsed = new Date(isoDateMatch[1]);
+          if (!isNaN(parsed.getTime())) {
+            listing.auctionEndDate = parsed.toISOString();
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
+    // Pattern 3: "X days/hours remaining" text
+    if (!listing.auctionEndDate) {
+      const timeRemainingMatch = html.match(/(\d+)\s*(?:day|days)\s*(?:,?\s*(\d+)\s*(?:hour|hours))?(?:\s+remaining|\s+left)?/i) ||
+                                html.match(/(\d+)\s*(?:hour|hours)(?:\s+remaining|\s+left)?/i);
+      if (timeRemainingMatch) {
+        const days = parseInt(timeRemainingMatch[1], 10) || 0;
+        const hours = parseInt(timeRemainingMatch[2], 10) || 0;
+        const now = new Date();
+        // Check if it's hours-only match
+        if (/hour|hours/i.test(timeRemainingMatch[0]) && !timeRemainingMatch[2]) {
+          now.setHours(now.getHours() + days); // First capture is actually hours
+        } else {
+          now.setDate(now.getDate() + days);
+          now.setHours(now.getHours() + hours);
+        }
+        listing.auctionEndDate = now.toISOString();
+      }
+    }
+
+    // Extract seller username
+    const sellerMatch = html.match(/seller[:\s]+([a-zA-Z0-9_-]+)/i) ||
+                        html.match(/by\s+([a-zA-Z0-9_-]+)\s+on\s+pcarmarket/i) ||
+                        html.match(/member\/([a-zA-Z0-9_-]+)/i);
+    if (sellerMatch) {
+      listing.sellerUsername = sellerMatch[1];
     }
 
     return listing;

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { CollapsibleWidget } from '../ui/CollapsibleWidget';
 
 type FieldPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -132,35 +133,13 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
   };
 
   return (
-    <div id="vehicle-proof-tasks" className="card">
-      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowWhy((v) => !v);
-            }}
-            title={showWhy ? 'Hide explanation' : 'Why am I seeing this?'}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: 0,
-              margin: 0,
-              fontSize: 'inherit',
-              fontWeight: 800,
-              cursor: 'pointer',
-              color: 'inherit',
-            }}
-          >
-            Proof tasks
-          </button>
-        </span>
-        <span className="badge badge-secondary">{sortedGaps.length}</span>
-      </div>
-
-      <div className="card-body">
+    <div id="vehicle-proof-tasks">
+      <CollapsibleWidget
+        title="Proof Tasks"
+        defaultCollapsed={true}
+        badge={<span className="badge badge-secondary">{sortedGaps.length}</span>}
+      >
+        <div>
         {showWhy && (
           <div style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 10, background: 'var(--grey-50)', marginBottom: 12 }}>
             <div style={{ fontWeight: 800, fontSize: '9pt', marginBottom: 4 }}>
@@ -222,7 +201,8 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
             ))}
           </div>
         )}
-      </div>
+        </div>
+      </CollapsibleWidget>
 
       {openGap && (
         <div className="modal-overlay" onClick={closeModal}>

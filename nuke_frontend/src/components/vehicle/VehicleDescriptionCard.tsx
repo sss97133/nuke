@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FaviconIcon } from '../common/FaviconIcon';
+import { CollapsibleWidget } from '../ui/CollapsibleWidget';
 
 interface VehicleDescriptionCardProps {
   vehicleId: string;
@@ -273,20 +274,20 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
   const isEmpty = !description || description.trim().length === 0;
 
   return (
-    <div className="card">
-      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>Description</div>
-        {isEditable && !isEditing && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              className="btn-utility"
-              style={{ fontSize: '8px', padding: '2px 6px' }}
-              onClick={handleGenerate}
-              disabled={generating}
-              title="Generate a factual description from known vehicle data and evidence"
-            >
-              {generating ? 'Generating...' : 'Generate'}
-            </button>
+    <CollapsibleWidget
+      title="Description"
+      defaultCollapsed={false}
+      action={isEditable && !isEditing ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+          <button
+            className="btn-utility"
+            style={{ fontSize: '8px', padding: '2px 6px' }}
+            onClick={handleGenerate}
+            disabled={generating}
+            title="Generate a factual description from known vehicle data and evidence"
+          >
+            {generating ? 'Generating...' : 'Generate'}
+          </button>
           <button
             className="btn-utility"
             style={{ fontSize: '8px', padding: '2px 6px' }}
@@ -294,10 +295,10 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
           >
             Edit
           </button>
-          </div>
-        )}
-      </div>
-      <div className="card-body">
+        </div>
+      ) : undefined}
+    >
+      <div>
         {isEditing ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <textarea
@@ -504,7 +505,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </CollapsibleWidget>
   );
 };
 

@@ -159,21 +159,28 @@ serve(async (req) => {
       }
     }
 
-    // Update the listing
-    const { error: updateError } = await supabase
-      .from('external_listings')
-      .update({
+    // Build update object - only update end_date if we have a new value
+    // This preserves the original end_date for sold/ended auctions
+    const updateObj: Record<string, any> = {
         current_bid: currentBid,
         bid_count: bidCount,
         watcher_count: watcherCount,
         view_count: viewCount,
         listing_status: newStatus,
-        end_date: endDateIso,
         final_price: finalPrice,
         sold_at: finalPrice ? new Date().toISOString() : null,
         last_synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
+    };
+    // Only update end_date if we extracted a value (don't clear existing)
+    if (endDateIso) {
+        updateObj.end_date = endDateIso;
+    }
+
+    // Update the listing
+    const { error: updateError } = await supabase
+      .from('external_listings')
+      .update(updateObj)
       .eq('id', externalListingId);
 
     if (updateError) throw updateError;
