@@ -15,6 +15,7 @@ const CONFIG = {
   MAX_LISTINGS: 0,          // 0 = no limit
   HEADLESS: true,
   SKIP_IMAGE_DELETE: true,  // Skip slow delete for speed
+  REPROCESS_EXISTING: true, // Re-process existing vehicles to enrich data (VIN, price, comments)
 };
 
 interface SBXListing {
@@ -28,6 +29,9 @@ interface SBXListing {
   mileage: number | null;
   transmission: string | null;
   currentBid: number | null;
+  finalPrice: number | null;
+  bidCount: number | null;
+  highBidder: string | null;
   reserveMet: boolean | null;
   auctionEndDate: string | null;
   auctionStatus: string;
@@ -44,6 +48,20 @@ interface SBXListing {
   mechanical: any;
   condition: any;
   carfaxUrl: string | null;
+  comments: SBXComment[];
+}
+
+interface SBXComment {
+  commentId: number;
+  authorUsername: string;
+  authorUserProfileId: number;
+  commentText: string;
+  postedAt: string;
+  parentCommentId: number | null;
+  likeCount: number;
+  replyCount: number;
+  isSeller: boolean;
+  bidAmount: number | null;
 }
 
 // ============================================================================
@@ -100,8 +118,58 @@ async function discoverListings(page: Page): Promise<string[]> {
 // ============================================================================
 async function scrapeListing(page: Page, url: string): Promise<SBXListing | null> {
   try {
+    // Extract lot number from URL for API call
+    const lotMatch = url.match(/\/listing\/(\d+)\//);
+    const lotNumber = lotMatch ? lotMatch[1] : '';
+
+    // Set up API interception for comments
+    let capturedComments: SBXComment[] = [];
+
+    const responseHandler = async (response: any) => {
+      const responseUrl = response.url();
+      if (responseUrl.includes('/api/v1/Comments/GetAllListingComments')) {
+        try {
+          const json = await response.json();
+          if (json.Value && Array.isArray(json.Value)) {
+            capturedComments = json.Value.map((c: any) => {
+              // Extract text from Spans array
+              let commentText = '';
+              if (c.Text && c.Text.Spans && Array.isArray(c.Text.Spans)) {
+                commentText = c.Text.Spans.map((s: any) => s.Text || '').join('').trim();
+              }
+
+              return {
+                commentId: c.CommentId,
+                authorUsername: c.CachedAuthorUsername || 'Anonymous',
+                authorUserProfileId: c.AuthorUserProfileId,
+                commentText,
+                postedAt: c.CreatedAt, // Actual field name is CreatedAt
+                parentCommentId: c.IsReply ? c.ParentCommentId : null,
+                likeCount: c.CachedThumbsUpCount || 0,
+                replyCount: c.Replies?.length || 0,
+                isSeller: c.CachedAuthorIsListingOwner || false,
+                bidAmount: null, // SBX doesn't include bid in comment API
+              };
+            });
+            console.log(`   Captured ${capturedComments.length} comments from API`);
+          }
+        } catch (e) {
+          console.log(`   Comment API error: ${e}`);
+        }
+      }
+    };
+
+    page.on('response', responseHandler);
+
     await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
     await page.waitForTimeout(2000);
+
+    // Trigger comments API by looking for comments section
+    await page.evaluate(() => {
+      // Scroll down to potentially trigger lazy loading
+      window.scrollTo(0, document.body.scrollHeight / 2);
+    });
+    await page.waitForTimeout(1500);
 
     // Wait for content to load
     await page.waitForSelector('h1, .auction-title, [class*="title"]', { timeout: 10000 }).catch(() => {});
@@ -162,20 +230,94 @@ async function scrapeListing(page: Page, url: string): Promise<SBXListing | null
       }
     }
 
-    // Get current bid from page text
-    let currentBid: number | null = null;
-    const bidMatch = pageText.match(/Current\s+Bid[:\s]*\$?([\d,]+)/i) ||
-                     pageText.match(/High\s+Bid[:\s]*\$?([\d,]+)/i) ||
-                     pageText.match(/Bid[:\s]*\$?([\d,]+)/i);
-    if (bidMatch) {
-      currentBid = parseInt(bidMatch[1].replace(/,/g, ''));
+    // Get VIN from schema.org JSON-LD first (most reliable)
+    let vin: string | null = null;
+    const schemaVin = await page.evaluate(() => {
+      const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const script of scripts) {
+        try {
+          const json = JSON.parse(script.textContent || '');
+          if (json.vehicleIdentificationNumber) {
+            return json.vehicleIdentificationNumber;
+          }
+          if (json['@type'] === 'Car' && json.vehicleIdentificationNumber) {
+            return json.vehicleIdentificationNumber;
+          }
+        } catch {}
+      }
+      return null;
+    });
+    if (schemaVin) {
+      vin = schemaVin;
+    } else {
+      // Fallback to page text
+      const vinMatch = pageText.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i);
+      if (vinMatch) {
+        vin = vinMatch[1];
+      }
     }
 
-    // Get VIN
-    let vin: string | null = null;
-    const vinMatch = pageText.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i);
-    if (vinMatch) {
-      vin = vinMatch[1];
+    // Get current bid and bidder from bid-counter-container
+    let currentBid: number | null = null;
+    let finalPrice: number | null = null;
+    let highBidder: string | null = null;
+    let bidCount: number | null = null;
+
+    // Try to get from bid container element
+    const bidContainerText = await page.$eval('.bid-counter-container, [class*="bid-counter"]',
+      el => el.textContent?.trim()
+    ).catch(() => null);
+
+    if (bidContainerText) {
+      // Parse "US$75,000 Current bid by: REXDEX" or similar
+      const priceMatch = bidContainerText.match(/\$?([\d,]+)/);
+      if (priceMatch) {
+        currentBid = parseInt(priceMatch[1].replace(/,/g, ''));
+      }
+      const bidderMatch = bidContainerText.match(/(?:by|bidder)[:\s]*([A-Za-z0-9_]+)/i);
+      if (bidderMatch) {
+        highBidder = bidderMatch[1];
+      }
+    }
+
+    // Get bid count from bids-count element
+    const bidCountText = await page.$eval('.bids-count, [class*="bids-count"]',
+      el => el.textContent?.trim()
+    ).catch(() => null);
+
+    if (bidCountText) {
+      const countMatch = bidCountText.match(/(\d+)/);
+      if (countMatch) {
+        bidCount = parseInt(countMatch[1]);
+      }
+    }
+
+    // If no price yet, try page text
+    if (!currentBid) {
+      const bidMatch = pageText.match(/Current\s+Bid[:\s]*\$?([\d,]+)/i) ||
+                       pageText.match(/High\s+Bid[:\s]*\$?([\d,]+)/i) ||
+                       pageText.match(/(?:US)?\$\s*([\d,]+)/);
+      if (bidMatch) {
+        currentBid = parseInt(bidMatch[1].replace(/,/g, ''));
+      }
+    }
+
+    // Check for sold price - require minimum value to avoid model numbers (e.g. 911, 720)
+    const soldMatch = pageText.match(/Sold\s+(?:for\s+)?(?:US)?\$\s*([\d,]+)/i);
+    if (soldMatch) {
+      const potentialPrice = parseInt(soldMatch[1].replace(/,/g, ''));
+      // Only accept if > $1000 (avoids model numbers like 911, 720, 356)
+      if (potentialPrice > 1000) {
+        finalPrice = potentialPrice;
+      }
+    }
+
+    // Check for AED prices and convert to approximate USD
+    const aedMatch = pageText.match(/(?:AED|د\.إ)\s*([\d,]+)/i);
+    if (aedMatch && !finalPrice && !currentBid) {
+      const aedAmount = parseInt(aedMatch[1].replace(/,/g, ''));
+      // AED to USD is roughly 0.27
+      currentBid = Math.round(aedAmount * 0.27);
     }
 
     // Get mileage
@@ -220,45 +362,30 @@ async function scrapeListing(page: Page, url: string): Promise<SBXListing | null
     // Get Carfax URL
     const carfaxUrl = await page.$eval('a[href*="carfax.com"]', el => (el as HTMLAnchorElement).href).catch(() => null);
 
-    const data = {
-      title,
+    // Remove response handler to prevent memory leaks
+    page.removeListener('response', responseHandler);
+
+    return {
+      url,
+      lotNumber,
+      title: title || '',
       year,
       make,
       model,
       vin,
       mileage,
+      transmission: null,
       currentBid,
+      finalPrice,
+      bidCount,
+      highBidder,
       reserveMet,
+      auctionEndDate: null,
       auctionStatus,
-      location,
+      images,
       description,
       highlights,
-      carfaxUrl,
-      images,
-    };
-
-    // Extract lot number from URL
-    const lotMatch = url.match(/\/listing\/(\d+)\//);
-    const lotNumber = lotMatch ? lotMatch[1] : '';
-
-    return {
-      url,
-      lotNumber,
-      title: data.title || '',
-      year: data.year,
-      make: data.make,
-      model: data.model,
-      vin: data.vin,
-      mileage: data.mileage,
-      transmission: null,
-      currentBid: data.currentBid,
-      reserveMet: data.reserveMet,
-      auctionEndDate: null,
-      auctionStatus: data.auctionStatus,
-      images: data.images,
-      description: data.description,
-      highlights: data.highlights,
-      location: data.location,
+      location,
       sellerName: null,
       specialistName: null,
       overview: null,
@@ -267,7 +394,8 @@ async function scrapeListing(page: Page, url: string): Promise<SBXListing | null
       interior: null,
       mechanical: null,
       condition: null,
-      carfaxUrl: data.carfaxUrl,
+      carfaxUrl,
+      comments: capturedComments,
     };
   } catch (error: any) {
     console.error(`   Error scraping ${url}:`, error.message);
@@ -289,6 +417,9 @@ async function saveListing(listing: SBXListing): Promise<{ vehicleId: string | n
   const isNew = !existing;
   let vehicleId = existing?.id;
 
+  // Determine final price to store
+  const priceToStore = listing.finalPrice || listing.currentBid;
+
   if (isNew) {
     // Create new vehicle
     const { data: newVehicle, error } = await supabase
@@ -303,6 +434,7 @@ async function saveListing(listing: SBXListing): Promise<{ vehicleId: string | n
         description: listing.description?.substring(0, 5000),
         location: listing.location,
         high_bid: listing.currentBid,
+        sold_price: listing.finalPrice,
         auction_outcome: listing.auctionStatus,
         status: 'active',
         discovery_url: listing.url,
@@ -317,18 +449,23 @@ async function saveListing(listing: SBXListing): Promise<{ vehicleId: string | n
 
     vehicleId = newVehicle.id;
   } else {
-    // Update existing vehicle
+    // Update existing vehicle with new data
+    const updateData: any = {
+      auction_outcome: listing.auctionStatus,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update if we have values
+    if (listing.vin) updateData.vin = listing.vin;
+    if (listing.mileage) updateData.mileage = listing.mileage;
+    if (listing.description) updateData.description = listing.description.substring(0, 5000);
+    if (listing.location) updateData.location = listing.location;
+    if (listing.currentBid) updateData.high_bid = listing.currentBid;
+    if (listing.finalPrice) updateData.sold_price = listing.finalPrice;
+
     await supabase
       .from('vehicles')
-      .update({
-        vin: listing.vin || undefined,
-        mileage: listing.mileage || undefined,
-        description: listing.description?.substring(0, 5000) || undefined,
-        location: listing.location || undefined,
-        high_bid: listing.currentBid || undefined,
-        auction_outcome: listing.auctionStatus,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', vehicleId);
   }
 
@@ -391,6 +528,60 @@ async function saveListing(listing: SBXListing): Promise<{ vehicleId: string | n
     }
   }
 
+  // Save comments to auction_comments table
+  if (listing.comments.length > 0 && vehicleId) {
+    let commentsCreated = 0;
+    let commentsSkipped = 0;
+
+    for (const comment of listing.comments) {
+      // Create content hash for deduplication
+      const contentHash = Buffer.from(
+        `sbx_cars-${listing.lotNumber}-${comment.commentId}`
+      ).toString('base64').substring(0, 64);
+
+      // Check if already exists
+      const { data: existing } = await supabase
+        .from('auction_comments')
+        .select('id')
+        .eq('content_hash', contentHash)
+        .maybeSingle();
+
+      if (existing) {
+        commentsSkipped++;
+        continue;
+      }
+
+      // Map to valid comment_type: 'bid', 'sold', or 'observation'
+      const commentType = comment.bidAmount ? 'bid' : 'observation';
+
+      const { error: commentError, data: commentData } = await supabase
+        .from('auction_comments')
+        .insert({
+          vehicle_id: vehicleId,
+          platform: 'sbx_cars',
+          author_username: comment.authorUsername,
+          comment_text: comment.commentText?.substring(0, 5000),
+          posted_at: comment.postedAt,
+          comment_type: commentType,
+          is_seller: comment.isSeller,
+          comment_likes: comment.likeCount,
+          reply_count: comment.replyCount,
+          bid_amount: comment.bidAmount,
+          content_hash: contentHash,
+          source_url: listing.url,
+        })
+        .select();
+
+      if (commentError) {
+        console.log(`   Comment insert error: ${commentError.message}`);
+      } else {
+        commentsCreated++;
+      }
+    }
+
+    console.log(`   Comments: ${commentsCreated} created, ${commentsSkipped} skipped`);
+  }
+
   return { vehicleId, isNew };
 }
 
@@ -421,21 +612,29 @@ async function main() {
       return;
     }
 
-    // Filter out already processed listings
+    // Check which listings already exist in DB
     const { data: existingUrls } = await supabase
       .from('vehicles')
       .select('listing_url')
       .in('listing_url', listingUrls.slice(0, 1000)); // Check first 1000
 
     const existingSet = new Set(existingUrls?.map(v => v.listing_url) || []);
-    const newUrls = listingUrls.filter(url => !existingSet.has(url));
 
-    console.log(`New listings to process: ${newUrls.length} (${existingSet.size} already in DB)`);
+    let toProcessUrls: string[];
+    if (CONFIG.REPROCESS_EXISTING) {
+      // Process all listings (new and existing) to enrich data
+      toProcessUrls = listingUrls;
+      console.log(`Processing ALL listings: ${listingUrls.length} (${existingSet.size} existing, will be enriched)`);
+    } else {
+      // Only process new listings
+      toProcessUrls = listingUrls.filter(url => !existingSet.has(url));
+      console.log(`New listings to process: ${toProcessUrls.length} (${existingSet.size} already in DB)`);
+    }
 
     // Limit if configured
     const toProcess = CONFIG.MAX_LISTINGS > 0
-      ? newUrls.slice(0, CONFIG.MAX_LISTINGS)
-      : newUrls;
+      ? toProcessUrls.slice(0, CONFIG.MAX_LISTINGS)
+      : toProcessUrls;
 
     // Step 2: Scrape and save each listing
     console.log('\nPHASE 2: EXTRACTION');
@@ -468,7 +667,12 @@ async function main() {
             updated++;
             console.log(`   📝 Updated: ${listing.year} ${listing.make} ${listing.model}`);
           }
-          console.log(`   Images: ${listing.images.length}, Bid: $${listing.currentBid?.toLocaleString() || 'N/A'}`);
+          const priceStr = listing.finalPrice
+            ? `Sold: $${listing.finalPrice.toLocaleString()}`
+            : listing.currentBid
+              ? `Bid: $${listing.currentBid.toLocaleString()}`
+              : 'No price';
+          console.log(`   VIN: ${listing.vin || 'N/A'}, ${priceStr}, Images: ${listing.images.length}, Comments: ${listing.comments.length}`);
         } else {
           errors++;
           console.log('   ❌ Failed to save');

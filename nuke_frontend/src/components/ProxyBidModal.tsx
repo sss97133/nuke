@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import BuyerAgencyAgreement from './BuyerAgencyAgreement';
+import { PlatformCredentialForm } from './bidding';
 import {
   calculateCommissionCents,
   formatCommissionRate,
@@ -31,12 +32,14 @@ interface ProxyBidModalProps {
 
 export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }: ProxyBidModalProps) {
   const { user } = useAuth();
-  const [step, setStep] = useState<'check' | 'agreement' | 'bid' | 'confirm' | 'success'>('check');
+  const [step, setStep] = useState<'check' | 'credentials' | 'agreement' | 'bid' | 'confirm' | 'success'>('check');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [hasActiveAgreement, setHasActiveAgreement] = useState(false);
   const [agreementId, setAgreementId] = useState<string | null>(null);
+  const [hasPlatformCredentials, setHasPlatformCredentials] = useState(false);
+  const [showCredentialForm, setShowCredentialForm] = useState(false);
 
   // Bid form
   const [maxBid, setMaxBid] = useState<string>('');
@@ -58,14 +61,28 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
   const commissionAmount = commissionCents / 100;
   const commissionRateRounded = Number(commissionRate.toFixed(2));
 
-  // Check for existing agreement
+  // Check for existing agreement and platform credentials
   useEffect(() => {
     if (!isOpen || !user) return;
 
-    const checkAgreement = async () => {
+    const checkRequirements = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        // Check for platform credentials (for automated bidding)
+        const { data: credData } = await supabase
+          .from('platform_credentials')
+          .select('id, status')
+          .eq('user_id', user.id)
+          .eq('platform', listing.platform)
+          .eq('status', 'active')
+          .limit(1)
+          .single();
+
+        const hasCredentials = !!credData;
+        setHasPlatformCredentials(hasCredentials);
+
+        // Check for buyer agency agreement
+        const { data: agreementData } = await supabase
           .from('buyer_agency_agreements')
           .select('id')
           .eq('user_id', user.id)
@@ -74,10 +91,16 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
           .limit(1)
           .single();
 
-        if (data && !error) {
+        if (agreementData) {
           setHasActiveAgreement(true);
-          setAgreementId(data.id);
-          setStep('bid');
+          setAgreementId(agreementData.id);
+
+          // If we have credentials, go to bid step; otherwise prompt for credentials
+          if (hasCredentials) {
+            setStep('bid');
+          } else {
+            setStep('credentials');
+          }
         } else {
           setHasActiveAgreement(false);
           setStep('agreement');
@@ -90,8 +113,8 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
       }
     };
 
-    checkAgreement();
-  }, [isOpen, user]);
+    checkRequirements();
+  }, [isOpen, user, listing.platform]);
 
   const handleAgreementComplete = (newAgreementId: string) => {
     setAgreementId(newAgreementId);
@@ -199,7 +222,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
         style={{
           background: 'var(--surface)',
           borderRadius: '8px',
-          maxWidth: step === 'agreement' ? '750px' : '500px',
+          maxWidth: step === 'agreement' ? '750px' : step === 'credentials' ? '450px' : '500px',
           width: '100%',
           maxHeight: '90vh',
           overflow: 'auto'
@@ -215,7 +238,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
           alignItems: 'center'
         }}>
           <h2 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>
-            {step === 'agreement' ? 'Buyer Agency Agreement' : 'Place Proxy Bid'}
+            {step === 'agreement' ? 'Buyer Agency Agreement' : step === 'credentials' ? 'Add Platform Login' : 'Place Proxy Bid'}
           </h2>
           <button
             onClick={onClose}
@@ -261,6 +284,106 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
               onComplete={handleAgreementComplete}
               onCancel={onClose}
             />
+          )}
+
+          {/* Credentials step */}
+          {step === 'credentials' && (
+            <div>
+              <div style={{
+                background: '#fef3c7',
+                border: '1px solid #fcd34d',
+                padding: '12px',
+                borderRadius: '4px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px' }}>
+                  Platform Login Required
+                </div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                  To bid automatically on {getPlatformName(listing.platform)}, we need your login credentials.
+                  Your credentials are encrypted and stored securely.
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                marginBottom: '16px',
+                padding: '12px',
+                background: 'var(--surface-hover)',
+                borderRadius: '4px'
+              }}>
+                {listing.vehicle.primary_image_url && (
+                  <img
+                    src={listing.vehicle.primary_image_url}
+                    alt=""
+                    style={{
+                      width: '80px',
+                      height: '60px',
+                      objectFit: 'cover',
+                      borderRadius: '4px'
+                    }}
+                  />
+                )}
+                <div>
+                  <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                    {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
+                  </div>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    on {getPlatformName(listing.platform)}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={onClose}
+                  style={{ fontSize: '9pt' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => setShowCredentialForm(true)}
+                  style={{ fontSize: '9pt', flex: 1 }}
+                >
+                  Add {getPlatformName(listing.platform)} Login
+                </button>
+              </div>
+
+              {/* Skip option */}
+              <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setStep('bid')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    fontSize: '8pt',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Skip for now (manual execution required)
+                </button>
+              </div>
+
+              {/* Credential form modal */}
+              <PlatformCredentialForm
+                isOpen={showCredentialForm}
+                onClose={() => setShowCredentialForm(false)}
+                platform={listing.platform}
+                onSaved={() => {
+                  setShowCredentialForm(false);
+                  setHasPlatformCredentials(true);
+                  setStep('bid');
+                }}
+              />
+            </div>
           )}
 
           {/* Bid form step */}

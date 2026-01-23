@@ -1,14 +1,8 @@
 /**
  * C&B HISTORICAL AUCTION DISCOVERY
  * =================================
- * Scrapes the past-auctions archive to discover all historical auctions.
- * Cars & Bids launched mid-2020, estimated 25,000-35,000 total auctions.
- *
- * Strategy:
- * 1. Paginate through past-auctions pages
- * 2. Extract auction URLs from each page
- * 3. Store in database for later full extraction
- * 4. Track which pages have been scraped
+ * Discovers all 33k+ past auctions from Cars & Bids via API interception
+ * Uses Playwright to bypass Cloudflare, then captures API responses
  */
 
 import { chromium, Page } from 'playwright';
@@ -22,213 +16,200 @@ const supabase = createClient(
 );
 
 const CONFIG = {
-  BASE_URL: 'https://carsandbids.com/past-auctions/',
-  MAX_PAGES: 500,        // Safety limit
-  DELAY_BETWEEN_PAGES: 3000,
-  HEADLESS: false,
+  SCROLL_DELAY: 1500,
+  MAX_SCROLLS: 800,
+  HEADLESS: false,  // Need visible browser to pass Cloudflare
 };
 
-// Extraction script for past-auctions page
-const EXTRACT_AUCTIONS = `
-(function() {
-  var auctions = [];
-
-  // Find all auction cards/links
-  var links = document.querySelectorAll('a[href*="/auctions/"]');
-  var seen = {};
-
-  for (var i = 0; i < links.length; i++) {
-    var href = links[i].href;
-
-    // Skip if not a valid auction URL
-    if (!href.match(/\\/auctions\\/[A-Za-z0-9]+\\//)) continue;
-
-    // Skip duplicates
-    if (seen[href]) continue;
-    seen[href] = true;
-
-    // Extract auction ID from URL
-    var idMatch = href.match(/\\/auctions\\/([A-Za-z0-9]+)\\//);
-    var auctionId = idMatch ? idMatch[1] : null;
-
-    // Try to extract title from the link or nearby element
-    var title = links[i].textContent?.trim() || '';
-
-    // Look for year/make/model in URL
-    var ymmMatch = href.match(/\\/(\\d{4})-([^/]+)$/);
-    var urlTitle = ymmMatch ? ymmMatch[1] + ' ' + ymmMatch[2].replace(/-/g, ' ') : '';
-
-    if (auctionId) {
-      auctions.push({
-        url: href,
-        auctionId: auctionId,
-        title: title || urlTitle
-      });
-    }
-  }
-
-  // Check for pagination - look for "next" or page numbers
-  var hasNextPage = false;
-  var nextPageUrl = null;
-
-  var nextLinks = document.querySelectorAll('a[href*="page="], a.next, a[rel="next"]');
-  for (var j = 0; j < nextLinks.length; j++) {
-    var text = nextLinks[j].textContent?.toLowerCase() || '';
-    if (text.includes('next') || text.includes('>') || text.includes('»')) {
-      hasNextPage = true;
-      nextPageUrl = nextLinks[j].href;
-      break;
-    }
-  }
-
-  // Also check for numbered pagination
-  var pageLinks = document.querySelectorAll('a[href*="page="]');
-  var currentPage = 1;
-  var maxPage = 1;
-
-  for (var k = 0; k < pageLinks.length; k++) {
-    var pageMatch = pageLinks[k].href.match(/page=(\\d+)/);
-    if (pageMatch) {
-      var pageNum = parseInt(pageMatch[1], 10);
-      if (pageNum > maxPage) maxPage = pageNum;
-    }
-    if (pageLinks[k].classList.contains('active') || pageLinks[k].getAttribute('aria-current')) {
-      var curMatch = pageLinks[k].href.match(/page=(\\d+)/);
-      if (curMatch) currentPage = parseInt(curMatch[1], 10);
-    }
-  }
-
-  return {
-    auctions: auctions,
-    hasNextPage: hasNextPage || currentPage < maxPage,
-    nextPageUrl: nextPageUrl,
-    currentPage: currentPage,
-    maxPage: maxPage,
-    totalOnPage: auctions.length
-  };
-})()
-`;
-
-async function main() {
-  console.log('═══════════════════════════════════════════════════════════════════');
-  console.log('  C&B HISTORICAL AUCTION DISCOVERY');
-  console.log('═══════════════════════════════════════════════════════════════════\n');
-
-  const browser = await chromium.launch({ headless: CONFIG.HEADLESS });
-  const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-    viewport: { width: 1920, height: 1080 },
-  });
-  const page = await context.newPage();
-
-  // Warm up
-  console.log('Warming up on C&B...');
-  await page.goto('https://carsandbids.com', { waitUntil: 'load' });
-  for (let i = 0; i < 15; i++) {
-    const title = await page.title();
-    if (!title.includes('Just a moment')) break;
-    await page.waitForTimeout(1000);
-  }
-  await page.waitForTimeout(3000);
-
-  let totalDiscovered = 0;
-  let pageNum = 1;
-  let allAuctions: any[] = [];
-
-  console.log('Starting discovery...\n');
-
-  while (pageNum <= CONFIG.MAX_PAGES) {
-    const url = pageNum === 1
-      ? CONFIG.BASE_URL
-      : `${CONFIG.BASE_URL}?page=${pageNum}`;
-
-    console.log(`Page ${pageNum}: ${url}`);
-
-    try {
-      await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-
-      // Wait for Cloudflare
-      for (let i = 0; i < 15; i++) {
-        const title = await page.title();
-        if (!title.includes('Just a moment')) break;
-        await page.waitForTimeout(1000);
-      }
-      await page.waitForTimeout(2000);
-
-      const result = await page.evaluate(EXTRACT_AUCTIONS);
-
-      console.log(`  Found ${result.totalOnPage} auctions (max page: ${result.maxPage})`);
-
-      if (result.auctions.length === 0) {
-        console.log('  No auctions found - reached end or blocked');
-        break;
-      }
-
-      allAuctions.push(...result.auctions);
-      totalDiscovered += result.auctions.length;
-
-      // Save batch to database every 100 auctions
-      if (allAuctions.length >= 100) {
-        await saveDiscoveredAuctions(allAuctions);
-        allAuctions = [];
-      }
-
-      if (!result.hasNextPage) {
-        console.log('  No more pages');
-        break;
-      }
-
-      pageNum++;
-      await page.waitForTimeout(CONFIG.DELAY_BETWEEN_PAGES);
-
-    } catch (err: any) {
-      console.log(`  Error: ${err.message}`);
-      break;
-    }
-  }
-
-  // Save remaining
-  if (allAuctions.length > 0) {
-    await saveDiscoveredAuctions(allAuctions);
-  }
-
-  await browser.close();
-
-  console.log('\n═══════════════════════════════════════════════════════════════════');
-  console.log('  DISCOVERY COMPLETE');
-  console.log('═══════════════════════════════════════════════════════════════════');
-  console.log(`  Pages scraped: ${pageNum}`);
-  console.log(`  Auctions discovered: ${totalDiscovered}`);
+interface DiscoveredAuction {
+  id: string;
+  url: string;
+  title: string;
+  subTitle: string;
+  year?: number;
+  make?: string;
+  model?: string;
+  location?: string;
+  mileage?: string;
+  noReserve?: boolean;
 }
 
-async function saveDiscoveredAuctions(auctions: any[]) {
-  console.log(`    Saving ${auctions.length} auctions to queue...`);
+async function discoverAuctions(page: Page): Promise<DiscoveredAuction[]> {
+  const allAuctions: DiscoveredAuction[] = [];
+  const seenIds = new Set<string>();
 
-  // Check which ones we already have
-  const urls = auctions.map(a => a.url);
-  const { data: existing } = await supabase
-    .from('external_listings')
-    .select('listing_url')
-    .in('listing_url', urls);
+  // Intercept API responses
+  page.on('response', async response => {
+    const url = response.url();
+    if (url.includes('/v2/autos/auctions') && url.includes('status=closed')) {
+      try {
+        const json = await response.json();
+        if (json.auctions && Array.isArray(json.auctions)) {
+          for (const auction of json.auctions) {
+            if (!seenIds.has(auction.id)) {
+              seenIds.add(auction.id);
 
-  const existingUrls = new Set(existing?.map(e => e.listing_url) || []);
+              // Parse year/make/model from title
+              let year: number | undefined;
+              let make: string | undefined;
+              let model: string | undefined;
+              const titleMatch = auction.title?.match(/^(\d{4})\s+([A-Za-z-]+)\s+(.+)$/);
+              if (titleMatch) {
+                year = parseInt(titleMatch[1]);
+                make = titleMatch[2];
+                model = titleMatch[3];
+              }
+
+              allAuctions.push({
+                id: auction.id,
+                url: 'https://carsandbids.com/auctions/' + auction.id,
+                title: auction.title || '',
+                subTitle: auction.sub_title || '',
+                year,
+                make,
+                model,
+                location: auction.location,
+                mileage: auction.mileage,
+                noReserve: auction.no_reserve,
+              });
+            }
+          }
+          console.log('  API: +' + json.auctions.length + ' auctions (total: ' + allAuctions.length + '/' + json.total + ')');
+        }
+      } catch (e) {}
+    }
+  });
+
+  console.log('Navigating to past-auctions page...');
+  await page.goto('https://carsandbids.com/past-auctions/', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  });
+
+  await page.waitForTimeout(5000);
+
+  console.log('Scrolling to trigger API loads...');
+  let lastCount = 0;
+  let sameCountIterations = 0;
+
+  for (let i = 0; i < CONFIG.MAX_SCROLLS; i++) {
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(CONFIG.SCROLL_DELAY);
+
+    if (allAuctions.length === lastCount) {
+      sameCountIterations++;
+      if (sameCountIterations >= 15) {
+        console.log('No new auctions after 15 scrolls. Done.');
+        break;
+      }
+    } else {
+      sameCountIterations = 0;
+      lastCount = allAuctions.length;
+    }
+
+    if ((i + 1) % 100 === 0) {
+      console.log('  Scroll ' + (i + 1) + ': ' + allAuctions.length + ' auctions');
+    }
+  }
+
+  return allAuctions;
+}
+
+async function saveDiscoveredAuctions(auctions: DiscoveredAuction[]): Promise<void> {
+  console.log('\nPreparing to save ' + auctions.length + ' discovered auctions...');
+
+  const existingUrls = new Set<string>();
+  let offset = 0;
+  while (true) {
+    const { data } = await supabase
+      .from('vehicles')
+      .select('listing_url')
+      .ilike('listing_url', '%carsandbids%')
+      .range(offset, offset + 1000);
+
+    if (!data || data.length === 0) break;
+    data.forEach(v => { if (v.listing_url) existingUrls.add(v.listing_url); });
+    offset += 1000;
+  }
+
+  console.log('Found ' + existingUrls.size + ' existing C&B vehicles in database');
+
   const newAuctions = auctions.filter(a => !existingUrls.has(a.url));
+  console.log('New auctions to add: ' + newAuctions.length);
 
   if (newAuctions.length === 0) {
-    console.log(`    All ${auctions.length} already exist`);
+    console.log('No new auctions to add.');
     return;
   }
 
-  console.log(`    ${newAuctions.length} new, ${auctions.length - newAuctions.length} existing`);
+  let created = 0;
+  let errors = 0;
 
-  // For now, just log - full insertion would require vehicle creation
-  // This is a discovery script to understand the scale
-  for (const a of newAuctions.slice(0, 5)) {
-    console.log(`      NEW: ${a.title}`);
+  for (let i = 0; i < newAuctions.length; i += 25) {
+    const batch = newAuctions.slice(i, i + 25).map(a => ({
+      year: a.year || null,
+      make: a.make || 'Unknown',
+      model: a.model || 'Unknown',
+      listing_url: a.url,
+      location: a.location || null,
+      mileage: a.mileage ? parseInt(a.mileage.replace(/[^\d]/g, '')) : null,
+      status: 'pending_backfill',
+      discovery_url: a.url,
+    }));
+
+    const { error } = await supabase.from('vehicles').insert(batch);
+    if (error) {
+      for (const v of batch) {
+        const { error: e } = await supabase.from('vehicles').insert(v);
+        if (!e) created++;
+        else if (!e?.message.includes('duplicate')) errors++;
+      }
+    } else {
+      created += batch.length;
+    }
+
+    if ((i + 25) % 500 < 25) {
+      console.log('  Progress: ' + created + ' created, ' + errors + ' errors');
+    }
   }
-  if (newAuctions.length > 5) {
-    console.log(`      ... and ${newAuctions.length - 5} more`);
+
+  console.log('\nDone: ' + created + ' new vehicles created, ' + errors + ' errors');
+}
+
+async function main() {
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('  C&B HISTORICAL AUCTION DISCOVERY');
+  console.log('  Target: ~33,877 auctions');
+  console.log('═══════════════════════════════════════════════════════════════\n');
+
+  const browser = await chromium.launch({
+    headless: CONFIG.HEADLESS,
+    args: ['--disable-blink-features=AutomationControlled'],
+  });
+
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+  });
+
+  const page = await context.newPage();
+
+  try {
+    const auctions = await discoverAuctions(page);
+    console.log('\n✅ Discovered ' + auctions.length + ' total auctions\n');
+
+    console.log('Sample:');
+    auctions.slice(0, 5).forEach(a => {
+      console.log('  ' + a.year + ' ' + a.make + ' ' + a.model + ' (' + a.location + ')');
+    });
+
+    await saveDiscoveredAuctions(auctions);
+  } finally {
+    await browser.close();
   }
+
+  console.log('\n═══════════════════════════════════════════════════════════════');
+  console.log('  DISCOVERY COMPLETE');
+  console.log('═══════════════════════════════════════════════════════════════');
 }
 
 main().catch(console.error);
