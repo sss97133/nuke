@@ -184,20 +184,169 @@ function extractNextData(html: string): any | null {
 // CONTENT EXTRACTION (Contentful rich text)
 // ============================================================================
 
-function extractPlainText(contentfulNode: any): string {
-  if (!contentfulNode) return '';
+function decodeHtmlEntities(input: string): string {
+  const text = String(input || '');
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(Number(num)))
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&');
+}
 
+function stripHtmlTags(input: string): string {
+  return String(input || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<\/?[^>]+>/g, ' ');
+}
+
+function normalizeInlineText(input: string): string {
+  return decodeHtmlEntities(stripHtmlTags(input))
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')')
+    .trim();
+}
+
+function normalizeDescription(input: string): string {
+  return String(input || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function extractInlineText(contentfulNode: any): string {
+  if (!contentfulNode) return '';
   if (typeof contentfulNode === 'string') return contentfulNode;
+  if (contentfulNode.nodeType === 'text') return contentfulNode.value || '';
+  if (contentfulNode.content && Array.isArray(contentfulNode.content)) {
+    return contentfulNode.content.map(extractInlineText).join('');
+  }
+  return '';
+}
+
+function extractListItemText(contentfulNode: any): string {
+  if (!contentfulNode?.content || !Array.isArray(contentfulNode.content)) return '';
+  const parts: string[] = [];
+  for (const child of contentfulNode.content) {
+    if (child?.nodeType === 'unordered-list' || child?.nodeType === 'ordered-list') {
+      const nestedBlocks = extractBlocks(child);
+      if (nestedBlocks.length > 0) {
+        parts.push(nestedBlocks.join(' '));
+      }
+      continue;
+    }
+    const text = normalizeInlineText(extractInlineText(child));
+    if (text) parts.push(text);
+  }
+  return normalizeInlineText(parts.join(' '));
+}
+
+function extractBlocks(contentfulNode: any): string[] {
+  if (!contentfulNode) return [];
+
+  if (typeof contentfulNode === 'string') {
+    const text = normalizeInlineText(contentfulNode);
+    return text ? [text] : [];
+  }
 
   if (contentfulNode.nodeType === 'text') {
-    return contentfulNode.value || '';
+    const text = normalizeInlineText(contentfulNode.value || '');
+    return text ? [text] : [];
+  }
+
+  const nodeType = contentfulNode.nodeType || '';
+  if (nodeType === 'paragraph' || nodeType.startsWith('heading-')) {
+    const text = normalizeInlineText(extractInlineText(contentfulNode));
+    return text ? [text] : [];
+  }
+
+  if (nodeType === 'unordered-list' || nodeType === 'ordered-list') {
+    const items = Array.isArray(contentfulNode.content) ? contentfulNode.content : [];
+    const lines: string[] = [];
+    let idx = 1;
+    for (const item of items) {
+      if (item?.nodeType !== 'list-item') continue;
+      const text = extractListItemText(item);
+      if (!text) continue;
+      lines.push(nodeType === 'ordered-list' ? `${idx}. ${text}` : `- ${text}`);
+      idx += 1;
+    }
+    return lines.length > 0 ? [lines.join('\n')] : [];
+  }
+
+  if (nodeType === 'list-item') {
+    const text = extractListItemText(contentfulNode);
+    return text ? [text] : [];
   }
 
   if (contentfulNode.content && Array.isArray(contentfulNode.content)) {
-    return contentfulNode.content.map(extractPlainText).join('\n');
+    return contentfulNode.content.flatMap(extractBlocks);
   }
 
-  return '';
+  return [];
+}
+
+function extractPlainText(contentfulNode: any): string {
+  if (!contentfulNode) return '';
+  const blocks = extractBlocks(contentfulNode);
+  if (blocks.length === 0) return '';
+  return normalizeDescription(blocks.join('\n\n'));
+}
+
+// ============================================================================
+// COUNT NORMALIZATION
+// ============================================================================
+
+function normalizeCountValue(value: any): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.trunc(value));
+  }
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[^\d]/g, '');
+    if (!cleaned) return null;
+    const parsed = Number.parseInt(cleaned, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  if (value && typeof value === 'object') {
+    const total = (value as any).totalCount ?? (value as any).total ?? (value as any).count;
+    if (typeof total === 'number' && Number.isFinite(total)) return Math.max(0, Math.trunc(total));
+    if (typeof total === 'string') {
+      const cleaned = total.replace(/[^\d]/g, '');
+      if (cleaned) {
+        const parsed = Number.parseInt(cleaned, 10);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+    const nodes = (value as any).nodes;
+    if (Array.isArray(nodes)) return nodes.length;
+    const edges = (value as any).edges;
+    if (Array.isArray(edges)) return edges.length;
+    const items = (value as any).items;
+    if (Array.isArray(items)) return items.length;
+  }
+  return null;
+}
+
+function pickCount(...values: any[]): number {
+  for (const value of values) {
+    const normalized = normalizeCountValue(value);
+    if (typeof normalized === 'number') return normalized;
+  }
+  return 0;
 }
 
 // ============================================================================
@@ -283,11 +432,61 @@ function extractFromNextData(nextData: any, url: string): HagertyExtracted {
   const hasReserve = auction.hasReserve ?? false;  // Default to no reserve if null
   const reserveMet = auction.reserveMet ?? null;
 
-  // Counts
-  const bidCount = auction.successfulBidCount || auction.bidCount || 0;
-  const viewCount = auction.pageViews || 0;
-  const commentCount = auction.comments || 0;
-  const likeCount = auction.likes || 0;
+  // Counts (normalize across numeric, string, arrays, or nested objects)
+  const bidCount = pickCount(
+    auction?.successfulBidCount,
+    auction?.bidCount,
+    auction?.bid_count,
+    auction?.bidsCount,
+    auction?.totalBids,
+    auction?.numberOfBids,
+    auction?.numBids,
+    auction?.bids,
+    auction?.bidHistory,
+    auction?.biddingHistory,
+    auction?.bidActivity?.bids,
+    auction?.bidActivity?.history,
+    auction?.bidActivity?.totalBids,
+    item?.bidCount,
+    item?.bidsCount,
+    item?.bidHistory,
+  );
+  const viewCount = pickCount(
+    auction?.pageViews,
+    auction?.viewCount,
+    auction?.views,
+    auction?.totalViews,
+    auction?.pageViewCount,
+    item?.viewCount,
+    item?.views,
+  );
+  const commentCount = pickCount(
+    auction?.commentCount,
+    auction?.commentsCount,
+    auction?.comment_count,
+    auction?.totalComments,
+    auction?.numberOfComments,
+    auction?.numComments,
+    auction?.comments,
+    auction?.commentary,
+    auction?.commentThread?.comments,
+    auction?.commentThread?.items,
+    auction?.commentSummary,
+    item?.commentCount,
+    item?.commentsCount,
+    item?.comments,
+  );
+  const likeCount = pickCount(
+    auction?.likes,
+    auction?.likeCount,
+    auction?.like_count,
+    auction?.favorites,
+    auction?.favoriteCount,
+    auction?.favoritesCount,
+    item?.likeCount,
+    item?.likes,
+    item?.favorites,
+  );
 
   // Dates
   const auctionStart = auction.startDateTime || null;
@@ -704,6 +903,7 @@ serve(async (req) => {
             end_date: extracted.auction_end || null,  // Keep full ISO timestamp for countdown timer
             final_price: extracted.sale_price,
             bid_count: extracted.bid_count,
+            comment_count: extracted.comment_count,
             view_count: extracted.view_count,
             sold_at: extracted.status === 'sold' && extracted.auction_end ? extracted.auction_end : null,
             metadata: {

@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
-import { computePrimaryPrice, formatCurrency } from '../../services/priceSignalService';
+import { computePrimaryPrice, formatCurrency as formatUsdCurrency } from '../../services/priceSignalService';
+import { formatCurrencyAmount, resolveCurrencyCode } from '../../utils/currency';
 import { supabase } from '../../lib/supabase';
 // Deprecated modals (history/analysis/tag review) intentionally removed from UI
 import { VehicleValuationService } from '../../services/vehicleValuationService';
@@ -59,6 +60,67 @@ const formatLivePlatformLabel = (provider?: string | null, platform?: string | n
   return platform;
 };
 
+const normalizePartyHandle = (raw?: string | null): string | null => {
+  const h = String(raw || '').trim();
+  if (!h) return null;
+  const normalized = h
+    .replace(/^@/, '')
+    .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
+    .replace(/^https?:\/\/carsandbids\.com\/u\//i, '')
+    .replace(/^https?:\/\/www\.hagerty\.com\/marketplace\/profile\//i, '')
+    .replace(/^https?:\/\/pcarmarket\.com\/member\//i, '')
+    .replace(/\/+$/, '')
+    .trim();
+  return normalized || null;
+};
+
+const toTitleCase = (input: string) =>
+  input
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const formatAuctionHouseLabel = (platform?: string | null, host?: string | null, source?: string | null) => {
+  const raw = String(platform || source || host || '').trim();
+  if (!raw) return null;
+  const normalized = raw
+    .toLowerCase()
+    .replace(/^www\./, '')
+    .replace(/\.com$/, '')
+    .replace(/\s+/g, '_');
+  const map: Record<string, string> = {
+    bat: 'Bring a Trailer',
+    bringatrailer: 'Bring a Trailer',
+    bring_a_trailer: 'Bring a Trailer',
+    carsandbids: 'Cars & Bids',
+    cars_and_bids: 'Cars & Bids',
+    hagerty: 'Hagerty Marketplace',
+    hagerty_marketplace: 'Hagerty Marketplace',
+    pcarmarket: 'PCarMarket',
+    mecum: 'Mecum',
+    barrett_jackson: 'Barrett-Jackson',
+    barrettjackson: 'Barrett-Jackson',
+    rm_sothebys: "RM Sotheby's",
+    rmsothebys: "RM Sotheby's",
+    collecting_cars: 'Collecting Cars',
+    collectingcars: 'Collecting Cars',
+    sbxcars: 'SBX Cars',
+    broadarrow: 'Broad Arrow',
+    broad_arrow: 'Broad Arrow',
+    ebay_motors: 'eBay Motors',
+    ebay: 'eBay Motors',
+    facebook_marketplace: 'Facebook Marketplace',
+    facebook: 'Facebook Marketplace',
+    hemmings: 'Hemmings',
+    autotrader: 'AutoTrader',
+    classic: 'Classic.com',
+    classic_com: 'Classic.com',
+  };
+  if (map[normalized]) return map[normalized];
+  return toTitleCase(normalized.replace(/[_-]+/g, ' '));
+};
+
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
   isOwner,
@@ -112,6 +174,42 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const locationRef = useRef<HTMLDivElement>(null);
   const ownerClaimRef = useRef<HTMLDivElement>(null);
   const accessRef = useRef<HTMLDivElement>(null);
+  const auctionCurrency = useMemo(() => {
+    const v: any = vehicle as any;
+    const externalListing = v?.external_listings?.[0];
+    const pulseMeta = (auctionPulse as any)?.metadata;
+    return resolveCurrencyCode(
+      pulseMeta?.currency,
+      pulseMeta?.currency_code,
+      pulseMeta?.currencyCode,
+      pulseMeta?.price_currency,
+      pulseMeta?.priceCurrency,
+      externalListing?.currency,
+      externalListing?.currency_code,
+      externalListing?.price_currency,
+      externalListing?.metadata?.currency,
+      externalListing?.metadata?.currency_code,
+      externalListing?.metadata?.currencyCode,
+      externalListing?.metadata?.price_currency,
+      externalListing?.metadata?.priceCurrency,
+      v?.origin_metadata?.currency,
+      v?.origin_metadata?.currency_code,
+      v?.origin_metadata?.price_currency,
+      v?.origin_metadata?.priceCurrency,
+      v?.origin_metadata?.priceCurrencyCode,
+    );
+  }, [vehicle, auctionPulse]);
+  const formatCurrency = (value?: number | null) => {
+    if (auctionCurrency) {
+      return formatCurrencyAmount(value, {
+        currency: auctionCurrency,
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0,
+        fallback: '—',
+      });
+    }
+    return formatUsdCurrency(value);
+  };
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -2036,6 +2134,39 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
   })();
 
+  const auctionListingUrl =
+    String(
+      (auctionPulse as any)?.listing_url ||
+        (vehicle as any)?.bat_auction_url ||
+        (vehicle as any)?.listing_url ||
+        (vehicle as any)?.discovery_url ||
+        ''
+    ).trim() || null;
+  const auctionHost = (() => {
+    if (!auctionListingUrl) return null;
+    try {
+      const host = new URL(String(auctionListingUrl)).hostname;
+      return host.startsWith('www.') ? host.slice(4) : host;
+    } catch {
+      return null;
+    }
+  })();
+  const auctionHouseLabel = formatAuctionHouseLabel(
+    String((auctionPulse as any)?.platform || (vehicle as any)?.auction_source || '').trim() || null,
+    auctionHost,
+    listingSourceLabel || listingHost || null,
+  );
+  const headerLocationLabel =
+    (locationDisplay?.short && locationDisplay.short !== ':' ? locationDisplay.short : null) ||
+    listingLocation ||
+    (vehicle as any)?.bat_location ||
+    null;
+  const headerLocationTitle =
+    (locationDisplay?.full || locationDisplay?.short) ||
+    listingLocation ||
+    (vehicle as any)?.bat_location ||
+    null;
+
   const identityParts = vehicle ? [vehicle.year, vehicle.make].filter(Boolean) : [];
   const cleanedModelForHeader = cleanListingishTitle(String(displayModel || ''), vehicle?.year ?? null, vehicle?.make ?? null);
   appendUnique(identityParts, cleanedModelForHeader);
@@ -2049,6 +2180,138 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   const baseTextColor = 'var(--text)';
   const mutedTextColor = 'var(--text-muted)';
+  const hasAuctionContext = Boolean(
+    (auctionPulse as any)?.listing_url ||
+      (vehicle as any)?.auction_end_date ||
+      (vehicle as any)?.auction_outcome ||
+      (vehicle as any)?.auction_source ||
+      (vehicle as any)?.bat_auction_url ||
+      (vehicle as any)?.listing_kind === 'auction'
+  );
+  const headerSeller = useMemo(() => {
+    if (!hasAuctionContext) return null;
+    if (sellerBadge?.label) {
+      const relationship = String((sellerBadge as any)?.relationship || '').toLowerCase();
+      const roleLabel = relationship === 'consigner' || relationship === 'sold_by' ? 'Dealer' : 'Seller';
+      const label = String(sellerBadge.label || '').trim();
+      if (!label) return null;
+      return {
+        roleLabel,
+        label,
+        href: (sellerBadge as any)?.href || null,
+        title: `${roleLabel}: ${label}`,
+      };
+    }
+
+    const sellerHandle = normalizePartyHandle(
+      (auctionPulse as any)?.seller_username ||
+        (auctionPulse as any)?.metadata?.seller_username ||
+        (auctionPulse as any)?.metadata?.seller ||
+        (vehicle as any)?.bat_seller ||
+        (vehicle as any)?.origin_metadata?.bat_seller ||
+        (vehicle as any)?.origin_metadata?.seller ||
+        null
+    );
+    if (!sellerHandle) return null;
+    return {
+      roleLabel: 'Seller',
+      label: `@${sellerHandle}`,
+      href: batIdentityHref?.seller?.href || null,
+      title: `Seller: @${sellerHandle}`,
+    };
+  }, [hasAuctionContext, sellerBadge, auctionPulse, vehicle, batIdentityHref]);
+  const headerBuyer = useMemo(() => {
+    if (!hasAuctionContext) return null;
+    const outcome = auctionContext?.outcome;
+    const isUnsold = outcome === 'reserve_not_met' || outcome === 'no_sale' || isRNM;
+    const winnerHandle =
+      normalizePartyHandle(
+        (auctionPulse as any)?.winner_name ||
+          (auctionPulse as any)?.metadata?.buyer_username ||
+          (auctionPulse as any)?.metadata?.buyer ||
+          (auctionPulse as any)?.winning_bidder_name ||
+          (auctionPulse as any)?.winner_display_name ||
+          (vehicle as any)?.bat_buyer ||
+          (vehicle as any)?.origin_metadata?.bat_buyer ||
+          (vehicle as any)?.origin_metadata?.buyer ||
+          null
+      ) ||
+      (ownerGuess?.role === 'buyer' ? normalizePartyHandle(ownerGuess.username) : null);
+    const winnerHref =
+      batIdentityHref?.winner?.handle && winnerHandle && batIdentityHref.winner.handle === winnerHandle
+        ? batIdentityHref.winner.href
+        : null;
+    const highBidderHandle = normalizePartyHandle(
+      (auctionPulse as any)?.metadata?.high_bidder_username ||
+        (auctionPulse as any)?.metadata?.high_bidder ||
+        (auctionPulse as any)?.metadata?.current_bidder ||
+        (auctionPulse as any)?.metadata?.current_bidder_username ||
+        null
+    );
+    const currentBid =
+      parseMoneyNumber((auctionPulse as any)?.current_bid) ??
+      parseMoneyNumber((vehicle as any)?.current_bid) ??
+      null;
+
+    if (isAuctionLive) {
+      if (highBidderHandle) {
+        return {
+          label: `High Bidder: @${highBidderHandle}`,
+          href: null,
+          tone: 'neutral',
+        };
+      }
+      if (currentBid) {
+        return {
+          label: `High Bid: ${formatCurrency(currentBid)}`,
+          tone: 'neutral',
+        };
+      }
+      return { label: 'High Bid: —', tone: 'muted' };
+    }
+
+    if (isSoldContext) {
+      if (winnerHandle) {
+        return {
+          label: `Winner: @${winnerHandle}`,
+          href: winnerHref,
+          tone: 'success',
+        };
+      }
+      return { label: 'Winner: Unverified', tone: 'success' };
+    }
+
+    if (isUnsold) {
+      const text = outcome === 'no_sale' ? 'NO SALE' : 'RNM';
+      return { label: text, tone: 'muted' };
+    }
+    return null;
+  }, [hasAuctionContext, auctionContext?.outcome, isRNM, auctionPulse, vehicle, isAuctionLive, isSoldContext, ownerGuess, batIdentityHref]);
+  const headerCountdown = useMemo(() => {
+    if (!hasAuctionContext || !timerEndDate) return null;
+    const rawLabel = formatCountdownClock(timerEndDate, true) || formatRemaining(timerEndDate);
+    if (!rawLabel) return null;
+    if (rawLabel === 'Ended') return null;
+    const label = `Ends ${rawLabel}`;
+    const title = timerEndDate
+      ? `Auction ends in ${formatRemaining(timerEndDate) || rawLabel}`
+      : 'Auction countdown';
+    return {
+      label,
+      title,
+      isLive: isAuctionLive,
+    };
+  }, [hasAuctionContext, timerEndDate, isAuctionLive, auctionNow]);
+  const headerAuctionHouse = useMemo(() => {
+    if (!auctionHouseLabel) return null;
+    return { label: auctionHouseLabel, url: auctionListingUrl };
+  }, [auctionHouseLabel, auctionListingUrl]);
+  const bidCta = useMemo(() => {
+    if (!isAuctionLive || !auctionListingUrl) return null;
+    const currentBid = parseMoneyNumber((auctionPulse as any)?.current_bid);
+    const label = currentBid ? `Bid ${formatCurrency(currentBid)}` : 'Bid';
+    return { label, url: auctionListingUrl };
+  }, [isAuctionLive, auctionListingUrl, auctionPulse]);
   const trendIndicator = useMemo(() => {
     if (trendPct === null) return null;
     const positive = trendPct >= 0;
@@ -2168,20 +2431,21 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     >
       <div style={{ 
         display: 'flex', 
-        flexWrap: 'nowrap', 
+        flexWrap: 'wrap', 
         justifyContent: 'flex-start', 
         alignItems: 'center', 
         gap: '8px', 
+        rowGap: '4px',
         flex: '1 1 auto',
         minWidth: 0,
-        height: '31px',
-        // Allow dropdowns (location / claim) to render below the sticky header.
-        // Without this, the dropdown opens but is clipped, making the badge feel "unclickable".
-        overflow: (showLocationDropdown || showOwnerClaimDropdown || showAccessInfo) ? 'visible' : 'hidden',
+        minHeight: '31px',
+        height: 'auto',
+        // Allow dropdowns + multi-row badges to render below the sticky header.
+        overflow: 'visible',
         marginTop: 0,
         marginBottom: 0,
-        paddingTop: 0,
-        paddingBottom: 0,
+        paddingTop: 2,
+        paddingBottom: 2,
         position: 'static'
       }}>
         {/* 1. Title */}
@@ -2192,7 +2456,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </div>
 
         {/* 2. Badges Section */}
-        <div className="vehicle-header-badges" style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, alignItems: 'center', flexShrink: 0, overflow: (showLocationDropdown || showOwnerClaimDropdown || showAccessInfo) ? 'visible' : 'hidden', maxWidth: '100%' }}>
+        <div className="vehicle-header-badges" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, rowGap: 4, alignItems: 'center', flexShrink: 0, overflow: 'visible', maxWidth: '100%' }}>
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
             <div className="badge-priority-2">
             <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
@@ -2282,6 +2546,250 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             );
           })()}
 
+          {/* Auction metadata (seller/location/house/buyer/timer) */}
+          {hasAuctionContext && (
+            <>
+              {headerSeller && (
+                <div className="badge-priority-3">
+                  {headerSeller.href ? (
+                    <a
+                      href={headerSeller.href}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                      title={headerSeller.title}
+                    >
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: '8px',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          color: baseTextColor,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {headerSeller.roleLabel}: {headerSeller.label}
+                      </span>
+                    </a>
+                  ) : (
+                    <span
+                      className="badge"
+                      title={headerSeller.title}
+                      style={{
+                        fontSize: '8px',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        color: baseTextColor,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {headerSeller.roleLabel}: {headerSeller.label}
+                    </span>
+                  )}
+                </div>
+              )}
+              {!locationDisplay?.short && headerLocationLabel && (
+                <div className="badge-priority-3">
+                  <span
+                    className="badge"
+                    title={headerLocationTitle || headerLocationLabel}
+                    style={{
+                      fontSize: '8px',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      color: baseTextColor,
+                      lineHeight: 1,
+                    }}
+                  >
+                    LOC {headerLocationLabel}
+                  </span>
+                </div>
+              )}
+              {headerAuctionHouse?.label && (
+                <div className="badge-priority-3">
+                  {headerAuctionHouse.url ? (
+                    <a
+                      href={headerAuctionHouse.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                      title={`Auction house: ${headerAuctionHouse.label}`}
+                    >
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: '8px',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          color: baseTextColor,
+                          lineHeight: 1,
+                        }}
+                      >
+                        Auction: {headerAuctionHouse.label}
+                      </span>
+                    </a>
+                  ) : (
+                    <span
+                      className="badge"
+                      title={`Auction house: ${headerAuctionHouse.label}`}
+                      style={{
+                        fontSize: '8px',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        color: baseTextColor,
+                        lineHeight: 1,
+                      }}
+                    >
+                      Auction: {headerAuctionHouse.label}
+                    </span>
+                  )}
+                </div>
+              )}
+              {headerBuyer && (
+                <div className="badge-priority-3">
+                  {headerBuyer.href ? (
+                    <a
+                      href={headerBuyer.href}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                      title={headerBuyer.label}
+                    >
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: '8px',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background:
+                            headerBuyer.tone === 'success'
+                              ? '#dcfce7'
+                              : headerBuyer.tone === 'muted'
+                                ? 'var(--grey-100)'
+                                : 'var(--surface)',
+                          border:
+                            headerBuyer.tone === 'success'
+                              ? '1px solid #166534'
+                              : '1px solid var(--border)',
+                          color:
+                            headerBuyer.tone === 'success'
+                              ? '#166534'
+                              : headerBuyer.tone === 'muted'
+                                ? mutedTextColor
+                                : baseTextColor,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {headerBuyer.label}
+                      </span>
+                    </a>
+                  ) : (
+                    <span
+                      className="badge"
+                      title={headerBuyer.label}
+                      style={{
+                        fontSize: '8px',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        background:
+                          headerBuyer.tone === 'success'
+                            ? '#dcfce7'
+                            : headerBuyer.tone === 'muted'
+                              ? 'var(--grey-100)'
+                              : 'var(--surface)',
+                        border:
+                          headerBuyer.tone === 'success'
+                            ? '1px solid #166534'
+                            : '1px solid var(--border)',
+                        color:
+                          headerBuyer.tone === 'success'
+                            ? '#166534'
+                            : headerBuyer.tone === 'muted'
+                              ? mutedTextColor
+                              : baseTextColor,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {headerBuyer.label}
+                    </span>
+                  )}
+                </div>
+              )}
+              {headerCountdown && (
+                <div className="badge-priority-3">
+                  <span
+                    className="badge"
+                    title={headerCountdown.title || headerCountdown.label}
+                    style={{
+                      fontSize: '8px',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      color: baseTextColor,
+                      lineHeight: 1,
+                    }}
+                  >
+                    <span
+                      className={headerCountdown.isLive ? 'auction-live-dot' : undefined}
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background: headerCountdown.isLive ? '#dc2626' : '#94a3b8',
+                        display: 'inline-block',
+                        flexShrink: 0,
+                      }}
+                    />
+                    {headerCountdown.label}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+
           {/* Location Badge with Dropdown */}
           {locationDisplay && locationDisplay.short && locationDisplay.short.trim().length > 0 && locationDisplay.short !== ':' && (
             <div ref={locationRef} className="badge-priority-3" style={{ position: 'relative' }}>
@@ -2292,21 +2800,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   setShowLocationDropdown((prev) => !prev);
                 }}
                 style={{
-                  fontSize: '9px',
-                  fontWeight: 600,
+                  fontSize: '8px',
+                  fontWeight: 700,
                   fontFamily: 'monospace',
                   letterSpacing: '0.5px',
                   display: 'inline-flex',
                   alignItems: 'center',
                   cursor: 'pointer',
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '2px 4px',
-                  color: 'var(--text-muted)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  padding: '2px 6px',
+                  color: 'var(--text)',
+                  borderRadius: '4px',
                 }}
                 title={`Location: ${locationDisplay.full || locationDisplay.short}`}
               >
-                {locationDisplay.short}
+                LOC {locationDisplay.short}
               </button>
               
               {/* Location Dropdown */}
@@ -3803,8 +4312,38 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           position: 'relative', 
           zIndex: showFollowAuctionCard ? 1001 : 'auto',
           minWidth: 0,
-          maxWidth: '100%'
+          maxWidth: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          justifyContent: 'flex-end'
         }}>
+          {bidCta ? (
+            <a
+              href={bidCta.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={auctionPulseMs && isAuctionLive ? 'auction-cta-pulse' : undefined}
+              style={{
+                border: '2px solid var(--border)',
+                background: 'var(--white)',
+                color: 'var(--text)',
+                fontWeight: 800,
+                padding: '4px 8px',
+                cursor: 'pointer',
+                fontSize: '8pt',
+                borderRadius: '3px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
+              }}
+              title="Open live auction (place bids on the auction platform)"
+            >
+              {bidCta.label}
+            </a>
+          ) : null}
           <button
             type="button"
             onClick={(e) => {
