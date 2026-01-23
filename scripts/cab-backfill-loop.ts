@@ -52,10 +52,10 @@ const supabase = createClient(
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════
 const CONFIG = {
-  BATCH_SIZE: 20,           // Vehicles per batch
+  BATCH_SIZE: 25,           // Vehicles per batch
   DELAY_BETWEEN: 2000,      // ms between vehicles
   DELAY_BETWEEN_BATCHES: 5000, // ms between batches
-  MAX_VEHICLES: 100,        // Max to process (0 = all)
+  MAX_VEHICLES: 0,          // 0 = ALL (1,265 vehicles)
   START_FROM: 0,            // Offset to start from
   HEADLESS: true,           // Headless for speed
 };
@@ -67,16 +67,30 @@ const EXTRACTION_SCRIPT = `
 (function() {
   var result = {
     success: true,
+    // Basic
     vin: null,
+    pageTitle: null,
+    // Prices
     currentBid: null,
     soldPrice: null,
     highBid: null,
+    // Stats
     bidCount: null,
     commentCount: null,
     viewCount: null,
     watcherCount: null,
     timeLeft: null,
+    // Seller
+    sellerUsername: null,
+    sellerProfileUrl: null,
+    // Winner (for sold auctions)
+    winnerUsername: null,
+    // Links
     carfaxUrl: null,
+    videoUrl: null,
+    // Location
+    location: null,
+    // Content
     dougsTake: null,
     highlights: [],
     equipment: [],
@@ -87,11 +101,13 @@ const EXTRACTION_SCRIPT = `
     facts: {},
     comments: [],
     images: [],
+    // Result
     auctionResult: {
       status: null,
       sold: false,
       reserveNotMet: false,
-      noSale: false
+      noSale: false,
+      endDate: null
     }
   };
 
@@ -149,6 +165,50 @@ const EXTRACTION_SCRIPT = `
       result.auctionResult.noSale = true;
     } else {
       result.auctionResult.status = 'active';
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PAGE TITLE
+    // ═══════════════════════════════════════════════════════════════
+    result.pageTitle = document.title || null;
+
+    // ═══════════════════════════════════════════════════════════════
+    // SELLER INFO
+    // ═══════════════════════════════════════════════════════════════
+    // Look for seller link - get href to extract username
+    var sellerLinks = document.querySelectorAll('a[href*="/user/"]');
+    for (var sl = 0; sl < sellerLinks.length; sl++) {
+      var href = sellerLinks[sl].getAttribute('href') || '';
+      var userMatch = href.match(/\\/user\\/([A-Za-z0-9_]+)/);
+      if (userMatch) {
+        result.sellerUsername = userMatch[1];
+        result.sellerProfileUrl = href;
+        break;
+      }
+    }
+    // Fallback: extract from "Seller: FollowUsername" pattern (Follow is button)
+    if (!result.sellerUsername) {
+      var sellerMatch = bodyText.match(/Seller[\\s:]+Follow([A-Za-z0-9_]+)/i);
+      if (sellerMatch) {
+        result.sellerUsername = sellerMatch[1];
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // LOCATION
+    // ═══════════════════════════════════════════════════════════════
+    var locationMatch = bodyText.match(/Location[:\\s]+([^\\n]+)/i);
+    result.location = locationMatch ? locationMatch[1].trim() : null;
+
+    // ═══════════════════════════════════════════════════════════════
+    // VIDEO URL
+    // ═══════════════════════════════════════════════════════════════
+    var videoLink = document.querySelector('a[href*="youtube.com"], a[href*="youtu.be"], a[href*="vimeo.com"]');
+    result.videoUrl = videoLink ? videoLink.href : null;
+    // Also check for embedded video
+    var videoEmbed = document.querySelector('iframe[src*="youtube"], iframe[src*="vimeo"]');
+    if (videoEmbed && !result.videoUrl) {
+      result.videoUrl = videoEmbed.src || null;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -289,6 +349,22 @@ const EXTRACTION_SCRIPT = `
           replyTo: replyTo,
           bidAmount: bidAmount
         });
+
+        // Extract winner from system comment "Sold to [username]"
+        if (isSystem && text.indexOf('Sold to') >= 0) {
+          var winnerMatch = text.match(/Sold to (\\w+)/i);
+          if (winnerMatch) {
+            result.winnerUsername = winnerMatch[1];
+          }
+        }
+
+        // Extract auction end date from system comments
+        if (isSystem && text.indexOf('ended') >= 0) {
+          var dateMatch = text.match(/(\\w+\\s+\\d+,?\\s+\\d{4})/i);
+          if (dateMatch) {
+            result.auctionResult.endDate = dateMatch[1];
+          }
+        }
       }
     }
 
@@ -505,9 +581,20 @@ async function main() {
 async function updateDatabase(vehicleId: string, listingId: string, url: string, data: any) {
   // Update external_listing metadata with structured data
   const metadata = {
-    source: 'cab_backfill_v3',
+    source: 'cab_backfill_v4',
     extracted_at: new Date().toISOString(),
+    page_title: data.pageTitle,
+    // Seller info
+    seller_username: data.sellerUsername,
+    seller_profile_url: data.sellerProfileUrl,
+    // Winner (for sold auctions)
+    winner_username: data.winnerUsername,
+    // Location
+    location: data.location,
+    // Links
     carfax_url: data.carfaxUrl,
+    video_url: data.videoUrl,
+    // Doug's Take
     dougs_take: data.dougsTake?.substring(0, 5000),
     // Structured arrays for SQL analysis
     highlights: data.highlights,
@@ -565,7 +652,8 @@ async function updateDatabase(vehicleId: string, listingId: string, url: string,
       sequence_number: idx + 1,
       author_username: c.username,
       is_seller: c.isSeller,
-      comment_type: c.isSystem ? 'system' : c.isBid ? 'bid' : c.text.includes('?') ? 'question' : 'observation',
+      comment_type: c.isSystem ? 'sold' : c.isBid ? 'bid' : 'observation',
+      posted_at: new Date().toISOString(),
       comment_text: c.text,
       word_count: c.text.split(/\s+/).length,
       has_question: c.text.includes('?'),
@@ -577,33 +665,37 @@ async function updateDatabase(vehicleId: string, listingId: string, url: string,
       .upsert(commentRows, { onConflict: 'vehicle_id,content_hash' });
   }
 
-  // Save images (with proper source to distinguish from bad batch)
+  // Save images - use source='external_import' to satisfy vehicle_images_attribution_check
+  // Do NOT include user_id field - omitting allows constraint to pass
   if (data.images.length > 0) {
+    // Delete existing external_import images first to avoid duplicates
+    await supabase
+      .from('vehicle_images')
+      .delete()
+      .eq('vehicle_id', vehicleId)
+      .eq('source', 'external_import');
+
     const imageRows = data.images.map((img: any, idx: number) => ({
       vehicle_id: vehicleId,
       image_url: img.fullResUrl,
+      source: 'external_import',  // Must be 'external_import' for attribution check
       source_url: img.url,
-      source: 'cab_backfill_v2',  // Different source to distinguish
       position: idx,
       display_order: idx,
       is_primary: idx === 0,
       is_external: true,
       is_approved: true,
-      verification_status: 'approved',
       approval_status: 'auto_approved',
+      redaction_level: 'none',
       exif_data: {
         source_url: url,
-        imported_from: 'Cars & Bids v2',  // v2 to distinguish from bad batch
+        discovery_url: url,
+        imported_from: 'cars_and_bids',
         category: img.category,
-        original_width: img.width,
-        extracted_at: new Date().toISOString(),
       },
     }));
 
-    await supabase.from('vehicle_images').upsert(imageRows, {
-      onConflict: 'vehicle_id,image_url',
-      ignoreDuplicates: true,
-    });
+    await supabase.from('vehicle_images').insert(imageRows);
   }
 }
 

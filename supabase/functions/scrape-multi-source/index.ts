@@ -8,6 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const DEALER_INSPIRE_ALGOLIA_APP_ID = 'YL5AFXM3DW';
+const DEALER_INSPIRE_ALGOLIA_SEARCH_KEY = '59d32b7b5842f84284e044c7ca465498';
+
 type DealerInfo = {
   name?: string | null;
   address?: string | null;
@@ -20,6 +23,13 @@ type DealerInfo = {
   dealer_license?: string | null;
   specialties?: string[] | null;
   description?: string | null;
+};
+
+type DealerInspireAlgoliaConfig = {
+  app_id: string;
+  search_key: string;
+  index_name: string;
+  query_url: string;
 };
 
 function safeString(value: unknown): string | null {
@@ -97,6 +107,197 @@ function normalizeTextArray(raw: unknown, maxItems = 25): string[] {
     out.push(cleaned);
   }
   return Array.from(new Set(out));
+}
+
+function normalizeStringList(raw: unknown, maxItems = 25): string[] {
+  if (Array.isArray(raw)) return normalizeTextArray(raw, maxItems);
+  const s = safeString(raw);
+  return s ? [s] : [];
+}
+
+function normalizeAlgoliaNumber(raw: unknown): number | null {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'string') {
+    const cleaned = raw.replace(/[^\d.]/g, '');
+    if (!cleaned) return null;
+    const num = Number(cleaned);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+function buildDealerInspireIndexCandidates(hostname: string): string[] {
+  const host = hostname.replace(/^www\./, '').toLowerCase();
+  const parts = host.split('.');
+  if (parts.length < 2) return [];
+  const base = parts.slice(0, -1).join('.');
+  const compact = base.replace(/[^a-z0-9]+/g, '');
+  const underscored = base.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const dashed = base.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const slugs = [compact, underscored, dashed].filter(Boolean);
+  return Array.from(new Set(slugs)).map((slug) => `${slug}_production_inventory`);
+}
+
+function buildDealerInspireQueryUrl(indexName: string): string {
+  const host = `${DEALER_INSPIRE_ALGOLIA_APP_ID.toLowerCase()}-dsn.algolia.net`;
+  return `https://${host}/1/indexes/${indexName}/query?x-algolia-application-id=${DEALER_INSPIRE_ALGOLIA_APP_ID}&x-algolia-api-key=${DEALER_INSPIRE_ALGOLIA_SEARCH_KEY}`;
+}
+
+async function probeDealerInspireIndex(indexName: string): Promise<any | null> {
+  const queryUrl = buildDealerInspireQueryUrl(indexName);
+  try {
+    const resp = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ params: 'hitsPerPage=1&page=0' }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json().catch(() => null);
+    if (!data || typeof data.nbHits !== 'number' || !Array.isArray(data.hits)) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveDealerInspireConfig(sourceUrl: string): Promise<DealerInspireAlgoliaConfig | null> {
+  try {
+    const host = new URL(sourceUrl).hostname;
+    const candidates = buildDealerInspireIndexCandidates(host);
+    for (const indexName of candidates) {
+      const data = await probeDealerInspireIndex(indexName);
+      if (!data) continue;
+      return {
+        app_id: DEALER_INSPIRE_ALGOLIA_APP_ID,
+        search_key: DEALER_INSPIRE_ALGOLIA_SEARCH_KEY,
+        index_name: indexName,
+        query_url: buildDealerInspireQueryUrl(indexName),
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function buildDealerInspireTitle(parts: {
+  year?: number | null;
+  make?: string | null;
+  model?: string | null;
+  trim?: string | null;
+}): string | null {
+  const bits = [];
+  if (typeof parts.year === 'number') bits.push(String(parts.year));
+  if (parts.make) bits.push(parts.make);
+  if (parts.model) bits.push(parts.model);
+  if (parts.trim) bits.push(parts.trim);
+  return bits.length > 0 ? bits.join(' ') : null;
+}
+
+function mapDealerInspireHitToListing(hit: any): any | null {
+  const url = safeString(hit?.link);
+  if (!url) return null;
+
+  const year = typeof hit?.year === 'number' ? hit.year : normalizeAlgoliaNumber(hit?.year);
+  const make = safeString(hit?.make);
+  const model = safeString(hit?.model);
+  const trim = safeString(hit?.trim);
+  const title =
+    safeString(hit?.title_vrp) ||
+    safeString(hit?.title) ||
+    buildDealerInspireTitle({ year: year ?? null, make, model, trim });
+  const price =
+    normalizeAlgoliaNumber(hit?.our_price) ??
+    normalizeAlgoliaNumber(hit?.msrp);
+  const mileage = normalizeAlgoliaNumber(hit?.miles);
+  const thumbnail = safeString(hit?.thumbnail);
+
+  const features = normalizeStringList(hit?.features, 50);
+  const extOptions = normalizeStringList(hit?.ext_options, 50);
+  const intOptions = normalizeStringList(hit?.int_options, 50);
+
+  return {
+    title,
+    url,
+    price,
+    year,
+    make,
+    model,
+    trim,
+    mileage,
+    location: safeString(hit?.location),
+    thumbnail_url: thumbnail,
+    image_urls: thumbnail ? [thumbnail] : [],
+    description_snippet: safeString(hit?.body),
+    vin: safeString(hit?.vin),
+    listing_status: 'in_stock',
+    raw: {
+      source: 'dealerinspire_algolia',
+      api_id: hit?.api_id ?? null,
+      stock: safeString(hit?.stock),
+      drivetrain: safeString(hit?.drivetrain),
+      engine_description: safeString(hit?.engine_description),
+      transmission_description: safeString(hit?.transmission_description),
+      ext_color: safeString(hit?.ext_color),
+      int_color: safeString(hit?.int_color),
+      features: features.length ? features : null,
+      ext_options: extOptions.length ? extOptions : null,
+      int_options: intOptions.length ? intOptions : null,
+      algolia_object_id: safeString(hit?.objectID),
+    },
+  };
+}
+
+async function fetchDealerInspireListings(
+  config: DealerInspireAlgoliaConfig,
+  limit: number,
+  offset: number
+): Promise<{ listings: any[]; total_hits: number | null }> {
+  const maxPerPage = 50;
+  const hitsPerPage = Math.max(1, Math.min(maxPerPage, limit || maxPerPage));
+  let page = Math.floor(offset / hitsPerPage);
+  let offsetInPage = offset % hitsPerPage;
+  let totalHits: number | null = null;
+  const listings: any[] = [];
+
+  while (listings.length < limit) {
+    let data: any = null;
+    try {
+      const resp = await fetch(config.query_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ params: `hitsPerPage=${hitsPerPage}&page=${page}` }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!resp.ok) break;
+      data = await resp.json().catch(() => null);
+    } catch {
+      break;
+    }
+
+    if (!data || !Array.isArray(data.hits)) break;
+    if (totalHits === null && typeof data.nbHits === 'number') {
+      totalHits = data.nbHits;
+    }
+
+    const pageHits = data.hits.slice(offsetInPage);
+    if (pageHits.length === 0) break;
+
+    for (const hit of pageHits) {
+      if (listings.length >= limit) break;
+      const listing = mapDealerInspireHitToListing(hit);
+      if (listing?.url) listings.push(listing);
+    }
+
+    const nextPage = typeof data.page === 'number' ? data.page + 1 : page + 1;
+    const totalPages = typeof data.nbPages === 'number' ? data.nbPages : nextPage;
+    if (nextPage >= totalPages) break;
+    page = nextPage;
+    offsetInPage = 0;
+  }
+
+  return { listings, total_hits: totalHits };
 }
 
 function sanitizeSourceName(raw: string | null | undefined, url: string): string {
@@ -385,6 +586,18 @@ serve(async (req) => {
       }
     })();
 
+    const shouldTryDealerInspire = (() => {
+      try {
+        const u = new URL(source_url);
+        const path = u.pathname.toLowerCase();
+        return path.includes('used-vehicles') || path.includes('/inventory') || path.includes('/vehicles');
+      } catch {
+        return false;
+      }
+    })();
+    const dealerInspireConfig = shouldTryDealerInspire ? await resolveDealerInspireConfig(source_url) : null;
+    const isDealerInspireInventory = !!dealerInspireConfig;
+
     // Step 1: Scrape with Firecrawl STRUCTURED EXTRACTION (AGGRESSIVE)
     if (cheap_mode) {
       console.log('Cheap mode enabled: skipping OpenAI and minimizing Firecrawl usage');
@@ -562,6 +775,28 @@ serve(async (req) => {
         };
         metadata = { source: 'bhcc_isapi_xml', api_urls: apiUrls, total_listings_reported: totalReported };
       }
+    } else if (isDealerInspireInventory && dealerInspireConfig) {
+      console.log(`⚡ DealerInspire inventory detected; using Algolia index ${dealerInspireConfig.index_name}`);
+      const di = await fetchDealerInspireListings(dealerInspireConfig, maxListingsToProcess, startOffset);
+      if (di.listings.length > 0 || di.total_hits !== null) {
+        extract = {
+          dealer_info: {
+            name: extractDomainName(source_url),
+            website: normalizeWebsiteUrl(source_url),
+          },
+          listings: di.listings,
+          next_page_url: null,
+          total_listings_on_page: di.listings.length,
+        };
+        metadata = {
+          source: 'dealerinspire_algolia',
+          algolia: {
+            app_id: dealerInspireConfig.app_id,
+            index_name: dealerInspireConfig.index_name,
+            total_hits: di.total_hits,
+          },
+        };
+      }
     } else if (isLartIndex) {
       // L'Art pages are static HTML and include all /fiche/ links. Firecrawl+LLM is slow here and can
       // exceed Edge runtime limits, so fetch HTML directly and enumerate deterministically.
@@ -697,7 +932,7 @@ serve(async (req) => {
       }
     }
 
-    if (!html) {
+    if (!html && !extract) {
       console.log('Falling back to direct fetch for HTML...');
       const resp = await fetch(source_url, {
         headers: {
