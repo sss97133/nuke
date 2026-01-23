@@ -10,6 +10,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function detectCurrencyCodeFromText(text: string | null | undefined): string | null {
+  const raw = String(text || '');
+  if (!raw) return null;
+  const upper = raw.toUpperCase();
+  if (upper.includes('AED') || raw.includes('د.إ')) return 'AED';
+  if (upper.includes('EUR') || raw.includes('€')) return 'EUR';
+  if (upper.includes('GBP') || raw.includes('£')) return 'GBP';
+  if (upper.includes('CHF')) return 'CHF';
+  if (upper.includes('JPY') || raw.includes('¥')) return 'JPY';
+  if (upper.includes('CAD')) return 'CAD';
+  if (upper.includes('AUD')) return 'AUD';
+  if (upper.includes('USD') || raw.includes('US$') || raw.includes('$')) return 'USD';
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -92,7 +107,7 @@ serve(async (req) => {
     // Query external_listings directly since that's where SBX data is stored
     const { data: listings } = await supabase
       .from('external_listings')
-      .select('id, vehicle_id, listing_url, end_date, current_bid, listing_status')
+      .select('id, vehicle_id, listing_url, end_date, current_bid, listing_status, metadata')
       .eq('platform', 'sbx')
       .in('listing_status', ['active', 'live', 'upcoming'])
       .order('updated_at', { ascending: true })
@@ -146,6 +161,16 @@ serve(async (req) => {
           if (update.auction_end_date) listingUpdates.end_date = update.auction_end_date
           if (update.auction_status) {
             listingUpdates.listing_status = update.auction_status === 'live' ? 'active' : update.auction_status
+          }
+          if (update.currency_code) {
+            const existingMeta =
+              listing?.metadata && typeof listing.metadata === 'object' ? listing.metadata : {}
+            listingUpdates.metadata = {
+              ...existingMeta,
+              currency_code: update.currency_code,
+              currency: update.currency_code,
+              price_currency: update.currency_code,
+            }
           }
 
           await supabase
@@ -237,6 +262,7 @@ async function monitorListing(url: string, firecrawlKey: string | undefined): Pr
     // Extract sale price if sold
     const salePriceMatch = statusText.match(/(?:sold|final)[:\s]+(?:US\$|AED|€|£)?([\d,]+)/i)
     const salePrice = salePriceMatch ? parseInt(salePriceMatch[1].replace(/,/g, '')) : null
+    const currencyCode = detectCurrencyCodeFromText(bidText) || detectCurrencyCodeFromText(statusText)
 
     // Extract auction end date from countdown or time remaining
     let auctionEndDate: string | null = null
@@ -276,6 +302,7 @@ async function monitorListing(url: string, firecrawlKey: string | undefined): Pr
       sale_price: salePrice,
       auction_status: auctionStatus,
       auction_end_date: auctionEndDate,
+      currency_code: currencyCode,
       last_checked_at: new Date().toISOString(),
     }
   } catch (error: any) {

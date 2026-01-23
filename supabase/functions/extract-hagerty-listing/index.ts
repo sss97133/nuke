@@ -893,7 +893,7 @@ serve(async (req) => {
 
         const { data: listingData, error: listingError } = await supabase
           .from('external_listings')
-          .insert({
+          .upsert({
             vehicle_id: targetVehicleId,
             platform: 'hagerty',
             listing_url: extracted.url,
@@ -920,7 +920,7 @@ serve(async (req) => {
               video_urls: extracted.video_urls,
               websocket_channel: extracted.websocket_channel,
             },
-          })
+          }, { onConflict: 'platform,listing_url_key' })
           .select()
           .single();
 

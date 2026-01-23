@@ -152,6 +152,21 @@ function extractVehiclePrice(text: string): number | null {
   return null;
 }
 
+function detectCurrencyCodeFromText(text: string | null | undefined): string | null {
+  const raw = String(text || '');
+  if (!raw) return null;
+  const upper = raw.toUpperCase();
+  if (upper.includes('AED') || raw.includes('د.إ')) return 'AED';
+  if (upper.includes('EUR') || raw.includes('€')) return 'EUR';
+  if (upper.includes('GBP') || raw.includes('£')) return 'GBP';
+  if (upper.includes('CHF')) return 'CHF';
+  if (upper.includes('JPY') || raw.includes('¥')) return 'JPY';
+  if (upper.includes('CAD')) return 'CAD';
+  if (upper.includes('AUD')) return 'AUD';
+  if (upper.includes('USD') || raw.includes('US$') || raw.includes('$')) return 'USD';
+  return null;
+}
+
 function normalizeImageUrls(urls: any[]): string[] {
   const out: string[] = []
   const seen = new Set<string>()
@@ -2034,6 +2049,10 @@ serve(async (req) => {
         const priceMatch = priceText?.match(/\$?([\d,]+)/)
         if (priceMatch) {
           data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+        }
+        const currencyCode = detectCurrencyCodeFromText(priceText)
+        if (currencyCode) {
+          data.currency_code = currencyCode
         }
       }
 

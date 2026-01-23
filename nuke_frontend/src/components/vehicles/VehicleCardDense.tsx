@@ -263,18 +263,28 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const maxReasonable = 60 * 24 * 60 * 60 * 1000;
     if (diffMs > maxReasonable) return null;
 
-    const twoMinutesMs = 2 * 60 * 1000;
-    if (diffMs > twoMinutesMs) return null;
+    const formatDuration = (ms: number) => {
+      const totalSeconds = Math.floor(ms / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const pad = (n: number) => String(n).padStart(2, '0');
 
-    const totalSeconds = Math.floor(Math.abs(diffMs) / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const ticker = `${pad(minutes)}:${pad(seconds)}`;
+      // Show days when > 24 hours, HH:MM:SS when <= 24 hours
+      // For very long auctions (>7 days), show simplified format (e.g., "19d 18h")
+      if (totalSeconds > 7 * 86400) {
+        return `${days}d ${hours}h`;
+      }
+      if (totalSeconds > 86400) {
+        return `${days}d`;
+      }
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    };
 
-    if (diffMs >= 0) return ticker;
-    if (isAuctionLiveStatus) return `OT ${ticker}`;
-    return null;
+    if (diffMs >= 0) return formatDuration(diffMs);
+    if (isAuctionLiveStatus) return `OT ${formatDuration(Math.abs(diffMs))}`;
+    return 'Ended';
   }, [auctionEndDate, auctionNow, isAuctionLiveStatus]);
 
   // PERF: Never do per-card network calls on the feed.
@@ -631,7 +641,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }, [vehicle]);
 
   // Update timer every second for active auctions (must be after isActiveAuction is defined)
-  const shouldTickAuctionTimer = Boolean(auctionEndDate) && (isActiveAuction || isAuctionLiveStatus);
+  const shouldTickAuctionTimer = Boolean(auctionEndDate);
   const lastUpdateRef = React.useRef<number>(Date.now());
   React.useEffect(() => {
     if (!shouldTickAuctionTimer) return;

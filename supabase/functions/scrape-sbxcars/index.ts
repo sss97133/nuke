@@ -24,6 +24,7 @@ interface SBXCarsListing {
   current_bid: number | null
   current_bid_username: string | null
   reserve_price: number | null
+  currency_code: string | null
   auction_end_date: string | null
   auction_status: 'upcoming' | 'live' | 'ended' | 'sold'
   images: string[]
@@ -385,6 +386,21 @@ function extractUrlsFromJson(obj: any, urls: string[] = []): string[] {
   return urls
 }
 
+function detectCurrencyCodeFromText(text: string | null | undefined): string | null {
+  const raw = String(text || '');
+  if (!raw) return null;
+  const upper = raw.toUpperCase();
+  if (upper.includes('AED') || raw.includes('د.إ')) return 'AED';
+  if (upper.includes('EUR') || raw.includes('€')) return 'EUR';
+  if (upper.includes('GBP') || raw.includes('£')) return 'GBP';
+  if (upper.includes('CHF')) return 'CHF';
+  if (upper.includes('JPY') || raw.includes('¥')) return 'JPY';
+  if (upper.includes('CAD')) return 'CAD';
+  if (upper.includes('AUD')) return 'AUD';
+  if (upper.includes('USD') || raw.includes('US$') || raw.includes('$')) return 'USD';
+  return null;
+}
+
 /**
  * Scrape a single SBX Cars listing page
  */
@@ -491,6 +507,7 @@ async function scrapeSBXCarsListing(
     const bidText = bidSection?.textContent || ''
     const bidMatch = bidText.match(/(?:latest|current)\s+bid[:\s]+(?:US\$|AED|€|£)?([\d,]+)/i)
     const currentBid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, '')) : null
+    const currencyCode = detectCurrencyCodeFromText(bidText)
     const currentBidUsername = extractCurrentBidUsername(doc)
 
     // Extract bidder usernames (for live auctions)
@@ -571,6 +588,7 @@ async function scrapeSBXCarsListing(
       current_bid: currentBid,
       current_bid_username: currentBidUsername,
       reserve_price: null,
+      currency_code: currencyCode,
       auction_end_date: null,
       auction_status: auctionStatus,
       images,
