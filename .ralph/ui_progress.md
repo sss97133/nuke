@@ -108,6 +108,22 @@
 - Also updates vehicles table with auction_end_date
 - Successfully updated 5 PCarMarket listings with end_date
 
+**23. Broad Arrow Monitor - New Function Created**
+- Created monitor-broad-arrow-listings edge function
+- Extracts auction name from URL codes (ve26=Velocity, gi26=Greenwich, am26=Amelia)
+- Traditional auction house - most listings are "upcoming" or "ended" (physical events)
+
+**24. Collecting Cars Monitor - New Function Created**
+- Created monitor-collecting-cars-listings edge function
+- Heavily JS-rendered site - limited extraction without Firecrawl
+- Can detect sold status but countdown data not easily accessible
+
+**25. Cars & Bids Batch Monitor - New Function Created**
+- Created monitor-cars-and-bids-listings edge function with Firecrawl support
+- Cleans up stale listings by detecting ended/sold status
+- Extracts current_bid, bid_count, view_count, watcher_count
+- Active listings reduced from 192 to ~145 (stale ones marked ended/sold)
+
 ---
 
 ### Summary Stats
@@ -123,7 +139,9 @@
 - **5 Hagerty listings** backfilled with correct timestamps
 - **SBX listings** now have end_date and status synced
 - **5 PCarMarket listings** now have end_date
-- **7 edge functions deployed** (extract-hagerty-listing, hagerty-bid-tracker, extract-cars-and-bids-core, sync-cars-and-bids-listing, monitor-sbxcars-listings, import-pcarmarket-listing, monitor-pcarmarket-listings)
+- **~71 C&B stale listings** cleaned up (192 → 121 active)
+- **PCarMarket coverage** improved from 19% to 86%
+- **11 edge functions deployed** (extract-hagerty-listing, hagerty-bid-tracker, extract-cars-and-bids-core, sync-cars-and-bids-listing, monitor-sbxcars-listings, import-pcarmarket-listing, monitor-pcarmarket-listings, monitor-broad-arrow-listings, monitor-collecting-cars-listings, monitor-cars-and-bids-listings)
 
 ---
 
@@ -166,9 +184,11 @@
 
 ### Latest Deployment
 
-**https://n-zero.dev** (nuke project)
+**https://n-zero.dev** (nuke project) - Updated 2026-01-23 21:00 UTC
 
-Also deployed to: https://nukefrontend-fizpsg5pp-nzero.vercel.app (nuke_frontend project)
+Previous deployments:
+- https://nuke-pmzzoaek6-nzero.vercel.app
+- https://nukefrontend-fizpsg5pp-nzero.vercel.app
 
 **Previous:**
 - https://nukefrontend-lvo0vkdhx-nzero.vercel.app

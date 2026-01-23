@@ -170,17 +170,43 @@ serve(async (req) => {
       success: true,
     });
 
-    // TODO: Trigger async validation via Elixir backend
-    // For now, we'll validate synchronously in a future iteration
-    // The Elixir PlatformAuthenticator will pick this up and validate
+    // Trigger async validation
+    const validateUrl = `${supabaseUrl}/functions/v1/validate-platform-credentials`;
+    const validationPromise = fetch(validateUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({ credential_id: result.id }),
+    }).then(async (res) => {
+      const data = await res.json();
+      return data;
+    }).catch((err) => {
+      console.error("Validation trigger failed:", err);
+      return { success: false, error: err.message };
+    });
 
-    // For now, mark as pending - Elixir backend will validate
+    // Wait for validation result (with timeout)
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => resolve({ success: false, error: "Validation timeout", status: "pending" }), 15000)
+    );
+
+    const validationResult = await Promise.race([validationPromise, timeoutPromise]) as any;
+
     return new Response(
       JSON.stringify({
         id: result.id,
         platform: result.platform,
-        status: result.status,
-        message: "Credentials stored. Validation will be performed by the backend.",
+        status: validationResult.status || result.status,
+        validation_success: validationResult.success,
+        validation_error: validationResult.error,
+        requires_2fa: validationResult.requires_2fa || false,
+        message: validationResult.success
+          ? "Credentials validated successfully"
+          : validationResult.requires_2fa
+          ? "2FA verification required"
+          : validationResult.error || "Credentials stored, validation pending",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
