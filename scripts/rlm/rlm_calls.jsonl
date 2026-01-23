@@ -1,0 +1,8 @@
+{"callIndex":1,"stage":"chunk_1","promptChars":12438,"contextChars":12000,"responseChars":2874,"timestamp":"2026-01-23T23:36:44.403Z"}
+{"callIndex":2,"stage":"chunk_2","promptChars":12438,"contextChars":12000,"responseChars":3095,"timestamp":"2026-01-23T23:37:00.867Z"}
+{"callIndex":3,"stage":"chunk_3","promptChars":12438,"contextChars":12000,"responseChars":3118,"timestamp":"2026-01-23T23:37:16.607Z"}
+{"callIndex":4,"stage":"chunk_4","promptChars":12438,"contextChars":12000,"responseChars":2728,"timestamp":"2026-01-23T23:37:30.885Z"}
+{"callIndex":5,"stage":"chunk_5","promptChars":12438,"contextChars":12000,"responseChars":3102,"timestamp":"2026-01-23T23:37:43.099Z"}
+{"callIndex":6,"stage":"chunk_6","promptChars":12438,"contextChars":12000,"responseChars":3272,"timestamp":"2026-01-23T23:37:56.978Z"}
+{"callIndex":7,"stage":"chunk_7","promptChars":7692,"contextChars":7254,"responseChars":3075,"timestamp":"2026-01-23T23:38:08.118Z"}
+{"callIndex":8,"stage":"final","promptChars":12438,"contextChars":12000,"responseChars":3411,"timestamp":"2026-01-23T23:38:24.930Z"}

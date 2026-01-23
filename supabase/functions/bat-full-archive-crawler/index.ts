@@ -230,11 +230,11 @@ serve(async (req) => {
     // Also check import_queue
     const { data: queuedUrls } = await supabase
       .from('import_queue')
-      .select('url')
-      .ilike('url', '%bringatrailer%');
+      .select('listing_url')
+      .ilike('listing_url', '%bringatrailer%');
 
     for (const q of queuedUrls || []) {
-      existingSet.add(q.url);
+      if (q.listing_url) existingSet.add(q.listing_url);
     }
 
     console.log(`[bat-full-crawler] ${existingSet.size} URLs already known`);
@@ -272,12 +272,12 @@ serve(async (req) => {
 
         // Queue new URLs
         if (newUrls.length > 0) {
-          const queueRecords = newUrls.map(url => ({
-            url,
-            source: 'bat_archive_crawler',
+          const queueRecords = newUrls.map(listingUrl => ({
+            listing_url: listingUrl,
             status: 'pending',
             priority: 1,
-            metadata: {
+            raw_data: {
+              source: 'bat_archive_crawler',
               year_range: `${yearRange.start}-${yearRange.end}`,
               discovered_page: page,
             },
@@ -285,7 +285,7 @@ serve(async (req) => {
 
           const { error: insertError } = await supabase
             .from('import_queue')
-            .upsert(queueRecords, { onConflict: 'url', ignoreDuplicates: true });
+            .upsert(queueRecords, { onConflict: 'listing_url', ignoreDuplicates: true });
 
           if (insertError) {
             results.errors.push(`Page ${page}: ${insertError.message}`);

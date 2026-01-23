@@ -1,0 +1,39 @@
+{
+  "projectRoot": ".",
+  "includePaths": [
+    "scripts/rlm/bat_backlog_prompt.md",
+    "supabase/functions/bat-full-archive-crawler/index.ts",
+    "supabase/functions/bat-wayback-crawler/index.ts",
+    "supabase/functions/bat-archive-crawler/index.ts",
+    "scripts/ralph-wiggum.sh",
+    "scripts/ralph-process-bat-queue.ts",
+    "docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md",
+    "docs/systems/IMPORT_QUEUE_ROUTING.md",
+    "docs/BAT_EXTRACTION_MIGRATION_COMPLETE.md"
+  ],
+  "excludeGlobs": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.cursor/**"
+  ],
+  "allowedExtensions": [
+    ".md",
+    ".txt",
+    ".ts",
+    ".sh",
+    ".json"
+  ],
+  "maxFiles": 80,
+  "maxFileBytes": 200000,
+  "maxTotalChars": 600000,
+  "chunkSizeChars": 12000,
+  "chunkOverlapChars": 800,
+  "maxDepth": 2,
+  "maxCalls": 8,
+  "timeoutMs": 900000,
+  "claudeCommand": "claude",
+  "outputFormat": "json",
+  "goal": "Summarize the BaT backlog discovery + ingestion loop. Highlight current counters, next actions, and guardrails to keep Firecrawl usage under 30k credits."
+}

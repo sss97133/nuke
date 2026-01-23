@@ -114,11 +114,11 @@ serve(async (req) => {
     // Also check import_queue
     const { data: queuedUrls } = await supabase
       .from('import_queue')
-      .select('url')
-      .in('url', listingUrls);
+      .select('listing_url')
+      .in('listing_url', listingUrls);
 
     for (const q of queuedUrls || []) {
-      existingSet.add(q.url);
+      if (q.listing_url) existingSet.add(q.listing_url);
     }
 
     // Queue new URLs
@@ -129,12 +129,14 @@ serve(async (req) => {
 
     // Batch insert into import_queue
     if (newUrls.length > 0) {
-      const queueRecords = newUrls.map((url: string) => ({
-        url,
-        source: 'bat_archive_crawler',
+      const queueRecords = newUrls.map((listingUrl: string) => ({
+        listing_url: listingUrl,
         status: 'pending',
-        priority: 1,  // Low priority for backfill
-        metadata: { discovered_at: new Date().toISOString() },
+        priority: 1, // Low priority for backfill
+        raw_data: {
+          source: 'bat_archive_crawler',
+          discovered_at: new Date().toISOString(),
+        },
       }));
 
       // Insert in batches of 1000
@@ -143,7 +145,7 @@ serve(async (req) => {
         const { error: insertError } = await supabase
           .from('import_queue')
           .insert(batch)
-          .onConflict('url')
+          .onConflict('listing_url')
           .ignore();
 
         if (insertError) {
