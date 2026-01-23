@@ -53,11 +53,12 @@ const supabase = createClient(
 // ═══════════════════════════════════════════════════════════════════
 const CONFIG = {
   BATCH_SIZE: 25,           // Vehicles per batch
-  DELAY_BETWEEN: 2000,      // ms between vehicles
-  DELAY_BETWEEN_BATCHES: 5000, // ms between batches
-  MAX_VEHICLES: 0,          // 0 = ALL (1,265 vehicles)
+  DELAY_BETWEEN: 2000,      // ms between vehicles (2 sec)
+  DELAY_BETWEEN_BATCHES: 5000, // ms between batches (5 sec)
+  MAX_VEHICLES: 0,          // 0 = ALL
   START_FROM: 0,            // Offset to start from
   HEADLESS: true,           // Headless for speed
+  SKIP_IMAGE_DELETE: true,  // Skip slow delete, dedupe later
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -369,8 +370,44 @@ const EXTRACTION_SCRIPT = `
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // IMAGES (SKIP AVATARS!)
+    // IMAGES (ONLY FROM THIS AUCTION!)
     // ═══════════════════════════════════════════════════════════════
+
+    // STEP 1: Find the auction's unique hash from the main gallery
+    // The main gallery images have URLs like /HASH/photos/exterior/...
+    var auctionHash = null;
+
+    // Look for images in the main gallery area first
+    var galleryContainers = document.querySelectorAll('.gallery, .carousel, [class*="gallery"], [class*="photo-gallery"]');
+    for (var gc = 0; gc < galleryContainers.length && !auctionHash; gc++) {
+      var galleryImgs = galleryContainers[gc].querySelectorAll('img[src*="media.carsandbids.com"]');
+      for (var gi = 0; gi < galleryImgs.length && !auctionHash; gi++) {
+        var gSrc = galleryImgs[gi].src || '';
+        var hashMatch = gSrc.match(/\\/([a-f0-9]{32,})\\/photos\\//);
+        if (hashMatch) {
+          auctionHash = hashMatch[1];
+        }
+      }
+    }
+
+    // Fallback: find the first large image with /photos/ path
+    if (!auctionHash) {
+      var allImgs = document.querySelectorAll('img[src*="media.carsandbids.com"]');
+      for (var ai = 0; ai < allImgs.length && !auctionHash; ai++) {
+        var aiSrc = allImgs[ai].src || '';
+        // Skip avatars
+        if (aiSrc.indexOf('width=80') >= 0 && aiSrc.indexOf('height=80') >= 0) continue;
+        // Check for photo path with hash
+        var aiHashMatch = aiSrc.match(/\\/([a-f0-9]{32,})\\/photos\\//);
+        if (aiHashMatch) {
+          auctionHash = aiHashMatch[1];
+        }
+      }
+    }
+
+    result.auctionImageHash = auctionHash;
+
+    // STEP 2: Extract only images matching this auction's hash
     var imgEls = document.querySelectorAll('img');
     var seenUrls = {};
     for (var k = 0; k < imgEls.length; k++) {
@@ -388,12 +425,16 @@ const EXTRACTION_SCRIPT = `
       var width = widthMatch ? parseInt(widthMatch[1], 10) : 0;
       if (width < 200) continue;
 
+      // CRITICAL: Only include images from THIS auction's hash
+      if (auctionHash && src.indexOf(auctionHash) < 0) continue;
+
       // Convert to full res
       var fullRes = src.replace(/width=\\d+/, 'width=2080').replace(/,height=\\d+/, '');
 
-      // Skip duplicates
-      if (seenUrls[fullRes]) continue;
-      seenUrls[fullRes] = true;
+      // Skip duplicates (by base path, not full URL)
+      var basePath = fullRes.split('?')[0];
+      if (seenUrls[basePath]) continue;
+      seenUrls[basePath] = true;
 
       // Detect category from URL
       var category = 'other';
@@ -498,6 +539,25 @@ async function main() {
       process.stdout.write(`[${processed}] ${name}... `);
 
       try {
+        // Extract auction ID from URL (e.g., /auctions/9a7XbAL8/...)
+        const auctionIdMatch = url.match(/\/auctions\/([A-Za-z0-9]+)\//);
+        const auctionId = auctionIdMatch ? auctionIdMatch[1] : null;
+
+        // Set up API response listener to capture photos
+        let apiPhotos: any = null;
+        const apiListener = async (response: any) => {
+          const respUrl = response.url();
+          if (auctionId && respUrl.includes(`/v2/autos/auctions/${auctionId}`)) {
+            try {
+              const data = await response.json();
+              if (data.listing?.photos) {
+                apiPhotos = data.listing.photos;
+              }
+            } catch {}
+          }
+        };
+        page.on('response', apiListener);
+
         // Navigate to auction
         await page.goto(url, { waitUntil: 'load', timeout: 60000 });
 
@@ -508,6 +568,9 @@ async function main() {
           await page.waitForTimeout(1000);
         }
         await page.waitForTimeout(2000);
+
+        // Remove listener after page load
+        page.off('response', apiListener);
 
         // Check for 404
         const title = await page.title();
@@ -535,13 +598,69 @@ async function main() {
           }
         }
 
-        // Extract data
+        // Extract data from DOM
         const data = await page.evaluate(EXTRACTION_SCRIPT);
 
         if (!data.success) {
           console.log(`X Error: ${data.error}`);
           failed++;
           continue;
+        }
+
+        // MERGE API PHOTOS: If we captured photos from API, use them instead of DOM photos
+        if (apiPhotos) {
+          const baseUrl = apiPhotos.base_url || 'media.carsandbids.com';
+          const allPhotos: any[] = [];
+
+          // Extract photos from all categories
+          const categories = ['exterior', 'interior', 'mechanical', 'docs', 'other'];
+          for (const cat of categories) {
+            const catPhotos = apiPhotos[cat];
+            if (Array.isArray(catPhotos)) {
+              for (const photo of catPhotos) {
+                if (photo.link) {
+                  allPhotos.push({
+                    url: `https://${baseUrl}/cdn-cgi/image/width=542,quality=70/${photo.link}`,
+                    fullResUrl: `https://${baseUrl}/cdn-cgi/image/width=2080,quality=70/${photo.link}`,
+                    category: cat === 'docs' ? 'documentation' : cat,
+                    width: photo.width || 0,
+                    photoId: photo.id,
+                    link: photo.link  // Keep original link for hash extraction
+                  });
+                }
+              }
+            }
+          }
+
+          // FILTER BY AUCTION HASH: Only keep images matching the primary auction's hash
+          // The hash is the 40-char hex string in the photo path, e.g., "e25a925f6f6a.../photos/..."
+          const extractHash = (link: string) => link?.match(/^([a-f0-9]{40})\//)?.[1] || null;
+
+          // Find the most common hash (should be the current auction's hash)
+          const hashCounts: Record<string, number> = {};
+          allPhotos.forEach(p => {
+            const hash = extractHash(p.link);
+            if (hash) hashCounts[hash] = (hashCounts[hash] || 0) + 1;
+          });
+
+          // Get the dominant hash (most images)
+          const sortedHashes = Object.entries(hashCounts).sort((a, b) => b[1] - a[1]);
+          const primaryHash = sortedHashes.length > 0 ? sortedHashes[0][0] : null;
+
+          // Filter to only include images with the primary hash
+          const filteredPhotos = primaryHash
+            ? allPhotos.filter(p => extractHash(p.link) === primaryHash)
+            : allPhotos;
+
+          // Log if we filtered out polluted images
+          const pollutedCount = allPhotos.length - filteredPhotos.length;
+          if (pollutedCount > 0) {
+            console.log(`  [filtered ${pollutedCount} polluted images from ${sortedHashes.length - 1} other auctions]`);
+          }
+
+          // Replace DOM images with filtered API images
+          data.images = filteredPhotos;
+          data.apiPhotoCount = filteredPhotos.length;
         }
 
         // Update database
@@ -634,16 +753,84 @@ async function updateDatabase(vehicleId: string, listingId: string, url: string,
     })
     .eq('id', listingId);
 
-  // Update vehicle VIN if found
-  if (data.vin) {
-    await supabase
-      .from('vehicles')
-      .update({ vin: data.vin, updated_at: new Date().toISOString() })
-      .eq('id', vehicleId);
+  // Update vehicle with extracted data
+  const vehicleUpdate: any = {
+    updated_at: new Date().toISOString(),
+  };
+  if (data.vin) vehicleUpdate.vin = data.vin;
+  if (data.location) vehicleUpdate.location = data.location;
+  if (data.dougsTake) vehicleUpdate.description = data.dougsTake.substring(0, 5000);
+  if (data.sellerUsername) vehicleUpdate.bat_seller = data.sellerUsername;
+  if (data.soldPrice) vehicleUpdate.sold_price = data.soldPrice;
+  if (data.highBid) vehicleUpdate.high_bid = data.highBid;
+  if (data.bidCount) vehicleUpdate.bid_count = data.bidCount;
+  if (data.viewCount) vehicleUpdate.view_count = data.viewCount;
+  if (data.auctionResult?.status) vehicleUpdate.auction_outcome = data.auctionResult.status;
+
+  await supabase
+    .from('vehicles')
+    .update(vehicleUpdate)
+    .eq('id', vehicleId);
+
+  // Save content sections (Doug's Take, Highlights, Equipment, etc.)
+  const contentSections: { vehicle_id: string; section_type: string; content: any }[] = [];
+
+  if (data.dougsTake) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'dougs_take', content: data.dougsTake });
   }
+  if (data.highlights?.length > 0) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'highlights', content: data.highlights });
+  }
+  if (data.equipment?.length > 0) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'equipment', content: data.equipment });
+  }
+  if (data.modifications?.length > 0) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'modifications', content: data.modifications });
+  }
+  if (data.knownFlaws?.length > 0) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'known_flaws', content: data.knownFlaws });
+  }
+  if (data.serviceHistory?.length > 0) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'service_history', content: data.serviceHistory });
+  }
+  if (data.sellerNotes) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'seller_notes', content: data.sellerNotes });
+  }
+  if (data.carfaxUrl) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'carfax_url', content: data.carfaxUrl });
+  }
+  if (data.videoUrl) {
+    contentSections.push({ vehicle_id: vehicleId, section_type: 'video_url', content: data.videoUrl });
+  }
+
+  // Note: vehicle_content_sections table doesn't exist yet
+  // Content is already saved in external_listings.metadata
+  // Skipping content sections insert for now
 
   // Save comments
   if (data.comments.length > 0) {
+    const now = Date.now();
+
+    // Parse relative time to actual timestamp
+    const parseRelativeTime = (relTime: string): Date => {
+      if (!relTime) return new Date(now);
+      const match = relTime.match(/(\d+)\s*(s|m|h|d|w|mo|y)/i);
+      if (!match) return new Date(now);
+      const num = parseInt(match[1], 10);
+      const unit = match[2].toLowerCase();
+      let msAgo = 0;
+      switch (unit) {
+        case 's': msAgo = num * 1000; break;
+        case 'm': msAgo = num * 60 * 1000; break;
+        case 'h': msAgo = num * 60 * 60 * 1000; break;
+        case 'd': msAgo = num * 24 * 60 * 60 * 1000; break;
+        case 'w': msAgo = num * 7 * 24 * 60 * 60 * 1000; break;
+        case 'mo': msAgo = num * 30 * 24 * 60 * 60 * 1000; break;
+        case 'y': msAgo = num * 365 * 24 * 60 * 60 * 1000; break;
+      }
+      return new Date(now - msAgo);
+    };
+
     const commentRows = data.comments.map((c: any, idx: number) => ({
       vehicle_id: vehicleId,
       platform: 'cars_and_bids',
@@ -653,7 +840,7 @@ async function updateDatabase(vehicleId: string, listingId: string, url: string,
       author_username: c.username,
       is_seller: c.isSeller,
       comment_type: c.isSystem ? 'sold' : c.isBid ? 'bid' : 'observation',
-      posted_at: new Date().toISOString(),
+      posted_at: parseRelativeTime(c.relativeTime).toISOString(),
       comment_text: c.text,
       word_count: c.text.split(/\s+/).length,
       has_question: c.text.includes('?'),
@@ -668,12 +855,22 @@ async function updateDatabase(vehicleId: string, listingId: string, url: string,
   // Save images - use source='external_import' to satisfy vehicle_images_attribution_check
   // Do NOT include user_id field - omitting allows constraint to pass
   if (data.images.length > 0) {
-    // Delete existing external_import images first to avoid duplicates
-    await supabase
-      .from('vehicle_images')
-      .delete()
-      .eq('vehicle_id', vehicleId)
-      .eq('source', 'external_import');
+    // Skip delete if configured (much faster, dedupe later)
+    if (!CONFIG.SKIP_IMAGE_DELETE) {
+      for (let delAttempt = 0; delAttempt < 30; delAttempt++) {
+        const { data: existingImages } = await supabase
+          .from('vehicle_images')
+          .select('id')
+          .eq('vehicle_id', vehicleId)
+          .eq('source', 'external_import')
+          .limit(20);
+
+        if (!existingImages || existingImages.length === 0) break;
+
+        const ids = existingImages.map(img => img.id);
+        await supabase.from('vehicle_images').delete().in('id', ids);
+      }
+    }
 
     const imageRows = data.images.map((img: any, idx: number) => ({
       vehicle_id: vehicleId,
