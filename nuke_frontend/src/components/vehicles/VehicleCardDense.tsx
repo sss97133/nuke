@@ -14,6 +14,7 @@ import { OwnershipDetailsPopup } from './OwnershipDetailsPopup';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useVehicleFollow } from '../../hooks/useVehicleFollow';
+import { formatCurrencyAmount, formatCurrencyFromCents, resolveCurrencyCode } from '../../utils/currency';
 
 const parseMoneyNumber = (val: any): number | null => {
   if (val === null || val === undefined) return null;
@@ -166,6 +167,40 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }>({ loading: false, images: [], error: null });
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [computedCardSize, setComputedCardSize] = React.useState(cardSizePx || 200);
+  const listingCurrency = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const externalListing = v?.external_listings?.[0];
+    return resolveCurrencyCode(
+      externalListing?.currency,
+      externalListing?.currency_code,
+      externalListing?.price_currency,
+      externalListing?.metadata?.currency,
+      externalListing?.metadata?.currency_code,
+      externalListing?.metadata?.currencyCode,
+      externalListing?.metadata?.price_currency,
+      externalListing?.metadata?.priceCurrency,
+      externalListing?.metadata?.priceCurrencyCode,
+      v?.origin_metadata?.currency,
+      v?.origin_metadata?.currency_code,
+      v?.origin_metadata?.price_currency,
+      v?.origin_metadata?.priceCurrency,
+      v?.origin_metadata?.priceCurrencyCode,
+    );
+  }, [vehicle]);
+  const formatCurrencyValue = (amount?: number | null, fallback = '—') =>
+    formatCurrencyAmount(amount, {
+      currency: listingCurrency ?? undefined,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      fallback,
+    });
+  const formatCurrencyCents = (cents?: number | null, fallback = '—') =>
+    formatCurrencyFromCents(cents, {
+      currency: listingCurrency ?? undefined,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      fallback,
+    });
   
   // Follow system with ROI tracking (only if enabled)
   const { isFollowing, isLoading: followLoading, followROI, toggleFollow } = useVehicleFollow(
@@ -212,33 +247,35 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date || null;
   }, [vehicle]);
 
+  const isAuctionLiveStatus = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const saleStatus = String(v?.sale_status || '').toLowerCase();
+    const externalStatus = String(v?.external_listings?.[0]?.listing_status || '').toLowerCase();
+    return saleStatus === 'auction_live' || externalStatus === 'active' || externalStatus === 'live';
+  }, [vehicle]);
+
   const formatAuctionTimer = React.useMemo(() => {
     if (!auctionEndDate) return null;
     const end = new Date(auctionEndDate).getTime();
     if (!Number.isFinite(end)) return null;
-    const diff = end - auctionNow;
+    const diffMs = end - auctionNow;
     // Allow up to 60 days for legitimate long auctions (BaT auctions can be up to 10 days, but allow buffer)
     const maxReasonable = 60 * 24 * 60 * 60 * 1000;
-    if (diff > maxReasonable) return null;
-    if (diff <= 0) return 'Ended';
-    
-    const totalSeconds = Math.floor(diff / 1000);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (diffMs > maxReasonable) return null;
+
+    const twoMinutesMs = 2 * 60 * 1000;
+    if (diffMs > twoMinutesMs) return null;
+
+    const totalSeconds = Math.floor(Math.abs(diffMs) / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     const pad = (n: number) => String(n).padStart(2, '0');
-    
-    // Show days when > 24 hours, HH:MM:SS when <= 24 hours
-    // For very long auctions (>7 days), show simplified format (e.g., "19d 18h")
-    if (totalSeconds > 7 * 86400) {
-      return `${days}d ${hours}h`;
-    }
-    if (totalSeconds > 86400) {
-      return `${days}d`;
-    }
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-  }, [auctionEndDate, auctionNow]);
+    const ticker = `${pad(minutes)}:${pad(seconds)}`;
+
+    if (diffMs >= 0) return ticker;
+    if (isAuctionLiveStatus) return `OT ${ticker}`;
+    return null;
+  }, [auctionEndDate, auctionNow, isAuctionLiveStatus]);
 
   // PERF: Never do per-card network calls on the feed.
   // Use the already-available vehicle fields (or precomputed display_price) to render pricing synchronously.
@@ -297,12 +334,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       msrp ??
       null;
 
-    const formatted = priceValue ? new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(priceValue) : '—';
+    const formatted = formatCurrencyValue(priceValue);
 
     return { displayPrice: formatted };
   }, [vehicle]);
@@ -378,15 +410,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     ).catch(() => null);
   }, [viewerUserId, vehicle?.id, identity.meta.maxDifferentiators, identity.meta.transmissionStrategy]);
 
-  const formatPrice = (price?: number) => {
-    if (!price) return '—';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
+  const formatPrice = (price?: number) => formatCurrencyValue(price);
 
   // Check if vehicle is from Mecum and extract lot data
   const mecumLotData = React.useMemo(() => {
@@ -607,9 +631,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }, [vehicle]);
 
   // Update timer every second for active auctions (must be after isActiveAuction is defined)
+  const shouldTickAuctionTimer = Boolean(auctionEndDate) && (isActiveAuction || isAuctionLiveStatus);
   const lastUpdateRef = React.useRef<number>(Date.now());
   React.useEffect(() => {
-    if (!isActiveAuction || !auctionEndDate) return;
+    if (!shouldTickAuctionTimer) return;
     const tick = () => {
       const now = Date.now();
       setAuctionNow(now);
@@ -643,7 +668,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       window.clearInterval(id);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isActiveAuction, auctionEndDate]);
+  }, [shouldTickAuctionTimer, auctionEndDate]);
   
   // Get auction mode for additional context
   const auctionMode = React.useMemo(() => {
@@ -690,7 +715,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         // Check current_bid first (most up-to-date for live auctions)
         const listingLiveBid = parseMoneyNumber(externalListing.current_bid);
         if (listingLiveBid !== null) {
-          return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(listingLiveBid);
+          return formatCurrencyValue(listingLiveBid);
         }
         // If current_bid is 0 or null, check if there are any bids at all
         const bidCount = typeof externalListing.bid_count === 'number' ? externalListing.bid_count : 0;
@@ -703,7 +728,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       // Fallback: vehicle.current_bid for active auctions
       const currentBid = parseMoneyNumber(v.current_bid);
       if (currentBid) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(currentBid);
+        return formatCurrencyValue(currentBid);
       }
       
       // No bids yet for active auction
@@ -718,7 +743,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     
     const finalBid = salePrice ?? winningBid ?? highBid;
     if (finalBid) {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(finalBid);
+      return formatCurrencyValue(finalBid);
     }
     
     // Fallback: check cents fields
@@ -726,7 +751,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       (typeof v.current_high_bid_cents === 'number' ? v.current_high_bid_cents : null) ??
       (typeof v.latest_bid_cents === 'number' ? v.latest_bid_cents : null);
     if (typeof cents === 'number' && Number.isFinite(cents) && cents > 0) {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cents / 100);
+      return formatCurrencyCents(cents);
     }
     
     return null;
@@ -989,10 +1014,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // If auction ended > 1 day ago, show asset value instead of auction status
     if (shouldShowAssetValue) {
       if (marketValue) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(marketValue);
+        return formatCurrencyValue(marketValue);
       }
       if (ownerCost) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(ownerCost);
+        return formatCurrencyValue(ownerCost);
       }
     }
     
@@ -1004,10 +1029,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     }
     // Fallback to market value if displayPrice is empty
     if (marketValue) {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(marketValue);
+      return formatCurrencyValue(marketValue);
     }
     if (ownerCost) {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(ownerCost);
+      return formatCurrencyValue(ownerCost);
     }
     return displayPrice; // Will be "—" if nothing found
   }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost, isSold, shouldShowSoldBadge]);
@@ -1271,7 +1296,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }, [badgeMainText]);
 
   const showPriceBadge = showPriceOverlay && (mecumLotData || badgeMainText !== '—');
-  const showTopLeftBadges = vehicle.is_streaming || (isActiveAuction && formatAuctionTimer);
+  const showTopLeftBadges = vehicle.is_streaming || !!formatAuctionTimer;
+  const showSourceBadge = Boolean(sourceFaviconUrl) && cardTier !== 'xs';
+  const showGridSourceBadge = showSourceBadge && viewMode === 'grid';
+  const showTopLeftStack = showTopLeftBadges || showGridSourceBadge;
   const showTopRightBadges = showPriceBadge || showFollowButton;
   const topRightBadgeGap = showPriceBadge && showFollowButton
     ? (isCompactCard ? '10px' : '12px')
@@ -1483,7 +1511,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     </div>
                   )}
 
-                  {isActiveAuction && formatAuctionTimer && (
+                  {formatAuctionTimer && (
                     <div
                       style={{
                         background: 'rgba(0, 0, 0, 0.75)',
@@ -2033,7 +2061,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             No Image
           </div>
         )}
-        {(showTopLeftBadges || showTopRightBadges) && (
+        {(showTopLeftStack || showTopRightBadges) && (
           <div
             style={{
               position: 'absolute',
@@ -2048,7 +2076,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               zIndex: 12,
             }}
           >
-            {showTopLeftBadges ? (
+            {showTopLeftStack ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start', minWidth: 0 }}>
                 {vehicle.is_streaming && (
                   <div
@@ -2067,7 +2095,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   </div>
                 )}
 
-                {isActiveAuction && formatAuctionTimer && (
+                {formatAuctionTimer && (
                   <div
                     style={{
                       background: 'rgba(0, 0, 0, 0.75)',
@@ -2086,6 +2114,26 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     }}
                   >
                     {formatAuctionTimer}
+                  </div>
+                )}
+
+                {showGridSourceBadge && (
+                  <div
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      backdropFilter: 'blur(4px)',
+                      padding: '3px 5px',
+                      borderRadius: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      zIndex: 10,
+                    }}
+                  >
+                    <FaviconIcon url={sourceFaviconUrl} size={12} preserveAspectRatio={true} />
+                    {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={12} preserveAspectRatio={true} /> : null}
                   </div>
                 )}
               </div>
@@ -2292,28 +2340,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         )}
 
       </div>
-
-      {/* Favicon in top-left corner (hide on tiniest cards; it turns into noise) */}
-      {sourceFaviconUrl && cardTier !== 'xs' && (
-        <div style={{
-          position: 'absolute',
-          top: '6px',
-          left: '6px',
-          background: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(4px)',
-          padding: '3px 5px',
-          borderRadius: '4px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px',
-          border: '1px solid rgba(255,255,255,0.15)',
-          zIndex: 10,
-        }}>
-          <FaviconIcon url={sourceFaviconUrl} size={12} preserveAspectRatio={true} />
-          {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={12} preserveAspectRatio={true} /> : null}
-        </div>
-      )}
 
       {/* Follow button is rendered in the image overlay stack (top-right). */}
       

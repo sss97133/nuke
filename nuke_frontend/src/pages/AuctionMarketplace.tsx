@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
+import { formatCurrencyFromCents, resolveCurrencyCode } from '../utils/currency';
 import ProxyBidModal from '../components/ProxyBidModal';
 import '../design-system.css';
 
@@ -30,6 +31,7 @@ interface AuctionListing {
   lead_image_url?: string | null;
   current_high_bid_cents: number | null;
   reserve_price_cents: number | null;
+  currency_code?: string | null;
   bid_count: number;
   auction_start_time?: string | null;
   auction_end_time: string | null;
@@ -271,6 +273,19 @@ export default function AuctionMarketplace() {
           bat_views: (typeof v?.bat_views === 'number' ? v.bat_views : null) as number | null,
         };
       };
+
+      const resolveListingCurrency = (listing: any): string | null =>
+        resolveCurrencyCode(
+          listing?.currency,
+          listing?.currency_code,
+          listing?.price_currency,
+          listing?.metadata?.currency,
+          listing?.metadata?.currency_code,
+          listing?.metadata?.currencyCode,
+          listing?.metadata?.price_currency,
+          listing?.metadata?.priceCurrency,
+          listing?.metadata?.priceCurrencyCode,
+        );
 
       const hasBidSignal = (params: { bidCount: any; currentHighBidCents: any }) => {
         const n = typeof params.bidCount === 'number' ? params.bidCount : Number(params.bidCount || 0);
@@ -539,6 +554,7 @@ export default function AuctionMarketplace() {
             lead_image_url: vehicle.primary_image_url || null,
             current_high_bid_cents: currentHighBidCents,
             reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
+            currency_code: resolveListingCurrency(listing),
             bid_count: listing.bid_count || 0,
             auction_end_time: effectiveEndDate,
             status: listing.listing_status,
@@ -696,11 +712,13 @@ export default function AuctionMarketplace() {
     setLoading(false);
   };
 
-  const formatCurrency = (cents: number | null) => {
-    const v = typeof cents === 'number' ? cents : 0;
-    const safe = Number.isFinite(v) ? v : 0;
-    return `$${(safe / 100).toLocaleString()}`;
-  };
+  const formatCurrency = (cents: number | null, currencyCode?: string | null) =>
+    formatCurrencyFromCents(cents, {
+      currency: currencyCode ?? undefined,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      fallback: '—',
+    });
 
   const formatTimeRemaining = (endTime: string | null) => {
     if (!endTime) return '—';
@@ -1063,7 +1081,7 @@ export default function AuctionMarketplace() {
 
 interface AuctionCardProps {
   listing: AuctionListing;
-  formatCurrency: (cents: number | null) => string;
+  formatCurrency: (cents: number | null, currency?: string | null) => string;
   formatTimeRemaining: (endTime: string | null) => string;
   getTimeRemainingColor: (endTime: string | null) => string;
   onBidClick?: (listing: AuctionListing) => void;
@@ -1326,7 +1344,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
         >
           <div>
             <div style={{ fontSize: '10pt', fontWeight: 800, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
-              {formatCurrency(listing.current_high_bid_cents)}
+              {formatCurrency(listing.current_high_bid_cents, listing.currency_code)}
             </div>
             {isStale && (
               <div style={{ fontSize: '7pt', color: '#b45309', fontWeight: 700, marginTop: '2px' }}>

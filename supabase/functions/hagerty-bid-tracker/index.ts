@@ -158,6 +158,7 @@ serve(async (req) => {
             current_bid: currentBid,
             bid_count: extracted.bid_count,
             view_count: extracted.view_count,
+            comment_count: extracted.comment_count,
             listing_status: extracted.status,
             final_price: extracted.status === 'sold' ? extracted.sale_price : null,
             updated_at: now,

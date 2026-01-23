@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useExternalAuctionSync } from '../../hooks/useExternalAuctionSync';
 import { supabase } from '../../lib/supabase';
 import PlatformCredentialForm from '../bidding/PlatformCredentialForm';
+import { formatCurrencyAmount } from '../../utils/currency';
 
 interface ExternalAuctionLiveBannerProps {
   /** External listing ID */
@@ -12,6 +13,8 @@ interface ExternalAuctionLiveBannerProps {
   listingUrl: string;
   /** Current bid amount in dollars */
   currentBid: number | null;
+  /** Optional currency code (USD, EUR, AED, etc.) */
+  currencyCode?: string | null;
   /** Number of bids */
   bidCount: number | null;
   /** Number of watchers */
@@ -69,9 +72,13 @@ function formatTimeRemaining(endDate: string | null): { text: string; urgent: bo
   }
 }
 
-function formatCurrency(amount: number | null): string {
-  if (amount === null || amount === undefined) return '--';
-  return `$${amount.toLocaleString()}`;
+function formatCurrency(amount: number | null, currencyCode?: string | null): string {
+  return formatCurrencyAmount(amount, {
+    currency: currencyCode ?? undefined,
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    fallback: '--',
+  });
 }
 
 export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps> = ({
@@ -79,6 +86,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
   platform,
   listingUrl,
   currentBid: initialBid,
+  currencyCode,
   bidCount: initialBidCount,
   watcherCount: initialWatcherCount,
   commentCount,
@@ -247,7 +255,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               textShadow: bidChanged ? `0 0 12px ${colors.accent}` : 'none',
             }}
           >
-            {formatCurrency(currentBid)}
+            {formatCurrency(currentBid, currencyCode)}
           </span>
         </div>
 

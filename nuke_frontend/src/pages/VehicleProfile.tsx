@@ -37,6 +37,7 @@ import WiringQueryContextBar from '../components/wiring/WiringQueryContextBar';
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
 import LiveAuctionBanner from '../components/auction/LiveAuctionBanner';
 import ExternalAuctionLiveBanner from '../components/auction/ExternalAuctionLiveBanner';
+import { resolveCurrencyCode } from '../utils/currency';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
 import { BATListingManager } from '../components/vehicle/BATListingManager';
@@ -101,6 +102,31 @@ const VehicleProfile: React.FC = () => {
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
   const [showMap, setShowMap] = useState(false);
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
+  const auctionCurrency = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const externalListing = v?.external_listings?.[0];
+    const pulseMeta = (auctionPulse as any)?.metadata;
+    return resolveCurrencyCode(
+      pulseMeta?.currency,
+      pulseMeta?.currency_code,
+      pulseMeta?.currencyCode,
+      pulseMeta?.price_currency,
+      pulseMeta?.priceCurrency,
+      externalListing?.currency,
+      externalListing?.currency_code,
+      externalListing?.price_currency,
+      externalListing?.metadata?.currency,
+      externalListing?.metadata?.currency_code,
+      externalListing?.metadata?.currencyCode,
+      externalListing?.metadata?.price_currency,
+      externalListing?.metadata?.priceCurrency,
+      v?.origin_metadata?.currency,
+      v?.origin_metadata?.currency_code,
+      v?.origin_metadata?.price_currency,
+      v?.origin_metadata?.priceCurrency,
+      v?.origin_metadata?.priceCurrencyCode,
+    );
+  }, [vehicle, auctionPulse]);
   const presenceAvailableRef = React.useRef<boolean>(true);
   const vehicleHeaderRef = React.useRef<HTMLDivElement | null>(null);
   const [vehicleHeaderHeight, setVehicleHeaderHeight] = React.useState<number>(88);
@@ -505,6 +531,7 @@ const VehicleProfile: React.FC = () => {
         last_bid_at: null as string | null,
         last_comment_at: null as string | null,
         updated_at: updatedAt,
+        metadata: (best?.metadata && typeof best.metadata === 'object') ? best.metadata : null,
         _vehicle_id: vehicleIdForRows,
       };
     };
@@ -1162,6 +1189,7 @@ const VehicleProfile: React.FC = () => {
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
             updated_at: (merged as any)?.updated_at ?? auctionPulse?.updated_at ?? null,
+            metadata: (merged as any)?.metadata ?? (auctionPulse as any)?.metadata ?? null,
             // Preserve any derived winner/seller identity from auction_comments
             winner_name: (auctionPulse as any)?.winner_name ?? null,
             seller_username: (auctionPulse as any)?.seller_username ?? null,
@@ -1814,6 +1842,7 @@ const VehicleProfile: React.FC = () => {
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
             updated_at: (effective as any).updated_at || null,
+            metadata: (effective as any).metadata ?? null,
             winner_name: (effective as any).winner_name ?? null,
             seller_username: (effective as any).seller_username ?? null,
           });
@@ -3776,6 +3805,7 @@ const VehicleProfile: React.FC = () => {
               endDate={auctionPulse?.end_date || null}
               listingStatus={auctionPulse?.listing_status || null}
               lastUpdatedAt={auctionPulse?.updated_at || null}
+              currencyCode={auctionCurrency}
             />
           </div>
         )}
