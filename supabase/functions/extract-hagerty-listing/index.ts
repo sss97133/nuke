@@ -571,6 +571,7 @@ serve(async (req) => {
     const dbErrors: string[] = [];
     let imagesSaved = 0;
     let externalListingSaved = false;
+    let identitiesSaved: string[] = [];
 
     // Save to database if requested
     if (save_to_db || vehicle_id) {
@@ -642,18 +643,36 @@ serve(async (req) => {
         targetVehicleId = data.id;
       }
 
-      // Save images
+      // Save images - must satisfy vehicle_images_attribution_check
+      // Use source='external_import' and include required fields
       if (extracted.image_urls.length > 0 && targetVehicleId) {
-        const imageRecords = extracted.image_urls.map((img_url, i) => ({
+        const imageRecords = extracted.image_urls.slice(0, 100).map((img_url, i) => ({
           vehicle_id: targetVehicleId,
           image_url: img_url,
-          position: i,
-          source: 'hagerty_import',
+          source: 'external_import',  // Required for attribution check
+          source_url: img_url,
           is_external: true,
+          approval_status: 'auto_approved',
+          is_approved: true,
+          redaction_level: 'none',
+          position: i,
+          display_order: i,
+          is_primary: i === 0,
+          exif_data: {
+            source_url: extracted.url,
+            discovery_url: extracted.url,
+            imported_from: 'hagerty',
+          },
         }));
 
-        // Use insert with conflict ignore (simpler, more reliable)
-        const { error: imgError, count } = await supabase
+        // Delete existing external_import images for this vehicle to avoid duplicates
+        await supabase
+          .from('vehicle_images')
+          .delete()
+          .eq('vehicle_id', targetVehicleId)
+          .eq('source', 'external_import');
+
+        const { data: insertedImages, error: imgError } = await supabase
           .from('vehicle_images')
           .insert(imageRecords)
           .select('id');
@@ -662,7 +681,7 @@ serve(async (req) => {
           console.error('[hagerty] Image save error:', JSON.stringify(imgError));
           dbErrors.push(`images: ${imgError.message || JSON.stringify(imgError)}`);
         } else {
-          imagesSaved = imageRecords.length;
+          imagesSaved = insertedImages?.length || 0;
           console.log(`[hagerty] Saved ${imagesSaved} images for vehicle ${targetVehicleId}`);
         }
       }
@@ -710,6 +729,68 @@ serve(async (req) => {
         } else {
           externalListingSaved = true;
           console.log(`[hagerty] Created external_listings record: ${listingData?.id}`);
+        }
+      }
+
+      // Save seller/buyer to external_identities
+      if (extracted.seller_username || extracted.buyer_username) {
+        const nowIso = new Date().toISOString();
+        const identitiesToUpsert = [];
+
+        // Seller identity
+        if (extracted.seller_username) {
+          identitiesToUpsert.push({
+            platform: 'hagerty',
+            handle: extracted.seller_username,
+            display_name: extracted.seller_username,
+            profile_url: extracted.seller_slug
+              ? `https://www.hagerty.com/marketplace/profile/${extracted.seller_slug}`
+              : null,
+            metadata: {
+              seller_id: extracted.seller_id,
+              slug: extracted.seller_slug,
+              is_specialist: extracted.seller_is_specialist,
+              is_verified: extracted.seller_verified,
+              first_seen_listing: extracted.url,
+            },
+            first_seen_at: nowIso,
+            last_seen_at: nowIso,
+            updated_at: nowIso,
+          });
+        }
+
+        // Buyer identity (if sold)
+        if (extracted.buyer_username && extracted.status === 'sold') {
+          identitiesToUpsert.push({
+            platform: 'hagerty',
+            handle: extracted.buyer_username,
+            display_name: extracted.buyer_username,
+            profile_url: null,
+            metadata: {
+              buyer_id: extracted.buyer_id,
+              first_seen_as_buyer: extracted.url,
+            },
+            first_seen_at: nowIso,
+            last_seen_at: nowIso,
+            updated_at: nowIso,
+          });
+        }
+
+        if (identitiesToUpsert.length > 0) {
+          const { data: upsertedIdentities, error: identityError } = await supabase
+            .from('external_identities')
+            .upsert(identitiesToUpsert, { onConflict: 'platform,handle' })
+            .select('id, handle');
+
+          if (identityError) {
+            console.error('[hagerty] External identity save error:', JSON.stringify(identityError));
+            dbErrors.push(`external_identities: ${identityError.message || JSON.stringify(identityError)}`);
+          } else {
+            for (const id of upsertedIdentities || []) {
+              identitiesSaved.push(id.handle);
+            }
+            console.log(`[hagerty] Saved ${identitiesSaved.length} external identities: ${identitiesSaved.join(', ')}`);
+          }
         }
       }
 
@@ -769,6 +850,7 @@ serve(async (req) => {
         vehicle_saved: !!extracted.vehicle_id,
         images_saved: imagesSaved,
         external_listing_saved: externalListingSaved,
+        identities_saved: identitiesSaved || [],
         errors: dbErrors,
       } : null,
     };

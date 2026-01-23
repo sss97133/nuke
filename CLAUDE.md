@@ -64,6 +64,7 @@ When user says "extract [URL]":
 | `ralph-wiggum-rlm-extraction-coordinator` | Coordination brief for system status |
 | `bat-simple-extract` | Bring a Trailer extraction |
 | `extract-cars-and-bids-core` | Cars & Bids extraction |
+| `extract-hagerty-listing` | Hagerty Marketplace extraction |
 | `import-pcarmarket-listing` | PCarMarket extraction |
 | `extract-vehicle-data-ai` | AI-powered generic extraction |
 | `discovery-snowball` | Recursive lead discovery |

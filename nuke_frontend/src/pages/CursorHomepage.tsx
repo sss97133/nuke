@@ -1392,6 +1392,9 @@ const CursorHomepage: React.FC = () => {
           .neq('status', 'pending');
         if (includeListingKind) query = query.eq('listing_kind', 'vehicle');
 
+        // CRITICAL: Override default 1000 row limit for filtered stats calculation
+        query = query.limit(15000);
+
         // "Added today" filter (created_at within local day)
         if (filters.addedTodayOnly) {
           const start = new Date();
