@@ -186,8 +186,34 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
 
       if (insertError) throw insertError;
 
-      // TODO: Create Stripe PaymentIntent for deposit hold
-      // For now, we'll skip actual payment and mark as pending
+      // Create Stripe PaymentIntent for deposit hold
+      const { data: session } = await supabase.auth.getSession();
+      const depositResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-proxy-bid-deposit`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.session?.access_token}`,
+          },
+          body: JSON.stringify({ proxy_bid_request_id: data.id }),
+        }
+      );
+
+      const depositResult = await depositResponse.json();
+
+      if (!depositResult.success) {
+        // If deposit authorization fails, update the bid request status
+        await supabase
+          .from('proxy_bid_requests')
+          .update({ status: 'cancelled', deposit_status: 'failed' })
+          .eq('id', data.id);
+
+        if (depositResult.requires_payment_method) {
+          throw new Error('Please add a payment method to your account before placing a proxy bid.');
+        }
+        throw new Error(depositResult.error || 'Failed to authorize deposit');
+      }
 
       setStep('success');
       onBidPlaced?.(data.id);

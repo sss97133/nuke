@@ -1270,6 +1270,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return { label: null as string | null, value: raw || null };
   }, [badgeMainText]);
 
+  const showPriceBadge = showPriceOverlay && (mecumLotData || badgeMainText !== '—');
+  const showTopLeftBadges = vehicle.is_streaming || (isActiveAuction && formatAuctionTimer);
+  const showTopRightBadges = showPriceBadge || showFollowButton;
+  const topRightBadgeGap = showPriceBadge && showFollowButton
+    ? (isCompactCard ? '10px' : '12px')
+    : '6px';
+
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
     return (
@@ -1442,145 +1449,174 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
           />
-
-          {/* LIVE badge (kept separate) */}
-          {vehicle.is_streaming && (
+          {(showTopLeftBadges || showPriceBadge) && (
             <div
               style={{
                 position: 'absolute',
                 top: '8px',
                 left: '8px',
-                background: '#ef4444',
-                color: 'white',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                fontSize: '7pt',
-                fontWeight: 700,
-                letterSpacing: '0.5px',
-                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
-              }}
-            >
-              LIVE
-            </div>
-          )}
-
-          {/* Timer badge (separate, on left side top) - only for ACTIVE auctions */}
-          {isActiveAuction && formatAuctionTimer && (
-            <div style={{
-              position: 'absolute',
-              top: vehicle.is_streaming ? '34px' : '8px', // Below LIVE badge if it exists
-              left: '8px',
-              background: 'rgba(0, 0, 0, 0.75)',
-              backdropFilter: 'blur(6px)',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              fontSize: '7pt',
-              fontWeight: 700,
-              fontFamily: 'monospace',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              border: '1px solid rgba(255,255,255,0.18)',
-              zIndex: 5,
-            }}>
-              {formatAuctionTimer}
-            </div>
-          )}
-
-          {/* Price/Bid badge (no favicon here) - Show LotBadge for Mecum, otherwise show price */}
-          {showPriceOverlay && (mecumLotData || badgeMainText !== '—') && (
-            <div 
-              style={{ 
-                ...badgeStyle, 
-                top: '8px', 
                 right: '8px',
-                cursor: (isSold && shouldShowSoldBadge) ? 'pointer' : 'default',
-                transition: (isSold && shouldShowSoldBadge) ? 'all 0.12s ease' : undefined,
-              }}
-              onClick={(e) => {
-                if (isSold && shouldShowSoldBadge) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowOwnershipPopup(true);
-                }
-              }}
-              onMouseEnter={(e) => {
-                if (isSold && shouldShowSoldBadge) {
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (isSold && shouldShowSoldBadge) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = undefined;
-                }
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                flexWrap: 'wrap',
+                pointerEvents: 'none',
+                zIndex: 12,
               }}
             >
-              {mecumLotData ? (
-                <LotBadge
-                  lotNumber={mecumLotData.lotNumber}
-                  date={mecumLotData.date}
-                  location={mecumLotData.location}
-                  salePrice={mecumLotData.salePrice}
-                  estimateLow={mecumLotData.estimateLow}
-                  estimateHigh={mecumLotData.estimateHigh}
-                  listingUrl={mecumLotData.listingUrl}
-                />
-              ) : isActiveAuction ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
-                    BID
-                  </div>
-                  {auctionHighBidText && (
-                    <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
-                      {auctionHighBidText}
+              {showTopLeftBadges ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', minWidth: 0 }}>
+                  {vehicle.is_streaming && (
+                    <div
+                      style={{
+                        background: '#ef4444',
+                        color: 'white',
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        fontSize: '7pt',
+                        fontWeight: 700,
+                        letterSpacing: '0.5px',
+                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
+                      }}
+                    >
+                      LIVE
                     </div>
                   )}
-                  {(() => {
-                    const v: any = vehicle as any;
-                    // Prioritize bid_count from external_listings (live data), fallback to vehicle
-                    const externalBidCount = typeof v?.external_listings?.[0]?.bid_count === 'number' 
-                      ? v.external_listings[0].bid_count 
-                      : null;
-                    const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 
-                      ? v.bid_count 
-                      : null;
-                    const bidCount = externalBidCount ?? vehicleBidCount;
-                    return bidCount ? (
-                      <div style={{ fontSize: '6pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
-                        {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
-                      </div>
-                    ) : null;
-                  })()}
+
+                  {isActiveAuction && formatAuctionTimer && (
+                    <div
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.75)',
+                        backdropFilter: 'blur(6px)',
+                        color: 'white',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '7pt',
+                        fontWeight: 700,
+                        fontFamily: 'monospace',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        border: '1px solid rgba(255,255,255,0.18)',
+                        zIndex: 5,
+                      }}
+                    >
+                      {formatAuctionTimer}
+                    </div>
+                  )}
                 </div>
-              ) : badgeParts.label ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
-                  <div
-                    style={{
-                      fontSize: '6.5pt',
-                      fontWeight: 800,
-                      lineHeight: 1,
-                      color:
-                        badgeParts.label === 'SOLD'
-                          ? '#10b981'
-                          : badgeParts.label === 'RESULT'
-                          ? '#f59e0b'
-                          : 'rgba(255,255,255,0.92)',
+              ) : null}
+
+              {showPriceBadge && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    gap: '6px',
+                    marginLeft: 'auto',
+                    maxWidth: '85%',
+                    minWidth: 0,
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  <div 
+                    style={{ 
+                      ...badgeStyle, 
+                      position: 'relative',
+                      top: undefined,
+                      right: undefined,
+                      maxWidth: '100%',
+                      cursor: (isSold && shouldShowSoldBadge) ? 'pointer' : 'default',
+                      transition: (isSold && shouldShowSoldBadge) ? 'all 0.12s ease' : undefined,
+                      pointerEvents: 'auto',
+                    }}
+                    onClick={(e) => {
+                      if (isSold && shouldShowSoldBadge) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowOwnershipPopup(true);
+                      }
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isSold && shouldShowSoldBadge) {
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (isSold && shouldShowSoldBadge) {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = undefined;
+                      }
                     }}
                   >
-                    {badgeParts.label}
-                    </div>
-                  {badgeParts.value ? (
-                    <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
-                      {badgeParts.value}
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div style={{ fontSize: '9pt', fontWeight: 800 }}>
-                  {badgeParts.value || badgeMainText}
+                    {mecumLotData ? (
+                      <LotBadge
+                        lotNumber={mecumLotData.lotNumber}
+                        date={mecumLotData.date}
+                        location={mecumLotData.location}
+                        salePrice={mecumLotData.salePrice}
+                        estimateLow={mecumLotData.estimateLow}
+                        estimateHigh={mecumLotData.estimateHigh}
+                        listingUrl={mecumLotData.listingUrl}
+                      />
+                    ) : isActiveAuction ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                        <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
+                          BID
+                        </div>
+                        {auctionHighBidText && (
+                          <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
+                            {auctionHighBidText}
+                          </div>
+                        )}
+                        {(() => {
+                          const v: any = vehicle as any;
+                          // Prioritize bid_count from external_listings (live data), fallback to vehicle
+                          const externalBidCount = typeof v?.external_listings?.[0]?.bid_count === 'number' 
+                            ? v.external_listings[0].bid_count 
+                            : null;
+                          const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 
+                            ? v.bid_count 
+                            : null;
+                          const bidCount = externalBidCount ?? vehicleBidCount;
+                          return bidCount ? (
+                            <div style={{ fontSize: '6pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
+                              {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    ) : badgeParts.label ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                        <div
+                          style={{
+                            fontSize: '6.5pt',
+                            fontWeight: 800,
+                            lineHeight: 1,
+                            color:
+                              badgeParts.label === 'SOLD'
+                                ? '#10b981'
+                                : badgeParts.label === 'RESULT'
+                                ? '#f59e0b'
+                                : 'rgba(255,255,255,0.92)',
+                          }}
+                        >
+                          {badgeParts.label}
+                        </div>
+                        {badgeParts.value ? (
+                          <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
+                            {badgeParts.value}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '9pt', fontWeight: 800 }}>
+                        {badgeParts.value || badgeMainText}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1997,247 +2033,263 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             No Image
           </div>
         )}
-        {/* LIVE badge (kept separate) */}
-        {vehicle.is_streaming && (
-          <div style={{
-            position: 'absolute',
-            top: '6px',
-            left: '6px',
-            background: '#ef4444',
-            color: 'white',
-            padding: '3px 8px',
-            borderRadius: '3px',
-            fontSize: '7pt',
-            fontWeight: 700,
-            letterSpacing: '0.5px',
-            animation: 'pulse 2s ease-in-out infinite'
-          }}>
-            LIVE
-          </div>
-        )}
-
-        {/* Timer badge (separate, on left side top) - only for ACTIVE auctions */}
-        {isActiveAuction && formatAuctionTimer && (
-          <div style={{
-            position: 'absolute',
-            top: vehicle.is_streaming ? '28px' : '6px', // Below LIVE badge if it exists
-            left: '6px',
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(6px)',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: '6px',
-            fontSize: '6.5pt',
-            fontWeight: 700,
-            fontFamily: 'monospace',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            border: '1px solid rgba(255,255,255,0.18)',
-            zIndex: 5,
-          }}>
-            {formatAuctionTimer}
-          </div>
-        )}
-
-        {/* Top-right overlay stack (prevents Follow overlapping price) */}
-        {(showPriceOverlay && (mecumLotData || badgeMainText !== '—')) || showFollowButton ? (
+        {(showTopLeftBadges || showTopRightBadges) && (
           <div
             style={{
               position: 'absolute',
               top: '6px',
+              left: '6px',
               right: '6px',
               display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
+              alignItems: 'flex-start',
               gap: '6px',
+              flexWrap: 'wrap',
+              pointerEvents: 'none',
               zIndex: 12,
-              maxWidth: '85%',
             }}
           >
-            {/* Price/Bid badge (Show LotBadge for Mecum, otherwise show price) */}
-            {showPriceOverlay && (mecumLotData || badgeMainText !== '—') && (
-              <div 
-                style={{
-                  ...badgeStyle,
-                  // Un-absolute when inside the stack
-                  position: 'relative',
-                  top: undefined,
-                  right: undefined,
-                  maxWidth: '100%',
-                  cursor: (isSold && shouldShowSoldBadge) ? 'pointer' : 'default',
-                  transition: (isSold && shouldShowSoldBadge) ? 'all 0.12s ease' : undefined,
-                }}
-                onClick={(e) => {
-                  // Make clickable if sold and within display window
-                  if (isSold && shouldShowSoldBadge) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowOwnershipPopup(true);
-                  }
-                }}
-                onMouseEnter={(e) => {
-                  if (isSold && shouldShowSoldBadge) {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (isSold && shouldShowSoldBadge) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = undefined;
-                  }
-                }}
-              >
-                {mecumLotData ? (
-                  <LotBadge
-                    lotNumber={mecumLotData.lotNumber}
-                    date={mecumLotData.date}
-                    location={mecumLotData.location}
-                    salePrice={mecumLotData.salePrice}
-                    estimateLow={mecumLotData.estimateLow}
-                    estimateHigh={mecumLotData.estimateHigh}
-                    listingUrl={mecumLotData.listingUrl}
-                  />
-                ) : isCompactCard ? (
-                  // Compact mode: single-line badge (border color already encodes SOLD/RESULT).
-                  <div style={{ fontSize: gridTypography.badge, fontWeight: 900, lineHeight: 1 }}>
-                    {(() => {
-                      if (isActiveAuction) return auctionHighBidText || 'BID';
-                      if (badgeParts.value) return badgeParts.value;
-                      if (badgeParts.label) return badgeParts.label;
-                      return badgeMainText;
-                    })()}
+            {showTopLeftBadges ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start', minWidth: 0 }}>
+                {vehicle.is_streaming && (
+                  <div
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      padding: '3px 8px',
+                      borderRadius: '3px',
+                      fontSize: '7pt',
+                      fontWeight: 700,
+                      letterSpacing: '0.5px',
+                      animation: 'pulse 2s ease-in-out infinite',
+                    }}
+                  >
+                    LIVE
                   </div>
-                ) : isActiveAuction ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
-                      BID
-                    </div>
-                    {auctionHighBidText && (
-                      <div style={{ fontSize: gridTypography.badge, fontWeight: 800, lineHeight: 1 }}>
-                        {auctionHighBidText}
-                      </div>
-                    )}
-                    {(() => {
-                      const v: any = vehicle as any;
-                      // Prioritize bid_count from external_listings (live data), fallback to vehicle
-                      const externalBidCount = typeof v?.external_listings?.[0]?.bid_count === 'number' 
-                        ? v.external_listings[0].bid_count 
-                        : null;
-                      const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 
-                        ? v.bid_count 
-                        : null;
-                      const bidCount = externalBidCount ?? vehicleBidCount;
-                      return bidCount ? (
-                        <div style={{ fontSize: '5.5pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
-                          {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                ) : badgeParts.label ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
-                    <div
-                      style={{
-                        fontSize: '6.5pt',
-                        fontWeight: 800,
-                        lineHeight: 1,
-                        color:
-                          badgeParts.label === 'SOLD'
-                            ? '#10b981'
-                            : badgeParts.label === 'RESULT'
-                            ? '#f59e0b'
-                            : 'rgba(255,255,255,0.92)',
-                      }}
-                    >
-                      {badgeParts.label}
-                    </div>
-                    {badgeParts.value ? (
-                      <div style={{ fontSize: gridTypography.badge, fontWeight: 800, lineHeight: 1 }}>
-                        {badgeParts.value}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: gridTypography.badge, fontWeight: 800 }}>
-                    {badgeParts.value || badgeMainText}
+                )}
+
+                {isActiveAuction && formatAuctionTimer && (
+                  <div
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.75)',
+                      backdropFilter: 'blur(6px)',
+                      color: 'white',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      fontSize: '6.5pt',
+                      fontWeight: 700,
+                      fontFamily: 'monospace',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      border: '1px solid rgba(255,255,255,0.18)',
+                      zIndex: 5,
+                    }}
+                  >
+                    {formatAuctionTimer}
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
 
-            {/* Follow Button with ROI (compact at small card sizes) */}
-            {showFollowButton && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  toggleFollow();
-                }}
-                disabled={followLoading}
+            {showTopRightBadges ? (
+              <div
                 style={{
-                  background: isFollowing 
-                    ? 'rgba(59, 130, 246, 0.9)' 
-                    : 'rgba(0, 0, 0, 0.7)',
-                  backdropFilter: 'blur(4px)',
-                  border: isFollowing 
-                    ? '1px solid rgba(59, 130, 246, 0.5)' 
-                    : '1px solid rgba(255,255,255,0.2)',
-                  color: 'white',
-                  padding: isCompactCard ? '0' : '4px 8px',
-                  width: isCompactCard ? '22px' : undefined,
-                  height: isCompactCard ? '22px' : undefined,
-                  borderRadius: isCompactCard ? '999px' : '4px',
-                  fontSize: isCompactCard ? '10pt' : '7pt',
-                  fontWeight: 700,
-                  cursor: followLoading ? 'wait' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  transition: 'all 0.12s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-end',
+                  gap: topRightBadgeGap,
+                  marginLeft: 'auto',
+                  maxWidth: '85%',
+                  minWidth: 0,
+                  pointerEvents: 'auto',
                 }}
-                onMouseEnter={(e) => {
-                  if (!followLoading) {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-                title={
-                  isFollowing && followROI
-                    ? `Following since ${followROI.days_following} days ago. If you invested $${followROI.price_at_follow?.toLocaleString()} when you started following, you'd have ${followROI.hypothetical_roi_pct && followROI.hypothetical_roi_pct > 0 ? '+' : ''}${followROI.hypothetical_roi_pct?.toFixed(1)}% return (${followROI.hypothetical_gain && followROI.hypothetical_gain > 0 ? '+' : ''}$${followROI.hypothetical_gain?.toLocaleString()})`
-                    : 'Follow this vehicle to track hypothetical ROI'
-                }
               >
-                {followLoading ? (
-                  '...'
-                ) : isFollowing ? (
-                  <>
-                    {isCompactCard ? (
-                      '★'
-                    ) : followROI && followROI.hypothetical_roi_pct !== null ? (
-                      <span style={{
-                        color: followROI.hypothetical_roi_pct > 0 ? '#10b981' : followROI.hypothetical_roi_pct < 0 ? '#ef4444' : 'inherit',
-                        fontWeight: 800,
-                      }}>
-                        {followROI.hypothetical_roi_pct > 0 ? '+' : ''}{followROI.hypothetical_roi_pct.toFixed(1)}%
-                      </span>
+                {/* Price/Bid badge (Show LotBadge for Mecum, otherwise show price) */}
+                {showPriceBadge && (
+                  <div 
+                    style={{
+                      ...badgeStyle,
+                      // Un-absolute when inside the stack
+                      position: 'relative',
+                      top: undefined,
+                      right: undefined,
+                      maxWidth: '100%',
+                      cursor: (isSold && shouldShowSoldBadge) ? 'pointer' : 'default',
+                      transition: (isSold && shouldShowSoldBadge) ? 'all 0.12s ease' : undefined,
+                      pointerEvents: 'auto',
+                    }}
+                    onClick={(e) => {
+                      // Make clickable if sold and within display window
+                      if (isSold && shouldShowSoldBadge) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowOwnershipPopup(true);
+                      }
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isSold && shouldShowSoldBadge) {
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (isSold && shouldShowSoldBadge) {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = undefined;
+                      }
+                    }}
+                  >
+                    {mecumLotData ? (
+                      <LotBadge
+                        lotNumber={mecumLotData.lotNumber}
+                        date={mecumLotData.date}
+                        location={mecumLotData.location}
+                        salePrice={mecumLotData.salePrice}
+                        estimateLow={mecumLotData.estimateLow}
+                        estimateHigh={mecumLotData.estimateHigh}
+                        listingUrl={mecumLotData.listingUrl}
+                      />
+                    ) : isCompactCard ? (
+                      // Compact mode: single-line badge (border color already encodes SOLD/RESULT).
+                      <div style={{ fontSize: gridTypography.badge, fontWeight: 900, lineHeight: 1 }}>
+                        {(() => {
+                          if (isActiveAuction) return auctionHighBidText || 'BID';
+                          if (badgeParts.value) return badgeParts.value;
+                          if (badgeParts.label) return badgeParts.label;
+                          return badgeMainText;
+                        })()}
+                      </div>
+                    ) : isActiveAuction ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                        <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
+                          BID
+                        </div>
+                        {auctionHighBidText && (
+                          <div style={{ fontSize: gridTypography.badge, fontWeight: 800, lineHeight: 1 }}>
+                            {auctionHighBidText}
+                          </div>
+                        )}
+                        {(() => {
+                          const v: any = vehicle as any;
+                          // Prioritize bid_count from external_listings (live data), fallback to vehicle
+                          const externalBidCount = typeof v?.external_listings?.[0]?.bid_count === 'number' 
+                            ? v.external_listings[0].bid_count 
+                            : null;
+                          const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 
+                            ? v.bid_count 
+                            : null;
+                          const bidCount = externalBidCount ?? vehicleBidCount;
+                          return bidCount ? (
+                            <div style={{ fontSize: '5.5pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
+                              {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    ) : badgeParts.label ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                        <div
+                          style={{
+                            fontSize: '6.5pt',
+                            fontWeight: 800,
+                            lineHeight: 1,
+                            color:
+                              badgeParts.label === 'SOLD'
+                                ? '#10b981'
+                                : badgeParts.label === 'RESULT'
+                                ? '#f59e0b'
+                                : 'rgba(255,255,255,0.92)',
+                          }}
+                        >
+                          {badgeParts.label}
+                        </div>
+                        {badgeParts.value ? (
+                          <div style={{ fontSize: gridTypography.badge, fontWeight: 800, lineHeight: 1 }}>
+                            {badgeParts.value}
+                          </div>
+                        ) : null}
+                      </div>
                     ) : (
-                      'Following'
+                      <div style={{ fontSize: gridTypography.badge, fontWeight: 800 }}>
+                        {badgeParts.value || badgeMainText}
+                      </div>
                     )}
-                  </>
-                ) : (
-                  isCompactCard ? '☆' : 'Follow'
+                  </div>
                 )}
-              </button>
-            )}
+
+                {/* Follow Button with ROI (compact at small card sizes) */}
+                {showFollowButton && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleFollow();
+                    }}
+                    disabled={followLoading}
+                    style={{
+                      background: isFollowing 
+                        ? 'rgba(59, 130, 246, 0.9)' 
+                        : 'rgba(0, 0, 0, 0.7)',
+                      backdropFilter: 'blur(4px)',
+                      border: isFollowing 
+                        ? '1px solid rgba(59, 130, 246, 0.5)' 
+                        : '1px solid rgba(255,255,255,0.2)',
+                      color: 'white',
+                      padding: isCompactCard ? '0' : '4px 8px',
+                      width: isCompactCard ? '22px' : undefined,
+                      height: isCompactCard ? '22px' : undefined,
+                      borderRadius: isCompactCard ? '999px' : '4px',
+                      fontSize: isCompactCard ? '10pt' : '7pt',
+                      fontWeight: 700,
+                      cursor: followLoading ? 'wait' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.12s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!followLoading) {
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                    title={
+                      isFollowing && followROI
+                        ? `Following since ${followROI.days_following} days ago. If you invested $${followROI.price_at_follow?.toLocaleString()} when you started following, you'd have ${followROI.hypothetical_roi_pct && followROI.hypothetical_roi_pct > 0 ? '+' : ''}${followROI.hypothetical_roi_pct?.toFixed(1)}% return (${followROI.hypothetical_gain && followROI.hypothetical_gain > 0 ? '+' : ''}$${followROI.hypothetical_gain?.toLocaleString()})`
+                        : 'Follow this vehicle to track hypothetical ROI'
+                    }
+                  >
+                    {followLoading ? (
+                      '...'
+                    ) : isFollowing ? (
+                      <>
+                        {isCompactCard ? (
+                          '★'
+                        ) : followROI && followROI.hypothetical_roi_pct !== null ? (
+                          <span style={{
+                            color: followROI.hypothetical_roi_pct > 0 ? '#10b981' : followROI.hypothetical_roi_pct < 0 ? '#ef4444' : 'inherit',
+                            fontWeight: 800,
+                          }}>
+                            {followROI.hypothetical_roi_pct > 0 ? '+' : ''}{followROI.hypothetical_roi_pct.toFixed(1)}%
+                          </span>
+                        ) : (
+                          'Following'
+                        )}
+                      </>
+                    ) : (
+                      isCompactCard ? '☆' : 'Follow'
+                    )}
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        )}
 
       </div>
 
