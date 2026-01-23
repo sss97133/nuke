@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { CollapsibleWidget } from '../ui/CollapsibleWidget';
 
 type ResearchItemType = 'source' | 'note' | 'question' | 'claim' | 'event';
 type ResearchStatus = 'open' | 'resolved' | 'dismissed';
@@ -144,17 +145,17 @@ export default function VehicleResearchItemsCard({ vehicleId }: { vehicleId: str
   const openItems = useMemo(() => items.filter((item) => item.status === 'open'), [items]);
 
   return (
-    <div className="card">
-      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>RESEARCH NOTES</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="badge badge-secondary">{openItems.length}</span>
-          <button className="button button-small" onClick={() => setShowAdd((v) => !v)}>
-            {showAdd ? 'Close' : 'Add'}
-          </button>
-        </div>
-      </div>
-      <div className="card-body">
+    <CollapsibleWidget
+      title="Research Notes"
+      defaultCollapsed={true}
+      badge={<span className="badge badge-secondary">{openItems.length}</span>}
+      action={
+        <button className="button button-small" onClick={(e) => { e.stopPropagation(); setShowAdd((v) => !v); }}>
+          {showAdd ? 'Close' : 'Add'}
+        </button>
+      }
+    >
+      <div>
         {showAdd && (
           <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
             <input
@@ -246,6 +247,6 @@ export default function VehicleResearchItemsCard({ vehicleId }: { vehicleId: str
           </div>
         )}
       </div>
-    </div>
+    </CollapsibleWidget>
   );
 }

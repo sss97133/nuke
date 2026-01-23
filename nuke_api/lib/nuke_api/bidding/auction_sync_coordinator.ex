@@ -198,11 +198,11 @@ defmodule NukeApi.Bidding.AuctionSyncCoordinator do
     # Load active proxy bids from database
     query = """
       SELECT pbr.id, pbr.user_id, pbr.external_listing_id, pbr.platform, pbr.external_auction_url,
-             el.auction_end_date
+             el.end_date
       FROM proxy_bid_requests pbr
       LEFT JOIN external_listings el ON el.id = pbr.external_listing_id
       WHERE pbr.status IN ('active', 'winning', 'outbid')
-      AND (el.auction_end_date IS NULL OR el.auction_end_date > NOW())
+      AND (el.end_date IS NULL OR el.end_date > NOW())
     """
 
     case Repo.query(query, []) do

@@ -282,9 +282,66 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
             result.exteriorColor = auction.exteriorColor || auction.color;
           }
           if (!result.location && auction.location) result.location = auction.location;
+
+          // Extract auction data (bid, end date, status)
+          if (!result.currentBid && auction.currentBid) {
+            const bid = parseInt(String(auction.currentBid).replace(/[^0-9]/g, ''), 10);
+            if (Number.isFinite(bid) && bid > 0) result.currentBid = bid;
+          }
+          if (!result.endDate && (auction.endDate || auction.endTime || auction.endsAt)) {
+            const endDateStr = auction.endDate || auction.endTime || auction.endsAt;
+            try {
+              const parsed = new Date(endDateStr);
+              if (!isNaN(parsed.getTime())) result.endDate = parsed.toISOString();
+            } catch { /* ignore */ }
+          }
+          if (!result.auctionStatus && auction.status) {
+            result.auctionStatus = String(auction.status).toLowerCase();
+          }
         }
       } catch {
         // Ignore parse errors
+      }
+    }
+
+    // 7. Extract auction data from countdown/bid elements in HTML
+    // Pattern for countdown: data-countdown-date="2026-01-23T23:35:00Z"
+    const countdownMatch = html.match(/data-countdown-date\s*=\s*["']([^"']+)["']/i) ||
+                           html.match(/data-end-date\s*=\s*["']([^"']+)["']/i) ||
+                           html.match(/"endDate"\s*:\s*"([^"]+)"/i);
+    if (countdownMatch && !result.endDate) {
+      try {
+        const parsed = new Date(countdownMatch[1]);
+        if (!isNaN(parsed.getTime())) result.endDate = parsed.toISOString();
+        console.log('✅ C&B: Extracted endDate from countdown:', result.endDate);
+      } catch { /* ignore */ }
+    }
+
+    // Pattern for current bid: "$12,500" or "USD $12,500"
+    const bidPatterns = [
+      /Current\s+Bid[^>]*>.*?USD\s*\$?([\d,]+)/i,
+      /Current\s+Bid[^>]*>.*?\$([\d,]+)/i,
+      /"currentBid"\s*:\s*(\d+)/i,
+      /data-current-bid[^>]*>.*?\$([\d,]+)/i,
+    ];
+    for (const pattern of bidPatterns) {
+      if (result.currentBid) break;
+      const bidMatch = html.match(pattern);
+      if (bidMatch) {
+        const bid = parseInt(bidMatch[1].replace(/,/g, ''), 10);
+        if (Number.isFinite(bid) && bid > 0) {
+          result.currentBid = bid;
+          console.log('✅ C&B: Extracted currentBid from HTML:', result.currentBid);
+        }
+      }
+    }
+
+    // Check auction status from HTML
+    if (!result.auctionStatus) {
+      if (/Auction\s+Ended/i.test(html) || /Reserve\s+Not\s+Met/i.test(html)) {
+        result.auctionStatus = 'ended';
+      } else if (/Sold\s+for/i.test(html)) {
+        result.auctionStatus = 'sold';
       }
     }
 

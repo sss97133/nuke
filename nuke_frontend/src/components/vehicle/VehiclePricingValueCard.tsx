@@ -4,6 +4,7 @@ import { isListingLive, parseMoneyNumber } from '../../lib/auctionUtils';
 import { getPlatformDisplayName, normalizePlatform } from '../../services/platformNomenclature';
 import PriceAnalysisPanel from './PriceAnalysisPanel';
 import PriceHistoryModal from './PriceHistoryModal';
+import { CollapsibleWidget } from '../ui/CollapsibleWidget';
 
 type AuctionPulseLike = {
   platform?: string | null;
@@ -145,9 +146,10 @@ export function VehiclePricingValueCard(props: {
 
   return (
     <>
-      <div className="card">
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <div style={{ flex: 1 }}>Pricing &amp; Value</div>
+      <CollapsibleWidget
+        title="Pricing & Value"
+        defaultCollapsed={true}
+        action={
           <div style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
             <button className="button button-small" onClick={() => setShowAnalysis(true)} style={{ fontSize: '8pt' }}>
               Price analysis
@@ -156,9 +158,9 @@ export function VehiclePricingValueCard(props: {
               Price ledger
             </button>
           </div>
-        </div>
-
-        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* Market lane */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: '9pt', fontWeight: 800 }}>Market (observed)</div>
@@ -225,7 +227,7 @@ export function VehiclePricingValueCard(props: {
             Tip: click the main price in the header to view provenance. Live bid is sourced from `external_listings` and cached to `vehicles.high_bid`.
           </div>
         </div>
-      </div>
+      </CollapsibleWidget>
 
       {showAnalysis && vehicleId && (
         <PriceAnalysisPanel vehicleId={vehicleId} isOpen={showAnalysis} onClose={() => setShowAnalysis(false)} />

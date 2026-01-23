@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { CollapsibleWidget } from '../ui/CollapsibleWidget';
 
 type RoiSummary = {
   vehicle_id: string;
@@ -89,55 +90,52 @@ export default function VehicleROISummaryCard({ vehicleId }: { vehicleId: string
   }, [vehicleId]);
 
   return (
-    <div className="card">
-      <div className="card-header">Investment Summary</div>
-      <div className="card-body">
-        {loading ? (
-          <div className="text-small text-muted">Loading ROI…</div>
-        ) : error ? (
-          <div className="text-small text-muted">ROI unavailable: {error}</div>
-        ) : (
-          <div className="vehicle-details">
-            <div className="vehicle-detail">
-              <span>Attributed spend</span>
-              <span className="text font-bold">{formatUSD2(data?.spend?.attributed_spend_usd)}</span>
-            </div>
-            <div className="vehicle-detail">
-              <span>Current value</span>
-              <span className="text">{formatUSD0(data?.value?.current_value_usd ?? null)}</span>
-            </div>
-            <div className="vehicle-detail">
-              <span>Value 30d ago</span>
-              <span className="text">{formatUSD0(data?.value?.value_30d_ago_usd ?? null)}</span>
-            </div>
-            <div className="vehicle-detail">
-              <span>Δ 30d</span>
-              <span
-                className="text"
-                style={{
-                  color: (data?.value?.delta_30d_usd ?? 0) >= 0 ? '#008000' : '#800000'
-                }}
-              >
-                {formatUSD0(data?.value?.delta_30d_usd ?? null)}
-              </span>
-            </div>
-            <div className="vehicle-detail">
-              <span>ROI (30d)</span>
-              <span className="text" style={{ fontFamily: 'var(--font-mono, monospace)' }}>
-                {formatPct2(data?.roi?.roi_30d ?? null)}
-              </span>
-            </div>
-            <div className="vehicle-detail">
-              <span>Event value impact (sum)</span>
-              <span className="text">{formatUSD0(data?.roi?.event_value_impact_sum ?? null)}</span>
-            </div>
-            <div className="text-small text-muted" style={{ marginTop: '8px' }}>
-              Derived from receipts/work orders (spend) and valuation series (value delta). This is best-effort until all costs are attributed.
-            </div>
+    <CollapsibleWidget title="Investment Summary" defaultCollapsed={true}>
+      {loading ? (
+        <div className="text-small text-muted">Loading ROI…</div>
+      ) : error ? (
+        <div className="text-small text-muted">ROI unavailable: {error}</div>
+      ) : (
+        <div className="vehicle-details">
+          <div className="vehicle-detail">
+            <span>Attributed spend</span>
+            <span className="text font-bold">{formatUSD2(data?.spend?.attributed_spend_usd)}</span>
           </div>
-        )}
-      </div>
-    </div>
+          <div className="vehicle-detail">
+            <span>Current value</span>
+            <span className="text">{formatUSD0(data?.value?.current_value_usd ?? null)}</span>
+          </div>
+          <div className="vehicle-detail">
+            <span>Value 30d ago</span>
+            <span className="text">{formatUSD0(data?.value?.value_30d_ago_usd ?? null)}</span>
+          </div>
+          <div className="vehicle-detail">
+            <span>Δ 30d</span>
+            <span
+              className="text"
+              style={{
+                color: (data?.value?.delta_30d_usd ?? 0) >= 0 ? '#008000' : '#800000'
+              }}
+            >
+              {formatUSD0(data?.value?.delta_30d_usd ?? null)}
+            </span>
+          </div>
+          <div className="vehicle-detail">
+            <span>ROI (30d)</span>
+            <span className="text" style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+              {formatPct2(data?.roi?.roi_30d ?? null)}
+            </span>
+          </div>
+          <div className="vehicle-detail">
+            <span>Event value impact (sum)</span>
+            <span className="text">{formatUSD0(data?.roi?.event_value_impact_sum ?? null)}</span>
+          </div>
+          <div className="text-small text-muted" style={{ marginTop: '8px' }}>
+            Derived from receipts/work orders (spend) and valuation series (value delta). This is best-effort until all costs are attributed.
+          </div>
+        </div>
+      )}
+    </CollapsibleWidget>
   );
 }
 

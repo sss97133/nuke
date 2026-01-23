@@ -644,12 +644,12 @@ serve(async (req) => {
       }
 
       // Save images - must satisfy vehicle_images_attribution_check
-      // Use source='external_import' and include required fields
+      // Constraint now allows platform-specific sources
       if (extracted.image_urls.length > 0 && targetVehicleId) {
         const imageRecords = extracted.image_urls.slice(0, 100).map((img_url, i) => ({
           vehicle_id: targetVehicleId,
           image_url: img_url,
-          source: 'external_import',  // Required for attribution check
+          source: 'hagerty',  // Platform-specific source for traceability
           source_url: img_url,
           is_external: true,
           approval_status: 'auto_approved',
@@ -665,12 +665,13 @@ serve(async (req) => {
           },
         }));
 
-        // Delete existing external_import images for this vehicle to avoid duplicates
+        // Delete existing hagerty/external_import images for this vehicle to avoid duplicates
+        // Includes 'external_import' for backwards compatibility during migration
         await supabase
           .from('vehicle_images')
           .delete()
           .eq('vehicle_id', targetVehicleId)
-          .eq('source', 'external_import');
+          .in('source', ['hagerty', 'external_import']);
 
         const { data: insertedImages, error: imgError } = await supabase
           .from('vehicle_images')
@@ -700,7 +701,7 @@ serve(async (req) => {
             listing_url_key: listingUrlKey,
             listing_id: extracted.listing_uuid,
             listing_status: extracted.status,
-            end_date: extracted.auction_end ? extracted.auction_end.split('T')[0] : null,
+            end_date: extracted.auction_end || null,  // Keep full ISO timestamp for countdown timer
             final_price: extracted.sale_price,
             bid_count: extracted.bid_count,
             view_count: extracted.view_count,

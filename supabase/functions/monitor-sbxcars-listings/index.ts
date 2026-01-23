@@ -89,14 +89,16 @@ serve(async (req) => {
     }
 
     // Batch mode: monitor all active SBX Cars listings
-    const { data: vehicles } = await supabase
-      .from('vehicles')
-      .select('id, discovery_url, asking_price, auction_end_date')
-      .eq('discovery_source', 'sbxcars')
-      .or('auction_end_date.is.null,auction_end_date.gt.' + new Date().toISOString())
+    // Query external_listings directly since that's where SBX data is stored
+    const { data: listings } = await supabase
+      .from('external_listings')
+      .select('id, vehicle_id, listing_url, end_date, current_bid, listing_status')
+      .eq('platform', 'sbx')
+      .in('listing_status', ['active', 'live', 'upcoming'])
+      .order('updated_at', { ascending: true })
       .limit(batch_size)
 
-    if (!vehicles || vehicles.length === 0) {
+    if (!listings || listings.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
@@ -113,8 +115,9 @@ serve(async (req) => {
       errors: 0,
     }
 
-    for (const vehicle of vehicles) {
-      if (!vehicle.discovery_url) continue
+    for (const listing of listings) {
+      if (!listing.listing_url) continue
+      const vehicle = { id: listing.vehicle_id, discovery_url: listing.listing_url }
 
       try {
         const update = await monitorListing(vehicle.discovery_url, firecrawlKey)
@@ -133,6 +136,23 @@ serve(async (req) => {
             .from('vehicles')
             .update(updates)
             .eq('id', vehicle.id)
+
+          // Also update external_listings for countdown timer support
+          const listingUpdates: any = {
+            updated_at: new Date().toISOString(),
+          }
+          if (update.current_bid !== null) listingUpdates.current_bid = update.current_bid
+          if (update.sale_price !== null) listingUpdates.final_price = update.sale_price
+          if (update.auction_end_date) listingUpdates.end_date = update.auction_end_date
+          if (update.auction_status) {
+            listingUpdates.listing_status = update.auction_status === 'live' ? 'active' : update.auction_status
+          }
+
+          await supabase
+            .from('external_listings')
+            .update(listingUpdates)
+            .eq('vehicle_id', vehicle.id)
+            .eq('platform', 'sbx')
 
           stats.updated++
         }
@@ -218,11 +238,44 @@ async function monitorListing(url: string, firecrawlKey: string | undefined): Pr
     const salePriceMatch = statusText.match(/(?:sold|final)[:\s]+(?:US\$|AED|€|£)?([\d,]+)/i)
     const salePrice = salePriceMatch ? parseInt(salePriceMatch[1].replace(/,/g, '')) : null
 
+    // Extract auction end date from countdown or time remaining
+    let auctionEndDate: string | null = null
+
+    // Try to find countdown data attribute
+    const countdownMatch = html.match(/data-countdown\s*=\s*["'](\d+)["']/i) ||
+                          html.match(/data-end-time\s*=\s*["'](\d+)["']/i) ||
+                          html.match(/"endTime"\s*:\s*(\d+)/i)
+    if (countdownMatch) {
+      const timestamp = parseInt(countdownMatch[1], 10)
+      if (timestamp > 0) {
+        // Check if it's seconds or milliseconds
+        const ts = timestamp > 9999999999 ? timestamp : timestamp * 1000
+        auctionEndDate = new Date(ts).toISOString()
+      }
+    }
+
+    // Fallback: parse "X days", "X hours" remaining
+    if (!auctionEndDate) {
+      const timeRemainingMatch = statusText.match(/(\d+)\s*(?:day|days)\s*(?:remaining|left)?/i) ||
+                                  statusText.match(/(\d+)\s*(?:hour|hours|H)\s*(?:remaining|left)?/i)
+      if (timeRemainingMatch) {
+        const value = parseInt(timeRemainingMatch[1], 10)
+        const isHours = /hour|H/i.test(timeRemainingMatch[0])
+        const now = new Date()
+        if (isHours) {
+          now.setHours(now.getHours() + value)
+        } else {
+          now.setDate(now.getDate() + value)
+        }
+        auctionEndDate = now.toISOString()
+      }
+    }
+
     return {
       current_bid: currentBid,
       sale_price: salePrice,
       auction_status: auctionStatus,
-      auction_end_date: null, // Could extract if needed
+      auction_end_date: auctionEndDate,
       last_checked_at: new Date().toISOString(),
     }
   } catch (error: any) {

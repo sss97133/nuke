@@ -1407,16 +1407,39 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         ''
     ).trim();
     if (metaSeller) {
+      // Detect platform for generating correct profile URL
+      const platform = String(
+        (auctionPulse as any)?.platform ||
+        (vehicle as any)?.profile_origin?.replace('_import', '') ||
+        'bat'
+      ).toLowerCase();
+
       const slug = metaSeller
         .trim()
         .replace(/^@/, '')
         .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
+        .replace(/^https?:\/\/www\.hagerty\.com\/marketplace\/profile\//i, '')
+        .replace(/^https?:\/\/carsandbids\.com\/u\//i, '')
         .replace(/\/+$/, '');
-      const proofUrl = slug ? `https://bringatrailer.com/member/${slug}/` : null;
+
+      // Generate platform-specific profile URL
+      let proofUrl: string | null = null;
+      if (platform === 'bat' || platform === 'bringatrailer') {
+        proofUrl = slug ? `https://bringatrailer.com/member/${slug}/` : null;
+      } else if (platform === 'hagerty') {
+        const sellerSlug = (auctionPulse as any)?.metadata?.seller_slug || slug;
+        proofUrl = sellerSlug ? `https://www.hagerty.com/marketplace/profile/${sellerSlug}` : null;
+      } else if (platform === 'cars_and_bids' || platform === 'carsandbids') {
+        proofUrl = slug ? `https://carsandbids.com/u/${slug}/` : null;
+      } else if (platform === 'pcarmarket') {
+        proofUrl = slug ? `https://pcarmarket.com/member/${slug}/` : null;
+      }
+
+      const normalizedPlatform = platform === 'bringatrailer' ? 'bat' : platform;
       const href = slug && proofUrl
-        ? `/claim-identity?platform=bat&handle=${encodeURIComponent(slug)}&profileUrl=${encodeURIComponent(proofUrl)}`
+        ? `/claim-identity?platform=${encodeURIComponent(normalizedPlatform)}&handle=${encodeURIComponent(slug)}&profileUrl=${encodeURIComponent(proofUrl)}`
         : null;
-      return { label: metaSeller, logo_url: null, relationship: 'seller', href, proofUrl, handle: slug, kind: 'bat_user' };
+      return { label: metaSeller, logo_url: null, relationship: 'seller', href, proofUrl, handle: slug, kind: `${normalizedPlatform}_user` };
     }
 
     return null;

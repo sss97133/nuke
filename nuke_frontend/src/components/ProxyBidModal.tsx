@@ -119,7 +119,12 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
   const handleAgreementComplete = (newAgreementId: string) => {
     setAgreementId(newAgreementId);
     setHasActiveAgreement(true);
-    setStep('bid');
+    // Check credentials before allowing bid
+    if (hasPlatformCredentials) {
+      setStep('bid');
+    } else {
+      setStep('credentials');
+    }
   };
 
   const handleSubmitBid = async () => {
@@ -143,6 +148,13 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
 
     if (!maxBidCents) {
       setError('Enter a valid maximum bid amount.');
+      return;
+    }
+
+    // Verify credentials exist before placing bid
+    if (!hasPlatformCredentials) {
+      setError('Platform credentials required. Please connect your account first.');
+      setStep('credentials');
       return;
     }
 

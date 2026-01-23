@@ -222,6 +222,7 @@ interface FilterState {
   yearMin: number | null;
   yearMax: number | null;
   makes: string[];
+  models: string[]; // Models filter (after make is selected)
   bodyStyles: string[]; // Car types: Coupe, Sedan, Pickup, SUV, etc.
   is4x4: boolean; // 4WD/4x4/AWD filter
   priceMin: number | null;
@@ -256,6 +257,7 @@ const DEFAULT_FILTERS: FilterState = {
   yearMin: null,
   yearMax: null,
   makes: [],
+  models: [],
   bodyStyles: [],
   is4x4: false,
   priceMin: null,
@@ -530,6 +532,11 @@ const CursorHomepage: React.FC = () => {
   const [availableMakes, setAvailableMakes] = useState<string[]>([]);
   const [availableBodyStyles, setAvailableBodyStyles] = useState<string[]>([]);
 
+  // Model filter state (shown after make is selected)
+  const [modelSearchText, setModelSearchText] = useState('');
+  const [showModelSuggestions, setShowModelSuggestions] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+
   const homepageDebugEnabled =
     DEBUG_CURSOR_HOMEPAGE &&
     typeof window !== 'undefined' &&
@@ -546,6 +553,7 @@ const CursorHomepage: React.FC = () => {
       (filters.yearMin || filters.yearMax) ||
       (filters.priceMin || filters.priceMax) ||
       ((filters.makes?.length || 0) > 0) ||
+      ((filters.models?.length || 0) > 0) ||
       ((filters.bodyStyles?.length || 0) > 0) ||
       filters.is4x4 ||
       ((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.radiusMiles > 0)) ||
@@ -821,6 +829,44 @@ const CursorHomepage: React.FC = () => {
   useEffect(() => {
     saveFilters(filters);
   }, [filters]);
+
+  // Load available models when makes are selected
+  useEffect(() => {
+    const loadModelsForMakes = async () => {
+      if (!filters.makes || filters.makes.length === 0) {
+        setAvailableModels([]);
+        return;
+      }
+      try {
+        // Query models for selected makes
+        const { data: modelData } = await supabase
+          .from('vehicles')
+          .select('model')
+          .eq('is_public', true)
+          .in('make', filters.makes)
+          .not('model', 'is', null)
+          .limit(500);
+
+        if (modelData && Array.isArray(modelData)) {
+          const modelCounts = new Map<string, number>();
+          for (const row of modelData as any[]) {
+            const model = String(row?.model || '').trim();
+            if (model && model.length > 0 && model.length < 100) {
+              modelCounts.set(model, (modelCounts.get(model) || 0) + 1);
+            }
+          }
+          // Sort by frequency, then alphabetically
+          const sortedModels = Array.from(modelCounts.entries())
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([model]) => model);
+          setAvailableModels(sortedModels);
+        }
+      } catch (err) {
+        console.error('Error loading models for makes:', err);
+      }
+    };
+    loadModelsForMakes();
+  }, [filters.makes]);
 
   // Save other filter-related state
   useEffect(() => {
@@ -1417,6 +1463,12 @@ const CursorHomepage: React.FC = () => {
           // Use OR for multiple makes - Supabase .or() syntax
           const makeFilters = filters.makes.map(make => `make.ilike.%${make}%`).join(',');
           query = query.or(makeFilters);
+        }
+
+        // Model filters (only applied if makes are selected)
+        if (filters.models && filters.models.length > 0) {
+          const modelFilters = filters.models.map(model => `model.ilike.%${model}%`).join(',');
+          query = query.or(modelFilters);
         }
 
         // For sale filter
@@ -5390,6 +5442,91 @@ const CursorHomepage: React.FC = () => {
                     {availableMakes.length > 20 && (
                       <span style={{ fontSize: '6pt', color: 'var(--text-muted)', alignSelf: 'center' }}>
                         +{availableMakes.length - 20} more (type to search)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Model filter - only shows when makes are selected */}
+              {filters.makes.length > 0 && availableModels.length > 0 && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  fontSize: '7pt'
+                }}>
+                  <div style={{ fontSize: '7pt', fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>
+                    model (for {filters.makes.join(', ')})
+                  </div>
+                  {filters.models && filters.models.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
+                      {filters.models.map((model) => (
+                        <span
+                          key={model}
+                          style={{
+                            padding: '2px 6px',
+                            background: 'var(--grey-600)',
+                            color: 'var(--white)',
+                            fontSize: '7pt',
+                            borderRadius: '2px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          {model}
+                          <button
+                            onClick={() => setFilters({...filters, models: filters.models.filter(m => m !== model)})}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--white)',
+                              cursor: 'pointer',
+                              padding: 0,
+                              fontSize: '8pt',
+                              lineHeight: 1
+                            }}
+                          >
+                            x
+                          </button>
+                        </span>
+                      ))}
+                      <button
+                        onClick={() => setFilters({...filters, models: []})}
+                        className="button-win95"
+                        style={{ padding: '2px 6px', fontSize: '6pt' }}
+                      >
+                        clear
+                      </button>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {availableModels.slice(0, 15).map((model) => (
+                      <button
+                        key={model}
+                        onClick={() => {
+                          if (filters.models?.includes(model)) {
+                            setFilters({...filters, models: filters.models.filter(m => m !== model)});
+                          } else {
+                            setFilters({...filters, models: [...(filters.models || []), model]});
+                          }
+                        }}
+                        className="button-win95"
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: '7pt',
+                          background: filters.models?.includes(model) ? 'var(--grey-600)' : 'var(--white)',
+                          color: filters.models?.includes(model) ? 'var(--white)' : 'var(--text)'
+                        }}
+                      >
+                        {model}
+                      </button>
+                    ))}
+                    {availableModels.length > 15 && (
+                      <span style={{ fontSize: '6pt', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                        +{availableModels.length - 15} more
                       </span>
                     )}
                   </div>
