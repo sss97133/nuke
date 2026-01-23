@@ -20,6 +20,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const DEALER_INSPIRE_ALGOLIA_APP_ID = 'YL5AFXM3DW';
+const DEALER_INSPIRE_ALGOLIA_SEARCH_KEY = '59d32b7b5842f84284e044c7ca465498';
+
 interface DiscoveryRequest {
   organization_id: string;
   website?: string; // Optional, will fetch from org if not provided
@@ -34,6 +37,7 @@ interface SiteStructure {
   page_types: PageType[];
   listing_patterns: ListingPattern[];
   pagination_pattern?: string;
+  data_sources?: Record<string, any>;
 }
 
 interface PageType {
@@ -48,6 +52,13 @@ interface ListingPattern {
   pattern: string;
   confidence: number;
   sample_matches: string[];
+}
+
+interface DealerInspireAlgoliaConfig {
+  app_id: string;
+  search_key: string;
+  index_name: string;
+  query_url: string;
 }
 
 interface ExtractionPattern {
@@ -223,6 +234,102 @@ Deno.serve(async (req) => {
   }
 });
 
+function buildDealerInspireIndexCandidates(hostname: string): string[] {
+  const host = hostname.replace(/^www\./, '').toLowerCase();
+  const parts = host.split('.');
+  if (parts.length < 2) return [];
+  const base = parts.slice(0, -1).join('.');
+  const compact = base.replace(/[^a-z0-9]+/g, '');
+  const underscored = base.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const dashed = base.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const slugs = [compact, underscored, dashed].filter(Boolean);
+  return Array.from(new Set(slugs)).map((slug) => `${slug}_production_inventory`);
+}
+
+function buildDealerInspireQueryUrl(indexName: string): string {
+  const host = `${DEALER_INSPIRE_ALGOLIA_APP_ID.toLowerCase()}-dsn.algolia.net`;
+  return `https://${host}/1/indexes/${indexName}/query?x-algolia-application-id=${DEALER_INSPIRE_ALGOLIA_APP_ID}&x-algolia-api-key=${DEALER_INSPIRE_ALGOLIA_SEARCH_KEY}`;
+}
+
+async function probeDealerInspireIndex(indexName: string): Promise<boolean> {
+  const queryUrl = buildDealerInspireQueryUrl(indexName);
+  try {
+    const resp = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ params: 'hitsPerPage=1&page=0' }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!resp.ok) return false;
+    const data = await resp.json().catch(() => null);
+    return !!data && typeof data.nbHits === 'number' && Array.isArray(data.hits);
+  } catch {
+    return false;
+  }
+}
+
+async function resolveDealerInspireConfig(siteUrl: string): Promise<DealerInspireAlgoliaConfig | null> {
+  try {
+    const host = new URL(siteUrl).hostname;
+    const candidates = buildDealerInspireIndexCandidates(host);
+    for (const indexName of candidates) {
+      const ok = await probeDealerInspireIndex(indexName);
+      if (!ok) continue;
+      return {
+        app_id: DEALER_INSPIRE_ALGOLIA_APP_ID,
+        search_key: DEALER_INSPIRE_ALGOLIA_SEARCH_KEY,
+        index_name: indexName,
+        query_url: buildDealerInspireQueryUrl(indexName),
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function buildDealerInspireExtractionPatterns(): ExtractionPattern[] {
+  const makePattern = (field: string): ExtractionPattern => ({
+    field_name: field,
+    selectors: [`algolia.${field}`],
+    extraction_method: 'api',
+    confidence: 0.95,
+    sample_values: [],
+  });
+
+  return [
+    makePattern('year'),
+    makePattern('make'),
+    makePattern('model'),
+    makePattern('trim'),
+    makePattern('vin'),
+    makePattern('miles'),
+    makePattern('our_price'),
+    makePattern('msrp'),
+    makePattern('engine_description'),
+    makePattern('drivetrain'),
+    makePattern('transmission_description'),
+    makePattern('ext_color'),
+    makePattern('int_color'),
+    makePattern('features'),
+  ];
+}
+
+function resolveInventoryUrl(siteUrl: string, inventoryPage?: PageType): string {
+  const sample = inventoryPage?.sample_urls?.[0];
+  if (sample) return sample;
+  try {
+    const u = new URL(siteUrl);
+    const path = u.pathname.toLowerCase();
+    if (/(used-vehicles|inventory|vehicles)/i.test(path)) {
+      return u.toString();
+    }
+    return `${u.origin}/inventory`;
+  } catch {
+    return `${siteUrl.replace(/\/$/, '')}/inventory`;
+  }
+}
+
 /**
  * Discover site structure adaptively
  */
@@ -244,6 +351,48 @@ async function discoverSiteStructure(
       page_types: existingPatterns.schema_data?.page_types || [],
       listing_patterns: existingPatterns.schema_data?.listing_patterns || [],
       pagination_pattern: existingPatterns.schema_data?.pagination_pattern,
+      data_sources: existingPatterns.schema_data?.data_sources || undefined,
+    };
+  }
+
+  const dealerInspireConfig = await resolveDealerInspireConfig(siteUrl);
+  if (dealerInspireConfig) {
+    const sitePath = (() => {
+      try {
+        const u = new URL(siteUrl);
+        return u.pathname.replace(/\/$/, '') || '/inventory';
+      } catch {
+        return '/inventory';
+      }
+    })();
+    return {
+      domain,
+      site_type: 'dealer_website',
+      platform: 'DealerInspire',
+      page_types: [
+        {
+          type: 'inventory',
+          url_pattern: sitePath,
+          sample_urls: [siteUrl],
+          structure_hints: ['Algolia-backed inventory results'],
+        },
+        {
+          type: 'vehicle_detail',
+          url_pattern: '/inventory/',
+          sample_urls: [],
+          structure_hints: ['DealerInspire VDP pages under /inventory/'],
+        },
+      ],
+      listing_patterns: [
+        {
+          pattern_type: 'api',
+          pattern: dealerInspireConfig.query_url,
+          confidence: 0.95,
+          sample_matches: [dealerInspireConfig.index_name],
+        },
+      ],
+      pagination_pattern: 'page={n}',
+      data_sources: { algolia: dealerInspireConfig },
     };
   }
 
@@ -382,6 +531,10 @@ async function learnExtractionPatterns(
     return existingPatterns.schema_data.extraction_patterns;
   }
 
+  if (siteStructure.data_sources?.algolia) {
+    return buildDealerInspireExtractionPatterns();
+  }
+
   // Check for reusable patterns from similar sites
   const { data: reusablePatterns } = await supabase
     .from('extraction_pattern_registry')
@@ -504,6 +657,7 @@ async function storeLearnedPatterns(
       listing_patterns: siteStructure.listing_patterns,
       pagination_pattern: siteStructure.pagination_pattern,
       extraction_patterns: extractionPatterns,
+      data_sources: siteStructure.data_sources,
       discovered_at: new Date().toISOString(),
     };
 
@@ -548,7 +702,7 @@ async function extractAllData(
 
   // Find inventory URL
   const inventoryPage = siteStructure.page_types.find((pt) => pt.type === 'inventory');
-  let inventoryUrl = inventoryPage?.sample_urls[0] || `${siteUrl}/inventory`;
+  const inventoryUrl = resolveInventoryUrl(siteUrl, inventoryPage);
   
   // Detect if URL redirects to Motorious
   const isMotoriousUrl = inventoryUrl.toLowerCase().includes('motorious.com') || 
