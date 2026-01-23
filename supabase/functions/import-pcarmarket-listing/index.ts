@@ -428,6 +428,57 @@ Deno.serve(async (req: Request) => {
         });
     }
 
+    // Step 5b: Create/update external_listings record for countdown timer support
+    if (vehicleId) {
+      const listingStatus = listing.auctionOutcome === 'sold' ? 'sold' : 'active';
+      const externalListingData: Record<string, any> = {
+        vehicle_id: vehicleId,
+        platform: 'pcarmarket',
+        listing_url: listing.url,
+        listing_id: listing.auctionId || listing.slug || null,
+        listing_status: listingStatus,
+        current_bid: listing.salePrice || null,
+        bid_count: listing.bidCount || null,
+        view_count: listing.viewCount || null,
+        updated_at: new Date().toISOString(),
+      };
+      // Only set end_date if we extracted it (don't clear existing)
+      if (listing.auctionEndDate) {
+        externalListingData.end_date = listing.auctionEndDate;
+      }
+      if (listing.auctionOutcome === 'sold') {
+        externalListingData.final_price = listing.salePrice;
+        externalListingData.sold_at = new Date().toISOString();
+      }
+
+      // Check if external_listing already exists
+      const { data: existingListing } = await supabase
+        .from('external_listings')
+        .select('id')
+        .eq('vehicle_id', vehicleId)
+        .eq('platform', 'pcarmarket')
+        .maybeSingle();
+
+      if (existingListing) {
+        await supabase
+          .from('external_listings')
+          .update(externalListingData)
+          .eq('id', existingListing.id);
+        console.log(`Updated external_listing: ${existingListing.id}`);
+      } else {
+        externalListingData.created_at = new Date().toISOString();
+        const { data: newListing, error: listingError } = await supabase
+          .from('external_listings')
+          .insert(externalListingData)
+          .select('id')
+          .single();
+
+        if (!listingError && newListing) {
+          console.log(`Created external_listing: ${newListing.id}`);
+        }
+      }
+    }
+
     // Step 6: Import ALL images from gallery
     if (listing.images && listing.images.length > 0 && vehicleId) {
       // Get user_id for images (required field)

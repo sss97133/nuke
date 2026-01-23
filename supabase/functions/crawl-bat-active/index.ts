@@ -26,28 +26,59 @@ const BROWSER_HEADERS = {
 // ============================================================================
 
 async function getListingsFromRss(): Promise<string[]> {
-  console.log('[bat-crawl] Fetching RSS feed...');
-  try {
-    const response = await fetch('https://bringatrailer.com/feed/', {
-      headers: BROWSER_HEADERS,
-      signal: AbortSignal.timeout(30000),
-    });
+  console.log('[bat-crawl] Fetching RSS feeds (paginated)...');
+  const allUrls: string[] = [];
 
-    if (!response.ok) {
-      console.error('[bat-crawl] RSS fetch failed:', response.status);
-      return [];
+  try {
+    // Paginate through auctions feed - BaT has ~400 active auctions typically
+    for (let page = 1; page <= 30; page++) {
+      const response = await fetch(`https://bringatrailer.com/auctions/feed/?paged=${page}`, {
+        headers: BROWSER_HEADERS,
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!response.ok) {
+        console.log(`[bat-crawl] RSS page ${page} returned ${response.status}, stopping pagination`);
+        break;
+      }
+
+      const xml = await response.text();
+      const urls = [...xml.matchAll(/<link>(https:\/\/bringatrailer\.com\/listing\/[^<]+)<\/link>/g)]
+        .map(m => m[1])
+        .filter(url => !url.includes('sign-') && !url.includes('memorabilia-'));
+
+      if (urls.length === 0) {
+        console.log(`[bat-crawl] RSS page ${page} empty, stopping pagination`);
+        break;
+      }
+
+      allUrls.push(...urls);
+      console.log(`[bat-crawl] RSS page ${page}: ${urls.length} listings (total: ${allUrls.length})`);
+
+      // Small delay between pages
+      await new Promise(r => setTimeout(r, 200));
     }
 
-    const xml = await response.text();
-    const urls = [...xml.matchAll(/<link>(https:\/\/bringatrailer\.com\/listing\/[^<]+)<\/link>/g)]
-      .map(m => m[1])
-      .filter(url => !url.includes('sign-') && !url.includes('memorabilia-'));
+    // Also get main feed for newest listings
+    const mainFeed = await fetch('https://bringatrailer.com/feed/', {
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(15000),
+    });
 
-    console.log(`[bat-crawl] Found ${urls.length} listings in RSS`);
-    return urls;
+    if (mainFeed.ok) {
+      const xml = await mainFeed.text();
+      const urls = [...xml.matchAll(/<link>(https:\/\/bringatrailer\.com\/listing\/[^<]+)<\/link>/g)]
+        .map(m => m[1])
+        .filter(url => !url.includes('sign-') && !url.includes('memorabilia-'));
+      allUrls.push(...urls);
+    }
+
+    const unique = [...new Set(allUrls)];
+    console.log(`[bat-crawl] Found ${unique.length} unique listings from RSS feeds`);
+    return unique;
   } catch (err: any) {
     console.error('[bat-crawl] RSS error:', err.message);
-    return [];
+    return [...new Set(allUrls)];
   }
 }
 

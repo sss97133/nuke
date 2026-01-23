@@ -97,6 +97,17 @@
 - Now syncs end_date, current_bid, listing_status to external_listings
 - Enables countdown timers for SBX auctions
 
+**21. PCarMarket Extractor - end_date Extraction Added**
+- Added auction end date extraction (countdown data, ISO dates, time remaining)
+- Added bid count, view count, seller username extraction
+- Added external_listings sync for countdown timer support
+
+**22. PCarMarket Monitor - New Function Created**
+- Created monitor-pcarmarket-listings edge function
+- Updates external_listings with end_date, bid data, status
+- Also updates vehicles table with auction_end_date
+- Successfully updated 5 PCarMarket listings with end_date
+
 ---
 
 ### Summary Stats
@@ -107,11 +118,12 @@
 - **1 new filter** (model) added to CursorHomepage
 - **7 deployments** to Vercel production
 - **2 database triggers/functions** created for automation
-- **5 extractor fixes** (Hagerty timestamp, Hagerty bid tracker, C&B extractor, C&B sync, SBX monitor)
+- **7 extractor fixes** (Hagerty timestamp, Hagerty bid tracker, C&B extractor, C&B sync, SBX monitor, PCarMarket extractor, PCarMarket monitor)
 - **1 header fix** (platform-aware seller badges)
 - **5 Hagerty listings** backfilled with correct timestamps
 - **SBX listings** now have end_date and status synced
-- **5 edge functions deployed** (extract-hagerty-listing, hagerty-bid-tracker, extract-cars-and-bids-core, sync-cars-and-bids-listing, monitor-sbxcars-listings)
+- **5 PCarMarket listings** now have end_date
+- **7 edge functions deployed** (extract-hagerty-listing, hagerty-bid-tracker, extract-cars-and-bids-core, sync-cars-and-bids-listing, monitor-sbxcars-listings, import-pcarmarket-listing, monitor-pcarmarket-listings)
 
 ---
 
@@ -154,20 +166,24 @@
 
 ### Latest Deployment
 
-https://nukefrontend-lvo0vkdhx-nzero.vercel.app
+**https://n-zero.dev** (nuke project)
+
+Also deployed to: https://nukefrontend-fizpsg5pp-nzero.vercel.app (nuke_frontend project)
 
 **Previous:**
+- https://nukefrontend-lvo0vkdhx-nzero.vercel.app
 - https://nukefrontend-9f2gffacc-nzero.vercel.app
 
 ---
 
 ### Session Continuation Notes (Context Recovery)
 
-**Live Auction Status (as of 2026-01-23 20:00 UTC):**
+**Live Auction Status (as of 2026-01-23 20:23 UTC):**
 - BaT: ~100+ auctions ending today (full timestamps working)
 - Cars & Bids: 4+ auctions active (ending Jan 23-27, end_date now extracted)
 - SBX: 6+ auctions active (ending Jan 27-28)
 - Hagerty: 5 active (all backfilled with full timestamps via bid-tracker)
+- PCarMarket: 5 active (all now have end_date via monitor)
 
 **What's Working:**
 - Countdown timers in VehicleHeader work when end_date has full timestamp
@@ -176,12 +192,29 @@ https://nukefrontend-lvo0vkdhx-nzero.vercel.app
 - Model filter working on CursorHomepage after make selection
 - Hagerty bid tracker now updates end_date + seller_slug on each run
 - Cars & Bids core extractor now extracts auction data (bid, end_date, status)
+- PCarMarket monitor now extracts end_date and syncs to external_listings
 
 **Next Steps:**
 1. Research Hagerty comments API to extract actual comment text
 2. Schedule cleanup_stale_listings() via Supabase dashboard
 3. Consider stats panel improvements (Bloomberg-style insights)
-4. Run hagerty-bid-tracker and C&B sync periodically to keep data fresh
+4. Run monitor functions periodically to keep data fresh
+5. Consider adding monitors for traditional auction houses (Broad Arrow, Collecting Cars, Gooding, RM Sotheby's)
+
+**Suggested Cron Schedule for Monitors:**
+```bash
+# Hagerty bid tracker - hourly during auctions
+0 * * * * curl -X POST "$SUPABASE_URL/functions/v1/hagerty-bid-tracker" -H "Authorization: Bearer $SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d '{}'
+
+# PCarMarket monitor - every 4 hours
+0 */4 * * * curl -X POST "$SUPABASE_URL/functions/v1/monitor-pcarmarket-listings" -H "Authorization: Bearer $SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d '{"batch_size": 20}'
+
+# SBX monitor - every 4 hours
+0 */4 * * * curl -X POST "$SUPABASE_URL/functions/v1/monitor-sbxcars-listings" -H "Authorization: Bearer $SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d '{"batch_size": 20}'
+
+# Cleanup stale listings - every 30 minutes
+*/30 * * * * SELECT cleanup_stale_listings();
+```
 
 ---
 
@@ -189,7 +222,7 @@ https://nukefrontend-lvo0vkdhx-nzero.vercel.app
 
 **Total Changes Made:**
 - 7 frontend components modified (CursorHomepage, VehicleHeader, 6 widgets)
-- 4 edge functions fixed and deployed
+- 7 edge functions fixed and deployed
 - 2 database functions created
 - 1 database trigger created
 - 1 Vercel deployment (frontend)
@@ -200,8 +233,25 @@ https://nukefrontend-lvo0vkdhx-nzero.vercel.app
 3. Cars & Bids extractor now captures auction data
 4. Model filter on homepage
 5. Unified collapsible widget pattern
+6. PCarMarket extractor + monitor for end_date extraction
+7. SBX monitor for end_date extraction
 
 **Verified Working:**
 - Hagerty listings now have correct end_date with time (20:00, 20:05, etc.)
 - Seller badge generates correct URLs for Hagerty, C&B, PCar
+- PCarMarket listings have end_date for countdown timers
+- SBX listings have end_date for countdown timers
 - Frontend deployed and accessible at https://nukefrontend-lvo0vkdhx-nzero.vercel.app
+
+**Platform Countdown Timer Coverage:**
+| Platform | end_date Support | Notes |
+|----------|------------------|-------|
+| BaT | ✅ Full | Already working |
+| Hagerty | ✅ Full | Fixed timestamp truncation |
+| Cars & Bids | ✅ Partial | Extractor works, some listings ended |
+| SBX | ✅ Full | Monitor syncs end_date |
+| PCarMarket | ✅ Full | New monitor created |
+| Broad Arrow | ❌ None | Traditional auction house |
+| Collecting Cars | ❌ None | Traditional auction house |
+| Gooding | ❌ None | Traditional auction house |
+| RM Sotheby's | ❌ None | Traditional auction house |
