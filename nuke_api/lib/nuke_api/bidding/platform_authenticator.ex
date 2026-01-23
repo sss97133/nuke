@@ -26,7 +26,7 @@ defmodule NukeApi.Bidding.PlatformAuthenticator do
   Authenticates a user on a platform.
 
   Returns {:ok, session} on success.
-  Returns {:error, :2fa_pending} if manual 2FA input is required.
+  Returns {:error, :twofa_pending} if manual 2FA input is required.
   Returns {:error, reason} on failure.
   """
   @spec authenticate(String.t(), String.t()) :: {:ok, map()} | {:error, term()}
@@ -110,7 +110,7 @@ defmodule NukeApi.Bidding.PlatformAuthenticator do
           Logger.info("[PlatformAuth] Login successful for #{platform}/#{user_id}")
           {:ok, session}
 
-        {:error, {:2fa_required, challenge}} ->
+        {:error, {:twofa_required, challenge}} ->
           # 2FA required
           handle_2fa_challenge(cred_data, challenge, adapter)
 
@@ -190,7 +190,7 @@ defmodule NukeApi.Bidding.PlatformAuthenticator do
 
         # TODO: Send push notification to user
 
-        {:error, {:2fa_pending, %{
+        {:error, {:twofa_pending, %{
           request_id: request_id,
           method: challenge.method,
           challenge_data: challenge.challenge_data,

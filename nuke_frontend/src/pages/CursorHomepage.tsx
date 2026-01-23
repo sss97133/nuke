@@ -1836,12 +1836,51 @@ const CursorHomepage: React.FC = () => {
   });
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
 
-  // Add function to load database-wide stats (around line 726, before loadSession)
+  // Load database-wide stats using server-side RPC (no row limits!)
   const loadDatabaseStats = async () => {
     try {
       setDbStatsLoading(true);
-      
-      // Get total vehicle count (public vehicles only, excluding pending - matching the displayed count)
+
+      // Use server-side RPC for accurate stats (no 1000 row limit!)
+      const { data: serverStats, error: rpcError } = await supabase.rpc('calculate_portfolio_value_server');
+
+      if (!rpcError && serverStats) {
+        // Map RPC response to our state shape
+        const stats = {
+          totalVehicles: Number(serverStats.total_vehicles) || 0,
+          totalValue: Number(serverStats.total_value) || 0,
+          salesVolume: Number(serverStats.sales_volume_today) || 0,
+          salesCountToday: Number(serverStats.sales_count_today) || 0,
+          forSaleCount: Number(serverStats.for_sale_count) || 0,
+          activeAuctions: Number(serverStats.active_auctions) || 0,
+          totalBids: 0, // Not tracked in RPC yet
+          avgValue: Number(serverStats.avg_value) || 0,
+          vehiclesAddedToday: Number(serverStats.vehicles_added_today) || 0,
+          valueMarkTotal: Number(serverStats.value_mark_total) || 0,
+          valueAskTotal: Number(serverStats.value_ask_total) || 0,
+          valueRealizedTotal: Number(serverStats.value_realized_total) || 0,
+          valueCostTotal: Number(serverStats.value_cost_total) || 0,
+          valueImportedToday: Number(serverStats.value_imported_today) || 0,
+          valueImported24h: Number(serverStats.value_imported_24h) || 0,
+          valueImported7d: Number(serverStats.value_imported_7d) || 0,
+        };
+
+        console.log('Server-side stats loaded:', {
+          totalVehicles: stats.totalVehicles,
+          totalValue: stats.totalValue,
+          vehiclesWithValue: serverStats.vehicles_with_value,
+          source: 'calculate_portfolio_value_server RPC'
+        });
+
+        setDbStats(stats);
+        setDbStatsLoading(false);
+        return;
+      }
+
+      // Fallback to client-side calculation if RPC fails
+      console.warn('RPC failed, falling back to client-side stats:', rpcError);
+
+      // Get total vehicle count
       const { count: totalCount, error: countError } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
         let q = supabase
           .from('vehicles')
@@ -1851,38 +1890,35 @@ const CursorHomepage: React.FC = () => {
         if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
         return q;
       });
-      
+
       if (countError) {
         console.error('Error loading vehicle count:', countError);
-        // #region agent log
-        // #endregion
       }
-      
-      // Get comprehensive vehicle data for stats (public vehicles only, excluding pending)
+
+      // IMPORTANT: Add explicit limit to avoid Supabase default 1000 row limit!
       const { data: allVehicles, error: vehiclesError } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
         let q = supabase
           .from('vehicles')
           .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, created_at, sale_date')
           .eq('is_public', true)
-          .neq('status', 'pending');
+          .neq('status', 'pending')
+          .limit(15000); // CRITICAL: Override default 1000 row limit
         if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
         return q;
       });
-      
+
       if (vehiclesError) {
         console.error('Error loading vehicles for stats:', vehiclesError);
-        // #region agent log
-        // #endregion
         return;
       }
-      
-      // Helper to safely parse numeric values (handles both number and string from DB)
+
+      // Helper to safely parse numeric values
       const safeNum = (val: any): number => {
         if (val == null) return 0;
         const n = typeof val === 'number' ? val : parseFloat(String(val));
         return Number.isFinite(n) ? n : 0;
       };
-      
+
       const nowMs = Date.now();
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
@@ -1892,7 +1928,7 @@ const CursorHomepage: React.FC = () => {
       const tomorrowStartMs = tomorrowStart.getTime();
       const last24hMs = nowMs - 24 * 60 * 60 * 1000;
       const last7dMs = nowMs - 7 * 24 * 60 * 60 * 1000;
-      const todayISO = todayStart.toISOString().split('T')[0]; // YYYY-MM-DD
+      const todayISO = todayStart.toISOString().split('T')[0];
 
       let totalValue = 0;
       let vehiclesWithValue = 0;
