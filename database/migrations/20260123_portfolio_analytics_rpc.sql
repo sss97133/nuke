@@ -19,26 +19,44 @@ BEGIN
   WITH vehicle_values AS (
     SELECT
       id,
-      COALESCE(
-        NULLIF(sale_price, 0),
-        NULLIF(winning_bid, 0),
-        NULLIF(high_bid, 0),
-        NULLIF(asking_price, 0),
-        NULLIF(current_value, 0),
-        NULLIF(purchase_price, 0),
-        NULLIF(msrp, 0),
-        0
-      ) as best_price,
+      -- For "reserve_not_met" auctions, only use non-sale prices (current_value, purchase_price)
+      -- Don't count their high_bid as portfolio value since the sale didn't happen
+      CASE
+        WHEN auction_outcome = 'reserve_not_met' OR auction_outcome = 'reserve_not_met' THEN
+          COALESCE(
+            NULLIF(current_value, 0),
+            NULLIF(purchase_price, 0),
+            0
+          )
+        ELSE
+          COALESCE(
+            NULLIF(sale_price, 0),
+            NULLIF(winning_bid, 0),
+            NULLIF(high_bid, 0),
+            NULLIF(asking_price, 0),
+            NULLIF(current_value, 0),
+            NULLIF(purchase_price, 0),
+            NULLIF(msrp, 0),
+            0
+          )
+      END as best_price,
       is_for_sale,
       sale_date,
       created_at,
       current_value,
       purchase_price,
       asking_price,
-      sale_price
+      sale_price,
+      auction_outcome
     FROM vehicles
     WHERE is_public = true
       AND status != 'pending'
+      -- Exclude vehicles with suspiciously low "sale" prices (likely bad data)
+      AND NOT (
+        auction_outcome = 'sold'
+        AND COALESCE(sale_price, winning_bid, high_bid, 0) > 0
+        AND COALESCE(sale_price, winning_bid, high_bid) < 500
+      )
   ),
   stats AS (
     SELECT
@@ -71,6 +89,10 @@ BEGIN
       AND status != 'pending'
       AND sale_date >= CURRENT_DATE
       AND sale_price > 0
+      -- Exclude bad data: "sold" with prices under $500 are likely reserve-not-met
+      AND sale_price >= 500
+      -- Only count actual sales, not reserve_not_met
+      AND (auction_outcome IS NULL OR auction_outcome NOT IN ('reserve_not_met', 'reserve_not_met'))
   ),
   active_auctions AS (
     SELECT COUNT(DISTINCT vehicle_id) as count
@@ -201,19 +223,34 @@ SELECT
   COUNT(*) as total_vehicles,
   COUNT(*) FILTER (WHERE is_public = true AND status != 'pending') as public_vehicles,
   SUM(
-    COALESCE(
-      NULLIF(sale_price, 0),
-      NULLIF(winning_bid, 0),
-      NULLIF(high_bid, 0),
-      NULLIF(asking_price, 0),
-      NULLIF(current_value, 0),
-      NULLIF(purchase_price, 0),
-      NULLIF(msrp, 0),
-      0
-    )
+    CASE
+      -- For reserve_not_met, only use ownership-based values (not auction bids)
+      WHEN auction_outcome IN ('reserve_not_met', 'reserve_not_met') THEN
+        COALESCE(NULLIF(current_value, 0), NULLIF(purchase_price, 0), 0)
+      -- For suspicious "sold" with low prices, exclude from value
+      WHEN auction_outcome = 'sold' AND COALESCE(sale_price, winning_bid, high_bid, 0) < 500 THEN 0
+      -- Normal case
+      ELSE
+        COALESCE(
+          NULLIF(sale_price, 0),
+          NULLIF(winning_bid, 0),
+          NULLIF(high_bid, 0),
+          NULLIF(asking_price, 0),
+          NULLIF(current_value, 0),
+          NULLIF(purchase_price, 0),
+          NULLIF(msrp, 0),
+          0
+        )
+    END
   ) FILTER (WHERE is_public = true AND status != 'pending') as total_value,
   COUNT(*) FILTER (WHERE is_for_sale = true AND is_public = true) as for_sale_count,
   COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE AND is_public = true) as added_today,
+  -- Track bad data for monitoring
+  COUNT(*) FILTER (
+    WHERE auction_outcome = 'sold'
+    AND COALESCE(sale_price, winning_bid, high_bid, 0) < 500
+    AND is_public = true
+  ) as suspicious_sales_count,
   NOW() as refreshed_at
 FROM vehicles;
 

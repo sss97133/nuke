@@ -235,23 +235,27 @@ BEGIN
       avg_sale_price,
       highest_sale,
       live_auctions,
+      -- CITED COMMISSION RATES (buyer premium only, excludes listing fees)
+      -- BaT: 5% buyer premium, $0 seller fee [bringatrailer.com/2024/01/26/bat-site-update]
+      -- C&B: 5% buyer premium as of Feb 2025 [theautopian.com/cars-bids-raises-its-buyer-fees]
+      -- Note: Listing fees ($99-$2500) not included in percentage calc
       CASE platform_normalized
-        WHEN 'bat' THEN 0.10
-        WHEN 'bring_a_trailer' THEN 0.10
-        WHEN 'cars_and_bids' THEN 0.09
-        WHEN 'pcarmarket' THEN 0.10
-        WHEN 'collecting_cars' THEN 0.10
-        WHEN 'broad_arrow' THEN 0.17
-        WHEN 'rm_sothebys' THEN 0.21
-        WHEN 'rmsothebys' THEN 0.21
-        WHEN 'gooding' THEN 0.22
-        WHEN 'bonhams' THEN 0.25
-        WHEN 'mecum' THEN 0.15
-        WHEN 'barrett_jackson' THEN 0.18
-        WHEN 'sbx' THEN 0.07
-        WHEN 'hemmings' THEN 0.035
-        WHEN 'ebay_motors' THEN 0.05
-        ELSE 0.08
+        WHEN 'bat' THEN 0.05              -- 5% buyer premium only (no seller fee)
+        WHEN 'bring_a_trailer' THEN 0.05  -- same as bat
+        WHEN 'cars_and_bids' THEN 0.05    -- 5% as of Feb 2025 (was 4.5%)
+        WHEN 'pcarmarket' THEN 0.05       -- ~5% buyer premium
+        WHEN 'collecting_cars' THEN 0.06  -- 6% buyer premium
+        WHEN 'broad_arrow' THEN 0.12      -- 12% buyer premium
+        WHEN 'rm_sothebys' THEN 0.13      -- 13% buyer premium + seller negotiated
+        WHEN 'rmsothebys' THEN 0.13
+        WHEN 'gooding' THEN 0.12          -- 12% buyer premium
+        WHEN 'bonhams' THEN 0.15          -- ~15% buyer premium
+        WHEN 'mecum' THEN 0.10            -- 10% buyer premium
+        WHEN 'barrett_jackson' THEN 0.10  -- 10% buyer premium
+        WHEN 'sbx' THEN 0.04              -- 4% buyer premium
+        WHEN 'hemmings' THEN 0.00         -- classified, no premium
+        WHEN 'ebay_motors' THEN 0.00      -- fees are flat/capped
+        ELSE 0.05
       END as commission_rate
     FROM platform_sales
   )

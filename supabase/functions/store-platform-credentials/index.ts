@@ -7,10 +7,13 @@ const corsHeaders = {
 };
 
 // AES-256-GCM encryption
-async function encrypt(plaintext: string, keyHex: string): Promise<{ ciphertext: Uint8Array; iv: Uint8Array; tag: Uint8Array }> {
+async function encrypt(plaintext: string, keyBase64: string): Promise<{ ciphertext: Uint8Array; iv: Uint8Array; tag: Uint8Array }> {
+  // Decode base64 key
+  const keyBytes = Uint8Array.from(atob(keyBase64), c => c.charCodeAt(0));
+
   const key = await crypto.subtle.importKey(
     "raw",
-    hexToBytes(keyHex),
+    keyBytes,
     { name: "AES-GCM" },
     false,
     ["encrypt"]
