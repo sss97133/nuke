@@ -2576,6 +2576,28 @@ serve(async (req) => {
           (Array.isArray(scrapeData?.data?.images) && scrapeData.data.images.length > 0)
             ? String(scrapeData.data.images[0] || '').trim()
             : (typeof (item as any)?.thumbnail_url === 'string' ? String((item as any).thumbnail_url).trim() : null);
+        const normalizeCurrencyCode = (value: any): string | null => {
+          if (!value) return null;
+          const raw = String(value || '').trim();
+          if (!raw) return null;
+          const upper = raw.toUpperCase();
+          if (/^[A-Z]{3}$/.test(upper)) return upper;
+          const match = upper.match(/\b[A-Z]{3}\b/);
+          return match ? match[0] : null;
+        };
+        const currencyCode = normalizeCurrencyCode(
+          scrapeData?.data?.currency_code ||
+            scrapeData?.data?.currency ||
+            scrapeData?.data?.price_currency ||
+            scrapeData?.data?.priceCurrency ||
+            scrapeData?.data?.priceCurrencyCode ||
+            rawData?.currency_code ||
+            rawData?.currency ||
+            rawData?.price_currency ||
+            rawData?.priceCurrency ||
+            rawData?.priceCurrencyCode ||
+            null
+        );
 
         const { data: newVehicle, error: vehicleError} = await supabase
           .from('vehicles')
@@ -2606,6 +2628,7 @@ serve(async (req) => {
               imported_at: new Date().toISOString(),
               image_urls: scrapeData.data.images || [], // Store for reference
               image_count: scrapeData.data.images?.length || 0,
+              ...(currencyCode ? { currency_code: currencyCode, currency: currencyCode, price_currency: currencyCode } : {}),
               ...(bhccStockNo ? { bhcc: { stockno: bhccStockNo } } : {}),
               ...(scrapeData?.data?.stock_number ? { stock_number: scrapeData.data.stock_number } : {}),
               ...(isLartFiche ? {
