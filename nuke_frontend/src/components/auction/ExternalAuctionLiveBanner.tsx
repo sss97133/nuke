@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useExternalAuctionSync } from '../../hooks/useExternalAuctionSync';
+import { supabase } from '../../lib/supabase';
+import PlatformCredentialForm from '../bidding/PlatformCredentialForm';
 
 interface ExternalAuctionLiveBannerProps {
   /** External listing ID */
@@ -99,6 +101,34 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
   const watcherCount = syncResult?.watcher_count ?? initialWatcherCount;
   const endDate = syncResult?.end_date ?? initialEndDate;
   const status = syncResult?.listing_status ?? listingStatus;
+
+  // Platform credential check
+  const [hasCredential, setHasCredential] = useState<boolean | null>(null);
+  const [showCredentialForm, setShowCredentialForm] = useState(false);
+
+  useEffect(() => {
+    const checkCredential = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setHasCredential(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('platform_credentials')
+        .select('id, status')
+        .eq('user_id', user.id)
+        .eq('platform', platform)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      setHasCredential(!!data && !error);
+    };
+
+    if (isActive) {
+      checkCredential();
+    }
+  }, [platform, isActive]);
 
   // Live countdown timer
   const [timeState, setTimeState] = useState(() => formatTimeRemaining(endDate));
@@ -243,7 +273,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
           </div>
         )}
 
-        {/* Sync indicator */}
+        {/* Actions */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           {syncing && (
             <span style={{ fontSize: '6pt', opacity: 0.6 }}>syncing...</span>
@@ -253,6 +283,56 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               {pollingInterval < 10000 ? 'FAST' : pollingInterval < 30000 ? 'MED' : ''} sync
             </span>
           )}
+
+          {/* Connect to Bid button when no credentials */}
+          {isActive && !timeState.ended && hasCredential === false && (
+            <button
+              onClick={() => setShowCredentialForm(true)}
+              style={{
+                background: colors.accent,
+                border: 'none',
+                color: '#000',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                fontSize: '7pt',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <span>🔐</span>
+              Connect {platformName.split(' ')[0]} to Bid
+            </button>
+          )}
+
+          {/* Ready to bid indicator when credentials exist */}
+          {isActive && !timeState.ended && hasCredential === true && (
+            <span
+              style={{
+                background: 'rgba(34, 197, 94, 0.2)',
+                color: '#22c55e',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '6pt',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              <span>✓</span> Ready to Bid
+            </span>
+          )}
+
           <button
             onClick={handleViewOnPlatform}
             style={{
@@ -285,6 +365,18 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
           50% { opacity: 0.6; transform: scale(0.9); }
         }
       `}</style>
+
+      {/* Platform credential form modal */}
+      <PlatformCredentialForm
+        isOpen={showCredentialForm}
+        onClose={() => setShowCredentialForm(false)}
+        existingCredential={null}
+        platform={platform}
+        onSaved={() => {
+          setShowCredentialForm(false);
+          setHasCredential(true);
+        }}
+      />
     </div>
   );
 };

@@ -52,9 +52,13 @@ export default function PlatformCredentialForm({
         setUsername('');
         setPassword('');
         setTotpSecret('');
+        // Set platform from prop if provided
+        if (initialPlatform) {
+          setPlatform(initialPlatform);
+        }
       }
     }
-  }, [isOpen, existingCredential]);
+  }, [isOpen, existingCredential, initialPlatform]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,8 +204,8 @@ export default function PlatformCredentialForm({
 
           {step === 'form' && (
             <form onSubmit={handleSubmit}>
-              {/* Platform selector */}
-              {!existingCredential && (
+              {/* Platform selector (only show when not editing and no platform preselected) */}
+              {!existingCredential && !initialPlatform && (
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '8px' }}>
                     Platform *
@@ -225,6 +229,31 @@ export default function PlatformCredentialForm({
                         <div style={{ fontSize: '7pt', fontWeight: 600 }}>{p.name}</div>
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Show selected platform when preselected */}
+              {!existingCredential && initialPlatform && (
+                <div style={{
+                  background: 'var(--surface-hover)',
+                  padding: '12px',
+                  borderRadius: '4px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <span style={{ fontSize: '20pt' }}>
+                    {PLATFORMS.find(p => p.id === initialPlatform)?.icon}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '10pt', fontWeight: 600 }}>
+                      Connect to {PLATFORMS.find(p => p.id === initialPlatform)?.name}
+                    </div>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      Enter your login credentials to enable automated bidding
+                    </div>
                   </div>
                 </div>
               )}

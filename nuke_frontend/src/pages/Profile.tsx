@@ -57,6 +57,7 @@ import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
 import { ProfileCommentsTab } from '../components/profile/ProfileCommentsTab';
 import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
 import { getUserProfileData } from '../services/profileStatsService';
+import ConnectedPlatforms from '../components/bidding/ConnectedPlatforms';
 
 const Profile: React.FC = () => {
   const { userId, externalIdentityId } = useParams<{ userId?: string; externalIdentityId?: string }>();
@@ -806,7 +807,10 @@ const Profile: React.FC = () => {
                     <ProfileVerification />
                   </div>
                 </div>
-                
+
+                {/* Connected Auction Platforms */}
+                <ConnectedPlatforms />
+
                 {/* Password Change */}
                 <div className="card">
                   <div className="card-header">
