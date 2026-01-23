@@ -1,6 +1,93 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+
+// Hook to watch for pending 2FA requests
+export function usePending2FARequests() {
+  const { user } = useAuth();
+  const [pendingRequest, setPendingRequest] = useState<{
+    request_id: string;
+    method: string;
+    challenge_data?: any;
+    expires_at: string;
+    platform: string;
+  } | null>(null);
+
+  const clearRequest = useCallback(() => {
+    setPendingRequest(null);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Check for existing pending requests
+    const checkPending = async () => {
+      const { data } = await supabase
+        .from('pending_2fa_requests')
+        .select(`
+          id,
+          method,
+          challenge_data,
+          expires_at,
+          platform_credentials!inner(platform, user_id)
+        `)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data && data.platform_credentials?.user_id === user.id) {
+        setPendingRequest({
+          request_id: data.id,
+          method: data.method,
+          challenge_data: data.challenge_data,
+          expires_at: data.expires_at,
+          platform: data.platform_credentials.platform,
+        });
+      }
+    };
+
+    checkPending();
+
+    // Subscribe to realtime changes for new 2FA requests
+    const channel = supabase
+      .channel('pending_2fa_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'pending_2fa_requests',
+        },
+        async (payload) => {
+          // Check if this request belongs to the current user
+          const { data: cred } = await supabase
+            .from('platform_credentials')
+            .select('user_id, platform')
+            .eq('id', payload.new.credential_id)
+            .single();
+
+          if (cred?.user_id === user.id) {
+            setPendingRequest({
+              request_id: payload.new.id,
+              method: payload.new.method,
+              challenge_data: payload.new.challenge_data,
+              expires_at: payload.new.expires_at,
+              platform: cred.platform,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  return { pendingRequest, clearRequest };
+}
 
 interface TwoFactorPromptProps {
   isOpen: boolean;
