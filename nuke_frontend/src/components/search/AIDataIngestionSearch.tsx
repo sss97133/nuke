@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { aiDataIngestion, type ExtractionResult } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
+import { universalSearchService, type UniversalSearchResult } from '../../services/universalSearchService';
 import { useToast } from '../../hooks/useToast';
 import VehicleCritiqueMode from './VehicleCritiqueMode';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
@@ -134,13 +135,9 @@ export default function AIDataIngestionSearch() {
   const [wiringMessages, setWiringMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([]);
   const [showWiringUploader, setShowWiringUploader] = useState(false);
 
-  // Autocomplete state
-  const [autocompleteResults, setAutocompleteResults] = useState<Array<{
-    id: string;
-    title: string;
-    type: 'vehicle' | 'organization' | 'vin' | 'url';
-    subtitle?: string;
-  }>>([]);
+  // Autocomplete state - now uses UniversalSearchResult for rich results
+  const [autocompleteResults, setAutocompleteResults] = useState<UniversalSearchResult[]>([]);
+  const [autocompleteAISuggestion, setAutocompleteAISuggestion] = useState<string | null>(null);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedAutocompleteIndex, setSelectedAutocompleteIndex] = useState(-1);
   const autocompleteDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -164,14 +161,14 @@ export default function AIDataIngestionSearch() {
     }
   }, [vehicleIdFromRoute, showPreview]);
 
-  // Autocomplete as user types
+  // Autocomplete as user types - uses universal search for rich results
   useEffect(() => {
     if (autocompleteDebounceRef.current) {
       clearTimeout(autocompleteDebounceRef.current);
     }
 
     const trimmedInput = input.trim();
-    
+
     // Don't show autocomplete if:
     // - Input is too short (< 2 chars)
     // - Processing
@@ -179,91 +176,44 @@ export default function AIDataIngestionSearch() {
     // - Already showing preview
     if (trimmedInput.length < 2 || isProcessing || attachedImage || showPreview) {
       setAutocompleteResults([]);
+      setAutocompleteAISuggestion(null);
       setShowAutocomplete(false);
       return;
     }
 
-    // Check if it's a URL or VIN (don't autocomplete these)
+    // Check if it's a URL (don't autocomplete URLs, they go to extraction)
     const isURL = !!normalizeUrlInput(trimmedInput);
-    const isVIN = /^[A-HJ-NPR-Z0-9]{11,17}$/i.test(trimmedInput.replace(/[^A-Z0-9]/gi, ''));
-    
-    if (isURL || isVIN) {
+    if (isURL) {
       setAutocompleteResults([]);
+      setAutocompleteAISuggestion(null);
       setShowAutocomplete(false);
       return;
     }
+
+    // VINs can be searched - universal search handles them
 
     autocompleteDebounceRef.current = setTimeout(async () => {
       try {
-        const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
-        const searchLower = trimmedInput.toLowerCase();
-        const searchLowerSafe = escapeILike(searchLower);
+        // Use universal search service for rich results with thumbnails
+        const response = await universalSearchService.search(trimmedInput, {
+          limit: 10,
+          includeAI: true
+        });
 
-        const results: Array<{
-          id: string;
-          title: string;
-          type: 'vehicle' | 'organization' | 'vin' | 'url';
-          subtitle?: string;
-        }> = [];
-
-        // Search vehicles - PostgREST doesn't support type casting in or filters
-        // So we search year separately if it's a number, otherwise use text search
-        let vehicleQuery = supabase
-          .from('vehicles')
-          .select('id, year, make, model, vin')
-          .eq('is_public', true);
-        
-        // Check if search term is a 4-digit year
-        const yearMatch = searchLower.match(/^\d{4}$/);
-        if (yearMatch) {
-          const year = parseInt(yearMatch[0]);
-          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchLowerSafe}%,model.ilike.%${searchLowerSafe}%,vin.ilike.%${searchLowerSafe}%,year.eq.${year}`);
-        } else {
-          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchLowerSafe}%,model.ilike.%${searchLowerSafe}%,vin.ilike.%${searchLowerSafe}%`);
-        }
-        
-        const { data: vehicles } = await vehicleQuery.limit(5);
-
-        if (vehicles) {
-          vehicles.forEach((v: any) => {
-            const title = `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Vehicle';
-            results.push({
-              id: v.id,
-              title,
-              type: 'vehicle',
-              subtitle: v.vin ? `VIN: ${v.vin}` : undefined,
-            });
-          });
-        }
-
-        // Search organizations
-        const { data: orgs } = await supabase
-          .from('businesses')
-          .select('id, business_name, website')
-          .eq('is_public', true)
-          .ilike('business_name', `%${searchLowerSafe}%`)
-          .limit(3);
-
-        if (orgs) {
-          orgs.forEach((o: any) => {
-            results.push({
-              id: o.id,
-              title: o.business_name,
-              type: 'organization',
-              subtitle: o.website ? new URL(o.website).hostname : undefined,
-            });
-          });
-        }
-
-        setAutocompleteResults(results);
-        setShowAutocomplete(results.length > 0);
+        setAutocompleteResults(response.results);
+        setAutocompleteAISuggestion(response.ai_suggestion || null);
+        setShowAutocomplete(response.results.length > 0 || !!response.ai_suggestion);
         setSelectedAutocompleteIndex(-1);
+
+        // Log search performance
+        console.log(`🔍 Search: "${trimmedInput}" → ${response.results.length} results in ${response.search_time_ms}ms`);
       } catch (error) {
         console.error('Autocomplete error:', error);
         setAutocompleteResults([]);
+        setAutocompleteAISuggestion(null);
         setShowAutocomplete(false);
       }
-    }, 300); // 300ms debounce
+    }, 200); // 200ms debounce for snappier feel
 
     return () => {
       if (autocompleteDebounceRef.current) {
@@ -952,19 +902,46 @@ export default function AIDataIngestionSearch() {
     }
   };
 
-  const handleAutocompleteSelect = (result: { id: string; type: string; title: string }) => {
+  const handleAutocompleteSelect = (result: UniversalSearchResult) => {
     setShowAutocomplete(false);
     setSelectedAutocompleteIndex(-1);
-    
-    if (result.type === 'vehicle') {
-      navigate(`/vehicle/${result.id}`);
-      setInput('');
-    } else if (result.type === 'organization') {
-      navigate(`/org/${result.id}`);
-      setInput('');
-    } else {
-      // For VIN or URL, just set the input
-      setInput(result.title);
+    setAutocompleteAISuggestion(null);
+
+    switch (result.type) {
+      case 'vehicle':
+      case 'vin_match':
+        navigate(`/vehicle/${result.id}`);
+        setInput('');
+        break;
+
+      case 'organization':
+        navigate(`/org/${result.id}`);
+        setInput('');
+        break;
+
+      case 'user':
+        navigate(`/profile/${result.id}`);
+        setInput('');
+        break;
+
+      case 'external_identity':
+        // External identities have id format "external_<uuid>"
+        const externalId = result.id.replace('external_', '');
+        navigate(`/profile/external/${externalId}`);
+        setInput('');
+        break;
+
+      case 'tag':
+        // Tags navigate to search with that tag as query
+        const tagName = result.metadata?.tag || result.title;
+        navigate(`/search?q=${encodeURIComponent(tagName)}`);
+        setInput('');
+        break;
+
+      default:
+        // Fallback: set input and let user press Enter
+        setInput(result.title);
+        break;
     }
   };
 
@@ -1148,34 +1125,125 @@ export default function AIDataIngestionSearch() {
             fontSize: '8pt'
           }}
         >
-          {autocompleteResults.map((result, index) => (
-            <div
-              key={`${result.type}-${result.id}`}
-              onClick={() => handleAutocompleteSelect(result)}
-              onMouseEnter={() => setSelectedAutocompleteIndex(index)}
-              style={{
-                padding: '6px 8px',
-                cursor: 'pointer',
-                background: selectedAutocompleteIndex === index ? '#e3f2fd' : 'transparent',
-                borderBottom: '1px solid var(--border-light)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px'
-              }}
-            >
-              <div style={{ fontWeight: 'bold', color: result.type === 'vehicle' ? '#1976d2' : '#388e3c' }}>
-                {result.title}
-              </div>
-              {result.subtitle && (
-                <div style={{ fontSize: '7pt', color: '#666' }}>
-                  {result.subtitle}
-                </div>
-              )}
-              <div style={{ fontSize: '7pt', color: '#999', textTransform: 'uppercase' }}>
-                {result.type}
-              </div>
+          {/* AI Suggestion banner */}
+          {autocompleteAISuggestion && autocompleteResults.length === 0 && (
+            <div style={{
+              padding: '10px 12px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              fontSize: '8pt',
+              borderBottom: '1px solid var(--border-light)'
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>AI Assistant</div>
+              <div>{autocompleteAISuggestion}</div>
             </div>
-          ))}
+          )}
+
+          {/* Rich results with thumbnails */}
+          {autocompleteResults.map((result, index) => {
+            const typeColors: Record<string, string> = {
+              vehicle: '#1976d2',
+              organization: '#388e3c',
+              user: '#9c27b0',
+              tag: '#ff9800',
+              external_identity: '#00bcd4',
+              vin_match: '#e91e63'
+            };
+            const typeIcons: Record<string, string> = {
+              vehicle: '🚗',
+              organization: '🏢',
+              user: '👤',
+              tag: '🏷️',
+              external_identity: '🔗',
+              vin_match: '🔑'
+            };
+
+            return (
+              <div
+                key={`${result.type}-${result.id}`}
+                onClick={() => handleAutocompleteSelect(result as any)}
+                onMouseEnter={() => setSelectedAutocompleteIndex(index)}
+                style={{
+                  padding: '8px 10px',
+                  cursor: 'pointer',
+                  background: selectedAutocompleteIndex === index ? '#e3f2fd' : 'transparent',
+                  borderBottom: '1px solid var(--border-light)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  transition: 'background 0.1s'
+                }}
+              >
+                {/* Thumbnail */}
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '4px',
+                  background: result.image_url ? `url(${result.image_url}) center/cover` : '#e0e0e0',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
+                  border: '1px solid var(--border-light)'
+                }}>
+                  {!result.image_url && (typeIcons[result.type] || '📄')}
+                </div>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{
+                    fontWeight: 600,
+                    color: typeColors[result.type] || '#333',
+                    fontSize: '9pt',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {result.title}
+                  </div>
+                  {result.subtitle && (
+                    <div style={{
+                      fontSize: '7pt',
+                      color: '#666',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {result.subtitle}
+                    </div>
+                  )}
+                </div>
+
+                {/* Type badge */}
+                <div style={{
+                  fontSize: '6pt',
+                  color: 'white',
+                  background: typeColors[result.type] || '#999',
+                  padding: '2px 6px',
+                  borderRadius: '3px',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                  flexShrink: 0
+                }}>
+                  {result.type.replace('_', ' ')}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* AI suggestion at bottom when we have results but few */}
+          {autocompleteAISuggestion && autocompleteResults.length > 0 && autocompleteResults.length < 3 && (
+            <div style={{
+              padding: '8px 12px',
+              background: '#f5f5f5',
+              color: '#666',
+              fontSize: '7pt',
+              borderTop: '1px solid var(--border-light)'
+            }}>
+              💡 {autocompleteAISuggestion}
+            </div>
+          )}
         </div>
       )}
 

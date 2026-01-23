@@ -2,6 +2,18 @@
 
 Autonomous extraction system for collector vehicle data. Pipeline: **Link → Entity Recognition → Vehicle Linking → Timeline Storage → Discovery Agent**
 
+## IMPORTANT: Auto-Execute Behavior
+
+**If the user's message is just a URL (or starts with a URL):**
+1. DO NOT ask clarifying questions
+2. Immediately treat it as "extract this"
+3. Get coordination brief for context
+4. Identify the domain and check for existing extractor
+5. Run extraction (existing extractor OR Firecrawl → AI)
+6. Report results
+
+This is the default behavior. Just do it.
+
 ## Available Tools
 
 ### MCP Servers (use these first)
@@ -44,15 +56,24 @@ When user says "extract [URL]":
 2. **If exists**: Call via Supabase MCP or curl
 3. **If not**: Use **Firecrawl MCP** to scrape, then process with AI
 
-### Existing Extractors
+### Key Edge Functions
 
-| Source | Function | Notes |
-|--------|----------|-------|
-| Bring a Trailer | `bat-simple-extract` | Primary BaT extractor |
-| Cars & Bids | `extract-cars-and-bids-core` | Doug's auctions |
-| PCarMarket | `import-pcarmarket-listing` | Porsche specialist |
-| Generic | `extract-vehicle-data-ai` | AI-powered fallback |
-| Discovery | `discovery-snowball` | Recursive lead finding |
+| Function | Purpose |
+|----------|---------|
+| `universal-search` | **Magic input handler** - searches vehicles, orgs, users, tags with thumbnails |
+| `ralph-wiggum-rlm-extraction-coordinator` | Coordination brief for system status |
+| `bat-simple-extract` | Bring a Trailer extraction |
+| `extract-cars-and-bids-core` | Cars & Bids extraction |
+| `import-pcarmarket-listing` | PCarMarket extraction |
+| `extract-vehicle-data-ai` | AI-powered generic extraction |
+| `discovery-snowball` | Recursive lead discovery |
+| **Unknown source** | Use Firecrawl MCP → AI |
+
+### No Extractor? Use This Flow:
+1. Use **Firecrawl MCP** to scrape the URL
+2. Parse scraped content for vehicle data (year, make, model, price, images, etc.)
+3. Either insert directly to `import_queue` or call `extract-vehicle-data-ai`
+4. Report what was extracted
 
 ### New Source Extraction (Firecrawl)
 
