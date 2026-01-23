@@ -26,8 +26,10 @@
 #   ./ralph-wiggum.sh --full       # Run with discovery snowball
 #   ./ralph-wiggum.sh --discover   # Run discovery only
 #   ./ralph-wiggum.sh --youtube    # Process YouTube videos only
-#   ./ralph-wiggum.sh --status     # Check current status
-#   ./ralph-wiggum.sh --watch      # Watch logs in real-time
+#   ./ralph-wiggum.sh --status       # Check current status
+#   ./ralph-wiggum.sh --watch        # Watch logs in real-time
+#   ./ralph-wiggum.sh --bat-backlog  # Run BaT backlog discovery cycle
+#   ./ralph-wiggum.sh --bat-loop     # Run BaT backlog cycle continuously
 #
 
 set -euo pipefail
@@ -39,10 +41,21 @@ LOG_DIR="$PROJECT_DIR/logs/ralph-wiggum"
 LOG_FILE="$LOG_DIR/ralph-$(date +%Y%m%d).log"
 STATE_FILE="$LOG_DIR/state.json"
 LOOP_INTERVAL=1800  # 30 minutes between cycles
+API_CALL_MAX_TIME=${API_CALL_MAX_TIME:-180}
+BAT_ARCHIVE_PAGES_PER_RUN=${BAT_ARCHIVE_PAGES_PER_RUN:-2}
+BAT_WAYBACK_PAGES_PER_RUN=${BAT_WAYBACK_PAGES_PER_RUN:-1}
 
 # Load environment
 if [[ -f "$PROJECT_DIR/.env" ]]; then
-  export $(grep -E "^(SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)=" "$PROJECT_DIR/.env" | xargs)
+  export $(grep -E "^(SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY|VITE_SUPABASE_URL|SERVICE_ROLE_KEY)=" "$PROJECT_DIR/.env" | xargs)
+fi
+
+# Normalize env keys (support VITE_ and legacy naming)
+if [[ -z "${SUPABASE_URL:-}" ]]; then
+  SUPABASE_URL="${VITE_SUPABASE_URL:-}"
+fi
+if [[ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+  SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY:-}"
 fi
 
 # Ensure we have credentials
@@ -73,12 +86,20 @@ api_call() {
   local endpoint="$1"
   local data="${2:-{}}"
 
-  curl -sS -X POST \
+  local response
+  response=$(curl -sS -X POST \
     "${SUPABASE_URL}/functions/v1/${endpoint}" \
     -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
     -H "Content-Type: application/json" \
-    --max-time 120 \
-    -d "$data" 2>/dev/null
+    --max-time "${API_CALL_MAX_TIME}" \
+    -d "$data" 2>/dev/null || true)
+
+  if [[ -z "$response" ]]; then
+    echo "{\"success\":false,\"error\":\"api_call_failed\",\"endpoint\":\"${endpoint}\"}"
+    return 0
+  fi
+
+  echo "$response"
 }
 
 # Get count from Supabase REST API
@@ -320,6 +341,70 @@ run_youtube_cycle() {
   log_info ""
 }
 
+# BaT backlog discovery cycle (budget-safe: API + Wayback)
+run_bat_backlog_cycle() {
+  local cycle_num="${1:-1}"
+
+  log_info "=========================================="
+  log_info "BAT BACKLOG CYCLE $cycle_num"
+  log_info "=========================================="
+  log_info "Discovery-only: BaT API + Wayback (no Firecrawl)"
+  log_info ""
+
+  # Step 1: BaT API archive crawl
+  log_info "Step 1: BaT full archive crawler (API)..."
+  local archive_result
+  archive_result=$(api_call "bat-full-archive-crawler" "{\"action\":\"crawl\",\"pages_per_run\":${BAT_ARCHIVE_PAGES_PER_RUN}}")
+  local archive_discovered
+  local archive_queued
+  archive_discovered=$(echo "$archive_result" | jq -r '.urls_discovered // 0' 2>/dev/null || echo 0)
+  archive_queued=$(echo "$archive_result" | jq -r '.urls_queued // 0' 2>/dev/null || echo 0)
+  log_info "  API discovered: $archive_discovered, queued: $archive_queued"
+
+  # Step 2: Wayback CDX crawl
+  log_info "Step 2: BaT Wayback crawler (CDX)..."
+  local wayback_result
+  wayback_result=$(api_call "bat-wayback-crawler" "{\"action\":\"crawl\",\"pages_per_run\":${BAT_WAYBACK_PAGES_PER_RUN}}")
+  local wayback_discovered
+  local wayback_queued
+  wayback_discovered=$(echo "$wayback_result" | jq -r '.urls_discovered // 0' 2>/dev/null || echo 0)
+  wayback_queued=$(echo "$wayback_result" | jq -r '.urls_queued // 0' 2>/dev/null || echo 0)
+  log_info "  Wayback discovered: $wayback_discovered, queued: $wayback_queued"
+
+  # Step 3: BaT import_queue status
+  log_info "Step 3: BaT import_queue status..."
+  local pending_bat
+  local total_bat
+  pending_bat=$(get_count "import_queue" "status=eq.pending&listing_url=ilike.%25bringatrailer.com%2Flisting%2F%25")
+  total_bat=$(get_count "import_queue" "listing_url=ilike.%25bringatrailer.com%2Flisting%2F%25")
+  log_info "  BaT import_queue: ${pending_bat:-0} pending / ${total_bat:-0} total"
+
+  save_state "$(get_health)" "$cycle_num" "bat_backlog_cycle"
+
+  log_info ""
+  log_info "BAT BACKLOG CYCLE $cycle_num COMPLETE"
+  log_info ""
+}
+
+# Continuous BaT backlog loop
+run_bat_backlog_loop() {
+  local cycle=1
+
+  log_info "Starting BaT backlog loop"
+  log_info "Interval: ${LOOP_INTERVAL}s between cycles"
+  log_info "Press Ctrl+C to stop"
+  log_info ""
+
+  while true; do
+    run_bat_backlog_cycle "$cycle"
+
+    log_info "Sleeping ${LOOP_INTERVAL}s until next cycle..."
+    sleep "$LOOP_INTERVAL"
+
+    ((cycle++))
+  done
+}
+
 # Full cycle - extraction + discovery + youtube
 run_full_cycle() {
   local cycle_num="${1:-1}"
@@ -421,6 +506,12 @@ main() {
     --youtube)
       run_youtube_cycle 1
       ;;
+    --bat-backlog)
+      run_bat_backlog_cycle 1
+      ;;
+    --bat-loop)
+      run_bat_backlog_loop
+      ;;
     --status)
       show_status
       ;;
@@ -439,6 +530,8 @@ main() {
       echo "  $0 --full-loop    Run full cycle continuously"
       echo "  $0 --discover     Run discovery snowball only"
       echo "  $0 --youtube      Run YouTube extraction only"
+      echo "  $0 --bat-backlog  Run BaT backlog discovery cycle"
+      echo "  $0 --bat-loop     Run BaT backlog cycle continuously"
       echo "  $0 --status       Show current status"
       echo "  $0 --watch        Watch logs in real-time"
       echo ""

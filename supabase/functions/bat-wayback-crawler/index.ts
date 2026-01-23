@@ -37,7 +37,8 @@ async function fetchWaybackPage(resumeKey: string | null): Promise<{
   total: number;
 }> {
   const params = new URLSearchParams({
-    url: 'bringatrailer.com/listing/*',
+    // Use prefix match; avoid wildcard which returns empty results.
+    url: 'bringatrailer.com/listing/',
     matchType: 'prefix',
     output: 'json',
     fl: 'original,statuscode',
@@ -172,11 +173,11 @@ serve(async (req) => {
     // Check import_queue too
     const { data: queuedUrls } = await supabase
       .from('import_queue')
-      .select('url')
-      .ilike('url', '%bringatrailer%');
+      .select('listing_url')
+      .ilike('listing_url', '%bringatrailer%');
 
     for (const q of queuedUrls || []) {
-      existingSet.add(q.url);
+      if (q.listing_url) existingSet.add(q.listing_url);
     }
 
     console.log(`[bat-wayback] ${existingSet.size} URLs already known`);
@@ -208,12 +209,12 @@ serve(async (req) => {
 
         // Queue new URLs in batches
         if (newUrls.length > 0) {
-          const queueRecords = newUrls.map(url => ({
-            url,
-            source: 'bat_wayback_crawler',
+          const queueRecords = newUrls.map(listingUrl => ({
+            listing_url: listingUrl,
             status: 'pending',
-            priority: 2,  // Medium priority for historical backfill
-            metadata: {
+            priority: 2, // Medium priority for historical backfill
+            raw_data: {
+              source: 'bat_wayback_crawler',
               discovered_via: 'wayback_machine',
               discovered_at: new Date().toISOString(),
             },
@@ -224,14 +225,14 @@ serve(async (req) => {
             const batch = queueRecords.slice(j, j + 1000);
             const { error: insertError } = await supabase
               .from('import_queue')
-              .upsert(batch, { onConflict: 'url', ignoreDuplicates: true });
+              .upsert(batch, { onConflict: 'listing_url', ignoreDuplicates: true });
 
             if (insertError) {
               results.errors.push(`Batch insert: ${insertError.message}`);
             } else {
               results.urls_queued += batch.length;
               // Add to existing set to avoid re-processing
-              batch.forEach(r => existingSet.add(r.url));
+              batch.forEach(r => existingSet.add(r.listing_url));
             }
           }
         }
