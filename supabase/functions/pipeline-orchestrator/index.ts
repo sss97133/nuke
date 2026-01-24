@@ -171,6 +171,7 @@ serve(async (req) => {
 
       const scrapers = [
         { name: 'BaT active auctions', fn: 'sync-active-auctions', body: { batch_size: 20 } },
+        { name: 'Live auction tracker', fn: 'live-auction-tracker', body: { batch_size: 25, cooldown_seconds: 10 } },
         // Note: Premium auction scrapers are expensive and timeout-prone; skip for now
         // The orchestrator will trigger sync-active-auctions which handles BaT discovery
         // Individual auction scrapers (Mecum, Cars & Bids, Broad Arrow) have their own crons
