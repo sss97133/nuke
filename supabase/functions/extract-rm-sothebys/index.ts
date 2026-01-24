@@ -219,7 +219,8 @@ function extractVinOrChassis(html: string): { vin: string | null; chassis: strin
 }
 
 // Parse currency amount (handles "USD 150,000" or "$150,000" or "150000")
-function parseCurrency(text: string): { amount: number | null; currency: string | null } {
+function parseCurrency(text: string | undefined): { amount: number | null; currency: string | null } {
+  if (!text) return { amount: null, currency: null };
   const cleaned = text.replace(/,/g, '').trim();
 
   // Match currency code + amount
@@ -389,7 +390,7 @@ async function extractRMSothebysListing(url: string): Promise<{ extracted: RMSot
     // Fallback to HTML meta/title
     const titleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
                        html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-    if (titleMatch) {
+    if (titleMatch && titleMatch[1]) {
       extracted.title = titleMatch[1]
         .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
         .replace(/&amp;/g, '&')
@@ -474,7 +475,7 @@ async function extractRMSothebysListing(url: string): Promise<{ extracted: RMSot
 
   for (const pattern of mileagePatterns) {
     const match = html.match(pattern);
-    if (match) {
+    if (match && match[1]) {
       const num = parseInt(match[1].replace(/,/g, ''));
       const unit = (match[2] || 'miles').toLowerCase();
       extracted.mileage = num;
@@ -524,7 +525,7 @@ async function extractRMSothebysListing(url: string): Promise<{ extracted: RMSot
 
   // Extract description (look for large text blocks)
   const descMatch = html.match(/<div[^>]*class=["'][^"']*description[^"']*["'][^>]*>([\s\S]{100,5000}?)<\/div>/i);
-  if (descMatch) {
+  if (descMatch && descMatch[1]) {
     extracted.description = descMatch[1]
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -600,6 +601,7 @@ async function saveToDatabase(supabase: any, extracted: RMSothebysExtracted): Pr
     listing_url: extracted.url,
     is_public: true,
     status: 'active',
+    selling_organization_id: 'f437a196-707d-447f-8527-fe0315aab52d', // RM Sotheby's org
   };
 
   if (vehicleId) {

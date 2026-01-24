@@ -681,7 +681,7 @@ serve(async (req) => {
         // Store chassis number in VIN field for vintage vehicles if no modern VIN
         vin: extracted.vin ? extracted.vin.toUpperCase() : (extracted.chassis_number ? extracted.chassis_number.toUpperCase() : null),
         mileage: extracted.mileage,
-        exterior_color: extracted.exterior_color,
+        color: extracted.exterior_color, // vehicles table uses 'color' not 'exterior_color'
         interior_color: extracted.interior_color,
         transmission: extracted.transmission,
         engine_type: extracted.engine,
@@ -697,6 +697,7 @@ serve(async (req) => {
         discovery_source: 'bonhams',
         profile_origin: 'bonhams_import',
         is_public: true,
+        selling_organization_id: '174f863a-1ec0-4e0d-820a-0624473796b3', // Bonhams org
         origin_metadata: {
           source: 'bonhams_import',
           lot_number: extracted.lot_number,
