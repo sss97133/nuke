@@ -97,6 +97,80 @@ async function updateQueueStatus(id, status, vehicleId = null) {
   });
 }
 
+// VIN patterns for extraction
+const VIN_PATTERNS = [
+  /\b([1-5][A-HJ-NPR-Z0-9]{16})\b/g,
+  /\b(J[A-HJ-NPR-Z0-9]{16})\b/g,
+  /\b(K[A-HJ-NPR-Z0-9]{16})\b/g,
+  /\b(S[A-HJ-NPR-Z0-9]{16})\b/g,
+  /\b(W[A-HJ-NPR-Z0-9]{16})\b/g,
+  /\b(Z[A-HJ-NPR-Z0-9]{16})\b/g,
+  /\b(WP0[A-Z0-9]{14})\b/g,
+  /\b(WDB[A-Z0-9]{14})\b/g,
+  /\b(WBA[A-Z0-9]{14})\b/g,
+  /\b(ZFF[A-Z0-9]{14})\b/g,
+];
+
+function extractVinFromHtml(html) {
+  for (const pattern of VIN_PATTERNS) {
+    const matches = html.match(pattern);
+    if (matches && matches.length > 0) {
+      return matches[0];
+    }
+  }
+  return null;
+}
+
+async function fetchVinFromBatDirect(url) {
+  // Quick fetch from live BaT just for VIN
+  try {
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: url,
+        formats: ['rawHtml'],
+        waitFor: 5000,
+        timeout: 30000,
+      }),
+    });
+    const data = await response.json();
+    if (data.success && data.data?.rawHtml) {
+      return extractVinFromHtml(data.data.rawHtml);
+    }
+  } catch (e) {
+    // Ignore errors - VIN fetch is best effort
+  }
+  return null;
+}
+
+async function updateVehicleVin(vehicleId, vin) {
+  await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'apikey': SUPABASE_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ vin }),
+  });
+}
+
+async function activateVehicle(vehicleId) {
+  await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'apikey': SUPABASE_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ status: 'active' }),
+  });
+}
+
 async function processResult(queueItem, html) {
   if (!html || html.length < 1000) {
     await updateQueueStatus(queueItem.id, 'failed');
@@ -132,7 +206,23 @@ async function processResult(queueItem, html) {
 
     if (result.success || result.vehicle_id) {
       await updateQueueStatus(queueItem.id, 'complete', result.vehicle_id);
-      return { success: true, title: result.title || result.vehicle_id };
+
+      // Activate vehicle immediately so it appears in production
+      if (result.vehicle_id) {
+        await activateVehicle(result.vehicle_id);
+      }
+
+      // If VIN missing and vehicle is 1981+, try fetching from live BaT
+      const extracted = result.extracted || result;
+      if (!extracted.vin && extracted.year >= 1981 && result.vehicle_id) {
+        const vin = await fetchVinFromBatDirect(queueItem.listing_url);
+        if (vin) {
+          await updateVehicleVin(result.vehicle_id, vin);
+          console.log(`    [VIN backfill] ${vin}`);
+        }
+      }
+
+      return { success: true, title: result.title || extracted.title || result.vehicle_id };
     } else {
       await updateQueueStatus(queueItem.id, 'failed');
       return { success: false, error: result.error };

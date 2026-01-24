@@ -68,8 +68,10 @@ serve(async (req) => {
     }
 
     if (sourceTable === "auction_comments") {
-      // Get comments that haven't been migrated yet
-      // We track migration by checking if an observation with matching source_identifier exists
+      // Use pagination based on batch number
+      const offset = (batchNumber - 1) * batchSize;
+
+      // Get comments with pagination
       const { data: comments, error: fetchError } = await supabase
         .from("auction_comments")
         .select(`
@@ -89,9 +91,11 @@ serve(async (req) => {
         .not("vehicle_id", "is", null)
         .not("comment_text", "is", null)
         .order("posted_at", { ascending: true })
-        .limit(batchSize);
+        .range(offset, offset + batchSize - 1);
 
       if (fetchError) throw fetchError;
+
+      console.log(`Batch ${batchNumber}: offset=${offset}, fetched=${comments?.length || 0} comments`);
 
       if (!comments?.length) {
         return new Response(JSON.stringify({

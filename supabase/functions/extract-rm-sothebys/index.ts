@@ -271,21 +271,26 @@ function extractJsonLd(html: string): any[] {
 }
 
 // Extract all images from gallery (cdn.rmsothebys.com)
-function extractImages(html: string): string[] {
+function extractImages(html: string, markdown: string): string[] {
   const images = new Set<string>();
 
-  // Match cdn.rmsothebys.com images
-  const cdnMatches = html.matchAll(/https?:\/\/cdn\.rmsothebys\.com[^"'\s)]+/gi);
-  for (const match of cdnMatches) {
-    let url = match[0];
-    // Remove query params for cleaner URLs (optional - some sites use these for resizing)
-    // url = url.split('?')[0];
-    if (url.includes('/lot/') || url.includes('/image/')) {
+  // Extract from markdown first - format: ![](https://cdn.rmsothebys.com/...)
+  const mdImageMatches = markdown.matchAll(/!\[[^\]]*\]\((https?:\/\/cdn\.rmsothebys\.com[^)]+)\)/gi);
+  for (const match of mdImageMatches) {
+    const url = match[1];
+    // Filter out tiny thumbnails and icons
+    if (url.includes('.webp') || url.includes('.jpg') || url.includes('.png')) {
       images.add(url);
     }
   }
 
-  // Also check for data attributes and JSON
+  // Also check HTML for cdn.rmsothebys.com images
+  const cdnMatches = html.matchAll(/https?:\/\/cdn\.rmsothebys\.com\/[a-f0-9\/]+\.(webp|jpg|jpeg|png)/gi);
+  for (const match of cdnMatches) {
+    images.add(match[0]);
+  }
+
+  // Check for data attributes
   const dataImageMatches = html.matchAll(/data-[a-z-]*image[a-z-]*=["']([^"']+)["']/gi);
   for (const match of dataImageMatches) {
     if (match[1].includes('cdn.rmsothebys.com')) {
@@ -293,7 +298,8 @@ function extractImages(html: string): string[] {
     }
   }
 
-  return Array.from(images);
+  // Dedupe and limit to reasonable count (first 100 unique images)
+  return Array.from(images).slice(0, 100);
 }
 
 // Main extraction function
@@ -308,6 +314,7 @@ async function extractRMSothebysListing(url: string): Promise<{ extracted: RMSot
     waitFor: 5000,
     timeout: 60000,
     mobile: false,
+    proxy: 'stealth', // Use stealth proxy to bypass reCAPTCHA
   });
 
   const fetchDuration = Date.now() - startTime;
@@ -373,16 +380,27 @@ async function extractRMSothebysListing(url: string): Promise<{ extracted: RMSot
   extracted.lot_slug = urlParts.lotSlug;
   extracted.lot_number = urlParts.lotNumber;
 
-  // Extract title from meta tags or h1
-  const titleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
-                     html.match(/<title[^>]*>([^<]+)<\/title>/i) ||
-                     html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-  if (titleMatch) {
-    extracted.title = titleMatch[1]
-      .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .trim();
+  // Extract title - prefer markdown h1 which has cleaner vehicle title
+  // Pattern: "# 2015 Ferrari LaFerrari" or "# _One of the last..._ 2022 Ford GT..."
+  const mdTitleMatch = markdown.match(/^#\s+(?:_[^_]+_\s+)?(\d{4}\s+[^\n]+)/m);
+  if (mdTitleMatch) {
+    extracted.title = mdTitleMatch[1].trim();
+  } else {
+    // Fallback to HTML meta/title
+    const titleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+                       html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    if (titleMatch) {
+      extracted.title = titleMatch[1]
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .trim();
+    }
+  }
+
+  // Skip if title indicates reCAPTCHA or error page
+  if (extracted.title?.toLowerCase().includes('recaptcha') || extracted.title?.toLowerCase().includes('captcha')) {
+    extracted.title = null;
   }
 
   // Parse title for year/make/model
@@ -399,14 +417,22 @@ async function extractRMSothebysListing(url: string): Promise<{ extracted: RMSot
   extracted.vin = vinChassis.vin;
   extracted.chassis_number = vinChassis.chassis;
 
-  // Extract estimate (common patterns: "Estimate: USD 150,000 - 200,000" or "$150,000 - $200,000")
-  const estimateMatch = html.match(/Estimate[:\s]*(?:USD|EUR|GBP)?\s*[\$€£¥]?\s*([\d,]+)\s*[-–—]\s*[\$€£¥]?\s*([\d,]+)/i);
-  if (estimateMatch) {
-    const low = parseCurrency(estimateMatch[1]);
-    const high = parseCurrency(estimateMatch[2]);
-    extracted.estimate_low = low.amount;
-    extracted.estimate_high = high.amount;
-    extracted.currency = low.currency || high.currency;
+  // Extract estimate - try markdown first (format: "$4,450,000 - $4,750,000 USD")
+  const mdEstimateMatch = markdown.match(/\$([\d,]+)\s*[-–—]\s*\$([\d,]+)\s*(USD|EUR|GBP)?/i);
+  if (mdEstimateMatch) {
+    extracted.estimate_low = parseInt(mdEstimateMatch[1].replace(/,/g, ''));
+    extracted.estimate_high = parseInt(mdEstimateMatch[2].replace(/,/g, ''));
+    extracted.currency = mdEstimateMatch[3] || 'USD';
+  } else {
+    // Fallback to HTML patterns
+    const estimateMatch = html.match(/Estimate[:\s]*(?:USD|EUR|GBP)?\s*[\$€£¥]?\s*([\d,]+)\s*[-–—]\s*[\$€£¥]?\s*([\d,]+)/i);
+    if (estimateMatch) {
+      const low = parseCurrency(estimateMatch[1]);
+      const high = parseCurrency(estimateMatch[2]);
+      extracted.estimate_low = low.amount;
+      extracted.estimate_high = high.amount;
+      extracted.currency = low.currency || high.currency;
+    }
   }
 
   // Extract hammer price / sold price
@@ -506,8 +532,8 @@ async function extractRMSothebysListing(url: string): Promise<{ extracted: RMSot
       .slice(0, 5000);
   }
 
-  // Extract images
-  extracted.image_urls = extractImages(html);
+  // Extract images from both HTML and markdown
+  extracted.image_urls = extractImages(html, markdown);
 
   console.log(`[rm-sothebys] Extracted ${extracted.image_urls.length} images`);
 
