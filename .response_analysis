@@ -1,17 +1,17 @@
 {
   "loop_number": 1,
-  "timestamp": "2026-01-22T14:59:26+00:00",
-  "output_file": "logs/claude_output_2026-01-22_10-56-26.log",
+  "timestamp": "2026-01-24T00:00:11+00:00",
+  "output_file": "logs/claude_output_2026-01-23_19-55-00.log",
   "output_format": "json",
   "analysis": {
     "has_completion_signal": false,
     "is_test_only": false,
     "is_stuck": false,
     "has_progress": true,
-    "files_modified": 9,
+    "files_modified": 3,
     "confidence_score": 70,
     "exit_signal": false,
-    "work_summary": "**Summary of this loop:**\n\n1. ✅ **Attribution fix confirmed** - Image insertion code now uses `cab_import` source with all required fields\n2. ✅ **Enhanced Firecrawl** - Added markdown format, increased waitFor to 10000ms\n3. ✅ **Enhanced image extraction** - Added markdown parsing, multiple regex patterns\n4. ⚠️ **Images still 0** - C&B uses intersection observer (lazy loading) that prevents Firecrawl from capturing images\n\n**Key accomplishment:** The `vehicle_images_attribution_check` constraint issue is **FIXED**. When images are found, they will now insert correctly.\n\n**Remaining issue:** C&B's aggressive lazy loading means images don't appear in the HTML until scrolled into view. This would require Firecrawl `actions` to scroll the page, or finding an alternative API endpoint.",
-    "output_length": 1825
+    "work_summary": "**Summary**: 128,573 BaT URLs queued (57.7% of 223k). Full-archive-crawler at page 44 of year range 2020-2026 with 7.1% yield. Wayback exhausted. Continue running full-archive-crawler to progress through older year ranges with likely better yields.",
+    "output_length": 1281
   }
 }
