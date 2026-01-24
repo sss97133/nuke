@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import IntelligentSearch from '../components/search/IntelligentSearch';
 import SearchResults from '../components/search/SearchResults';
@@ -14,6 +14,10 @@ export default function Search() {
   const [searchSummary, setSearchSummary] = useState('Enter a search query to find vehicles, organizations, parts, and more');
   const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | undefined>(undefined);
+  const [resultFilter, setResultFilter] = useState<
+    'all' | 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'source'
+  >('all');
+  const resultsRef = useRef<HTMLDivElement | null>(null);
 
   const [answer, setAnswer] = useState<string>('');
   const [answerLoading, setAnswerLoading] = useState(false);
@@ -379,6 +383,7 @@ export default function Search() {
     setResults(searchResults);
     setSearchSummary(summary);
     setLoading(false);
+    setResultFilter('all');
 
     const q = (searchParams.get('q') || searchQuery || '').trim();
     if (looksLikeQuestion(q)) {
@@ -389,6 +394,78 @@ export default function Search() {
       setAnswerLoading(false);
       setAnswerSources([]);
     }
+  };
+
+  const resultCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    results.forEach((result) => {
+      counts[result.type] = (counts[result.type] || 0) + 1;
+    });
+    return counts;
+  }, [results]);
+
+  const focusQuery = searchQuery.trim();
+  const focusEncoded = focusQuery ? encodeURIComponent(focusQuery) : '';
+
+  const workspaceSections = useMemo(() => {
+    return [
+      {
+        title: 'Assets & Listings',
+        helper: 'Vehicles, auctions, and sellable assets',
+        actions: [
+          { label: 'Vehicle library', href: '/vehicles' },
+          { label: focusQuery ? `Vehicles for "${focusQuery}"` : 'Search vehicles', href: focusQuery ? `/vehicles?search=${focusEncoded}` : '/vehicles', badge: resultCounts.vehicle },
+          { label: 'Auctions', href: '/auctions', badge: resultCounts.auction },
+          { label: 'List a vehicle', href: '/auctions/create' }
+        ]
+      },
+      {
+        title: 'Market & Money',
+        helper: 'Investment, trading, and contracts',
+        actions: [
+          { label: 'Market dashboard', href: '/market' },
+          { label: 'Browse investments', href: '/market/browse' },
+          { label: 'Market segments', href: '/market/segments' },
+          { label: 'Builder workspace', href: '/market/builder' },
+          { label: 'Contract station', href: '/market/contracts' }
+        ]
+      },
+      {
+        title: 'Organizations & Services',
+        helper: 'Builders, shops, and specialists',
+        actions: [
+          { label: 'Organizations', href: '/org', badge: resultCounts.organization },
+          { label: 'Create organization', href: '/org/create' },
+          { label: 'Shops & service', href: '/org', badge: resultCounts.shop }
+        ]
+      },
+      {
+        title: 'Research & Evidence',
+        helper: 'Library, members, and knowledge trails',
+        actions: [
+          { label: 'Library', href: '/library', badge: (resultCounts.reference || 0) + (resultCounts.document || 0) },
+          { label: 'Capsule', href: '/capsule' },
+          { label: 'Members', href: '/bat-members', badge: resultCounts.user }
+        ]
+      }
+    ];
+  }, [focusEncoded, focusQuery, resultCounts]);
+
+  const laneFilters = useMemo(() => ([
+    { key: 'vehicle', label: 'Vehicles', count: resultCounts.vehicle || 0 },
+    { key: 'auction', label: 'Auctions', count: resultCounts.auction || 0 },
+    { key: 'organization', label: 'Organizations', count: resultCounts.organization || 0 },
+    { key: 'shop', label: 'Shops', count: resultCounts.shop || 0 },
+    { key: 'user', label: 'People', count: resultCounts.user || 0 },
+    { key: 'timeline_event', label: 'Timeline', count: resultCounts.timeline_event || 0 },
+    { key: 'document', label: 'Documents', count: resultCounts.document || 0 },
+    { key: 'image', label: 'Images', count: resultCounts.image || 0 },
+    { key: 'reference', label: 'References', count: resultCounts.reference || 0 }
+  ]), [resultCounts]);
+
+  const jumpToFilter = (next: typeof resultFilter) => {
+    setResultFilter(next);
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // Sync searchQuery with URL parameter
@@ -411,6 +488,96 @@ export default function Search() {
           userLocation={userLocation}
           onSearchResults={handleSearchResults}
         />
+      </div>
+
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{
+          padding: '12px 16px',
+          background: 'var(--surface)',
+          border: '2px solid #000',
+          borderRadius: '0px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            <div>
+              <div style={{ fontSize: '9pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Search Workstation
+              </div>
+              <div style={{ fontSize: '8pt', color: '#666' }}>
+                {focusQuery ? `Focus: ${focusQuery}` : 'Start with a brand, model, or intent'}
+              </div>
+            </div>
+            <button
+              onClick={() => jumpToFilter('all')}
+              style={{
+                padding: '4px 8px',
+                fontSize: '8pt',
+                fontWeight: 700,
+                border: '2px solid #000',
+                background: '#fff',
+                cursor: 'pointer'
+              }}
+            >
+              View all results
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+            {workspaceSections.map((section) => (
+              <div key={section.title} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
+                <div style={{ fontSize: '9pt', fontWeight: 700 }}>{section.title}</div>
+                <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px' }}>{section.helper}</div>
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  {section.actions.map((action) => (
+                    <a
+                      key={action.label}
+                      href={action.href}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '8px',
+                        textDecoration: 'none',
+                        color: '#000',
+                        border: '1px solid var(--border)',
+                        padding: '6px 8px',
+                        background: 'var(--surface)'
+                      }}
+                    >
+                      <span style={{ fontSize: '8pt', fontWeight: 600 }}>{action.label}</span>
+                      {typeof action.badge === 'number' && action.badge > 0 && (
+                        <span style={{ fontSize: '7pt', color: '#666' }}>{action.badge}</span>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {focusQuery && (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '6px' }}>Jump to a lane</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {laneFilters.filter((lane) => lane.count > 0).map((lane) => (
+                  <button
+                    key={lane.key}
+                    onClick={() => jumpToFilter(lane.key as typeof resultFilter)}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '8pt',
+                      fontWeight: 700,
+                      border: '2px solid #000',
+                      background: '#fff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {lane.label} · {lane.count}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {searchQuery && looksLikeQuestion(searchQuery) && (answerLoading || answer || answerError) && (
@@ -469,11 +636,15 @@ export default function Search() {
 
       {/* Results - Always show if there's a query or results */}
       {searchQuery && (
-        <SearchResults
-          results={results}
-          searchSummary={searchSummary}
-          loading={loading}
-        />
+        <div ref={resultsRef}>
+          <SearchResults
+            results={results}
+            searchSummary={searchSummary}
+            loading={loading}
+            activeFilter={resultFilter}
+            onFilterChange={setResultFilter}
+          />
+        </div>
       )}
     </div>
   );

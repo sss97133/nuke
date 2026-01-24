@@ -277,12 +277,6 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       }
     }
     
-    // VISIBLE DEBUG - ALERT TO CONFIRM CODE IS RUNNING
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('🔍 EXECUTESEARCH CALLED - NEW CODE VERSION');
-    console.log('🔍 Query:', trimmedQuery);
-    console.log('🔍 Query length:', trimmedQuery.length);
-    console.log('═══════════════════════════════════════════════════════');
 
     // Check if query is a Craigslist URL - check DB first, then import if needed
     const craigslistUrlPattern = /https?:\/\/([^.]+)\.craigslist\.org\/[^/]+\/d\/[^/]+\/[^/]+\.html/i;
@@ -290,27 +284,17 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     const isCraigslistUrl = craigslistUrlPattern.test(trimmedQuery);
     const isKSLUrl = kslUrlPattern.test(trimmedQuery);
     
-    console.log('🔍 Is Craigslist URL?', isCraigslistUrl);
-    console.log('🔍 Is KSL URL?', isKSLUrl);
-    console.log('🔍 Pattern test result:', craigslistUrlPattern.test(trimmedQuery));
-    console.log('🔍 Pattern matches:', trimmedQuery.match(craigslistUrlPattern));
-    
     if (isCraigslistUrl || isKSLUrl) {
-      const source = isCraigslistUrl ? 'CRAIGSLIST' : 'KSL';
-      console.log(`🚀🚀🚀 DETECTED ${source} URL - STARTING IMPORT 🚀🚀🚀`);
-      alert(`${source} URL DETECTED - Starting import...`);
+      const source = isCraigslistUrl ? 'Craigslist' : 'KSL';
       setIsSearching(true);
       try {
         // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          console.log('❌ User not logged in');
           onSearchResults([], 'Please log in to import vehicles from Craigslist.');
           setIsSearching(false);
           return;
         }
-        
-        console.log('✅ User logged in:', user.id);
 
         // FIRST: Check if vehicle already exists in database
         const { data: existingVehicle } = await supabase
@@ -370,7 +354,6 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         }
 
         // Scrape the listing
-        console.log('📡 Calling simple-scraper function...');
         const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('simple-scraper', {
           body: { url: searchQuery.trim() }
         });
@@ -392,18 +375,6 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           return;
         }
         
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('✅ SCRAPING RESULT:');
-        console.log('Year:', scrapedData?.year);
-        console.log('Make:', scrapedData?.make);
-        console.log('Model:', scrapedData?.model);
-        console.log('Images count:', scrapedData?.images?.length || 0);
-        console.log('Images type:', typeof scrapedData?.images);
-        console.log('Is array:', Array.isArray(scrapedData?.images));
-        console.log('Images value:', scrapedData?.images);
-        const scrapedDataStr = scrapedData ? JSON.stringify(scrapedData, null, 2) : 'null';
-        console.log('Full scrapedData:', scrapedDataStr.length > 500 ? scrapedDataStr.substring(0, 500) + '...' : scrapedDataStr);
-        console.log('═══════════════════════════════════════════════════════');
         
         // Helper function to extract make/model from title as fallback
         const extractFromTitle = (title: string) => {
@@ -502,7 +473,6 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         if (scrapedData.trim) vehicleData.trim = scrapedData.trim;
         if (scrapedData.series) vehicleData.series = scrapedData.series;
 
-        console.log('💾 Creating vehicle in database...');
         const { data: newVehicle, error: vehicleError } = await supabase
           .from('vehicles')
           .insert(vehicleData)
@@ -510,13 +480,11 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           .single();
 
         if (vehicleError) {
-          console.error('❌ Vehicle creation failed:', vehicleError);
+          console.error('Vehicle creation failed:', vehicleError);
           onSearchResults([], `Failed to create vehicle: ${vehicleError.message}`);
           setIsSearching(false);
           return;
         }
-        
-        console.log('✅ Vehicle created:', newVehicle.id);
 
         // Extract and cache favicon for this source (non-blocking)
         const sourceInfo = detectSourceType(searchQuery.trim());
@@ -556,8 +524,6 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           });
           if (timelineError) {
             console.warn('Timeline event creation failed:', timelineError);
-          } else {
-            console.log('✅ Timeline event created');
           }
         } catch (err) {
           console.warn('Timeline event creation error:', err);
@@ -593,33 +559,14 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         supabase.rpc('queue_analysis', {
           p_vehicle_id: newVehicle.id,
           p_analysis_type: 'expert_valuation',
-          p_priority: 3, // High priority for new imports
+          p_priority: 3,
           p_triggered_by: 'user'
-        }).then(({ data: queueId, error: queueError }) => {
-          if (queueError) {
-            console.warn('⚠️ Failed to queue analysis (will retry automatically):', queueError);
-          } else {
-            console.log('✅ AI analysis queued (ID:', queueId, ') - will process automatically');
-          }
-        }, (err: any) => {
-          console.warn('⚠️ Analysis queue error (non-critical, will retry):', err);
+        }).catch(() => {
+          // Non-critical - analysis will be retried
         });
 
-        // Import images directly if available (BLOCKING - wait for at least first image)
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('🔍 IMAGE IMPORT CHECK:');
-        console.log('scrapedData exists:', !!scrapedData);
-        console.log('scrapedData.images exists:', !!scrapedData?.images);
-        console.log('scrapedData.images type:', typeof scrapedData?.images);
-        console.log('Is array:', Array.isArray(scrapedData?.images));
-        console.log('Images length:', scrapedData?.images?.length);
-        console.log('Vehicle ID exists:', !!newVehicle.id);
-        console.log('Vehicle ID:', newVehicle.id);
-        console.log('Condition result:', !!(scrapedData?.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id));
-        console.log('═══════════════════════════════════════════════════════');
-        
+        // Import images directly if available
         if (scrapedData?.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id) {
-          console.log(`📸 Importing ALL ${scrapedData.images.length} images...`);
           
           let successCount = 0;
           const imagesToImport = scrapedData.images; // Import ALL images
@@ -634,25 +581,18 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             try {
               // Upgrade to high-res if it's a Craigslist thumbnail
               const fullSizeUrl = String(imageUrl).replace('_600x450.jpg', '_1200x900.jpg').replace('_300x300.jpg', '_1200x900.jpg');
-              
-              // Defensive check before substring
+
               if (!fullSizeUrl || typeof fullSizeUrl !== 'string') {
-                console.warn(`⚠️ Invalid fullSizeUrl for image ${i + 1}, skipping`);
                 continue;
               }
-              
-              const urlPreview = fullSizeUrl.length > 80 ? fullSizeUrl.substring(0, 80) + '...' : fullSizeUrl;
-              console.log(`📥 Downloading image ${i + 1}/${imagesToImport.length}: ${urlPreview}`);
               
               // Download image
               const response = await fetch(fullSizeUrl);
               if (!response.ok) {
-                console.warn(`⚠️ Failed to download image ${i + 1}: ${response.statusText}`);
                 continue;
               }
-              
+
               const blob = await response.blob();
-              console.log(`✅ Downloaded image ${i + 1}, size: ${(blob.size / 1024).toFixed(1)}KB`);
               
               // Use UnifiedImageImportService for proper attribution
               // Note: source should be 'scraper' not 'craigslist_scrape' based on the service definition
@@ -678,26 +618,18 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
               
               if (result.success) {
                 successCount++;
-                console.log(`✅ Imported image ${i + 1}/${imagesToImport.length} (ID: ${result.imageId})`);
-              } else {
-                console.error(`❌ Failed to import image ${i + 1}:`, result.error);
               }
-              
+
               // Small delay to avoid rate limiting
               await new Promise(resolve => setTimeout(resolve, 300));
-              
-            } catch (imgErr: any) {
-              console.error(`❌ Error importing image ${i + 1}:`, imgErr);
+
+            } catch {
+              // Continue with next image
             }
           }
-          
-          console.log(`✅ Image import complete: ${successCount}/${imagesToImport.length} imported`);
-        } else {
-          console.log('⚠️ No images to import - scrapedData.images:', scrapedData.images);
         }
 
         // Navigate to vehicle profile
-        console.log('🚀 Navigating to vehicle:', newVehicle.id);
         window.location.href = `/vehicle/${newVehicle.id}`;
         return;
 
@@ -718,7 +650,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         const { data: edgeData, error: edgeError } = await supabase.functions.invoke('search', {
           body: {
             query: searchQuery.trim(),
-            limit: 50
+            limit: 150
           }
         });
 
@@ -737,7 +669,6 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       }
 
       const analysis = parseSearchQuery(searchQuery);
-      console.log('Search analysis:', analysis);
 
       let results: SearchResult[] = [];
       let searchInsights = {
@@ -748,22 +679,24 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         parts_available: 0
       };
 
-      // Comprehensive multi-table search - search everything
-      const searches = [
+      // Streamlined fallback: Only run essential searches
+      // Priority: Vehicles first, then users/orgs, minimal other tables
+      const essentialSearches = [
         searchVehicles(searchQuery, analysis),
-        searchOrganizations(searchQuery, analysis),
         searchUsers(searchQuery, analysis),
-        searchTimelineEvents(searchQuery, analysis),
-        searchImages(searchQuery, analysis),
-        searchDocuments(searchQuery, analysis),
-        searchAuctions(searchQuery, analysis),
-        searchParts(searchQuery, analysis),
-        searchShops(searchQuery, analysis),
-        searchReferences(searchQuery, analysis)
+        searchOrganizations(searchQuery, analysis)
       ];
 
-      // Execute all searches in parallel
-      const searchResults = await Promise.all(searches);
+      // Only add additional searches if query suggests them
+      if (analysis.shop_query) {
+        essentialSearches.push(searchShops(searchQuery, analysis));
+      }
+      if (analysis.parts_query) {
+        essentialSearches.push(searchParts(searchQuery, analysis));
+      }
+
+      // Execute searches in parallel (3-5 queries instead of 10)
+      const searchResults = await Promise.all(essentialSearches);
 
       // Combine and rank results
       searchResults.forEach(resultSet => {
@@ -825,7 +758,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         onSearchResults([], `No results found for "${searchQuery.trim()}". Try a different search term or check your spelling.`);
       } else {
         const response: SearchResponse = {
-          results: results.slice(0, 50),
+          results: results.slice(0, 200),
           total_count: results.length,
           search_summary: summary,
           suggested_filters: generateSuggestedFilters(analysis, results),
@@ -854,17 +787,10 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   useEffect(() => {
     const trimmed = initialQuery?.trim();
     if (trimmed && lastSearchedRef.current !== trimmed) {
-      console.log('═══════════════════════════════════════════════════════');
-      console.log('AUTO-TRIGGER FIRING - NEW CODE VERSION');
-      console.log('initialQuery:', trimmed);
-      console.log('initialQuery type:', typeof trimmed);
-      console.log('═══════════════════════════════════════════════════════');
       lastSearchedRef.current = trimmed;
       setHasInitialSearched(true);
       setIsSearching(true);
-      // Use setTimeout to ensure executeSearch is defined
       setTimeout(() => {
-        console.log('🚀🚀🚀 CALLING EXECUTESEARCH FROM AUTO-TRIGGER 🚀🚀🚀');
         executeSearch(trimmed);
       }, 100);
     }
@@ -900,7 +826,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       let hybridVehicles: any[] = [];
       try {
         hybridVehicles = await fullTextSearchService.searchVehiclesHybrid(searchTerm, {
-          limit: 20
+          limit: 40
         });
       } catch (ftError) {
         // Full-text search RPC might not exist, fall through to simple search
@@ -954,7 +880,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
         }
 
-        const { data: simpleResults, error } = await vehicleQuery.limit(60);
+        const { data: simpleResults, error } = await vehicleQuery.limit(100);
         
         if (error) {
           console.error('Simple vehicle search error:', error);
@@ -964,7 +890,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             .select('id, year, make, model, normalized_model, series, trim, title, vin, color, description, created_at, uploaded_by')
             .eq('is_public', true)
             .ilike('make', `%${searchTermSafe}%`)
-            .limit(20);
+            .limit(50);
           
           const { data: fallbackResults } = await fallbackQuery;
           const fallbackVehicles = (fallbackResults || []).map((v: any) => ({
@@ -1078,7 +1004,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       }
 
       // Use full-text search
-      const events = await fullTextSearchService.searchTimelineEvents(searchTerm, { limit: 15 });
+      const events = await fullTextSearchService.searchTimelineEvents(searchTerm, { limit: 40 });
 
       // Fetch vehicle info separately
       const vehicleIds = [...new Set(events.map(e => e.vehicle_id).filter(Boolean))];
@@ -1124,7 +1050,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         .select('id, year, make, model, description, created_at')
         .eq('is_public', true)
         .ilike('description', `%${searchTerm}%`)
-        .limit(10);
+        .limit(40);
 
       if (error) {
         console.error('Parts search error:', error);
@@ -1163,7 +1089,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         .select('id, name, description, location_city, location_state, created_at')
         .eq('is_verified', true) // Only show verified shops
         .or(`name.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`)
-        .limit(10);
+        .limit(30);
 
       if (error) {
         console.error('Shops search error:', error);
@@ -1199,7 +1125,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       }
 
       // Use full-text search
-      let orgs = await fullTextSearchService.searchBusinesses(searchTerm, { limit: 15 });
+      let orgs = await fullTextSearchService.searchBusinesses(searchTerm, { limit: 30 });
 
       // Fallback to simple ILIKE search if full-text search returns no results
       if (orgs.length === 0) {
@@ -1208,7 +1134,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           .select('id, business_name, legal_name, description, city, state, created_at')
           .eq('is_public', true)
           .or(`business_name.ilike.%${searchTermSafe}%,legal_name.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`)
-          .limit(15);
+          .limit(30);
 
         if (!simpleError && simpleSearchOrgs) {
           orgs = simpleSearchOrgs.map((org: any) => ({
@@ -1238,7 +1164,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         relatedVehiclesQuery = relatedVehiclesQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%`);
       }
       
-      const { data: relatedVehicles } = await relatedVehiclesQuery.limit(5);
+      const { data: relatedVehicles } = await relatedVehiclesQuery.limit(12);
 
       // Fetch full org details for location data
       const orgIds = orgs.map((o: any) => o.id);
@@ -1292,7 +1218,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       const results: SearchResult[] = [];
 
       // 1. Search profiles (internal users)
-      const users = await fullTextSearchService.searchProfiles(searchTerm, { limit: 10 });
+      const users = await fullTextSearchService.searchProfiles(searchTerm, { limit: 25 });
       users.forEach(user => {
         results.push({
           id: user.id,
@@ -1315,7 +1241,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         .from('external_identities')
         .select('id, platform, handle, metadata')
         .or(`handle.ilike.%${searchTerm}%,handle.ilike.%${searchTerm.toLowerCase()}%`)
-        .limit(10);
+        .limit(25);
 
       if (!extError && externalIdentities) {
         externalIdentities.forEach(identity => {
@@ -1356,7 +1282,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         return bComments - aComments;
       });
 
-      return results.slice(0, 10); // Return top 10
+      return results.slice(0, 20); // Return top 20
     } catch (error) {
       console.error('Users search exception:', error);
       return [];
@@ -1381,7 +1307,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           vehicle_id
         `)
         .ilike('caption', `%${searchTerm}%`)
-        .limit(15);
+        .limit(40);
 
       if (error) {
         console.error('Images search error:', error);
@@ -1441,7 +1367,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           vehicle_id
         `)
         .or(`title.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%,document_type.ilike.%${searchTermSafe}%`)
-        .limit(10);
+        .limit(40);
 
       if (error) {
         console.error('Documents search error:', error);
@@ -1496,7 +1422,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         .from('vehicles')
         .select('id')
         .or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%`)
-        .limit(50);
+        .limit(120);
 
       if (!matchingVehicles || matchingVehicles.length === 0) {
         return [];
@@ -1523,7 +1449,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         `)
         .eq('listing_status', 'active')
         .in('vehicle_id', vehicleIds)
-        .limit(10);
+        .limit(25);
 
       if (error) {
         // Silently fail if table doesn't exist or query fails
@@ -1576,17 +1502,17 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         .from('reference_libraries')
         .select('id, title, description, created_at')
         .ilike('title', `%${searchTerm}%`)
-        .limit(10);
+        .limit(30);
 
       const { data: libsByDesc } = await supabase
         .from('reference_libraries')
         .select('id, title, description, created_at')
         .ilike('description', `%${searchTerm}%`)
-        .limit(10);
+        .limit(30);
 
       // Combine and deduplicate
       const allLibs = [...(libsByTitle || []), ...(libsByDesc || [])];
-      const uniqueLibs = Array.from(new Map(allLibs.map(l => [l.id, l])).values()).slice(0, 10);
+      const uniqueLibs = Array.from(new Map(allLibs.map(l => [l.id, l])).values()).slice(0, 20);
       
       const libs = uniqueLibs;
       const libError = null;
@@ -1599,16 +1525,16 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           .from('library_documents')
           .select('id, title, description, created_at')
           .ilike('title', `%${searchTerm}%`)
-          .limit(10);
+          .limit(30);
 
         const { data: docsByDesc } = await supabase
           .from('library_documents')
           .select('id, title, description, created_at')
           .ilike('description', `%${searchTerm}%`)
-          .limit(10);
+          .limit(30);
 
         const allDocs = [...(docsByTitle || []), ...(docsByDesc || [])];
-        const uniqueDocs = Array.from(new Map(allDocs.map(d => [d.id, d])).values()).slice(0, 10);
+        const uniqueDocs = Array.from(new Map(allDocs.map(d => [d.id, d])).values()).slice(0, 20);
         
         if (uniqueDocs.length > 0) {
           refs = uniqueDocs;
@@ -1738,28 +1664,16 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     e?.preventDefault();
     e?.stopPropagation();
     const searchTerm = query.trim();
-    console.log('🔘 GO button clicked, query:', searchTerm);
     if (searchTerm) {
-      console.log('✅ Executing search...');
       saveToHistory(searchTerm);
       executeSearch(searchTerm);
       setShowSuggestions(false);
-      
-      // Track search analytics
-      try {
-        supabase.from('search_analytics').insert({
-          query: searchTerm,
-          timestamp: new Date().toISOString()
-        }).then(() => {
-          // Ignore analytics success
-        }, () => {
-          // Ignore analytics errors
-        });
-      } catch {
-        // Ignore
-      }
-    } else {
-      console.log('⚠️ Empty query, not searching');
+
+      // Track search analytics (fire-and-forget)
+      supabase.from('search_analytics').insert({
+        query: searchTerm,
+        timestamp: new Date().toISOString()
+      }).catch(() => {});
     }
   };
 

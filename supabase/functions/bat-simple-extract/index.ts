@@ -5,6 +5,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { fetchBatPage, logFetchCost, type FetchResult } from '../_shared/batFetcher.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -663,7 +664,56 @@ serve(async (req) => {
     console.log(`Reserve: ${extracted.reserve_status || 'unknown'}`);
     console.log(`Specs: ${extracted.mileage || '?'}mi | ${extracted.exterior_color || '?'} | ${extracted.transmission || '?'} | ${extracted.drivetrain || '?'}`);
     console.log(`Images: ${extracted.image_urls.length} | Parsed comments: ${extracted.comments.length}`);
-    
+
+    // === FIELD-LEVEL EXTRACTION HEALTH LOGGING ===
+    const healthLogger = new ExtractionLogger(supabase, {
+      source: 'bat',
+      extractorName: 'bat-simple-extract',
+      extractorVersion: '1.0',
+      sourceUrl: url,
+      vehicleId: vehicle_id,
+    });
+
+    // Log each field with appropriate status
+    healthLogger.logField('title', extracted.title, 0.95);
+    healthLogger.logField('year', extracted.year, extracted.year ? 0.95 : 0);
+    healthLogger.logField('make', extracted.make, extracted.make ? 0.90 : 0);
+    healthLogger.logField('model', extracted.model, extracted.model ? 0.85 : 0);
+
+    // VIN with validation
+    if (extracted.vin) {
+      const vinValidation = validateVin(extracted.vin);
+      if (vinValidation.valid) {
+        healthLogger.logField('vin', extracted.vin, extracted.vin.length === 17 ? 0.95 : 0.75);
+      } else {
+        healthLogger.logValidationFail('vin', extracted.vin, vinValidation.errorCode!, vinValidation.errorDetails);
+      }
+    } else {
+      healthLogger.logField('vin', null, 0);
+    }
+
+    healthLogger.logField('location', extracted.location, 0.85);
+    healthLogger.logField('mileage', extracted.mileage, extracted.mileage ? 0.80 : 0);
+    healthLogger.logField('exterior_color', extracted.exterior_color, extracted.exterior_color ? 0.75 : 0);
+    healthLogger.logField('interior_color', extracted.interior_color, extracted.interior_color ? 0.70 : 0);
+    healthLogger.logField('transmission', extracted.transmission, extracted.transmission ? 0.80 : 0);
+    healthLogger.logField('drivetrain', extracted.drivetrain, extracted.drivetrain ? 0.80 : 0);
+    healthLogger.logField('engine', extracted.engine, extracted.engine ? 0.75 : 0);
+    healthLogger.logField('body_style', extracted.body_style, extracted.body_style ? 0.75 : 0);
+    healthLogger.logField('seller_username', extracted.seller_username, extracted.seller_username ? 0.95 : 0);
+    healthLogger.logField('buyer_username', extracted.buyer_username, extracted.buyer_username ? 0.95 : 0);
+    healthLogger.logField('sale_price', extracted.sale_price, extracted.sale_price ? 0.95 : 0);
+    healthLogger.logField('high_bid', extracted.high_bid, extracted.high_bid ? 0.90 : 0);
+    healthLogger.logField('bid_count', extracted.bid_count, 0.95);
+    healthLogger.logField('comment_count', extracted.comment_count, 0.95);
+    healthLogger.logField('lot_number', extracted.lot_number, extracted.lot_number ? 0.95 : 0);
+    healthLogger.logField('reserve_status', extracted.reserve_status, extracted.reserve_status ? 0.90 : 0);
+    healthLogger.logField('description', extracted.description, extracted.description ? 0.85 : 0);
+    healthLogger.logField('images', extracted.image_urls.length > 0 ? extracted.image_urls.length : null,
+                          extracted.image_urls.length > 0 ? 0.95 : 0);
+
+    // NOTE: flush() is called AFTER vehicle creation so we have the vehicle_id
+
     // Optionally save to database
     if (save_to_db || vehicle_id) {
       let targetVehicleId = vehicle_id;
@@ -709,6 +759,7 @@ serve(async (req) => {
         
         console.log(`Updated vehicle: ${vehicle_id}`);
         extracted.vehicle_id = vehicle_id;
+        healthLogger.setVehicleId(vehicle_id);
       } else {
         // Insert new vehicle (not upsert - start fresh)
         const { data, error } = await supabase
@@ -760,6 +811,7 @@ serve(async (req) => {
         
         console.log(`Saved vehicle: ${data.id}`);
         extracted.vehicle_id = data.id;
+        healthLogger.setVehicleId(data.id);
       }
       
       // Save ALL images (BaT has great galleries - use them)
@@ -914,6 +966,12 @@ serve(async (req) => {
           console.error(`Failed to trigger comment extraction: ${e.message}`);
         });
       }
+
+      // Flush health logs now that we have the vehicle_id
+      healthLogger.flush().catch(err => console.error('Health log flush error:', err));
+    } else {
+      // No database save requested - still flush the logs (with null vehicle_id)
+      healthLogger.flush().catch(err => console.error('Health log flush error:', err));
     }
 
     return new Response(

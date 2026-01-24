@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { MarketStatsService, type SquarebodyMarketStats as MarketStats, type RecentSquarebody, type RegionActivity, type PriceTrend } from '../services/marketStatsService';
 import '../design-system.css';
 
-interface MarketStats {
+interface DashboardMarketStats {
   total_discovered: number;
   discovered_today: number;
   discovered_this_week: number;
@@ -26,22 +26,22 @@ interface RecentDiscovery {
   listing_url: string;
 }
 
-interface PriceTrend {
+interface DashboardPriceTrend {
   date: string;
   count: number;
   avg_price: number;
 }
 
-interface RegionActivity {
+interface DashboardRegionActivity {
   region: string;
   count: number;
 }
 
 const SquarebodyMarketDashboard: React.FC = () => {
-  const [stats, setStats] = useState<MarketStats | null>(null);
+  const [stats, setStats] = useState<DashboardMarketStats | null>(null);
   const [recentDiscoveries, setRecentDiscoveries] = useState<RecentDiscovery[]>([]);
-  const [priceTrends, setPriceTrends] = useState<PriceTrend[]>([]);
-  const [regionActivity, setRegionActivity] = useState<RegionActivity[]>([]);
+  const [priceTrends, setPriceTrends] = useState<DashboardPriceTrend[]>([]);
+  const [regionActivity, setRegionActivity] = useState<DashboardRegionActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
@@ -57,172 +57,49 @@ const SquarebodyMarketDashboard: React.FC = () => {
 
   const loadData = async () => {
     try {
-      // Get market stats
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      // Fetch all data in parallel using optimized RPC calls
+      const [marketStats, recentVehicles, regions, trends] = await Promise.all([
+        MarketStatsService.getSquarebodyMarketStats(),
+        MarketStatsService.getRecentSquarebodies(12),
+        MarketStatsService.getSquarebodyRegionActivity(10),
+        MarketStatsService.getSquarebodyPriceTrends()
+      ]);
 
-      // Total discovered (from queue complete + existing vehicles)
-      const { data: queueComplete, error: queueError } = await supabase
-        .from('craigslist_listing_queue')
-        .select('id, processed_at, vehicle_id')
-        .eq('status', 'complete');
-
-      const { data: vehicles, error: vehiclesError } = await supabase
-        .from('vehicles')
-        .select('id, created_at, asking_price, discovery_source, discovery_url')
-        .eq('discovery_source', 'craigslist_scrape')
-        .order('created_at', { ascending: false });
-
-      if (vehiclesError) throw vehiclesError;
-
-      // Calculate stats
-      const totalDiscovered = vehicles?.length || 0;
-      const discoveredToday = vehicles?.filter(v => 
-        new Date(v.created_at) >= today
-      ).length || 0;
-      const discoveredThisWeek = vehicles?.filter(v => 
-        new Date(v.created_at) >= weekAgo
-      ).length || 0;
-      const discoveredThisMonth = vehicles?.filter(v => 
-        new Date(v.created_at) >= monthAgo
-      ).length || 0;
-
-      // Price stats
-      const prices = vehicles
-        ?.map(v => v.asking_price)
-        .filter((p): p is number => p !== null && p > 0) || [];
-      
-      const avgPrice = prices.length > 0
-        ? prices.reduce((sum, p) => sum + p, 0) / prices.length
-        : 0;
-      
-      const priceRange = prices.length > 0
-        ? { min: Math.min(...prices), max: Math.max(...prices) }
-        : { min: 0, max: 0 };
-
-      // Regions active (from discovery URLs)
-      const regions = new Set<string>();
-      vehicles?.forEach(v => {
-        if (v.discovery_url) {
-          const match = v.discovery_url.match(/https?:\/\/([^.]+)\.craigslist\.org/);
-          if (match) regions.add(match[1]);
-        }
-      });
-
-      // With images
-      const vehicleIds = vehicles?.map(v => v.id) || [];
-      const { count: imageCount } = await supabase
-        .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds.slice(0, 100)); // Sample first 100
-
-      // Processing rate (vehicles per day this week)
-      const processingRate = discoveredThisWeek / 7;
-
+      // Set market stats
       setStats({
-        total_discovered: totalDiscovered,
-        discovered_today: discoveredToday,
-        discovered_this_week: discoveredThisWeek,
-        discovered_this_month: discoveredThisMonth,
-        average_price: avgPrice,
-        price_range: priceRange,
-        regions_active: regions.size,
-        with_images: imageCount || 0,
-        processing_rate: processingRate
+        total_discovered: marketStats.total_discovered,
+        discovered_today: marketStats.discovered_today,
+        discovered_this_week: marketStats.discovered_this_week,
+        discovered_this_month: marketStats.discovered_this_month,
+        average_price: marketStats.average_price,
+        price_range: { min: marketStats.price_min, max: marketStats.price_max },
+        regions_active: marketStats.regions_active,
+        with_images: marketStats.with_images,
+        processing_rate: marketStats.processing_rate
       });
 
-      // Recent discoveries with details
-      const recentVehicles = vehicles?.slice(0, 12) || [];
-      const recentWithDetails = await Promise.all(
-        recentVehicles.map(async (v) => {
-          // Get primary image
-          const { data: image } = await supabase
-            .from('vehicle_images')
-            .select('image_url')
-            .eq('vehicle_id', v.id)
-            .eq('is_primary', true)
-            .limit(1)
-            .maybeSingle();
+      // Set recent discoveries (already includes images from RPC)
+      setRecentDiscoveries(recentVehicles.map(v => ({
+        id: v.id,
+        year: v.year,
+        make: v.make,
+        model: v.model,
+        asking_price: v.asking_price,
+        location: v.location,
+        image_url: v.image_url,
+        discovered_at: v.discovered_at,
+        listing_url: v.listing_url
+      })));
 
-          // Get vehicle details
-          const { data: vehicle } = await supabase
-            .from('vehicles')
-            .select('year, make, model, asking_price, discovery_url')
-            .eq('id', v.id)
-            .single();
+      // Set price trends
+      setPriceTrends(trends.map(t => ({
+        date: t.date,
+        count: t.count,
+        avg_price: t.avg_price
+      })));
 
-          // Extract location from discovery URL
-          let location = null;
-          if (v.discovery_url) {
-            const match = v.discovery_url.match(/https?:\/\/([^.]+)\.craigslist\.org/);
-            if (match) {
-              location = match[1].replace(/([A-Z])/g, ' $1').trim();
-            }
-          }
-
-          return {
-            id: v.id,
-            year: vehicle?.year || 0,
-            make: vehicle?.make || '',
-            model: vehicle?.model || '',
-            asking_price: vehicle?.asking_price || null,
-            location: location,
-            image_url: image?.image_url || null,
-            discovered_at: v.created_at,
-            listing_url: v.discovery_url || ''
-          };
-        })
-      );
-
-      setRecentDiscoveries(recentWithDetails);
-
-      // Price trends (last 7 days)
-      const trendData: PriceTrend[] = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
-        const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-        
-        const dayVehicles = vehicles?.filter(v => {
-          const created = new Date(v.created_at);
-          return created >= dayStart && created < dayEnd;
-        }) || [];
-
-        const dayPrices = dayVehicles
-          .map(v => v.asking_price)
-          .filter((p): p is number => p !== null && p > 0);
-
-        trendData.push({
-          date: date.toISOString().split('T')[0],
-          count: dayVehicles.length,
-          avg_price: dayPrices.length > 0
-            ? dayPrices.reduce((sum, p) => sum + p, 0) / dayPrices.length
-            : 0
-        });
-      }
-
-      setPriceTrends(trendData);
-
-      // Region activity
-      const regionCounts: Record<string, number> = {};
-      vehicles?.forEach(v => {
-        if (v.discovery_url) {
-          const match = v.discovery_url.match(/https?:\/\/([^.]+)\.craigslist\.org/);
-          if (match) {
-            const region = match[1];
-            regionCounts[region] = (regionCounts[region] || 0) + 1;
-          }
-        }
-      });
-
-      const regionArray = Object.entries(regionCounts)
-        .map(([region, count]) => ({ region, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-
-      setRegionActivity(regionArray);
+      // Set region activity
+      setRegionActivity(regions);
 
       setLastUpdate(new Date());
     } catch (error) {

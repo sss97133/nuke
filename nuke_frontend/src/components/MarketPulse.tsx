@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { MarketStatsService } from '../services/marketStatsService';
 
 interface PulseMetric {
   label: string;
@@ -29,29 +29,18 @@ const MarketPulse: React.FC = () => {
 
   const loadMetrics = async () => {
     try {
-      // Get current metrics from real database
-      const [vehicleCount, avgPrice, forSaleCount, todayAdds] = await Promise.all([
-        supabase.from('vehicles').select('id', { count: 'exact' }).eq('is_public', true),
-        supabase.from('vehicles').select('current_value').eq('is_public', true).not('current_value', 'is', null),
-        supabase.from('vehicles').select('id', { count: 'exact' }).eq('is_for_sale', true).eq('is_public', true),
-        supabase.from('vehicles').select('id', { count: 'exact' })
-          .eq('is_public', true)
-          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24 hours
-      ]);
+      // Single RPC call replaces 4 parallel queries
+      const stats = await MarketStatsService.getMarketPulseStats();
 
-      const totalVehicles = vehicleCount.count || 0;
-      const prices = avgPrice.data || [];
-      const averagePrice = prices.length > 0 
-        ? Math.round(prices.reduce((sum, v) => sum + (v.current_value || 0), 0) / prices.length / 1000)
+      const averagePrice = stats.avg_price > 0
+        ? Math.round(stats.avg_price / 1000)
         : 0;
-      const forSale = forSaleCount.count || 0;
-      const newToday = todayAdds.count || 0;
-      
+
       setMetrics([
-        { label: 'Active Listings', value: totalVehicles },
+        { label: 'Active Listings', value: stats.total_vehicles },
         { label: 'Avg Price', value: averagePrice, unit: 'k' },
-        { label: 'For Sale', value: forSale },
-        { label: 'New Today', value: newToday }
+        { label: 'For Sale', value: stats.for_sale_count },
+        { label: 'New Today', value: stats.new_today }
       ]);
     } catch (error) {
       console.error('Error loading pulse metrics:', error);

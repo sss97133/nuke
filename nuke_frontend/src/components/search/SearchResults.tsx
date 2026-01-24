@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
@@ -7,18 +7,37 @@ import { highlightSearchTerm } from '../../utils/searchHighlight';
 import type { SearchResult } from '../../types/search';
 import '../../design-system.css';
 
+type SearchFilter =
+  | 'all'
+  | 'vehicle'
+  | 'organization'
+  | 'shop'
+  | 'part'
+  | 'user'
+  | 'timeline_event'
+  | 'image'
+  | 'document'
+  | 'auction'
+  | 'reference'
+  | 'source';
+
 interface SearchResultsProps {
   results: SearchResult[];
   searchSummary: string;
   loading?: boolean;
+  activeFilter?: SearchFilter;
+  onFilterChange?: (next: SearchFilter) => void;
 }
 
-const SearchResults = ({ results, searchSummary, loading = false }: SearchResultsProps) => {
+const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange }: SearchResultsProps) => {
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('q') || '';
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'map'>('cards');
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location'>('relevance');
-  const [filterBy, setFilterBy] = useState<'all' | 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'source'>('all');
+  const [internalFilter, setInternalFilter] = useState<SearchFilter>('all');
+  const [showBazaar, setShowBazaar] = useState(true);
+  const filterBy = activeFilter ?? internalFilter;
+  const setFilterBy = onFilterChange ?? setInternalFilter;
 
   const getResultHref = (result: SearchResult): string | undefined => {
     switch (result.type) {
@@ -77,6 +96,64 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
       default: return '';
     }
   };
+
+  const typeLabels: Record<string, string> = {
+    vehicle: 'Vehicles',
+    organization: 'Organizations',
+    shop: 'Shops',
+    part: 'Parts & Tools',
+    user: 'People',
+    timeline_event: 'Timeline',
+    image: 'Images',
+    document: 'Documents',
+    auction: 'Auctions',
+    reference: 'References',
+    source: 'Sources'
+  };
+
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    results.forEach((result) => {
+      counts[result.type] = (counts[result.type] || 0) + 1;
+    });
+    return counts;
+  }, [results]);
+
+  const bazaarGroups = useMemo(() => {
+    const groups = [
+      {
+        id: 'assets',
+        title: 'Assets',
+        helper: 'Vehicles, auctions, and parts',
+        types: ['vehicle', 'auction', 'part'] as SearchFilter[]
+      },
+      {
+        id: 'services',
+        title: 'Organizations & Shops',
+        helper: 'Builders, sellers, and service providers',
+        types: ['organization', 'shop'] as SearchFilter[]
+      },
+      {
+        id: 'people',
+        title: 'People',
+        helper: 'Members, sellers, and external identities',
+        types: ['user'] as SearchFilter[]
+      },
+      {
+        id: 'evidence',
+        title: 'Evidence & Activity',
+        helper: 'Timeline, docs, images, references',
+        types: ['timeline_event', 'document', 'image', 'reference', 'source'] as SearchFilter[]
+      }
+    ];
+
+    return groups
+      .map((group) => {
+        const groupResults = results.filter((result) => group.types.includes(result.type as SearchFilter));
+        return { ...group, results: groupResults, count: groupResults.length };
+      })
+      .filter((group) => group.count > 0);
+  }, [results]);
 
   const filteredAndSortedResults = results
     .filter(result => filterBy === 'all' || result.type === filterBy)
@@ -181,33 +258,38 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
           flexWrap: 'wrap',
           alignItems: 'center'
         }}>
-          {['vehicle', 'organization', 'shop', 'part', 'user', 'timeline_event', 'image', 'document', 'auction', 'reference'].map(type => {
-            const count = results.filter(r => r.type === type).length;
+          {(['vehicle', 'organization', 'shop', 'part', 'user', 'timeline_event', 'image', 'document', 'auction', 'reference', 'source'] as SearchFilter[]).map(type => {
+            const count = typeCounts[type] || 0;
             if (count === 0) return null;
+            const isActive = filterBy === type;
 
             return (
-              <div
+              <button
                 key={type}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   background: 'var(--surface)',
-                  border: '2px solid #e5e7eb',
+                  border: `2px solid ${isActive ? '#3b82f6' : '#e5e7eb'}`,
                   padding: '4px 8px',
                   borderRadius: '0px',
                   fontSize: '8pt',
                   fontWeight: 600,
                   color: '#000',
                   transition: 'all 0.12s ease',
-                  cursor: 'default'
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  setFilterBy(type);
+                  setViewMode('cards');
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = '#3b82f6';
                   e.currentTarget.style.background = '#eff6ff';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.borderColor = isActive ? '#3b82f6' : '#e5e7eb';
                   e.currentTarget.style.background = '#ffffff';
                 }}
               >
@@ -218,11 +300,116 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                 }}>{getTypeIcon(type)}</span>
                 <span style={{ fontWeight: 600 }}>{count}</span>
                 <span style={{ color: '#6b7280', textTransform: 'capitalize' }}>{type.replace('_', ' ')}</span>
-              </div>
+              </button>
             );
           })}
         </div>
       </div>
+
+      {showBazaar && bazaarGroups.length > 0 && (
+        <div style={{
+          marginBottom: '20px',
+          padding: '12px 16px',
+          background: 'var(--surface)',
+          border: '2px solid #000',
+          borderRadius: '0px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            <div>
+              <div style={{ fontSize: '9pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Workstation Lanes
+              </div>
+              <div style={{ fontSize: '8pt', color: '#666' }}>
+                Jump into the slice you care about.
+              </div>
+            </div>
+            <button
+              onClick={() => setShowBazaar(false)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '8pt',
+                fontWeight: 700,
+                border: '2px solid #000',
+                background: '#fff',
+                cursor: 'pointer'
+              }}
+            >
+              Hide lanes
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {bazaarGroups.map((group) => (
+              <div key={group.id} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '9pt', fontWeight: 700 }}>{group.title}</div>
+                    <div style={{ fontSize: '8pt', color: '#666' }}>{group.helper}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {group.types.map((type) => {
+                      const count = typeCounts[type] || 0;
+                      if (count === 0) return null;
+                      const isActive = filterBy === type;
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            setFilterBy(type);
+                            setViewMode('cards');
+                          }}
+                          style={{
+                            padding: '3px 6px',
+                            fontSize: '7pt',
+                            fontWeight: 700,
+                            border: `2px solid ${isActive ? '#3b82f6' : '#000'}`,
+                            background: isActive ? '#eff6ff' : '#fff',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {typeLabels[type]} · {count}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+                  {group.results.slice(0, 6).map((result) => {
+                    const href = getResultHref(result);
+                    const isExternal = href?.startsWith('http');
+                    return (
+                      <a
+                        key={`${group.id}-${result.id}`}
+                        href={href}
+                        target={isExternal ? '_blank' : undefined}
+                        rel={isExternal ? 'noreferrer' : undefined}
+                        style={{
+                          border: '1px solid var(--border)',
+                          padding: '8px',
+                          textDecoration: 'none',
+                          color: '#000',
+                          background: 'var(--surface)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{result.title}</div>
+                          <div style={{ fontSize: '7pt', color: '#666', whiteSpace: 'nowrap' }}>{typeLabels[result.type] || result.type}</div>
+                        </div>
+                        {result.description && (
+                          <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px' }}>
+                            {String(result.description).slice(0, 120)}
+                          </div>
+                        )}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Controls */}
       <div style={{
@@ -272,6 +459,25 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
               {mode}
             </button>
           ))}
+          {bazaarGroups.length > 0 && (
+            <button
+              onClick={() => setShowBazaar((prev) => !prev)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '8pt',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                height: '24px',
+                border: '2px solid #000',
+                borderRadius: '0px',
+                background: showBazaar ? '#eff6ff' : '#fff',
+                color: '#000',
+                cursor: 'pointer'
+              }}
+            >
+              {showBazaar ? 'Hide lanes' : 'Show lanes'}
+            </button>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>

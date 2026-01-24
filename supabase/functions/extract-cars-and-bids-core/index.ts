@@ -31,6 +31,7 @@ function normalizeUrl(raw: string): string {
     const u = new URL(raw);
     u.hash = "";
     u.search = "";
+    // Don't lowercase - C&B auction IDs are case-sensitive!
     if (!u.pathname.endsWith("/")) u.pathname = `${u.pathname}/`;
     return u.toString();
   } catch {
@@ -44,6 +45,7 @@ function canonicalUrl(raw: string): string {
     const u = new URL(raw);
     u.hash = "";
     u.search = "";
+    // Don't lowercase - C&B auction IDs are case-sensitive!
     if (u.pathname.endsWith("/")) u.pathname = u.pathname.slice(0, -1);
     return u.toString();
   } catch {
@@ -72,6 +74,12 @@ interface CabExtractedData {
   sellerName: string | null;
   description: string | null;
   lotNumber: string | null;
+  // C&B specific fields
+  dougsTake: string | null;
+  highlights: string | null;
+  equipment: string | null;
+  commentCount: number | null;
+  bidCount: number | null;
 }
 
 /**
@@ -102,6 +110,12 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
     sellerName: null,
     description: null,
     lotNumber: null,
+    // C&B specific
+    dougsTake: null,
+    highlights: null,
+    equipment: null,
+    commentCount: null,
+    bidCount: null,
   };
 
   try {
@@ -155,6 +169,126 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
     const ogDescMatch = html.match(/<meta[^>]*(?:property|name)=["'](?:og:)?description["'][^>]*content=["']([^"']+)["']/i);
     if (ogDescMatch) {
       result.description = ogDescMatch[1];
+    }
+
+    // 2a. Extract structured data from markdown (C&B renders these as key-value pairs)
+    // Format: "Mileage21,800" or "VIN1G1YB2D42N5117572" etc.
+    if (markdown) {
+      console.log('✅ C&B: Parsing structured data from markdown');
+
+      // VIN - 17 characters for post-1980, 11-14 for older vehicles
+      // C&B format is "VIN1G1YB2D42N5117572Title" - VIN followed immediately by "Title"
+      const mdVinMatch = markdown.match(/VIN([A-HJ-NPR-Z0-9]{17})(?:Title|[^A-Za-z0-9]|$)/i) ||
+                         markdown.match(/VIN([A-HJ-NPR-Z0-9]{11,17})(?:Title|[^A-Za-z0-9]|$)/i);
+      if (mdVinMatch && !result.vin) {
+        result.vin = mdVinMatch[1].toUpperCase();
+        console.log('✅ C&B: Found VIN in markdown:', result.vin);
+      }
+
+      // Mileage - "Mileage21,800" or "Mileage~21,800"
+      const mdMileageMatch = markdown.match(/Mileage~?([\d,]+)/i);
+      if (mdMileageMatch && !result.mileage) {
+        const m = parseInt(mdMileageMatch[1].replace(/,/g, ''), 10);
+        if (Number.isFinite(m)) {
+          result.mileage = m;
+          console.log('✅ C&B: Found mileage in markdown:', result.mileage);
+        }
+      }
+
+      // Exterior Color - "Exterior ColorCeramic Matrix Gray"
+      const mdExtColorMatch = markdown.match(/Exterior\s*Color([A-Za-z0-9\s]+?)(?:Interior|Seller|Engine|Drivetrain|Transmission|Body|Location|\n|$)/i);
+      if (mdExtColorMatch && !result.exteriorColor) {
+        result.exteriorColor = mdExtColorMatch[1].trim();
+        console.log('✅ C&B: Found exterior color in markdown:', result.exteriorColor);
+      }
+
+      // Interior Color - "Interior ColorAdrenaline Red"
+      const mdIntColorMatch = markdown.match(/Interior\s*Color([A-Za-z0-9\s]+?)(?:Seller|Engine|Drivetrain|Transmission|Body|Location|\n|$)/i);
+      if (mdIntColorMatch && !result.interiorColor) {
+        result.interiorColor = mdIntColorMatch[1].trim();
+        console.log('✅ C&B: Found interior color in markdown:', result.interiorColor);
+      }
+
+      // Transmission - "TransmissionAutomatic (8-Speed)" or "TransmissionManual (6-Speed)"
+      const mdTransMatch = markdown.match(/Transmission((?:Automatic|Manual)(?:\s*\([^)]+\))?)/i);
+      if (mdTransMatch && !result.transmission) {
+        result.transmission = mdTransMatch[1].trim();
+        console.log('✅ C&B: Found transmission in markdown:', result.transmission);
+      }
+
+      // Engine - "Engine6.2L Turbocharged V8"
+      const mdEngineMatch = markdown.match(/Engine([^\n]+?)(?:Drivetrain|Transmission|Body|Exterior|Interior|Seller|$)/i);
+      if (mdEngineMatch && !result.engine) {
+        result.engine = mdEngineMatch[1].trim();
+        console.log('✅ C&B: Found engine in markdown:', result.engine);
+      }
+
+      // Bid/Sale price - "Bid to $61,000" or "Sold for $XX,XXX"
+      const mdBidMatch = markdown.match(/(?:Bid to|Sold for|High Bid|Final Bid)\s*\$?([\d,]+)/i);
+      if (mdBidMatch && !result.currentBid) {
+        const bid = parseInt(mdBidMatch[1].replace(/,/g, ''), 10);
+        if (Number.isFinite(bid) && bid > 0) {
+          result.currentBid = bid;
+          console.log('✅ C&B: Found bid/price in markdown:', result.currentBid);
+        }
+      }
+
+      // Location - "Location[Canyon, TX 79015]" or "LocationCanyon, TX"
+      const mdLocationMatch = markdown.match(/Location\[?([A-Za-z0-9,\s]+?)(?:\]|\n|Seller|$)/i);
+      if (mdLocationMatch && !result.location) {
+        result.location = mdLocationMatch[1].trim();
+        console.log('✅ C&B: Found location in markdown:', result.location);
+      }
+
+      // Auction status - check for ended/sold indicators
+      if (markdown.includes('Auction Ended') || markdown.includes('This auction has ended')) {
+        result.auctionStatus = 'ended';
+      } else if (markdown.includes('Reserve Not Met')) {
+        result.auctionStatus = 'reserve_not_met';
+      } else if (markdown.includes('Sold for')) {
+        result.auctionStatus = 'sold';
+      }
+
+      // C&B Specific: Doug's Take
+      const dougsTakeMatch = markdown.match(/Doug['']s Take\s*([\s\S]*?)(?:####\s*Highlights|####\s*Equipment|$)/i);
+      if (dougsTakeMatch && dougsTakeMatch[1]) {
+        result.dougsTake = dougsTakeMatch[1].trim().slice(0, 5000);
+        console.log('✅ C&B: Found Doug\'s Take:', result.dougsTake.slice(0, 100) + '...');
+      }
+
+      // C&B Specific: Highlights
+      const highlightsMatch = markdown.match(/####\s*Highlights\s*([\s\S]*?)(?:####\s*Equipment|####\s*Modifications|$)/i);
+      if (highlightsMatch && highlightsMatch[1]) {
+        result.highlights = highlightsMatch[1].trim().slice(0, 8000);
+        console.log('✅ C&B: Found Highlights section');
+      }
+
+      // C&B Specific: Equipment
+      const equipmentMatch = markdown.match(/####\s*Equipment\s*([\s\S]*?)(?:####\s*Modifications|####\s*Known Flaws|####\s*Recent Service|$)/i);
+      if (equipmentMatch && equipmentMatch[1]) {
+        result.equipment = equipmentMatch[1].trim().slice(0, 5000);
+        console.log('✅ C&B: Found Equipment section');
+      }
+
+      // C&B Specific: Comment count - "Comments37" or "37 comments"
+      const commentCountMatch = markdown.match(/Comments?(\d+)/i) || markdown.match(/(\d+)\s*comments?/i);
+      if (commentCountMatch) {
+        const count = parseInt(commentCountMatch[1], 10);
+        if (Number.isFinite(count)) {
+          result.commentCount = count;
+          console.log('✅ C&B: Found comment count:', result.commentCount);
+        }
+      }
+
+      // C&B Specific: Bid count - "Bids22" or "22 bids"
+      const bidCountMatch = markdown.match(/Bids?(\d+)/i) || markdown.match(/(\d+)\s*bids?/i);
+      if (bidCountMatch) {
+        const count = parseInt(bidCountMatch[1], 10);
+        if (Number.isFinite(count)) {
+          result.bidCount = count;
+          console.log('✅ C&B: Found bid count:', result.bidCount);
+        }
+      }
     }
 
     // 2b. Extract og:image as potential primary image
@@ -352,6 +486,43 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
   return result;
 }
 
+/**
+ * Log extraction attempt to scraping_health for self-healing feedback loop
+ */
+async function logScrapingHealth(args: {
+  supabase: any;
+  url: string;
+  success: boolean;
+  statusCode?: number | null;
+  errorMessage?: string | null;
+  errorType?: string | null;
+  responseTimeMs?: number;
+  dataExtracted?: Record<string, any>;
+  imagesFound?: number;
+  hasPrice?: boolean;
+}): Promise<void> {
+  try {
+    const { supabase, url, success, statusCode, errorMessage, errorType, responseTimeMs, dataExtracted, imagesFound, hasPrice } = args;
+
+    await supabase.from('scraping_health').insert({
+      source: 'carsandbids',
+      url,
+      success,
+      status_code: statusCode || null,
+      error_message: errorMessage || null,
+      error_type: errorType || null,
+      response_time_ms: responseTimeMs || null,
+      data_extracted: dataExtracted || null,
+      images_found: imagesFound || 0,
+      has_price: hasPrice || false,
+      function_name: 'extract-cars-and-bids-core',
+    });
+    console.log(`✅ C&B: Logged health status (success=${success})`);
+  } catch (e: any) {
+    console.warn(`⚠️ C&B: Failed to log scraping health: ${e?.message}`);
+  }
+}
+
 async function trySaveHtmlSnapshot(args: {
   supabase: any;
   listingUrl: string;
@@ -427,41 +598,17 @@ serve(async (req) => {
     console.log(`extract-cars-and-bids-core: Processing ${listingUrlCanonical}`);
 
     // Fetch HTML using Firecrawl (C&B blocks direct fetch)
-    // Use LLM extraction to reliably get images from C&B lazy-loading pages
-    // Also use scroll actions to trigger intersection observer
-    const extractionSchema = {
-      type: 'object',
-      properties: {
-        images: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of all vehicle image URLs from media.carsandbids.com',
-        },
-        vin: { type: 'string', description: 'Vehicle VIN number (17 characters)' },
-        mileage: { type: 'number', description: 'Current mileage of the vehicle' },
-        exterior_color: { type: 'string', description: 'Exterior color of the vehicle' },
-        interior_color: { type: 'string', description: 'Interior color of the vehicle' },
-        transmission: { type: 'string', description: 'Transmission type (manual/automatic)' },
-        engine: { type: 'string', description: 'Engine description' },
-        title_status: { type: 'string', description: 'Title status (clean, salvage, etc)' },
-      },
-    };
-
+    // COST OPTIMIZED: No LLM extract (we parse HTML ourselves), minimal scroll
+    // This reduces cost from ~50 credits to ~1-2 credits per page
     const firecrawlResult = await firecrawlScrape(
       {
         url: listingUrlNorm,
-        formats: ['html', 'markdown', 'extract'],
-        extract: { schema: extractionSchema },
+        formats: ['html', 'markdown'],  // NO 'extract' - we parse ourselves (huge cost savings)
         onlyMainContent: false,
-        waitFor: 8000, // Initial wait for React to render
+        waitFor: 3000, // Reduced from 8000 - React renders fast
         actions: [
-          { type: 'wait', milliseconds: 5000 },
-          { type: 'scroll', direction: 'down', pixels: 1000 },
-          { type: 'wait', milliseconds: 2000 },
-          { type: 'scroll', direction: 'down', pixels: 1500 },
-          { type: 'wait', milliseconds: 2000 },
-          { type: 'scroll', direction: 'down', pixels: 2000 },
-          { type: 'wait', milliseconds: 3000 },
+          { type: 'scroll', direction: 'down', pixels: 2000 },  // Single scroll to trigger lazy load
+          { type: 'wait', milliseconds: 1500 },
         ],
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -471,15 +618,20 @@ serve(async (req) => {
       },
       {
         apiKey: firecrawlApiKey,
-        timeoutMs: 120000, // Increase timeout for scroll actions
-        maxAttempts: 2,
+        timeoutMs: 30000,  // Reduced from 120000
+        maxAttempts: 1,    // Reduced from 2 - don't double-spend on failures
       }
     );
 
+    // No LLM extract - we parse HTML/markdown ourselves
+    const llmExtract = null;
+
+    const scrapeStartTime = Date.now();
     const html = firecrawlResult.data?.html || '';
     const markdown = firecrawlResult.data?.markdown || '';
-    const llmExtract = firecrawlResult.data?.extract || null;
     const httpStatus = firecrawlResult.httpStatus;
+    const scrapeEndTime = Date.now();
+    const responseTimeMs = scrapeEndTime - scrapeStartTime;
 
     // Log LLM extraction results
     if (llmExtract) {
@@ -495,6 +647,16 @@ serve(async (req) => {
         errorMessage: firecrawlResult.error || "Firecrawl returned insufficient HTML",
         html: html || null,
         metadata: { extractor: "extract-cars-and-bids-core", llmExtract },
+      });
+      // Log failure to scraping_health
+      await logScrapingHealth({
+        supabase,
+        url: listingUrlCanonical,
+        success: false,
+        statusCode: httpStatus,
+        errorMessage: firecrawlResult.error || `Insufficient HTML (${html?.length || 0} chars)`,
+        errorType: 'parse_error',
+        responseTimeMs,
       });
       throw new Error(firecrawlResult.error || `Firecrawl returned insufficient HTML (${html?.length || 0} chars)`);
     }
@@ -564,6 +726,16 @@ serve(async (req) => {
 
     // Still no year/make? Return error
     if (!extracted.year || !extracted.make) {
+      // Log failure to scraping_health
+      await logScrapingHealth({
+        supabase,
+        url: listingUrlCanonical,
+        success: false,
+        statusCode: httpStatus,
+        errorMessage: 'Could not extract vehicle identity (year/make/model)',
+        errorType: 'parse_error',
+        responseTimeMs,
+      });
       return new Response(JSON.stringify({
         success: false,
         error: "Could not extract vehicle identity (year/make/model)",
@@ -580,22 +752,41 @@ serve(async (req) => {
     // Canonical organization ID for Cars & Bids (from organizations table)
     const CARS_AND_BIDS_ORG_ID = "4dac1878-b3fc-424c-9e92-3cf552f1e053";
 
-    // Prepare vehicle data
+    // Prepare vehicle data (use actual column names from vehicles table)
     const vehicleData: Record<string, any> = {
       year: extracted.year,
       make: extracted.make,
       model: extracted.model,
       vin: extracted.vin,
       mileage: extracted.mileage,
-      exterior_color: extracted.exteriorColor,
+      color: extracted.exteriorColor,  // vehicles table uses 'color' not 'exterior_color'
       interior_color: extracted.interiorColor,
-      engine: extracted.engine,
+      engine_type: extracted.engine,   // vehicles table uses 'engine_type' not 'engine'
       transmission: extracted.transmission,
-      description: extracted.description,
+      // Create rich description from Doug's Take + Highlights
+      description: [
+        extracted.dougsTake ? `**Doug's Take:**\n${extracted.dougsTake}` : null,
+        extracted.highlights ? `**Highlights:**\n${extracted.highlights}` : null,
+        extracted.description,
+      ].filter(Boolean).join('\n\n') || null,
+      location: extracted.location,
+      sale_price: extracted.currentBid, // Store as sale_price for ended auctions
+      bid_count: extracted.bidCount,
       discovery_url: listingUrlCanonical,
       discovery_source: "carsandbids",
-      listing_source: "extract-cars-and-bids-core", // Extraction receipt
+      listing_source: "extract-cars-and-bids-core",
       status: "active",
+      // Store C&B-specific data in import_metadata
+      import_metadata: {
+        platform: "carsandbids",
+        dougs_take: extracted.dougsTake,
+        highlights: extracted.highlights,
+        equipment: extracted.equipment,
+        comment_count: extracted.commentCount,
+        bid_count: extracted.bidCount,
+        auction_status: extracted.auctionStatus,
+        extracted_at: new Date().toISOString(),
+      },
     };
 
     // Clean null values
@@ -605,13 +796,15 @@ serve(async (req) => {
       }
     });
 
-    // Check for existing vehicle by URL
+    // Check for existing vehicle by URL (use ilike for case-insensitive matching)
     let vehicleId = providedVehicleId;
 
+    // Extract just the path part for matching (handles different URL formats)
+    const urlPath = listingUrlCanonical.replace(/^https?:\/\/[^/]+/, '');
     const { data: existingByUrl } = await supabase
       .from("vehicles")
       .select("id")
-      .or(`discovery_url.eq.${listingUrlCanonical},discovery_url.eq.${listingUrlNorm}`)
+      .ilike("discovery_url", `%${urlPath}%`)
       .limit(1)
       .maybeSingle();
 
@@ -799,6 +992,25 @@ serve(async (req) => {
       }
     }
 
+    // Log success to scraping_health
+    await logScrapingHealth({
+      supabase,
+      url: listingUrlCanonical,
+      success: true,
+      statusCode: httpStatus,
+      responseTimeMs,
+      dataExtracted: {
+        year: extracted.year,
+        make: extracted.make,
+        model: extracted.model,
+        has_vin: !!extracted.vin,
+        has_mileage: !!extracted.mileage,
+        images_count: extracted.images.length,
+      },
+      imagesFound: extracted.images.length,
+      hasPrice: !!extracted.currentBid,
+    });
+
     return new Response(JSON.stringify({
       success: true,
       source: "Cars & Bids",
@@ -813,7 +1025,11 @@ serve(async (req) => {
         vin: extracted.vin,
         mileage: extracted.mileage,
         exterior_color: extracted.exteriorColor,
+        interior_color: extracted.interiorColor,
         transmission: extracted.transmission,
+        engine: extracted.engine,
+        location: extracted.location,
+        current_bid: extracted.currentBid,
         images_count: extracted.images.length,
       },
       images_inserted: imagesInserted,
@@ -825,6 +1041,27 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error("extract-cars-and-bids-core error:", error);
+    // Try to log error to scraping_health
+    try {
+      const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+      const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+      if (supabaseUrl && serviceRoleKey) {
+        const supabase = createClient(supabaseUrl, serviceRoleKey);
+        const body = await req.clone().json().catch(() => ({}));
+        const inputUrl = String(body?.url || body?.listing_url || body?.auction_url || "").trim();
+        if (inputUrl) {
+          await logScrapingHealth({
+            supabase,
+            url: inputUrl,
+            success: false,
+            errorMessage: error.message || String(error),
+            errorType: error.message?.includes('timeout') ? 'timeout' : 'network',
+          });
+        }
+      }
+    } catch (healthError) {
+      console.warn('Failed to log error to scraping_health:', healthError);
+    }
     return new Response(JSON.stringify({
       success: false,
       error: error.message || String(error),

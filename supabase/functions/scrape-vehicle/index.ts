@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -2111,6 +2112,60 @@ serve(async (req) => {
     const eventMentions = extractEventMentionsFromText(data.description || '')
     if (eventMentions.length > 0) {
       data.event_mentions = eventMentions
+    }
+
+    // === FIELD-LEVEL EXTRACTION HEALTH LOGGING ===
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      )
+
+      // Determine source from URL
+      let sourceName = 'unknown'
+      try {
+        const urlObj = new URL(url)
+        sourceName = urlObj.hostname.replace(/^www\./, '')
+      } catch {}
+
+      const healthLogger = new ExtractionLogger(supabase, {
+        source: sourceName,
+        extractorName: 'scrape-vehicle',
+        extractorVersion: '1.0',
+        sourceUrl: url,
+        lowConfidenceThreshold: 0.5,
+      })
+
+      // Log each extracted field
+      healthLogger.logField('title', data.title, data.title ? 0.90 : 0)
+      healthLogger.logField('year', data.year, data.year ? 0.95 : 0)
+      healthLogger.logField('make', data.make, data.make ? 0.85 : 0)
+      healthLogger.logField('model', data.model, data.model ? 0.80 : 0)
+
+      // VIN with validation
+      if (data.vin) {
+        const vinValidation = validateVin(data.vin)
+        if (vinValidation.valid) {
+          healthLogger.logField('vin', data.vin, data.vin.length === 17 ? 0.90 : 0.65)
+        } else {
+          healthLogger.logValidationFail('vin', data.vin, vinValidation.errorCode!, vinValidation.errorDetails)
+        }
+      } else {
+        healthLogger.logField('vin', null, 0)
+      }
+
+      healthLogger.logField('mileage', data.mileage, data.mileage ? 0.80 : 0)
+      healthLogger.logField('asking_price', data.asking_price, data.asking_price ? 0.85 : 0)
+      healthLogger.logField('description', data.description, data.description ? 0.90 : 0)
+      healthLogger.logField('images', data.images?.length || 0, data.images?.length > 0 ? 0.90 : 0)
+      healthLogger.logField('location', data.location, data.location ? 0.75 : 0)
+      healthLogger.logField('transmission', data.transmission, data.transmission ? 0.75 : 0)
+      healthLogger.logField('exterior_color', data.color || data.exterior_color, (data.color || data.exterior_color) ? 0.70 : 0)
+
+      // Flush in background
+      healthLogger.flush().catch(err => console.warn('Health log flush error:', err))
+    } catch (healthLogErr) {
+      console.warn('Health logging failed (non-blocking):', healthLogErr)
     }
 
     console.log(`✅ Final data structure being returned:`, data)
