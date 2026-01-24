@@ -223,28 +223,30 @@ serve(async (req) => {
           .filter(Boolean)
       )];
 
-      // Check which already have external_identities
+      // Check which already have external_identities (table uses 'handle' not 'username')
       const { data: existingIds } = await supabase
         .from("external_identities")
-        .select("username, profile_url")
+        .select("handle, profile_url")
         .eq("platform", "bat")
-        .in("username", usernames.slice(0, 1000));
+        .in("handle", usernames.slice(0, 1000));
 
-      const existingUsernames = new Set((existingIds || []).map(i => i.username));
+      const existingUsernames = new Set((existingIds || []).map(i => i.handle));
       const newUsernames = usernames.filter(u => !existingUsernames.has(u));
 
       // Create new identities for unlinked users
       if (newUsernames.length > 0) {
-        const newIdentities = newUsernames.slice(0, 100).map(username => ({
+        const newIdentities = newUsernames.slice(0, 100).map(handle => ({
           platform: "bat",
-          username,
-          profile_url: `https://bringatrailer.com/member/${username}/`,
+          handle,
+          profile_url: `https://bringatrailer.com/member/${handle}/`,
           metadata: { discovered_from: "observation_linkage", discovered_at: new Date().toISOString() },
+          first_seen_at: new Date().toISOString(),
+          last_seen_at: new Date().toISOString(),
         }));
 
         const { error } = await supabase
           .from("external_identities")
-          .upsert(newIdentities, { onConflict: "platform,username", ignoreDuplicates: true });
+          .upsert(newIdentities, { onConflict: "platform,handle", ignoreDuplicates: true });
 
         if (error) console.error("Identity upsert error:", error);
       }

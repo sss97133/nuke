@@ -308,6 +308,14 @@ const saveFilters = (filters: FilterState) => {
 
 type SourceKind = 'craigslist' | 'dealer_site' | 'ksl' | 'bat' | 'classic' | 'user' | 'unknown';
 
+const SOURCE_META: Record<string, { title: string; domain: string }> = {
+  craigslist: { title: 'Craigslist', domain: 'craigslist.org' },
+  ksl: { title: 'KSL', domain: 'ksl.com' },
+  bat: { title: 'Bring a Trailer', domain: 'bringatrailer.com' },
+  classic: { title: 'Classic.com', domain: 'classic.com' },
+  dealer_site: { title: 'Dealer Sites', domain: 'autotrader.com' },
+};
+
 const normalizeHost = (url: string | null | undefined): string => {
   try {
     if (!url) return '';
@@ -319,6 +327,16 @@ const normalizeHost = (url: string | null | undefined): string => {
     const m = s.match(/^(?:https?:\/\/)?([^/]+)/i);
     return (m?.[1] || '').replace(/^www\./, '').toLowerCase();
   }
+};
+
+const normalizeAlias = (value: string | null | undefined): string => {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+};
+
+const stripTld = (host: string): string => {
+  const parts = String(host || '').split('.');
+  if (parts.length <= 1) return host;
+  return parts.slice(0, -1).join('.');
 };
 
 const classifySource = (v: any): SourceKind => {
@@ -1020,14 +1038,15 @@ const CursorHomepage: React.FC = () => {
 
   // Map domain to filter key for backward compatibility
   const domainToFilterKey = useCallback((domain: string): string => {
-    const domainLower = domain.toLowerCase();
-    if (domainLower.includes('craigslist')) return 'craigslist';
-    if (domainLower.includes('ksl')) return 'ksl';
-    if (domainLower.includes('autotrader') || domainLower.includes('dealer')) return 'dealer_site';
-    if (domainLower.includes('bringatrailer') || domainLower.includes('bat')) return 'bat';
-    if (domainLower.includes('classic')) return 'classic';
-    // For new sources, use domain as key
-    return domainLower.replace(/[^a-z0-9]/g, '_');
+    const host = normalizeHost(domain);
+    if (!host) return '';
+    if (host === 'craigslist.org' || host.endsWith('.craigslist.org')) return 'craigslist';
+    if (host === 'ksl.com' || host.endsWith('.ksl.com')) return 'ksl';
+    if (host === 'autotrader.com' || host.endsWith('.autotrader.com')) return 'dealer_site';
+    if (host === 'bringatrailer.com' || host.endsWith('.bringatrailer.com')) return 'bat';
+    if (host === 'classic.com' || host.endsWith('.classic.com')) return 'classic';
+    // For new sources, use normalized host as key
+    return host.replace(/[^a-z0-9]/g, '_');
   }, []);
 
   const includedSources = useMemo(() => {
@@ -1105,6 +1124,68 @@ const CursorHomepage: React.FC = () => {
     filters,
     domainToFilterKey
   ]);
+
+  const sourceAliasMap = useMemo(() => {
+    const map = new Map<string, string>();
+    activeSources.forEach((source) => {
+      const host = normalizeHost(source.domain);
+      if (!host) return;
+      const key = domainToFilterKey(host);
+      if (!key) return;
+      const aliases = new Set<string>();
+      aliases.add(host);
+      aliases.add(normalizeAlias(host));
+      aliases.add(normalizeAlias(stripTld(host)));
+      aliases.add(normalizeAlias(source.source_name || ''));
+      aliases.add(normalizeAlias(key));
+      aliases.forEach((alias) => {
+        if (alias) map.set(alias, key);
+      });
+    });
+    return map;
+  }, [activeSources, domainToFilterKey]);
+
+  const getSourceFilterKey = useCallback((v: any): string => {
+    const discoveryHost = normalizeHost(v?.discovery_url || '');
+    if (discoveryHost) {
+      const key = domainToFilterKey(discoveryHost);
+      if (key) return key;
+    }
+    const discoverySource = String(v?.discovery_source || '').trim().toLowerCase();
+    if (discoverySource) {
+      const normalized = normalizeAlias(discoverySource);
+      const mapped = sourceAliasMap.get(discoverySource) || sourceAliasMap.get(normalized);
+      if (mapped) return mapped;
+      const key = domainToFilterKey(discoverySource);
+      if (key) return key;
+    }
+    return classifySource(v);
+  }, [domainToFilterKey, sourceAliasMap]);
+
+  const buildSourceCounts = useCallback((vehicles: any[]) => {
+    const counts: Record<string, number> = {};
+    (vehicles || []).forEach((v: any) => {
+      const host = normalizeHost(v?.discovery_url || '');
+      const keyFromHost = host ? domainToFilterKey(host) : '';
+      if (keyFromHost) {
+        counts[keyFromHost] = (counts[keyFromHost] || 0) + 1;
+      }
+      const fallback = classifySource(v);
+      if (fallback && (!keyFromHost || fallback === 'dealer_site') && fallback !== keyFromHost) {
+        counts[fallback] = (counts[fallback] || 0) + 1;
+      }
+    });
+
+    const domainCounts: Record<string, number> = {};
+    const seenKeys = new Set<string>();
+    activeSources.forEach((source) => {
+      const key = domainToFilterKey(source.domain);
+      if (!key || seenKeys.has(key)) return;
+      seenKeys.add(key);
+      domainCounts[key] = counts[key] || 0;
+    });
+    return domainCounts;
+  }, [activeSources, domainToFilterKey]);
 
   // Apply filters and sorting function - defined before useEffect
   const applyFiltersAndSort = useCallback(() => {
@@ -1242,14 +1323,14 @@ const CursorHomepage: React.FC = () => {
       const beforeCount = result.length;
       const sourceBreakdown: Record<string, number> = {};
       result.forEach((v: any) => {
-        const src = classifySource(v);
+        const src = getSourceFilterKey(v);
         sourceBreakdown[src] = (sourceBreakdown[src] || 0) + 1;
       });
       // #endregion
 
       // Use inclusion-based filtering: only show vehicles from included sources
       result = result.filter((v: any) => {
-        const src = classifySource(v);
+        const src = getSourceFilterKey(v);
         // Check if this source is included based on includedSources
         // If hasSourceSelections is true, only include sources that are explicitly set to true
         // If a source isn't in includedSources, exclude it (don't default to included)
@@ -1277,7 +1358,7 @@ const CursorHomepage: React.FC = () => {
       const afterCount = result.length;
       const afterSourceBreakdown: Record<string, number> = {};
       result.forEach((v: any) => {
-        const src = classifySource(v);
+        const src = getSourceFilterKey(v);
         afterSourceBreakdown[src] = (afterSourceBreakdown[src] || 0) + 1;
       });
       // #endregion
@@ -1358,7 +1439,7 @@ const CursorHomepage: React.FC = () => {
     }
     
     setFilteredVehicles(result);
-  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, activeSources, domainToFilterKey]);
+  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, activeSources, domainToFilterKey]);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
@@ -1501,33 +1582,18 @@ const CursorHomepage: React.FC = () => {
       let filtered = vehicles || [];
       
       // Source filters (client-side to match classifySource logic exactly)
-      if (
+      const hasSourceSelections =
         filters.hideDealerListings ||
         filters.hideCraigslist ||
         filters.hideDealerSites ||
         filters.hideKsl ||
         filters.hideBat ||
         filters.hideClassic ||
-        (filters.hiddenSources && filters.hiddenSources.length > 0)
-      ) {
+        (filters.hiddenSources && filters.hiddenSources.length > 0);
+      if (hasSourceSelections) {
         filtered = filtered.filter((v: any) => {
-          const src = classifySource(v);
-          const hiddenSourcesSet = new Set(filters.hiddenSources || []);
-
-          if (filters.hideDealerListings) {
-            if (src === 'craigslist' || src === 'dealer_site' || src === 'ksl') return false;
-          }
-
-          if (filters.hideCraigslist && src === 'craigslist') return false;
-          if (filters.hideDealerSites && src === 'dealer_site') return false;
-          if (filters.hideKsl && src === 'ksl') return false;
-          if (filters.hideBat && src === 'bat') return false;
-          if (filters.hideClassic && src === 'classic') return false;
-          
-          // Check dynamic sources
-          if (hiddenSourcesSet.has(src)) return false;
-
-          return true;
+          const src = getSourceFilterKey(v);
+          return includedSources[src] === true;
         });
       }
       
@@ -3447,61 +3513,14 @@ const CursorHomepage: React.FC = () => {
             }
             // eslint-disable-next-line @typescript-eslint/no-shadow
             const vehicles = retry.data as any[];
-            // Count vehicles per source key using classifySource
-            const counts: Record<string, number> = {};
-            (vehicles || []).forEach((v: any) => {
-              const sourceKey = classifySource(v);
-              counts[sourceKey] = (counts[sourceKey] || 0) + 1;
-            });
-            // Map source keys to domain keys for display
-            const domainCounts: Record<string, number> = {};
-            activeSources.forEach(source => {
-              const domainKey = domainToFilterKey(source.domain);
-              if (counts[domainKey] !== undefined) {
-                domainCounts[domainKey] = counts[domainKey];
-              } else {
-                const domainLower = source.domain.toLowerCase();
-                const matchingCount = (vehicles || []).filter((v: any) => {
-                  const url = (v.discovery_url || '').toLowerCase();
-                  return url.includes(domainLower);
-                }).length;
-                domainCounts[domainKey] = matchingCount;
-              }
-            });
-            setSourceCounts(domainCounts);
+            setSourceCounts(buildSourceCounts(vehicles || []));
             return;
           }
           console.error('Error loading source counts:', error);
           return;
         }
 
-        // Count vehicles per source key using classifySource
-        const counts: Record<string, number> = {};
-        (vehicles || []).forEach((v: any) => {
-          const sourceKey = classifySource(v);
-          counts[sourceKey] = (counts[sourceKey] || 0) + 1;
-        });
-
-        // Map source keys to domain keys for display
-        const domainCounts: Record<string, number> = {};
-        activeSources.forEach(source => {
-          const domainKey = domainToFilterKey(source.domain);
-          // For known sources, classifySource returns the same key as domainToFilterKey
-          // For new sources, match by domain from discovery_url
-          if (counts[domainKey] !== undefined) {
-            domainCounts[domainKey] = counts[domainKey];
-          } else {
-            // For new sources, try to match by domain from discovery_url
-            const domainLower = source.domain.toLowerCase();
-            const matchingCount = (vehicles || []).filter((v: any) => {
-              const url = (v.discovery_url || '').toLowerCase();
-              return url.includes(domainLower);
-            }).length;
-            domainCounts[domainKey] = matchingCount;
-          }
-        });
-
-        setSourceCounts(domainCounts);
+        setSourceCounts(buildSourceCounts(vehicles || []));
       } catch (err) {
         console.error('Error loading source counts:', err);
       }
@@ -3510,7 +3529,7 @@ const CursorHomepage: React.FC = () => {
     if (activeSources.length > 0) {
       loadSourceCounts();
     }
-  }, [activeSources, domainToFilterKey]);
+  }, [activeSources, buildSourceCounts, domainToFilterKey]);
 
   const faviconUrl = useCallback((domain: string) => {
     return `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}`;
@@ -3518,8 +3537,7 @@ const CursorHomepage: React.FC = () => {
 
   const sourcePogs = useMemo(() => {
     // Deduplicate sources by their filter key - keep the first one for each key
-    const seenKeys = new Set<string>();
-    const deduplicated: Array<{
+    const deduplicatedMap = new Map<string, {
       key: string;
       domain: string;
       title: string;
@@ -3527,28 +3545,29 @@ const CursorHomepage: React.FC = () => {
       id: string;
       url: string;
       count: number;
-    }> = [];
+    }>();
 
-    activeSources.forEach(source => {
+    activeSources.forEach((source) => {
       const key = domainToFilterKey(source.domain);
-      if (!seenKeys.has(key)) {
-        seenKeys.add(key);
-        deduplicated.push({
-          key: key as any,
-          domain: source.domain,
-          title: source.source_name || source.domain,
-          included: includedSources[key] !== false, // Default to true if not explicitly set
-          id: source.id,
-          url: source.url,
-          count: sourceCounts[key] || 0
-        });
-      } else {
-        // Merge counts for duplicate keys
-        const existing = deduplicated.find(s => s.key === key);
-        if (existing) {
-          existing.count += (sourceCounts[key] || 0);
-        }
-      }
+      if (!key || deduplicatedMap.has(key)) return;
+      const meta = SOURCE_META[key];
+      deduplicatedMap.set(key, {
+        key,
+        domain: meta?.domain || source.domain,
+        title: meta?.title || source.source_name || source.domain,
+        included: includedSources[key] !== false, // Default to true if not explicitly set
+        id: meta ? key : source.id,
+        url: meta ? `https://${meta.domain}` : source.url,
+        count: sourceCounts[key] || 0
+      });
+    });
+
+    const deduplicated = Array.from(deduplicatedMap.values()).sort((a, b) => {
+      if (a.included !== b.included) return a.included ? -1 : 1;
+      if (a.count !== b.count) return b.count - a.count;
+      const titleCompare = a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true });
+      if (titleCompare !== 0) return titleCompare;
+      return a.domain.localeCompare(b.domain, undefined, { sensitivity: 'base', numeric: true });
     });
 
     // #region agent log
