@@ -739,10 +739,7 @@ serve(async (req) => {
         
         const { error: imgError } = await supabase
           .from('vehicle_images')
-          .upsert(imageRecords, {
-            onConflict: 'vehicle_id,image_url',
-            ignoreDuplicates: false
-          });
+          .insert(imageRecords);
         
         if (imgError) {
           console.error('Image save error:', imgError);

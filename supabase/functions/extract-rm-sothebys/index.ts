@@ -557,11 +557,12 @@ async function saveToDatabase(supabase: any, extracted: RMSothebysExtracted): Pr
     if (data) vehicleId = data.id;
   }
 
-  if (!vehicleId && extracted.chassis_number) {
+  // For vintage vehicles, chassis number is often used in place of VIN - look it up
+  if (!vehicleId && extracted.chassis_number && !extracted.vin) {
     const { data } = await supabase
       .from('vehicles')
       .select('id')
-      .eq('chassis_number', extracted.chassis_number)
+      .eq('vin', extracted.chassis_number)
       .maybeSingle();
     if (data) vehicleId = data.id;
   }
@@ -576,14 +577,13 @@ async function saveToDatabase(supabase: any, extracted: RMSothebysExtracted): Pr
     if (data) vehicleId = data.id;
   }
 
-  // Prepare vehicle data
+  // Prepare vehicle data (store chassis_number in VIN field if no modern VIN)
   const vehicleData: any = {
     year: extracted.year,
     make: extracted.make?.toLowerCase(),
     model: extracted.model?.toLowerCase(),
     trim: extracted.trim || null,
-    vin: extracted.vin,
-    chassis_number: extracted.chassis_number,
+    vin: extracted.vin || extracted.chassis_number, // Chassis number for vintage vehicles
     mileage: extracted.mileage,
     color: extracted.exterior_color,
     interior_color: extracted.interior_color,

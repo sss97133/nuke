@@ -678,7 +678,8 @@ serve(async (req) => {
         year: extracted.year,
         make: extracted.make?.toLowerCase(),
         model: extracted.model?.toLowerCase(),
-        vin: extracted.vin ? extracted.vin.toUpperCase() : null,
+        // Store chassis number in VIN field for vintage vehicles if no modern VIN
+        vin: extracted.vin ? extracted.vin.toUpperCase() : (extracted.chassis_number ? extracted.chassis_number.toUpperCase() : null),
         mileage: extracted.mileage,
         exterior_color: extracted.exterior_color,
         interior_color: extracted.interior_color,
