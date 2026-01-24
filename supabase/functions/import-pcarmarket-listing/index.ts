@@ -22,14 +22,19 @@ interface PCarMarketListing {
   description?: string;
   seller?: string;
   sellerUsername?: string;
+  sellerId?: number;
   buyer?: string;
   buyerUsername?: string;
   images?: string[];
   slug?: string;
   auctionId?: string;
+  lotNumber?: string;
   bidCount?: number;
   viewCount?: number;
+  watchCount?: number;
   location?: string;
+  reserveStatus?: string;
+  isMemorabillia?: boolean;
 }
 
 function normalizeUrl(raw: string): string {
@@ -66,50 +71,204 @@ function parsePCarMarketIdentityFromUrl(url: string): { year: number; make: stri
   }
 }
 
-async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing | null> {
+async function scrapePCarMarketListing(url: string, providedHtml?: string): Promise<PCarMarketListing | null> {
   try {
-    // Use Firecrawl if available, otherwise direct fetch
-    const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-
     let html: string;
-    if (FIRECRAWL_API_KEY) {
-      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url,
-          formats: ['html'],
-          waitFor: 5000,
-          mobile: false,
-        }),
-      });
 
-      if (firecrawlResponse.ok) {
-        const firecrawlData = await firecrawlResponse.json();
-        html = firecrawlData.data?.html || '';
-      } else {
-        throw new Error(`Firecrawl failed: ${firecrawlResponse.status}`);
-      }
+    // Use provided HTML if available (for pre-scraped content)
+    if (providedHtml) {
+      console.log('[pcarmarket] Using provided HTML');
+      html = providedHtml;
     } else {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      // Use Firecrawl if available, otherwise direct fetch
+      const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+
+      if (FIRECRAWL_API_KEY) {
+        console.log('[pcarmarket] Fetching via Firecrawl...');
+        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: url,
+            formats: ['html'],
+            waitFor: 8000,
+            mobile: false,
+          }),
+        });
+
+        if (firecrawlResponse.ok) {
+          const firecrawlData = await firecrawlResponse.json();
+          if (firecrawlData.success === false) {
+            console.error('[pcarmarket] Firecrawl error:', firecrawlData.error);
+            throw new Error(`Firecrawl error: ${firecrawlData.error || 'Unknown error'}`);
+          }
+          html = firecrawlData.data?.html || '';
+          console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
+        } else {
+          throw new Error(`Firecrawl HTTP error: ${firecrawlResponse.status}`);
         }
-      });
-      html = await response.text();
+      } else {
+        console.log('[pcarmarket] No Firecrawl key, trying direct fetch...');
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+          }
+        });
+        html = await response.text();
+        console.log(`[pcarmarket] Direct fetch returned ${html.length} chars`);
+
+        // Check if we got a JS-required page
+        if (html.includes('You need to enable JavaScript')) {
+          console.error('[pcarmarket] Page requires JavaScript rendering');
+          throw new Error('Page requires JavaScript rendering. Set FIRECRAWL_API_KEY or provide pre-rendered HTML.');
+        }
+      }
     }
 
-    // Parse HTML using regex (basic extraction)
-    // In production, you'd want to use a proper HTML parser or the scrape-vehicle function
-
+    // Initialize listing
     const listing: PCarMarketListing = {
       url: normalizeUrl(url),
       title: '',
       images: []
     };
+
+    // Extract slug from URL first
+    const slugMatch = url.match(/\/auction\/([^\/\?]+)/);
+    if (slugMatch) {
+      listing.slug = slugMatch[1];
+      listing.auctionId = slugMatch[1].split('-').pop() || undefined;
+    }
+
+    // PRIORITY: Try to extract embedded JSON data (PCarMarket embeds all data as JSON)
+    // Look for common patterns where JSON is embedded
+    const jsonPatterns = [
+      // Next.js __NEXT_DATA__
+      /<script id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/,
+      // Window variable
+      /window\.__AUCTION_DATA__\s*=\s*(\{[\s\S]+?\});/,
+      // Generic auction JSON in script
+      /"auction"\s*:\s*(\{[\s\S]+?\})\s*[,}]/,
+      // Look for the specific structure we know exists
+      /"id"\s*:\s*\d+\s*,\s*"title"\s*:\s*"[^"]+"\s*,\s*"slug"\s*:\s*"[^"]+"/,
+    ];
+
+    let jsonData: any = null;
+    for (const pattern of jsonPatterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          // Check if it's Next.js data with nested auction
+          if (parsed.props?.pageProps?.auction) {
+            jsonData = parsed.props.pageProps.auction;
+            break;
+          } else if (parsed.id && parsed.title && parsed.slug) {
+            jsonData = parsed;
+            break;
+          }
+        } catch { /* continue to next pattern */ }
+      }
+    }
+
+    // If we found JSON data, use it (much more complete than regex)
+    if (jsonData) {
+      console.log('[pcarmarket] Found embedded JSON data');
+
+      listing.title = jsonData.title || '';
+      listing.auctionId = String(jsonData.id || '');
+      listing.slug = jsonData.slug || listing.slug;
+      listing.lotNumber = jsonData.lot_number;
+
+      // Vehicle data
+      if (jsonData.vehicle) {
+        listing.year = jsonData.vehicle.year;
+        listing.make = jsonData.vehicle.make?.toLowerCase();
+        listing.model = jsonData.vehicle.model?.toLowerCase();
+      }
+
+      // VIN (accept 6-17 chars for classic cars)
+      if (jsonData.vin && jsonData.vin.length >= 6) {
+        listing.vin = jsonData.vin.toUpperCase();
+      }
+
+      // Mileage
+      listing.mileage = jsonData.mileage_body || jsonData.mileage_engine || null;
+
+      // Pricing
+      listing.salePrice = jsonData.high_bid || jsonData.auction_final_bid || null;
+      listing.reserveStatus = jsonData.reserve_status;
+
+      // Status
+      if (jsonData.sold === true || jsonData.status === 'Sold') {
+        listing.auctionOutcome = 'sold';
+        if (jsonData.end_date) {
+          listing.saleDate = jsonData.end_date;
+        }
+      } else if (jsonData.status === 'Unsold') {
+        listing.auctionOutcome = 'reserve_not_met';
+      }
+
+      // Dates
+      if (jsonData.end_date) {
+        listing.auctionEndDate = jsonData.end_date;
+      }
+
+      // Engagement
+      listing.bidCount = jsonData.bid_count || null;
+      listing.viewCount = jsonData.view_count || null;
+      listing.watchCount = jsonData.watch_count || null;
+
+      // Location
+      if (jsonData.location) {
+        listing.location = jsonData.zip_code
+          ? `${jsonData.location} ${jsonData.zip_code}`.trim()
+          : jsonData.location;
+      }
+
+      // Seller
+      listing.sellerUsername = jsonData.seller_username || null;
+      listing.sellerId = jsonData.seller_user_id || null;
+
+      // Description
+      listing.description = jsonData.description || null;
+
+      // Memorabilia detection
+      listing.isMemorabillia = jsonData.vehicle === null ||
+                               jsonData.lot_number?.startsWith('M-') ||
+                               jsonData.categories?.some((c: any) => c.slug === 'memorabilia');
+
+      // Images from gallery
+      if (jsonData.gallery_images?.length) {
+        listing.images = jsonData.gallery_images.map((img: any) =>
+          img.original_url || img.full_url || img.hero_url || img.url
+        ).filter(Boolean);
+      }
+
+      // Add featured image if not already included
+      const featuredImg = jsonData.featured_image_large_url || jsonData.featured_image_url;
+      if (featuredImg && !listing.images?.includes(featuredImg)) {
+        listing.images = [featuredImg, ...(listing.images || [])];
+      }
+
+      // Extract buyer from comments if sold (look for winning bidder)
+      if (jsonData.comments?.length && listing.auctionOutcome === 'sold') {
+        const winningBid = jsonData.comments
+          .filter((c: any) => c.is_bid)
+          .sort((a: any, b: any) => (b.bid_amount || 0) - (a.bid_amount || 0))[0];
+        if (winningBid) {
+          listing.buyerUsername = winningBid.username;
+          listing.buyer = winningBid.username;
+        }
+      }
+
+      return listing;
+    }
+
+    // FALLBACK: Use regex parsing if no JSON found
+    console.log('[pcarmarket] Falling back to regex parsing');
 
     // Extract title
     const titleMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/i) ||
@@ -132,8 +291,8 @@ async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing |
       listing.images?.push(match[1]);
     }
 
-    // Extract VIN (17-character alphanumeric)
-    const vinMatch = html.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
+    // Extract VIN (6-17 character alphanumeric for classic + modern)
+    const vinMatch = html.match(/\b([A-HJ-NPR-Z0-9]{6,17})\b/);
     if (vinMatch) {
       listing.vin = vinMatch[1];
     }
@@ -153,13 +312,6 @@ async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing |
       listing.auctionOutcome = null;
     }
 
-    // Extract slug and auction ID from URL
-    const slugMatch = url.match(/\/auction\/([^\/]+)/);
-    if (slugMatch) {
-      listing.slug = slugMatch[1];
-      listing.auctionId = slugMatch[1].split('-').pop() || undefined;
-    }
-
     // Extract bid count
     const bidCountMatch = html.match(/([\d,]+)\s+bids?/i) ||
                           html.match(/bid(?:s)?[:\s]*([\d,]+)/i);
@@ -173,59 +325,23 @@ async function scrapePCarMarketListing(url: string): Promise<PCarMarketListing |
       listing.viewCount = parseInt(viewCountMatch[1].replace(/,/g, ''));
     }
 
-    // Extract auction end date - multiple patterns
-    // Pattern 1: data-countdown or data-end attributes (Unix timestamp)
-    const countdownMatch = html.match(/data-countdown\s*=\s*["'](\d+)["']/i) ||
-                          html.match(/data-end-time\s*=\s*["'](\d+)["']/i) ||
-                          html.match(/data-end\s*=\s*["'](\d+)["']/i);
-    if (countdownMatch) {
-      const ts = parseInt(countdownMatch[1], 10);
-      // Check if seconds or milliseconds
-      const timestamp = ts > 9999999999 ? ts : ts * 1000;
-      listing.auctionEndDate = new Date(timestamp).toISOString();
-    }
-
-    // Pattern 2: ISO date string in JSON or attributes
-    if (!listing.auctionEndDate) {
-      const isoDateMatch = html.match(/"endDate"\s*:\s*"([^"]+)"/i) ||
-                          html.match(/"end_date"\s*:\s*"([^"]+)"/i) ||
-                          html.match(/data-end-date\s*=\s*["']([^"']+)["']/i) ||
-                          html.match(/auction\s+ends?[:\s]+(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})/i);
-      if (isoDateMatch) {
-        try {
-          const parsed = new Date(isoDateMatch[1]);
-          if (!isNaN(parsed.getTime())) {
-            listing.auctionEndDate = parsed.toISOString();
-          }
-        } catch { /* ignore */ }
-      }
-    }
-
-    // Pattern 3: "X days/hours remaining" text
-    if (!listing.auctionEndDate) {
-      const timeRemainingMatch = html.match(/(\d+)\s*(?:day|days)\s*(?:,?\s*(\d+)\s*(?:hour|hours))?(?:\s+remaining|\s+left)?/i) ||
-                                html.match(/(\d+)\s*(?:hour|hours)(?:\s+remaining|\s+left)?/i);
-      if (timeRemainingMatch) {
-        const days = parseInt(timeRemainingMatch[1], 10) || 0;
-        const hours = parseInt(timeRemainingMatch[2], 10) || 0;
-        const now = new Date();
-        // Check if it's hours-only match
-        if (/hour|hours/i.test(timeRemainingMatch[0]) && !timeRemainingMatch[2]) {
-          now.setHours(now.getHours() + days); // First capture is actually hours
-        } else {
-          now.setDate(now.getDate() + days);
-          now.setHours(now.getHours() + hours);
-        }
-        listing.auctionEndDate = now.toISOString();
-      }
+    // Extract auction end date from JSON fields in HTML
+    const endDateMatch = html.match(/"end_date"\s*:\s*"([^"]+)"/i);
+    if (endDateMatch) {
+      try {
+        listing.auctionEndDate = new Date(endDateMatch[1]).toISOString();
+      } catch { /* ignore */ }
     }
 
     // Extract seller username
-    const sellerMatch = html.match(/seller[:\s]+([a-zA-Z0-9_-]+)/i) ||
-                        html.match(/by\s+([a-zA-Z0-9_-]+)\s+on\s+pcarmarket/i) ||
-                        html.match(/member\/([a-zA-Z0-9_-]+)/i);
-    if (sellerMatch) {
-      listing.sellerUsername = sellerMatch[1];
+    const sellerJsonMatch = html.match(/"seller_username"\s*:\s*"([^"]+)"/i);
+    if (sellerJsonMatch) {
+      listing.sellerUsername = sellerJsonMatch[1];
+    } else {
+      const sellerMatch = html.match(/member\/([a-zA-Z0-9_-]+)/i);
+      if (sellerMatch) {
+        listing.sellerUsername = sellerMatch[1];
+      }
     }
 
     return listing;
@@ -241,7 +357,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { listing_url } = await req.json();
+    const body = await req.json();
+    const { listing_url, html: providedHtml } = body;
 
     if (!listing_url) {
       return new Response(
@@ -290,8 +407,10 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Importing PCarMarket listing: ${listing_url}`);
 
-    // Step 1: Scrape listing
-    const listing = await scrapePCarMarketListing(listing_url);
+    // Step 1: Scrape listing (or use provided HTML)
+    const listing = providedHtml
+      ? await scrapePCarMarketListing(listing_url, providedHtml)
+      : await scrapePCarMarketListing(listing_url);
     if (!listing) {
       return new Response(
         JSON.stringify({ error: 'Failed to scrape listing' }),
@@ -376,15 +495,20 @@ Deno.serve(async (req: Request) => {
         origin_metadata: {
           source: 'PCARMARKET_IMPORT',
           pcarmarket_url: listing.url,
-        pcarmarket_listing_title: listing.title,
-        pcarmarket_seller_username: listing.sellerUsername || null,
-        pcarmarket_buyer_username: listing.buyerUsername || null,
-        pcarmarket_auction_id: listing.auctionId || null,
-        pcarmarket_auction_slug: listing.slug || null,
-        bid_count: listing.bidCount || null,
-        view_count: listing.viewCount || null,
-        sold_status: listing.auctionOutcome === 'sold' ? 'sold' : 'unsold',
-        imported_at: new Date().toISOString()
+          pcarmarket_listing_title: listing.title,
+          pcarmarket_seller_username: listing.sellerUsername || null,
+          pcarmarket_seller_id: listing.sellerId || null,
+          pcarmarket_buyer_username: listing.buyerUsername || null,
+          pcarmarket_auction_id: listing.auctionId || null,
+          pcarmarket_auction_slug: listing.slug || null,
+          pcarmarket_lot_number: listing.lotNumber || null,
+          bid_count: listing.bidCount || null,
+          view_count: listing.viewCount || null,
+          watch_count: listing.watchCount || null,
+          reserve_status: listing.reserveStatus || null,
+          sold_status: listing.auctionOutcome === 'sold' ? 'sold' : 'unsold',
+          is_memorabilia: listing.isMemorabillia || false,
+          imported_at: new Date().toISOString()
       },
       is_public: true,
       status: 'active'
@@ -525,6 +649,66 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Step 7: Create external_identities for seller and buyer (claimable profiles)
+    const identitiesSaved: string[] = [];
+    if (listing.sellerUsername || listing.buyerUsername) {
+      const nowIso = new Date().toISOString();
+      const identitiesToUpsert = [];
+
+      // Seller identity
+      if (listing.sellerUsername) {
+        identitiesToUpsert.push({
+          platform: 'pcarmarket',
+          handle: listing.sellerUsername,
+          display_name: listing.seller || listing.sellerUsername,
+          profile_url: `https://www.pcarmarket.com/member/${listing.sellerUsername}/`,
+          metadata: {
+            source: 'pcarmarket_import',
+            first_seen_listing: listing.url,
+            first_seen_at: nowIso,
+          },
+          first_seen_at: nowIso,
+          last_seen_at: nowIso,
+          updated_at: nowIso,
+        });
+      }
+
+      // Buyer identity (if sold)
+      if (listing.buyerUsername && listing.auctionOutcome === 'sold') {
+        identitiesToUpsert.push({
+          platform: 'pcarmarket',
+          handle: listing.buyerUsername,
+          display_name: listing.buyer || listing.buyerUsername,
+          profile_url: `https://www.pcarmarket.com/member/${listing.buyerUsername}/`,
+          metadata: {
+            source: 'pcarmarket_import',
+            first_seen_as_buyer: true,
+            first_seen_listing: listing.url,
+            first_seen_at: nowIso,
+          },
+          first_seen_at: nowIso,
+          last_seen_at: nowIso,
+          updated_at: nowIso,
+        });
+      }
+
+      if (identitiesToUpsert.length > 0) {
+        const { data: upsertedIdentities, error: identityError } = await supabase
+          .from('external_identities')
+          .upsert(identitiesToUpsert, { onConflict: 'platform,handle' })
+          .select('id, handle');
+
+        if (identityError) {
+          console.error('[pcarmarket] External identity save error:', JSON.stringify(identityError));
+        } else {
+          for (const id of upsertedIdentities || []) {
+            identitiesSaved.push(id.handle);
+          }
+          console.log(`[pcarmarket] Saved ${identitiesSaved.length} external identities: ${identitiesSaved.join(', ')}`);
+        }
+      }
+    }
+
     // Update source health tracking
     if (sourceId) {
       await supabase
@@ -543,9 +727,20 @@ Deno.serve(async (req: Request) => {
         vehicle_id: vehicleId,
         organization_id: orgId,
         source_id: sourceId,
+        identities_saved: identitiesSaved,
         listing: {
           title: listing.title,
-          url: listing.url
+          url: listing.url,
+          year: listing.year,
+          make: listing.make,
+          model: listing.model,
+          vin: listing.vin,
+          sale_price: listing.salePrice,
+          status: listing.auctionOutcome,
+          seller_username: listing.sellerUsername,
+          buyer_username: listing.buyerUsername,
+          is_memorabilia: listing.isMemorabillia,
+          image_count: listing.images?.length || 0,
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
