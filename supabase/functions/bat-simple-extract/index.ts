@@ -197,18 +197,21 @@ function extractAuctionData(html: string): {
   const buyer_username = buyerMatch?.[1]?.trim() || null;
   
   // Sale price - "Sold for <strong>USD $6,954</strong>" or "for <strong>USD $6,954.00</strong>"
-  // Extract full price string first, then parse
-  const priceMatch = html.match(/Sold for\s*<strong>USD \$([0-9,]+(?:\.\d+)?\s*[kKmM]?)/i) ||
-                     html.match(/for <strong>USD \$([0-9,]+(?:\.\d+)?\s*[kKmM]?)<\/strong>/i) ||
-                     html.match(/Sold for[^$]*\$([0-9,]+(?:\.\d+)?\s*[kKmM]?)/i);
+  // Only match explicit "Sold for" patterns to avoid grabbing random prices from comments
+  // Do NOT use greedy fallback patterns that could match comment text
+  const priceMatch = html.match(/Sold for\s*<strong>USD \$([0-9,]+(?:\.\d+)?)/i) ||
+                     html.match(/to <strong>[^<]+<\/strong> for <strong>USD \$([0-9,]+(?:\.\d+)?)<\/strong>/i);
   let sale_price: number | null = null;
   if (priceMatch) {
     sale_price = parseMoney(priceMatch[1]);
   }
   
   // High bid (for active/unsold auctions)
-  const bidMatch = html.match(/Current Bid[^$]*\$([0-9,]+(?:\.\d+)?\s*[kKmM]?)/i) ||
-                   html.match(/High Bid[^$]*\$([0-9,]+(?:\.\d+)?\s*[kKmM]?)/i);
+  // Multiple patterns: "Bid to USD $X", "USD $X (Reserve Not Met)", "High Bid: $X"
+  const bidMatch = html.match(/Bid to[^$]*USD \$([0-9,]+(?:\.\d+)?)/i) ||
+                   html.match(/USD[^$]*\$([0-9,]+(?:\.\d+)?)\s*\(Reserve Not Met\)/i) ||
+                   html.match(/Current Bid[^$]*\$([0-9,]+(?:\.\d+)?)/i) ||
+                   html.match(/High Bid[^$]*\$([0-9,]+(?:\.\d+)?)/i);
   const high_bid = bidMatch ? parseMoney(bidMatch[1]) : null;
   
   // Bid count - from JSON blob (more accurate than counting)
@@ -231,12 +234,16 @@ function extractAuctionData(html: string): {
   const lotMatch = html.match(/<strong>Lot<\/strong>\s*#([0-9,]+)/i);
   const lot_number = lotMatch ? lotMatch[1].replace(/,/g, '') : null;
   
-  // Reserve status - look for "No Reserve" badge or reserve not met
+  // Reserve status - look for specific patterns in listing content
+  // Check "Reserve Not Met" FIRST (before "No Reserve") since "No Reserve" appears in nav menu
   let reserve_status: string | null = null;
-  if (html.includes('no-reserve') || html.includes('No Reserve')) {
-    reserve_status = 'no_reserve';
-  } else if (html.includes('Reserve Not Met') || html.includes('reserve-not-met')) {
+  if (html.includes('Reserve Not Met') || html.includes('reserve-not-met')) {
     reserve_status = 'reserve_not_met';
+    // Car didn't sell - ensure sale_price is null
+    sale_price = null;
+  } else if (html.match(/class="[^"]*no-reserve[^"]*"/) || html.match(/>No Reserve</)) {
+    // Match "no-reserve" class or "No Reserve" as visible text, not in nav menu
+    reserve_status = 'no_reserve';
   } else if (html.includes('Reserve Met') || sale_price) {
     reserve_status = 'reserve_met';
   }

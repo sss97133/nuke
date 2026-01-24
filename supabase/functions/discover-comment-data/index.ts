@@ -175,13 +175,13 @@ serve(async (req) => {
         .single();
       if (vehicle) vehiclesToProcess = [vehicle];
     } else {
-      // Get distinct vehicle_ids that have comments in auction_comments
-      // First, sample from auction_comments to find vehicles with comments
+      // Get distinct vehicle_ids that have comments in vehicle_observations
       const { data: commentSamples } = await supabase
-        .from("auction_comments")
+        .from("vehicle_observations")
         .select("vehicle_id")
+        .eq("kind", "comment")
         .not("vehicle_id", "is", null)
-        .order("created_at", { ascending: false })
+        .order("observed_at", { ascending: false })
         .limit(500);
 
       if (commentSamples) {
@@ -212,10 +212,11 @@ serve(async (req) => {
             for (const v of vehicles) {
               if (vehiclesToProcess.length >= batchSize) break;
 
-              // Check comment count
+              // Check comment count in vehicle_observations
               const { count } = await supabase
-                .from("auction_comments")
+                .from("vehicle_observations")
                 .select("id", { count: "exact", head: true })
+                .eq("kind", "comment")
                 .eq("vehicle_id", v.id);
 
               if ((count || 0) >= minComments) {
@@ -243,13 +244,22 @@ serve(async (req) => {
 
     for (const vehicle of vehiclesToProcess) {
       try {
-        // Get comments
-        const { data: comments } = await supabase
-          .from("auction_comments")
-          .select("author_username, comment_text, is_seller, created_at")
+        // Get comments from vehicle_observations
+        const { data: rawComments } = await supabase
+          .from("vehicle_observations")
+          .select("content_text, structured_data, observed_at")
+          .eq("kind", "comment")
           .eq("vehicle_id", vehicle.id)
-          .order("created_at", { ascending: true })
+          .order("observed_at", { ascending: true })
           .limit(150);
+
+        // Transform to expected format
+        const comments = (rawComments || []).map((c: any) => ({
+          author_username: c.structured_data?.author_username || 'unknown',
+          comment_text: c.content_text,
+          is_seller: c.structured_data?.is_seller || false,
+          created_at: c.observed_at,
+        }));
 
         if (!comments || comments.length < 10) {
           results.errors++;

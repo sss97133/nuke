@@ -29,56 +29,77 @@ serve(async (req) => {
     // Run all counts in parallel
     const [
       vehiclesRes,
-      commentsRes,
-      distinctVehiclesRes,
+      imagesRes,
+      // Observations (current system)
+      obsCommentsRes,
+      obsBidsRes,
+      obsVehiclesRes,
+      // Legacy auction_comments (for reference)
+      legacyCommentsRes,
+      // BaT listings
       batListingsRes,
-      batExtractedRes,
+      batWithCommentsRes,
+      // Discoveries (AI analysis)
       commentDiscRes,
       descDiscRes,
-      imagesRes,
+      // Organizations
+      orgsRes,
     ] = await Promise.all([
       supabase.from("vehicles").select("id", { count: "exact", head: true }),
+      supabase.from("vehicle_images").select("id", { count: "exact", head: true }),
+      // Observations - the actual data source
+      supabase.from("vehicle_observations").select("id", { count: "exact", head: true }).eq("kind", "comment"),
+      supabase.from("vehicle_observations").select("id", { count: "exact", head: true }).eq("kind", "bid"),
+      supabase.from("vehicle_observations").select("vehicle_id").eq("kind", "comment").limit(50000),
+      // Legacy table
       supabase.from("auction_comments").select("id", { count: "exact", head: true }),
-      supabase.from("auction_comments").select("vehicle_id").not("vehicle_id", "is", null).limit(100000),
+      // BaT
+      supabase.from("bat_listings").select("id", { count: "exact", head: true }),
       supabase.from("bat_listings").select("id", { count: "exact", head: true }).gt("comment_count", 0),
-      supabase.from("bat_listings").select("id,raw_data").gt("comment_count", 10).not("vehicle_id", "is", null).order("comment_count", { ascending: false }).limit(500),
+      // AI discoveries
       supabase.from("comment_discoveries").select("id", { count: "exact", head: true }),
       supabase.from("description_discoveries").select("id", { count: "exact", head: true }),
-      supabase.from("vehicle_images").select("id", { count: "exact", head: true }),
+      // Orgs
+      supabase.from("organizations").select("id", { count: "exact", head: true }),
     ]);
 
-    // Calculate distinct vehicles with comments
+    // Calculate distinct vehicles with comment observations
     const vehicleIds = new Set(
-      (distinctVehiclesRes.data || []).map((r: any) => r.vehicle_id)
+      (obsVehiclesRes.data || []).map((r: any) => r.vehicle_id)
     );
-
-    // Calculate extracted bat_listings
-    const extracted = (batExtractedRes.data || []).filter(
-      (r: any) => r.raw_data?.comments_extracted_at
-    ).length;
-    const pending = (batExtractedRes.data || []).filter(
-      (r: any) => !r.raw_data?.comments_extracted_at
-    ).length;
 
     const stats = {
       // Core counts
       total_vehicles: vehiclesRes.count || 0,
-      total_comments: commentsRes.count || 0,
-      vehicles_with_comments: vehicleIds.size,
       total_images: imagesRes.count || 0,
+      total_organizations: orgsRes.count || 0,
 
-      // BaT extraction progress (top 500 by comment_count, which is backfill order)
-      bat_listings_with_comments: batListingsRes.count || 0,
-      bat_top500_extracted: extracted,
-      bat_top500_pending: pending,
-      bat_top500_progress_pct: Math.round(100 * extracted / Math.max(extracted + pending, 1)),
+      // Observations (current system - this is the source of truth)
+      observations: {
+        comments: obsCommentsRes.count || 0,
+        bids: obsBidsRes.count || 0,
+        total: (obsCommentsRes.count || 0) + (obsBidsRes.count || 0),
+        vehicles_with_comments: vehicleIds.size,
+      },
 
-      // Discovery progress
-      comment_discoveries: commentDiscRes.count || 0,
-      description_discoveries: descDiscRes.count || 0,
+      // BaT listings (metadata, not extracted content)
+      bat_listings: {
+        total: batListingsRes.count || 0,
+        with_comments: batWithCommentsRes.count || 0,
+      },
 
-      // Helpful context
-      _note: "Use these numbers to understand data distribution before querying individual tables",
+      // AI Analysis progress
+      ai_analysis: {
+        comment_discoveries: commentDiscRes.count || 0,
+        description_discoveries: descDiscRes.count || 0,
+        vehicles_analyzed: (commentDiscRes.count || 0) + (descDiscRes.count || 0),
+      },
+
+      // Legacy table (for reference only - data migrated to observations)
+      _legacy: {
+        auction_comments: legacyCommentsRes.count || 0,
+        note: "Legacy table - use observations.comments instead",
+      },
     };
 
     return new Response(JSON.stringify(stats, null, 2), {
