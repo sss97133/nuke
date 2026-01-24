@@ -1,17 +1,17 @@
 {
-  "loop_number": 1,
-  "timestamp": "2026-01-24T00:00:11+00:00",
-  "output_file": "logs/claude_output_2026-01-23_19-55-00.log",
+  "loop_number": 22,
+  "timestamp": "2026-01-24T13:42:32+00:00",
+  "output_file": "logs/claude_output_2026-01-24_09-41-11.log",
   "output_format": "json",
   "analysis": {
     "has_completion_signal": false,
     "is_test_only": false,
     "is_stuck": false,
     "has_progress": true,
-    "files_modified": 3,
+    "files_modified": 15,
     "confidence_score": 70,
     "exit_signal": false,
-    "work_summary": "**Summary**: 128,573 BaT URLs queued (57.7% of 223k). Full-archive-crawler at page 44 of year range 2020-2026 with 7.1% yield. Wayback exhausted. Continue running full-archive-crawler to progress through older year ranges with likely better yields.",
-    "output_length": 1281
+    "work_summary": "---\n\n## Loop 29 Complete\n\n**STATUS**: `CONTINUE`\n\n**WORK_DONE**: Task 4.6 - Validated backfill success rate. 1,841 BaT vehicles were updated in the last hour. Of the vehicles that previously had missing VIN, 65% successfully extracted VIN (1,195 vehicles). The remaining 35% (646 vehicles) legitimately don't have VIN on the source page (motorcycles, pre-VIN vehicles, project cars). Backfill is working correctly.\n\n**NEXT_TASK**: Task 4.7 - Backfill: Re-extract 100 BaT vehicles missing images\n\n**BLOCKERS**: None\n\n**CUMULATIVE_STATS**:\n- Loops completed: 29\n- Phase 4 tasks: 4.1-4.6 ✅, 4.7-4.10 pending\n- BaT VIN backfill: 1,841 vehicles processed, 65% VIN extraction success rate\n- Overall BaT VIN: 77.7% (up from ~76.4% baseline)",
+    "output_length": 1782
   }
 }

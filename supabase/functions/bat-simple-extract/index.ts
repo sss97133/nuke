@@ -78,6 +78,7 @@ const VIN_PATTERNS = [
 ];
 
 function extractVin(html: string): string | null {
+  // First try modern 17-char VINs
   for (const pattern of VIN_PATTERNS) {
     const matches = html.match(pattern);
     if (matches && matches.length > 0) {
@@ -89,6 +90,22 @@ function extractVin(html: string): string | null {
       return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
     }
   }
+
+  // Fall back to chassis/serial number for pre-1981 vehicles
+  // BaT uses "Chassis" label in essentials section, often wrapped in <a> tag
+  const chassisMatch = html.match(/Chassis:\s*<a[^>]*>([A-Z0-9*-]+)<\/a>/i) ||
+                       html.match(/Chassis:\s*([A-Z0-9*-]+)/i) ||
+                       html.match(/>Chassis<\/strong>:\s*([A-Z0-9*-]+)/i) ||
+                       html.match(/Serial(?:\s*Number)?:\s*<a[^>]*>([A-Z0-9*-]+)<\/a>/i) ||
+                       html.match(/Serial(?:\s*Number)?:\s*([A-Z0-9*-]+)/i);
+  if (chassisMatch) {
+    const chassis = chassisMatch[1].trim();
+    // Validate it looks like a chassis (at least 6 chars, alphanumeric)
+    if (chassis.length >= 6 && /^[A-Z0-9*-]+$/i.test(chassis)) {
+      return chassis;
+    }
+  }
+
   return null;
 }
 

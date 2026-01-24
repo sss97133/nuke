@@ -1360,6 +1360,56 @@ serve(async (req) => {
           if (locationElement) {
             scrapeData.data.location = locationElement.textContent?.trim().replace(/[()]/g, '');
           }
+
+          // Fallback: Extract location from URL if not found in page
+          // CL URLs are like: seattle.craigslist.org, sfbay.craigslist.org, etc.
+          if (!scrapeData.data.location && item.listing_url) {
+            const urlMatch = item.listing_url.match(/https?:\/\/([a-z]+)\.craigslist\.org/i);
+            if (urlMatch && urlMatch[1]) {
+              // Map common CL city codes to readable names
+              const cityMap: Record<string, string> = {
+                'sfbay': 'San Francisco Bay Area',
+                'losangeles': 'Los Angeles',
+                'newyork': 'New York',
+                'chicago': 'Chicago',
+                'seattle': 'Seattle',
+                'portland': 'Portland',
+                'denver': 'Denver',
+                'dallas': 'Dallas',
+                'houston': 'Houston',
+                'austin': 'Austin',
+                'phoenix': 'Phoenix',
+                'sandiego': 'San Diego',
+                'atlanta': 'Atlanta',
+                'miami': 'Miami',
+                'boston': 'Boston',
+                'philadelphia': 'Philadelphia',
+                'detroit': 'Detroit',
+                'minneapolis': 'Minneapolis',
+                'washingtondc': 'Washington DC',
+                'orangecounty': 'Orange County',
+                'inlandempire': 'Inland Empire',
+                'sacramento': 'Sacramento',
+                'lasvegas': 'Las Vegas',
+                'tampa': 'Tampa',
+                'raleigh': 'Raleigh',
+                'nashville': 'Nashville',
+                'cleveland': 'Cleveland',
+                'columbus': 'Columbus',
+                'charlotte': 'Charlotte',
+                'orlando': 'Orlando',
+                'pittsburgh': 'Pittsburgh',
+                'stlouis': 'St. Louis',
+                'sanantonio': 'San Antonio',
+                'kansascity': 'Kansas City',
+                'indianapolis': 'Indianapolis',
+                'baltimore': 'Baltimore',
+                'saltlakecity': 'Salt Lake City',
+              };
+              const cityCode = urlMatch[1].toLowerCase();
+              scrapeData.data.location = cityMap[cityCode] || cityCode.charAt(0).toUpperCase() + cityCode.slice(1);
+            }
+          }
           const bodyElement = doc.querySelector('#postingbody');
           if (bodyElement) {
             let description = bodyElement.textContent?.trim() || '';
@@ -1448,7 +1498,30 @@ serve(async (req) => {
               
               // Extract make (validate against known makes)
               // Skip invalid prefixes
-              const invalidPrefixes = ['this', 'el', 'red', 'beautiful', 'supercharged', 'all', '6k-mile', '10k-mile', '18k-mile', '47k-mile', 'original-owner', 'single-family-owned', '20-years-owned'];
+              const invalidPrefixes = [
+                // Original list
+                'this', 'el', 'red', 'beautiful', 'supercharged', 'all',
+                '6k-mile', '10k-mile', '18k-mile', '47k-mile',
+                'original-owner', 'single-family-owned', '20-years-owned',
+                // Common CL title starters (added for make/model parsing fix)
+                'miss', "don't", 'dont', 'check', 'look', 'see', 'wow', 'hey',
+                'clean', 'mint', 'pristine', 'perfect', 'excellent', 'great', 'good',
+                'nice', 'rare', 'classic', 'vintage', 'antique', 'collectible', 'collector',
+                'low', 'high', 'one', 'single', 'only', 'just', 'new', 'like', 'brand',
+                'must', 'need', 'priced', 'reduced', 'obo', 'firm', 'cash', 'best',
+                'title', 'clean-title', 'salvage', 'rebuilt', 'restored', 'project',
+                'custom', 'modified', 'stock', 'original', 'numbers-matching', 'matching',
+                'runs', 'drives', 'needs', 'work', 'running', 'driving',
+                'sale', 'for', 'by', 'owner', 'dealer', 'private',
+                'no', 'not', 'never', 'always', 'garage', 'kept', 'stored',
+                'super', 'ultra', 'very', 'really', 'absolutely', 'totally',
+                'hot', 'cool', 'sweet', 'sick', 'bad', 'badass', 'awesome',
+                'black', 'white', 'blue', 'green', 'silver', 'gray', 'grey', 'gold', 'yellow', 'orange', 'purple', 'brown', 'tan', 'beige',
+                'fast', 'quick', 'powerful', 'strong', 'sporty', 'luxury', 'loaded',
+                'low-mile', 'low-mileage', 'high-mile', 'one-owner', 'two-owner', 'adult-owned',
+                'well', 'maintained', 'serviced', 'documented', 'records', 'carfax',
+                'immaculate', 'flawless', 'showroom', 'concours', 'museum', 'quality'
+              ];
               
               let makeIndex = startIndex;
               while (makeIndex < parts.length && invalidPrefixes.includes(parts[makeIndex].toLowerCase())) {

@@ -689,6 +689,7 @@ serve(async (req) => {
             discovery_source: 'dupont_registry',
             profile_origin: 'dupont_registry_import',
             is_public: true,
+            selling_organization_id: 'cb469909-920b-4b50-b9ec-eeb00245d04c', // Dupont Registry org
           })
           .select()
           .single();
