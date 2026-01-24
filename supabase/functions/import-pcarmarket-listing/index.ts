@@ -37,6 +37,22 @@ interface PCarMarketListing {
   isMemorabillia?: boolean;
 }
 
+// Validate VIN - reject obvious placeholders
+function isValidVin(vin: string): boolean {
+  if (!vin || vin.length < 6 || vin.length > 17) return false;
+
+  // Reject all-same-digit VINs like "000000" or "111111"
+  if (/^(.)\1+$/.test(vin)) return false;
+
+  // Reject sequential patterns like "123456"
+  if (/^(0123456|1234567|12345678|123456789)/.test(vin)) return false;
+
+  // Reject obviously invalid patterns
+  if (/^(test|none|na|unknown|n\/a)/i.test(vin)) return false;
+
+  return true;
+}
+
 function normalizeUrl(raw: string): string {
   try {
     const u = new URL(raw);
@@ -48,23 +64,165 @@ function normalizeUrl(raw: string): string {
   }
 }
 
+// Parse title like "2007 Porsche 911 Carrera 4S" into year/make/model
+function parseTitleToVehicle(title: string): { year?: number; make?: string; model?: string } {
+  const result: { year?: number; make?: string; model?: string } = {};
+
+  // Remove site name suffix
+  const cleanTitle = title.replace(/\s*\|\s*PCARMARKET$/i, '').trim();
+
+  // Match year at the start
+  const yearMatch = cleanTitle.match(/^(\d{4})\s+/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[1]);
+    if (year >= 1885 && year <= new Date().getFullYear() + 2) {
+      result.year = year;
+    }
+  }
+
+  // Remove year and parse make/model
+  const rest = cleanTitle.replace(/^\d{4}\s+/, '').trim();
+  const parts = rest.split(/\s+/);
+
+  if (parts.length >= 1) {
+    // Handle compound makes like "Mercedes-Benz", "Aston Martin", etc.
+    const firstLower = parts[0]?.toLowerCase();
+    const secondLower = parts[1]?.toLowerCase();
+
+    if (firstLower === 'mercedes' && secondLower === 'benz') {
+      result.make = 'mercedes-benz';
+      result.model = parts.slice(2).join(' ').toLowerCase();
+    } else if (firstLower === 'aston' && secondLower === 'martin') {
+      result.make = 'aston martin';
+      result.model = parts.slice(2).join(' ').toLowerCase();
+    } else if (firstLower === 'alfa' && secondLower === 'romeo') {
+      result.make = 'alfa romeo';
+      result.model = parts.slice(2).join(' ').toLowerCase();
+    } else if (firstLower === 'land' && secondLower === 'rover') {
+      result.make = 'land rover';
+      result.model = parts.slice(2).join(' ').toLowerCase();
+    } else if (firstLower === 'rolls' && secondLower === 'royce') {
+      result.make = 'rolls-royce';
+      result.model = parts.slice(2).join(' ').toLowerCase();
+    } else {
+      // Single-word makes: Porsche, BMW, Ferrari, etc.
+      result.make = firstLower;
+      result.model = parts.slice(1).join(' ').toLowerCase();
+    }
+  }
+
+  return result;
+}
+
+// Parse bid field like "SOLD$39,00026 BidsEnded Apr 16, 201917,241 Views • 44 Saves"
+function parseBidField(bidText: string): {
+  sold: boolean;
+  price?: number;
+  bidCount?: number;
+  viewCount?: number;
+  watchCount?: number;
+  endDate?: string;
+} {
+  const result: {
+    sold: boolean;
+    price?: number;
+    bidCount?: number;
+    viewCount?: number;
+    watchCount?: number;
+    endDate?: string;
+  } = { sold: false };
+
+  // Check if sold
+  if (/sold/i.test(bidText)) {
+    result.sold = true;
+  }
+
+  // Extract price (handle both "$39,000" and "$39000")
+  const priceMatch = bidText.match(/\$?([\d,]+)/);
+  if (priceMatch) {
+    result.price = parseInt(priceMatch[1].replace(/,/g, ''));
+  }
+
+  // Extract bid count
+  const bidMatch = bidText.match(/([\d,]+)\s*Bids?/i);
+  if (bidMatch) {
+    result.bidCount = parseInt(bidMatch[1].replace(/,/g, ''));
+  }
+
+  // Extract views
+  const viewMatch = bidText.match(/([\d,]+)\s*Views?/i);
+  if (viewMatch) {
+    result.viewCount = parseInt(viewMatch[1].replace(/,/g, ''));
+  }
+
+  // Extract saves/watches
+  const saveMatch = bidText.match(/([\d,]+)\s*Saves?/i);
+  if (saveMatch) {
+    result.watchCount = parseInt(saveMatch[1].replace(/,/g, ''));
+  }
+
+  // Extract end date (e.g., "Ended Apr 16, 2019" or "Apr 16, 2019")
+  const dateMatch = bidText.match(/(?:Ended\s+)?([A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4})/i);
+  if (dateMatch) {
+    try {
+      const parsed = new Date(dateMatch[1]);
+      if (!isNaN(parsed.getTime())) {
+        result.endDate = parsed.toISOString();
+      }
+    } catch {}
+  }
+
+  return result;
+}
+
+// Parse seller field like "woodardsaMessage SellerFollow Seller..."
+function parseSellerField(sellerText: string): string | null {
+  // Username is usually at the start before "Message Seller"
+  const match = sellerText.match(/^([a-zA-Z0-9_-]+)/);
+  return match?.[1] || null;
+}
+
 function parsePCarMarketIdentityFromUrl(url: string): { year: number; make: string; model: string } | null {
   try {
     const u = new URL(url);
     // Pattern: /auction/2002-aston-martin-db7-v12-vantage-2
     const m = u.pathname.match(/\/auction\/(\d{4})-([a-z0-9-]+)-(\d+)\/?$/i);
     if (!m?.[1] || !m?.[2]) return null;
-    
+
     const year = Number(m[1]);
     if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) return null;
 
     const parts = String(m[2]).split('-').filter(Boolean);
     if (parts.length < 2) return null;
-    
-    // Make is usually first 1-2 words
-    const make = parts.slice(0, 2).join(' ').toLowerCase();
-    const model = parts.slice(2).join(' ').toLowerCase();
 
+    // Handle compound makes, otherwise single word
+    const first = parts[0]?.toLowerCase();
+    const second = parts[1]?.toLowerCase();
+    let make: string;
+    let modelStart: number;
+
+    if (first === 'mercedes' && second === 'benz') {
+      make = 'mercedes-benz';
+      modelStart = 2;
+    } else if (first === 'aston' && second === 'martin') {
+      make = 'aston martin';
+      modelStart = 2;
+    } else if (first === 'alfa' && second === 'romeo') {
+      make = 'alfa romeo';
+      modelStart = 2;
+    } else if (first === 'land' && second === 'rover') {
+      make = 'land rover';
+      modelStart = 2;
+    } else if (first === 'rolls' && second === 'royce') {
+      make = 'rolls-royce';
+      modelStart = 2;
+    } else {
+      // Single-word makes: porsche, bmw, ferrari, etc.
+      make = first;
+      modelStart = 1;
+    }
+
+    const model = parts.slice(modelStart).join(' ').toLowerCase();
     return { year, make, model: model || 'unknown' };
   } catch {
     return null;
@@ -93,8 +251,9 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
           },
           body: JSON.stringify({
             url: url,
-            formats: ['html'],
-            waitFor: 8000,
+            formats: ['rawHtml'],  // rawHtml captures full rendered page with XHR data
+            waitFor: 20000,        // Wait 20s for dynamic content to load
+            timeout: 60000,
             mobile: false,
           }),
         });
@@ -105,7 +264,7 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
             console.error('[pcarmarket] Firecrawl error:', firecrawlData.error);
             throw new Error(`Firecrawl error: ${firecrawlData.error || 'Unknown error'}`);
           }
-          html = firecrawlData.data?.html || '';
+          html = firecrawlData.data?.rawHtml || firecrawlData.data?.html || '';
           console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
         } else {
           throw new Error(`Firecrawl HTTP error: ${firecrawlResponse.status}`);
@@ -140,6 +299,72 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
     if (slugMatch) {
       listing.slug = slugMatch[1];
       listing.auctionId = slugMatch[1].split('-').pop() || undefined;
+    }
+
+    // Check if the provided HTML is actually a JSON object from our Playwright scraper
+    // Format: { source: "dom", meta: {...}, dom: {...}, images: [...], html: "..." }
+    if (html.trim().startsWith('{') && html.includes('"source"')) {
+      try {
+        const scraperData = JSON.parse(html);
+
+        if (scraperData.source === 'dom' && scraperData.meta) {
+          console.log('[pcarmarket] Processing Playwright DOM extraction data');
+
+          // Extract from meta tags
+          if (scraperData.meta.title) {
+            listing.title = scraperData.meta.title.replace(/\s*\|\s*PCARMARKET$/i, '').trim();
+          }
+
+          // Parse title for year/make/model
+          const titleData = parseTitleToVehicle(scraperData.meta.title || scraperData.dom?.h1 || '');
+          listing.year = titleData.year;
+          listing.make = titleData.make;
+          listing.model = titleData.model;
+
+          // Parse bid field for price, status, counts, date
+          if (scraperData.dom?.bid) {
+            const bidData = parseBidField(scraperData.dom.bid);
+            listing.salePrice = bidData.price;
+            listing.bidCount = bidData.bidCount;
+            listing.viewCount = bidData.viewCount;
+            listing.watchCount = bidData.watchCount;
+            if (bidData.sold) {
+              listing.auctionOutcome = 'sold';
+              listing.saleDate = bidData.endDate;
+            }
+            listing.auctionEndDate = bidData.endDate;
+          }
+
+          // Parse seller username
+          if (scraperData.dom?.seller) {
+            listing.sellerUsername = parseSellerField(scraperData.dom.seller);
+          }
+
+          // Get images from scraper
+          if (scraperData.images?.length) {
+            listing.images = scraperData.images;
+          }
+
+          // If the scraper also passed the full HTML, extract more data from it
+          if (scraperData.html) {
+            html = scraperData.html;
+            // Continue to the JSON/regex extraction below to fill in any missing data
+          } else {
+            // No HTML available, use URL parsing as fallback
+            if (!listing.year || !listing.make) {
+              const urlIdentity = parsePCarMarketIdentityFromUrl(url);
+              if (urlIdentity) {
+                listing.year = listing.year || urlIdentity.year;
+                listing.make = listing.make || urlIdentity.make;
+                listing.model = listing.model || urlIdentity.model;
+              }
+            }
+            return listing;
+          }
+        }
+      } catch (e) {
+        console.log('[pcarmarket] Input is not valid JSON, treating as HTML');
+      }
     }
 
     // PRIORITY: Try to extract embedded JSON data (PCarMarket embeds all data as JSON)
@@ -189,8 +414,8 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
         listing.model = jsonData.vehicle.model?.toLowerCase();
       }
 
-      // VIN (accept 6-17 chars for classic cars)
-      if (jsonData.vin && jsonData.vin.length >= 6) {
+      // VIN (accept 6-17 chars for classic cars, validate to avoid placeholders)
+      if (jsonData.vin && jsonData.vin.length >= 6 && isValidVin(jsonData.vin)) {
         listing.vin = jsonData.vin.toUpperCase();
       }
 
@@ -292,9 +517,17 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
     }
 
     // Extract VIN (6-17 character alphanumeric for classic + modern)
-    const vinMatch = html.match(/\b([A-HJ-NPR-Z0-9]{6,17})\b/);
-    if (vinMatch) {
-      listing.vin = vinMatch[1];
+    // Look for VIN in context to avoid false positives
+    const vinPatterns = [
+      /(?:vin|chassis)[:\s#]*([A-HJ-NPR-Z0-9]{6,17})\b/i,
+      /"vin"\s*:\s*"([A-HJ-NPR-Z0-9]{6,17})"/i,
+    ];
+    for (const pattern of vinPatterns) {
+      const vinMatch = html.match(pattern);
+      if (vinMatch && isValidVin(vinMatch[1])) {
+        listing.vin = vinMatch[1];
+        break;
+      }
     }
 
     // Extract sale price (look for "Final bid: $X" or "High bid: $X")

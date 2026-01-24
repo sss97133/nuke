@@ -356,18 +356,23 @@ function extractEssentials(html: string): {
   };
 
   const parseMoney = (raw: string | null): number | null => {
-    const s = String(raw || "").replace(/,/g, "").trim();
+    const s = String(raw || "").trim().toLowerCase();
     if (!s) return null;
-    const n = parseInt(s, 10);
+    const normalized = s.replace(/,/g, "").replace(/\s+/g, "");
+    const m = normalized.match(/^([0-9]+(?:\.[0-9]+)?)([km])?$/i);
+    if (!m?.[1]) return null;
+    const n = parseFloat(m[1]);
     if (!Number.isFinite(n) || n <= 0) return null;
-    return n;
+    const suffix = m[2]?.toLowerCase();
+    const multiplier = suffix === "k" ? 1000 : suffix === "m" ? 1_000_000 : 1;
+    return Math.round(n * multiplier);
   };
 
   const parseMoneyFromRow = (rowHtml: string | null): number | null => {
     if (!rowHtml) return null;
-    const strong = rowHtml.match(/<strong>\s*(?:USD\s*)?\$?\s*([0-9,]+)\s*<\/strong>/i);
+    const strong = rowHtml.match(/<strong>\s*(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)\s*<\/strong>/i);
     if (strong?.[1]) return parseMoney(strong[1]);
-    const anyDollar = rowHtml.match(/\$\s*([0-9,]+)/);
+    const anyDollar = rowHtml.match(/\$\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i);
     if (anyDollar?.[1]) return parseMoney(anyDollar[1]);
     return null;
   };
@@ -491,16 +496,18 @@ function extractEssentials(html: string): {
     high_bid = bidFromStats;
   }
 
-  const bidToMatch = text.match(/Bid\s+to\s+(?:USD\s*)?\$?([0-9,]+)/i);
+  const bidToMatch = text.match(/Bid\s+to\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i);
   if (!sale_price && bidToMatch?.[1]) {
-    const n = parseInt(bidToMatch[1].replace(/,/g, ""), 10);
+    const n = parseMoney(bidToMatch[1]);
     if (Number.isFinite(n) && n > 0) high_bid = n;
   }
 
   // SOLD signals (prefer title for low-noise extraction).
-  const titleSoldMatch = titleText ? titleText.match(/\bsold\s+(?:for|to)\s+\$?([0-9,]+)/i) : null;
+  const titleSoldMatch = titleText
+    ? titleText.match(/\bsold\s+(?:for|to)\s+\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i)
+    : null;
   if (!sale_price && titleSoldMatch?.[1]) {
-    const n = parseInt(titleSoldMatch[1].replace(/,/g, ""), 10);
+    const n = parseMoney(titleSoldMatch[1]);
     if (Number.isFinite(n) && n > 0) {
       sale_price = n;
       high_bid = high_bid || n;
@@ -509,15 +516,15 @@ function extractEssentials(html: string): {
 
   if (!sale_price) {
     const soldPatterns = [
-      /Sold\s+(?:for|to)\s+(?:USD\s*)?\$?([0-9,]+)/i,
+      /Sold\s+(?:for|to)\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i,
       // "Sold on 2/3/22 for $76,500 to ..."
-      /Sold\s+on\b[\s\S]{0,120}?\bfor\s+(?:USD\s*)?\$?([0-9,]+)/i,
-      /Sold\s+(?:USD\s*)?\$?([0-9,]+)\s+(?:on|for)/i,
+      /Sold\s+on\b[\s\S]{0,120}?\bfor\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i,
+      /Sold\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)\s+(?:on|for)/i,
     ];
     for (const p of soldPatterns) {
       const m = text.match(p);
       if (m?.[1]) {
-        const n = parseInt(m[1].replace(/,/g, ""), 10);
+        const n = parseMoney(m[1]);
         if (Number.isFinite(n) && n > 0) {
           sale_price = n;
           high_bid = high_bid || n;

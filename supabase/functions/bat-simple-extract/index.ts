@@ -139,6 +139,19 @@ function extractTitle(html: string): { title: string | null; year: number | null
   return { title, year: null, make: null, model: null };
 }
 
+function parseMoney(raw: string | null): number | null {
+  const s = String(raw || "").trim().toLowerCase();
+  if (!s) return null;
+  const normalized = s.replace(/,/g, "").replace(/\s+/g, "");
+  const m = normalized.match(/^([0-9]+(?:\.[0-9]+)?)([km])?$/i);
+  if (!m?.[1]) return null;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const suffix = m[2]?.toLowerCase();
+  const multiplier = suffix === "k" ? 1000 : suffix === "m" ? 1_000_000 : 1;
+  return Math.round(n * multiplier);
+}
+
 function extractAuctionData(html: string): {
   seller_username: string | null;
   buyer_username: string | null;
@@ -168,20 +181,18 @@ function extractAuctionData(html: string): {
   
   // Sale price - "Sold for <strong>USD $6,954</strong>" or "for <strong>USD $6,954.00</strong>"
   // Extract full price string first, then parse
-  const priceMatch = html.match(/Sold for\s*<strong>USD \$([0-9,]+(?:\.\d{2})?)/i) ||
-                     html.match(/for <strong>USD \$([0-9,]+(?:\.\d{2})?)<\/strong>/i) ||
-                     html.match(/Sold for[^$]*\$([0-9,]+)/i);
+  const priceMatch = html.match(/Sold for\s*<strong>USD \$([0-9,]+(?:\.\d+)?\s*[kKmM]?)/i) ||
+                     html.match(/for <strong>USD \$([0-9,]+(?:\.\d+)?\s*[kKmM]?)<\/strong>/i) ||
+                     html.match(/Sold for[^$]*\$([0-9,]+(?:\.\d+)?\s*[kKmM]?)/i);
   let sale_price: number | null = null;
   if (priceMatch) {
-    // Remove commas and parse - ignore cents
-    const priceStr = priceMatch[1].replace(/,/g, '').split('.')[0];
-    sale_price = parseInt(priceStr);
+    sale_price = parseMoney(priceMatch[1]);
   }
   
   // High bid (for active/unsold auctions)
-  const bidMatch = html.match(/Current Bid[^$]*\$([0-9,]+)/i) ||
-                   html.match(/High Bid[^$]*\$([0-9,]+)/i);
-  const high_bid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, '')) : null;
+  const bidMatch = html.match(/Current Bid[^$]*\$([0-9,]+(?:\.\d+)?\s*[kKmM]?)/i) ||
+                   html.match(/High Bid[^$]*\$([0-9,]+(?:\.\d+)?\s*[kKmM]?)/i);
+  const high_bid = bidMatch ? parseMoney(bidMatch[1]) : null;
   
   // Bid count - from JSON blob (more accurate than counting)
   const bidCountMatch = html.match(/"type":"bat-bid"/g);
