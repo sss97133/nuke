@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { MarketStatsService } from '../services/marketStatsService';
 import '../design-system.css';
 
 interface SquarebodyVehicle {
@@ -164,27 +165,14 @@ const SquarebodyLiveFeed: React.FC = () => {
 
   const loadStats = async () => {
     try {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      // Single RPC call replaces fetching all vehicles and client-side filtering
+      const marketStats = await MarketStatsService.getSquarebodyMarketStats();
 
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('created_at')
-        .in('make', ['Chevrolet', 'GMC', 'Chevy'])
-        .gte('year', 1973)
-        .lte('year', 1991);
-
-      if (error) throw error;
-
-      const statsData = {
-        today: data.filter(v => new Date(v.created_at) >= today).length,
-        week: data.filter(v => new Date(v.created_at) >= weekAgo).length,
-        month: data.filter(v => new Date(v.created_at) >= monthAgo).length
-      };
-
-      setStats(statsData);
+      setStats({
+        today: marketStats.discovered_today,
+        week: marketStats.discovered_this_week,
+        month: marketStats.discovered_this_month
+      });
     } catch (error) {
       console.error('Error loading stats:', error);
     }

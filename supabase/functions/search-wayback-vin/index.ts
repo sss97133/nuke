@@ -93,23 +93,50 @@ function getWaybackUrl(timestamp: string, originalUrl: string): string {
 }
 
 // Identify source type from URL
-function identifySourceFromUrl(url: string): { slug: string; name: string; category: string } | null {
+function identifySourceFromUrl(url: string): { slug: string; name: string; category: string; isAuction: boolean } | null {
   const urlLower = url.toLowerCase();
 
-  if (urlLower.includes('bringatrailer.com')) return { slug: 'bat', name: 'Bring a Trailer', category: 'auction' };
-  if (urlLower.includes('carsandbids.com')) return { slug: 'cars-and-bids', name: 'Cars & Bids', category: 'auction' };
-  if (urlLower.includes('ebay.com')) return { slug: 'ebay', name: 'eBay Motors', category: 'marketplace' };
-  if (urlLower.includes('hemmings.com')) return { slug: 'hemmings', name: 'Hemmings', category: 'marketplace' };
-  if (urlLower.includes('barrett-jackson')) return { slug: 'barrett-jackson', name: 'Barrett-Jackson', category: 'auction' };
-  if (urlLower.includes('mecum.com')) return { slug: 'mecum', name: 'Mecum', category: 'auction' };
-  if (urlLower.includes('rmsothebys')) return { slug: 'rm-sothebys', name: "RM Sotheby's", category: 'auction' };
-  if (urlLower.includes('bonhams.com')) return { slug: 'bonhams', name: 'Bonhams', category: 'auction' };
-  if (urlLower.includes('goodingco')) return { slug: 'gooding', name: 'Gooding & Company', category: 'auction' };
-  if (urlLower.includes('pcarmarket')) return { slug: 'pcarmarket', name: 'PCarMarket', category: 'auction' };
-  if (urlLower.includes('classic.com')) return { slug: 'classic-com', name: 'Classic.com', category: 'aggregator' };
-  if (urlLower.includes('craigslist')) return { slug: 'craigslist', name: 'Craigslist', category: 'marketplace' };
+  // AUCTION sites - time-sensitive, snapshots may be incomplete
+  if (urlLower.includes('bringatrailer.com')) return { slug: 'bat', name: 'Bring a Trailer', category: 'auction', isAuction: true };
+  if (urlLower.includes('carsandbids.com')) return { slug: 'cars-and-bids', name: 'Cars & Bids', category: 'auction', isAuction: true };
+  if (urlLower.includes('barrett-jackson')) return { slug: 'barrett-jackson', name: 'Barrett-Jackson', category: 'auction', isAuction: true };
+  if (urlLower.includes('mecum.com')) return { slug: 'mecum', name: 'Mecum', category: 'auction', isAuction: true };
+  if (urlLower.includes('rmsothebys')) return { slug: 'rm-sothebys', name: "RM Sotheby's", category: 'auction', isAuction: true };
+  if (urlLower.includes('bonhams.com')) return { slug: 'bonhams', name: 'Bonhams', category: 'auction', isAuction: true };
+  if (urlLower.includes('goodingco')) return { slug: 'gooding', name: 'Gooding & Company', category: 'auction', isAuction: true };
+  if (urlLower.includes('pcarmarket')) return { slug: 'pcarmarket', name: 'PCarMarket', category: 'auction', isAuction: true };
+
+  // NON-AUCTION sites - snapshots are generally complete/reliable
+  if (urlLower.includes('ebay.com')) return { slug: 'ebay', name: 'eBay Motors', category: 'marketplace', isAuction: false };
+  if (urlLower.includes('hemmings.com')) return { slug: 'hemmings', name: 'Hemmings', category: 'marketplace', isAuction: false };
+  if (urlLower.includes('classic.com')) return { slug: 'classic-com', name: 'Classic.com', category: 'aggregator', isAuction: false };
+  if (urlLower.includes('craigslist')) return { slug: 'craigslist', name: 'Craigslist', category: 'marketplace', isAuction: false };
 
   return null;
+}
+
+// Determine what kind of observation this Wayback snapshot represents
+function categorizeWaybackSnapshot(sourceInfo: { isAuction: boolean } | null): {
+  observationKind: string;
+  confidenceNote: string;
+  usefulFor: string[];
+  notUsefulFor: string[];
+} {
+  if (sourceInfo?.isAuction) {
+    return {
+      observationKind: 'sighting',  // NOT 'sale_result' - we don't know if auction completed
+      confidenceNote: 'Auction snapshot - may be mid-auction, price/comments likely incomplete',
+      usefulFor: ['vehicle_existed', 'photos', 'description', 'seller_identity', 'listing_date'],
+      notUsefulFor: ['final_price', 'complete_comments', 'bid_history', 'sale_result'],
+    };
+  }
+
+  return {
+    observationKind: 'listing',
+    confidenceNote: 'Non-auction source - snapshot likely represents complete listing state',
+    usefulFor: ['price', 'photos', 'description', 'seller_identity', 'specifications'],
+    notUsefulFor: [],
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -185,6 +212,7 @@ Deno.serve(async (req: Request) => {
       const sourceInfo = identifySourceFromUrl(snapshot.original);
       const waybackUrl = getWaybackUrl(snapshot.timestamp, snapshot.original);
       const observedAt = waybackTimestampToDate(snapshot.timestamp);
+      const snapshotCategory = categorizeWaybackSnapshot(sourceInfo);
 
       // Get source ID if we know this source
       let originalSourceId = null;
@@ -198,6 +226,8 @@ Deno.serve(async (req: Request) => {
       }
 
       // Create observation with lineage
+      // IMPORTANT: For auctions, this is a SIGHTING not a sale_result
+      // We cannot trust price/comments from mid-auction snapshots
       const observationData = {
         vehicle_id: vehicle_id || null,
 
@@ -210,17 +240,26 @@ Deno.serve(async (req: Request) => {
         source_url: waybackUrl,
         source_identifier: snapshot.digest,
 
-        // Observation type
-        kind: 'listing',
-        content_text: `Historical listing found via Wayback Machine from ${sourceInfo?.name || domain}`,
+        // Observation type - SIGHTING for auctions (we don't know if it completed)
+        kind: snapshotCategory.observationKind,
+        content_text: sourceInfo?.isAuction
+          ? `Historical auction SIGHTING via Wayback - ${sourceInfo?.name || domain} (may be mid-auction, price unreliable)`
+          : `Historical listing found via Wayback Machine from ${sourceInfo?.name || domain}`,
 
-        // Structured data
+        // Structured data - clearly mark auction limitations
         structured_data: {
           vin: vin.toUpperCase(),
           original_url: snapshot.original,
           wayback_timestamp: snapshot.timestamp,
           original_source: sourceInfo?.name || domain,
           archive_url: waybackUrl,
+          // CRITICAL: Flag auction snapshots as potentially incomplete
+          is_auction_source: sourceInfo?.isAuction || false,
+          data_quality_warning: sourceInfo?.isAuction
+            ? 'Auction snapshot - price and comments may be incomplete (mid-auction)'
+            : null,
+          useful_for: snapshotCategory.usefulFor,
+          not_useful_for: snapshotCategory.notUsefulFor,
         },
 
         // Lineage - track the data path
@@ -228,12 +267,16 @@ Deno.serve(async (req: Request) => {
         original_source_url: snapshot.original,
         discovered_via_id: waybackSourceId,
 
-        // High confidence - Wayback is extremely reliable
-        confidence: 'verified',
-        confidence_score: 0.95,
+        // Confidence varies by source type:
+        // - Auctions: MEDIUM (we don't know auction state)
+        // - Non-auctions: HIGH (snapshot is generally complete)
+        confidence: sourceInfo?.isAuction ? 'medium' : 'high',
+        confidence_score: sourceInfo?.isAuction ? 0.60 : 0.90,
         confidence_factors: {
-          archive_source: 0.2,
+          archive_source: 0.15,
           timestamp_verified: 0.1,
+          auction_state_unknown: sourceInfo?.isAuction ? -0.25 : 0,
+          price_may_be_incomplete: sourceInfo?.isAuction ? -0.15 : 0,
         },
 
         // Not processed - will need content extraction
@@ -243,6 +286,8 @@ Deno.serve(async (req: Request) => {
           extractor: 'search-wayback-vin',
           search_vin: vin,
           wayback_digest: snapshot.digest,
+          is_auction_source: sourceInfo?.isAuction || false,
+          snapshot_category: snapshotCategory,
         },
       };
 
@@ -262,6 +307,10 @@ Deno.serve(async (req: Request) => {
           original_url: snapshot.original,
           observed_at: observedAt,
           source: sourceInfo?.name || domain,
+          is_auction: sourceInfo?.isAuction || false,
+          data_warning: sourceInfo?.isAuction
+            ? 'Auction snapshot - price/comments may be incomplete'
+            : null,
         });
 
         // Record lineage chain
@@ -310,15 +359,32 @@ Deno.serve(async (req: Request) => {
       })
       .eq('vin', vin.toUpperCase());
 
+    // Separate auction vs non-auction observations for clarity
+    const auctionObs = observations.filter(o => o.is_auction);
+    const nonAuctionObs = observations.filter(o => !o.is_auction);
+
     return new Response(
       JSON.stringify({
         success: true,
         vin: vin.toUpperCase(),
         snapshots_found: allSnapshots.length,
         observations_recorded: observations.length,
+
+        // Break down by reliability
+        summary: {
+          reliable_listings: nonAuctionObs.length,  // Dealers, classifieds - price is trustworthy
+          auction_sightings: auctionObs.length,     // Auctions - existence confirmed, price NOT trustworthy
+        },
+
+        // Warning about auction data
+        data_quality_note: auctionObs.length > 0
+          ? `${auctionObs.length} auction snapshots found - these confirm vehicle existed but price/comments may be mid-auction (incomplete). Use for provenance/photos, not final sale data.`
+          : null,
+
         timeline: observations.sort((a, b) => a.observed_at.localeCompare(b.observed_at)),
+
         message: observations.length > 0
-          ? `Found ${observations.length} historical listings - timeline data added`
+          ? `Found ${observations.length} historical records (${nonAuctionObs.length} reliable, ${auctionObs.length} auction sightings)`
           : 'No historical listings found in Wayback Machine',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -7,6 +7,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,6 +84,52 @@ serve(async (req) => {
 
     // Validate and normalize extracted data
     const normalized = normalizeExtractedData(extractedJson, url)
+
+    // === FIELD-LEVEL EXTRACTION HEALTH LOGGING ===
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    const overallConfidence = extractedJson.confidence || 0.8
+    const healthLogger = new ExtractionLogger(supabase, {
+      source: source || 'unknown',
+      extractorName: 'extract-vehicle-data-ai',
+      extractorVersion: '1.0',
+      sourceUrl: url,
+      lowConfidenceThreshold: 0.6,
+    })
+
+    // Log each field with AI's confidence (scaled by per-field presence)
+    healthLogger.logField('vin', normalized.vin, normalized.vin ? overallConfidence : 0)
+    if (normalized.vin) {
+      const vinValidation = validateVin(normalized.vin)
+      if (!vinValidation.valid) {
+        healthLogger.logValidationFail('vin', normalized.vin, vinValidation.errorCode!, vinValidation.errorDetails)
+      }
+    }
+    healthLogger.logField('year', normalized.year, normalized.year ? overallConfidence : 0)
+    healthLogger.logField('make', normalized.make, normalized.make ? overallConfidence * 0.95 : 0)
+    healthLogger.logField('model', normalized.model, normalized.model ? overallConfidence * 0.90 : 0)
+    healthLogger.logField('series', normalized.series, normalized.series ? overallConfidence * 0.85 : 0)
+    healthLogger.logField('trim', normalized.trim, normalized.trim ? overallConfidence * 0.80 : 0)
+    healthLogger.logField('mileage', normalized.mileage, normalized.mileage ? overallConfidence * 0.85 : 0)
+    healthLogger.logField('price', normalized.price, normalized.price ? overallConfidence * 0.90 : 0)
+    healthLogger.logField('sold_price', normalized.sold_price, normalized.sold_price ? overallConfidence * 0.95 : 0)
+    healthLogger.logField('exterior_color', normalized.exterior_color, normalized.exterior_color ? overallConfidence * 0.80 : 0)
+    healthLogger.logField('interior_color', normalized.interior_color, normalized.interior_color ? overallConfidence * 0.75 : 0)
+    healthLogger.logField('transmission', normalized.transmission, normalized.transmission ? overallConfidence * 0.85 : 0)
+    healthLogger.logField('drivetrain', normalized.drivetrain, normalized.drivetrain ? overallConfidence * 0.80 : 0)
+    healthLogger.logField('engine', normalized.engine, normalized.engine ? overallConfidence * 0.80 : 0)
+    healthLogger.logField('body_style', normalized.body_style, normalized.body_style ? overallConfidence * 0.80 : 0)
+    healthLogger.logField('description', normalized.description, normalized.description ? overallConfidence * 0.95 : 0)
+    healthLogger.logField('images', normalized.image_urls?.length > 0 ? normalized.image_urls.length : null,
+                          normalized.image_urls?.length > 0 ? overallConfidence * 0.90 : 0)
+    healthLogger.logField('location', normalized.location, normalized.location ? overallConfidence * 0.85 : 0)
+    healthLogger.logField('seller', normalized.seller, normalized.seller ? overallConfidence * 0.80 : 0)
+
+    // Flush logs in background
+    healthLogger.flush().catch(err => console.error('Health log flush error:', err))
 
     return new Response(
       JSON.stringify({

@@ -4,6 +4,7 @@ import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { normalizeListingLocation } from "../_shared/normalizeListingLocation.ts";
 import { extractGalleryImagesFromHtml } from "../_shared/batDomMap.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
+import { ExtractionLogger, validateVin } from "../_shared/extractionHealth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -2738,6 +2739,48 @@ serve(async (req) => {
           message: 'Inserted vehicles row (initial form baseline)',
           data: { queue_id: item.id, vehicle_id: newVehicle.id, year, make, model, status: 'pending', is_public: false, org_id: organizationId || null },
         });
+
+        // === FIELD-LEVEL EXTRACTION HEALTH LOGGING ===
+        const healthLogger = new ExtractionLogger(supabase, {
+          source: listingHost || 'unknown',
+          extractorName: 'process-import-queue',
+          extractorVersion: '1.0',
+          sourceUrl: item.listing_url,
+          vehicleId: newVehicle.id,
+          lowConfidenceThreshold: 0.5,
+        });
+
+        // Log each extracted field with quality assessment
+        healthLogger.logField('year', year, year ? 0.95 : 0);
+        healthLogger.logField('make', make, make ? 0.90 : 0);
+        healthLogger.logField('model', model, model ? 0.85 : 0);
+
+        // VIN with validation
+        if (safeVin) {
+          const vinValidation = validateVin(safeVin);
+          if (vinValidation.valid) {
+            healthLogger.logField('vin', safeVin, safeVin.length === 17 ? 0.90 : 0.70);
+          } else {
+            healthLogger.logValidationFail('vin', safeVin, vinValidation.errorCode!, vinValidation.errorDetails);
+          }
+        } else {
+          healthLogger.logField('vin', null, 0);
+        }
+
+        healthLogger.logField('mileage', scrapeData?.data?.mileage, scrapeData?.data?.mileage ? 0.80 : 0);
+        healthLogger.logField('asking_price', scrapeData?.data?.asking_price || scrapeData?.data?.price,
+                              (scrapeData?.data?.asking_price || scrapeData?.data?.price) ? 0.85 : 0);
+        healthLogger.logField('description', scrapeData?.data?.description, scrapeData?.data?.description ? 0.90 : 0);
+        healthLogger.logField('images', scrapeData?.data?.images?.length || 0,
+                              scrapeData?.data?.images?.length > 0 ? 0.95 : 0);
+        healthLogger.logField('location', scrapeData?.data?.location, scrapeData?.data?.location ? 0.75 : 0);
+        healthLogger.logField('transmission', scrapeData?.data?.transmission, scrapeData?.data?.transmission ? 0.80 : 0);
+        healthLogger.logField('drivetrain', scrapeData?.data?.drivetrain, scrapeData?.data?.drivetrain ? 0.80 : 0);
+        healthLogger.logField('exterior_color', scrapeData?.data?.color || scrapeData?.data?.exterior_color,
+                              (scrapeData?.data?.color || scrapeData?.data?.exterior_color) ? 0.75 : 0);
+
+        // Flush logs in background (non-blocking)
+        healthLogger.flush().catch(err => console.warn('Health log flush error:', err));
 
         // Best-effort: persist BHCC numeric stock number into origin_metadata for future sold monitoring.
         // Do not fail queue processing if this write fails.

@@ -16,7 +16,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const BATCH_SIZE = parseInt(process.argv[2]) || 20;
 const MAX_PAGES = parseInt(process.argv[3]) || 500;
-const ORG_ID = 'c124e282-a99c-4c9a-971d-65a0ddc03224';
+// Edge function handles org linking automatically
 
 let totalSuccess = 0;
 let totalFailed = 0;
@@ -119,7 +119,7 @@ async function discoverSoldListings(page) {
     for (const m of markdown.matchAll(mdPattern)) {
       if (isValidCabUrl(m[1])) {
         listings.add(`https://carsandbids.com/auctions/${m[1]}`);
-      listings.add(cleanUrl);
+      }
     }
 
     return [...listings];
@@ -131,66 +131,27 @@ async function discoverSoldListings(page) {
 
 async function extractListing(url) {
   try {
-    // Use Firecrawl to scrape
-    const scrapeRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url,
-        formats: ['rawHtml'],
-        waitFor: 8000,
-        timeout: 45000,
-      }),
-    });
-
-    const scrapeData = await scrapeRes.json();
-    if (!scrapeData.success) {
-      return { success: false, error: 'Scrape failed' };
-    }
-
-    const html = scrapeData.data?.rawHtml || '';
-    if (html.length < 1000) {
-      return { success: false, error: 'No content' };
-    }
-
-    // Call edge function to extract and save
+    // Call edge function directly - it has better Firecrawl options
+    // (LLM extraction schema, scroll actions, markdown format)
     const extractRes = await fetch(`${SUPABASE_URL}/functions/v1/extract-cars-and-bids-core`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        url,
-        html,
-        save_to_db: true,
-      }),
+      body: JSON.stringify({ url }),
     });
 
     const result = await extractRes.json();
 
     if (result.success && result.vehicle_id) {
-      // Link to org
-      await fetch(`${SUPABASE_URL}/rest/v1/organization_vehicles`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'apikey': SUPABASE_KEY,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=ignore-duplicates,return=minimal',
-        },
-        body: JSON.stringify({
-          organization_id: ORG_ID,
-          vehicle_id: result.vehicle_id,
-          relationship_type: 'sold_by',
-          auto_tagged: true,
-        }),
-      });
-
-      return { success: true, title: result.title || result.vehicle?.title };
+      return {
+        success: true,
+        title: result.extracted ?
+          `${result.extracted.year} ${result.extracted.make} ${result.extracted.model}` :
+          result.title,
+        extracted: result.extracted,
+      };
     }
 
     return { success: false, error: result.error || 'Extract failed' };
