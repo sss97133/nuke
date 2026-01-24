@@ -497,7 +497,7 @@ async function extractBonhamsListing(url: string): Promise<BonhamsExtracted> {
   // Use Firecrawl for JS rendering (Bonhams requires it)
   const result = await firecrawlScrape({
     url,
-    formats: ['html'],
+    formats: ['html', 'markdown'],
     waitFor: 5000,  // Wait for JS to load images
     onlyMainContent: false,
   });
@@ -507,17 +507,90 @@ async function extractBonhamsListing(url: string): Promise<BonhamsExtracted> {
   }
 
   const html = result.data.html;
+  const markdown = result.data.markdown || '';
   const costCents = 1; // Standard Firecrawl cost
 
-  console.log(`[Bonhams] Firecrawl returned ${html.length} bytes`);
+  console.log(`[Bonhams] Firecrawl returned ${html.length} bytes HTML, ${markdown.length} bytes markdown`);
 
-  // Extract all data
-  const titleData = extractTitle(html);
-  const vinData = extractVinOrChassis(html);
-  const auctionData = extractAuctionData(html);
+  // Try markdown extraction first for cleaner data (cars.bonhams.com returns good markdown)
+  let titleData = { title: null as string | null, year: null as number | null, make: null as string | null, model: null as string | null };
+
+  // Markdown title pattern: "# _description_ 1981 Lamborghini Countach..." or "# 1981 Lamborghini..."
+  const mdTitleMatch = markdown.match(/^#\s+(?:_[^_]+_\s+)?(\d{4}\s+[^\n]+)/m);
+  if (mdTitleMatch) {
+    const rawTitle = mdTitleMatch[1].trim();
+    const yearMatch = rawTitle.match(/^(\d{4})/);
+    const year = yearMatch ? parseInt(yearMatch[1]) : null;
+    if (year) {
+      const afterYear = rawTitle.slice(4).trim();
+      const parts = afterYear.split(/\s+/);
+      titleData = {
+        title: rawTitle,
+        year,
+        make: parts[0] || null,
+        model: parts.slice(1).join(' ') || null,
+      };
+    }
+  }
+
+  // Fall back to HTML extraction if markdown didn't work
+  if (!titleData.title) {
+    titleData = extractTitle(html);
+  }
+
+  // Extract chassis from markdown first: "Chassis no. 1121412"
+  let vinData = extractVinOrChassis(html);
+  const mdChassisMatch = markdown.match(/Chassis\s+no\.?\s*([A-Z0-9]+)/i);
+  if (mdChassisMatch) {
+    vinData.chassis = mdChassisMatch[1];
+  }
+  // Also try "Engine no. 1638115"
+  const mdEngineMatch = markdown.match(/Engine\s+no\.?\s*([A-Z0-9]+)/i);
+
+  // Try markdown for sold price first: "Sold for £546,250 inc. premium"
+  let auctionData = extractAuctionData(html);
+  const mdSoldMatch = markdown.match(/Sold for\s*([£€$])([\d,]+)/i);
+  if (mdSoldMatch) {
+    const currencySymbol = mdSoldMatch[1];
+    const currency = currencySymbol === '£' ? 'GBP' : currencySymbol === '€' ? 'EUR' : 'USD';
+    auctionData.total_price = parseInt(mdSoldMatch[2].replace(/,/g, ''));
+    auctionData.price_currency = currency;
+    auctionData.auction_status = 'sold';
+    // Clear bad hammer_price/buyers_premium if we got markdown price
+    auctionData.hammer_price = null;
+    auctionData.buyers_premium = null;
+  }
+
+  // Extract estimate from markdown: "Estimate:€580,000 - €700,000" or "£450,000 - £550,000"
+  const mdEstimateMatch = markdown.match(/Estimate[:\s]*([£€$])([\d,]+)\s*[-–]\s*([£€$])?([\d,]+)/i);
+  if (mdEstimateMatch) {
+    const currency = mdEstimateMatch[1] === '£' ? 'GBP' : mdEstimateMatch[1] === '€' ? 'EUR' : 'USD';
+    auctionData.estimate_low = parseInt(mdEstimateMatch[2].replace(/,/g, ''));
+    auctionData.estimate_high = parseInt(mdEstimateMatch[4].replace(/,/g, ''));
+    auctionData.estimate_currency = currency;
+  }
+
+  // Extract lot number from markdown "LOT 104"
+  const mdLotMatch = markdown.match(/^LOT\s+(\d+)/m);
+  if (mdLotMatch) {
+    auctionData.lot_number = mdLotMatch[1];
+  }
+
   const specs = extractSpecs(html);
   const content = extractContent(html);
-  const images = extractImages(html);
+
+  // Extract images from markdown first (format: ![...](https://cars.bonhams.com/_next/image...))
+  let images = [...markdown.matchAll(/!\[[^\]]*\]\((https:\/\/(?:cars\.)?bonhams\.com\/_next\/image[^)]+)\)/gi)]
+    .map(m => m[1])
+    .filter(url => url.includes('.jpg') || url.includes('.png') || url.includes('.webp'));
+
+  // Dedupe and add HTML images if needed
+  if (images.length < 5) {
+    const htmlImages = extractImages(html);
+    images = [...new Set([...images, ...htmlImages])];
+  } else {
+    images = [...new Set(images)];
+  }
 
   console.log(`[Bonhams] Extracted: ${titleData.title}`);
   console.log(`[Bonhams] Year/Make/Model: ${titleData.year} ${titleData.make} ${titleData.model}`);

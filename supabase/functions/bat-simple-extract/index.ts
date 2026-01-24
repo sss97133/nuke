@@ -713,6 +713,7 @@ serve(async (req) => {
             discovery_source: 'bat',
             is_public: true,
             sale_status: extracted.sale_price ? 'sold' : 'available',
+            status: 'active',
           })
           .select()
           .single();
