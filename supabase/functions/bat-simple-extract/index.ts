@@ -310,20 +310,31 @@ function extractSpecs(html: string): {
   const descMatch = html.match(/<div[^>]*class="post-excerpt"[^>]*>([\s\S]*?)<\/div>\s*<script/i);
   const descText = descMatch ? descMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') : html;
   
-  // Mileage - from description patterns
+  // Mileage - from description patterns (ordered by specificity)
   let mileage: number | null = null;
   const mileagePatterns = [
+    // Most specific patterns first
     /odometer\s+(?:indicates|shows|reads)\s+([0-9,]+)\s*k?\s*miles/i,
     /([0-9,]+)\s*k?\s*miles\s+(?:are|were)\s+(?:shown|indicated)/i,
-    /shows?\s+([0-9,]+)\s*k?\s*miles/i,
-    /([0-9,]+)\s*k\s+miles/i,
+    // "shows" with optional words like "just", "only", "approximately"
+    /shows?\s+(?:just\s+|only\s+|approximately\s+|roughly\s+|about\s+)?([0-9,]+)\s*k?\s*miles/i,
+    // "has" pattern - very common: "has 27,802 documented miles"
+    /has\s+(?:just\s+|only\s+|approximately\s+)?([0-9,]+)\s*k?\s*(?:documented\s+)?miles/i,
+    // "with" pattern: "with 12k miles"
+    /with\s+(?:just\s+|only\s+|approximately\s+)?([0-9,]+)\s*k?\s*miles/i,
+    // "indicates" without "odometer"
+    /indicates\s+([0-9,]+)\s*k?\s*miles/i,
+    // "Xk miles" standalone - must be at word boundary
+    /\b([0-9,]+)\s*k\s+miles\b/i,
+    // Generic "X miles" at start of sentence or after common words
+    /(?:^|\.\s+)(?:this\s+\w+\s+)?(?:shows?\s+|has\s+|with\s+)?([0-9,]+)\s+miles\b/i,
   ];
   for (const pattern of mileagePatterns) {
     const match = descText.match(pattern);
     if (match) {
       let num = parseInt(match[1].replace(/,/g, ''));
-      // Handle "18k" notation
-      if (match[0].toLowerCase().includes('k') && num < 1000) {
+      // Handle "18k" notation - check if "k" appears after the number
+      if (match[0].toLowerCase().match(/[0-9,]+\s*k\s+miles/i) && num < 1000) {
         num = num * 1000;
       }
       mileage = num;
@@ -855,10 +866,30 @@ serve(async (req) => {
         console.log(`Created ${events.length} timeline events`);
       }
       
-      // NOTE: Comment extraction removed from bat-simple-extract
-      // Comments should be extracted using extract-auction-comments function
-      // which properly parses DOM, uses content_hash for deduplication, and links to auction_events
-      // This function only extracts vehicle data, images, and metadata - NOT comments
+      // Trigger comment extraction asynchronously (don't block the response)
+      // extract-auction-comments handles: JSON parsing, content_hash deduplication, external_identities, AI analysis
+      if (extracted.vehicle_id && extracted.url) {
+        const commentExtractionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/extract-auction-comments`;
+        fetch(commentExtractionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            auction_url: extracted.url,
+            vehicle_id: extracted.vehicle_id,
+          }),
+        }).then(res => {
+          if (res.ok) {
+            console.log(`Comment extraction triggered for ${extracted.vehicle_id}`);
+          } else {
+            res.text().then(t => console.error(`Comment extraction failed: ${res.status} - ${t}`));
+          }
+        }).catch(e => {
+          console.error(`Failed to trigger comment extraction: ${e.message}`);
+        });
+      }
     }
 
     return new Response(

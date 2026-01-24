@@ -164,6 +164,8 @@ serve(async (req) => {
     const vehicleId = body.vehicle_id;
     const batchSize = Math.min(body.batch_size || 5, 10);
     const minComments = body.min_comments ?? 20;
+    // NEW: source param - "auction_comments" (legacy 1.37M) or "vehicle_observations" (new)
+    const source = body.source || "auction_comments"; // Default to legacy for full coverage
 
     let vehiclesToProcess: any[] = [];
 
@@ -174,8 +176,62 @@ serve(async (req) => {
         .eq("id", vehicleId)
         .single();
       if (vehicle) vehiclesToProcess = [vehicle];
+    } else if (source === "auction_comments") {
+      // USE bat_listings to find vehicles with comments (has comment_count metadata)
+      // Then verify they have extracted comments in auction_comments
+
+      // Get already discovered vehicle_ids first
+      const { data: alreadyDiscovered } = await supabase
+        .from("comment_discoveries")
+        .select("vehicle_id");
+      const discoveredIds = new Set((alreadyDiscovered || []).map((d: any) => d.vehicle_id));
+      console.log(`Already discovered: ${discoveredIds.size}`);
+
+      // Get bat_listings with comments, ordered by comment_count desc
+      const { data: batListings } = await supabase
+        .from("bat_listings")
+        .select("vehicle_id, comment_count")
+        .gt("comment_count", minComments)
+        .not("vehicle_id", "is", null)
+        .order("comment_count", { ascending: false })
+        .limit(500);
+
+      if (batListings) {
+        // Filter to undiscovered
+        const undiscoveredListings = batListings.filter(
+          (bl: any) => bl.vehicle_id && !discoveredIds.has(bl.vehicle_id)
+        );
+        console.log(`bat_listings with ${minComments}+ comments: ${batListings.length}`);
+        console.log(`Undiscovered: ${undiscoveredListings.length}`);
+
+        // Take batch and verify they have actual comments in auction_comments
+        const candidateIds = undiscoveredListings.slice(0, batchSize * 2).map((bl: any) => bl.vehicle_id);
+
+        if (candidateIds.length > 0) {
+          // Get vehicle details
+          const { data: vehicles } = await supabase
+            .from("vehicles")
+            .select("id, year, make, model, sale_price")
+            .in("id", candidateIds)
+            .order("sale_price", { ascending: false, nullsFirst: false });
+
+          if (vehicles) {
+            // For each vehicle, verify comments exist and get count
+            for (const v of vehicles.slice(0, batchSize)) {
+              const { count } = await supabase
+                .from("auction_comments")
+                .select("id", { count: "exact", head: true })
+                .eq("vehicle_id", v.id);
+
+              if ((count || 0) >= 10) {
+                vehiclesToProcess.push({ ...v, comment_count: count });
+              }
+            }
+          }
+        }
+      }
     } else {
-      // Get distinct vehicle_ids that have comments in vehicle_observations
+      // Use vehicle_observations (new system)
       const { data: commentSamples } = await supabase
         .from("vehicle_observations")
         .select("vehicle_id")
@@ -244,22 +300,41 @@ serve(async (req) => {
 
     for (const vehicle of vehiclesToProcess) {
       try {
-        // Get comments from vehicle_observations
-        const { data: rawComments } = await supabase
-          .from("vehicle_observations")
-          .select("content_text, structured_data, observed_at")
-          .eq("kind", "comment")
-          .eq("vehicle_id", vehicle.id)
-          .order("observed_at", { ascending: true })
-          .limit(150);
+        let comments: any[] = [];
 
-        // Transform to expected format
-        const comments = (rawComments || []).map((c: any) => ({
-          author_username: c.structured_data?.author_username || 'unknown',
-          comment_text: c.content_text,
-          is_seller: c.structured_data?.is_seller || false,
-          created_at: c.observed_at,
-        }));
+        if (source === "auction_comments") {
+          // Get comments from legacy auction_comments table
+          const { data: rawComments } = await supabase
+            .from("auction_comments")
+            .select("comment_text, author_username, is_seller, posted_at, bid_amount")
+            .eq("vehicle_id", vehicle.id)
+            .order("posted_at", { ascending: true })
+            .limit(150);
+
+          comments = (rawComments || []).map((c: any) => ({
+            author_username: c.author_username || 'unknown',
+            comment_text: c.comment_text,
+            is_seller: c.is_seller || false,
+            created_at: c.posted_at,
+            bid_amount: c.bid_amount,
+          }));
+        } else {
+          // Get comments from vehicle_observations
+          const { data: rawComments } = await supabase
+            .from("vehicle_observations")
+            .select("content_text, structured_data, observed_at")
+            .eq("kind", "comment")
+            .eq("vehicle_id", vehicle.id)
+            .order("observed_at", { ascending: true })
+            .limit(150);
+
+          comments = (rawComments || []).map((c: any) => ({
+            author_username: c.structured_data?.author_username || 'unknown',
+            comment_text: c.content_text,
+            is_seller: c.structured_data?.is_seller || false,
+            created_at: c.observed_at,
+          }));
+        }
 
         if (!comments || comments.length < 10) {
           results.errors++;

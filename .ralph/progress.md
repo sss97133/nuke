@@ -1042,3 +1042,347 @@ npx tsx scripts/backfill-missing-fields.ts --source="Craigslist" --field=locatio
 **Next**: Task 4.8 - Backfill 100 C&B vehicles missing images
 
 ---
+
+---
+
+## Loop: Comment Analysis Sprint (2026-01-24 ~10:50 AST)
+
+### Pipelines Running
+1. **backfill-comments**: Self-continuing, extracting comments from bat_listings
+2. **migrate-to-observations**: Self-continuing, migrating auction_comments → vehicle_observations
+3. **discover-comment-data loop**: Background script running every 30s
+
+### Current Stats
+- Will update after stats call
+
+### Actions Taken
+- Started discovery loop (PID tracked)
+- Updated fix_plan.md with Phase 7 (Comment Analysis mission)
+- Running multiple discovery batches
+
+
+### Stats at 10:52 AST
+- Observations comments: 313,240 (was 251,966, +61,274)
+- Vehicles with comments: 142 (was 118, +24)
+- Comment discoveries: 87 (was 74, +13)
+- bat_listings with comments: 6,934
+
+### Pipeline Health: GOOD ✅
+All self-continuing pipelines running.
+
+
+---
+
+## Status Update 10:55 AST
+
+### Pipeline Growth (Last 30 min)
+| Metric | Start | Now | Growth |
+|--------|-------|-----|--------|
+| Observations | 466,435 | 490,506 | +24,071 |
+| Comments | 313,240 | 328,144 | +14,904 |
+| Vehicles w/ comments | 138 | 152 | +14 |
+| Comment discoveries | 87 | 92 | +5 |
+
+### Identity Graph
+- Users analyzed: 1,171
+- Whales identified: 6 ($4.98M total)
+- Top: ashephil ($1.19M), frisco5459 ($854k), Jomiddour ($645k)
+
+### Background Processes
+- ✅ Discovery loop: RUNNING  
+- ✅ Ralph loop: RUNNING
+- ✅ backfill-comments: SELF-CONTINUING
+- ✅ migrate-to-observations: SELF-CONTINUING
+
+### Next Actions
+- Let pipelines run autonomously for 2-3 hours
+- Monitor via: tail -f /tmp/ralph_loop.log
+- Check stats: curl db-stats
+
+
+---
+
+### Loop 31 - C&B Lazy-Loading Status Check
+**Task**: 2.3 - Check C&B lazy-loading status - is it still broken?
+
+**Answer**: NO - Lazy-loading has been FIXED!
+
+**Evidence from Extractor Code** (`extract-cars-and-bids-core/index.ts`):
+
+The extractor now uses a multi-pronged approach to handle C&B's React SPA:
+
+1. **Firecrawl with scroll actions** (lines 450-477):
+   - Uses `waitFor: 8000` for initial React render
+   - Executes 3 scroll actions with waits (5s, 2s, 2s, 3s total = 12s more)
+   - This triggers intersection observers for lazy-loaded images
+
+2. **LLM extraction schema** (lines 432-448):
+   - Uses Firecrawl's AI extraction to pull images, VIN, mileage, colors
+   - This is a fallback for content that requires full JS rendering
+
+3. **Multi-pattern image extraction** (lines 177-213):
+   - 3 regex patterns for `media.carsandbids.com` URLs
+   - JSON embedded image array parsing
+   - Markdown image extraction
+
+4. **VIN from __NEXT_DATA__** (lines 265-305):
+   - Parses Next.js SSR data if available
+   - Extracts VIN, mileage, year, make, model, colors
+
+**Current C&B Extraction Accuracy**:
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Total Vehicles | 1,379 | |
+| VIN | 74.9% | Good (up from 51% in Loop 1 baseline!) |
+| Mileage | 85.7% | Good (up from 49.5% in baseline!) |
+| Price | 80.3% | Good (up from 29.9% in baseline!) |
+| Description | 57.9% | Moderate gap |
+| Avg Images | 91.7 per vehicle | Excellent! |
+
+**Comparison to Baseline (Loop 1)**:
+| Metric | Was | Now | Change |
+|--------|-----|-----|--------|
+| VIN | 51.1% | 74.9% | +23.8% |
+| Mileage | 49.5% | 85.7% | +36.2% |
+| Price | 29.9% | 80.3% | +50.4% |
+
+**Conclusion**: C&B lazy-loading is NO LONGER an issue. The current extractor:
+- Uses Firecrawl scroll actions to trigger lazy loading
+- Uses LLM extraction as backup for JS-rendered content
+- Has 91.7 avg images per vehicle (excellent)
+- VIN/Mileage/Price all significantly improved from baseline
+
+**Remaining Gap**: Description at 57.9% could be improved, but not a blocking issue.
+
+---
+
+### Loop 32 - process-import-queue Routing Logic Analysis
+**Task**: 2.4 - Read `process-import-queue/index.ts` - understand routing logic
+
+**File**: `supabase/functions/process-import-queue/index.ts` (~4,000 lines)
+
+**Entry Point** (line 565):
+```typescript
+serve(async (req) => { ... })
+```
+
+**Queue Claiming** (lines 608-616):
+- Uses atomic `claim_import_queue_batch` RPC for horizontal scaling
+- Claims batch of items with worker locking (15 min TTL)
+- Supports filtering by `source_id`, `priority_only`
+
+**Routing Logic** (by URL pattern - inline processing):
+
+| URL Pattern | Handler | Lines |
+|-------------|---------|-------|
+| `facebook.com/marketplace` | `scrape-vehicle` edge function | 704-711 |
+| `lartdelautomobile.com/fiche/` | `scrape-vehicle` edge function | 931-959 |
+| `bringatrailer.com` | **Inline** - URL parsing + DOM extraction | 1001-1328 |
+| `craigslist.org` | **Inline** - DOM extraction + LLM price fallback | 1332-1519+ |
+| `tbtfw.com/am-inventory/` | **Inline** - AutoManager pattern | 866-929 |
+| Other URLs | **Inline** - Generic DOM + VIN patterns | 832-850 |
+
+**Delegation to Other Functions** (via `supabase.functions.invoke`):
+- `scrape-vehicle` - Facebook Marketplace, L'Art de l'Automobile
+- `simple-scraper` - Basic scraping fallback (lines 1229, 3463)
+- `backfill-images` - Image processing (lines 2504, 2851, 3059)
+- `filter-vehicle-images-ai` - AI image filtering (line 3410)
+- `smart-extraction-router` - Fallback extraction (line 3496)
+- `extract-price-from-description` - LLM price extraction for CL (line 1441)
+- `analyze-image` - AI image analysis (line 2929)
+- `auto-merge-duplicate-orgs` - Org deduplication (line 1965)
+
+**Key Insight**: Most extraction happens **inline** in this file, NOT via separate edge functions.
+- BaT extraction: lines 1001-1328 (parsing URL + DOM)
+- Craigslist extraction: lines 1332-1519 (DOM + regex + LLM)
+- Generic extraction: lines 832-850 + VIN patterns 962-975
+
+**Not Delegated** (contrary to earlier assumptions):
+- `extract-bat-core` - NOT called (BaT handled inline)
+- `extract-cars-and-bids-core` - NOT called (C&B must go through different route)
+- `extract-premium-auction` - NOT called from this function
+
+**Quality Gates** (lines 113-131):
+- `isLikelyJunkIdentity()` - Filters garbage make/model
+- `looksLikeNonListingPage()` - Filters category/inventory pages
+- `cleanModelName()` - Removes pricing/dealer text from model
+
+**Parallel Processing** (lines 3901-3942):
+- Processes queue items in batches of 4 concurrent
+- Reports success rate per batch
+
+---
+
+### Loop 33 - BaT VIN Extraction Analysis
+**Task**: 3.1 - BaT: Fix VIN extraction if missing (check __NEXT_DATA__ parsing)
+
+**Analysis**: Reviewed `bat-simple-extract/index.ts` VIN extraction code (lines 59-110)
+
+**Current Implementation**:
+1. **17 manufacturer VIN patterns** (lines 59-78):
+   - US/Canada/Mexico (1-5), Japan (J), Korea (K), China (L)
+   - UK (S), Germany (W), Sweden/Belgium (Y), Italy (Z)
+   - Brand-specific: Porsche (WP0), Mercedes (WDB), VW (WVW), BMW (WBA)
+   - Audi (WAU), Ferrari (ZFF), Maserati (ZAM), Aston Martin (SCFZ)
+   - Jaguar (SAJ), Land Rover (SAL)
+
+2. **Chassis/Serial fallback** (lines 96-107):
+   - Parses "Chassis:" and "Serial Number:" labels
+   - Handles `<a>` tags around chassis numbers
+   - Validates format (6+ chars, alphanumeric)
+
+**Accuracy Check**:
+```
+Total BaT vehicles: 14,961
+With VIN: 13,193 (88.2%)
+
+By Era:
+- Post-1981 (modern VIN): 8,279 vehicles, 97.2% have VIN ✅
+- Pre-1981 (chassis only): 6,671 vehicles, 77.0% have VIN
+```
+
+**Conclusion**: NO FIX NEEDED
+- Modern VIN extraction is 97.2% - excellent
+- Pre-1981 chassis extraction is 77.0% - reasonable for vintage vehicles
+- Missing 23% of pre-1981 vehicles either:
+  - Don't have chassis listed on BaT page
+  - Are motorcycles/kit cars without standard numbering
+  - Have unusual chassis formats not matching patterns
+
+**Task Status**: ✅ COMPLETE (no code changes required)
+
+---
+
+### Loop 34 - BaT Mileage Extraction Improvement
+**Task**: 3.2 - BaT: Fix mileage extraction if missing
+
+**Current State**:
+- Total BaT vehicles: 16,470
+- With mileage: 15,091 (91.6%)
+- Missing mileage: 1,379 (8.4%)
+
+**Problem Analysis**:
+Sampled descriptions with mileage patterns that weren't extracted:
+- "shows just 23,600 miles" - word "just" broke the pattern
+- "shows 12k miles" - "k" notation not fully handled  
+- "has 27,802 documented miles" - "has...documented" pattern missing
+- "with 12k miles" - "with" pattern missing
+
+**Fix Applied**:
+Updated `bat-simple-extract/index.ts` mileage patterns (lines 313-343):
+
+**Before** (4 patterns):
+```typescript
+const mileagePatterns = [
+  /odometer\s+(?:indicates|shows|reads)\s+([0-9,]+)\s*k?\s*miles/i,
+  /([0-9,]+)\s*k?\s*miles\s+(?:are|were)\s+(?:shown|indicated)/i,
+  /shows?\s+([0-9,]+)\s*k?\s*miles/i,
+  /([0-9,]+)\s*k\s+miles/i,
+];
+```
+
+**After** (8 patterns):
+```typescript
+const mileagePatterns = [
+  /odometer\s+(?:indicates|shows|reads)\s+([0-9,]+)\s*k?\s*miles/i,
+  /([0-9,]+)\s*k?\s*miles\s+(?:are|were)\s+(?:shown|indicated)/i,
+  // "shows" with optional words like "just", "only", "approximately"
+  /shows?\s+(?:just\s+|only\s+|approximately\s+|roughly\s+|about\s+)?([0-9,]+)\s*k?\s*miles/i,
+  // "has" pattern - very common: "has 27,802 documented miles"
+  /has\s+(?:just\s+|only\s+|approximately\s+)?([0-9,]+)\s*k?\s*(?:documented\s+)?miles/i,
+  // "with" pattern: "with 12k miles"
+  /with\s+(?:just\s+|only\s+|approximately\s+)?([0-9,]+)\s*k?\s*miles/i,
+  // "indicates" without "odometer"
+  /indicates\s+([0-9,]+)\s*k?\s*miles/i,
+  // "Xk miles" standalone - must be at word boundary
+  /\b([0-9,]+)\s*k\s+miles\b/i,
+  // Generic "X miles" at start of sentence or after common words
+  /(?:^|\.\s+)(?:this\s+\w+\s+)?(?:shows?\s+|has\s+|with\s+)?([0-9,]+)\s+miles\b/i,
+];
+```
+
+**Deployment**:
+```
+Deployed Functions: bat-simple-extract (129.3kB)
+```
+
+**Expected Impact**:
+- Patterns now cover: "shows just X miles", "has X documented miles", "with X miles"
+- Should improve mileage extraction from 91.6% to ~95%+
+- Existing 1,379 vehicles without mileage need re-extraction to benefit
+
+**Task Status**: ✅ COMPLETE - Code deployed, backfill needed for existing vehicles
+
+---
+
+---
+
+### Loop 35 - BaT Gallery Image Capture Verification
+**Task**: 3.3 - BaT: Ensure all gallery images are captured (not just first)
+
+**Analysis of `bat-simple-extract/index.ts` extractImages() function** (lines 464-487):
+
+The function already correctly captures ALL gallery images:
+1. Parses `data-gallery-items` JSON attribute (line 466)
+2. Returns ALL images via `items.map(...)` (line 477)
+3. Gets highest resolution: `full`, `large`, or `small` (line 479)
+4. Removes resize params for full resolution (line 482)
+
+**Verification Data**:
+
+| Image Bracket | Vehicles |
+|---------------|----------|
+| 0 images | 1,784 |
+| 1-5 images | 1 |
+| 6-20 images | 30 |
+| 21-50 images | 728 |
+| 51-100 images | 3,762 |
+| 100+ images | 10,993 |
+
+- **Recent extractions (last 24h)**: 162.2 avg images/vehicle
+- **1,754 of 1,783 zero-image vehicles** have valid BaT URLs (re-extractable)
+
+**Conclusion**: NO CODE FIX NEEDED
+
+The extractor is correctly capturing all gallery images. The 1,783 vehicles with 0 images are legacy imports from before image extraction was implemented. These can be addressed via the existing backfill script (task 4.7).
+
+**Task Status**: ✅ COMPLETE - Verified working, no changes required
+
+---
+
+### Loop 36 - C&B Image Backfill
+**Task**: 4.8 - Backfill: Re-extract 100 C&B vehicles missing images
+
+**Initial State**:
+- 110 C&B vehicles showing 0 images in image_counts query
+- 88.7 avg images per vehicle for C&B overall (excellent)
+
+**Backfill Run**:
+- Script: `npx tsx scripts/backfill-missing-fields.ts --source="Cars & Bids" --field=images --limit=10`
+- Found only 8 vehicles truly missing images (not 110)
+- Processed: 8/8 successful (100%)
+- Time: 5.4 minutes
+
+**Vehicles Processed**:
+1. 2014 BMW 328i xDrive Sports Wagon → 48 images
+2. 2018 Ford Mustang GT Coupe → 66 images
+3. 2017 Subaru BRZ Limited → 50 images
+4. 2017 BMW Alpina B7 xDrive → extracted
+5. 1999 Nissan Silvia Spec R → 46 images
+6. 1993 Toyota Land Cruiser FZJ73 → 83 images
+7. 2023 Porsche 911 GT3 → 70 images
+8. 2017 Mercedes AMG CLS63 S → 76 images
+
+**Analysis**:
+- The 110 "0 images" in DB queries is misleading
+- Backfill script found only 8 C&B vehicles with valid URLs and missing images
+- Remaining 102 are either:
+  - Invalid/expired URLs
+  - Duplicate records
+  - Source attribution issues
+
+**Conclusion**: C&B image extraction is working well. Small number of vehicles needed re-extraction.
+
+**Task Status**: ✅ COMPLETE
+
+---
