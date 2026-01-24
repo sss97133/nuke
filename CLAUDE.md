@@ -108,16 +108,105 @@ interface ExtractedVehicle {
 
 Project: `qkgaybvrernstplzjaam`
 
-Key tables:
-- `vehicles` - Core vehicle entities (~15k)
-- `vehicle_timeline_events` - Immutable event history
-- `vehicle_images` - All images (1M+)
-- `import_queue` - Staging pipeline (pending/processing/complete/failed)
-- `external_listings` - Live auction tracking
-- `external_identities` - Cross-platform user profiles
-- `scrape_sources` - Source configuration
+### FIRST: Check Quick Stats
+Before querying individual tables, get the big picture:
+```bash
+curl -sS "${VITE_SUPABASE_URL}/functions/v1/db-stats" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" | jq .
+```
+Returns:
+- `total_vehicles`, `total_comments`, `vehicles_with_comments`
+- `bat_top500_extracted/pending` - extraction progress for high-comment listings
+- `comment_discoveries`, `description_discoveries` - AI analysis counts
+
+**This shows the REAL data distribution** - don't trust naive COUNT queries.
+
+### Core Tables (300+ exist, these matter most)
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `vehicles` | Core entities (~18k) | id, year, make, model, vin, sale_price |
+| `auction_comments` | Extracted comments (~364k) | vehicle_id, comment_text, posted_at |
+| `bat_listings` | BaT source data (~4.4k) | vehicle_id, comment_count, comments_extracted_at |
+| `vehicle_images` | All images (1M+) | vehicle_id, url |
+| `auction_events` | Auction instances | vehicle_id, platform |
+| `comment_discoveries` | AI sentiment analysis | vehicle_id, overall_sentiment, sentiment_score |
+| `description_discoveries` | AI field extraction | vehicle_id, total_fields, raw_extraction |
+
+### Data Flow: BaT Comments
+```
+bat_listings (has comment_count)
+    → extract-auction-comments (scrapes BaT page)
+    → auction_comments (normalized rows)
+    → discover-comment-data (AI analysis)
+    → comment_discoveries (sentiment/themes)
+```
+
+### Tracking Extraction Progress
+```bash
+# Quick stats (includes extraction progress)
+curl -sS "${VITE_SUPABASE_URL}/functions/v1/db-stats" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" | jq '{extracted: .bat_top500_extracted, pending: .bat_top500_pending, pct: .bat_top500_progress_pct}'
+
+# Or check backfill status
+curl -sS -X POST "${VITE_SUPABASE_URL}/functions/v1/backfill-comments" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" -H "Content-Type: application/json" -d '{"batch_size": 0}'
+```
+
+### Common Pitfalls
+- **Don't count distinct vehicle_id with LIMIT** - you'll get wrong numbers
+- **bat_listings.comment_count** = expected comments, not extracted
+- **auction_comments** may have comments for only some vehicles
+- **Check `comments_extracted_at`** to know if extraction ran
 
 Use Supabase MCP for queries instead of raw SQL.
+
+## Observation System (New Architecture)
+
+The system is moving from auction-centric to source-agnostic. **All data points are "observations" with provenance.**
+
+### Core Tables
+
+| Table | Purpose |
+|-------|---------|
+| `observation_sources` | Registry of data sources (auctions, forums, social, etc.) |
+| `vehicle_observations` | Unified event store - ALL observations, ANY source |
+| `observation_extractors` | Config for how to extract from each source |
+| `observation_discoveries` | AI insights derived from observations |
+
+### Adding a New Source (Config, Not Code)
+
+```sql
+-- 1. Register source
+INSERT INTO observation_sources (slug, display_name, category, base_trust_score, supported_observations)
+VALUES ('xyz-auctions', 'XYZ Auctions', 'auction', 0.75, ARRAY['listing', 'comment', 'bid']);
+
+-- 2. Configure extractor (or write edge function)
+INSERT INTO observation_extractors (source_id, extractor_type, edge_function_name, produces_kinds)
+VALUES ((SELECT id FROM observation_sources WHERE slug = 'xyz-auctions'),
+        'edge_function', 'extract-xyz-listing', ARRAY['listing', 'comment']);
+```
+
+### Key Functions
+
+| Function | Purpose |
+|----------|---------|
+| `ingest-observation` | Unified intake - all extractors write through here |
+| `discover-from-observations` | Source-agnostic AI analysis |
+| `migrate-to-observations` | Port existing data to new system |
+| `db-stats` | Quick database overview |
+
+### Observation Flow
+```
+[Any Source] → ingest-observation → vehicle_observations → discover-from-observations → observation_discoveries
+```
+
+### Source Categories
+- `auction` - BaT, C&B, RM Sotheby's, Mecum, etc.
+- `forum` - Rennlist, Pelican Parts, model-specific
+- `social_media` - Instagram, YouTube
+- `marketplace` - eBay, Craigslist, Hagerty
+- `registry` - Marque registries, Hagerty valuation
+- `shop` - Service records, restoration shops
+- `owner` - Direct owner input
+- `documentation` - Titles, build sheets
 
 ## Project Structure
 
