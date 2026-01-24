@@ -1,10 +1,17 @@
 /**
  * DISCOVER SPEED DIGITAL CLIENTS V2
- * 
- * Enhanced discovery that:
+ *
+ * Philosophy: "All organizations provide a service or tool - understand the overlap"
+ *
+ * Speed Digital / DealerAccelerate is a WEBSITE BUILDER - they power dealer sites.
+ * This function:
  * 1. Scrapes Speed Digital /work page
  * 2. Searches for "Powered by SpeedDigital" footer pattern
- * 3. Discovers clients from known Speed Digital sites
+ * 3. Discovers clients and tags them with powered_by_org_id
+ * 4. Categorizes Speed Digital as 'website_builder' service_type
+ *
+ * The relationship: Speed Digital (platform) -> powers -> Dealer websites
+ * When we find data on a dealer site, we know it goes through Speed Digital's system.
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -128,6 +135,16 @@ Deno.serve(async (req) => {
     if (existingSD) {
       speedDigitalOrgId = existingSD.id;
       console.log(`   ✅ Speed Digital org exists: ${speedDigitalOrgId}`);
+
+      // Ensure proper service_type is set
+      await supabase
+        .from('businesses')
+        .update({
+          service_type: 'website_builder',
+          service_description: 'DealerAccelerate platform - powers 200+ classic car dealer websites. Acquired by Hagerty 2022.',
+          powers_other_orgs: true,
+        })
+        .eq('id', speedDigitalOrgId);
     } else {
       const { data: newSD, error: sdError } = await supabase
         .from('businesses')
@@ -136,6 +153,10 @@ Deno.serve(async (req) => {
           business_type: 'other',
           website: 'https://www.speeddigital.com',
           description: 'Leader in collector car websites and management systems. Provides technology for over 200 top automotive brands.',
+          // NEW: Proper service categorization
+          service_type: 'website_builder',
+          service_description: 'DealerAccelerate platform - powers 200+ classic car dealer websites. Acquired by Hagerty 2022.',
+          powers_other_orgs: true,
           metadata: {
             client_count: clients.length,
             services: ['website_design', 'cms', 'inventory_management'],
@@ -177,22 +198,25 @@ Deno.serve(async (req) => {
         if (existing) {
           clientOrgId = existing.id;
           results.existing++;
-          
-          // Update metadata to ensure Speed Digital link
+
+          // Update to use proper powered_by relationship + service_type
           await supabase
             .from('businesses')
             .update({
+              // NEW: Proper relationship tracking
+              service_type: 'dealer',
+              powered_by_org_id: speedDigitalOrgId,
               metadata: {
                 speed_digital_client: true,
-                speed_digital_service_provider_id: speedDigitalOrgId,
+                speed_digital_css_class: `${client.name}-work-item`,
                 discovered_from: 'speeddigital.com/work',
                 discovered_at: new Date().toISOString(),
               },
             })
             .eq('id', clientOrgId);
-          
+
           results.updated++;
-          console.log(`   ✅ ${client.name} exists: ${existing.business_name}`);
+          console.log(`   ✅ ${client.name} exists: ${existing.business_name} (linked to Speed Digital)`);
         } else {
           const { data: newOrg, error: createError } = await supabase
             .from('businesses')
@@ -200,10 +224,12 @@ Deno.serve(async (req) => {
               business_name: client.name.charAt(0).toUpperCase() + client.name.slice(1).replace(/-/g, ' '),
               business_type: 'dealership',
               website: client.website_url,
+              // NEW: Proper relationship tracking
+              service_type: 'dealer',
+              powered_by_org_id: speedDigitalOrgId,
               metadata: {
                 speed_digital_client: true,
                 speed_digital_css_class: `${client.name}-work-item`,
-                speed_digital_service_provider_id: speedDigitalOrgId,
                 discovered_from: 'speeddigital.com/work',
                 discovered_at: new Date().toISOString(),
               },

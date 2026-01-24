@@ -242,7 +242,26 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
       const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
 
       if (FIRECRAWL_API_KEY) {
-        console.log('[pcarmarket] Fetching via Firecrawl...');
+        console.log('[pcarmarket] Fetching via Firecrawl with LLM extraction...');
+
+        // LLM extraction schema for key fields
+        const extractSchema = {
+          type: 'object',
+          properties: {
+            vin: { type: 'string', description: 'Vehicle VIN or chassis number' },
+            mileage: { type: 'number', description: 'Current mileage/odometer reading' },
+            price: { type: 'number', description: 'Final sale price or current high bid in dollars' },
+            sold: { type: 'boolean', description: 'Whether the auction has sold' },
+            bid_count: { type: 'number', description: 'Number of bids placed' },
+            end_date: { type: 'string', description: 'Auction end date' },
+            seller: { type: 'string', description: 'Seller username' },
+            exterior_color: { type: 'string', description: 'Exterior color' },
+            interior_color: { type: 'string', description: 'Interior color' },
+            transmission: { type: 'string', description: 'Transmission type' },
+            engine: { type: 'string', description: 'Engine description' },
+          },
+        };
+
         const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
           method: 'POST',
           headers: {
@@ -251,10 +270,23 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
           },
           body: JSON.stringify({
             url: url,
-            formats: ['rawHtml'],  // rawHtml captures full rendered page with XHR data
-            waitFor: 20000,        // Wait 20s for dynamic content to load
-            timeout: 60000,
+            formats: ['rawHtml', 'markdown', 'extract'],
+            extract: { schema: extractSchema },
+            waitFor: 10000,
+            timeout: 90000,
             mobile: false,
+            actions: [
+              { type: 'wait', milliseconds: 5000 },
+              { type: 'scroll', direction: 'down', pixels: 800 },
+              { type: 'wait', milliseconds: 2000 },
+              { type: 'scroll', direction: 'down', pixels: 1200 },
+              { type: 'wait', milliseconds: 3000 },
+            ],
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
           }),
         });
 
@@ -265,6 +297,15 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
             throw new Error(`Firecrawl error: ${firecrawlData.error || 'Unknown error'}`);
           }
           html = firecrawlData.data?.rawHtml || firecrawlData.data?.html || '';
+
+          // Store LLM extraction for later use
+          const llmExtract = firecrawlData.data?.extract;
+          if (llmExtract) {
+            console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
+            // Store in html as JSON prefix for downstream parsing
+            html = JSON.stringify({ llmExtract, html }) ;
+          }
+
           console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
         } else {
           throw new Error(`Firecrawl HTTP error: ${firecrawlResponse.status}`);
@@ -577,6 +618,40 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
       }
     }
 
+    // Check if we have LLM extracted data (from Firecrawl) to fill in gaps
+    // The html variable may be JSON-wrapped with { llmExtract, html } format
+    try {
+      if (html.startsWith('{"llmExtract"')) {
+        const wrapped = JSON.parse(html);
+        const llm = wrapped.llmExtract;
+        if (llm) {
+          console.log('[pcarmarket] Applying LLM extraction fallbacks');
+          if (!listing.mileage && llm.mileage && typeof llm.mileage === 'number') {
+            listing.mileage = llm.mileage;
+            console.log(`[pcarmarket] LLM filled mileage: ${llm.mileage}`);
+          }
+          if (!listing.salePrice && llm.price && typeof llm.price === 'number') {
+            listing.salePrice = llm.price;
+            console.log(`[pcarmarket] LLM filled price: ${llm.price}`);
+          }
+          if (!listing.auctionOutcome && llm.sold === true) {
+            listing.auctionOutcome = 'sold';
+          }
+          if (!listing.bidCount && llm.bid_count) {
+            listing.bidCount = llm.bid_count;
+          }
+          if (!listing.sellerUsername && llm.seller) {
+            listing.sellerUsername = llm.seller;
+          }
+          if (!listing.vin && llm.vin && llm.vin.length >= 6 && isValidVin(llm.vin)) {
+            listing.vin = llm.vin.toUpperCase();
+          }
+        }
+      }
+    } catch (e) {
+      // Not JSON-wrapped, ignore
+    }
+
     return listing;
   } catch (error) {
     console.error('Error scraping PCarMarket listing:', error);
@@ -658,34 +733,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Step 2: Find or create organization
-    let orgId: string | null = null;
-    const { data: existingOrg } = await supabase
-      .from('businesses')
-      .select('id')
-      .eq('website', 'https://www.pcarmarket.com')
-      .maybeSingle();
-
-    if (existingOrg) {
-      orgId = existingOrg.id;
-    } else {
-      const { data: newOrg, error: orgError } = await supabase
-        .from('businesses')
-        .insert({
-          business_name: 'PCarMarket',
-          business_type: 'auction_house',
-          website: 'https://www.pcarmarket.com',
-          description: 'Premium car auction marketplace',
-          is_verified: false,
-          is_public: true
-        })
-        .select('id')
-        .single();
-
-      if (!orgError && newOrg) {
-        orgId = newOrg.id;
-      }
-    }
+    // Step 2: Use canonical organization ID for PCarMarket
+    // This ID matches both organizations and businesses tables
+    const orgId = "2a2494ae-cc22-4300-accb-24ed9a054663";
 
     // Step 3: Find existing vehicle
     let vehicleId: string | null = null;
@@ -725,6 +775,7 @@ Deno.serve(async (req: Request) => {
       discovery_source: 'PCARMARKET',
       discovery_url: listing.url,
       listing_url: listing.url,
+      listing_source: 'import-pcarmarket-listing', // Extraction receipt
         origin_metadata: {
           source: 'PCARMARKET_IMPORT',
           pcarmarket_url: listing.url,

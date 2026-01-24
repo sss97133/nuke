@@ -69,6 +69,13 @@ Analyze these comments thoroughly. Extract:
    - What topics dominate discussion?
    - What does this tell us about market sentiment for this type of vehicle?
 
+8. META-ANALYSIS (Self-Learning Loop)
+   - What data is MISSING that would make this analysis more valuable?
+   - What questions could NOT be answered from available data?
+   - What external sources would improve understanding? (service records, owner history, registry data, etc.)
+   - Rate your confidence in each insight (high/medium/low) based on data quality
+   - What patterns suggest this vehicle is typical or atypical for its segment?
+
 Return a comprehensive JSON object capturing all of this. Include specific quotes where valuable.
 Use snake_case keys. Be thorough.
 
@@ -88,7 +95,21 @@ Use snake_case keys. Be thorough.
   "key_quotes": [...],
   "discussion_themes": [...],
   "authenticity_discussion": {...},
-  "price_sentiment": {...}
+  "price_sentiment": {...},
+  "meta_analysis": {
+    "missing_data": ["list of data that would improve analysis"],
+    "unanswerable_questions": ["questions we couldn't answer from comments"],
+    "recommended_sources": ["external data sources that would help"],
+    "confidence_ratings": {
+      "sentiment": "high|medium|low",
+      "price_assessment": "high|medium|low",
+      "authenticity": "high|medium|low",
+      "condition": "high|medium|low"
+    },
+    "segment_typicality": "typical|atypical|outlier",
+    "data_quality_score": <0.0 to 1.0>,
+    "analysis_gaps": ["what we wish we knew but don't"]
+  }
 }
 
 Return ONLY valid JSON.`;
@@ -166,6 +187,8 @@ serve(async (req) => {
     const minComments = body.min_comments ?? 20;
     // NEW: source param - "auction_comments" (legacy 1.37M) or "vehicle_observations" (new)
     const source = body.source || "auction_comments"; // Default to legacy for full coverage
+    // Offset for pagination through large result sets
+    const offset = body.offset || 0;
 
     let vehiclesToProcess: any[] = [];
 
@@ -187,14 +210,15 @@ serve(async (req) => {
       const discoveredIds = new Set((alreadyDiscovered || []).map((d: any) => d.vehicle_id));
       console.log(`Already discovered: ${discoveredIds.size}`);
 
-      // Get bat_listings with comments, ordered by comment_count desc
+      // Get bat_listings with comments, with pagination support
+      // Use offset to get different batches of vehicles
       const { data: batListings } = await supabase
         .from("bat_listings")
         .select("vehicle_id, comment_count")
         .gt("comment_count", minComments)
         .not("vehicle_id", "is", null)
         .order("comment_count", { ascending: false })
-        .limit(500);
+        .range(offset, offset + 2000);
 
       if (batListings) {
         // Filter to undiscovered
@@ -349,6 +373,12 @@ serve(async (req) => {
         const sentiment = discovered.sentiment?.overall || null;
         const sentimentScore = discovered.sentiment?.score || null;
 
+        // Extract meta-analysis for self-learning loop
+        const meta = discovered.meta_analysis || {};
+        const dataQualityScore = meta.data_quality_score || null;
+        const missingDataFlags = meta.missing_data || [];
+        const recommendedSources = meta.recommended_sources || [];
+
         // Store
         const { error: insertError } = await supabase
           .from("comment_discoveries")
@@ -361,6 +391,10 @@ serve(async (req) => {
             sale_price: vehicle.sale_price,
             overall_sentiment: sentiment,
             sentiment_score: sentimentScore,
+            // New meta-analysis columns
+            data_quality_score: dataQualityScore,
+            missing_data_flags: missingDataFlags,
+            recommended_sources: recommendedSources,
           }, { onConflict: "vehicle_id" });
 
         if (insertError) {

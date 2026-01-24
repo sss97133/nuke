@@ -874,6 +874,22 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     try {
       const searchTerm = query.replace(/near me|for sale|buy/gi, '').trim();
       const searchTermSafe = escapeILike(searchTerm);
+      const normalizeToken = (value: string) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normalizeHay = (value: string) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const rawTokens = searchTerm.split(/\s+/).filter(Boolean);
+      const rawTokensLower = rawTokens.map((t) => t.toLowerCase()).filter((t) => t.length > 1);
+      const tokens = rawTokens.map(normalizeToken).filter((t) => t.length > 1);
+      const yearTokens = tokens.filter((t) => /^\d{4}$/.test(t));
+      const textTokens = tokens.filter((t) => !/^\d{4}$/.test(t));
+      const expandedTextTokens = new Set<string>(textTokens);
+      if (analysis?.vehicle_specific) {
+        expandedTextTokens.add(normalizeToken(analysis.vehicle_specific));
+      }
+      const uniqueTextTokens = Array.from(expandedTextTokens).filter(Boolean).slice(0, 6);
+      const queryTokenVariants = new Set<string>([...rawTokensLower, ...uniqueTextTokens]);
+      if (analysis?.vehicle_specific) {
+        queryTokenVariants.add(String(analysis.vehicle_specific).toLowerCase());
+      }
       
       if (!searchTerm) {
         return [];
@@ -881,8 +897,9 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
       // Try hybrid full-text search (PostgreSQL + BM25)
       let vehicles: any[] = [];
+      let hybridVehicles: any[] = [];
       try {
-        vehicles = await fullTextSearchService.searchVehiclesHybrid(searchTerm, {
+        hybridVehicles = await fullTextSearchService.searchVehiclesHybrid(searchTerm, {
           limit: 20
         });
       } catch (ftError) {
@@ -890,48 +907,67 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         console.log('Full-text search unavailable, using simple search');
       }
 
-      // If full-text search returned no results, use simple search
-      if (vehicles.length === 0) {
+      vehicles = hybridVehicles;
+
+      // If full-text search returned few or no results, use simple search to widen recall
+      if (vehicles.length < 6) {
         let vehicleQuery = supabase
           .from('vehicles')
-          .select('id, year, make, model, color, description, created_at, uploaded_by')
+          .select('id, year, make, model, normalized_model, series, trim, title, vin, color, description, created_at, uploaded_by')
           .eq('is_public', true);
 
         // Apply filters based on analysis
         if (analysis.vehicle_specific) {
-          vehicleQuery = vehicleQuery.ilike('model', `%${analysis.vehicle_specific}%`);
+          const specificSafe = escapeILike(analysis.vehicle_specific);
+          vehicleQuery = vehicleQuery.or(`model.ilike.%${specificSafe}%,normalized_model.ilike.%${specificSafe}%,series.ilike.%${specificSafe}%,trim.ilike.%${specificSafe}%`);
         }
 
-        // Check if search term is a number (year)
-        const yearMatch = searchTerm.match(/^\d{4}$/);
-        if (yearMatch) {
-          const year = parseInt(yearMatch[0]);
-          vehicleQuery = vehicleQuery.or(`year.eq.${year},make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
-        } else {
-          // Text search across multiple fields (PostgREST doesn't support type casting in or filters)
-          // Also search VIN if it looks like a VIN
-          const isVIN = /^[A-HJ-NPR-Z0-9]{11,17}$/i.test(searchTerm.replace(/[^A-Z0-9]/gi, ''));
+        const orClauses: string[] = [];
+        Array.from(queryTokenVariants).forEach((token) => {
+          const tokenSafe = escapeILike(token);
+          if (!tokenSafe) return;
+          orClauses.push(
+            `make.ilike.%${tokenSafe}%`,
+            `model.ilike.%${tokenSafe}%`,
+            `normalized_model.ilike.%${tokenSafe}%`,
+            `series.ilike.%${tokenSafe}%`,
+            `trim.ilike.%${tokenSafe}%`,
+            `title.ilike.%${tokenSafe}%`,
+            `description.ilike.%${tokenSafe}%`
+          );
+          const isVIN = /^[A-HJ-NPR-Z0-9]{11,17}$/i.test(token.replace(/[^A-Z0-9]/gi, ''));
           if (isVIN) {
-            vehicleQuery = vehicleQuery.or(`vin.ilike.%${searchTermSafe}%,make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
-          } else {
-            vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
+            orClauses.push(`vin.ilike.%${tokenSafe}%`);
           }
+        });
+        yearTokens.forEach((yearToken) => {
+          const year = parseInt(yearToken, 10);
+          if (Number.isFinite(year)) {
+            orClauses.push(`year.eq.${year}`);
+          }
+        });
+
+        if (orClauses.length > 0) {
+          vehicleQuery = vehicleQuery.or(orClauses.join(','));
+        } else {
+          // Fallback to original term when tokenization yields nothing useful
+          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
         }
 
-        const { data: simpleResults, error } = await vehicleQuery.limit(20);
+        const { data: simpleResults, error } = await vehicleQuery.limit(60);
         
         if (error) {
           console.error('Simple vehicle search error:', error);
           // Don't return empty - try even simpler search
           const fallbackQuery = supabase
             .from('vehicles')
-            .select('id, year, make, model, color, description, created_at, uploaded_by')
+            .select('id, year, make, model, normalized_model, series, trim, title, vin, color, description, created_at, uploaded_by')
             .eq('is_public', true)
             .ilike('make', `%${searchTermSafe}%`)
             .limit(20);
           
           const { data: fallbackResults } = await fallbackQuery;
-          vehicles = (fallbackResults || []).map((v: any) => ({
+          const fallbackVehicles = (fallbackResults || []).map((v: any) => ({
             id: v.id,
             year: v.year,
             make: v.make,
@@ -941,17 +977,60 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             created_at: v.created_at,
             relevance: 0.3
           }));
+          const vehicleMap = new Map<string, any>();
+          hybridVehicles.forEach((v: any) => vehicleMap.set(v.id, v));
+          fallbackVehicles.forEach((v: any) => {
+            if (!vehicleMap.has(v.id)) {
+              vehicleMap.set(v.id, v);
+            }
+          });
+          vehicles = Array.from(vehicleMap.values());
         } else {
-          vehicles = (simpleResults || []).map((v: any) => ({
-            id: v.id,
-            year: v.year,
-            make: v.make,
-            model: v.model,
-            color: v.color,
-            description: v.description,
-            created_at: v.created_at,
-            relevance: 0.5
-          }));
+          const cleaned = (simpleResults || []).map((v: any) => {
+            const hay = normalizeHay([
+              v.year,
+              v.make,
+              v.model,
+              v.normalized_model,
+              v.series,
+              v.trim,
+              v.title,
+              v.vin,
+              v.color,
+              v.description
+            ].filter(Boolean).join(' '));
+            const hayCompact = hay.replace(/\s+/g, '');
+            const tokenMatches = uniqueTextTokens.filter((t) => hay.includes(t) || hayCompact.includes(t)).length;
+            const requiredMatches = uniqueTextTokens.length <= 2
+              ? 1
+              : Math.ceil(uniqueTextTokens.length * 0.6);
+            const textMatchOk = uniqueTextTokens.length === 0 || tokenMatches >= requiredMatches;
+            const yearMatchOk = yearTokens.length === 0 || yearTokens.some((y) => String(v.year || '') === y);
+            if (!textMatchOk || !yearMatchOk) return null;
+
+            const matchRatio = uniqueTextTokens.length > 0 ? tokenMatches / uniqueTextTokens.length : 0.5;
+            const relevance = Math.min(1, 0.35 + matchRatio * 0.55 + (yearMatchOk && yearTokens.length > 0 ? 0.1 : 0));
+            return {
+              id: v.id,
+              year: v.year,
+              make: v.make,
+              model: v.model,
+              color: v.color,
+              description: v.description,
+              created_at: v.created_at,
+              relevance
+            };
+          }).filter(Boolean);
+
+          const vehicleMap = new Map<string, any>();
+          hybridVehicles.forEach((v: any) => vehicleMap.set(v.id, v));
+          cleaned.forEach((v: any) => {
+            const existing = vehicleMap.get(v.id);
+            if (!existing || (v.relevance || 0) > (existing.relevance || 0)) {
+              vehicleMap.set(v.id, v);
+            }
+          });
+          vehicles = Array.from(vehicleMap.values());
         }
       }
 

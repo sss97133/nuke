@@ -352,6 +352,19 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       Vehicles
                     </Link>
                     <Link
+                      to="/search"
+                      className={`nav-link ${isActivePage('/search') ? 'active' : ''}`}
+                      style={{
+                        display: 'block',
+                        padding: '8px 12px',
+                        textDecoration: 'none',
+                        borderBottom: '1px solid var(--border)'
+                      }}
+                      onClick={() => setNZeroMenuOpen(false)}
+                    >
+                      Search
+                    </Link>
+                    <Link
                       to="/auctions"
                       className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
                       style={{

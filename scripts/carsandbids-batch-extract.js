@@ -86,27 +86,39 @@ async function discoverSoldListings(page) {
     }
 
     // C&B URLs look like: carsandbids.com/auctions/[id]/[year]-[make]-[model]
-    // Try multiple patterns
+    // Slug should only contain alphanumeric, hyphens - NO %20 or other encoded chars
     const listings = new Set();
 
-    // Pattern 1: Full URLs in HTML
-    const fullUrlPattern = /https:\/\/carsandbids\.com\/auctions\/([A-Za-z0-9]+\/[^"'\s<>]+)/g;
+    // Helper to validate and clean URL
+    const isValidCabUrl = (slug) => {
+      // Reject if contains URL-encoded characters like %20, %22
+      if (/%[0-9A-Fa-f]{2}/.test(slug)) return false;
+      // Should match pattern: [id]/[slug]
+      if (!/^[a-z0-9]+\/[a-z0-9-]+$/i.test(slug)) return false;
+      return true;
+    };
+
+    // Pattern 1: Full URLs in HTML - strict alphanumeric + hyphen only
+    const fullUrlPattern = /https:\/\/carsandbids\.com\/auctions\/([a-z0-9]+\/[a-z0-9-]+)/gi;
     for (const m of html.matchAll(fullUrlPattern)) {
-      const cleanUrl = `https://carsandbids.com/auctions/${m[1]}`.split('?')[0];
-      listings.add(cleanUrl);
+      if (isValidCabUrl(m[1])) {
+        listings.add(`https://carsandbids.com/auctions/${m[1]}`);
+      }
     }
 
-    // Pattern 2: Relative URLs
-    const relPattern = /href="\/auctions\/([A-Za-z0-9]+\/[^"]+)"/g;
+    // Pattern 2: Relative URLs - strict pattern
+    const relPattern = /href="\/auctions\/([a-z0-9]+\/[a-z0-9-]+)"/gi;
     for (const m of html.matchAll(relPattern)) {
-      const cleanUrl = `https://carsandbids.com/auctions/${m[1]}`.split('?')[0];
-      listings.add(cleanUrl);
+      if (isValidCabUrl(m[1])) {
+        listings.add(`https://carsandbids.com/auctions/${m[1]}`);
+      }
     }
 
-    // Pattern 3: From markdown links
-    const mdPattern = /\(https:\/\/carsandbids\.com\/auctions\/([^)]+)\)/g;
+    // Pattern 3: From markdown links - strict pattern
+    const mdPattern = /\(https:\/\/carsandbids\.com\/auctions\/([a-z0-9]+\/[a-z0-9-]+)\)/gi;
     for (const m of markdown.matchAll(mdPattern)) {
-      const cleanUrl = `https://carsandbids.com/auctions/${m[1]}`.split('?')[0];
+      if (isValidCabUrl(m[1])) {
+        listings.add(`https://carsandbids.com/auctions/${m[1]}`);
       listings.add(cleanUrl);
     }
 
