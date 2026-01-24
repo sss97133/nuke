@@ -599,10 +599,14 @@ async function saveToDatabase(supabase: any, extracted: RMSothebysExtracted): Pr
     discovery_source: 'rmsothebys',
     discovery_url: extracted.url,
     listing_url: extracted.url,
+    listing_source: 'extract-rm-sothebys', // Extraction receipt
     is_public: true,
     status: 'active',
-    selling_organization_id: 'f437a196-707d-447f-8527-fe0315aab52d', // RM Sotheby's org
+    selling_organization_id: '5761f2bf-d37f-4b24-aa38-0d8c95ea2ae1', // Canonical RM Sotheby's org
   };
+
+  // Canonical RM Sotheby's organization ID
+  const RM_SOTHEBYS_ORG_ID = '5761f2bf-d37f-4b24-aa38-0d8c95ea2ae1';
 
   if (vehicleId) {
     // Update existing
@@ -622,6 +626,29 @@ async function saveToDatabase(supabase: any, extracted: RMSothebysExtracted): Pr
     if (error) throw error;
     vehicleId = data.id;
     console.log(`[rm-sothebys] Created vehicle ${vehicleId}`);
+  }
+
+  // Link to RM Sotheby's organization
+  if (vehicleId) {
+    const relationshipType = extracted.auction_status === 'sold' ? 'sold_by' : 'consigner';
+    const { error: orgLinkError } = await supabase
+      .from('organization_vehicles')
+      .upsert({
+        organization_id: RM_SOTHEBYS_ORG_ID,
+        vehicle_id: vehicleId,
+        relationship_type: relationshipType,
+        status: 'active',
+        auto_tagged: true,
+        notes: `Imported from RM Sotheby's: ${extracted.url}`
+      }, {
+        onConflict: 'organization_id,vehicle_id,relationship_type'
+      });
+
+    if (orgLinkError) {
+      console.warn(`[rm-sothebys] Org link failed: ${orgLinkError.message}`);
+    } else {
+      console.log(`[rm-sothebys] Linked vehicle to RM Sotheby's org`);
+    }
   }
 
   // Save external listing

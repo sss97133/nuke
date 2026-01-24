@@ -121,6 +121,42 @@ const formatAuctionHouseLabel = (platform?: string | null, host?: string | null,
   return toTitleCase(normalized.replace(/[_-]+/g, ' '));
 };
 
+const normalizeBusinessType = (value?: string | null) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized || null;
+};
+
+const isIntermediaryBusinessType = (value?: string | null) => {
+  const normalized = normalizeBusinessType(value);
+  if (!normalized) return false;
+  return (
+    normalized.includes('auction') ||
+    normalized.includes('platform') ||
+    normalized.includes('marketplace') ||
+    normalized.includes('broker') ||
+    normalized.includes('aggregator')
+  );
+};
+
+const roleLabelFromBusinessType = (value?: string | null) => {
+  const normalized = normalizeBusinessType(value);
+  if (!normalized) return null;
+  if (normalized === 'auction_house' || normalized.includes('auction')) return 'Auction platform';
+  if (normalized === 'dealer' || normalized === 'dealership' || normalized === 'classic_car_dealer' || normalized === 'dealer_group') return 'Dealer';
+  if (normalized.includes('broker')) return 'Broker';
+  if (normalized.includes('marketplace') || normalized.includes('platform') || normalized.includes('aggregator')) return 'Marketplace';
+  return null;
+};
+
+const formatSellerRoleLabel = (relationship?: string | null, businessType?: string | null) => {
+  const fromBusiness = roleLabelFromBusinessType(businessType);
+  if (fromBusiness) return fromBusiness;
+  const rel = String(relationship || '').toLowerCase();
+  if (rel === 'consigner') return 'Consigner';
+  if (rel === 'sold_by' || rel === 'seller') return 'Seller';
+  return rel ? toTitleCase(rel.replace(/[_-]+/g, ' ')) : 'Seller';
+};
+
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
   isOwner,
@@ -1477,11 +1513,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const links = (organizationLinks || []) as any[];
     const pickRel = (r: any) => String(r?.relationship_type || '').toLowerCase();
     const sellerRels = ['sold_by', 'seller', 'consigner'];
-    const first = links
-      .filter((x) => x && sellerRels.includes(pickRel(x)))
-      .sort((a, b) => sellerRels.indexOf(pickRel(a)) - sellerRels.indexOf(pickRel(b)))[0];
+    const candidates = links.filter((x) => x && sellerRels.includes(pickRel(x)));
+    const first = [...candidates].sort((a, b) => {
+      const aIntermediary = isIntermediaryBusinessType(a?.business_type);
+      const bIntermediary = isIntermediaryBusinessType(b?.business_type);
+      if (aIntermediary !== bIntermediary) return aIntermediary ? 1 : -1;
+      return sellerRels.indexOf(pickRel(a)) - sellerRels.indexOf(pickRel(b));
+    })[0];
 
-    if (first?.business_name) {
+    const metaSeller = String(
+      (auctionPulse as any)?.seller_username ||
+        (auctionPulse as any)?.metadata?.seller_username ||
+        (auctionPulse as any)?.metadata?.seller ||
+        (vehicle as any)?.origin_metadata?.bat_seller ||
+        (vehicle as any)?.origin_metadata?.seller ||
+        ''
+    ).trim();
+    const firstIsIntermediary = first ? isIntermediaryBusinessType(first.business_type) : false;
+
+    if (first?.business_name && !firstIsIntermediary) {
       // Ensure we use business_name, not description or any other field
       const businessName = String(first.business_name || '').trim();
       // If business_name appears to be a description (too long or contains certain patterns), fall back to organization ID or skip
@@ -1493,17 +1543,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         label: businessName,
         logo_url: first.logo_url ? String(first.logo_url) : null,
         relationship: pickRel(first),
+        business_type: first.business_type || null,
       };
     }
 
-    const metaSeller = String(
-      (auctionPulse as any)?.seller_username ||
-        (auctionPulse as any)?.metadata?.seller_username ||
-        (auctionPulse as any)?.metadata?.seller ||
-        (vehicle as any)?.origin_metadata?.bat_seller ||
-        (vehicle as any)?.origin_metadata?.seller ||
-        ''
-    ).trim();
     if (metaSeller) {
       // Detect platform for generating correct profile URL
       const platform = String(
@@ -1537,7 +1580,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       const href = slug && proofUrl
         ? `/claim-identity?platform=${encodeURIComponent(normalizedPlatform)}&handle=${encodeURIComponent(slug)}&profileUrl=${encodeURIComponent(proofUrl)}`
         : null;
-      return { label: metaSeller, logo_url: null, relationship: 'seller', href, proofUrl, handle: slug, kind: `${normalizedPlatform}_user` };
+      return { label: metaSeller, logo_url: null, relationship: 'seller', business_type: null, href, proofUrl, handle: slug, kind: `${normalizedPlatform}_user` };
+    }
+
+    if (first?.business_name) {
+      const businessName = String(first.business_name || '').trim();
+      if (!businessName || businessName.length > 100 || businessName.toLowerCase().includes('is a dealer') || businessName.toLowerCase().includes('specializing')) {
+        return null;
+      }
+      return {
+        label: businessName,
+        logo_url: first.logo_url ? String(first.logo_url) : null,
+        relationship: pickRel(first),
+        business_type: first.business_type || null,
+      };
     }
 
     return null;
@@ -2192,7 +2248,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (!hasAuctionContext) return null;
     if (sellerBadge?.label) {
       const relationship = String((sellerBadge as any)?.relationship || '').toLowerCase();
-      const roleLabel = relationship === 'consigner' || relationship === 'sold_by' ? 'Dealer' : 'Seller';
+      const roleLabel = formatSellerRoleLabel(relationship, (sellerBadge as any)?.business_type || null);
       const label = String(sellerBadge.label || '').trim();
       if (!label) return null;
       return {

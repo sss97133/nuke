@@ -866,6 +866,30 @@ serve(async (req) => {
         console.log(`Created ${events.length} timeline events`);
       }
       
+      // Link to Bring a Trailer organization
+      if (extracted.vehicle_id) {
+        const BAT_ORG_ID = "d2bd6370-11d1-4af0-8dd2-3de2c3899166"; // Canonical BaT org ID
+        const relationshipType = extracted.sold_status === 'sold' ? 'sold_by' : 'consigner';
+        const { error: orgLinkError } = await supabase
+          .from('organization_vehicles')
+          .upsert({
+            organization_id: BAT_ORG_ID,
+            vehicle_id: extracted.vehicle_id,
+            relationship_type: relationshipType,
+            status: 'active',
+            auto_tagged: true,
+            notes: `Imported from Bring a Trailer: ${extracted.url}`
+          }, {
+            onConflict: 'organization_id,vehicle_id,relationship_type'
+          });
+
+        if (orgLinkError) {
+          console.warn(`Org link failed: ${orgLinkError.message}`);
+        } else {
+          console.log(`Linked vehicle to BaT org`);
+        }
+      }
+
       // Trigger comment extraction asynchronously (don't block the response)
       // extract-auction-comments handles: JSON parsing, content_hash deduplication, external_identities, AI analysis
       if (extracted.vehicle_id && extracted.url) {

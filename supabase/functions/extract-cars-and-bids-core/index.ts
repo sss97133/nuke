@@ -577,6 +577,9 @@ serve(async (req) => {
 
     console.log(`✅ C&B: Extracted - Year: ${extracted.year}, Make: ${extracted.make}, Model: ${extracted.model}, VIN: ${extracted.vin || 'N/A'}, Mileage: ${extracted.mileage || 'N/A'}`);
 
+    // Canonical organization ID for Cars & Bids (from organizations table)
+    const CARS_AND_BIDS_ORG_ID = "4dac1878-b3fc-424c-9e92-3cf552f1e053";
+
     // Prepare vehicle data
     const vehicleData: Record<string, any> = {
       year: extracted.year,
@@ -591,6 +594,7 @@ serve(async (req) => {
       description: extracted.description,
       discovery_url: listingUrlCanonical,
       discovery_source: "carsandbids",
+      listing_source: "extract-cars-and-bids-core", // Extraction receipt
       status: "active",
     };
 
@@ -742,6 +746,29 @@ serve(async (req) => {
 
     if (listingError) {
       console.warn(`⚠️ C&B: External listing upsert failed: ${listingError.message}`);
+    }
+
+    // Link to Cars & Bids organization
+    if (vehicleId) {
+      const relationshipType = extracted.auctionStatus === 'sold' ? 'sold_by' : 'consigner';
+      const { error: orgLinkError } = await supabase
+        .from('organization_vehicles')
+        .upsert({
+          organization_id: CARS_AND_BIDS_ORG_ID,
+          vehicle_id: vehicleId,
+          relationship_type: relationshipType,
+          status: 'active',
+          auto_tagged: true,
+          notes: `Imported from Cars & Bids: ${listingUrlCanonical}`
+        }, {
+          onConflict: 'organization_id,vehicle_id,relationship_type'
+        });
+
+      if (orgLinkError) {
+        console.warn(`⚠️ C&B: Org link failed: ${orgLinkError.message}`);
+      } else {
+        console.log(`✅ C&B: Linked vehicle to Cars & Bids org`);
+      }
     }
 
     // Upsert auction_event
