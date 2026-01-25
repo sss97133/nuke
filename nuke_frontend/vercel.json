@@ -3,22 +3,17 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "vite",
-  "functions": {
-    "api/quickbooks/callback.ts": {
-      "runtime": "@vercel/node@3.0.0"
-    }
-  },
   "rewrites": [
     {
-      "source": "/api/quickbooks/callback",
-      "destination": "/api/quickbooks/callback"
+      "source": "/api/quickbooks/:path*",
+      "destination": "/api/quickbooks/:path*"
     },
     {
       "source": "/api/:path*",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path*"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ],
