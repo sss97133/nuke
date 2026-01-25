@@ -28,6 +28,10 @@ const OfferingDetail = React.lazy(() => import('../pages/OfferingDetail'));
 const SubscriptionFlow = React.lazy(() => import('../components/compliance/SubscriptionFlow'));
 const SubscriptionSuccess = React.lazy(() => import('../pages/SubscriptionSuccess'));
 
+// Business management
+const BusinessSettings = React.lazy(() => import('../pages/BusinessSettings'));
+const QuickBooksCallback = React.lazy(() => import('../pages/QuickBooksCallback'));
+
 // Legacy pages (still used by navigation components)
 const Profile = React.lazy(() => import('../pages/Profile'));
 const Capture = React.lazy(() => import('../pages/Capture'));
@@ -108,6 +112,10 @@ export const DomainRoutes = () => {
         <Route path="/invest/subscribe/:offeringId" element={<SubscriptionFlow />} />
         <Route path="/invest/subscription/:subscriptionId/success" element={<SubscriptionSuccess />} />
         <Route path="/market-intelligence" element={<MarketIntelligence />} />
+
+        {/* Business Management */}
+        <Route path="/business/settings" element={<BusinessSettings />} />
+        <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
