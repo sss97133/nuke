@@ -81,6 +81,40 @@ Investments through the NUKE platform are NOT:
 - Collection costs if default occurs
 - No FDIC insurance
 
+### Vehicle Insurance Products
+
+**What You're Buying:** Insurance coverage for collector vehicles through our partner carriers.
+
+**Available Coverage Types:**
+- **Agreed Value:** Coverage for the full agreed value of your vehicle
+- **Storage Coverage:** Protection while vehicle is in storage
+- **Transit Coverage:** Protection during transport/shipping
+- **GAP Insurance:** Covers difference between loan balance and vehicle value
+- **Title Insurance:** Protection against title defects
+
+**How It Works:**
+1. Request quote through Platform (vehicle info required)
+2. Receive quote from partner carrier
+3. Review coverage terms and premium
+4. Accept quote and bind coverage
+5. Receive policy documents
+6. File claims through Platform if needed
+
+**Important:**
+- NUKE LTD is NOT an insurance company
+- Coverage provided by licensed insurance partners
+- All policies subject to carrier's terms and conditions
+- Claims handled by carrier, not NUKE
+- State availability varies by carrier licensing
+
+**Risks:**
+- Coverage may be denied based on vehicle condition
+- Premiums may increase at renewal
+- Claims may be denied if policy terms violated
+- Deductibles apply to all claims
+
+---
+
 ### Direct Vehicle Acquisition
 
 **What You're Buying:** Full legal ownership of a physical vehicle with title transfer.
