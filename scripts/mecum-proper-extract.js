@@ -78,7 +78,38 @@ async function scrapeDetailPage(page, url) {
 
       // === VEHICLE IDENTITY ===
       const vinMatch = bodyText.match(/VIN\s*\/?\s*SERIAL[:\s]+([A-Z0-9]+)/i);
-      const title = document.querySelector('h1')?.innerText?.trim();
+      const rawTitle = document.querySelector('h1')?.innerText?.trim();
+
+      // Parse year/make/model from title
+      // Mecum titles are typically: "1970 Plymouth 'Cuda Convertible" or "2015 Ford Mustang GT"
+      let title = rawTitle;
+      let year = null;
+      let make = null;
+      let model = null;
+
+      if (rawTitle) {
+        // Clean up common Mecum title suffixes
+        title = rawTitle
+          .replace(/\s+\|.*$/i, '')
+          .replace(/\s+-\s+Mecum.*$/i, '')
+          .trim();
+
+        // Extract year (4-digit starting with 19 or 20)
+        const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+        if (yearMatch) {
+          year = parseInt(yearMatch[0]);
+
+          // Everything after the year is make + model
+          const afterYear = title.slice(title.indexOf(yearMatch[0]) + yearMatch[0].length).trim();
+          const parts = afterYear.split(/\s+/);
+
+          // First word is typically the make
+          make = parts[0] || null;
+
+          // Rest is model (may include trim level, body style, etc.)
+          model = parts.slice(1).join(' ') || null;
+        }
+      }
       
       // === AUCTION EVENT ===
       const lotMatch = bodyText.match(/LOT\s+([A-Z]?\d+)/i);
@@ -127,6 +158,9 @@ async function scrapeDetailPage(page, url) {
         // Vehicle data
         vin: vinMatch?.[1],
         title,
+        year,
+        make,
+        model,
         engine: findAfter('ENGINE'),
         transmission: findAfter('TRANSMISSION'),
         exterior_color: findAfter('EXTERIOR COLOR'),
@@ -173,6 +207,9 @@ async function upsertVehicle(vehicleId, data) {
   // Update vehicle with extracted data
   const updateData = {
     vin: data.vin,
+    year: data.year,
+    make: data.make,
+    model: data.model,
     engine_size: data.engine,
     transmission: data.transmission,
     color: data.exterior_color,
@@ -205,7 +242,8 @@ async function upsertVehicle(vehicleId, data) {
 
   // Store ALL images to vehicle_images table
   if (data.images?.length > 0) {
-    for (const url of data.images) {
+    for (let i = 0; i < data.images.length; i++) {
+      const url = data.images[i];
       await fetch(`${SUPABASE_URL}/rest/v1/vehicle_images`, {
         method: 'POST',
         headers: {
@@ -216,8 +254,12 @@ async function upsertVehicle(vehicleId, data) {
         },
         body: JSON.stringify({
           vehicle_id: targetVehicleId,
-          url: url,
-          source: 'mecum'
+          image_url: url,
+          source: 'mecum',
+          source_url: url,
+          is_primary: i === 0,
+          position: i,
+          is_external: true
         })
       });
     }
@@ -314,6 +356,9 @@ async function worker(workerId, browser, queue, stats) {
     
     // Build status string
     const fields = [];
+    if (data.year) fields.push(data.year);
+    if (data.make) fields.push(data.make);
+    if (data.model) fields.push(data.model.slice(0, 15));
     if (data.vin) fields.push('VIN');
     if (data.mileage) fields.push('mi');
     if (data.engine) fields.push('eng');

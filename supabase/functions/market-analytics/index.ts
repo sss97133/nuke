@@ -18,6 +18,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// UUID validation helper
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(str: string | undefined | null): boolean {
+  return typeof str === 'string' && UUID_REGEX.test(str);
+}
+
+// Safe division helper to avoid divide-by-zero
+function safeDivide(numerator: number, denominator: number, fallback: number = 0): number {
+  return denominator !== 0 && isFinite(denominator) ? numerator / denominator : fallback;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -48,6 +59,12 @@ serve(async (req) => {
       case "trading":
         if (!offeringId) {
           return new Response(JSON.stringify({ error: "offering_id required for trading analytics" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        if (!isValidUUID(offeringId)) {
+          return new Response(JSON.stringify({ error: "Invalid offering_id format" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
@@ -394,13 +411,14 @@ async function getIndexComparison(supabase: any, indexCodes: string[]) {
     };
   });
 
-  // Calculate relative metrics
+  // Calculate relative metrics (comparison is guaranteed to have >= 2 elements from check above)
   const baseIndex = comparison[0];
+  const baseValue = baseIndex.current_value || 1; // Avoid division by zero
   const relativeComparison = comparison.map((idx: any) => ({
     ...idx,
     relative_to_base: {
-      value_ratio: (idx.current_value / baseIndex.current_value).toFixed(2),
-      premium_discount: ((idx.current_value - baseIndex.current_value) / baseIndex.current_value * 100).toFixed(1) + '%'
+      value_ratio: safeDivide(idx.current_value, baseValue, 0).toFixed(2),
+      premium_discount: (safeDivide(idx.current_value - baseValue, baseValue, 0) * 100).toFixed(1) + '%'
     }
   }));
 
@@ -410,14 +428,20 @@ async function getIndexComparison(supabase: any, indexCodes: string[]) {
     generated_at: new Date().toISOString(),
     indexes: relativeComparison,
     summary: {
-      highest_value: comparison.reduce((max: any, idx: any) =>
-        idx.current_value > max.current_value ? idx : max
-      ),
-      lowest_value: comparison.reduce((min: any, idx: any) =>
-        idx.current_value < min.current_value ? idx : min
-      ),
-      spread: Math.max(...comparison.map((i: any) => i.current_value)) -
-              Math.min(...comparison.map((i: any) => i.current_value))
+      highest_value: comparison.length > 0
+        ? comparison.reduce((max: any, idx: any) =>
+            idx.current_value > max.current_value ? idx : max
+          )
+        : null,
+      lowest_value: comparison.length > 0
+        ? comparison.reduce((min: any, idx: any) =>
+            idx.current_value < min.current_value ? idx : min
+          )
+        : null,
+      spread: comparison.length > 0
+        ? Math.max(...comparison.map((i: any) => i.current_value)) -
+          Math.min(...comparison.map((i: any) => i.current_value))
+        : 0
     }
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -483,12 +507,12 @@ async function getTradingAnalytics(supabase: any, offeringId: string, timeframe:
     .eq('offering_id', offeringId)
     .maybeSingle();
 
-  // Fetch current offering data
+  // Fetch current offering data (use maybeSingle to avoid throwing on not found)
   const { data: offering } = await supabase
     .from('vehicle_offerings')
     .select('current_share_price, opening_price, total_trades, total_volume_shares')
     .eq('id', offeringId)
-    .single();
+    .maybeSingle();
 
   const tradeList = trades || [];
   const currentPrice = offering?.current_share_price || null;
@@ -517,7 +541,8 @@ async function getTradingAnalytics(supabase: any, offeringId: string, timeframe:
   if (currentPrice !== null && tradeList.length > 0) {
     const firstPrice = tradeList[0].price_per_share;
     priceChange = currentPrice - firstPrice;
-    priceChangePct = (priceChange / firstPrice) * 100;
+    // Avoid division by zero
+    priceChangePct = firstPrice > 0 ? (priceChange / firstPrice) * 100 : null;
   }
 
   // Volatility (annualized standard deviation of returns)
@@ -553,7 +578,8 @@ async function getTradingAnalytics(supabase: any, offeringId: string, timeframe:
   if (tradeList.length >= 2) {
     const recentPrice = tradeList[tradeList.length - 1].price_per_share;
     const oldPrice = tradeList[0].price_per_share;
-    momentum = ((recentPrice - oldPrice) / oldPrice) * 100;
+    // Avoid division by zero
+    momentum = oldPrice > 0 ? ((recentPrice - oldPrice) / oldPrice) * 100 : null;
   }
 
   // RSI (14-period)

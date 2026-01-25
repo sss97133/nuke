@@ -83,6 +83,19 @@ type AuctionRequest =
   | SettleRequest
   | GetAuctionRequest;
 
+// UUID validation helper
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(str: string | undefined | null): boolean {
+  return typeof str === 'string' && UUID_REGEX.test(str);
+}
+
+// Date validation helper
+function isValidDateString(str: string | undefined | null): boolean {
+  if (!str || typeof str !== 'string') return false;
+  const date = new Date(str);
+  return !isNaN(date.getTime());
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -93,7 +106,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const body: AuctionRequest = await req.json();
+    let body: AuctionRequest;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const { action } = body;
 
     // Get authenticated user for most actions
@@ -159,14 +180,36 @@ async function handleCreateAuction(supabase: any, body: CreateAuctionRequest, us
     terms,
   } = body;
 
-  // Validate dates
+  // Validate required fields
+  if (!isValidUUID(offeringId)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid or missing offeringId' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  if (typeof startingPrice !== 'number' || startingPrice <= 0 || !isFinite(startingPrice)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'startingPrice must be a positive number' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Validate dates exist and are valid
+  if (!isValidDateString(visibilityStart) || !isValidDateString(biddingStart) || !isValidDateString(scheduledEnd)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid date format. Use ISO 8601 format.' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   const visStart = new Date(visibilityStart);
   const bidStart = new Date(biddingStart);
   const schedEnd = new Date(scheduledEnd);
 
   if (visStart >= bidStart || bidStart >= schedEnd) {
     return new Response(
-      JSON.stringify({ success: false, error: 'Invalid date sequence' }),
+      JSON.stringify({ success: false, error: 'Invalid date sequence: visibility < bidding < end required' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -222,6 +265,30 @@ async function handlePlaceBid(supabase: any, body: BidRequest, userId: string | 
 
   const { auctionId, bidAmount, sharesRequested = 1, maxBid } = body;
 
+  // Validate auctionId
+  if (!isValidUUID(auctionId)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid auctionId format' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Validate bidAmount
+  if (typeof bidAmount !== 'number' || bidAmount <= 0 || !isFinite(bidAmount)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'bidAmount must be a positive number' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Validate sharesRequested
+  if (typeof sharesRequested !== 'number' || sharesRequested < 1 || !Number.isInteger(sharesRequested)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'sharesRequested must be a positive integer' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   const { data: result, error } = await supabase.rpc('place_committed_bid', {
     p_auction_id: auctionId,
     p_bidder_id: userId,
@@ -231,6 +298,14 @@ async function handlePlaceBid(supabase: any, body: BidRequest, userId: string | 
   });
 
   if (error) throw error;
+
+  // Handle null result from RPC
+  if (!result) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Bid placement returned no result' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   return new Response(
     JSON.stringify(result),
@@ -248,12 +323,28 @@ async function handleCancelBid(supabase: any, body: CancelBidRequest, userId: st
 
   const { bidId } = body;
 
+  // Validate bidId
+  if (!isValidUUID(bidId)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid bidId format' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   const { data: result, error } = await supabase.rpc('cancel_committed_bid', {
     p_bid_id: bidId,
     p_user_id: userId,
   });
 
   if (error) throw error;
+
+  // Handle null result from RPC
+  if (!result) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Bid cancellation returned no result' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   return new Response(
     JSON.stringify(result),
@@ -263,6 +354,14 @@ async function handleCancelBid(supabase: any, body: CancelBidRequest, userId: st
 
 async function handleGetBidStack(supabase: any, body: GetBidStackRequest) {
   const { auctionId } = body;
+
+  // Validate auctionId
+  if (!isValidUUID(auctionId)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid auctionId format' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   const { data, error } = await supabase.rpc('get_bid_stack', {
     p_auction_id: auctionId,
@@ -343,11 +442,27 @@ async function handleCheckEndings(supabase: any) {
 async function handleSettle(supabase: any, body: SettleRequest) {
   const { auctionId } = body;
 
+  // Validate auctionId
+  if (!isValidUUID(auctionId)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid auctionId format' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   const { data: result, error } = await supabase.rpc('settle_auction', {
     p_auction_id: auctionId,
   });
 
   if (error) throw error;
+
+  // Handle null result from RPC
+  if (!result) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Settlement returned no result' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   return new Response(
     JSON.stringify(result),
@@ -357,6 +472,14 @@ async function handleSettle(supabase: any, body: SettleRequest) {
 
 async function handleGetAuction(supabase: any, body: GetAuctionRequest) {
   const { auctionId } = body;
+
+  // Validate auctionId
+  if (!isValidUUID(auctionId)) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid auctionId format' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   const { data: auction, error } = await supabase
     .from('scheduled_auctions')
@@ -372,7 +495,16 @@ async function handleGetAuction(supabase: any, body: GetAuctionRequest) {
     .eq('id', auctionId)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Handle not found separately
+    if (error.code === 'PGRST116') {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Auction not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    throw error;
+  }
 
   // Get bid stack
   const { data: bidStack } = await supabase.rpc('get_bid_stack', {

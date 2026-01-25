@@ -41,8 +41,14 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get authenticated user
-    const authHeader = req.headers.get('Authorization')!;
+    // Get authenticated user - safely handle missing header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
@@ -53,13 +59,38 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
-    const body: CancelOrderRequest = await req.json();
+    // Parse request body - handle invalid JSON
+    let body: CancelOrderRequest;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const { orderId, assetType = 'vehicle' } = body;
 
     if (!orderId) {
       return new Response(
         JSON.stringify({ success: false, error: 'Missing orderId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate orderId is a valid UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (typeof orderId !== 'string' || !uuidRegex.test(orderId)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid orderId format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate assetType
+    if (assetType !== 'vehicle' && assetType !== 'organization') {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid assetType - must be "vehicle" or "organization"' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -92,6 +123,13 @@ serve(async (req) => {
     if (order.status === 'cancelled') {
       return new Response(
         JSON.stringify({ success: false, error: 'Order is already cancelled' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (order.status === 'expired') {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Cannot cancel an expired order' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
