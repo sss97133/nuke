@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
   Building2,
@@ -60,14 +60,28 @@ interface LegalDocument {
 
 export default function BusinessSettings() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [company, setCompany] = useState<ParentCompany | null>(null);
   const [qbStatus, setQbStatus] = useState<QuickBooksStatus | null>(null);
   const [documents, setDocuments] = useState<LegalDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
+    // Handle QuickBooks OAuth callback result
+    const qbResult = searchParams.get('qb');
+    if (qbResult === 'success') {
+      setNotification({ type: 'success', message: 'QuickBooks connected successfully!' });
+      // Clear the query params
+      setSearchParams({});
+    } else if (qbResult === 'error') {
+      const errorMsg = searchParams.get('message') || 'Failed to connect QuickBooks';
+      setNotification({ type: 'error', message: decodeURIComponent(errorMsg) });
+      setSearchParams({});
+    }
+
     loadData();
   }, []);
 
@@ -203,6 +217,32 @@ export default function BusinessSettings() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Notification Banner */}
+        {notification && (
+          <div
+            className={`mb-6 p-4 rounded-lg flex items-center justify-between ${
+              notification.type === 'success'
+                ? 'bg-green-500/10 border border-green-500/30 text-green-400'
+                : 'bg-red-500/10 border border-red-500/30 text-red-400'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {notification.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5" />
+              ) : (
+                <AlertCircle className="w-5 h-5" />
+              )}
+              <span>{notification.message}</span>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="text-zinc-400 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <div className="p-3 bg-blue-500/10 rounded-xl">

@@ -3,6 +3,11 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "vite",
+  "functions": {
+    "api/quickbooks/callback.ts": {
+      "runtime": "@vercel/node@3.0.0"
+    }
+  },
   "routes": [
     {
       "src": "/assets/(.*)",
@@ -26,6 +31,10 @@
         "X-XSS-Protection": "1; mode=block"
       },
       "continue": true
+    },
+    {
+      "src": "/api/quickbooks/callback",
+      "dest": "/api/quickbooks/callback.ts"
     },
     {
       "src": "/api/(.*)",
