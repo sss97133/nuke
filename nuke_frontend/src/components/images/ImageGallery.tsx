@@ -557,6 +557,27 @@ const ImageGallery = ({
     return false;
   };
 
+  const VEHICLE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  const extractVehicleIdFromPath = (value?: string | null): string | null => {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const path = raw.includes('/vehicle-images/') ? raw.split('/vehicle-images/')[1] : raw;
+    const clean = path.split('?')[0].replace(/^\/+/, '');
+    const parts = clean.split('/').filter(Boolean);
+    if (parts.length === 0) return null;
+    if (parts[0] === 'vehicles' && parts[1] && VEHICLE_ID_RE.test(parts[1])) return parts[1];
+    if (VEHICLE_ID_RE.test(parts[0])) return parts[0];
+    return null;
+  };
+
+  const isMismatchedVehicleAsset = (img: any): boolean => {
+    const currentId = String(vehicleId || '').toLowerCase();
+    if (!currentId) return false;
+    const candidate = extractVehicleIdFromPath(img?.storage_path || img?.image_url);
+    return Boolean(candidate && candidate.toLowerCase() !== currentId);
+  };
+
   // Quarantine policy:
   // - Always hide organization logo assets (not vehicle photos)
   // - Treat import_queue + organization_import as "soft quarantined":
@@ -592,7 +613,10 @@ const ImageGallery = ({
       );
     };
 
-    const noLogos = rows.filter((img: any) => !isOrgLogoPath(img));
+    const noMismatched = rows.filter((img: any) => !isMismatchedVehicleAsset(img));
+    if (noMismatched.length === 0) return [];
+
+    const noLogos = noMismatched.filter((img: any) => !isOrgLogoPath(img));
     if (noLogos.length === 0) return [];
 
     const hasBetter = noLogos.some((img: any) => !isSoftQuarantined(img));

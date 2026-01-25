@@ -1,355 +1,280 @@
-# Legal Disclaimers & Terms
+# Legal Disclaimers & Investment Terms
 
-**Effective Date:** October 24, 2025  
-**Platform:** Nuke (n-zero)
+**NUKE LTD — Investment Platform Disclosures**
 
----
-
-## Important Disclaimers
-
-### NOT SECURITIES
-
-**The financial products offered on this platform are NOT securities.**
-
-- Profit-sharing stakes are **contractual agreements** between you and vehicle owners
-- Share trading represents **community ownership interest**, not equity securities
-- Vehicle bonds are **personal loans** backed by vehicle collateral
-- These are **NOT** registered with the SEC or any securities regulator
-
-### INVESTMENT RISK
-
-**YOU CAN LOSE MONEY.**
-
-- Vehicles may decrease in value
-- Restoration projects may fail or be abandoned
-- Owners may default on obligations
-- No FDIC insurance or government protection
-- Past performance does not guarantee future results
-
-### NO GUARANTEES
-
-We make **NO GUARANTEES** about:
-
-- Vehicle valuations
-- Project completion
-- Return on investment
-- Owner credibility
-- Vehicle condition accuracy
+**Effective Date:** January 25, 2026
+**Last Updated:** January 25, 2026
 
 ---
 
-## Product-Specific Terms
+## IMPORTANT DISCLAIMERS
 
-### 1. Profit-Sharing Stakes
+### SECURITIES NOTICE
 
-**What You're Buying:** A contractual right to receive a percentage of net profit if/when the vehicle sells.
+Investment opportunities offered through the NUKE platform may constitute securities under federal and state law. Such offerings are made pursuant to applicable exemptions from registration, including:
 
-**Risks:**
-- Owner may never sell the vehicle
-- Vehicle may sell for less than invested amount
-- Owner may default on agreement
-- No voting rights or control over vehicle
+- **Regulation A (Tier 1):** Offerings up to $20 million in a 12-month period
+- **Regulation A (Tier 2):** Offerings up to $75 million in a 12-month period
+- **Regulation D (Rule 506(b) and 506(c)):** Private placements to accredited investors
 
-**Your Rights:**
-- Percentage of profit pool if vehicle sells
-- Right to view vehicle documentation
-- Right to request status updates
+**THE SECURITIES OFFERED HAVE NOT BEEN REGISTERED UNDER THE SECURITIES ACT OF 1933, AS AMENDED, OR ANY STATE SECURITIES LAWS AND ARE BEING OFFERED AND SOLD IN RELIANCE UPON EXEMPTIONS FROM THE REGISTRATION REQUIREMENTS OF SAID ACT AND SUCH LAWS.**
 
-**Your Obligations:**
-- Cannot demand sale of vehicle
-- Cannot force owner to accept offers
-- Cannot sue for profit if vehicle doesn't sell
+### INVESTMENT RISK WARNING
 
-**Payout Terms:**
-- Profit = (Sale Price - Owner Costs - Platform Fee)
-- Your share = Your stake % × Profit pool %
-- Payouts within 30 days of sale closing
-- Minimum payout: $1 (smaller amounts forfeited)
+**YOU CAN LOSE YOUR ENTIRE INVESTMENT.**
 
-### 2. Tradeable Shares
+Investing in collector vehicles and fractional ownership interests involves substantial risks, including but not limited to:
 
-**What You're Buying:** Fractional community ownership interest in a vehicle profile, NOT equity in a legal entity.
+- **Total Loss of Principal:** You may lose 100% of your investment
+- **Illiquidity:** Investments may not be easily sold or transferred
+- **No Public Market:** There may be no secondary market for these securities
+- **Valuation Risk:** Vehicle values may decline significantly
+- **No Guaranteed Returns:** Past performance does not guarantee future results
+- **Operational Risk:** Projects may fail, be abandoned, or underperform
+- **Dilution:** Your ownership percentage may be reduced by future offerings
 
-**Risks:**
-- Share price may decrease to $0
-- Low liquidity - may not find buyers
-- Vehicle owner retains physical possession
-- Shares don't grant legal ownership of vehicle
+### NO FDIC INSURANCE
 
-**Your Rights:**
-- Can trade shares with other users
-- Can view vehicle documentation
-- Can vote on profile disputes (1 share = 1 vote)
+Investments through the NUKE platform are NOT:
+- Insured by the FDIC or any government agency
+- Guaranteed by any bank
+- Deposits or obligations of any financial institution
 
-**Your Obligations:**
-- Subject to platform trading fees (2%)
-- Cannot claim physical vehicle
-- Cannot sue owner for vehicle access
+---
 
-**Trading Rules:**
-- Market orders execute at best available price
-- Limit orders require exact price match
-- Trades settle instantly (T+0)
-- No short selling or margin trading
+## INVESTMENT PRODUCTS
 
-### 3. Vehicle Bonds
+### Fractional Ownership Interests
 
-**What You're Buying:** A personal loan to the vehicle owner, secured by vehicle collateral.
+**What You're Buying:** An equity interest in a Series LLC that owns a specific collector vehicle.
+
+**Structure:**
+- Each vehicle is held in a separate Series of NUKE Holdings, LLC (a Nevada Series LLC)
+- Investors purchase membership interests in the specific Series
+- The Series LLC owns legal title to the vehicle
+- Investors share proportionally in gains or losses upon sale
 
 **Risks:**
-- Owner may default (no payment)
-- Vehicle collateral may be insufficient
-- Collection may be difficult/impossible
-- No credit checks on borrowers
+- No control over vehicle management decisions
+- No voting rights on sale timing or price
+- Vehicle may depreciate or be damaged
+- Management fees reduce returns
+- Liquidity depends on secondary market development
 
-**Your Rights:**
-- Fixed interest payments per schedule
-- Lien on vehicle title (if registered)
-- Right to demand payment on maturity
-- Right to initiate collection if default
+**Fees:**
+- Management Fee: 1.5% annually of asset value
+- Performance Fee: 20% of profits above 8% hurdle rate
+- Platform Fee: 2% of transaction value
 
-**Your Obligations:**
-- Cannot demand early repayment
-- Must follow state collection laws
-- Cannot seize vehicle without legal process
+### Vehicle Bonds
 
-**Default Process:**
-1. Platform notifies owner of missed payment
-2. 30-day grace period
-3. Platform facilitates mediation
-4. You may pursue legal collection (your cost)
-5. Platform provides documentation, not legal representation
+**What You're Buying:** A secured debt instrument backed by vehicle collateral.
 
-### 4. Whole Vehicle Purchase
+**Terms:**
+- Fixed interest rate and maturity date
+- Secured by UCC filing on specific vehicle
+- Principal and interest due at maturity
 
-**What You're Buying:** Complete legal ownership of physical vehicle with title transfer.
+**Risks:**
+- Borrower default risk
+- Collateral value may be insufficient
+- Collection costs if default occurs
+- No FDIC insurance
+
+### Direct Vehicle Acquisition
+
+**What You're Buying:** Full legal ownership of a physical vehicle with title transfer.
+
+**Process:**
+1. Submit binding offer through Platform
+2. Seller acceptance creates binding contract
+3. Funds held in escrow (third-party escrow agent)
+4. Title verification and lien search
+5. Optional pre-purchase inspection (buyer's expense)
+6. Title transfer and fund release
+7. Transportation arranged by buyer
 
 **Risks:**
 - Vehicle condition may differ from description
-- Title may have issues (liens, salvage, etc.)
-- Transportation costs can be high
-- No warranty or return policy
-
-**Your Rights:**
-- Full legal ownership upon title transfer
-- Right to inspect vehicle before purchase
-- Right to cancel if title has undisclosed liens
-
-**Your Obligations:**
-- Pay all transportation costs
-- Pay 2% platform fee
-- Complete title transfer within 30 days
-- Assume all liability after title transfer
-
-**Purchase Process:**
-1. Make offer (binding commitment)
-2. Owner accepts/rejects/counters
-3. Platform holds funds in escrow
-4. Title verification (5-7 days)
-5. Arrange inspection (optional, your cost)
-6. Finalize or cancel if title issues
-7. Title transfer and fund release
+- Title issues may exist
+- No warranties (sold "as is")
+- Transportation costs and risks
 
 ---
 
-## Platform Rules
+## INVESTOR QUALIFICATIONS
 
-### User Conduct
+### Accredited Investors
 
-**Prohibited Activities:**
-- Fraud or misrepresentation
-- Money laundering
-- Manipulating valuations
-- Coordinating trades to manipulate prices
-- Harassing other users
-- Posting illegal content
+Certain offerings are limited to "accredited investors" as defined in Rule 501 of Regulation D:
 
-**Consequences:**
-- Account suspension or ban
-- Forfeiture of funds
-- Report to law enforcement
-- Civil lawsuit for damages
+- Individual income exceeding $200,000 (or $300,000 with spouse) in each of the two most recent years with expectation of same in current year
+- Individual net worth exceeding $1,000,000 (excluding primary residence)
+- Certain professional certifications (Series 7, 65, or 82 licenses)
+- Directors, executive officers, or general partners of the issuer
+- Entities with assets exceeding $5,000,000
 
-### Data Accuracy
+### Non-Accredited Investor Limits
 
-**Owner Responsibilities:**
-- Provide truthful vehicle information
-- Update mileage and condition regularly
-- Disclose accidents and modifications
-- Upload authentic documentation
+For Regulation A Tier 2 offerings, non-accredited investors are limited to investing the greater of:
+- 10% of annual income, OR
+- 10% of net worth (excluding primary residence)
 
-**Platform Role:**
-- We DO NOT verify all information
-- Users should independently verify claims
-- We may remove obvious fraud
-- Community can flag suspicious data
+### Suitability
 
-### Fund Management
-
-**Your Cash Balance:**
-- Stored in segregated platform account
-- Not FDIC insured
-- Subject to platform fees
-- Withdrawals process within 3-5 business days
-
-**Platform Fees:**
-- Trading: 2% per trade (buyer pays)
-- Stakes: 5% of profit distribution
-- Bonds: 2% origination fee
-- Whole vehicle: 2% of sale price
-- Withdrawals: $1 flat fee
-
-### Tax Implications
-
-**You Are Responsible For Your Taxes.**
-
-- Platform provides 1099 forms for US users
-- Profits may be taxable income
-- Losses may be deductible (consult CPA)
-- International tax rules vary
-- We are NOT tax advisors
+Before investing, consider whether the investment is suitable given your:
+- Financial situation and liquidity needs
+- Investment objectives and risk tolerance
+- Investment time horizon
+- Need for diversification
 
 ---
 
-## Dispute Resolution
+## OFFERING DOCUMENTS
 
-### Process
+For each investment opportunity, you will receive:
 
-1. **Direct Resolution:** Try to resolve with other party
-2. **Platform Mediation:** Request platform assistance (free)
-3. **Binding Arbitration:** If mediation fails (cost shared)
-4. **No Class Actions:** You waive right to class action lawsuits
+- **Offering Circular:** Detailed disclosure document (Reg A offerings)
+- **Subscription Agreement:** Your binding commitment to invest
+- **Operating Agreement:** Terms of the Series LLC (fractional ownership)
+- **Risk Disclosure Statement:** Summary of material risks
 
-### Arbitration Rules
-
-- American Arbitration Association (AAA) rules
-- Single arbitrator
-- Virtual hearings (video)
-- English language
-- Decided within 60 days
-- Decision is final and binding
-
-### Exceptions
-
-You MAY sue in small claims court if:
-- Claim is under $10,000
-- You file individually (not class action)
-- You file in your county of residence
+**READ ALL OFFERING DOCUMENTS CAREFULLY BEFORE INVESTING.**
 
 ---
 
-## Privacy & Data
+## PLATFORM FEES
 
-### What We Collect
-
-- Email, name, payment info
-- Vehicle data you upload
-- Trading and investment history
-- IP address and device info
-- Cookies and usage analytics
-
-### How We Use It
-
-- Operate the platform
-- Process transactions
-- Prevent fraud
-- Marketing (opt-out available)
-- Legal compliance
-
-### What We Share
-
-- **With Other Users:** Vehicle data, username, ratings
-- **With Partners:** Payment processors, analytics tools
-- **With Government:** If legally required (subpoena, etc.)
-- **NOT Sold:** We don't sell your data to advertisers
-
-### Your Rights
-
-- Request data deletion (GDPR/CCPA)
-- Opt out of marketing emails
-- Download your data
-- Correct inaccurate data
+| Fee Type | Amount | When Charged |
+|----------|--------|--------------|
+| Platform Fee | 2% | On each transaction |
+| Management Fee | 1.5% annually | Deducted from asset value |
+| Performance Fee | 20% | On profits above 8% hurdle |
+| Withdrawal Fee | $1 | Per withdrawal |
+| Wire Transfer | $25 | If requesting wire |
 
 ---
 
-## Limitation of Liability
+## TAX INFORMATION
 
-**PLATFORM PROVIDED "AS IS"**
+### Your Responsibilities
 
-We are NOT liable for:
-- Financial losses from investments
-- Vehicle condition inaccuracies
-- User fraud or misconduct
-- System downtime or data loss
-- Third-party service failures
-- Changes to tax or securities law
+You are solely responsible for determining and paying all taxes related to your investments, including:
+- Capital gains taxes on profitable sales
+- Ordinary income taxes on interest payments
+- State and local taxes as applicable
+- Foreign taxes if applicable
 
-**Maximum Liability:**  
-If we are found liable, our maximum obligation is the lesser of:
-- $100 USD, OR
-- The fees you paid us in past 12 months
+### Tax Documents
 
----
+NUKE will provide:
+- **Form 1099-DIV:** For dividend distributions
+- **Form 1099-B:** For proceeds from sales
+- **Schedule K-1:** For partnership/LLC income (fractional ownership)
 
-## Termination
+Tax documents are provided by March 15 for the prior tax year.
 
-### We May Terminate Your Account If:
+### Consult a Tax Professional
 
-- You violate these terms
-- You commit fraud
-- You're abusive to other users
-- Required by law
-- We stop operating the platform
-
-### If Your Account Is Terminated:
-
-- We will attempt to return your cash balance
-- You forfeit unvested stakes/bonds
-- You lose access to platform features
-- Outstanding obligations remain valid
+The tax treatment of alternative investments can be complex. **NUKE IS NOT A TAX ADVISOR.** Consult a qualified tax professional regarding your specific situation.
 
 ---
 
-## Changes to Terms
+## DISPUTE RESOLUTION
 
-- We may update these terms at any time
-- Material changes: 30-day notice via email
-- Continued use = acceptance of new terms
-- You should review terms periodically
+### Mandatory Arbitration
 
----
+Any dispute arising from your use of the Platform or investments shall be resolved by binding arbitration under the rules of the American Arbitration Association ("AAA").
 
-## Contact & Legal Entity
+**Arbitration Terms:**
+- Location: Clark County, Nevada
+- Single arbitrator selected per AAA rules
+- Virtual hearings permitted
+- Decision final and binding
+- Limited discovery
+- Arbitrator's award may be entered as judgment in any court
 
-**Platform Operator:**  
-Nuke Platform (n-zero.dev)  
-Operating in Beta  
-[Email: legal@n-zero.dev]
+### Class Action Waiver
 
-**Governing Law:**  
-These terms are governed by California law, excluding conflict of law provisions.
+**YOU WAIVE ANY RIGHT TO PARTICIPATE IN A CLASS ACTION, CLASS ARBITRATION, OR REPRESENTATIVE ACTION.**
 
-**Effective Date:**  
-These terms are effective as of October 24, 2025.
+All claims must be brought individually.
 
----
+### Small Claims Exception
 
-## Acknowledgment
-
-**BY USING THIS PLATFORM, YOU ACKNOWLEDGE:**
-
-✓ You have read and understood these terms  
-✓ You understand the investment risks  
-✓ You know these are NOT securities  
-✓ You may lose all money invested  
-✓ You are responsible for your own taxes  
-✓ You waive class action rights  
-✓ You agree to binding arbitration  
-
-**If you DO NOT agree, DO NOT use this platform.**
+Either party may bring an individual action in small claims court for claims within that court's jurisdiction.
 
 ---
 
-**Last Updated:** October 24, 2025  
-**Version:** 1.0
+## REGULATORY INFORMATION
 
+### State Registration
+
+Investment offerings may be registered or qualified in certain states, or offered pursuant to state exemptions. Availability varies by state.
+
+### SEC Filings
+
+Regulation A offerings are filed with the Securities and Exchange Commission. Offering Circulars are publicly available on the SEC's EDGAR system.
+
+### Compliance
+
+NUKE maintains compliance programs for:
+- Know Your Customer (KYC) verification
+- Anti-Money Laundering (AML) screening
+- Investor suitability assessment
+- Regulatory reporting
+
+---
+
+## LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW:
+
+- NUKE is not liable for investment losses
+- NUKE makes no warranties about investment returns
+- Total liability limited to fees paid in prior 12 months
+- No liability for indirect, consequential, or punitive damages
+
+---
+
+## GOVERNING LAW
+
+This Agreement is governed by the laws of the **State of Nevada**, without regard to conflict of law principles.
+
+---
+
+## CONTACT INFORMATION
+
+**NUKE LTD**
+676 Wells Road
+Boulder City, NV 89005
+United States
+
+**General Inquiries:** info@n-zero.dev
+**Legal/Compliance:** legal@n-zero.dev
+**Investor Relations:** investors@n-zero.dev
+**Phone:** (702) 624-6793
+
+**EIN:** 93-3397016
+**Nevada Business ID:** NV20232888774
+
+---
+
+## ACKNOWLEDGMENT
+
+**BY INVESTING THROUGH THE NUKE PLATFORM, YOU ACKNOWLEDGE:**
+
+✓ You have read the Offering Circular and all related documents
+✓ You understand the risks of investing in collector vehicles
+✓ You can afford to lose your entire investment
+✓ You meet the applicable investor qualification requirements
+✓ You are responsible for your own tax obligations
+✓ You agree to binding arbitration and waive class action rights
+✓ You have had the opportunity to ask questions
+
+**IF YOU DO NOT AGREE WITH THESE TERMS, DO NOT INVEST.**
+
+---
+
+*Last Updated: January 25, 2026*
+*Version: 2.0*

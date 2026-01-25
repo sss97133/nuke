@@ -7,6 +7,7 @@ import About from '../pages/About';
 import PrivacyPolicy from '../pages/PrivacyPolicy';
 import TermsOfService from '../pages/TermsOfService';
 import DataDeletion from '../pages/DataDeletion';
+import EULA from '../pages/EULA';
 
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
@@ -64,6 +65,7 @@ export const DomainRoutes = () => {
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/eula" element={<EULA />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
 
         {/* Domain Modules */}

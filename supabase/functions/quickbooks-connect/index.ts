@@ -100,7 +100,7 @@ serve(async (req) => {
           quickbooks_token_expires_at: expiresAt.toISOString(),
           quickbooks_connected_at: new Date().toISOString(),
         })
-        .eq('legal_name', 'Nuke Ltd');
+        .eq('legal_name', 'NUKE LTD');
 
       return new Response(JSON.stringify({
         success: true,
