@@ -32,14 +32,20 @@ const SERIES_WEIGHT_MAP = {
   'K10': '1/2 ton',
   'C1500': '1/2 ton',
   'K1500': '1/2 ton',
+  'R1500': '1/2 ton',
+  'V1500': '1/2 ton',
   'C20': '3/4 ton',
   'K20': '3/4 ton',
   'C2500': '3/4 ton',
   'K2500': '3/4 ton',
+  'R2500': '3/4 ton',
+  'V2500': '3/4 ton',
   'C30': '1 ton',
   'K30': '1 ton',
   'C3500': '1 ton',
-  'K3500': '1 ton'
+  'K3500': '1 ton',
+  'R3500': '1 ton',
+  'V3500': '1 ton'
 };
 
 // Weight class to series mapping (needs drivetrain context)
@@ -93,17 +99,26 @@ export function normalizeGMTruck(data) {
     data.trim || '',
     data.description || ''
   ].join(' ').toLowerCase();
+  const rvEra = data.year && data.year >= 1988 && data.year <= 1991;
 
   // 1. Detect drivetrain (4WD vs 2WD)
-  if (allText.match(/\b(4wd|4x4|four wheel drive|4 wheel drive|k10|k20|k30|k1500|k2500|k3500)\b/i)) {
+  if (allText.match(/\b(4wd|4x4|four wheel drive|4 wheel drive|k10|k20|k30|k1500|k2500|k3500|v1500|v2500|v3500)\b/i)) {
     result.drivetrain = '4WD';
-  } else if (allText.match(/\b(2wd|2x4|two wheel drive|rwd|c10|c20|c30|c1500|c2500|c3500)\b/i)) {
+  } else if (allText.match(/\b(2wd|2x4|two wheel drive|rwd|c10|c20|c30|c1500|c2500|c3500|r1500|r2500|r3500)\b/i)) {
     result.drivetrain = '2WD';
+  }
+
+  // 2. Extract R/V series for 1988-1991 squarebody
+  const rvSeriesMatch = allText.match(/\b(r|v)\s*-?\s*(1500|2500|3500)\b/i);
+  if (rvSeriesMatch) {
+    const prefix = rvEra ? rvSeriesMatch[1].toUpperCase() : (rvSeriesMatch[1].toLowerCase() === 'r' ? 'C' : 'K');
+    result.series = `${prefix}${rvSeriesMatch[2]}`;
+    result.confidence += 30;
   }
 
   // 2. Extract series from text
   const seriesMatch = allText.match(/\b(c|k)(10|20|30|1500|2500|3500)\b/i);
-  if (seriesMatch) {
+  if (seriesMatch && !result.series) {
     result.series = seriesMatch[0].toUpperCase();
     result.confidence += 30;
   }
@@ -113,7 +128,11 @@ export function normalizeGMTruck(data) {
     for (const [weightClass, seriesMap] of Object.entries(WEIGHT_TO_SERIES)) {
       if (allText.includes(weightClass)) {
         const drivetrain = result.drivetrain || '2WD';
-        result.series = seriesMap[drivetrain];
+        if (rvEra && (allText.includes('r/v') || allText.includes('rv'))) {
+          result.series = drivetrain === '4WD' ? seriesMap['4WD'].replace(/^K/, 'V') : seriesMap['2WD'].replace(/^C/, 'R');
+        } else {
+          result.series = seriesMap[drivetrain];
+        }
         result.corrections.push(`Derived series ${result.series} from "${weightClass}" + ${drivetrain}`);
         result.confidence += 20;
         break;

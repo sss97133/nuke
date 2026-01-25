@@ -173,7 +173,7 @@ Extract the following fields as JSON:
   "year": 1974,
   "make": "Chevrolet (NORMALIZE: 'Chevy' → 'Chevrolet', 'GMC' → 'GMC')",
   "model": "Truck (NORMALIZE: 'pickup' → 'Truck', 'truck' → 'Truck', 'Blazer' → 'Blazer'. Note: C/K was the series designation, not the model name)",
-  "series": "C10 (if found: C10, K10, C20, K20, K5, C5, C1500, K1500, etc.)",
+  "series": "C10 (if found: C10, K10, C20, K20, K5, C5, C1500, K1500, R1500, V1500, R2500, V2500, R3500, V3500, etc.)",
   "trim": "Cheyenne Super (if found: Cheyenne, Silverado, Scottsdale, Custom Deluxe, etc.)",
   "bed_length": "SWB or LWB (if mentioned: 'shortbed'/'SWB'/'short bed' → 'SWB', 'longbed'/'LWB'/'long bed' → 'LWB')",
   "engine_status": "No Motor (if mentioned: 'no motor', 'no engine', 'missing engine', 'no motor or transmission' → 'No Motor', otherwise null)",
@@ -214,7 +214,7 @@ Extract the following fields as JSON:
 CRITICAL RULES:
 - NORMALIZE make: "Chevy"/"Chevrolet" → "Chevrolet", "GMC" → "GMC"
 - NORMALIZE model: "pickup"/"truck" → "C/K", "Blazer" → "Blazer", "Suburban" → "Suburban"
-- Extract series from title/description: Look for C10, K10, C20, K20, K5, C5, etc.
+- Extract series from title/description: Look for C10/K10/C20/K20/K5/C5, and R/V 1500/2500/3500 (1988-1991 squarebody).
 - Extract trim from title/description: Look for Cheyenne, Silverado, Scottsdale, Custom Deluxe, Big 10, etc.
 - Detect bed length: "shortbed"/"SWB"/"short bed" → "SWB", "longbed"/"LWB"/"long bed" → "LWB"
 - Detect engine status: "no motor"/"no engine"/"missing engine"/"no motor or transmission" → "No Motor", set engine/engine_size to null

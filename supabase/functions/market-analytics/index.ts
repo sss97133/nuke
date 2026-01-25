@@ -33,6 +33,9 @@ serve(async (req) => {
     const analysisType = url.searchParams.get("type") || "overview";
     const indexCodes = url.searchParams.get("indexes")?.split(",") || [];
 
+    const offeringId = url.searchParams.get("offering_id");
+    const timeframe = url.searchParams.get("timeframe") || "1d";
+
     switch (analysisType) {
       case "overview":
         return await getMarketOverview(supabase);
@@ -42,6 +45,14 @@ serve(async (req) => {
         return await getSectorAnalysis(supabase);
       case "comparison":
         return await getIndexComparison(supabase, indexCodes);
+      case "trading":
+        if (!offeringId) {
+          return new Response(JSON.stringify({ error: "offering_id required for trading analytics" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        return await getTradingAnalytics(supabase, offeringId, timeframe);
       default:
         return await getMarketOverview(supabase);
     }
@@ -439,4 +450,197 @@ function calculateCorrelation(x: number[], y: number[]): number {
   if (denominator === 0) return 0;
 
   return Number((numerator / denominator).toFixed(3));
+}
+
+/**
+ * Trading Analytics for individual offerings
+ * VWAP, TWAP, volatility, market impact, momentum
+ */
+async function getTradingAnalytics(supabase: any, offeringId: string, timeframe: string) {
+  // Calculate time range
+  const now = new Date();
+  const timeRanges: Record<string, number> = {
+    '1h': 1 * 60 * 60 * 1000,
+    '4h': 4 * 60 * 60 * 1000,
+    '1d': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+  };
+  const startTime = new Date(now.getTime() - (timeRanges[timeframe] || timeRanges['1d']));
+
+  // Fetch trades for the timeframe
+  const { data: trades } = await supabase
+    .from('market_trades')
+    .select('price_per_share, shares_traded, executed_at')
+    .eq('offering_id', offeringId)
+    .gte('executed_at', startTime.toISOString())
+    .order('executed_at', { ascending: true });
+
+  // Fetch NBBO
+  const { data: nbbo } = await supabase
+    .from('nbbo_cache')
+    .select('*')
+    .eq('offering_id', offeringId)
+    .maybeSingle();
+
+  // Fetch current offering data
+  const { data: offering } = await supabase
+    .from('vehicle_offerings')
+    .select('current_share_price, opening_price, total_trades, total_volume_shares')
+    .eq('id', offeringId)
+    .single();
+
+  const tradeList = trades || [];
+  const currentPrice = offering?.current_share_price || null;
+
+  // VWAP: Sum(Price * Volume) / Sum(Volume)
+  let vwap: number | null = null;
+  let totalVolume = 0;
+  if (tradeList.length > 0) {
+    const totalPriceVolume = tradeList.reduce(
+      (sum: number, t: any) => sum + t.price_per_share * t.shares_traded,
+      0
+    );
+    totalVolume = tradeList.reduce((sum: number, t: any) => sum + t.shares_traded, 0);
+    vwap = totalVolume > 0 ? totalPriceVolume / totalVolume : null;
+  }
+
+  // TWAP: Simple average of prices
+  let twap: number | null = null;
+  if (tradeList.length > 0) {
+    twap = tradeList.reduce((sum: number, t: any) => sum + t.price_per_share, 0) / tradeList.length;
+  }
+
+  // Price change
+  let priceChange: number | null = null;
+  let priceChangePct: number | null = null;
+  if (currentPrice !== null && tradeList.length > 0) {
+    const firstPrice = tradeList[0].price_per_share;
+    priceChange = currentPrice - firstPrice;
+    priceChangePct = (priceChange / firstPrice) * 100;
+  }
+
+  // Volatility (annualized standard deviation of returns)
+  let volatility: number | null = null;
+  let volatilityDaily: number | null = null;
+  if (tradeList.length >= 2) {
+    const returns: number[] = [];
+    for (let i = 1; i < tradeList.length; i++) {
+      const ret = (tradeList[i].price_per_share - tradeList[i - 1].price_per_share) /
+                  tradeList[i - 1].price_per_share;
+      returns.push(ret);
+    }
+
+    if (returns.length > 0) {
+      const meanReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+      const variance = returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / returns.length;
+      volatilityDaily = Math.sqrt(variance);
+      volatility = volatilityDaily * Math.sqrt(252); // Annualized
+    }
+  }
+
+  // High-Low Range
+  let high: number | null = null;
+  let low: number | null = null;
+  if (tradeList.length > 0) {
+    const prices = tradeList.map((t: any) => t.price_per_share);
+    high = Math.max(...prices);
+    low = Math.min(...prices);
+  }
+
+  // Momentum
+  let momentum: number | null = null;
+  if (tradeList.length >= 2) {
+    const recentPrice = tradeList[tradeList.length - 1].price_per_share;
+    const oldPrice = tradeList[0].price_per_share;
+    momentum = ((recentPrice - oldPrice) / oldPrice) * 100;
+  }
+
+  // RSI (14-period)
+  let rsi: number | null = null;
+  if (tradeList.length >= 15) {
+    const gains: number[] = [];
+    const losses: number[] = [];
+    for (let i = 1; i < Math.min(tradeList.length, 15); i++) {
+      const change = tradeList[i].price_per_share - tradeList[i - 1].price_per_share;
+      if (change > 0) {
+        gains.push(change);
+        losses.push(0);
+      } else {
+        gains.push(0);
+        losses.push(Math.abs(change));
+      }
+    }
+    const avgGain = gains.reduce((a, b) => a + b, 0) / gains.length;
+    const avgLoss = losses.reduce((a, b) => a + b, 0) / losses.length;
+    if (avgLoss > 0) {
+      const rs = avgGain / avgLoss;
+      rsi = 100 - (100 / (1 + rs));
+    } else {
+      rsi = 100;
+    }
+  }
+
+  // Market Impact estimation
+  const bidDepth = nbbo?.total_bid_depth || 100;
+  const askDepth = nbbo?.total_ask_depth || 100;
+  const avgDepth = (bidDepth + askDepth) / 2;
+
+  const estimatedImpact = {
+    small: { shares: 10, impact_pct: (10 / avgDepth) * 0.5 },
+    medium: { shares: 50, impact_pct: (50 / avgDepth) * 0.5 },
+    large: { shares: 100, impact_pct: (100 / avgDepth) * 0.5 },
+  };
+
+  // Trading days calculation
+  const tradingDays = timeframe === '1h' ? 1/24 :
+                       timeframe === '4h' ? 1/6 :
+                       timeframe === '1d' ? 1 :
+                       timeframe === '7d' ? 7 : 30;
+  const averageDailyVolume = totalVolume / Math.max(tradingDays, 1);
+
+  return new Response(JSON.stringify({
+    success: true,
+    analysis_type: "trading_analytics",
+    generated_at: new Date().toISOString(),
+    offering_id: offeringId,
+    timeframe,
+    period: {
+      start: startTime.toISOString(),
+      end: now.toISOString()
+    },
+    price_metrics: {
+      current_price: currentPrice,
+      vwap,
+      twap,
+      high,
+      low,
+      price_change: priceChange,
+      price_change_pct: priceChangePct
+    },
+    volume_metrics: {
+      total_volume: totalVolume,
+      trade_count: tradeList.length,
+      average_daily_volume: averageDailyVolume,
+      average_trade_size: tradeList.length > 0 ? totalVolume / tradeList.length : 0
+    },
+    risk_metrics: {
+      volatility_annualized: volatility,
+      volatility_daily: volatilityDaily,
+      high_low_range: high !== null && low !== null ? high - low : null
+    },
+    momentum_indicators: {
+      momentum_pct: momentum,
+      rsi
+    },
+    liquidity_metrics: {
+      bid_ask_spread: nbbo?.spread || null,
+      bid_ask_spread_pct: nbbo?.spread_pct || null,
+      bid_depth: nbbo?.total_bid_depth || 0,
+      ask_depth: nbbo?.total_ask_depth || 0,
+      estimated_market_impact: estimatedImpact
+    }
+  }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" }
+  });
 }

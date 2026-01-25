@@ -8,44 +8,34 @@
       "runtime": "@vercel/node@3.0.0"
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/assets/(.*)",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      },
-      "continue": true
+      "source": "/api/quickbooks/callback",
+      "destination": "/api/quickbooks/callback"
     },
     {
-      "src": "/$",
-      "headers": {
-        "Cache-Control": "no-store"
-      },
-      "continue": true
+      "source": "/api/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path*"
     },
     {
-      "src": "/(.*)",
-      "headers": {
-        "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "DENY",
-        "X-XSS-Protection": "1; mode=block"
-      },
-      "continue": true
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
     },
     {
-      "src": "/api/quickbooks/callback",
-      "dest": "/api/quickbooks/callback.ts"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/$1"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" }
+      ]
     }
   ]
 }

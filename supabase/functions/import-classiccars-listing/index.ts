@@ -488,10 +488,24 @@ function normalizeVehicleData(data: any): any {
     // Remove location patterns like "in Sedona , Arizona"
     normalized.model = normalized.model.replace(/\s+in\s+[^,]+(?:,\s*[A-Z]{2})?/i, '').trim()
     
-    // Extract series from model (K5, K10, C10, etc.)
-    const seriesMatch = normalized.model.match(/\b([CK]\d+|K-5|K5|Blazer|Suburban|Tahoe|Yukon)\b/i)
+    const yearNum = typeof normalized.year === 'number' ? normalized.year : Number.parseInt(String(normalized.year || ''), 10)
+    const rvEra = Number.isFinite(yearNum) && yearNum >= 1988 && yearNum <= 1991
+    const normalizeRvPrefix = (prefix: string) => {
+      const upper = prefix.toUpperCase()
+      if (upper === 'R' || upper === 'V') {
+        return rvEra ? upper : (upper === 'R' ? 'C' : 'K')
+      }
+      return upper
+    }
+
+    // Extract series from model (K5, K10, C10, R/V 1500, etc.)
+    const seriesMatch = normalized.model.match(/\b([CK]\d+|K-5|K5|Blazer|Suburban|Tahoe|Yukon|[RV]\s*-?\s*(1500|2500|3500))\b/i)
     if (seriesMatch) {
-      const series = seriesMatch[1].toUpperCase().replace('-', '')
+      let series = seriesMatch[1].toUpperCase().replace('-', '').replace(/\s+/g, '')
+      if (series.startsWith('R') || series.startsWith('V')) {
+        const prefix = normalizeRvPrefix(series.charAt(0))
+        series = `${prefix}${series.slice(1)}`
+      }
       normalized.series = series
       
       // If model contains series, extract base model
@@ -503,7 +517,7 @@ function normalizeVehicleData(data: any): any {
         normalized.model = 'Tahoe'
       } else if (series.includes('YUKON')) {
         normalized.model = 'Yukon'
-      } else if (series.match(/^[CK]\d+$/)) {
+      } else if (series.match(/^[CKRV]\d+$/)) {
         normalized.model = 'C/K'
       }
     }

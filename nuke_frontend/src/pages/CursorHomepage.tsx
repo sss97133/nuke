@@ -6,6 +6,7 @@ import { UserInteractionService } from '../services/userInteractionService';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { getCanonicalBodyStyle } from '../services/bodyStyleTaxonomy';
 import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
+import { parseMoneyNumber } from '../lib/auctionUtils';
 
 interface HypeVehicle {
   id: string;
@@ -58,6 +59,11 @@ type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
 type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
 type SortDirection = 'asc' | 'desc';
+
+const getDisplayPriceValue = (vehicle: HypeVehicle | null | undefined): number | null => {
+  if (!vehicle) return null;
+  return parseMoneyNumber((vehicle as any).display_price);
+};
 
 const DEBUG_CURSOR_HOMEPAGE = import.meta.env.DEV;
 
@@ -1262,10 +1268,10 @@ const CursorHomepage: React.FC = () => {
       });
     }
     if (filters.priceMin) {
-      result = result.filter(v => (v.display_price || 0) >= filters.priceMin!);
+      result = result.filter(v => (getDisplayPriceValue(v) ?? 0) >= filters.priceMin!);
     }
     if (filters.priceMax) {
-      result = result.filter(v => (v.display_price || 0) <= filters.priceMax!);
+      result = result.filter(v => (getDisplayPriceValue(v) ?? 0) <= filters.priceMax!);
     }
     if (filters.hasImages) {
       result = result.filter(v => (v.image_count || 0) > 0);
@@ -1383,6 +1389,15 @@ const CursorHomepage: React.FC = () => {
       });
     }
     
+    const compareDisplayPrice = (a: HypeVehicle, b: HypeVehicle) => {
+      const aPrice = getDisplayPriceValue(a);
+      const bPrice = getDisplayPriceValue(b);
+      if (aPrice === null && bPrice === null) return 0;
+      if (aPrice === null) return 1;
+      if (bPrice === null) return -1;
+      return sortDirection === 'desc' ? bPrice - aPrice : aPrice - bPrice;
+    };
+
     // Apply sorting with direction - default to newest (created_at DESC)
     const dir = sortDirection === 'desc' ? 1 : -1;
     switch (sortBy) {
@@ -1412,10 +1427,8 @@ const CursorHomepage: React.FC = () => {
         );
         break;
       case 'price_high':
-        result.sort((a, b) => dir * ((b.display_price || 0) - (a.display_price || 0)));
-        break;
       case 'price_low':
-        result.sort((a, b) => dir * ((a.display_price || 0) - (b.display_price || 0)));
+        result.sort(compareDisplayPrice);
         break;
       case 'volume':
         result.sort((a, b) => 0);
@@ -1439,7 +1452,7 @@ const CursorHomepage: React.FC = () => {
     }
     
     setFilteredVehicles(result);
-  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, activeSources, domainToFilterKey]);
+  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, activeSources, domainToFilterKey, getDisplayPriceValue]);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
@@ -2790,18 +2803,18 @@ const CursorHomepage: React.FC = () => {
 
       // Process vehicles with optimized image data (use thumbnails for grid performance)
       const processed = vehiclesWithGoodImages.map((v: any) => {
-        const salePrice = v.sale_price ? Number(v.sale_price) : null;
-        const askingPrice = v.asking_price ? Number(v.asking_price) : null;
-        const currentValue = v.current_value ? Number(v.current_value) : null;
-        const purchasePrice = v.purchase_price ? Number(v.purchase_price) : null;
-        const winningBid = v.winning_bid ? Number(v.winning_bid) : null;
-        const highBid = v.high_bid ? Number(v.high_bid) : null;
+        const salePrice = parseMoneyNumber(v.sale_price);
+        const askingPrice = parseMoneyNumber(v.asking_price);
+        const currentValue = parseMoneyNumber(v.current_value);
+        const purchasePrice = parseMoneyNumber(v.purchase_price);
+        const winningBid = parseMoneyNumber(v.winning_bid);
+        const highBid = parseMoneyNumber(v.high_bid);
         const listing = auctionByVehicleId.get(String(v?.id || '')) || null;
         const listingStatus = String((listing as any)?.listing_status || '').toLowerCase();
         const saleStatus = String(v.sale_status || '').toLowerCase();
         const isLive = listingStatus === 'active' || listingStatus === 'live';
-        const listingLiveBid = typeof (listing as any)?.current_bid === 'number' ? (listing as any).current_bid : Number((listing as any)?.current_bid || 0);
-        const finalPrice = typeof (listing as any)?.final_price === 'number' ? (listing as any).final_price : Number((listing as any)?.final_price || 0);
+        const listingLiveBid = parseMoneyNumber((listing as any)?.current_bid);
+        const finalPrice = parseMoneyNumber((listing as any)?.final_price);
 
         // Priority order for display price:
         // 1. Sale price (actual sold price)
@@ -6154,7 +6167,9 @@ const CursorHomepage: React.FC = () => {
                   }}
                   onClick={() => {
                     if (sortBy === 'price_high' || sortBy === 'price_low') {
-                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                      const nextDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+                      setSortDirection(nextDirection);
+                      setSortBy(nextDirection === 'desc' ? 'price_high' : 'price_low');
                     } else {
                       setSortBy('price_high');
                       setSortDirection('desc');
