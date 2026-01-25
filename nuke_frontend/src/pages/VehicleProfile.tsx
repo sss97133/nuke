@@ -180,6 +180,26 @@ const VehicleProfile: React.FC = () => {
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
   const { lastMemeDrop } = useVehicleMemeDrops(vehicle?.id);
   const [isAdmin, setIsAdmin] = useState(false);
+  const VEHICLE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  const extractVehicleIdFromPath = (value?: string | null): string | null => {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const path = raw.includes('/vehicle-images/') ? raw.split('/vehicle-images/')[1] : raw;
+    const clean = path.split('?')[0].replace(/^\/+/, '');
+    const parts = clean.split('/').filter(Boolean);
+    if (parts.length === 0) return null;
+    if (parts[0] === 'vehicles' && parts[1] && VEHICLE_ID_RE.test(parts[1])) return parts[1];
+    if (VEHICLE_ID_RE.test(parts[0])) return parts[0];
+    return null;
+  };
+
+  const isMismatchedVehicleImage = (value?: string | null, expectedId?: string | null): boolean => {
+    const target = String(expectedId || '').toLowerCase();
+    if (!value || !target) return false;
+    const candidate = extractVehicleIdFromPath(value);
+    return Boolean(candidate && candidate.toLowerCase() !== target);
+  };
 
   // For BaT-import vehicles with no `vehicle_images` yet, fetch listing gallery URLs so the profile isn't empty.
   useEffect(() => {
@@ -1667,7 +1687,8 @@ const VehicleProfile: React.FC = () => {
         primaryImgLower.includes('import_queue') ||
         primaryImgLower.includes('organization-logos/') ||
         primaryImgLower.includes('organization_logos/');
-      if (primaryImg && !leadImageUrl && !primaryImgLooksWrong) {
+      const primaryImgMismatch = isMismatchedVehicleImage(primaryImg, vehicleData.id);
+      if (primaryImg && !leadImageUrl && !primaryImgLooksWrong && !primaryImgMismatch) {
         setLeadImageUrl(primaryImg);
       }
 
@@ -2526,8 +2547,9 @@ const VehicleProfile: React.FC = () => {
 
     const filterProfileImages = (urls: string[], v: any): string[] => {
       const normalized = (Array.isArray(urls) ? urls : []).map(normalizeUrl).filter(Boolean);
+      const withoutMismatched = normalized.filter((u: string) => !isMismatchedVehicleImage(u, v?.id));
       // Exclude organization/dealer logos and import_queue images from profile display
-      const withoutOrgLogos = normalized.filter((u: string) => {
+      const withoutOrgLogos = withoutMismatched.filter((u: string) => {
         const urlLower = String(u || '').toLowerCase();
         // Exclude import_queue images (these are organization/dealer images)
         if (urlLower.includes('import_queue')) return false;
@@ -2667,6 +2689,9 @@ const VehicleProfile: React.FC = () => {
           const s = String(p || '').toLowerCase();
           return s.includes('external_import') || s.includes('organization_import') || s.includes('import_queue');
         };
+        const isMismatchedStoragePath = (row: any): boolean => {
+          return isMismatchedVehicleImage(row?.storage_path || row?.image_url, vehicle.id);
+        };
         
         // Check if image URL is an organization/dealer logo (should never be used as vehicle image)
         const isOrganizationLogo = (url: string): boolean => {
@@ -2686,11 +2711,13 @@ const VehicleProfile: React.FC = () => {
         // Exclude import_queue images and organization logos from primary selection
         const primaryIsImportQueue = primaryRow && isImportedStoragePath(primaryRow?.storage_path);
         const primaryIsOrgLogo = primaryCandidate && isOrganizationLogo(primaryCandidate);
-        const primaryOk = primaryCandidate && !primaryIsImportQueue && !primaryIsOrgLogo && filterProfileImages([primaryCandidate], vehicle).length > 0;
+        const primaryIsMismatch = primaryRow && isMismatchedStoragePath(primaryRow);
+        const primaryOk = primaryCandidate && !primaryIsImportQueue && !primaryIsOrgLogo && !primaryIsMismatch && filterProfileImages([primaryCandidate], vehicle).length > 0;
 
         // Build fallback pool, excluding import_queue images and organization logos
         const fallbackPool = imageRecords
           .filter((r: any) => {
+            if (isMismatchedStoragePath(r)) return false;
             // Exclude import_queue images
             if (isImportedStoragePath(r?.storage_path)) return false;
             // Exclude organization/dealer logos
