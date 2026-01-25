@@ -5,12 +5,10 @@
  * Exchanges the authorization code for tokens immediately, then redirects to the UI.
  */
 
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   const { code, realmId, state, error } = req.query;
 
   // Handle OAuth errors from QuickBooks
@@ -29,9 +27,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Exchanging QuickBooks code for tokens...');
     console.log('Code:', String(code).substring(0, 10) + '...');
     console.log('RealmId:', realmId);
+    console.log('SUPABASE_URL:', SUPABASE_URL);
 
     // Call the Supabase edge function to exchange the code
     const callbackUrl = `${SUPABASE_URL}/functions/v1/quickbooks-connect?action=callback&code=${encodeURIComponent(String(code))}&realmId=${encodeURIComponent(String(realmId))}`;
+
+    console.log('Calling:', callbackUrl.substring(0, 60) + '...');
 
     const response = await fetch(callbackUrl, {
       method: 'GET',
@@ -51,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('Edge function error:', data.error);
       return res.redirect(302, `/business/settings?qb=error&message=${encodeURIComponent(data.error || 'Failed to connect')}`);
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error('Callback handler error:', err);
     return res.redirect(302, `/business/settings?qb=error&message=${encodeURIComponent(err.message || 'Unknown error')}`);
   }
