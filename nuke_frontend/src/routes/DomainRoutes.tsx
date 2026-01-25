@@ -21,6 +21,13 @@ const OAuthCallback = React.lazy(() => import('../components/auth/OAuthCallback'
 const ResetPassword = React.lazy(() => import('../pages/ResetPassword'));
 const DropboxCallback = React.lazy(() => import('../pages/DropboxCallback'));
 
+// Investment platform
+const Invest = React.lazy(() => import('../pages/Invest'));
+const MarketIntelligence = React.lazy(() => import('../pages/MarketIntelligence'));
+const OfferingDetail = React.lazy(() => import('../pages/OfferingDetail'));
+const SubscriptionFlow = React.lazy(() => import('../components/compliance/SubscriptionFlow'));
+const SubscriptionSuccess = React.lazy(() => import('../pages/SubscriptionSuccess'));
+
 // Legacy pages (still used by navigation components)
 const Profile = React.lazy(() => import('../pages/Profile'));
 const Capture = React.lazy(() => import('../pages/Capture'));
@@ -94,6 +101,13 @@ export const DomainRoutes = () => {
         <Route path="/bat-members" element={<BaTMembers />} />
         <Route path="/members" element={<BaTMembers />} />
         <Route path="/search" element={<Search />} />
+
+        {/* Investment Platform */}
+        <Route path="/invest" element={<Invest />} />
+        <Route path="/invest/offering/:offeringId" element={<OfferingDetail />} />
+        <Route path="/invest/subscribe/:offeringId" element={<SubscriptionFlow />} />
+        <Route path="/invest/subscription/:subscriptionId/success" element={<SubscriptionSuccess />} />
+        <Route path="/market-intelligence" element={<MarketIntelligence />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
