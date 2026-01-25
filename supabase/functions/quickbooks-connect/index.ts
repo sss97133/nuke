@@ -116,7 +116,7 @@ serve(async (req) => {
       const { data: company } = await supabase
         .from('parent_company')
         .select('*')
-        .eq('legal_name', 'Nuke Ltd')
+        .eq('legal_name', 'NUKE LTD')
         .single();
 
       if (!company?.quickbooks_access_token) {
@@ -158,7 +158,7 @@ serve(async (req) => {
       const { data: company } = await supabase
         .from('parent_company')
         .select('*')
-        .eq('legal_name', 'Nuke Ltd')
+        .eq('legal_name', 'NUKE LTD')
         .single();
 
       if (!company?.quickbooks_access_token) {
@@ -194,7 +194,7 @@ serve(async (req) => {
     const { data: company } = await supabase
       .from('parent_company')
       .select('legal_name, quickbooks_realm_id, quickbooks_connected_at, quickbooks_token_expires_at')
-      .eq('legal_name', 'Nuke Ltd')
+      .eq('legal_name', 'NUKE LTD')
       .single();
 
     return new Response(JSON.stringify({
