@@ -118,13 +118,15 @@ export default function BusinessSettings() {
   async function connectQuickBooks() {
     setConnecting(true);
     try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quickbooks-connect?action=auth_url`,
-        {
-          headers: {
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-        }
+        { headers }
       );
       const data = await res.json();
 
