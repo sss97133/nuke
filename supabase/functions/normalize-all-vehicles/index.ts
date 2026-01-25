@@ -7,18 +7,41 @@ const corsHeaders = {
 }
 
 // Vehicle hierarchy knowledge
-const TRUCK_SERIES = ['C10', 'K10', 'C20', 'K20', 'C30', 'K30', 'C1500', 'K1500', 'C2500', 'K2500', 'C3500', 'K3500', 'C5', 'K5']
+const TRUCK_SERIES = [
+  'C10', 'K10', 'C20', 'K20', 'C30', 'K30',
+  'C1500', 'K1500', 'C2500', 'K2500', 'C3500', 'K3500',
+  'R1500', 'V1500', 'R2500', 'V2500', 'R3500', 'V3500',
+  'C5', 'K5'
+]
 const TRUCK_TRIMS = ['Cheyenne', 'Silverado', 'Scottsdale', 'Custom Deluxe', 'Big 10', 'Sierra', 'Sierra Classic', 'High Sierra', 'Custom', 'Base']
 const TRUCK_MODELS = ['Truck', 'Pickup', 'C/K']
 
 const CAMARO_TRIMS = ['RS', 'SS', 'Z28', 'Z/28', 'LT', 'LS', 'IROC', 'Berlinetta', 'Sport', 'Base']
 const CAMARO_MODELS = ['Camaro']
 
-const SUBURBAN_SERIES = ['C10', 'K10', 'C1500', 'K1500', 'C2500', 'K2500']
+const SUBURBAN_SERIES = ['C10', 'K10', 'C1500', 'K1500', 'C2500', 'K2500', 'R1500', 'V1500', 'R2500', 'V2500']
 const SUBURBAN_TRIMS = ['Silverado', 'Cheyenne', 'Custom Deluxe', 'LS', 'LT', 'LTZ']
 const SUBURBAN_MODELS = ['Suburban']
 
 const BLAZER_SERIES = ['K5', 'C5']
+
+const getYearNumber = (year: any): number | null => {
+  if (typeof year === 'number' && Number.isFinite(year)) return year
+  const parsed = Number.parseInt(String(year || ''), 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const isRvEra = (year: number | null): boolean => {
+  return !!year && year >= 1988 && year <= 1991
+}
+
+const normalizeRvPrefix = (prefix: string, year: number | null): string => {
+  const upper = prefix.toUpperCase()
+  if (upper === 'R' || upper === 'V') {
+    return isRvEra(year) ? upper : (upper === 'R' ? 'C' : 'K')
+  }
+  return upper
+}
 const BLAZER_TRIMS = ['Silverado', 'Cheyenne', 'Custom', 'Base']
 const BLAZER_MODELS = ['Blazer', 'K5 Blazer']
 
@@ -79,11 +102,13 @@ serve(async (req) => {
         const model = (vehicle.model || '').trim()
         const series = (vehicle.series || '').trim()
         const trim = (vehicle.trim || '').trim()
+        const yearNum = getYearNumber(vehicle.year)
         
         const makeLower = make.toLowerCase()
         const modelLower = model.toLowerCase()
         const seriesLower = series.toLowerCase()
         const trimLower = trim.toLowerCase()
+        const rvHint = modelLower.includes('r/v') || modelLower.includes('rv')
         
         // Normalize make
         if (makeLower === 'chevy' || makeLower === 'chevrolet') {
@@ -131,9 +156,18 @@ serve(async (req) => {
         let extractedTrim: string | null = null
         let cleanModel = model
         
+        // Check if model contains R/V series (1988-1991 squarebody)
+        const rvSeriesInModel = modelLower.match(/\b([rv])\s*-?\s*(1500|2500|3500)\b/i)
+        if (rvSeriesInModel && !series) {
+          const prefix = normalizeRvPrefix(rvSeriesInModel[1], yearNum)
+          extractedSeries = `${prefix}${rvSeriesInModel[2]}`
+          cleanModel = cleanModel.replace(new RegExp(`${rvSeriesInModel[1]}\\s*-?\\s*${rvSeriesInModel[2]}`, 'gi'), '').trim()
+          needsUpdate = true
+        }
+
         // Check if model contains series designation (C10, K10, C1500, K2500, etc.)
         const seriesInModel = modelLower.match(/\b([ck]\d{2,4}|[ck]1500|[ck]2500|[ck]3500|[ck]5)\b/i)
-        if (seriesInModel && !series) {
+        if (seriesInModel && !series && !extractedSeries) {
           extractedSeries = seriesInModel[1].toUpperCase()
           cleanModel = cleanModel.replace(new RegExp(seriesInModel[1], 'gi'), '').trim()
           needsUpdate = true
@@ -142,14 +176,14 @@ serve(async (req) => {
         // Check if model contains standalone numbers that are series (1500, 2500, 3500, etc.)
         // Also check for "V1500" (old GMC designation, should be K1500)
         // Handle "2500 HD" pattern - extract the number as series
-        const seriesNumberMatch = modelLower.match(/\b([vk]?1500|[vk]?2500|[vk]?3500|250|350)\s*(?:hd)?\b/i)
+        const seriesNumberMatch = modelLower.match(/\b([rvk]?1500|[rvk]?2500|[rvk]?3500|250|350)\s*(?:hd)?\b/i)
         if (seriesNumberMatch && !series && (isTruck || isSuburban || makeLower.includes('gmc') || makeLower.includes('chevrolet'))) {
           let number = seriesNumberMatch[1]
           let prefix = 'C' // Default to 2WD
           
-          // Handle V1500, V2500 (old GMC, convert to K)
-          if (number.toLowerCase().startsWith('v')) {
-            prefix = 'K'
+          // Handle R/V (1988-1991) and K/C prefixes
+          if (number.toLowerCase().startsWith('r') || number.toLowerCase().startsWith('v')) {
+            prefix = normalizeRvPrefix(number.charAt(0), yearNum)
             number = number.substring(1)
           } else if (number.toLowerCase().startsWith('k')) {
             prefix = 'K'
@@ -186,7 +220,14 @@ serve(async (req) => {
           if (standaloneSeries && (isTruck || isSuburban || makeLower.includes('gmc') || makeLower.includes('chevrolet'))) {
             const number = standaloneSeries[1]
             const driveLower = (vehicle.drivetrain || '').toLowerCase()
-            const prefix = driveLower.includes('4wd') || driveLower.includes('4') || driveLower.includes('4x4') ? 'K' : 'C'
+            let prefix = driveLower.includes('4wd') || driveLower.includes('4') || driveLower.includes('4x4') ? 'K' : 'C'
+            if (isRvEra(yearNum) && rvHint) {
+              if (driveLower.includes('4wd') || driveLower.includes('4') || driveLower.includes('4x4')) {
+                prefix = 'V'
+              } else if (driveLower.includes('2wd') || driveLower.includes('rwd')) {
+                prefix = 'R'
+              }
+            }
             if (number === '250' || number === '350') {
               extractedSeries = `${prefix}${number}0`
             } else {
@@ -202,7 +243,14 @@ serve(async (req) => {
         const numberOnly = modelLower.match(/^\s*(\d{3,4})\s*$/)
         if (numberOnly && !series && (isTruck || isSuburban)) {
           const driveLower = (vehicle.drivetrain || '').toLowerCase()
-          const prefix = driveLower.includes('4wd') || driveLower.includes('4') ? 'K' : 'C'
+          let prefix = driveLower.includes('4wd') || driveLower.includes('4') ? 'K' : 'C'
+          if (isRvEra(yearNum) && rvHint) {
+            if (driveLower.includes('4wd') || driveLower.includes('4') || driveLower.includes('4x4')) {
+              prefix = 'V'
+            } else if (driveLower.includes('2wd') || driveLower.includes('rwd')) {
+              prefix = 'R'
+            }
+          }
           const number = numberOnly[1]
           if (number === '250' || number === '350') {
             extractedSeries = `${prefix}${number}0`
@@ -272,13 +320,13 @@ serve(async (req) => {
             needsUpdate = true
           } else {
             // Check if trim contains series number (e.g., "2500 HD", "1500", "3500")
-            const seriesInTrim = trimLower.match(/\b([vk]?1500|[vk]?2500|[vk]?3500|250|350)\s*(?:hd)?\b/i)
+            const seriesInTrim = trimLower.match(/\b([rvk]?1500|[rvk]?2500|[rvk]?3500|250|350)\s*(?:hd)?\b/i)
             if (seriesInTrim) {
               let number = seriesInTrim[1]
               let prefix = 'C'
               
-              if (number.toLowerCase().startsWith('v')) {
-                prefix = 'K'
+              if (number.toLowerCase().startsWith('r') || number.toLowerCase().startsWith('v')) {
+                prefix = normalizeRvPrefix(number.charAt(0), yearNum)
                 number = number.substring(1)
               } else if (number.toLowerCase().startsWith('k')) {
                 prefix = 'K'
@@ -289,6 +337,13 @@ serve(async (req) => {
               } else {
                 const driveLower = (vehicle.drivetrain || '').toLowerCase()
                 prefix = driveLower.includes('4wd') || driveLower.includes('4') || driveLower.includes('4x4') ? 'K' : 'C'
+                if (isRvEra(yearNum) && rvHint) {
+                  if (driveLower.includes('4wd') || driveLower.includes('4') || driveLower.includes('4x4')) {
+                    prefix = 'V'
+                  } else if (driveLower.includes('2wd') || driveLower.includes('rwd')) {
+                    prefix = 'R'
+                  }
+                }
               }
               
               if (number === '250' || number === '350') {
@@ -363,7 +418,7 @@ serve(async (req) => {
           .replace(/\b\d+ci\b/gi, '') // Engine cubic inches (454ci, etc.)
           .replace(/\b\d+k\s*miles?\b/gi, '') // Mileage
           .replace(/\b\d+\s*miles?\b/gi, '') // Other mileage formats
-          .replace(/\b(1500|2500|3500|250|350|v1500|v2500|v3500|k1500|k2500|k3500|c1500|c2500|c3500)\s*hd\b/gi, '') // Remove "HD" suffix
+          .replace(/\b(1500|2500|3500|250|350|r1500|r2500|r3500|v1500|v2500|v3500|k1500|k2500|k3500|c1500|c2500|c3500)\s*hd\b/gi, '') // Remove "HD" suffix
           .replace(/\bhd\b/gi, '') // Remove standalone "HD"
           .replace(/["']/g, '') // Remove quotes
           .replace(/&#215;/g, '') // Remove HTML entity for ×
@@ -373,7 +428,7 @@ serve(async (req) => {
         // Remove series numbers and designations that might still be in model
         if (cleanModel) {
           cleanModel = cleanModel
-            .replace(/\b(1500|2500|3500|250|350|v1500|v2500|v3500|k1500|k2500|k3500|c1500|c2500|c3500|c10|k10|c20|k20|c30|k30|k2500|c2500)\b/gi, '')
+            .replace(/\b(1500|2500|3500|250|350|r1500|r2500|r3500|v1500|v2500|v3500|k1500|k2500|k3500|c1500|c2500|c3500|c10|k10|c20|k20|c30|k30|k2500|c2500)\b/gi, '')
             .replace(/\s+/g, ' ')
             .trim()
         }

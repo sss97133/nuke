@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const getYearNumber = (year: any): number | null => {
+  if (typeof year === 'number' && Number.isFinite(year)) return year
+  const parsed = Number.parseInt(String(year || ''), 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const isRvEra = (year: number | null): boolean => {
+  return !!year && year >= 1988 && year <= 1991
+}
+
+const normalizeRvPrefix = (prefix: string, year: number | null): string => {
+  const upper = prefix.toUpperCase()
+  if (upper === 'R' || upper === 'V') {
+    return isRvEra(year) ? upper : (upper === 'R' ? 'C' : 'K')
+  }
+  return upper
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -94,13 +112,22 @@ serve(async (req) => {
         //           "3500 lowered dually" → model="Truck", series="C3500" or "K3500"
         if (vehicle.model) {
           const modelLower = vehicle.model.toLowerCase().trim()
+          const yearNum = getYearNumber(vehicle.year)
           let newModel = vehicle.model
           let extractedSeries: string | null = null
           let extractedTrim: string | null = null
           
+          // Check for R/V series (1988-1991 squarebody)
+          const rvSeriesMatch = modelLower.match(/\b([rv])\s*-?\s*(1500|2500|3500)\b/i)
+          if (rvSeriesMatch) {
+            const prefix = normalizeRvPrefix(rvSeriesMatch[1], yearNum)
+            extractedSeries = `${prefix}${rvSeriesMatch[2]}`
+            newModel = newModel.replace(new RegExp(`${rvSeriesMatch[1]}\\s*-?\\s*${rvSeriesMatch[2]}`, 'gi'), '').trim()
+          }
+
           // Check if model contains series designation (C10, K10, C20, K20, C3500, K3500, etc.)
           const seriesMatch = modelLower.match(/\b([ck]\d{2,4}|[ck]1500|[ck]2500|[ck]3500)\b/)
-          if (seriesMatch) {
+          if (seriesMatch && !extractedSeries) {
             extractedSeries = seriesMatch[1].toUpperCase()
             // Remove series from model
             newModel = newModel.replace(new RegExp(seriesMatch[1], 'gi'), '').trim()
@@ -111,7 +138,15 @@ serve(async (req) => {
           if (numberOnlyMatch && !extractedSeries) {
             // Infer series based on drivetrain (if available) or default to C
             const driveLower = (vehicle.drivetrain || '').toLowerCase()
-            const prefix = driveLower.includes('4wd') || driveLower.includes('4') ? 'K' : 'C'
+            const inferred4wd = driveLower.includes('4wd') || driveLower.includes('4') || modelLower.includes('4x4') || modelLower.includes('4wd')
+            let prefix = inferred4wd ? 'K' : 'C'
+            if (isRvEra(yearNum) && (modelLower.includes('r/v') || modelLower.includes('rv'))) {
+              if (driveLower.includes('4wd') || modelLower.includes('4x4') || modelLower.includes('4wd')) {
+                prefix = 'V'
+              } else if (driveLower.includes('2wd') || modelLower.includes('2wd') || driveLower.includes('rwd')) {
+                prefix = 'R'
+              }
+            }
             extractedSeries = `${prefix}${numberOnlyMatch[1]}`
             newModel = 'Truck'
             needsUpdate = true

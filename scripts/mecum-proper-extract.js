@@ -46,7 +46,22 @@ async function getVehiclesToProcess() {
 async function scrapeDetailPage(page, url) {
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(3000);
+
+    // Try to expand photo gallery if exists
+    try {
+      const viewAllPhotos = await page.$('text=View All Photos');
+      if (viewAllPhotos) {
+        await viewAllPhotos.click();
+        await page.waitForTimeout(2000);
+      }
+    } catch (e) { /* ignore */ }
+
+    // Scroll to load lazy images
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(1000);
 
     return await page.evaluate(() => {
       const bodyText = document.body.innerText;
@@ -139,11 +154,22 @@ async function scrapeDetailPage(page, url) {
 
 async function upsertVehicle(vehicleId, data) {
   // Check if VIN already exists
-  if (data.vin && vinToVehicleId.has(data.vin)) {
-    // VIN exists - return existing vehicle ID (we'll create auction_event for it)
-    return { vehicleId: vinToVehicleId.get(data.vin), isNew: false };
+  const existingVehicleId = data.vin && vinToVehicleId.has(data.vin)
+    ? vinToVehicleId.get(data.vin)
+    : null;
+
+  const targetVehicleId = existingVehicleId || vehicleId;
+
+  // Build description from highlights + equipment
+  const descParts = [];
+  if (data.highlights?.length) {
+    descParts.push('HIGHLIGHTS:\n' + data.highlights.join('\n'));
   }
-  
+  if (data.equipment?.length) {
+    descParts.push('EQUIPMENT:\n' + data.equipment.join('\n'));
+  }
+  const description = descParts.length > 0 ? descParts.join('\n\n') : null;
+
   // Update vehicle with extracted data
   const updateData = {
     vin: data.vin,
@@ -155,18 +181,19 @@ async function upsertVehicle(vehicleId, data) {
     mileage: data.mileage,
     highlights: data.highlights,
     equipment: data.equipment,
+    description: description,
     primary_image_url: data.images?.[0],
     image_url: data.images?.[0],
-    status: data.vin ? 'active' : 'pending'  // Only activate if we have VIN
+    status: 'active'  // Always activate - we extracted data
   };
-  
+
   // Add sale price if available
   if (data.sold_price) updateData.sale_price = data.sold_price;
   else if (data.high_bid) updateData.sale_price = data.high_bid;
-  
+
   Object.keys(updateData).forEach(k => { if (!updateData[k]) delete updateData[k]; });
-  
-  await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}`, {
+
+  await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${targetVehicleId}`, {
     method: 'PATCH',
     headers: {
       'apikey': SUPABASE_KEY,
@@ -175,11 +202,44 @@ async function upsertVehicle(vehicleId, data) {
     },
     body: JSON.stringify(updateData)
   });
-  
+
+  // Store ALL images to vehicle_images table
+  if (data.images?.length > 0) {
+    for (const url of data.images) {
+      await fetch(`${SUPABASE_URL}/rest/v1/vehicle_images`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=ignore-duplicates'
+        },
+        body: JSON.stringify({
+          vehicle_id: targetVehicleId,
+          url: url,
+          source: 'mecum'
+        })
+      });
+    }
+  }
+
+  // Mark original vehicle as merged if we deduplicated
+  if (existingVehicleId && existingVehicleId !== vehicleId) {
+    await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status: 'merged', merged_into: existingVehicleId })
+    });
+  }
+
   // Cache the VIN
-  if (data.vin) vinToVehicleId.set(data.vin, vehicleId);
-  
-  return { vehicleId, isNew: true };
+  if (data.vin) vinToVehicleId.set(data.vin, targetVehicleId);
+
+  return { vehicleId: targetVehicleId, isNew: !existingVehicleId };
 }
 
 async function createAuctionEvent(vehicleId, sourceUrl, data) {
@@ -261,10 +321,12 @@ async function worker(workerId, browser, queue, stats) {
     if (data.sold_price) fields.push('$' + (data.sold_price/1000).toFixed(0) + 'k');
     else if (data.high_bid) fields.push('bid$' + (data.high_bid/1000).toFixed(0) + 'k');
     if (data.images?.length) fields.push(data.images.length + 'img');
-    
+    if (data.highlights?.length) fields.push(data.highlights.length + 'hl');
+    if (data.equipment?.length) fields.push(data.equipment.length + 'eq');
+
     const eventStatus = event.created ? '+event' : (isNew ? '' : 'linked');
     const dedup = !isNew ? ' [DEDUP→' + vehicleId.slice(0,8) + ']' : '';
-    
+
     console.log(`[W${workerId}] ✓ ${fields.join(',')} ${eventStatus}${dedup}`);
     stats.processed++;
     if (!isNew) stats.deduplicated++;

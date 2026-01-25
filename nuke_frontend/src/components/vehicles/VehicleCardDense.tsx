@@ -1309,8 +1309,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const showTopLeftBadges = vehicle.is_streaming || !!formatAuctionTimer;
   const showSourceBadge = Boolean(sourceFaviconUrl) && cardTier !== 'xs';
   const showGridSourceBadge = showSourceBadge && viewMode === 'grid';
-  const showTopLeftStack = showTopLeftBadges || showGridSourceBadge;
-  const showTopRightBadges = showPriceBadge || showFollowButton;
+  // Tiny grid cards get image-only treatment to avoid overlapping badges.
+  const showImageOnly =
+    viewMode === 'grid' && typeof cardSizePx === 'number' && Number.isFinite(cardSizePx) && cardSizePx <= 120;
+  const showTopLeftStack = !showImageOnly && (showTopLeftBadges || showGridSourceBadge);
+  const showTopRightBadges = !showImageOnly && (showPriceBadge || showFollowButton);
   const topRightBadgeGap = showPriceBadge && showFollowButton
     ? (isCompactCard ? '10px' : '12px')
     : '6px';
@@ -2354,7 +2357,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       {/* Follow button is rendered in the image overlay stack (top-right). */}
       
       {/* Detail overlay on image instead of separate panel (progressive disclosure by card size) */}
-      {showDetailOverlay && cardTier !== 'xs' && (
+      {showDetailOverlay && !showImageOnly && cardTier !== 'xs' && (
         <div
           style={{
             position: 'absolute',

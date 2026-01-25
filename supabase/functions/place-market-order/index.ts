@@ -38,6 +38,7 @@ interface OrderResponse {
   commission?: number;
   message?: string;
   error?: string;
+  errorCode?: string;
 }
 
 serve(async (req) => {
@@ -86,6 +87,34 @@ serve(async (req) => {
         JSON.stringify({ success: false, error: 'Invalid order parameters' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Pre-trade risk check (for vehicle offerings only)
+    if (assetType === 'vehicle') {
+      const priceCents = Math.round(pricePerShare * 100);
+      const { data: riskCheck, error: riskError } = await supabase.rpc('pre_trade_risk_check', {
+        p_user_id: user.id,
+        p_offering_id: offeringId,
+        p_shares: sharesRequested,
+        p_price_cents: priceCents,
+        p_side: orderType
+      });
+
+      if (riskError) {
+        console.error('Risk check error:', riskError);
+        // Allow trade to proceed if risk check fails (fail-open for now)
+      } else if (riskCheck && !riskCheck.allowed) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            status: 'rejected',
+            sharesFilled: 0,
+            error: riskCheck.error || 'Order rejected by risk management',
+            errorCode: riskCheck.error_code
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Calculate order values
@@ -156,7 +185,21 @@ serve(async (req) => {
         );
       }
 
-      // TODO: Reserve shares (implement share reservation system)
+      // Reserve shares for sell order
+      const { data: reserveResult, error: reserveSharesError } = await supabase.rpc('reserve_shares', {
+        p_user_id: user.id,
+        p_offering_id: offeringId,
+        p_order_id: null, // Will be set after order creation
+        p_shares: sharesRequested
+      });
+
+      if (reserveSharesError || reserveResult === false) {
+        console.error('Failed to reserve shares:', reserveSharesError);
+        return new Response(
+          JSON.stringify({ success: false, status: 'rejected', sharesFilled: 0, error: 'Failed to reserve shares' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Create the order
@@ -194,15 +237,79 @@ serve(async (req) => {
       );
     }
 
-    // TODO: Attempt immediate matching (implement order matching engine)
-    // For now, just return the order as "active"
+    // Attempt immediate matching via order matching engine
+    const { data: matchResults, error: matchError } = await supabase.rpc('match_order_book', {
+      p_order_id: order.id
+    });
+
+    if (matchError) {
+      console.error('Order matching error:', matchError);
+      // Order still created, just not matched - continue
+    }
+
+    // Calculate execution results
+    let sharesFilled = 0;
+    let totalValueFilled = 0;
+    let averageFillPrice: number | undefined;
+    const trades: Array<{ tradeId: string; shares: number; price: number }> = [];
+
+    if (matchResults && Array.isArray(matchResults)) {
+      for (const match of matchResults) {
+        sharesFilled += match.shares_traded;
+        totalValueFilled += match.shares_traded * match.price_per_share;
+        trades.push({
+          tradeId: match.trade_id,
+          shares: match.shares_traded,
+          price: match.price_per_share
+        });
+      }
+      if (sharesFilled > 0) {
+        averageFillPrice = totalValueFilled / sharesFilled;
+      }
+    }
+
+    // Determine final order status
+    const finalStatus = sharesFilled === 0 ? 'active' :
+                        sharesFilled >= sharesRequested ? 'filled' :
+                        'partially_filled';
+
+    // Handle FOK/IOC failures
+    if (timeInForce === 'fok' && sharesFilled < sharesRequested) {
+      // FOK failed - order should be cancelled (already handled by RPC, but release cash)
+      if (orderType === 'buy' && sharesFilled === 0) {
+        await supabase.rpc('release_reserved_cash', {
+          p_user_id: user.id,
+          p_amount_cents: Math.round(totalValue * 100),
+          p_reference_id: offeringId
+        });
+      }
+    }
+
+    // Release excess reserved funds if partially filled buy order
+    if (orderType === 'buy' && sharesFilled > 0 && sharesFilled < sharesRequested) {
+      const unfilledShares = sharesRequested - sharesFilled;
+      const excessReserved = Math.round(unfilledShares * pricePerShare * 1.02 * 100); // Include commission
+      // Don't release yet - keep reserved for the active order portion
+    }
+
+    // Fetch updated order for accurate status
+    const { data: updatedOrder } = await supabase
+      .from(ordersTable)
+      .select('status, shares_filled, average_fill_price')
+      .eq('id', order.id)
+      .single();
 
     const response: OrderResponse = {
       success: true,
       orderId: order.id,
-      status: 'active',
-      sharesFilled: 0,
-      message: `${orderType.toUpperCase()} order placed for ${sharesRequested} shares @ $${pricePerShare.toFixed(2)}/share`
+      status: (updatedOrder?.status || finalStatus) as OrderResponse['status'],
+      sharesFilled: updatedOrder?.shares_filled || sharesFilled,
+      averageFillPrice: updatedOrder?.average_fill_price || averageFillPrice,
+      totalValue: sharesFilled > 0 ? totalValueFilled : undefined,
+      commission: sharesFilled > 0 ? totalValueFilled * 0.02 : undefined,
+      message: sharesFilled > 0
+        ? `${orderType.toUpperCase()} order ${finalStatus}: ${sharesFilled}/${sharesRequested} shares filled @ avg $${(averageFillPrice || pricePerShare).toFixed(2)}/share`
+        : `${orderType.toUpperCase()} order placed for ${sharesRequested} shares @ $${pricePerShare.toFixed(2)}/share`
     };
 
     return new Response(

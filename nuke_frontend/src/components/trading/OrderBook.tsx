@@ -1,214 +1,284 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { useMemo } from 'react';
+import { useTradingWebSocket } from '../../hooks/useTradingWebSocket';
+import type { OrderBookLevel } from '../../hooks/useTradingWebSocket';
 import '../../design-system.css';
 
-interface OrderBookEntry {
-  price: number;
-  shares: number;
-  total: number;
+interface OrderBookProps {
+  offeringId: string;
+  onPriceClick?: (price: number, side: 'buy' | 'sell') => void;
+  depth?: number;
+  showSpread?: boolean;
 }
 
-const OrderBook: React.FC<{ offeringId: string }> = ({ offeringId }) => {
-  const [bids, setBids] = useState<OrderBookEntry[]>([]);
-  const [asks, setAsks] = useState<OrderBookEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+const OrderBook: React.FC<OrderBookProps> = ({
+  offeringId,
+  onPriceClick,
+  depth = 10,
+  showSpread = true,
+}) => {
+  const { orderBook, nbbo, isConnected, lastUpdate } = useTradingWebSocket(offeringId, {
+    orderBookDepth: depth,
+  });
 
-  useEffect(() => {
-    loadOrderBook();
-    const interval = setInterval(loadOrderBook, 3000);
-    return () => clearInterval(interval);
-  }, [offeringId]);
+  // Calculate max shares for bar scaling
+  const maxShares = useMemo(() => {
+    const allShares = [
+      ...orderBook.bids.map(b => b.shares),
+      ...orderBook.asks.map(a => a.shares),
+    ];
+    return Math.max(...allShares, 1);
+  }, [orderBook]);
 
-  const loadOrderBook = async () => {
-    try {
-      setLoading(true);
-      const { data: orders } = await supabase
-        .from('market_orders')
-        .select('*')
-        .eq('offering_id', offeringId)
-        .eq('status', 'active');
+  // Calculate cumulative depth
+  const bidsWithCumulative = useMemo(() => {
+    let cumulative = 0;
+    return orderBook.bids.map(level => {
+      cumulative += level.shares;
+      return { ...level, cumulative };
+    });
+  }, [orderBook.bids]);
 
-      if (orders) {
-        // Group by price and sum shares
-        const bidMap = new Map<number, number>();
-        const askMap = new Map<number, number>();
+  const asksWithCumulative = useMemo(() => {
+    let cumulative = 0;
+    return orderBook.asks.map(level => {
+      cumulative += level.shares;
+      return { ...level, cumulative };
+    });
+  }, [orderBook.asks]);
 
-        orders.forEach(order => {
-          const available = order.shares_requested - order.shares_filled;
-          if (available <= 0) return;
+  const maxCumulative = useMemo(() => {
+    const bidTotal = bidsWithCumulative[bidsWithCumulative.length - 1]?.cumulative || 0;
+    const askTotal = asksWithCumulative[asksWithCumulative.length - 1]?.cumulative || 0;
+    return Math.max(bidTotal, askTotal, 1);
+  }, [bidsWithCumulative, asksWithCumulative]);
 
-          if (order.order_type === 'buy') {
-            bidMap.set(order.price_per_share, (bidMap.get(order.price_per_share) || 0) + available);
-          } else {
-            askMap.set(order.price_per_share, (askMap.get(order.price_per_share) || 0) + available);
-          }
-        });
+  const formatPrice = (price: number) => `$${price.toFixed(2)}`;
+  const formatShares = (shares: number) => shares.toLocaleString();
 
-        // Convert to arrays and sort
-        const bidsArray = Array.from(bidMap.entries())
-          .map(([price, shares]) => ({ price, shares, total: price * shares }))
-          .sort((a, b) => b.price - a.price)
-          .slice(0, 10);
+  const renderLevel = (
+    level: OrderBookLevel & { cumulative: number },
+    side: 'bid' | 'ask',
+    index: number
+  ) => {
+    const isBid = side === 'bid';
+    const barWidth = (level.shares / maxShares) * 100;
+    const cumulativeWidth = (level.cumulative / maxCumulative) * 100;
 
-        const asksArray = Array.from(askMap.entries())
-          .map(([price, shares]) => ({ price, shares, total: price * shares }))
-          .sort((a, b) => a.price - b.price)
-          .slice(0, 10);
+    return (
+      <div
+        key={`${side}-${level.price}`}
+        onClick={() => onPriceClick?.(level.price, isBid ? 'buy' : 'sell')}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isBid ? '1fr 60px 80px' : '80px 60px 1fr',
+          gap: '4px',
+          padding: '4px 8px',
+          position: 'relative',
+          cursor: onPriceClick ? 'pointer' : 'default',
+          transition: 'background 0.1s ease',
+          fontSize: '11px',
+          fontFamily: 'var(--font-mono, monospace)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = isBid ? '#dcfce7' : '#fee2e2';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+        }}
+      >
+        {/* Depth bar background */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            [isBid ? 'right' : 'left']: 0,
+            width: `${cumulativeWidth}%`,
+            background: isBid ? 'rgba(16, 185, 129, 0.08)' : 'rgba(220, 38, 38, 0.08)',
+            zIndex: 0,
+            transition: 'width 0.2s ease',
+          }}
+        />
 
-        setBids(bidsArray);
-        setAsks(asksArray);
-      }
-    } catch (error) {
-      console.error('Failed to load order book:', error);
-    } finally {
-      setLoading(false);
-    }
+        {/* Size bar */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            [isBid ? 'right' : 'left']: 0,
+            width: `${barWidth}%`,
+            background: isBid ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)',
+            zIndex: 1,
+            transition: 'width 0.2s ease',
+          }}
+        />
+
+        {isBid ? (
+          <>
+            <div style={{ textAlign: 'right', zIndex: 2, color: '#6b7280' }}>
+              {level.orderCount > 1 && <span style={{ fontSize: '9px' }}>({level.orderCount}) </span>}
+              {formatShares(level.shares)}
+            </div>
+            <div style={{ textAlign: 'center', zIndex: 2, fontWeight: 600, color: '#10b981' }}>
+              {formatPrice(level.price)}
+            </div>
+            <div />
+          </>
+        ) : (
+          <>
+            <div />
+            <div style={{ textAlign: 'center', zIndex: 2, fontWeight: 600, color: '#dc2626' }}>
+              {formatPrice(level.price)}
+            </div>
+            <div style={{ textAlign: 'left', zIndex: 2, color: '#6b7280' }}>
+              {formatShares(level.shares)}
+              {level.orderCount > 1 && <span style={{ fontSize: '9px' }}> ({level.orderCount})</span>}
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
-  const maxShares = Math.max(...bids.map(b => b.shares), ...asks.map(a => a.shares), 1);
-
   return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '2px solid #bdbdbd',
-      borderRadius: '4px',
-      padding: '12px',
-      fontSize: '9pt'
-    }}>
-      <h3 style={{ margin: '0 0 12px 0', fontSize: '10pt', fontWeight: 'bold' }}>Order Book</h3>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        {/* BIDS (Green side) */}
-        <div>
-          <div style={{
-            background: '#dcfce7',
-            padding: '8px',
-            marginBottom: '8px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            borderRadius: '2px',
-            color: '#10b981'
-          }}>
-            BIDS 🟢
-          </div>
-          {bids.length === 0 ? (
-            <div style={{ color: '#6b7280', textAlign: 'center', padding: '12px' }}>
-              No bids
-            </div>
-          ) : (
-            bids.map((bid, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: '4px',
-                  padding: '6px',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  marginBottom: '4px',
-                  borderRadius: '2px',
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#dcfce7';
-                  e.currentTarget.style.borderColor = '#6ee7b7';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f0fdf4';
-                  e.currentTarget.style.borderColor = '#bbf7d0';
-                }}
-              >
-                <div style={{ fontWeight: 'bold', color: '#10b981' }}>
-                  ${bid.price.toFixed(2)}
-                </div>
-                <div style={{ textAlign: 'right', color: '#6b7280' }}>
-                  {bid.shares}
-                </div>
-                <div
-                  style={{
-                    height: '20px',
-                    background: '#bbf7d0',
-                    borderRadius: '2px',
-                    width: `${(bid.shares / maxShares) * 100}%`
-                  }}
-                />
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* ASKS (Red side) */}
-        <div>
-          <div style={{
-            background: '#fee2e2',
-            padding: '8px',
-            marginBottom: '8px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            borderRadius: '2px',
-            color: '#dc2626'
-          }}>
-            ASKS 🔴
-          </div>
-          {asks.length === 0 ? (
-            <div style={{ color: '#6b7280', textAlign: 'center', padding: '12px' }}>
-              No asks
-            </div>
-          ) : (
-            asks.map((ask, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: '4px',
-                  padding: '6px',
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  marginBottom: '4px',
-                  borderRadius: '2px',
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#fee2e2';
-                  e.currentTarget.style.borderColor = '#fca5a5';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#fef2f2';
-                  e.currentTarget.style.borderColor = '#fecaca';
-                }}
-              >
-                <div style={{ fontWeight: 'bold', color: '#dc2626' }}>
-                  ${ask.price.toFixed(2)}
-                </div>
-                <div style={{ textAlign: 'right', color: '#6b7280' }}>
-                  {ask.shares}
-                </div>
-                <div
-                  style={{
-                    height: '20px',
-                    background: '#fca5a5',
-                    borderRadius: '2px',
-                    width: `${(ask.shares / maxShares) * 100}%`
-                  }}
-                />
-              </div>
-            ))
+    <div
+      style={{
+        background: 'var(--surface)',
+        border: '2px solid #bdbdbd',
+        borderRadius: '4px',
+        fontSize: '9pt',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 12px',
+          borderBottom: '1px solid #e5e7eb',
+          background: '#f9fafb',
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: '10pt', fontWeight: 'bold' }}>Order Book</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isConnected ? '#10b981' : '#ef4444',
+            }}
+            title={isConnected ? 'Connected' : 'Disconnected'}
+          />
+          {lastUpdate && (
+            <span style={{ fontSize: '8pt', color: '#6b7280' }}>
+              {lastUpdate.toLocaleTimeString()}
+            </span>
           )}
         </div>
       </div>
 
-      {loading && (
-        <div style={{
-          textAlign: 'center',
-          marginTop: '12px',
+      {/* Column Headers */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 60px 80px 80px 60px 1fr',
+          gap: '4px',
+          padding: '6px 8px',
+          borderBottom: '1px solid #e5e7eb',
+          fontSize: '8pt',
+          fontWeight: 600,
           color: '#6b7280',
-          fontSize: '8pt'
-        }}>
-          Updating...
+          textTransform: 'uppercase',
+        }}
+      >
+        <div style={{ textAlign: 'right' }}>Size</div>
+        <div style={{ textAlign: 'center', color: '#10b981' }}>Bid</div>
+        <div />
+        <div />
+        <div style={{ textAlign: 'center', color: '#dc2626' }}>Ask</div>
+        <div style={{ textAlign: 'left' }}>Size</div>
+      </div>
+
+      {/* Order Book Content */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+        {/* Bids (left side) */}
+        <div style={{ borderRight: '1px solid #e5e7eb' }}>
+          {bidsWithCumulative.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+              No bids
+            </div>
+          ) : (
+            bidsWithCumulative.map((level, i) => renderLevel(level, 'bid', i))
+          )}
+        </div>
+
+        {/* Asks (right side) */}
+        <div>
+          {asksWithCumulative.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+              No asks
+            </div>
+          ) : (
+            asksWithCumulative.map((level, i) => renderLevel(level, 'ask', i))
+          )}
+        </div>
+      </div>
+
+      {/* Spread Display */}
+      {showSpread && nbbo.spread !== null && (
+        <div
+          style={{
+            padding: '8px 12px',
+            borderTop: '1px solid #e5e7eb',
+            background: '#f9fafb',
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '16px',
+            fontSize: '9pt',
+          }}
+        >
+          <div>
+            <span style={{ color: '#6b7280' }}>Spread: </span>
+            <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono, monospace)' }}>
+              ${nbbo.spread.toFixed(2)}
+            </span>
+            {nbbo.spreadPct !== null && (
+              <span style={{ color: '#6b7280', marginLeft: '4px' }}>
+                ({nbbo.spreadPct.toFixed(2)}%)
+              </span>
+            )}
+          </div>
+          {nbbo.midPrice !== null && (
+            <div>
+              <span style={{ color: '#6b7280' }}>Mid: </span>
+              <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono, monospace)' }}>
+                ${nbbo.midPrice.toFixed(2)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Last Trade */}
+      {nbbo.lastTradePrice !== null && (
+        <div
+          style={{
+            padding: '6px 12px',
+            borderTop: '1px solid #e5e7eb',
+            fontSize: '8pt',
+            color: '#6b7280',
+            display: 'flex',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>Last: ${nbbo.lastTradePrice.toFixed(2)} x {nbbo.lastTradeSize}</span>
+          {nbbo.lastTradeTime && (
+            <span>{nbbo.lastTradeTime.toLocaleTimeString()}</span>
+          )}
         </div>
       )}
     </div>
