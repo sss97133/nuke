@@ -29,7 +29,7 @@ async function loadExistingVins() {
 
 async function getVehiclesToProcess() {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/vehicles?discovery_source=eq.pcarmarket&status=eq.pending&select=id,discovery_url&limit=${BATCH_SIZE}`,
+    `${SUPABASE_URL}/rest/v1/vehicles?discovery_source=eq.PCARMARKET&status=eq.pending&select=id,discovery_url&limit=${BATCH_SIZE}`,
     { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
   );
   return await res.json();
@@ -51,9 +51,40 @@ async function scrapeDetailPage(page, url) {
       
       // VIN
       const vinMatch = bodyText.match(/VIN[:\s#]+([A-HJ-NPR-Z0-9]{17})/i);
-      
-      // Title
-      const title = document.querySelector('h1')?.innerText?.trim();
+
+      // Title and year/make/model parsing
+      const rawTitle = document.querySelector('h1')?.innerText?.trim();
+
+      // Parse year/make/model from title
+      // PCarMarket titles are typically: "1975 Porsche 911 Carrera" or "2018 Porsche 911 GT3"
+      let title = rawTitle;
+      let year = null;
+      let make = null;
+      let model = null;
+
+      if (rawTitle) {
+        // Clean up PCarMarket title suffixes
+        title = rawTitle
+          .replace(/\s+\|.*$/i, '')
+          .replace(/\s+-\s+PCarMarket.*$/i, '')
+          .trim();
+
+        // Extract year (4-digit starting with 19 or 20)
+        const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+        if (yearMatch) {
+          year = parseInt(yearMatch[0]);
+
+          // Everything after the year is make + model
+          const afterYear = title.slice(title.indexOf(yearMatch[0]) + yearMatch[0].length).trim();
+          const parts = afterYear.split(/\s+/);
+
+          // First word is typically the make
+          make = parts[0] || null;
+
+          // Rest is model (may include trim level, body style, etc.)
+          model = parts.slice(1).join(' ') || null;
+        }
+      }
       
       // Specs
       const mileageMatch = bodyText.match(/([\d,]+)\s*(?:miles|mi)/i);
@@ -93,6 +124,9 @@ async function scrapeDetailPage(page, url) {
       return {
         vin: vinMatch?.[1],
         title,
+        year,
+        make,
+        model,
         mileage: mileageMatch ? parseInt(mileageMatch[1].replace(/,/g, '')) : null,
         engine: engineMatch?.[1]?.trim(),
         transmission: transMatch?.[1]?.trim(),
@@ -115,37 +149,78 @@ async function scrapeDetailPage(page, url) {
 }
 
 async function upsertVehicle(vehicleId, data) {
+  // Check for duplicate VIN
+  let targetVehicleId = vehicleId;
+  let isNew = true;
+  
   if (data.vin && vinToVehicleId.has(data.vin)) {
-    return { vehicleId: vinToVehicleId.get(data.vin), isNew: false };
+    targetVehicleId = vinToVehicleId.get(data.vin);
+    isNew = false;
+    // Mark the duplicate pending vehicle as merged
+    await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'merged', merged_into: targetVehicleId })
+    });
+  } else {
+    // Update vehicle data for new vehicles
+    const updateData = {
+      vin: data.vin,
+      year: data.year,
+      make: data.make,
+      model: data.model,
+      engine_size: data.engine,
+      transmission: data.transmission,
+      color: data.exterior_color,
+      interior_color: data.interior_color,
+      mileage: data.mileage,
+      description: data.description?.slice(0, 5000),
+      highlights: data.highlights,
+      primary_image_url: data.images?.[0],
+      image_url: data.images?.[0],
+      status: data.vin ? 'active' : 'pending'
+    };
+    
+    if (data.sold_price) updateData.sale_price = data.sold_price;
+    else if (data.current_bid) updateData.sale_price = data.current_bid;
+    
+    Object.keys(updateData).forEach(k => { if (!updateData[k]) delete updateData[k]; });
+    
+    await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData)
+    });
+    
+    if (data.vin) vinToVehicleId.set(data.vin, vehicleId);
   }
-  
-  const updateData = {
-    vin: data.vin,
-    engine_size: data.engine,
-    transmission: data.transmission,
-    color: data.exterior_color,
-    interior_color: data.interior_color,
-    mileage: data.mileage,
-    description: data.description?.slice(0, 5000),
-    highlights: data.highlights,
-    primary_image_url: data.images?.[0],
-    image_url: data.images?.[0],
-    status: data.vin ? 'active' : 'pending'
-  };
-  
-  if (data.sold_price) updateData.sale_price = data.sold_price;
-  else if (data.current_bid) updateData.sale_price = data.current_bid;
-  
-  Object.keys(updateData).forEach(k => { if (!updateData[k]) delete updateData[k]; });
-  
-  await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}`, {
-    method: 'PATCH',
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(updateData)
-  });
-  
-  if (data.vin) vinToVehicleId.set(data.vin, vehicleId);
-  return { vehicleId, isNew: true };
+
+  // Store ALL images to vehicle_images table (for both new and deduped vehicles)
+  if (data.images?.length > 0) {
+    for (let i = 0; i < data.images.length; i++) {
+      const url = data.images[i];
+      await fetch(`${SUPABASE_URL}/rest/v1/vehicle_images`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=ignore-duplicates'
+        },
+        body: JSON.stringify({
+          vehicle_id: targetVehicleId,
+          image_url: url,
+          source: 'pcarmarket',
+          source_url: url,
+          is_primary: i === 0 && isNew,
+          position: i,
+          is_external: true
+        })
+      });
+    }
+  }
+
+  return { vehicleId: targetVehicleId, isNew };
 }
 
 async function createAuctionEvent(vehicleId, sourceUrl, data) {
@@ -194,6 +269,9 @@ async function worker(workerId, browser, queue, stats) {
     await createAuctionEvent(vehicleId, vehicle.discovery_url, data);
     
     const fields = [];
+    if (data.year) fields.push(data.year);
+    if (data.make) fields.push(data.make);
+    if (data.model) fields.push(data.model.slice(0, 15));
     if (data.vin) fields.push('VIN');
     if (data.mileage) fields.push('mi');
     if (data.engine) fields.push('eng');

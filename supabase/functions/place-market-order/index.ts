@@ -54,7 +54,13 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get authenticated user
-    const authHeader = req.headers.get('Authorization')!;
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
@@ -84,7 +90,15 @@ serve(async (req) => {
 
     if (sharesRequested <= 0 || pricePerShare <= 0) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid order parameters' }),
+        JSON.stringify({ success: false, error: 'Invalid order parameters: shares and price must be positive' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Shares must be whole numbers
+    if (!Number.isInteger(sharesRequested)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid order parameters: shares must be a whole number' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -273,23 +287,60 @@ serve(async (req) => {
                         sharesFilled >= sharesRequested ? 'filled' :
                         'partially_filled';
 
-    // Handle FOK/IOC failures
+    // Handle FOK (Fill-Or-Kill) failures - must cancel if not fully filled
     if (timeInForce === 'fok' && sharesFilled < sharesRequested) {
-      // FOK failed - order should be cancelled (already handled by RPC, but release cash)
-      if (orderType === 'buy' && sharesFilled === 0) {
+      // FOK failed - cancel the order and release reserved funds/shares
+      await supabase
+        .from(ordersTable)
+        .update({ status: 'cancelled' })
+        .eq('id', order.id);
+
+      if (orderType === 'buy') {
+        // Release any unreserved cash (total minus what was filled)
+        const unfilledValue = (sharesRequested - sharesFilled) * pricePerShare * 1.02; // Include commission
         await supabase.rpc('release_reserved_cash', {
           p_user_id: user.id,
-          p_amount_cents: Math.round(totalValue * 100),
+          p_amount_cents: Math.round(unfilledValue * 100),
           p_reference_id: offeringId
         });
+      } else {
+        // Release unreserved shares for sell orders
+        const unfilledShares = sharesRequested - sharesFilled;
+        if (unfilledShares > 0) {
+          await supabase.rpc('release_reserved_shares', {
+            p_user_id: user.id,
+            p_offering_id: offeringId,
+            p_shares: unfilledShares
+          });
+        }
       }
     }
 
-    // Release excess reserved funds if partially filled buy order
-    if (orderType === 'buy' && sharesFilled > 0 && sharesFilled < sharesRequested) {
-      const unfilledShares = sharesRequested - sharesFilled;
-      const excessReserved = Math.round(unfilledShares * pricePerShare * 1.02 * 100); // Include commission
-      // Don't release yet - keep reserved for the active order portion
+    // Handle IOC (Immediate-Or-Cancel) - cancel unfilled portion
+    if (timeInForce === 'ioc' && sharesFilled < sharesRequested && sharesFilled > 0) {
+      // IOC partial fill - cancel remaining and release
+      await supabase
+        .from(ordersTable)
+        .update({ status: 'filled' }) // Mark as filled since we got what we could
+        .eq('id', order.id);
+
+      if (orderType === 'buy') {
+        const unfilledValue = (sharesRequested - sharesFilled) * pricePerShare * 1.02;
+        await supabase.rpc('release_reserved_cash', {
+          p_user_id: user.id,
+          p_amount_cents: Math.round(unfilledValue * 100),
+          p_reference_id: offeringId
+        });
+      } else {
+        const unfilledShares = sharesRequested - sharesFilled;
+        if (unfilledShares > 0) {
+          await supabase.rpc('release_reserved_shares', {
+            p_user_id: user.id,
+            p_offering_id: offeringId,
+            p_shares: unfilledShares
+          });
+        }
+      }
     }
 
     // Fetch updated order for accurate status
