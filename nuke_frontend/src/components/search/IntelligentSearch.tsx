@@ -816,6 +816,65 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       if (analysis?.vehicle_specific) {
         queryTokenVariants.add(String(analysis.vehicle_specific).toLowerCase());
       }
+      const compoundHints = [
+        'road',
+        'runner',
+        'super',
+        'sport',
+        'turbo',
+        'grand',
+        'touring',
+        'street',
+        'track',
+        'speed',
+        'power',
+        'auto',
+        'wagon',
+        'pickup',
+        'crew',
+        'cab',
+        'king',
+        'range',
+        'rover',
+        'roadster',
+        'spyder',
+        'spider'
+      ];
+      const compoundPatterns = new Set<string>();
+      const addCompoundVariants = (token: string) => {
+        if (!token || token.length < 7) return;
+        compoundHints.forEach((hint) => {
+          const idx = token.indexOf(hint);
+          if (idx === -1) return;
+          const before = token.slice(0, idx);
+          const after = token.slice(idx + hint.length);
+          if (hint.length >= 3) queryTokenVariants.add(hint);
+          if (before.length >= 3) queryTokenVariants.add(before);
+          if (after.length >= 3) queryTokenVariants.add(after);
+          if (before.length >= 3 && after.length >= 3) {
+            const beforeSafe = escapeILike(before);
+            const afterSafe = escapeILike(after);
+            if (beforeSafe && afterSafe) {
+              compoundPatterns.add(`${beforeSafe}%${afterSafe}`);
+            }
+          }
+          if (idx === 0 && after.length >= 3) {
+            const hintSafe = escapeILike(hint);
+            const afterSafe = escapeILike(after);
+            if (hintSafe && afterSafe) {
+              compoundPatterns.add(`${hintSafe}%${afterSafe}`);
+            }
+          }
+          if (idx > 0 && idx + hint.length === token.length && before.length >= 3) {
+            const beforeSafe = escapeILike(before);
+            const hintSafe = escapeILike(hint);
+            if (beforeSafe && hintSafe) {
+              compoundPatterns.add(`${beforeSafe}%${hintSafe}`);
+            }
+          }
+        });
+      };
+      tokens.forEach(addCompoundVariants);
       
       if (!searchTerm) {
         return [];
@@ -865,6 +924,14 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           if (isVIN) {
             orClauses.push(`vin.ilike.%${tokenSafe}%`);
           }
+        });
+        compoundPatterns.forEach((pattern) => {
+          orClauses.push(
+            `model.ilike.%${pattern}%`,
+            `normalized_model.ilike.%${pattern}%`,
+            `title.ilike.%${pattern}%`,
+            `description.ilike.%${pattern}%`
+          );
         });
         yearTokens.forEach((yearToken) => {
           const year = parseInt(yearToken, 10);
