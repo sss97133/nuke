@@ -138,6 +138,7 @@ export default function AIDataIngestionSearch() {
   // Autocomplete state - now uses UniversalSearchResult for rich results
   const [autocompleteResults, setAutocompleteResults] = useState<UniversalSearchResult[]>([]);
   const [autocompleteAISuggestion, setAutocompleteAISuggestion] = useState<string | null>(null);
+  const [autocompleteTotalCount, setAutocompleteTotalCount] = useState<number | null>(null);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedAutocompleteIndex, setSelectedAutocompleteIndex] = useState(-1);
   const autocompleteDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -177,6 +178,7 @@ export default function AIDataIngestionSearch() {
     if (trimmedInput.length < 2 || isProcessing || attachedImage || showPreview) {
       setAutocompleteResults([]);
       setAutocompleteAISuggestion(null);
+      setAutocompleteTotalCount(null);
       setShowAutocomplete(false);
       return;
     }
@@ -186,6 +188,7 @@ export default function AIDataIngestionSearch() {
     if (isURL) {
       setAutocompleteResults([]);
       setAutocompleteAISuggestion(null);
+      setAutocompleteTotalCount(null);
       setShowAutocomplete(false);
       return;
     }
@@ -196,13 +199,57 @@ export default function AIDataIngestionSearch() {
       try {
         // Use universal search service for rich results with thumbnails
         const response = await universalSearchService.search(trimmedInput, {
-          limit: 10,
+          limit: 24,
           includeAI: true
         });
 
-        setAutocompleteResults(response.results);
+        let combinedResults = response.results;
+
+        if (combinedResults.length < 8) {
+          try {
+            const safeQuery = trimmedInput.replace(/([%_\\])/g, '\\$1');
+            const { data: vehicles } = await supabase
+              .from('vehicles')
+              .select('id, year, make, model, normalized_model, series, trim, title, sale_price, current_value')
+              .eq('is_public', true)
+              .or(`make.ilike.%${safeQuery}%,model.ilike.%${safeQuery}%,normalized_model.ilike.%${safeQuery}%,series.ilike.%${safeQuery}%,trim.ilike.%${safeQuery}%,title.ilike.%${safeQuery}%`)
+              .limit(16);
+
+            if (vehicles && vehicles.length > 0) {
+              const fallbackResults: UniversalSearchResult[] = vehicles.map((v: any) => ({
+                id: v.id,
+                type: 'vehicle',
+                title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || v.title || 'Vehicle',
+                subtitle: v.trim || v.series || v.normalized_model || undefined,
+                description: v.title || undefined,
+                relevance_score: 0.3,
+                metadata: {
+                  year: v.year,
+                  make: v.make,
+                  model: v.model,
+                  price: v.sale_price || v.current_value
+                }
+              }));
+
+              const seen = new Set<string>();
+              const merged = [...combinedResults, ...fallbackResults].filter((r) => {
+                const key = `${r.type}:${r.id}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+              combinedResults = merged.slice(0, 24);
+            }
+          } catch {
+            // Ignore fallback errors; keep edge results.
+          }
+        }
+
+        setAutocompleteResults(combinedResults);
         setAutocompleteAISuggestion(response.ai_suggestion || null);
-        setShowAutocomplete(response.results.length > 0 || !!response.ai_suggestion);
+        const totalCount = Math.max(response.total_count || 0, combinedResults.length);
+        setAutocompleteTotalCount(totalCount > 0 ? totalCount : combinedResults.length);
+        setShowAutocomplete(combinedResults.length > 0 || !!response.ai_suggestion);
         setSelectedAutocompleteIndex(-1);
 
         // Log search performance
@@ -211,6 +258,7 @@ export default function AIDataIngestionSearch() {
         console.error('Autocomplete error:', error);
         setAutocompleteResults([]);
         setAutocompleteAISuggestion(null);
+        setAutocompleteTotalCount(null);
         setShowAutocomplete(false);
       }
     }, 200); // 200ms debounce for snappier feel
@@ -1120,7 +1168,7 @@ export default function AIDataIngestionSearch() {
             border: '2px solid var(--border)',
             boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
             zIndex: 1203,
-            maxHeight: '300px',
+            maxHeight: '420px',
             overflowY: 'auto',
             fontSize: '8pt'
           }}
@@ -1243,6 +1291,32 @@ export default function AIDataIngestionSearch() {
             }}>
               💡 {autocompleteAISuggestion}
             </div>
+          )}
+
+          {autocompleteResults.length > 0 && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const queryText = input.trim();
+                if (!queryText) return;
+                navigate(`/search?q=${encodeURIComponent(queryText)}`);
+              }}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '8px 12px',
+                background: '#f9fafb',
+                border: 'none',
+                borderTop: '1px solid var(--border-light)',
+                fontSize: '8pt',
+                cursor: 'pointer'
+              }}
+            >
+              {autocompleteTotalCount && autocompleteTotalCount > autocompleteResults.length
+                ? `View all ${autocompleteTotalCount} results for "${input.trim()}"`
+                : `View full search results for "${input.trim()}"`}
+            </button>
           )}
         </div>
       )}
