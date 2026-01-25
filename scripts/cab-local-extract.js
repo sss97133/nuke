@@ -42,44 +42,124 @@ async function discoverListings(page, pageNum) {
 async function extractListing(page, url) {
   try {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForTimeout(1500);
-    
-    // Scroll to trigger lazy loading
-    await page.evaluate(() => window.scrollBy(0, 1500));
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
+
+    // Scroll multiple times to load all lazy content (Doug's Take, Highlights, etc are below fold)
+    for (let i = 0; i < 4; i++) {
+      await page.evaluate((scrollY) => window.scrollTo(0, scrollY), (i + 1) * 1500);
+      await page.waitForTimeout(800);
+    }
+    // Scroll back up and wait for everything to settle
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(500);
     
     const data = await page.evaluate(() => {
-      const getMeta = (prop) => document.querySelector(`meta[property="${prop}"]`)?.content || 
+      const getMeta = (prop) => document.querySelector(`meta[property="${prop}"]`)?.content ||
                                 document.querySelector(`meta[name="${prop}"]`)?.content;
-      
+
       const ogTitle = getMeta('og:title') || '';
       const ymmMatch = ogTitle.match(/^(\d{4})\s+(\S+)\s+([^-]+)/);
-      
-      // Get mileage from og:title
-      const mileageMatch = ogTitle.match(/~?([\d,]+)\s*Miles/i);
+
+      const pageText = document.body?.innerText || '';
+
+      // Helper to extract key-value from C&B format "LabelValue"
+      const extractField = (label, stopWords = []) => {
+        const pattern = new RegExp(label + '([A-Za-z0-9,\\.\\s-]+?)(?:' + ['Seller','Engine','Drivetrain','Transmission','Body','Location','Exterior','Interior','Title','VIN','\\n', ...stopWords].join('|') + '|$)', 'i');
+        const match = pageText.match(pattern);
+        return match ? match[1].trim() : null;
+      };
+
+      // === CORE FIELDS ===
+      const mileageMatch = ogTitle.match(/~?([\d,]+)\s*Miles/i) || pageText.match(/Mileage~?([\d,]+)/i);
       const mileage = mileageMatch ? parseInt(mileageMatch[1].replace(/,/g, '')) : null;
-      
-      // Get images
+
+      const vinMatch = pageText.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i) || pageText.match(/VIN([A-HJ-NPR-Z0-9]{11,17})(?:Title|[^A-Za-z0-9]|$)/i);
+
+      const bidMatch = pageText.match(/(?:Sold for|Bid to|High Bid|Winning Bid)\s*\$?([\d,]+)/i);
+      const currentBid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, '')) : null;
+
+      // === VEHICLE DETAILS ===
+      const exteriorColor = extractField('Exterior\\s*Color') || (ogTitle.match(/,\s*([A-Za-z\s]+(?:Pearl|Metallic|White|Black|Blue|Red|Green|Yellow|Silver|Gray|Grey))\s*,/i) || [])[1];
+      const interiorColor = extractField('Interior\\s*Color');
+      const transmission = extractField('Transmission') || (ogTitle.match(/(\d+-Speed\s+(?:Manual|Automatic)|Manual|Automatic)/i) || [])[1];
+      const engine = extractField('Engine');
+      const drivetrain = extractField('Drivetrain');
+      const bodyStyle = extractField('Body\\s*Style');
+      const titleStatus = extractField('Title\\s*Status') || extractField('Title');
+
+      // === LOCATION & SELLER ===
+      const locationMatch = pageText.match(/Location\[?([A-Za-z0-9,\s]+?)(?:\]|\n|Seller|Private|Dealer|$)/i);
+      const location = locationMatch ? locationMatch[1].trim() : null;
+      const sellerMatch = pageText.match(/Seller([A-Za-z0-9\s]+?)(?:Private|Dealer|\n|$)/i);
+      const sellerName = sellerMatch ? sellerMatch[1].trim() : null;
+
+      // === AUCTION DATA ===
+      const bidCountMatch = pageText.match(/(\d+)\s*Bids?/i) || pageText.match(/Bids?\s*(\d+)/i);
+      const bidCount = bidCountMatch ? parseInt(bidCountMatch[1]) : null;
+      const commentCountMatch = pageText.match(/(\d+)\s*Comments?/i) || pageText.match(/Comments?\s*(\d+)/i);
+      const commentCount = commentCountMatch ? parseInt(commentCountMatch[1]) : null;
+
+      const auctionEnded = pageText.includes('Auction Ended') || pageText.includes('This auction has ended');
+      const reserveNotMet = pageText.includes('Reserve Not Met');
+      const sold = pageText.includes('Sold for');
+      const auctionStatus = sold ? 'sold' : reserveNotMet ? 'reserve_not_met' : auctionEnded ? 'ended' : 'active';
+
+      // === C&B UNIQUE CONTENT ===
+      const dougsTakeMatch = pageText.match(/Doug['']?s Take\s*([\s\S]{10,2000}?)(?:Highlights|Equipment|Modifications|$)/i);
+      const dougsTake = dougsTakeMatch ? dougsTakeMatch[1].trim().slice(0, 2000) : null;
+
+      const highlightsMatch = pageText.match(/Highlights\s*([\s\S]{10,3000}?)(?:Equipment|Modifications|Known Flaws|$)/i);
+      const highlights = highlightsMatch ? highlightsMatch[1].trim().slice(0, 3000) : null;
+
+      const equipmentMatch = pageText.match(/Equipment\s*([\s\S]{10,2000}?)(?:Modifications|Known Flaws|Recent Service|$)/i);
+      const equipment = equipmentMatch ? equipmentMatch[1].trim().slice(0, 2000) : null;
+
+      const modificationsMatch = pageText.match(/Modifications\s*([\s\S]{10,1500}?)(?:Known Flaws|Recent Service|$)/i);
+      const modifications = modificationsMatch ? modificationsMatch[1].trim() : null;
+
+      const knownFlawsMatch = pageText.match(/Known Flaws\s*([\s\S]{10,1500}?)(?:Recent Service|Other Items|$)/i);
+      const knownFlaws = knownFlawsMatch ? knownFlawsMatch[1].trim() : null;
+
+      const recentServiceMatch = pageText.match(/Recent Service\s*History\s*([\s\S]{10,1500}?)(?:Other Items|Private Party|$)/i);
+      const recentService = recentServiceMatch ? recentServiceMatch[1].trim() : null;
+
+      // === IMAGES ===
       const images = [...document.querySelectorAll('img[src*="media.carsandbids.com"]')]
         .map(img => img.src)
         .filter(src => !src.includes('width=80') && !src.includes('_thumb'));
-      
-      // Get VIN from page text
-      const pageText = document.body.innerText;
-      const vinMatch = pageText.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i);
-      
-      // Get current bid
-      const bidMatch = pageText.match(/(?:Sold for|Bid to|High Bid)\s*\$?([\d,]+)/i);
-      const currentBid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, '')) : null;
-      
+
       return {
+        // Core
         year: ymmMatch ? parseInt(ymmMatch[1]) : null,
         make: ymmMatch ? ymmMatch[2].trim() : null,
         model: ymmMatch ? ymmMatch[3].trim() : null,
-        mileage,
         vin: vinMatch ? vinMatch[1].toUpperCase() : null,
-        images: [...new Set(images)].slice(0, 50),
+        mileage,
         currentBid,
+        // Vehicle details
+        exteriorColor: exteriorColor?.trim() || null,
+        interiorColor: interiorColor?.trim() || null,
+        transmission: transmission?.trim() || null,
+        engine: engine?.trim() || null,
+        drivetrain: drivetrain?.trim() || null,
+        bodyStyle: bodyStyle?.trim() || null,
+        titleStatus: titleStatus?.trim() || null,
+        // Location & seller
+        location,
+        sellerName,
+        // Auction data
+        bidCount,
+        commentCount,
+        auctionStatus,
+        // C&B unique content
+        dougsTake,
+        highlights,
+        equipment,
+        modifications,
+        knownFlaws,
+        recentService,
+        // Images & description
+        images: [...new Set(images)].slice(0, 100),
         description: getMeta('og:description'),
       };
     });
@@ -92,16 +172,45 @@ async function extractListing(page, url) {
 
 async function saveVehicle(data, url) {
   const vehicleData = {
+    // Core
     year: data.year,
     make: data.make,
     model: data.model,
     vin: data.vin,
     mileage: data.mileage,
     sale_price: data.currentBid,
+    // Vehicle details
+    color: data.exteriorColor,
+    interior_color: data.interiorColor,
+    transmission: data.transmission,
+    engine_type: data.engine,
+    drivetrain: data.drivetrain,
+    body_style: data.bodyStyle,
+    title_status: data.titleStatus,
+    // Location & seller
+    location: data.location,
+    seller_name: data.sellerName,
+    // Auction data
+    bid_count: data.bidCount,
+    comment_count: data.commentCount,
+    auction_status: data.auctionStatus,
+    // C&B unique content - DEDICATED COLUMNS
+    dougs_take: data.dougsTake,
+    highlights: data.highlights,
+    equipment: data.equipment,
+    modifications: data.modifications,
+    known_flaws: data.knownFlaws,
+    recent_service_history: data.recentService,
+    // Basic description (og:description)
     description: data.description,
+    // Source tracking
     discovery_url: url.replace(/\/$/, ''),
     discovery_source: 'carsandbids',
     listing_source: 'cab-local-extract',
+    import_metadata: {
+      platform: 'carsandbids',
+      extracted_at: new Date().toISOString(),
+    },
     status: 'active',
   };
   
