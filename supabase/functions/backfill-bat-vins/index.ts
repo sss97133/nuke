@@ -14,14 +14,61 @@ function normalizeVin(raw: string): string {
 }
 
 function isVinCharsetOk(v: string): boolean {
-  // VINs exclude I/O/Q, but chassis numbers may be shorter; keep same restriction.
-  return v.length >= 8 && v.length <= 17 && !/[IOQ]/.test(v);
+  // Modern VINs (17 char) exclude I/O/Q
+  // Pre-1981 chassis numbers can be 6-17 chars and may be more permissive
+  if (v.length === 17) {
+    // Strict check for modern VINs
+    return !/[IOQ]/.test(v);
+  }
+  // For chassis numbers (6-16 chars), just validate length and alphanumeric
+  return v.length >= 6 && v.length <= 17 && /^[A-Z0-9]+$/.test(v);
 }
+
+// VIN patterns by manufacturer - covers 99% of vehicles on BaT
+// Copied from bat-simple-extract for consistency
+const VIN_PATTERNS = [
+  /\b([1-5][A-HJ-NPR-Z0-9]{16})\b/g,       // US/Canada/Mexico (1-5)
+  /\b(J[A-HJ-NPR-Z0-9]{16})\b/g,           // Japan
+  /\b(K[A-HJ-NPR-Z0-9]{16})\b/g,           // Korea
+  /\b(L[A-HJ-NPR-Z0-9]{16})\b/g,           // China
+  /\b(S[A-HJ-NPR-Z0-9]{16})\b/g,           // UK
+  /\b(W[A-HJ-NPR-Z0-9]{16})\b/g,           // Germany
+  /\b(Y[A-HJ-NPR-Z0-9]{16})\b/g,           // Sweden/Belgium
+  /\b(Z[A-HJ-NPR-Z0-9]{16})\b/g,           // Italy
+  /\b(WP0[A-Z0-9]{14})\b/g,                // Porsche
+  /\b(WDB[A-Z0-9]{14})\b/g,                // Mercedes
+  /\b(WVW[A-Z0-9]{14})\b/g,                // VW
+  /\b(WBA[A-Z0-9]{14})\b/g,                // BMW
+  /\b(WAU[A-Z0-9]{14})\b/g,                // Audi
+  /\b(ZFF[A-Z0-9]{14})\b/g,                // Ferrari
+  /\b(ZAM[A-Z0-9]{14})\b/g,                // Maserati
+  /\b(SCFZ[A-Z0-9]{13})\b/g,               // Aston Martin
+  /\b(SAJ[A-Z0-9]{14})\b/g,                // Jaguar
+  /\b(SAL[A-Z0-9]{14})\b/g,                // Land Rover
+];
 
 function extractVinFromBatHtml(html: string): { vin: string | null; reason?: string } {
   const h = String(html || "");
 
-  // Prefer "essentials" block when present (BaT layout)
+  // === PHASE 1: Try manufacturer-specific 17-char VIN patterns ===
+  // This is the most reliable method - searches entire HTML for known VIN prefixes
+  for (const pattern of VIN_PATTERNS) {
+    const matches = h.match(pattern);
+    if (matches && matches.length > 0) {
+      // Return the most common VIN (in case of noise from comments, etc.)
+      const counts: Record<string, number> = {};
+      for (const m of matches) {
+        counts[m] = (counts[m] || 0) + 1;
+      }
+      const bestVin = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      const v = normalizeVin(bestVin);
+      if (isVinCharsetOk(v)) {
+        return { vin: v, reason: `manufacturer_pattern:${pattern.source}` };
+      }
+    }
+  }
+
+  // === PHASE 2: Try essentials section for Chassis/Serial (pre-1981 vehicles) ===
   const essentialsStart = h.search(/<div[^>]*class="essentials"[^>]*>/i);
   let essentialsHTML = "";
   let essentialsText = "";
@@ -51,28 +98,39 @@ function extractVinFromBatHtml(html: string): { vin: string | null; reason?: str
     }
   }
 
-  const patterns: RegExp[] = [
-    /<li[^>]*>\s*VIN:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{8,17})<\/a>\s*<\/li>/i,
-    /<li[^>]*>\s*VIN:\s*([A-HJ-NPR-Z0-9]{8,17})\s*<\/li>/i,
-    /<li[^>]*>\s*Chassis:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{8,17})<\/a>\s*<\/li>/i,
-    /<li[^>]*>\s*Chassis:\s*([A-HJ-NPR-Z0-9]{8,17})\s*<\/li>/i,
-    /(?:VIN|Chassis)\s*[:#]\s*([A-HJ-NPR-Z0-9]{8,17})/i,
-    /"vin"\s*:\s*"([A-HJ-NPR-Z0-9]{8,17})"/i,
+  // Chassis/Serial patterns for pre-1981 vehicles
+  const chassisPatterns: Array<{ pattern: RegExp; label: string }> = [
+    { pattern: /Chassis:\s*<a[^>]*>([A-Z0-9*-]+)<\/a>/i, label: "chassis_anchor" },
+    { pattern: /Chassis:\s*([A-Z0-9*-]+)/i, label: "chassis_text" },
+    { pattern: />Chassis<\/strong>:\s*([A-Z0-9*-]+)/i, label: "chassis_strong" },
+    { pattern: /Serial(?:\s*Number)?:\s*<a[^>]*>([A-Z0-9*-]+)<\/a>/i, label: "serial_anchor" },
+    { pattern: /Serial(?:\s*Number)?:\s*([A-Z0-9*-]+)/i, label: "serial_text" },
+    { pattern: /<li[^>]*>\s*VIN:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{6,17})<\/a>/i, label: "vin_li_anchor" },
+    { pattern: /<li[^>]*>\s*VIN:\s*([A-HJ-NPR-Z0-9]{6,17})/i, label: "vin_li_text" },
+    { pattern: /(?:VIN|Chassis)\s*[:#]\s*([A-Z0-9*-]{6,17})/i, label: "vin_chassis_label" },
+    { pattern: /"vin"\s*:\s*"([A-HJ-NPR-Z0-9]{6,17})"/i, label: "json_vin" },
   ];
 
-  const tries = [
-    { label: "essentialsHTML", text: essentialsHTML || "" },
-    { label: "essentialsText", text: essentialsText || "" },
-    { label: "fullHTML", text: h },
+  // Try essentials HTML first, then essentials text, then full HTML
+  const textSources = [
+    { text: essentialsHTML, label: "essentialsHTML" },
+    { text: essentialsText, label: "essentialsText" },
+    { text: h, label: "fullHTML" },
   ];
 
-  for (const t of tries) {
-    if (!t.text) continue;
-    for (const p of patterns) {
-      const m = t.text.match(p);
+  for (const source of textSources) {
+    if (!source.text) continue;
+    for (const { pattern, label } of chassisPatterns) {
+      const m = source.text.match(pattern);
       if (m?.[1]) {
-        const v = normalizeVin(m[1]);
-        if (isVinCharsetOk(v)) return { vin: v, reason: `${t.label}:${p.source}` };
+        const chassis = m[1].trim();
+        // Validate: at least 6 chars, alphanumeric with optional * and -
+        if (chassis.length >= 6 && /^[A-Z0-9*-]+$/i.test(chassis)) {
+          const v = normalizeVin(chassis);
+          if (v.length >= 6) {
+            return { vin: v, reason: `${source.label}:${label}` };
+          }
+        }
       }
     }
   }
@@ -164,6 +222,8 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const max = Math.min(50, Math.max(1, Number(body?.max ?? 25)));
     const dryRun = body?.dry_run === true;
+    const offset = Math.max(0, Number(body?.offset ?? 0));
+    const randomize = body?.randomize !== false; // Default to randomizing
 
     const { data: rows, error } = await supabase
       .from("external_listings")
@@ -171,11 +231,11 @@ Deno.serve(async (req: Request) => {
       .eq("platform", "bat")
       .not("listing_url", "is", null)
       .order("updated_at", { ascending: false })
-      .limit(500);
+      .limit(2000); // Get more to have enough after filtering
 
     if (error) throw error;
 
-    const candidates = (rows || [])
+    let allCandidates = (rows || [])
       .map((r: any) => ({
         external_listing_id: r.id,
         vehicle_id: r.vehicle_id,
@@ -186,8 +246,14 @@ Deno.serve(async (req: Request) => {
       .filter((r) => {
         const v = String(r.vehicle_vin || "").trim();
         return !v || v.startsWith("VIVA-");
-      })
-      .slice(0, max);
+      });
+
+    // Randomize to avoid always hitting the same vehicles that have no VIN
+    if (randomize) {
+      allCandidates = allCandidates.sort(() => Math.random() - 0.5);
+    }
+
+    const candidates = allCandidates.slice(offset, offset + max);
 
     let scanned = 0;
     let updated = 0;
@@ -250,27 +316,29 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", c.vehicle_id);
 
-        await supabase
-          .from("vehicle_field_sources")
-          .insert({
-            vehicle_id: c.vehicle_id,
-            field_name: "vin",
-            field_value: extracted.vin,
-            source_type: "bat_listing",
-            source_url: url,
-            confidence_score: 80,
-            is_verified: false,
-            extraction_method: "html_regex",
-            raw_extracted_text: null,
-            metadata: {
-              external_listing_id: c.external_listing_id,
-              listing_status: c.listing_status,
-              extraction_reason: extracted.reason || null,
-            },
-            user_id: requesterId,
-            updated_at: new Date().toISOString(),
-          })
-          .catch(() => null);
+        // Insert field source record (ignore errors - this is optional)
+        try {
+          await supabase
+            .from("vehicle_field_sources")
+            .insert({
+              vehicle_id: c.vehicle_id,
+              field_name: "vin",
+              field_value: extracted.vin,
+              source_type: "bat_listing",
+              source_url: url,
+              confidence_score: 80,
+              is_verified: false,
+              extraction_method: "html_regex",
+              raw_extracted_text: null,
+              metadata: {
+                external_listing_id: c.external_listing_id,
+                listing_status: c.listing_status,
+                extraction_reason: extracted.reason || null,
+              },
+              user_id: requesterId,
+              updated_at: new Date().toISOString(),
+            });
+        } catch { /* ignore field source errors */ }
 
         updated += 1;
         results.push({ ...c, ok: true, vin: extracted.vin, updated: true });
