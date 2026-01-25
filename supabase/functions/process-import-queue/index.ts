@@ -166,10 +166,30 @@ function cleanModelName(model: string): string {
   
   // Remove parenthetical content that looks like dealer info
   cleaned = cleaned.replace(/\s*\([^)]{20,}\)/g, ''); // Long parentheticals (likely dealer info)
+
+  // Remove Craigslist noise fragments if they leak into model
+  cleaned = cleaned.replace(/\bimage\s*\d+\s*of\s*\d+\b/gi, '');
+  cleaned = cleaned.replace(/\b\d+\s*\/\s*\d+\b/g, '');
+  cleaned = cleaned.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi\s*\d{4,6}\b/gi, '');
+  cleaned = cleaned.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi(?:les)?\b/gi, '');
+  cleaned = cleaned.replace(/\bmi\s*\d{4,6}\b/gi, '');
   
   // Clean up multiple spaces
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
   
+  return cleaned;
+}
+
+function cleanCraigslistTitle(raw: string | null | undefined): string {
+  const input = (raw || '').trim();
+  if (!input) return '';
+  let cleaned = input.replace(/\s+/g, ' ').trim();
+  cleaned = cleaned.replace(/\bimage\s*\d+\s*of\s*\d+\b/gi, '');
+  cleaned = cleaned.replace(/\b\d+\s*\/\s*\d+\b/g, '');
+  cleaned = cleaned.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi\s*\d{4,6}\b/gi, '');
+  cleaned = cleaned.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi(?:les)?\b/gi, '');
+  cleaned = cleaned.replace(/\bmi\s*\d{4,6}\b/gi, '');
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
   return cleaned;
 }
 
@@ -1334,7 +1354,7 @@ serve(async (req) => {
           scrapeData.data.source = 'Craigslist';
           const titleElement = doc.querySelector('h1 .postingtitletext');
           if (titleElement) {
-            scrapeData.data.title = titleElement.textContent?.trim() || '';
+            scrapeData.data.title = cleanCraigslistTitle(titleElement.textContent);
           }
           // Extract price from Craigslist - use helper to avoid monthly payments
           const priceElement = doc.querySelector('.price');

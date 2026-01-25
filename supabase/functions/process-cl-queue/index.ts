@@ -1094,6 +1094,21 @@ function extractVehiclePrice(text: string): number | null {
   return null;
 }
 
+function cleanCraigslistTitle(raw: string | null | undefined): string {
+  const input = (raw || '').trim()
+  if (!input) return ''
+  let cleaned = input.replace(/\s+/g, ' ').trim()
+  // Remove image counters like "image 1 of 8" or "1/16"
+  cleaned = cleaned.replace(/\bimage\s*\d+\s*of\s*\d+\b/gi, '')
+  cleaned = cleaned.replace(/\b\d+\s*\/\s*\d+\b/g, '')
+  // Remove mileage fragments that sometimes get appended to titles
+  cleaned = cleaned.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi\s*\d{4,6}\b/gi, '')
+  cleaned = cleaned.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi(?:les)?\b/gi, '')
+  cleaned = cleaned.replace(/\bmi\s*\d{4,6}\b/gi, '')
+  cleaned = cleaned.replace(/\s+/g, ' ').trim()
+  return cleaned
+}
+
 // Inline Craigslist scraping function (same as scrape-all-craigslist-squarebodies)
 function scrapeCraigslistInline(doc: any, url: string): any {
 const data: any = {
@@ -1103,7 +1118,7 @@ const data: any = {
 
   const titleElement = doc.querySelector('h1, .postingtitletext #titletextonly')
   if (titleElement) {
-    data.title = titleElement.textContent.trim()
+    data.title = cleanCraigslistTitle(titleElement.textContent)
     
     // Step 1: Extract year from title
     const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)

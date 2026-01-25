@@ -29,10 +29,30 @@ function cleanModelName(raw: any): string | null {
   s = s.replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?.*$/i, '').trim()
   s = s.replace(/\s*\(\s*Est\.\s*payment.*$/i, '').trim()
   s = s.replace(/\s*-\s*craigslist\b.*$/i, '').trim()
+  // Remove common Craigslist noise fragments if they leak into model
+  s = s.replace(/\bimage\s*\d+\s*of\s*\d+\b/gi, ' ')
+  s = s.replace(/\b\d+\s*\/\s*\d+\b/g, ' ')
+  s = s.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi\s*\d{4,6}\b/gi, ' ')
+  s = s.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi(?:les)?\b/gi, ' ')
+  s = s.replace(/\bmi\s*\d{4,6}\b/gi, ' ')
   // Remove trailing parenthetical location/dealer
   s = s.replace(/\s*\([^)]*\)\s*$/i, '').trim()
+  s = s.replace(/\s+/g, ' ').trim()
   if (!s || s.length > 140) return null
   return s
+}
+
+function cleanCraigslistTitle(raw: string | null | undefined): string {
+  const input = (raw || '').trim()
+  if (!input) return ''
+  let cleaned = input.replace(/\s+/g, ' ').trim()
+  cleaned = cleaned.replace(/\bimage\s*\d+\s*of\s*\d+\b/gi, '')
+  cleaned = cleaned.replace(/\b\d+\s*\/\s*\d+\b/g, '')
+  cleaned = cleaned.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi\s*\d{4,6}\b/gi, '')
+  cleaned = cleaned.replace(/\b\d+(?:\.\d+)?\s*k?\s*mi(?:les)?\b/gi, '')
+  cleaned = cleaned.replace(/\bmi\s*\d{4,6}\b/gi, '')
+  cleaned = cleaned.replace(/\s+/g, ' ').trim()
+  return cleaned
 }
 
 function cleanMakeName(raw: any): string | null {
@@ -1738,7 +1758,7 @@ serve(async (req) => {
       // Extract title
       const titleElement = doc?.querySelector('h1 .postingtitletext')
       if (titleElement) {
-        data.title = titleElement.textContent?.trim()
+        data.title = cleanCraigslistTitle(titleElement.textContent)
       }
 
       // Extract price
