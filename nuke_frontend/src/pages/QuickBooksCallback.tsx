@@ -53,13 +53,15 @@ export default function QuickBooksCallback() {
       localStorage.removeItem('qb_oauth_state');
 
       // Exchange code for tokens via our edge function
+      const session = (await supabase.auth.getSession()).data.session;
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quickbooks-connect?action=callback&code=${encodeURIComponent(code)}&realmId=${encodeURIComponent(realmId)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-        }
+        { headers }
       );
 
       const data = await res.json();
