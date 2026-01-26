@@ -305,7 +305,7 @@ export default function Dashboard() {
           Please log in to view your dashboard
         </div>
         <button
-          onClick={() => navigate('/auth')}
+          onClick={() => navigate(`/login?returnUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`)}
           style={{
             fontSize: '8pt',
             fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",

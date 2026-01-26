@@ -22,6 +22,15 @@ const OAuthCallback = React.lazy(() => import('../components/auth/OAuthCallback'
 const ResetPassword = React.lazy(() => import('../pages/ResetPassword'));
 const DropboxCallback = React.lazy(() => import('../pages/DropboxCallback'));
 
+// Curation and receipts
+const CurationQueue = React.lazy(() => import('../pages/CurationQueue'));
+const UnlinkedReceipts = React.lazy(() => import('../pages/UnlinkedReceipts'));
+
+// Portfolio (legacy root paths)
+const Portfolio = React.lazy(() => import('../pages/Portfolio'));
+const CreditsSuccess = React.lazy(() => import('../pages/CreditsSuccess'));
+const PortfolioWithdraw = React.lazy(() => import('../pages/PortfolioWithdraw'));
+
 // Investment platform
 const Invest = React.lazy(() => import('../pages/Invest'));
 const MarketIntelligence = React.lazy(() => import('../pages/MarketIntelligence'));
@@ -63,6 +72,8 @@ export const DomainRoutes = () => {
       <Routes>
         {/* Auth */}
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Login />} />
+        <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/auth/callback" element={<OAuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dropbox-callback" element={<DropboxCallback />} />
@@ -131,6 +142,17 @@ export const DomainRoutes = () => {
         {/* Business Management */}
         <Route path="/business/settings" element={<BusinessSettings />} />
         <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
+
+        {/* Curation & receipts */}
+        <Route path="/curation-queue" element={<CurationQueue />} />
+        <Route path="/curation/queue" element={<Navigate to="/curation-queue" replace />} />
+        <Route path="/review/ai-detections" element={<Navigate to="/curation-queue" replace />} />
+        <Route path="/receipts/unlinked" element={<UnlinkedReceipts />} />
+
+        {/* Portfolio legacy routes */}
+        <Route path="/portfolio" element={<Portfolio />} />
+        <Route path="/portfolio/success" element={<CreditsSuccess />} />
+        <Route path="/portfolio/withdraw" element={<PortfolioWithdraw />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -22,7 +22,7 @@ const VehicleModerationDashboard: React.FC = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
+      navigate(`/login?returnUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`);
       return;
     }
     loadDashboard();

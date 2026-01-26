@@ -44,7 +44,7 @@ const QuickActions: React.FC = () => {
 
   const authActions = !isAuthenticated ? [{
     title: 'Join Community',
-    path: '/auth',
+    path: '/signup',
     primary: false
   }] : [];
 

@@ -102,7 +102,7 @@ const SecretaryModeToolbar: React.FC<SecretaryModeToolbarProps> = ({ userId }) =
         <div className="space-y-2 text-sm">
           {stats.aiDetectionsNeedingReview > 0 && (
             <button
-              onClick={() => navigate('/review/ai-detections')}
+              onClick={() => navigate('/curation-queue')}
               className="w-full flex items-center justify-between p-2 bg-white/20 rounded hover:bg-white/30 transition-colors"
             >
               <span className="flex items-center gap-2">
@@ -156,7 +156,7 @@ const SecretaryModeToolbar: React.FC<SecretaryModeToolbarProps> = ({ userId }) =
         <div className="mt-3 pt-3 border-t border-white/30 flex items-center justify-between text-xs">
           <span>Your job: Validate AI's work ✓✗</span>
           <button
-            onClick={() => navigate('/curation/queue')}
+            onClick={() => navigate('/curation-queue')}
             className="px-3 py-1 bg-white text-orange-600 rounded font-semibold hover:bg-gray-100"
           >
             Start Review →

@@ -156,14 +156,14 @@ const OrganizationOverviewTab: React.FC<Props> = ({ organization, stats, isOwner
                 Bulk Editor
               </button>
               <button
-                onClick={() => {/* Open edit modal */}}
+                onClick={() => navigate(`/org/${organization.id}?edit=1`)}
                 className="button button-secondary"
                 style={{ fontSize: '9pt' }}
               >
                 Edit Details
               </button>
               <button
-                onClick={() => {/* Open member manager */}}
+                onClick={() => navigate(`/org/${organization.id}?tab=contributors`)}
                 className="button button-secondary"
                 style={{ fontSize: '9pt' }}
               >

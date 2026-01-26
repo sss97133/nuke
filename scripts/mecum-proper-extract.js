@@ -16,6 +16,44 @@ const PARALLEL = parseInt(process.argv[3]) || 2;
 // Cache of existing VINs
 let vinToVehicleId = new Map();
 
+// Road art / memorabilia detection - these are NOT vehicles
+const ROAD_ART_PATTERNS = [
+  /\bsign\b/i, /\bneon\b/i, /\bclock\b/i, /\bposter\b/i, /\bbanner\b/i,
+  /\bflag\b/i, /\bpump\b/i, /\bjukebox\b/i, /\bpedal car\b/i,
+  /\btoy\b/i, /\btin\b/i, /\bporcelain\b/i, /\bdisplay\b/i, /\bembossed\b/i,
+  /\bmachine\b/i, /\bflange\b/i, /\bscale\s+model\b/i, /\bpromotional\b/i,
+  /\bglobelight\b/i, /\btopper\b/i, /\bthermometer\b/i, /\bcabinet\b/i,
+  /\brack\b/i, /\bstand\b/i, /\bshelf\b/i, /\bhydrant\b/i, /\bspinner\b/i,
+  /\d+x\d+x?\d*/i, // Dimensions like "48x48" or "21x6x12"
+  /^\d{4}\s+(quaker|phillips|mobil|shell|texaco|gulf|sinclair|standard|esso|sunoco|conoco|amoco|chevron|arco|valvoline|pennzoil|castrol|champion|autolite|ac\s+delco|delco|motorcraft|fram|wix|purolator|napa|carquest|autozone|oreilly|advance|pep\s+boys|midas|maaco|firestone|goodyear|michelin|bridgestone|cooper|bf\s+goodrich|general\s+tire|uniroyal|dunlop|pirelli|yokohama|toyo|falken|nitto|kumho|hankook|nexen|continental|kelly|mastercraft|sumitomo|ohtsu|cordovan|jetzon|sigma|big\s+o|les\s+schwab)/i, // Oil/tire brands as "make"
+];
+
+// NOT road art - legitimate vehicle models that might match patterns
+const REAL_VEHICLE_EXCEPTIONS = [
+  /\bmodel\s*[tabc]\b/i,  // Ford Model T, Model A, Model B, Model C
+  /\bmodel\s*\d+/i,       // Model 356, Model 911, etc.
+  /\brebel\s*machine\b/i, // AMC Rebel Machine (muscle car)
+  /\bneon\s*srt/i,        // Dodge Neon SRT-4
+  /\b[46]x[46]\b/i,       // 4x4, 6x6 drivetrains (not dimensions)
+  /\bsprinter\b/i,        // Mercedes Sprinter vans
+  /\braptor\b/i,          // Ford Raptor trucks
+  /\bapocalypse\b/i,      // Apocalypse custom trucks
+  /\bg63\b/i,             // Mercedes G63
+  /\bg550\b/i,            // Mercedes G550
+  /\bgladiator\b/i,       // Jeep Gladiator
+];
+
+function isRoadArt(title, make, model) {
+  const combined = `${title || ''} ${make || ''} ${model || ''}`;
+
+  // Check if it's a real vehicle exception first
+  if (REAL_VEHICLE_EXCEPTIONS.some(pattern => pattern.test(combined))) {
+    return false;
+  }
+
+  return ROAD_ART_PATTERNS.some(pattern => pattern.test(combined));
+}
+
 async function loadExistingVins() {
   console.log('Loading existing VINs...');
   let offset = 0;
@@ -187,6 +225,24 @@ async function scrapeDetailPage(page, url) {
 }
 
 async function upsertVehicle(vehicleId, data) {
+  // Check if this is road art / memorabilia (NOT a real vehicle)
+  if (isRoadArt(data.title, data.make, data.model)) {
+    // Mark as rejected - not a vehicle
+    await fetch(`${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        status: 'rejected',
+        notes: 'Road art / memorabilia - not a vehicle'
+      })
+    });
+    return { vehicleId, isNew: false, rejected: true, reason: 'road_art' };
+  }
+
   // Check if VIN already exists
   const existingVehicleId = data.vin && vinToVehicleId.has(data.vin)
     ? vinToVehicleId.get(data.vin)
@@ -221,7 +277,7 @@ async function upsertVehicle(vehicleId, data) {
     description: description,
     primary_image_url: data.images?.[0],
     image_url: data.images?.[0],
-    status: 'active'  // Always activate - we extracted data
+    status: 'active'  // Activate real vehicles
   };
 
   // Add sale price if available
@@ -348,12 +404,21 @@ async function worker(workerId, browser, queue, stats) {
       continue;
     }
 
-    // Upsert vehicle (handles VIN deduplication)
-    const { vehicleId, isNew } = await upsertVehicle(vehicle.id, data);
-    
-    // Always create auction event for timeline
+    // Upsert vehicle (handles VIN deduplication and road art rejection)
+    const result = await upsertVehicle(vehicle.id, data);
+
+    // Handle rejected road art
+    if (result.rejected) {
+      console.log(`[W${workerId}] 🚫 ROAD ART: ${data.title?.slice(0, 50) || data.make + ' ' + data.model}`);
+      stats.rejected = (stats.rejected || 0) + 1;
+      continue;
+    }
+
+    const { vehicleId, isNew } = result;
+
+    // Only create auction event for real vehicles
     const event = await createAuctionEvent(vehicleId, vehicle.discovery_url, data);
-    
+
     // Build status string
     const fields = [];
     if (data.year) fields.push(data.year);
@@ -409,6 +474,7 @@ async function main() {
 
   console.log(`\n✅ Done!`);
   console.log(`   Processed: ${stats.processed}`);
+  console.log(`   Rejected (road art): ${stats.rejected || 0}`);
   console.log(`   Deduplicated (linked to existing VIN): ${stats.deduplicated}`);
   console.log(`   Auction events created: ${stats.events}`);
   console.log(`   Errors: ${stats.errors}`);

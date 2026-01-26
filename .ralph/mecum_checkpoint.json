@@ -11,11 +11,36 @@
       "vehiclesFound": 0
     },
     "kissimmee-2024": {
-      "lastPage": 130,
-      "complete": false,
+      "lastPage": 220,
+      "complete": true,
       "vehiclesFound": 0
+    },
+    "kissimmee-2023": {
+      "lastPage": 7,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "kissimmee-2022": {
+      "lastPage": 95,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "kissimmee-2021": {
+      "lastPage": 62,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "kissimmee-2020": {
+      "lastPage": 169,
+      "complete": true,
+      "vehiclesFound": 2562
+    },
+    "kissimmee-2019": {
+      "lastPage": 95,
+      "complete": true,
+      "vehiclesFound": 2269
     }
   },
-  "totalDiscovered": 0,
-  "lastUpdated": "2026-01-26T03:46:25.658Z"
+  "totalDiscovered": 975,
+  "lastUpdated": "2026-01-26T04:34:07.043Z"
 }
