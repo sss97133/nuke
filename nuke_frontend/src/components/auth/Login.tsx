@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ForgotPasswordForm from '../auth/ForgotPasswordForm';
 import '../../design-system.css';
@@ -12,12 +12,28 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<'signin' | 'signup'>(() => {
+    const modeParam = searchParams.get('mode');
+    if (modeParam === 'signup' || location.pathname === '/signup') return 'signup';
+    return 'signin';
+  });
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const modeParam = searchParams.get('mode');
+    if (modeParam === 'signup' || location.pathname === '/signup') {
+      setMode('signup');
+      return;
+    }
+    if (modeParam === 'signin') {
+      setMode('signin');
+    }
+  }, [location.pathname, searchParams]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();

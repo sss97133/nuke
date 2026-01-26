@@ -1,0 +1,1095 @@
+{
+  "created": "2026-01-26T16:39:44.161790",
+  "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+  "mappings": [
+    {
+      "album": "1973 Dodge charger 360",
+      "photo_count": 1295,
+      "vehicle_id": "4bdcfb14-a93f-44c1-ab01-a55916718536",
+      "vehicle_title": "1973  Charger",
+      "vehicle_vin": "VIVA-1762059695071",
+      "score": 80,
+      "stats": {
+        "total": 1295,
+        "with_gps": 50,
+        "with_date": 50,
+        "date_range": [
+          "2020-01-30",
+          "2024-06-23"
+        ],
+        "cameras": [
+          "iPhone XS Max",
+          "iPhone 7 Plus",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1973 Dodge Charger",
+      "photo_count": 951,
+      "vehicle_id": "4bdcfb14-a93f-44c1-ab01-a55916718536",
+      "vehicle_title": "1973  Charger",
+      "vehicle_vin": "VIVA-1762059695071",
+      "score": 90,
+      "stats": {
+        "total": 951,
+        "with_gps": 24,
+        "with_date": 50,
+        "date_range": [
+          "2020-01-30",
+          "2024-05-30"
+        ],
+        "cameras": [
+          "iPhone 11 Pro",
+          "iPhone XS Max",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1977 K5 Chevrolet Blazer",
+      "photo_count": 1110,
+      "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+      "vehicle_title": "1977  Blazer",
+      "vehicle_vin": "CKR187F127263",
+      "score": 80,
+      "stats": {
+        "total": 1110,
+        "with_gps": 41,
+        "with_date": 50,
+        "date_range": [
+          "2016-04-23",
+          "2021-04-14"
+        ],
+        "cameras": [
+          "iPhone 11 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1987 GMC V15 LWB",
+      "photo_count": 49,
+      "vehicle_id": "b1fd848d-c64d-4b3a-8d09-0bacfeef9561",
+      "vehicle_title": "1987 GMC Suburban",
+      "vehicle_vin": "1GKGV26KXHF526945",
+      "score": 50,
+      "stats": {
+        "total": 49,
+        "with_gps": 45,
+        "with_date": 49,
+        "date_range": [
+          "2021-11-08",
+          "2021-12-11"
+        ],
+        "cameras": [
+          "iPhone 13 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1983 GMC K2500 LWB",
+      "photo_count": 483,
+      "vehicle_id": "5a1deb95-4b67-4cc3-9575-23bb5b180693",
+      "vehicle_title": "1983 GMC K2500",
+      "vehicle_vin": "1GTEK14H6DJ501481",
+      "score": 90,
+      "stats": {
+        "total": 483,
+        "with_gps": 38,
+        "with_date": 50,
+        "date_range": [
+          "2024-04-30",
+          "2025-03-19"
+        ],
+        "cameras": [
+          "iPad Pro (12.9-inch) (5th generation)",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1978 K20 Chevrolet LWB",
+      "photo_count": 188,
+      "vehicle_id": "5f6cc95c-9c1e-4a45-8371-40312c253abb",
+      "vehicle_title": "1978 Chevrolet Pickup",
+      "vehicle_vin": "CKL248Z129851",
+      "score": 50,
+      "stats": {
+        "total": 188,
+        "with_gps": 47,
+        "with_date": 50,
+        "date_range": [
+          "2024-01-06",
+          "2024-06-15"
+        ],
+        "cameras": [
+          "iPhone 12",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1972 K10 Chevrolet SWB",
+      "photo_count": 457,
+      "vehicle_id": "05b2cc98-cd4f-4fb6-a17e-038d6664905e",
+      "vehicle_title": "1972 Chevrolet K10",
+      "vehicle_vin": "CKE142Z161636",
+      "score": 90,
+      "stats": {
+        "total": 457,
+        "with_gps": 47,
+        "with_date": 50,
+        "date_range": [
+          "2018-07-19",
+          "2024-04-24"
+        ],
+        "cameras": [
+          "iPhone X",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1985 Chevrolet K20 LWB",
+      "photo_count": 286,
+      "vehicle_id": "90b58e8e-1fb5-4e4a-9f39-f33182e60a0c",
+      "vehicle_title": "1985 Chevrolet Suburban",
+      "vehicle_vin": null,
+      "score": 50,
+      "stats": {
+        "total": 286,
+        "with_gps": 47,
+        "with_date": 50,
+        "date_range": [
+          "2023-02-27",
+          "2023-07-01"
+        ],
+        "cameras": [
+          "iPhone 13 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1983 GMC K2500 BLUE",
+      "photo_count": 511,
+      "vehicle_id": "5a1deb95-4b67-4cc3-9575-23bb5b180693",
+      "vehicle_title": "1983 GMC K2500",
+      "vehicle_vin": "1GTEK14H6DJ501481",
+      "score": 90,
+      "stats": {
+        "total": 511,
+        "with_gps": 50,
+        "with_date": 50,
+        "date_range": [
+          "2025-10-18",
+          "2025-10-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1966 Ford Mustang Cpe Blk",
+      "photo_count": 389,
+      "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+      "vehicle_title": "1966 Ford Mustang",
+      "vehicle_vin": "6F07C219593",
+      "score": 90,
+      "stats": {
+        "total": 389,
+        "with_gps": 44,
+        "with_date": 50,
+        "date_range": [
+          "2024-07-25",
+          "2025-09-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1976 C20 Chevrolet LWB",
+      "photo_count": 110,
+      "vehicle_id": "3f1791fe-4fe2-4994-b6fe-b137ffa57370",
+      "vehicle_title": "1976 Chevrolet C10",
+      "vehicle_vin": "CCS246Z153447",
+      "score": 50,
+      "stats": {
+        "total": 110,
+        "with_gps": 44,
+        "with_date": 50,
+        "date_range": [
+          "2024-04-25",
+          "2024-06-12"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1985 Chevrolet K10 SWB",
+      "photo_count": 63,
+      "vehicle_id": "a84273ab-4e0d-45c4-bdaa-5c9ad023079d",
+      "vehicle_title": "1985  K10",
+      "vehicle_vin": "1GCGK24MXFJ174484",
+      "score": 80,
+      "stats": {
+        "total": 63,
+        "with_gps": 25,
+        "with_date": 50,
+        "date_range": [
+          "2024-03-22",
+          "2024-04-01"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1987 GMC V15 Suburban",
+      "photo_count": 117,
+      "vehicle_id": "b1fd848d-c64d-4b3a-8d09-0bacfeef9561",
+      "vehicle_title": "1987 GMC Suburban",
+      "vehicle_vin": "1GKGV26KXHF526945",
+      "score": 90,
+      "stats": {
+        "total": 117,
+        "with_gps": 38,
+        "with_date": 50,
+        "date_range": [
+          "2023-08-09",
+          "2023-08-12"
+        ],
+        "cameras": [
+          "iPhone 13",
+          "iPhone 13 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1997 Lexus LX450",
+      "photo_count": 411,
+      "vehicle_id": "4ecc1fa5-c2c2-485b-bc57-144d6215d22a",
+      "vehicle_title": "1997 LEXUS LX450",
+      "vehicle_vin": "JT6HJ88J4V0178097",
+      "score": 100,
+      "stats": {
+        "total": 411,
+        "with_gps": 44,
+        "with_date": 50,
+        "date_range": [
+          "2020-05-18",
+          "2025-08-26"
+        ],
+        "cameras": [
+          "iPhone 11 Pro",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1995 Chevrolet 2500 Suburban",
+      "photo_count": 405,
+      "vehicle_id": "4b2bd8b4-cfbc-43c5-afb8-7e281b2793d6",
+      "vehicle_title": "1995  Suburban",
+      "vehicle_vin": "VIVA-1762059692851",
+      "score": 80,
+      "stats": {
+        "total": 405,
+        "with_gps": 47,
+        "with_date": 50,
+        "date_range": [
+          "2024-01-15",
+          "2025-08-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1971 K15 GMC Suburban",
+      "photo_count": 22,
+      "vehicle_id": "2a269b9a-5956-40ee-8fa6-5d2188cfeb0f",
+      "vehicle_title": "1971 GMC Suburban",
+      "vehicle_vin": "VIVA-1762059703730",
+      "score": 90,
+      "stats": {
+        "total": 22,
+        "with_gps": 21,
+        "with_date": 22,
+        "date_range": [
+          "2017-01-20",
+          "2018-07-19"
+        ],
+        "cameras": [
+          "iPhone X",
+          "iPhone 7"
+        ]
+      }
+    },
+    {
+      "album": "1964 Chevrolet C20 LWB ",
+      "photo_count": 56,
+      "vehicle_id": "2e5ec4a1-c5fc-456d-8cff-82c6e582fd58",
+      "vehicle_title": "1964 Chevrolet Corvette Coupe L75 327/300 4-Speed",
+      "vehicle_vin": null,
+      "score": 50,
+      "stats": {
+        "total": 56,
+        "with_gps": 43,
+        "with_date": 50,
+        "date_range": [
+          "2017-10-16",
+          "2017-12-02"
+        ],
+        "cameras": [
+          "iPhone 7"
+        ]
+      }
+    },
+    {
+      "album": "1965 Chevrolet corvette",
+      "photo_count": 68,
+      "vehicle_id": "d29a8779-6815-42b9-a20f-c835742d6080",
+      "vehicle_title": "1965  Corvette",
+      "vehicle_vin": "194375S122492",
+      "score": 90,
+      "stats": {
+        "total": 68,
+        "with_gps": 49,
+        "with_date": 50,
+        "date_range": [
+          "2017-11-23",
+          "2018-05-18"
+        ],
+        "cameras": [
+          "iPhone X",
+          "iPhone SE",
+          "iPhone 7"
+        ]
+      }
+    },
+    {
+      "album": "1972 Chevrolet K10 LWB",
+      "photo_count": 38,
+      "vehicle_id": "05b2cc98-cd4f-4fb6-a17e-038d6664905e",
+      "vehicle_title": "1972 Chevrolet K10",
+      "vehicle_vin": "CKE142Z161636",
+      "score": 90,
+      "stats": {
+        "total": 38,
+        "with_gps": 38,
+        "with_date": 38,
+        "date_range": [
+          "2017-11-18",
+          "2024-05-02"
+        ],
+        "cameras": [
+          "iPhone 7",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1967 GTO Pontiac",
+      "photo_count": 52,
+      "vehicle_id": "defba683-ea3d-4514-bee4-373e53b9252a",
+      "vehicle_title": "1967  ",
+      "vehicle_vin": null,
+      "score": 80,
+      "stats": {
+        "total": 52,
+        "with_gps": 42,
+        "with_date": 50,
+        "date_range": [
+          "2018-01-18",
+          "2018-01-21"
+        ],
+        "cameras": [
+          "iPhone X"
+        ]
+      }
+    },
+    {
+      "album": "1988 GMC V15 Suburban",
+      "photo_count": 254,
+      "vehicle_id": "031c94fe-16fe-44f3-817b-f60abd94bb86",
+      "vehicle_title": "1988  Suburban",
+      "vehicle_vin": null,
+      "score": 80,
+      "stats": {
+        "total": 254,
+        "with_gps": 47,
+        "with_date": 50,
+        "date_range": [
+          "2018-03-29",
+          "2018-04-11"
+        ],
+        "cameras": [
+          "iPhone X"
+        ]
+      }
+    },
+    {
+      "album": "1967 Chevrolet C10 LWB",
+      "photo_count": 12,
+      "vehicle_id": "defba683-ea3d-4514-bee4-373e53b9252a",
+      "vehicle_title": "1967  ",
+      "vehicle_vin": null,
+      "score": 80,
+      "stats": {
+        "total": 12,
+        "with_gps": 12,
+        "with_date": 12,
+        "date_range": [
+          "2017-10-18",
+          "2018-07-19"
+        ],
+        "cameras": [
+          "iPhone X",
+          "iPhone 7"
+        ]
+      }
+    },
+    {
+      "album": "1973 C30 Chevrolet LWB",
+      "photo_count": 2,
+      "vehicle_id": "c2f5dc7d-f0d3-48c6-902b-a60a737641be",
+      "vehicle_title": "1973 Chevrolet C30",
+      "vehicle_vin": null,
+      "score": 90,
+      "stats": {
+        "total": 2,
+        "with_gps": 2,
+        "with_date": 2,
+        "date_range": [
+          "2024-05-28",
+          "2025-09-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1973 K5 GMC  jimmy",
+      "photo_count": 126,
+      "vehicle_id": "5b4e6bcd-7f31-410a-876a-cb2947d954f5",
+      "vehicle_title": "1973 GMC K10",
+      "vehicle_vin": "TKY183F505217",
+      "score": 50,
+      "stats": {
+        "total": 126,
+        "with_gps": 45,
+        "with_date": 50,
+        "date_range": [
+          "2023-10-09",
+          "2023-10-11"
+        ],
+        "cameras": [
+          "iPhone 13 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1971 Ford Bronco Coyote",
+      "photo_count": 394,
+      "vehicle_id": "95fbb5c3-568b-4ebd-b6dd-7f3adffd3e43",
+      "vehicle_title": "1971  Bronco",
+      "vehicle_vin": "U15GLK32565",
+      "score": 80,
+      "stats": {
+        "total": 394,
+        "with_gps": 50,
+        "with_date": 50,
+        "date_range": [
+          "2025-08-28",
+          "2025-09-09"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1973 K20 Chevrolet LWB",
+      "photo_count": 14,
+      "vehicle_id": "c2f5dc7d-f0d3-48c6-902b-a60a737641be",
+      "vehicle_title": "1973 Chevrolet C30",
+      "vehicle_vin": null,
+      "score": 50,
+      "stats": {
+        "total": 14,
+        "with_gps": 12,
+        "with_date": 14,
+        "date_range": [
+          "2023-12-01",
+          "2023-12-02"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1974 K5 Chevrolet Blazer",
+      "photo_count": 204,
+      "vehicle_id": "05f27cc4-914e-425a-8ed8-cfea35c1928d",
+      "vehicle_title": "1974 Chevrolet Blazer",
+      "vehicle_vin": "CKY184F130980",
+      "score": 90,
+      "stats": {
+        "total": 204,
+        "with_gps": 49,
+        "with_date": 50,
+        "date_range": [
+          "2021-11-27",
+          "2022-03-30"
+        ],
+        "cameras": [
+          "iPhone 13 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1971 Ford Bronco 302",
+      "photo_count": 327,
+      "vehicle_id": "95fbb5c3-568b-4ebd-b6dd-7f3adffd3e43",
+      "vehicle_title": "1971  Bronco",
+      "vehicle_vin": "U15GLK32565",
+      "score": 80,
+      "stats": {
+        "total": 327,
+        "with_gps": 33,
+        "with_date": 50,
+        "date_range": [
+          "2025-09-11",
+          "2025-10-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro Max",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1971 Chevrolet C10 LWB 396",
+      "photo_count": 32,
+      "vehicle_id": "50b9dca5-32af-4dec-8eb8-0956d6d0ac8c",
+      "vehicle_title": "1971  C10",
+      "vehicle_vin": "CE141J615018",
+      "score": 80,
+      "stats": {
+        "total": 32,
+        "with_gps": 32,
+        "with_date": 32,
+        "date_range": [
+          "2025-09-15",
+          "2025-11-04"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1979 Chevrolet Big10 Justin",
+      "photo_count": 1,
+      "vehicle_id": "d5317564-ef13-47d5-9880-1139f23a5c70",
+      "vehicle_title": "1979 Chevrolet C10",
+      "vehicle_vin": "VIVA-1762059707802",
+      "score": 50,
+      "stats": {
+        "total": 1,
+        "with_gps": 1,
+        "with_date": 1,
+        "date_range": [
+          "2025-10-17",
+          "2025-10-17"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1932 Ford Roadster",
+      "photo_count": 615,
+      "vehicle_id": "21ee373f-765e-4e24-a69d-e59e2af4f467",
+      "vehicle_title": "1932  Roadster",
+      "vehicle_vin": "AZ370615",
+      "score": 90,
+      "stats": {
+        "total": 615,
+        "with_gps": 49,
+        "with_date": 50,
+        "date_range": [
+          "2024-05-17",
+          "2024-12-01"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1967 Chevrolet C10 SWB",
+      "photo_count": 9,
+      "vehicle_id": "defba683-ea3d-4514-bee4-373e53b9252a",
+      "vehicle_title": "1967  ",
+      "vehicle_vin": null,
+      "score": 80,
+      "stats": {
+        "total": 9,
+        "with_gps": 9,
+        "with_date": 9,
+        "date_range": [
+          "2025-10-16",
+          "2025-10-17"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1977 Chevrolet K10 SWB",
+      "photo_count": 4,
+      "vehicle_id": "80e04dd6-983e-4c78-ba15-c0599e50ecd9",
+      "vehicle_title": "1977  K10",
+      "vehicle_vin": "CKL147Z186644",
+      "score": 80,
+      "stats": {
+        "total": 4,
+        "with_gps": 4,
+        "with_date": 4,
+        "date_range": [
+          "2024-01-15",
+          "2024-04-22"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1988 GMC V3500",
+      "photo_count": 7,
+      "vehicle_id": "c3ebf903-c553-42ba-af33-cba48f92fc5e",
+      "vehicle_title": "1988 GMC C1500",
+      "vehicle_vin": "VIVA-1762059715343",
+      "score": 50,
+      "stats": {
+        "total": 7,
+        "with_gps": 6,
+        "with_date": 7,
+        "date_range": [
+          "2018-07-09",
+          "2024-05-31"
+        ],
+        "cameras": [
+          "iPhone X",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1973 Chevrolet K20 LWB",
+      "photo_count": 6,
+      "vehicle_id": "c2f5dc7d-f0d3-48c6-902b-a60a737641be",
+      "vehicle_title": "1973 Chevrolet C30",
+      "vehicle_vin": null,
+      "score": 50,
+      "stats": {
+        "total": 6,
+        "with_gps": 6,
+        "with_date": 6,
+        "date_range": [
+          "2024-01-15",
+          "2024-01-15"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1966 Chevrolet C10 SWB",
+      "photo_count": 44,
+      "vehicle_id": "655f224f-d8ae-4fc6-a3ec-4ab8db234fdf",
+      "vehicle_title": "1966 Chevrolet C10",
+      "vehicle_vin": "C1446S140169",
+      "score": 90,
+      "stats": {
+        "total": 44,
+        "with_gps": 39,
+        "with_date": 44,
+        "date_range": [
+          "2024-01-15",
+          "2025-10-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1972 Chevrolet K10 LWB",
+      "photo_count": 52,
+      "vehicle_id": "05b2cc98-cd4f-4fb6-a17e-038d6664905e",
+      "vehicle_title": "1972 Chevrolet K10",
+      "vehicle_vin": "CKE142Z161636",
+      "score": 90,
+      "stats": {
+        "total": 52,
+        "with_gps": 50,
+        "with_date": 50,
+        "date_range": [
+          "2024-01-19",
+          "2024-03-16"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1979 Chevrolet K10 SWB Brown",
+      "photo_count": 139,
+      "vehicle_id": "d5317564-ef13-47d5-9880-1139f23a5c70",
+      "vehicle_title": "1979 Chevrolet C10",
+      "vehicle_vin": "VIVA-1762059707802",
+      "score": 50,
+      "stats": {
+        "total": 139,
+        "with_gps": 49,
+        "with_date": 50,
+        "date_range": [
+          "2024-01-15",
+          "2025-10-15"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1971 Chevrolet C10 SWB 402",
+      "photo_count": 38,
+      "vehicle_id": "50b9dca5-32af-4dec-8eb8-0956d6d0ac8c",
+      "vehicle_title": "1971  C10",
+      "vehicle_vin": "CE141J615018",
+      "score": 80,
+      "stats": {
+        "total": 38,
+        "with_gps": 35,
+        "with_date": 38,
+        "date_range": [
+          "2024-01-26",
+          "2025-10-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1985 Chevrolet K10 SWB Brad",
+      "photo_count": 54,
+      "vehicle_id": "a84273ab-4e0d-45c4-bdaa-5c9ad023079d",
+      "vehicle_title": "1985  K10",
+      "vehicle_vin": "1GCGK24MXFJ174484",
+      "score": 80,
+      "stats": {
+        "total": 54,
+        "with_gps": 21,
+        "with_date": 50,
+        "date_range": [
+          "2024-02-15",
+          "2024-04-01"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1967 Porsche 912",
+      "photo_count": 8,
+      "vehicle_id": "ed137428-9bd3-4378-a098-262c8d950dbb",
+      "vehicle_title": "1967  912",
+      "vehicle_vin": "VIVA-1762059702870",
+      "score": 90,
+      "stats": {
+        "total": 8,
+        "with_gps": 8,
+        "with_date": 8,
+        "date_range": [
+          "2024-03-07",
+          "2024-04-06"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1978 Chevrolet K20 LWB Blue",
+      "photo_count": 4,
+      "vehicle_id": "5f6cc95c-9c1e-4a45-8371-40312c253abb",
+      "vehicle_title": "1978 Chevrolet Pickup",
+      "vehicle_vin": "CKL248Z129851",
+      "score": 50,
+      "stats": {
+        "total": 4,
+        "with_gps": 4,
+        "with_date": 4,
+        "date_range": [
+          "2024-03-30",
+          "2025-10-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1985 Chevrolet k10 Suburban",
+      "photo_count": 25,
+      "vehicle_id": "90b58e8e-1fb5-4e4a-9f39-f33182e60a0c",
+      "vehicle_title": "1985 Chevrolet Suburban",
+      "vehicle_vin": null,
+      "score": 90,
+      "stats": {
+        "total": 25,
+        "with_gps": 21,
+        "with_date": 25,
+        "date_range": [
+          "2023-08-12",
+          "2025-10-18"
+        ],
+        "cameras": [
+          "iPhone 13 Pro",
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1987 Nissan maxima",
+      "photo_count": 1,
+      "vehicle_id": "1ac8edba-4613-4dc3-a619-7b282e5737e8",
+      "vehicle_title": "1987  Maxima",
+      "vehicle_vin": "JN1HU11P6HX872701",
+      "score": 90,
+      "stats": {
+        "total": 1,
+        "with_gps": 1,
+        "with_date": 1,
+        "date_range": [
+          "2025-10-18",
+          "2025-10-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1967 Chevrolet c10 swb",
+      "photo_count": 6,
+      "vehicle_id": "defba683-ea3d-4514-bee4-373e53b9252a",
+      "vehicle_title": "1967  ",
+      "vehicle_vin": null,
+      "score": 80,
+      "stats": {
+        "total": 6,
+        "with_gps": 6,
+        "with_date": 6,
+        "date_range": [
+          "2025-10-17",
+          "2025-10-17"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "2004 ford f350",
+      "photo_count": 1,
+      "vehicle_id": "d7bc0005-6ddb-4e34-8e0d-4d529cfa45e5",
+      "vehicle_title": "2004 Ford F350",
+      "vehicle_vin": "1FTWW33P24EA98718",
+      "score": 100,
+      "stats": {
+        "total": 1,
+        "with_gps": 1,
+        "with_date": 1,
+        "date_range": [
+          "2025-10-18",
+          "2025-10-18"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    },
+    {
+      "album": "1966 ford mustang yellow",
+      "photo_count": 1,
+      "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+      "vehicle_title": "1966 Ford Mustang",
+      "vehicle_vin": "6F07C219593",
+      "score": 90,
+      "stats": {
+        "total": 1,
+        "with_gps": 1,
+        "with_date": 1,
+        "date_range": [
+          "2025-11-04",
+          "2025-11-04"
+        ],
+        "cameras": [
+          "iPhone 15 Pro"
+        ]
+      }
+    }
+  ],
+  "unmatched": [
+    {
+      "album": "1974 bronco 351 Windsor",
+      "photo_count": 332,
+      "parsed": "1974 None bronco 351 Windsor"
+    },
+    {
+      "album": "1988 Chevrolet V3500 ",
+      "photo_count": 275,
+      "parsed": "1988 Chevrolet V3500"
+    },
+    {
+      "album": "1968 C10 Chevrolet LWB",
+      "photo_count": 43,
+      "parsed": "1968 Chevrolet C10 LWB"
+    },
+    {
+      "album": "1968 Chevrolet C10 LWB",
+      "photo_count": 45,
+      "parsed": "1968 Chevrolet C10 LWB"
+    },
+    {
+      "album": "1984 Chevrolet K20 LWB ",
+      "photo_count": 435,
+      "parsed": "1984 Chevrolet K20 LWB"
+    },
+    {
+      "album": "1968 Ford Mustang  FB blk",
+      "photo_count": 17,
+      "parsed": "1968 Ford Mustang FB blk"
+    },
+    {
+      "album": "1972 GMC C30 longhorn",
+      "photo_count": 14,
+      "parsed": "1972 GMC C30 longhorn"
+    },
+    {
+      "album": "1964 Jaguar convertible 4.2 xke",
+      "photo_count": 38,
+      "parsed": "1964 Jaguar convertible 4.2 xke"
+    },
+    {
+      "album": "1973 Pontiac Firebird",
+      "photo_count": 13,
+      "parsed": "1973 Pontiac Firebird"
+    },
+    {
+      "album": "1984 Chevrolet K10 SWB",
+      "photo_count": 7,
+      "parsed": "1984 Chevrolet K10 SWB"
+    },
+    {
+      "album": "1981 DMC Delorean",
+      "photo_count": 5,
+      "parsed": "1981 DMC Delorean"
+    },
+    {
+      "album": "1979 GMC K15 SWB White",
+      "photo_count": 33,
+      "parsed": "1979 GMC K15 SWB White"
+    },
+    {
+      "album": "1982 GMC K2500 LWB",
+      "photo_count": 27,
+      "parsed": "1982 GMC K2500 LWB"
+    },
+    {
+      "album": "1980 Chevrolet K30 Crew Cab",
+      "photo_count": 111,
+      "parsed": "1980 Chevrolet K30 Crew Cab"
+    },
+    {
+      "album": "1959 Chevrolet 3100 SWB",
+      "photo_count": 2,
+      "parsed": "1959 Chevrolet 3100 SWB"
+    },
+    {
+      "album": "1968 Porsche 911",
+      "photo_count": 266,
+      "parsed": "1968 Porsche 911"
+    },
+    {
+      "album": "1980 Chevrolet C10 LWB",
+      "photo_count": 100,
+      "parsed": "1980 Chevrolet C10 LWB"
+    },
+    {
+      "album": "2005 Ferrari 360 spider",
+      "photo_count": 108,
+      "parsed": "2005 Ferrari 360 spider"
+    },
+    {
+      "album": "1969 Chevrolet c10 lwb",
+      "photo_count": 15,
+      "parsed": "1969 Chevrolet c10 lwb"
+    },
+    {
+      "album": "1987 Chevrolet V3500 Dually",
+      "photo_count": 275,
+      "parsed": "1987 Chevrolet V3500 Dually"
+    },
+    {
+      "album": "1989 jimmy k5",
+      "photo_count": 34,
+      "parsed": "1989 None jimmy k5"
+    },
+    {
+      "album": "1972 k5 blazer",
+      "photo_count": 36,
+      "parsed": "1972 None k5 blazer"
+    },
+    {
+      "album": "2025 ford expedition ",
+      "photo_count": 8,
+      "parsed": "2025 Ford expedition"
+    },
+    {
+      "album": "1979 gmc sierra k1500",
+      "photo_count": 1,
+      "parsed": "1979 GMC sierra k1500"
+    },
+    {
+      "album": "1963 shovel head",
+      "photo_count": 3,
+      "parsed": "1963 None shovel head"
+    },
+    {
+      "album": "1970 Mercedes 280SL",
+      "photo_count": 3,
+      "parsed": "1970 Mercedes 280SL"
+    }
+  ]
+}

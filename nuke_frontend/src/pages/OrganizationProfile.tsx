@@ -354,6 +354,17 @@ export default function OrganizationProfile() {
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [gridWidth, setGridWidth] = useState<number>(0);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+    if (params.get('edit') === '1' || params.get('edit') === 'true') {
+      setShowOrganizationEditor(true);
+    }
+  }, [location.search]);
+
   // One-time CSS for "aliveness" bursts
   useEffect(() => {
     if (typeof document === 'undefined') return;

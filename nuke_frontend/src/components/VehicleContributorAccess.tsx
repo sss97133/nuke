@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import VINPhotoValidator from './VINPhotoValidator';
 
@@ -32,6 +33,7 @@ const VehicleContributorAccess: React.FC<VehicleContributorAccessProps> = ({
   isOwner,
   onAccessGranted
 }) => {
+  const navigate = useNavigate();
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
   const [vinValidations, setVinValidations] = useState<VINValidation[]>([]);
   const [showVinValidator, setShowVinValidator] = useState(false);
@@ -220,7 +222,7 @@ const VehicleContributorAccess: React.FC<VehicleContributorAccessProps> = ({
             </p>
             <button 
               className="button button-primary"
-              onClick={() => {/* Implement login flow */}}
+              onClick={() => navigate(`/login?returnUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`)}
             >
               Sign In to Continue
             </button>

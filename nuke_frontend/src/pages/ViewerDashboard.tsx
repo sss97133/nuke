@@ -42,7 +42,7 @@ const ViewerDashboard: React.FC = () => {
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
-      navigate('/auth');
+      navigate(`/login?returnUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`);
       return;
     }
     setUser(session.user);
