@@ -61,6 +61,25 @@ Strategy for launching with limited users and acquiring creators.
 - Geographic Focus Strategy
 - 90-Day Execution Plan
 
+### [PLATFORM_CASE_STUDIES.md](./PLATFORM_CASE_STUDIES.md)
+Specific case studies and documented algorithm changes from major platforms.
+
+**Key sections:**
+- Case Study 1: YouTube's 2012 click-to-watchtime shift
+- Case Study 2: Facebook's "Meaningful Social Interactions" (2018)
+- Case Study 3: TikTok's sound-based virality mechanism
+- Case Study 4: Instagram's Explore page evolution
+- Case Study 5: Hacker News's gravity factor (why 1.8?)
+- Case Study 6: Netflix's artwork personalization (20-30% CTR improvement)
+- Case Study 7: Twitter's Blue checkmark algorithm boost (open-sourced)
+- Case Study 8: Pinterest's visual search accuracy
+- Case Study 9: Spotify's Monday playlist problem
+- Case Study 10: Reddit's comment quality (Wilson score)
+- Case Study 11: Facebook Marketplace location radius
+- Case Study 12: Instagram's chronological feed restoration
+- Aggregated Insights: What works and what fails
+- Recommended A/B Tests for Nuke
+
 ---
 
 ## Key Research Findings
