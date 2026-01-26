@@ -150,6 +150,9 @@ interface SituationalAnalysis {
   // Context
   relationship_to_vehicle_history: string
   patterns_detected: string[]
+
+  // Follow-up questions for originator
+  originator_questions?: string[]
   
   // Confidence
   confidence_score: number // 0-100
@@ -425,7 +428,7 @@ async function analyzeSituationalContext(
   if (!anthropicApiKey) {
     throw new Error('ANTHROPIC_API_KEY not configured')
   }
-  const anthropicModel = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-3-5-sonnet-20241022'
+  const anthropicModel = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-3-5-haiku-20241022'
   const originatorContext = input?.originatorContext ? input.originatorContext.trim() : ''
   const promptQuestions = input?.contextQuestions || []
 
@@ -439,6 +442,16 @@ CRITICAL ANALYSIS REQUIREMENTS:
    - WHEN: When did this happen? How long? Continuation or standalone?
    - WHERE: Where was work done? Shop quality? Environment indicators?
    - WHY: Why was this work done? Problem solving? Preventive? Goal?
+
+2. GO BEYOND HARD FACTS:
+   - If the images are a listing screenshot or discovery, identify platform cues, price, mileage, location, seller, and any notable claims.
+   - Infer intent (discovery, verification, decision-making) and look for signals that matter to a buyer or historian.
+   - Do not repeat obvious facts as questions.
+
+3. ORIGINATOR FOLLOW-UPS:
+   - Produce 3-6 open-ended questions that help the originator explain context, motivations, and decision points.
+   - Avoid asking for facts already visible in the image or provided in originator notes.
+   - Focus on unique insight (why it mattered, what changed, what was learned, what was decided next).
 
 2. VALUE CALCULATION - Assign real dollar value to this event:
    - Labor Value: Hours × Market Rate for skill level shown
@@ -520,6 +533,10 @@ VALUE CALCULATION (use real dollar amounts):
 ORIGINATOR NOTES:
 ${originatorContext || 'None provided.'}
 
+FOLLOW-UP QUESTIONS:
+- Provide 3-6 open-ended questions to ask the originator.
+- Do NOT ask for facts already visible in the images or notes.
+
 CRITICAL: You MUST respond with VALID JSON matching this EXACT structure:
 
 {
@@ -583,6 +600,7 @@ CRITICAL: You MUST respond with VALID JSON matching this EXACT structure:
   "narrative_summary": "One paragraph story",
   "relationship_to_vehicle_history": "string",
   "patterns_detected": ["array"],
+  "originator_questions": ["array", "of", "strings"],
   "confidence_score": number (0-100),
   "reasoning": "string"
 }
@@ -744,6 +762,7 @@ async function saveContextualAnalysis(
           narrative_summary: analysis.narrative_summary,
           relationship_to_vehicle_history: analysis.relationship_to_vehicle_history,
           patterns_detected: analysis.patterns_detected,
+          originator_questions: Array.isArray(analysis.originator_questions) ? analysis.originator_questions.slice(0, 6) : [],
           // Metadata
           confidence_score: analysis.confidence_score,
           reasoning: analysis.reasoning,

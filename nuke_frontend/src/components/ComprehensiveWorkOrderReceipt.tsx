@@ -1006,7 +1006,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 color: '#666',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '6px'
               }}>
                 {(() => {
                   const status = (baseEvent as any)?.contextual_analysis_status;
@@ -1014,11 +1014,19 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   const done = status === 'completed' || has;
                   const processing = status === 'processing' || runningContextual;
                   const failed = status === 'failed';
+                  const statusLabel = done ? 'Analyzed' : failed ? 'AI failed' : processing ? 'Analyzing' : 'AI pending';
+                  const statusBg = done ? '#d1fae5' : failed ? '#fee2e2' : processing ? '#fef3c7' : '#f3f4f6';
 
                   return (
                     <>
-                      <span>
-                        {done ? 'Analyzed' : failed ? 'AI failed' : processing ? 'Analyzing' : 'AI pending'}
+                      <span style={{
+                        padding: '2px 6px',
+                        border: '1px solid #000',
+                        background: statusBg,
+                        fontWeight: 700,
+                        textTransform: 'uppercase'
+                      }}>
+                        {statusLabel}
                       </span>
                       {!done && (
                         <button
@@ -1026,7 +1034,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); runContextualBatchAnalysis(); }}
                           disabled={processing}
                           style={{
-                            marginLeft: '8px',
+                            marginLeft: '4px',
                             padding: '2px 6px',
                             fontSize: '7pt',
                             fontWeight: 'bold',
@@ -1046,13 +1054,17 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 })()}
               </div>
             </div>
+            <div style={{ fontSize: '7pt', color: '#666', marginBottom: '8px', lineHeight: 1.5 }}>
+              Add originator context to help AI interpret screenshots, listings, and discovery moments.
+              After analysis, you will get tailored follow-up questions to capture the story.
+            </div>
             {isOriginator && (
               <div style={{
                 marginTop: '6px',
-                padding: '8px',
-                border: '1px dashed #999',
+                padding: '10px',
+                border: '1px solid #111',
                 background: '#fff',
-                borderRadius: '3px'
+                borderRadius: '4px'
               }}>
                 <div style={{
                   fontSize: '7pt',
@@ -1060,7 +1072,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
                 }}>
-                  Originator context (optional)
+                  Originator context
                 </div>
                 <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px', lineHeight: 1.4 }}>
                   Help the analysis by adding what you know about this evidence set.
@@ -1094,8 +1106,9 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     resize: 'vertical'
                   }}
                 />
-                <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px' }}>
-                  This note will be included in AI analysis.
+                <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>This note will be included in AI analysis.</span>
+                  <span>{originatorContext.length}/1200</span>
                 </div>
               </div>
             )}
@@ -1220,6 +1233,18 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               {ca?.originator_context && (
                 <div style={{ marginTop: '8px', fontSize: '8pt', color: '#444', lineHeight: 1.5 }}>
                   <strong>ORIGINATOR NOTES:</strong> {String(ca.originator_context)}
+                </div>
+              )}
+              {Array.isArray(ca?.originator_questions) && ca.originator_questions.length > 0 && (
+                <div style={{ marginTop: '8px', fontSize: '8pt', color: '#444', lineHeight: 1.5 }}>
+                  <div style={{ fontWeight: 700, marginBottom: '4px' }}>FOLLOW-UP QUESTIONS</div>
+                  <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                    {ca.originator_questions.slice(0, 6).map((question: string) => (
+                      <li key={question} style={{ marginBottom: '2px' }}>
+                        {question}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
