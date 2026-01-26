@@ -1,0 +1,20 @@
+{
+  "SITE_TYPE": "dealer",
+  "INVENTORY_URL_PATTERN": "https://www.streetsideclassics.com/vehicles/new_arrivals",
+  "LISTING_URL_PATTERN": "https://www.streetsideclassics.com/vehicles/new_arrivals",
+  "EXTRACTION_SELECTORS": {
+    "year": "\\b(19|20)\\d{2}\\b",
+    "make": "h1, .title",
+    "model": "h1, .title, .vehicle-title",
+    "price": "\\$[\\d,]+",
+    "vin": ".vin, [class*=\"vin\"]",
+    "mileage": ".mileage, [class*=\"mileage\"]",
+    "images": "img[src*=\"vehicle\"], .gallery img, .slider img"
+  },
+  "PAGINATION_PATTERN": "a[href*=\"page\"], .pagination a, [class*=\"next\"]",
+  "CHALLENGES": [
+    "lazy_loading",
+    "dynamic_content"
+  ],
+  "RECOMMENDED_APPROACH": "playwright"
+}

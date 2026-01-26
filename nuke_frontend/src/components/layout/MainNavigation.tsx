@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  HomeIcon, 
-  TruckIcon, 
-  PlusIcon, 
-  UserIcon, 
+import {
+  HomeIcon,
+  TruckIcon,
+  PlusIcon,
+  UserIcon,
   CogIcon,
   ChartBarIcon,
   UsersIcon,
@@ -19,7 +19,11 @@ import {
   BuildingOfficeIcon,
   StarIcon,
   UserGroupIcon,
-  BuildingStorefrontIcon
+  BuildingStorefrontIcon,
+  ArrowTrendingUpIcon,
+  BanknotesIcon,
+  FireIcon,
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 
 interface NavigationItem {
@@ -42,7 +46,11 @@ const navigationItems: NavigationItem[] = [
   { name: 'Profile', href: '/profile', icon: UserIcon, category: 'main' },
   { name: 'Viewer Dashboard', href: '/viewer-dashboard', icon: StarIcon, category: 'main', description: 'Your critic profile and activity' },
   { name: 'Interaction Manager', href: '/interaction-manager', icon: UserGroupIcon, category: 'main', description: 'Manage vehicle requests and sessions' },
-  
+  { name: 'Trading', href: '/trading', icon: ArrowTrendingUpIcon, category: 'main', description: 'Trade vehicle shares' },
+  { name: 'Market', href: '/market', icon: BanknotesIcon, category: 'main', description: 'Market dashboard and exchange' },
+  { name: 'Auctions', href: '/auctions', icon: FireIcon, category: 'main', description: 'Browse and create auctions' },
+  { name: 'Vault', href: '/vault', icon: ArchiveBoxIcon, category: 'main', description: 'Vehicle storage management' },
+
   // Professional Tools
   { name: 'Browse Professionals', href: '/browse-professionals', icon: UsersIcon, category: 'professional', description: 'Find certified mechanics and appraisers' },
   { name: 'Project Management', href: '/project-management', icon: WrenchScrewdriverIcon, category: 'professional', description: 'Manage vehicle projects and tasks' },

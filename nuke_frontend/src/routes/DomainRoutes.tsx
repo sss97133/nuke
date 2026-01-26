@@ -29,6 +29,12 @@ const OfferingDetail = React.lazy(() => import('../pages/OfferingDetail'));
 const SubscriptionFlow = React.lazy(() => import('../components/compliance/SubscriptionFlow'));
 const SubscriptionSuccess = React.lazy(() => import('../pages/SubscriptionSuccess'));
 
+// Trading
+const TradingPage = React.lazy(() => import('../pages/TradingPage'));
+
+// Vault / Storage
+const VaultPage = React.lazy(() => import('../pages/VaultPage'));
+
 // Business management
 const BusinessSettings = React.lazy(() => import('../pages/BusinessSettings'));
 const QuickBooksCallback = React.lazy(() => import('../pages/QuickBooksCallback'));
@@ -114,6 +120,13 @@ export const DomainRoutes = () => {
         <Route path="/invest/subscribe/:offeringId" element={<SubscriptionFlow />} />
         <Route path="/invest/subscription/:subscriptionId/success" element={<SubscriptionSuccess />} />
         <Route path="/market-intelligence" element={<MarketIntelligence />} />
+
+        {/* Trading Terminal */}
+        <Route path="/trading" element={<TradingPage />} />
+        <Route path="/trading/:offeringId" element={<TradingPage />} />
+
+        {/* Vehicle Storage Vault */}
+        <Route path="/vault" element={<VaultPage />} />
 
         {/* Business Management */}
         <Route path="/business/settings" element={<BusinessSettings />} />
