@@ -770,7 +770,9 @@ serve(async (req) => {
         extracted.description,
       ].filter(Boolean).join('\n\n') || null,
       location: extracted.location,
-      sale_price: extracted.currentBid, // Store as sale_price for ended auctions
+      // Only set sale_price if auction actually sold, otherwise set high_bid
+      sale_price: extracted.auctionStatus === 'sold' ? extracted.currentBid : null,
+      high_bid: extracted.auctionStatus !== 'sold' ? extracted.currentBid : null,
       bid_count: extracted.bidCount,
       discovery_url: listingUrlCanonical,
       discovery_source: "carsandbids",

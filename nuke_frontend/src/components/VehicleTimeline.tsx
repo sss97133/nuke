@@ -1130,10 +1130,17 @@ const VehicleTimeline: React.FC<{
                                           if (onDateClick) {
                                             onDateClick(dayYmd, dayEvents);
                                           } else {
-                                            // Day receipt: show the day popup (with totals + event list), then allow drilling into receipts.
+                                            // Day receipt: open the receipt directly for single-event days, otherwise show the day popup.
                                             if (dayEvents.length > 0) {
-                                              setSelectedDayEvents(dayEvents as any);
-                                              setShowDayPopup(true);
+                                              const uniqueEvents = (dayEvents || []).filter((ev, idx, arr) =>
+                                                arr.findIndex(e => e.id === ev.id || (e.title === ev.title && e.event_date === ev.event_date)) === idx
+                                              );
+                                              if (uniqueEvents.length === 1) {
+                                                setSelectedEventForDetail(uniqueEvents[0].id);
+                                              } else {
+                                                setSelectedDayEvents(dayEvents as any);
+                                                setShowDayPopup(true);
+                                              }
                                             } else if (activityCount > 0) {
                                               // If day has activity but no events, get photos and auction activity for that date
                                               const dayStart = ymdToUtcStart(dayYmd);

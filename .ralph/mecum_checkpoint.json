@@ -1,0 +1,21 @@
+{
+  "auctions": {
+    "kissimmee-2026": {
+      "lastPage": 72,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "kissimmee-2025": {
+      "lastPage": 233,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "kissimmee-2024": {
+      "lastPage": 130,
+      "complete": false,
+      "vehiclesFound": 0
+    }
+  },
+  "totalDiscovered": 0,
+  "lastUpdated": "2026-01-26T03:46:25.658Z"
+}

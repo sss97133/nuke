@@ -177,8 +177,14 @@ async function upsertVehicle(vehicleId, data) {
     status: data.vin ? 'active' : 'pending'
   };
 
-  if (data.sold_price) updateData.sale_price = data.sold_price;
-  else if (data.current_bid) updateData.sale_price = data.current_bid;
+  // Price fields - depends on outcome
+  if (data.outcome === 'sold' && data.sold_price) {
+    updateData.sale_price = data.sold_price;
+    updateData.sold_price = data.sold_price;
+  } else if (data.current_bid) {
+    // Not sold - current_bid is the high bid
+    updateData.high_bid = data.current_bid;
+  }
 
   Object.keys(updateData).forEach(k => { if (!updateData[k]) delete updateData[k]; });
 
