@@ -1,0 +1,393 @@
+{
+  "url": "https://vanguardmotorsales.com",
+  "timestamp": "2026-01-25T17:58:39.379Z",
+  "pages": {
+    "homepage": {
+      "title": "Classic Cars for Sale Michigan: Muscle & Old Cars | Vanguard Motor Sales",
+      "url": "https://www.vanguardmotorsales.com/",
+      "bodyText": "ASK A QUESTION\n248-974-9513\nHOME\nINVENTORY\nSELL YOUR CAR\nSERVICES\nABOUT US\nCONTACT\nWE ARE DEDICATED TO PARKING\nYOUR DREAM IN YOUR DRIVEWAY\nVIEW INVENTORY\nSCROLL DOWN\nSOCIAL FEED\nFIND\nYOUR DREAM CAR\nVIEW INVENTORY\nSELL\nYOUR HIGH QUALITY CLASSIC CAR\nLEARN MORE\nTESTIMONIALS\n\nSee what our customers are saying about us!\n\nVIEW ALL TESTIMONIALS\nGET OUR\nNEWS\n\nInventory updates and industry news at your fingertips.\n\nEmail\nSign Up\nWATCH OUR\nABOUT US VIDEO\nHELLO FROM\nTHE MOTOR CITY\n15100 Keel St. Plymouth, MI 48170\n\nVanguard Motor Sales is the nation's premier classic and muscle car dealership. Since 2004, we have parked thousands of dreams in driveways. Our 80,000 sq. ft. indoor showroom is located in Plymouth, Michigan. Vanguard Motor Sales is dedicated to parking your dream in your driveway.\n\nCALL US\nCONTACT US\nHOME\nINVENTORY\nSELL YOUR CAR\nFINANCE\nTESTIMONIALS\nCONTACT\n15100 Keel St. Plymouth, MI 48170\n•\nPhone: 248-974-9513\n•\nEmail: tom@vanguardmotorsales.com\n•\n© 2026 Classic Cars for Sale Michigan: Muscle & Old Cars | Vanguard Motor Sales. All Rights Reserved. • • Disclosures & Fees\nPRIVACY POLICY\nTERMS AND CONDITIONS\nCOOKIES SETTINGS\nPOWERED BY\n\nBy clicking “Accept All Cookies”, you agree to the storing of cookies on your device to enhance site navigation, analyze site usage, and assist in our marketing efforts.\n\nCookies Settings Reject All Accept All Cookies",
+      "structure": {
+        "headings": [
+          "WE ARE DEDICATED TO PARKING",
+          "YOUR DREAM IN YOUR DRIVEWAY",
+          "SOCIAL FEED",
+          "FIND",
+          "YOUR DREAM CAR",
+          "SELL",
+          "YOUR HIGH QUALITY CLASSIC CAR",
+          "TESTIMONIALS",
+          "GET OUR",
+          "NEWS"
+        ],
+        "navLinks": [],
+        "mainClasses": [
+          "optanon-category-C0002 ",
+          "optanon-category-C0004 ",
+          "navigation-bar",
+          "vanguard-container",
+          "vanguard-nav-logo",
+          "logo-bg",
+          "navigation-top-row",
+          "top-left",
+          "ask-question",
+          "vanguard-question",
+          "mobile-phone",
+          "top-right",
+          "phone-number",
+          "vanguard-phone",
+          "mobile-menu-btn",
+          "navigation-bottom-row",
+          "navigation-link-bar",
+          "current",
+          "dropdown ",
+          "dropdown-toggle toggle-dropdown mobile",
+          "dropdown-menu",
+          "cycler-box",
+          "text-box",
+          "shadow line1",
+          "shadow line2",
+          "vanguard-btn lg",
+          "scroll-down",
+          "icon",
+          "cycler-bg-img",
+          "vanguard-wrap flex vanguard-desktop-featured"
+        ],
+        "dataAttributes": [
+          "data-domain-script",
+          "data-no-turbolink",
+          "data-ref",
+          "data-src",
+          "data-testid",
+          "data-dismiss",
+          "data-remote",
+          "data-form-id",
+          "data-optanongroupid"
+        ]
+      },
+      "images": [
+        "https://www.vanguardmotorsales.com/assets/vanguard/hidden-slide-ff17f66a343c076c066c44eb861b3343.gif",
+        "https://www.vanguardmotorsales.com/assets/vanguard/charger-rt-8d463037febb39709aed46b70a0e1308.png",
+        "https://www.vanguardmotorsales.com/assets/vanguard/phone-w.svg",
+        "https://www.vanguardmotorsales.com/assets/vanguard/bbb-w-69494ba6dd1a2ee7ed7bb887b28af159.png"
+      ],
+      "jsonLd": [
+        {
+          "@context": "https://schema.org",
+          "@type": "AutomotiveBusiness",
+          "name": "Vanguard Motor Cars",
+          "image": "https://d24n4yush2lwgd.cloudfront.net/assets/vanguard/vanguard-logo-81e74f0778f5f3080d827f84f7fd2bd3.png",
+          "@id": "",
+          "url": "https://www.vanguardmotorsales.com/",
+          "telephone": "248-974-9513",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "15100 Keel St.",
+            "addressLocality": "Plymouth",
+            "addressRegion": "MI",
+            "postalCode": "48170",
+            "addressCountry": "US"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 42.393719,
+            "longitude": -83.495773
+          },
+          "openingHoursSpecification": [
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday"
+              ],
+              "opens": "08:00",
+              "closes": "17:00"
+            },
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": "Saturday",
+              "opens": "09:00",
+              "closes": "15:00"
+            }
+          ],
+          "sameAs": [
+            "https://www.facebook.com/Vanguard-Motor-Sales-48652176325/",
+            "https://twitter.com/vanguardmotors",
+            "https://www.instagram.com/vanguardmotors/",
+            "https://www.youtube.com/user/Vanguardmotorsales/"
+          ]
+        }
+      ],
+      "meta": {
+        "description": "Find Classic Cars for Sale at Vanguard Motor Sales in Michigan - we ship worldwide! Browse inventory or visit our 60,000 Sq. Ft. Showroom."
+      }
+    },
+    "inventory": {
+      "title": "Current Inventory | Classic Cars for Sale Michigan: Muscle & Old Cars | Vanguard Motor Sales",
+      "url": "https://www.vanguardmotorsales.com/inventory",
+      "bodyText": "ASK A QUESTION\n248-974-9513\nHOME\nINVENTORY\nSELL YOUR CAR\nSERVICES\nABOUT US\nCONTACT\n70\nCLASSIC & MUSCLE CARS FOR SALE\nCURRENT\nSOLD\nAUTO LOCATOR\nFILTERS\nReset\nYear\nMake\nModel\nPrice\nSort By\nNEW ARRIVAL\n2022\nFORD\nMUSTANG SHELBY GT500 HERITAGE EDITION\nStock #: 2231 Heritage! 1 Owner, 2,838 Miles, 5.2L V8 (760hp) Handling Pkg, Painted Stripe\n$129,900\nNEW ARRIVAL\n1965\nFORD\nMUSTANG FASTBACK\nStock #: 1611 Rotisserie Build! Blueprint 302ci Crate V8, 4R70W OD Auto, 4W Disc, PS, PB, A/C\n$139,900\nor\n$1,169\n/ month\nNEW ARRIVAL\n1991\nTOYOTA\nPICKUP 4X4\nStock #: 7799 Toyota Pickup! 71k Original Miles, 22RE 2.2L I4, 5-Speed Manual, Clean History\n$69,900\nor\n$584\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1965\nSHELBY\nCOBRA BACKDRAFT\nStock #: 1142 Backdraft RT4! Iconic 427ci Crate V8, TKX 5-Speed Manual, Big & Tall Pkg, PS\n$109,900\nor\n$918\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1961\nCHEVROLET\nC10 PICKUP\nStock #: 3784 Frame Off Restored! GM 350ci Crate V8, TH350 Automatic, 4W Disc, PS, PB, A/C\n$119,900\nor\n$1,002\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1953\nFORD\nF100 PICKUP\nStock #: 8116 Frame Off Restored! Ford 215ci I6, 3-Speed Manual, Heat, 12V System, Wood Bed\n$79,900\nor\n$667\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1986\nCHEVROLET\nK-10 4X4 PICKUP RESTOMOD\nStock #: 4578 Frame Off Restored! Chevrolet 5.3L LS EFI V8, 4L80E Automatic, PS, PB, A/C, 4X4\n$139,900\nor\n$1,169\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1965\nSHELBY\nCOBRA BACKDRAFT\nStock #: 1136 Backdraft! Roush 427SRX Crate EFI V8 (495hp) Tremec 5-Speed, Dropped Footbox, PB\n$129,900\nor\n$1,085\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1967\nCHEVROLET\nCHEVELLE SS\nStock #: 2250 Frame Off Restored, SS! GM 396ci V8, Muncie 4-Speed Manual, 12 Bolt Posi, PS, PB\n$149,900\nor\n$1,252\n/ month\nVIDEO\nAVAILABLE\n2021\nFORD\nMUSTANG ROUSH STAGE 3\nStock #: 5329 Roush Stage 3! 7k Miles, Roushcharged 5.0L V8 (750hp) Automatic, Competition Pkg\n$79,900\nor\n$957\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1959\nCHEVROLET\nIMPALA RESTOMOD\nStock #: 4761 Frame Off Build! GM 572ci Crate V8 (620hp) 4L80E Auto, 4W Disc, Air Susp, PS, AC\n$229,900\nor\n$1,921\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1968\nCHEVROLET\nCHEVELLE SS RESTOMOD\nStock #: 0444 Rotisserie Build! LS9 Crate V8, T56M 6-Speed, Roadster Shop Chassis, PS, PB, A/C\n$249,900\nor\n$2,088\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1987\nCHEVROLET\nSILVERADO 4X4 PICKUP\nStock #: 1073 Frame Off Restored! GM 350ci Crate EFI V8, TH400 Automatic, PS, PB, A/C, 4X4\n$99,900\nor\n$835\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1969\nPLYMOUTH\nGTX\nStock #: 7997 Rotisserie Restored! # Matching, 440ci V8, 4-Speed, Dana 60 Sure-Grip, PS, PB\n$149,900\nor\n$1,252\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1971\nCHEVROLET\nCHEVELLE RESTOMOD\nStock #: 4956 Frame Off Build! 496ci EFI V8 (650hp) 4L85E Auto, Air Susp, 4W Disc, PS, PB, A/C\n$259,900\nor\n$2,171\n/ month\nVIDEO\nAVAILABLE\nSHOP MERCH\nNEW ARRIVAL\n1972\nGMC\nK1500 PICKUP 4X4 RESTOMOD\nStock #: 7154 Frame Off Build! GM 5.3L LS V8, 4L65E Automatic, 4-Wheel Disc, PS, PB, A/C, 4X4\n$199,900\nor\n$1,670\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1987\nCHEVROLET\nSILVERADO 4X4 PICKUP\nStock #: 7901 Fully Restored, Short Bed! GM 350ci EFI V8, Muncie 4-Speed, PS, PB, PW, A/C, 4X4\n$89,900\nor\n$751\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1956\nCHEVROLET\nBEL AIR RESTO MOD\nStock #: 8557 Rotisserie Build! 8-71 S/C 496ci EFI Crate V8, TH400 Auto, 4W Disc, PS, PB, A/C\n$329,900\nor\n$2,756\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1971\nDODGE\nCHARGER R/T V-CODE 440 SIX PACK\nStock #: 6560 Rotisserie Restored! # Match, 440ci Six Pack V8, 4-Speed, Dana 60, 1 of 80 Made\n$169,900\nor\n$1,419\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1972\nGMC\nC/K PICKUP 4X4 RESTOMOD\nStock #: 1478 Frame Off Build! LS3 V8 (525hp) 6L80E Auto, Modern GM Chassis, PS, PB, A/C, 4X4\n$299,900\nor\n$2,505\n/ month\nVIDEO\nAVAILABLE\n1979\nFORD\nBRONCO RESTOMOD 4X4\nStock #: 7327 Frame Off Build! Whipple S/C 5.0L Coyote V8 (700hp) 10R80 Automatic, PS, PB, A/C\n$259,900\nor\n$2,171\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1945\nCHEVROLET\nPICKUP\nStock #: 8186 Frame Off Restored, AK Series! GM 216ci I6, 3-Speed Manual, Rare War Era Pickup\n$99,900\nor\n$835\n/ month\nVIDEO\nAVAILABLE\n1965\nSHELBY\nCOBRA BACKDRAFT\nStock #: 1035 Backdraft Cobra! Roush 427R Crate V8 (550hp) Tremec 5-Speed, Factory Built\n$109,900\nor\n$918\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1955\nCHEVROLET\n150 RESTOMOD\nStock #: 2115 Rotisserie Build! GM LT4 6.2L V8, 4L80E Auto, Roadster Shop Chassis, PS, PB, A/C\n$299,900\nor\n$2,505\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1978\nFORD\nF-250 4X4 PICKUP\nStock #: 1110 Frame Off Restored! Built 460ci V8 w/ EFI, 4-Speed Manual, 4W Disc, PS, PB, A/C\n$159,900\nor\n$1,336\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1972\nCHEVROLET\nMONTE CARLO\nStock #: 1561 Nut & Bolt Restored! # Matching, GM 402ci V8, TH400 Automatic, PS, PB, A/C, Docs\n$109,900\nor\n$918\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1968\nFORD\nMUSTANG COUPE GT R-CODE 428CJ\nStock #: 6145 Rotisserie Restored! R-Code 428CJ V8, C6 Auto, PB, GT Pkg, 4x Gold Award, 1 of 1\n$179,900\nor\n$1,503\n/ month\nVIDEO\nAVAILABLE\nNEW ARRIVAL\n1974\nCHEVROLET\nBLAZER K5 4X4\nStock #: 5739 Fully Re",
+      "structure": {
+        "headings": [
+          "70\nCLASSIC & MUSCLE CARS FOR SALE",
+          "Message Us",
+          "The form was submitted successfully!",
+          "Privacy Preference Center",
+          "Manage Consent Preferences",
+          "Back Button Performance Cookies"
+        ],
+        "navLinks": [],
+        "mainClasses": [
+          "optanon-category-C0004 ",
+          "optanon-category-C0002 ",
+          "navigation-bar",
+          "vanguard-container",
+          "vanguard-nav-logo",
+          "logo-bg",
+          "navigation-top-row",
+          "top-left",
+          "ask-question",
+          "vanguard-question",
+          "mobile-phone",
+          "top-right",
+          "phone-number",
+          "vanguard-phone",
+          "mobile-menu-btn",
+          "navigation-bottom-row",
+          "navigation-link-bar",
+          "dropdown current",
+          "dropdown-toggle toggle-dropdown mobile",
+          "dropdown-menu",
+          "dropdown ",
+          "vanguard-page-wrap",
+          "top-background-vlp vanguard-header",
+          "glow",
+          "vanguard-wrap inventory-bg",
+          "top-filter-box",
+          "inventory-list-type-and-search",
+          "vanguard-container wrap",
+          "inventory-tabs",
+          "current"
+        ],
+        "dataAttributes": [
+          "data-domain-script",
+          "data-no-turbolink",
+          "data-src",
+          "data-adsbygoogle-status",
+          "data-ad-status",
+          "data-google-container-id",
+          "data-load-complete",
+          "data-dismiss",
+          "data-remote",
+          "data-form-id",
+          "data-optanongroupid"
+        ]
+      },
+      "images": [
+        "https://www.vanguardmotorsales.com/assets/vanguard/bbb-w-69494ba6dd1a2ee7ed7bb887b28af159.png"
+      ],
+      "jsonLd": [
+        {
+          "@context": "https://schema.org",
+          "@type": "Car",
+          "name": "2018 Chevrolet Camaro ZL1 1LE",
+          "image": "https://cdn.dealeraccelerate.com/vanguard/1/28740/1489150/1920x1440/2018-chevrolet-camaro-zl1-1le",
+          "color": "Blue",
+          "description": "ZL1 1LE! 841 Miles, LT4 Supercharged 6.2L V8 (650hp) 6-Speed Manual, 1 Owner",
+          "url": "https://www.vanguardmotorsales.com/vehicles/5465/2018-chevrolet-camaro-zl1-1le",
+          "brand": {
+            "@type": "Brand",
+            "name": "Chevrolet"
+          },
+          "vehicleIdentificationNumber": "1G1FJ1R63J0139019",
+          "vehicleInteriorColor": "Black",
+          "vehicleTransmission": "6 Speed Manual",
+          "bodyType": "Coupe",
+          "vehicleInteriorType": "",
+          "numberOfDoors": "2",
+          "vehicleModelDate": "2018",
+          "vehicleEngine": {
+            "@type": "EngineSpecification",
+            "name": "LT4 Supercharged V8",
+            "engineType": "Gasoline",
+            "fuelType": "Gasoline"
+          },
+          "manufacturer": "Chevrolet",
+          "model": "Camaro",
+          "vehicleConfiguration": "ZL1 1LE",
+          "offers": {
+            "@type": "Offer",
+            "url": "https://www.vanguardmotorsales.com/vehicles/5465/2018-chevrolet-camaro-zl1-1le",
+            "availability": "https://schema.org/InStock",
+            "price": "99900",
+            "priceCurrency": "USD"
+          },
+          "itemCondition": "https://schema.org/UsedCondition",
+          "mileageFromOdometer": {
+            "@type": "QuantitativeValue",
+            "value": "838",
+            "unitCode": "SMI"
+          }
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "Car",
+          "name": "1951 Chevrolet 3100 5-Window Pickup Restomod",
+          "image": "https://cdn.dealeraccelerate.com/vanguard/1/28691/1481157/1920x1440/1951-chevrolet-3100-5-window-pickup-restomod",
+          "color": "",
+          "description": "Restomod! GM 383ci V8 (510hp) Auto w/OD, Art Morrison Chassis, 4W Disc, PS, A/C",
+          "url": "https://www.vanguardmotorsales.com/vehicles/5417/1951-chevrolet-3100-5-window-pickup-restomod",
+          "brand": {
+            "@type": "Brand",
+            "name": "Chevrolet"
+          },
+          "vehicleIdentificationNumber": "JBA494690",
+          "vehicleInteriorColor": "Tan",
+          "vehicleTransmission": "3 Speed Automatic",
+          "bodyType": "Pickup Truck",
+          "vehicleInteriorType": "",
+          "numberOfDoors": "2",
+          "vehicleModelDate": "1951",
+          "vehicleEngine": {
+            "@type": "EngineSpecification",
+            "name": "383 V8",
+            "engineType": "Gasoline",
+            "fuelType": "Gasoline"
+          },
+          "manufacturer": "Chevrolet",
+          "model": "3100",
+          "vehicleConfiguration": "5-Window Pickup Restomod",
+          "offers": {
+            "@type": "Offer",
+            "url": "https://www.vanguardmotorsales.com/vehicles/5417/1951-chevrolet-3100-5-window-pickup-restomod",
+            "availability": "https://schema.org/InStock",
+            "price": "169900",
+            "priceCurrency": "USD"
+          },
+          "itemCondition": "https://schema.org/UsedCondition",
+          "mileageFromOdometer": {
+            "@type": "QuantitativeValue",
+            "value": "1013",
+            "unitCode": "SMI"
+          }
+        }
+      ],
+      "meta": {
+        "description": "Find Classic Cars for Sale at Vanguard Motor Sales in Michigan - we ship worldwide! Browse inventory or visit our 60,000 Sq. Ft. Showroom."
+      }
+    },
+    "detail": {
+      "title": "Vanguard Motor Sales Is Looking to Purchase Your High Quality Classic Car! | Classic Cars for Sale Michigan: Muscle & Old Cars | Vanguard Motor Sales",
+      "url": "https://www.vanguardmotorsales.com/sell-us-your-car",
+      "bodyText": "ASK A QUESTION\n248-974-9513\nHOME\nINVENTORY\nSELL YOUR CAR\nSERVICES\nABOUT US\nCONTACT\nWE WANT TO BUY YOUR CAR\nSAFE TRANSACTION. QUICK PAYMENT.\nWE ARE ALWAYS LOOKING FOR HIGH QUALITY VEHICLES\n— MUSCLE CARS\n— HOT RODS\n— LOW MILEAGE LATE MODELS\n— CLASSIC CARS\n— PICKUPS / SUVS / 4X4S\n— MODERN MUSCLE\n— RESTOMODS\n— PRO TOURING\n— EXCITING CARS\nWHO DO YOU KNOW WITH A HIGH QUALITY CAR FOR SALE?\nASK ABOUT OUR REFFERAL REWARD\nHOW TO SELL YOUR CAR TO VANGUARD\nCALL / TEXT / MAIL / EMAIL OUR BUY TEAM\nSEND US YOUR VEHICLE PHOTOS AND INFO\nWE MAKE AN OFFER ON YOUR VEHICLE\nE-SIGN PURCHASE DOCUMENTS\nVEHICLE SHIPPING AND CONFIRMATION\nPURCHASE COMPLETION\nCONTACT OUR BUY TEAM TODAY!\n\nCall our buy team directly:  248-660-4953\n\nEmail our buy team: sellyourcar@vanguardmotorsales.com\n\nSELL YOUR VEHICLE FORM\n\n* = Required Fields\n\nVEHICLE INFORMATION\nYEAR\nMAKE\nSelect Make *\n1932 FORD\nAbarth\nAC\nAcam\nAcoma\nAcura\nAdler\nAEC\nAero\nAlard\nAlegro\nAlfa\nAlfa Romeo\nAlpina\nAlpine\nAlvis\nAMC\nAmerican\nAmerican Ironhorse\nAmerican Lafrance\nAm General\nAmica\nAmilcar\nAmo Zil\nAmphicar\nAnglia\nApollo\nAprilia\nArcher\nAriel\nArlen Nes\nArnolt\nAsa\nASC/McLaren\nAshley\nAssembled\nAston Martin\nAstra\nAuburn\nAudi\nAustin\nAustin-Healey\nAutobianchi\nAutocar\nAutounion\nAvanti\nAzure\nBaci\nBackdraft Racing\nBantam\nBeck\nBela\nBentley\nBergholt\nBerkeley\nBerkely\nBerlina\nBernardi\nBig Bear\nBig Bog\nBig Dog\nBig Inch Bikes\nBimota\nBirel\nBiscuter\nBitri\nBizarini\nBlis\nBMC\nBMW\nBond\nBorgward\nBourget\nBradley\nBrewster\nBricklin\nBristol\nBrookville\nBrush\nBSA\nBuel\nBugatti\nBuick\nCadillac\nCagiva\nCalifornia Special\nCamelot\nCan Am\nCariage\nCari-Lite\nCarolina Custom\nCentury\nChalmers\nChambers\nChandler\nChecker\nChevrolet\nChinok\nChrysler\nChuck\nCitation\nCitroen\nCity\nClassic Roadster\nClenet\nCMC\nCMX\nCobra\nConfederate\nContempory Classics\nContinental Flyer\nCorbin\nCord\nCorsair\nCrosley\nCSX\nCuningham\nCushman\nDaimler\nDamon\nDatsun\nDB\nDelage\nDelahaye\nDeLorean\nDeSoto\nDestiny\nDe Tomaso\nDetroit Chopers\nDeVaux\nDevin\nDiamond T\nDiana\nDivco\nDKW\nDMC\nDodge\nDodge Brothers\nDort Motor Car Co\nDual-Ghia\nDucati\nDuece\nDuesenberg\nEagle\nEdsel\nEquus\nERA\nEsex\nEverett Morrison\nExcalibur\nExcelsior\nFacel\nFacel Vega\nFactory Five\nFarmal\nFeatherlite\nFerrari\nFiat\nFlanders\nFord\nFranklin\nFrazer\nFreightliner\nGazele\nGDT\nGeo\nGMC\nGraham\nHarley Davidson\nHaulmark\nHealey\nHeinkel\nHeney\nHenry J\nHereshof\nHilman\nHispano Suiza\nHolsman\nHolywod\nHonda\nHorch\nHudson\nHumber\nHummer\nHupmobile\nHyundai\nImperial\nIndian\nInfiniti\nInternational\nIsuzu\nJaguar\nJeep\nJensen\nJoe Shaheen\nJordan\nKaiser\nKarman Ghia\nKawasaki\nKia\nKimi\nKirkham\nKit Cars & Replicas\nKoenigseg\nLagonda\nLamborghini\nLancia\nLand Rover\nLa Sale\nLaSalle\nLexus\nLincoln\nLola\nLotus\nMack\nMarathon\nMarmon\nMaserati\nMatchless\nMaxwell\nMaybach\nMazda\nMclaren\nMcLaren\nMercedes-Benz\nMercury\nMeteor\nMG\nMike's Customs\nMini\nMINI\nMitchell\nMitsubishi\nmodels\nMonterey\nMorgan\nMorris\nMosler\nMuntz\nNash\nNash-Healey\nNissan\nNobel\nNoble\nOldsmobile\nOpel\nPackard\nPagani\nPaige\nPanhard\nPanoz\nPantera\nPanther\nPeerless\nPerana\nPerles\nPeugeot\nPGO\nPiagio\nPierce-Arow\nPlymouth\nPontiac\nPorsche\nQvale\nRace Car Replicas\nRam\nRambler\nReliant\nRenault\nREO\nRiley\nRoland Sands Design\nRols-Royce\nRolux\nRosion\nRoush\nRover\nSaab\nSaleen\nSalem\nSalen\nSaturn\nScion\nSea-Doo\nShelby\nShell Valley\nSkoda\nSmart\nSpartan\nSpyker\nStanley\nStorm\nStudebaker\nStutz\nSubaru\nSunbeam\nSuperformance\nSuperlite\nSuzuki\nSwalow\nSwift\nTalbot\nTalbot-Lago\nTango\nTatra\nTesla\nToyota\nTrabant\nTriumph\nTrumbul\nTucker\nTVR\nVector\nVolkswagen\nWhippet\nWillys\nYamaha\nZimer\nZipper\nMODEL\nSelect Model *\nVIN\nASKING PRICE\nVEHICLE DESCRIPTION\n\nCLICK TO UPLOAD PHOTOS\n\nUpload Vehicle Photos (.JPEG and .JPG Only)\n\nDO NOT attempt to upload PDFs or Word documents\n\nCONTACT DETAILS\nFIRST NAME\nLAST NAME\nREFERRAL SOURCE\nHow did you hear About Us?\nReferral\nWord of Mouth\nReturning Customer\nGoogle / Web Search\nFacebook\nInstagram\nYouTube\nTikTok\nOnline Classified Website\nEmail Newsletter\nCar Show\nPrint Ad\nPost Card\nOther\nEMAIL ADDRESS\nPHONE NUMBER\nZIP CODE\nSIGN UP FOR NEWSLETTER\nMEET THE BUY TEAM\nSam Showerman\nBuy Team Director\nsam@vanguardmotorsales.com\n321-615-1442\nBret Hoffman\nPurchasing Specialist\nbret@vanguardmotorsales.com\n810-333-5840\nCarley Preiss\nSearch Specialist\ncarley@vanguardmotorsales.com\n248-660-4953\nMike Coup\nInspector\nmike@vanguardmotorsales.com\n480-993-9914\nBill Gale\nInspector\nbill@vanguardmotorsales.com\n248-826-0987\nJay Wilson\nInspector\njay@vanguardmotorsales.com\n248-533-7786\nHOW TO PHOTOGRAPH YOUR VEHICLE\nWATCH THIS VIDEO FOR TIPS ON TAKING PHOTOS OF YOUR VEHICLE\nTESTIMONIALS FROM CLIENTS WHO HAVE SOLD US THEIR CARS\n1965 COBRA TESTIMONIAL\nBruce from Arizona\n2016 DODGE HELLCAT TESTIMONIAL\nBrett\n1965 PONTIAC GTO TESTIMONIAL\nChris\n1961 FORD THUNDERBIRD TESTIMONIAL\nJim\nVIEW MORE TESTIMONIALS\nHOME\nINVENTORY\nSELL YOUR CAR\nFINANCE\nTESTIMONIALS\nCONTACT\n15100 Keel St. Plymouth, MI 48170\n•\nPhone: 248-974-9513\n•\nEmail: tom@vanguardmotorsales.com\n•\n© 2026 Classic Cars for Sale Michigan: Muscle & Old Cars | Vanguard Motor Sales. All Rights Reserved. • • Disclosures & Fees\nPRIVACY POLICY\nTERMS AND CONDITIONS\nCOOKIES SETTINGS\nPOWERED BY",
+      "structure": {
+        "headings": [
+          "WE WANT TO BUY YOUR CAR",
+          "SAFE TRANSACTION. QUICK PAYMENT.",
+          "WE ARE ALWAYS LOOKING FOR HIGH QUALITY VEHICLES",
+          "HOW TO SELL YOUR CAR TO VANGUARD",
+          "CONTACT OUR BUY TEAM TODAY!",
+          "SELL YOUR VEHICLE FORM",
+          "VEHICLE INFORMATION",
+          "CONTACT DETAILS",
+          "The form was submitted successfully!",
+          "MEET THE BUY TEAM"
+        ],
+        "navLinks": [],
+        "mainClasses": [
+          "optanon-category-C0004 ",
+          "optanon-category-C0002 ",
+          "navigation-bar",
+          "vanguard-container",
+          "vanguard-nav-logo",
+          "logo-bg",
+          "navigation-top-row",
+          "top-left",
+          "ask-question",
+          "vanguard-question",
+          "mobile-phone",
+          "top-right",
+          "phone-number",
+          "vanguard-phone",
+          "mobile-menu-btn",
+          "navigation-bottom-row",
+          "navigation-link-bar",
+          "dropdown ",
+          "dropdown-toggle toggle-dropdown mobile",
+          "dropdown-menu",
+          "current",
+          "vanguard-page-wrap sell-your-car",
+          "sell-banner",
+          "sell-head",
+          "nodots-3",
+          "sell-know",
+          "sell-your-car-padding",
+          "six-how",
+          "sell-your-car-contact",
+          "sell-your-car-text"
+        ],
+        "dataAttributes": [
+          "data-domain-script",
+          "data-no-turbolink",
+          "data-darkreader-inline-color",
+          "data-remote",
+          "data-select-make",
+          "data-initialized",
+          "data-photo-names",
+          "data-form-id",
+          "data-dismiss",
+          "data-optanongroupid",
+          "data-adsbygoogle-status",
+          "data-ad-status",
+          "data-google-container-id",
+          "data-load-complete"
+        ]
+      },
+      "images": [
+        "https://www.vanguardmotorsales.com/assets/vanguard/cloud-up-w-515c9efcdf1a05e497da75071cf038a3.svg",
+        "https://cdn.dealeraccelerate.com/vanguard/marketing_assets/98/Sam_Showerman.webp",
+        "https://cdn.dealeraccelerate.com/vanguard/marketing_assets/99/Bret_Hoffman.webp",
+        "https://cdn.dealeraccelerate.com/vanguard/marketing_assets/100/Carley_Preiss.webp",
+        "https://cdn.dealeraccelerate.com/vanguard/marketing_assets/22/Buy_Team_VMS_Final_Edits-9-2__1_.webp",
+        "https://cdn.dealeraccelerate.com/vanguard/marketing_assets/101/Bill_Gale.webp",
+        "https://cdn.dealeraccelerate.com/vanguard/marketing_assets/105/Jay_Wilson.webp",
+        "https://www.vanguardmotorsales.com/assets/vanguard/bbb-w-69494ba6dd1a2ee7ed7bb887b28af159.png"
+      ],
+      "jsonLd": [],
+      "meta": {
+        "description": "Find Classic Cars for Sale at Vanguard Motor Sales in Michigan - we ship worldwide! Browse inventory or visit our 60,000 Sq. Ft. Showroom."
+      }
+    }
+  },
+  "inventoryLinks": [
+    {
+      "href": "https://www.vanguardmotorsales.com/inventory",
+      "text": "INVENTORY"
+    },
+    {
+      "href": "https://www.vanguardmotorsales.com/inventory/sold",
+      "text": "Sold"
+    },
+    {
+      "href": "https://www.google.com/maps/search/Classic+Cars+for+Sale+Michigan:+Muscle+&+Old+Cars+%7C+Vanguard+Motor+Sales+15100+Keel+St.+Plymouth+MI+48170",
+      "text": "15100 Keel St. Plymouth, MI 48170"
+    }
+  ],
+  "listingLinks": [
+    "https://www.vanguardmotorsales.com/sell-us-your-car",
+    "https://www.vanguardmotorsales.com/inventory/5490/1972-chevrolet-monte-carlo"
+  ],
+  "sampleDetailUrl": "https://www.vanguardmotorsales.com/sell-us-your-car",
+  "vehiclePatterns": {
+    "hasYear": true,
+    "hasMake": true,
+    "hasPrice": false,
+    "hasVIN": false,
+    "hasMileage": true,
+    "hasEngine": false,
+    "hasTransmission": true,
+    "imageCount": 12,
+    "galleryImages": 0
+  }
+}

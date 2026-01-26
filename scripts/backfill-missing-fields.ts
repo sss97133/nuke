@@ -158,12 +158,11 @@ async function reExtractVehicle(vehicle: VehicleToBackfill): Promise<{ success: 
   try {
     // For Craigslist, we need to queue through import_queue
     if (source === 'Craigslist') {
-      // Update import_queue to re-process
+      // Update import_queue to re-process (note: source_id is optional UUID, not string)
       const { error: queueError } = await supabase
         .from('import_queue')
         .upsert({
           listing_url: url,
-          source: 'craigslist',
           status: 'pending',
           vehicle_id: vehicle.id,
         }, {

@@ -1,0 +1,21 @@
+{
+  "new_targets": [
+    {"name": "Kindred Motorworks", "url": "https://kindredmotorworks.com", "type": "restorer"},
+    {"name": "Velocity Restorations", "url": "https://velocityrestorations.com", "type": "restorer"},
+    {"name": "Vanguard Motor Sales", "url": "https://vanguardmotorsales.com", "type": "dealer"},
+    {"name": "Otto Car", "url": "https://www.ottocar.com", "type": "dealer"},
+    {"name": "Avant Garde Collection", "url": "https://agcollection.com", "type": "dealer"},
+    {"name": "European Collectibles", "url": "https://europeancollectibles.com", "type": "dealer"},
+    {"name": "Streetside Classics", "url": "https://streetsideclassics.com", "type": "dealer"},
+    {"name": "Gateway Classic Cars", "url": "https://gatewayclassiccars.com", "type": "dealer"},
+    {"name": "Classic Car Deals", "url": "https://classiccardeals.com", "type": "dealer"},
+    {"name": "Speed Digital Sites", "url": "https://speeddigital.com", "type": "platform"},
+    {"name": "Classics.com", "url": "https://classics.com", "type": "aggregator"},
+    {"name": "Classic Driver", "url": "https://classicdriver.com", "type": "aggregator"},
+    {"name": "Hemmings", "url": "https://hemmings.com", "type": "marketplace"},
+    {"name": "RM Sothebys", "url": "https://rmsothebys.com", "type": "auction"},
+    {"name": "Bonhams", "url": "https://bonhams.com/cars", "type": "auction"},
+    {"name": "Barrett-Jackson", "url": "https://barrett-jackson.com", "type": "auction"},
+    {"name": "Gooding & Co", "url": "https://goodingco.com", "type": "auction"}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+    "timestamp": "2026-01-25T18:48:48Z",
+    "loop": 5,
+    "total_vehicles": [38;5;142m[dotenvx@1.52.0] injecting env (42) from .env[39m
+97390,
+    "pending_vehicles": [38;5;142m[dotenvx@1.52.0] injecting env (42) from .env[39m
+19617,
+    "success_count": 3,
+    "error_count": 0
+  }

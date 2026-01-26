@@ -1,0 +1,21 @@
+{
+  "SITE_TYPE": "marketplace",
+  "CURRENT_INVENTORY_URL": "https://kindredmotorworks.com/for-sale",
+  "SOLD_INVENTORY_URL": null,
+  "LISTING_URL_PATTERN": "a[href*=\"vehicle\"], a[href*=\"listing\"], a[href*=\"car\"], a[href*=\"build\"]",
+  "EXTRACTION_SELECTORS": {
+    "year": "h1, .title",
+    "make": "h1",
+    "model": "h1, .title, .vehicle-title",
+    "price": ".price, [class*=\"price\"]",
+    "vin": ".vin, [class*=\"vin\"]",
+    "mileage": ".mileage, [class*=\"mileage\"]",
+    "images": "img[src*=\"vehicle\"], .gallery img, .slider img, [class*=\"gallery\"] img"
+  },
+  "PAGINATION_PATTERN": "a[href*=\"page\"], .pagination a, [class*=\"next\"], [class*=\"load-more\"]",
+  "CHALLENGES": [
+    "lazy_loading",
+    "dynamic_content"
+  ],
+  "RECOMMENDED_APPROACH": "playwright"
+}
