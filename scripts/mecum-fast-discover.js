@@ -11,18 +11,31 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MAX_PAGES = parseInt(process.argv[2]) || 500;
 const PARALLEL = parseInt(process.argv[3]) || 3;
 
-// Mecum auction slugs to scrape
-const AUCTIONS = [
-  'kissimmee-2025', 'kissimmee-2024', 'kissimmee-2023',
-  'monterey-2025', 'monterey-2024', 'monterey-2023',
-  'indy-2025', 'indy-2024', 'indy-2023',
-  'glendale-2025', 'glendale-2024', 'glendale-2023',
-  'las-vegas-2024', 'las-vegas-2023',
-  'houston-2024', 'houston-2023',
-  'harrisburg-2024', 'harrisburg-2023',
-  'dallas-fort-worth-2024', 'dallas-fort-worth-2023',
-  'kansas-city-2024', 'kansas-city-2023',
+// Mecum auction locations (comprehensive list)
+const LOCATIONS = [
+  // Major annual auctions
+  'kissimmee', 'monterey', 'indy', 'glendale', 'las-vegas',
+  'houston', 'harrisburg', 'dallas-fort-worth', 'kansas-city',
+  'denver', 'portland', 'tulsa', 'chicago', 'seattle',
+  'louisville', 'chattanooga', 'austin', 'dallas', 'phoenix',
+  // Indy variants
+  'indy-fall', 'indy-spring', 'indy-fall-special', 'indy-road-art',
+  // Additional locations from Mecum history
+  'anaheim', 'st-charles', 'schaumburg', 'bloomington-gold',
+  'rockford', 'st-paul', 'belvidere', 'walworth', 'wisconsin-dells'
 ];
+
+// Years to scrape (2010-2026 = 480k+ potential vehicles)
+const YEARS = [
+  '2026', '2025', '2024', '2023', '2022', '2021', '2020',
+  '2019', '2018', '2017', '2016', '2015', '2014', '2013',
+  '2012', '2011', '2010'
+];
+
+// Generate all auction slugs
+const AUCTIONS = LOCATIONS.flatMap(loc =>
+  YEARS.map(year => `${loc}-${year}`)
+);
 
 let existingUrls = new Set();
 
@@ -217,9 +230,11 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
 
   // Build job queue: each auction × pages
+  // Note: Kissimmee 2024 has 200+ pages, so we need high page counts for big auctions
   const jobQueue = [];
+  const pagesPerAuction = Math.min(MAX_PAGES, 250); // Max 250 pages per auction
   for (const auction of AUCTIONS) {
-    for (let p = 1; p <= 50; p++) { // Most auctions have <50 pages
+    for (let p = 1; p <= pagesPerAuction; p++) {
       jobQueue.push({ auction, page: p });
     }
   }

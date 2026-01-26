@@ -5,6 +5,7 @@ import { formatSupabaseInvokeError } from '../utils/formatSupabaseInvokeError';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
+import { useAdminAccess } from '../hooks/useAdminAccess';
 import { TimelineEventService } from '../services/timelineEventService';
 import AddEventWizard from '../components/AddEventWizard';
 import EventMap from '../components/EventMap';
@@ -707,6 +708,7 @@ const VehicleProfile: React.FC = () => {
     canEdit,
     canUpload
   } = useVehiclePermissions(vehicleId || null, session, vehicle);
+  const { isAdmin: isAdminUser } = useAdminAccess();
 
   // Additional permission checks - use database function for claim status
   // Ownership claim status should not rely on missing RPCs. Use ownership_verifications directly.
@@ -724,6 +726,7 @@ const VehicleProfile: React.FC = () => {
     return userOwnershipClaim.status === 'approved' && hasTitle && hasId;
   })();
   const isDbUploader = Boolean(session?.user?.id && vehicle?.uploaded_by === session.user.id);
+  const canTriggerProofAnalysis = Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess || isAdminUser);
 
   // Consolidated permissions object - ensure all values are primitives for React safety
   const permissions: VehiclePermissions = {
@@ -3590,7 +3593,11 @@ const VehicleProfile: React.FC = () => {
               )}
 
               {/* Proof tasks / public scrutiny (data gaps) */}
-              <VehicleDataGapsCard vehicleId={vehicle.id} />
+              <VehicleDataGapsCard
+                vehicleId={vehicle.id}
+                canTriggerAnalysis={canTriggerProofAnalysis}
+                canAdminOverride={isAdminUser}
+              />
 
               {/* Research notes / open questions */}
               <VehicleResearchItemsCard vehicleId={vehicle.id} />

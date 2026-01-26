@@ -176,11 +176,16 @@ serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { event_id, vehicle_id, user_id, image_ids } = await req.json()
+    const { event_id, vehicle_id, user_id, image_ids, originator_context, context_questions } = await req.json()
     
     if (!event_id || !vehicle_id || !user_id || !image_ids || image_ids.length === 0) {
       throw new Error('Missing required parameters: event_id, vehicle_id, user_id, image_ids')
     }
+
+    const originatorContext = typeof originator_context === 'string' ? originator_context.trim() : ''
+    const contextQuestions = Array.isArray(context_questions)
+      ? context_questions.filter((q) => typeof q === 'string' && q.trim().length > 0).map((q) => q.trim())
+      : []
 
     console.log(`[Contextual Batch Analyzer] Analyzing batch: ${image_ids.length} images for event ${event_id}`)
 
@@ -188,13 +193,24 @@ serve(async (req) => {
     const context = await loadCompleteContext(supabase, vehicle_id, user_id, image_ids)
     
     // STEP 2: Analyze images with Claude (using system prompt)
-    const situationalAnalysis = await analyzeSituationalContext(context)
+    const situationalAnalysis = await analyzeSituationalContext(context, {
+      originatorContext,
+      contextQuestions
+    })
     
     // STEP 3: Calculate user commitment score
     const commitmentScore = calculateUserCommitmentScore(context, situationalAnalysis)
     
     // STEP 4: Save analysis to database
-    await saveContextualAnalysis(supabase, event_id, context, situationalAnalysis, commitmentScore)
+    await saveContextualAnalysis(
+      supabase,
+      event_id,
+      context,
+      situationalAnalysis,
+      commitmentScore,
+      originatorContext,
+      contextQuestions
+    )
     
     // STEP 5: Update timeline event with contextual information
     await updateTimelineEvent(supabase, event_id, situationalAnalysis, commitmentScore)
@@ -401,11 +417,17 @@ async function loadCompleteContext(
   }
 }
 
-async function analyzeSituationalContext(context: BatchContext): Promise<SituationalAnalysis> {
+async function analyzeSituationalContext(
+  context: BatchContext,
+  input?: { originatorContext?: string; contextQuestions?: string[] }
+): Promise<SituationalAnalysis> {
   const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!anthropicApiKey) {
     throw new Error('ANTHROPIC_API_KEY not configured')
   }
+  const anthropicModel = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-3-5-sonnet-20241022'
+  const originatorContext = input?.originatorContext ? input.originatorContext.trim() : ''
+  const promptQuestions = input?.contextQuestions || []
 
   // Build system prompt following Claude best practices
   const systemPrompt = `You are an expert automotive analyst and appraiser with deep understanding of vehicle restoration, maintenance, market values, and labor rates. Your role is to understand the COMPLETE SITUATION surrounding a batch of vehicle images and CALCULATE THE VALUE of the work performed.
@@ -456,6 +478,10 @@ CURRENT BATCH:
 - Time span: ${context.imageBatch.time_span_hours.toFixed(1)} hours
 - Date range: ${new Date(context.imageBatch.date_range.earliest).toLocaleDateString()} to ${new Date(context.imageBatch.date_range.latest).toLocaleDateString()}
 
+ORIGINATOR CONTEXT (use as authoritative if provided):
+${originatorContext || 'None provided.'}
+${promptQuestions.length > 0 ? `\nORIGINATOR PROMPT QUESTIONS (asked to the user):\n- ${promptQuestions.join('\n- ')}` : ''}
+
 MARKET CONTEXT (for valuation):
 - Professional shop labor typically: $100-150/hr
 - Skilled DIY equivalent value: $50-75/hr
@@ -490,6 +516,9 @@ VALUE CALCULATION (use real dollar amounts):
 - Vehicle Impact: Does this work increase value? Maintain it? Prevent loss? By how much?
 - Market Comparison: What would a shop charge for this exact work?
 - Total Event Value: What is this work session worth in real dollars?
+
+ORIGINATOR NOTES:
+${originatorContext || 'None provided.'}
 
 CRITICAL: You MUST respond with VALID JSON matching this EXACT structure:
 
@@ -578,7 +607,7 @@ Return ONLY the JSON object. No markdown, no explanations, just pure JSON.`
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-3-opus-20240229',
+      model: anthropicModel,
       max_tokens: 4000,
       system: systemPrompt,
       messages: [userMessage]
@@ -670,13 +699,38 @@ async function saveContextualAnalysis(
   eventId: string,
   context: BatchContext,
   analysis: SituationalAnalysis,
-  commitmentScore: UserCommitmentScore
+  commitmentScore: UserCommitmentScore,
+  originatorContext?: string,
+  contextQuestions: string[] = []
 ) {
+  const originatorPayload = originatorContext
+    ? {
+        originator_context: originatorContext,
+        originator_prompt_questions: contextQuestions,
+        originator_context_added_at: new Date().toISOString()
+      }
+    : {}
+
+  let existingMetadata: Record<string, any> = {}
+  try {
+    const { data: existingRow } = await supabase
+      .from('timeline_events')
+      .select('metadata')
+      .eq('id', eventId)
+      .maybeSingle()
+    if (existingRow?.metadata && typeof existingRow.metadata === 'object') {
+      existingMetadata = existingRow.metadata
+    }
+  } catch {
+    // fallback to empty metadata
+  }
+
   // Save the complete 5 W's analysis to timeline event metadata
   const { error } = await supabase
     .from('timeline_events')
     .update({
       metadata: {
+        ...existingMetadata,
         contextual_analysis: {
           // The 5 W's
           who: analysis.who,
@@ -693,6 +747,7 @@ async function saveContextualAnalysis(
           // Metadata
           confidence_score: analysis.confidence_score,
           reasoning: analysis.reasoning,
+          ...originatorPayload,
           analyzed_at: new Date().toISOString()
         },
         user_commitment_score: {

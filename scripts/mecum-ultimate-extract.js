@@ -22,6 +22,67 @@ const BATCH_SIZE = parseInt(process.argv[2]) || 50;
 const PARALLEL = parseInt(process.argv[3]) || 3;
 
 let vinToVehicleId = new Map();
+let collectionSlugToId = new Map();
+
+async function loadExistingCollections() {
+  console.log('Loading existing collections...');
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/organizations?type=eq.collection&select=id,slug,name`,
+    { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+  );
+  const data = await res.json();
+  data.forEach(org => collectionSlugToId.set(org.slug, org.id));
+  console.log(`Loaded ${collectionSlugToId.size} existing collections`);
+}
+
+async function getOrCreateCollection(name, slug, sourceUrl) {
+  // Check cache first
+  if (collectionSlugToId.has(slug)) {
+    return collectionSlugToId.get(slug);
+  }
+
+  // Try to create
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/organizations`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation,resolution=ignore-duplicates'
+    },
+    body: JSON.stringify({
+      name: name,
+      slug: slug,
+      type: 'collection',
+      discovered_via: 'mecum-extraction',
+      source_url: sourceUrl,
+      is_verified: false,
+      is_active: true
+    })
+  });
+
+  if (res.ok) {
+    const [org] = await res.json();
+    if (org) {
+      collectionSlugToId.set(slug, org.id);
+      console.log(`  📦 Created collection: ${name}`);
+      return org.id;
+    }
+  }
+
+  // If insert failed, try to fetch existing
+  const checkRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/organizations?slug=eq.${encodeURIComponent(slug)}&select=id`,
+    { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+  );
+  const existing = await checkRes.json();
+  if (existing.length > 0) {
+    collectionSlugToId.set(slug, existing[0].id);
+    return existing[0].id;
+  }
+
+  return null;
+}
 
 async function loadExistingVins() {
   console.log('Loading existing VINs...');
@@ -225,12 +286,18 @@ async function extractFullData(page, url) {
   }
 }
 
-async function upsertVehicle(vehicleId, data) {
+async function upsertVehicle(vehicleId, data, sourceUrl) {
   const existingVehicleId = data.vin && vinToVehicleId.has(data.vin)
     ? vinToVehicleId.get(data.vin)
     : null;
 
   const targetVehicleId = existingVehicleId || vehicleId;
+
+  // Handle collection creation/linking
+  let collectionId = null;
+  if (data.collection_name && data.collection_slug) {
+    collectionId = await getOrCreateCollection(data.collection_name, data.collection_slug, sourceUrl);
+  }
 
   // Build comprehensive description
   let description = '';
@@ -254,10 +321,21 @@ async function upsertVehicle(vehicleId, data) {
     status: 'active'
   };
 
-  // Price fields
+  // Link to collection if found
+  if (collectionId) {
+    updateData.selling_organization_id = collectionId;
+  }
+
+  // Price fields - depends on sale result
   if (data.hammer_price) {
-    updateData.sale_price = data.hammer_price;
-    updateData.sold_price = data.hammer_price;
+    if (data.sale_result === 'sold') {
+      // Actually sold - hammer_price is the sale price
+      updateData.sale_price = data.hammer_price;
+      updateData.sold_price = data.hammer_price;
+    } else {
+      // bid-goes-on, not-sold, etc - hammer_price is the high bid
+      updateData.high_bid = data.hammer_price;
+    }
   } else if (data.current_bid) {
     updateData.high_bid = data.current_bid;
   }
@@ -325,8 +403,8 @@ async function createAuctionEvent(vehicleId, sourceUrl, data) {
     auction_start_date: data.run_date,
     auction_end_date: data.run_date,
     outcome: data.sale_result === 'sold' ? 'sold' : data.sale_result,
-    winning_bid: data.hammer_price,
-    high_bid: data.current_bid,
+    winning_bid: data.sale_result === 'sold' ? data.hammer_price : null,
+    high_bid: data.sale_result !== 'sold' ? data.hammer_price : data.current_bid,
     estimate_low: data.low_estimate,
     estimate_high: data.high_estimate,
     seller_location: data.auction_city && data.auction_state
@@ -404,7 +482,7 @@ async function worker(workerId, browser, queue, stats) {
       continue;
     }
 
-    const { vehicleId, isNew } = await upsertVehicle(vehicle.id, data);
+    const { vehicleId, isNew } = await upsertVehicle(vehicle.id, data, vehicle.discovery_url);
     const event = await createAuctionEvent(vehicleId, vehicle.discovery_url, data);
 
     // Build status
@@ -418,13 +496,21 @@ async function worker(workerId, browser, queue, stats) {
       const priceStr = data.hammer_price >= 1000000
         ? `$${(data.hammer_price / 1000000).toFixed(1)}M`
         : `$${(data.hammer_price / 1000).toFixed(0)}k`;
-      fields.push(`SOLD ${priceStr}`);
-      stats.sold++;
-      stats.totalSales += data.hammer_price;
+      if (data.sale_result === 'sold') {
+        fields.push(`SOLD ${priceStr}`);
+        stats.sold++;
+        stats.totalSales += data.hammer_price;
+      } else {
+        fields.push(`BID ${priceStr}`);
+        stats.bidTo++;
+      }
     }
 
     if (data.images?.length) fields.push(data.images.length + 'img');
-    if (data.collection_name) fields.push(`[${data.collection_name.slice(0, 12)}]`);
+    if (data.collection_name) {
+      fields.push(`[${data.collection_name.slice(0, 12)}]`);
+      stats.collections++;
+    }
     if (data.ownership_history?.length) fields.push(`${data.ownership_history.length}own`);
     if (data.low_estimate) fields.push(`e$${(data.low_estimate/1000).toFixed(0)}k`);
 
@@ -448,6 +534,7 @@ async function main() {
   console.log('╚═══════════════════════════════════════════════════════════════╝\n');
 
   await loadExistingVins();
+  await loadExistingCollections();
 
   const vehicles = await getVehiclesToProcess();
   console.log(`Found ${vehicles.length} pending vehicles\n`);
@@ -456,7 +543,7 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   const queue = [...vehicles];
-  const stats = { processed: 0, deduplicated: 0, events: 0, errors: 0, sold: 0, totalSales: 0 };
+  const stats = { processed: 0, deduplicated: 0, events: 0, errors: 0, sold: 0, bidTo: 0, totalSales: 0, collections: 0 };
 
   const workers = [];
   for (let i = 0; i < PARALLEL; i++) {
@@ -469,6 +556,8 @@ async function main() {
   console.log(`\n✅ Done!`);
   console.log(`   Processed: ${stats.processed}`);
   console.log(`   Sold: ${stats.sold} ($${(stats.totalSales/1000000).toFixed(1)}M total)`);
+  console.log(`   Bid-to (unsold): ${stats.bidTo}`);
+  console.log(`   Collections: ${stats.collections} (${collectionSlugToId.size} unique)`);
   console.log(`   Deduplicated: ${stats.deduplicated}`);
   console.log(`   Events: ${stats.events}`);
   console.log(`   Errors: ${stats.errors}`);
