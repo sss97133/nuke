@@ -2,6 +2,24 @@
 
 This folder contains research and implementation documentation for Nuke's engagement algorithms and discovery feed system.
 
+## Start Here
+
+### [2026_PLATFORM_LANDSCAPE.md](./2026_PLATFORM_LANDSCAPE.md) ⭐ NEW
+**What's actually working right now, not 2018-2022 tactics.**
+
+Key insights:
+- Vertical communities > General platforms
+- Live commerce is mainstream (30% of China e-commerce)
+- AI-assisted discovery, not AI-generated content
+- Transaction metrics > Engagement time
+- Intent satisfaction > Engagement maximization
+- On-device personalization (privacy laws killed tracking)
+- Expert verification matters more than follower count
+
+**The 2026 move:** Don't be TikTok for cars. Be where car people actually get things done.
+
+---
+
 ## Documents
 
 ### [ENGAGEMENT_ALGORITHMS_RESEARCH.md](./ENGAGEMENT_ALGORITHMS_RESEARCH.md)
@@ -79,6 +97,17 @@ Specific case studies and documented algorithm changes from major platforms.
 - Case Study 12: Instagram's chronological feed restoration
 - Aggregated Insights: What works and what fails
 - Recommended A/B Tests for Nuke
+
+### [2026_PLATFORM_LANDSCAPE.md](./2026_PLATFORM_LANDSCAPE.md)
+Current platform landscape and forward-looking strategy.
+
+**Key sections:**
+- Part 1: What's Actually Working in 2026 (vertical communities, live commerce, AI concierge)
+- Part 2: Algorithm Trends in 2026 (on-device ML, hybrid curation, intent-based ranking)
+- Part 3: 2026 Strategy for Nuke (anti-TikTok positioning, live commerce, expert verification)
+- Part 4: Specific 2026 Tactics (Following Plus, transaction-driven recs, AI search)
+- Part 5: The 2026 Nuke Playbook (immediate, near-term, long-term actions)
+- Part 6: What NOT to Build (avoid 2020 tactics in 2026)
 
 ---
 
