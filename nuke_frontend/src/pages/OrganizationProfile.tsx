@@ -25,6 +25,7 @@ import { extractImageMetadata } from '../utils/imageMetadata';
 import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationServiceTab } from '../components/organization/OrganizationServiceTab';
 import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
+import OrganizationLegalTab from '../components/organization/OrganizationLegalTab';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
@@ -77,6 +78,18 @@ interface Organization {
   market_share?: string;
   branding?: string;
   labeling?: string;
+  // SEC compliance fields
+  incorporation_jurisdiction?: string;
+  year_incorporated?: number;
+  naics_code?: string;
+  revenue_range?: string;
+  revenue_declaration_date?: string;
+  is_sec_filer?: boolean;
+  cik_number?: string;
+  latest_form_d_date?: string;
+  latest_form_c_date?: string;
+  risk_factors?: string;
+  target_market_description?: string;
   created_at: string;
   updated_at: string;
 }
@@ -1017,6 +1030,7 @@ export default function OrganizationProfile() {
               { id: 'vehicles', priority: 80, label: 'Vehicles' },
               { id: 'images', priority: 70, label: 'Images' },
               { id: 'inventory', priority: 60, label: 'Inventory' },
+              { id: 'legal', priority: 55, label: 'Legal & SEC' },
               { id: 'contributors', priority: 50, label: 'Contributors' },
               { id: 'marketplace', priority: 40, label: 'Marketplace' },
               { id: 'notifications', priority: 20, label: 'Notifications' }
@@ -1030,6 +1044,7 @@ export default function OrganizationProfile() {
             { id: 'vehicles', priority: 80, label: 'Vehicles' },
             { id: 'images', priority: 70, label: 'Images' },
             { id: 'inventory', priority: 60, label: 'Inventory' },
+            { id: 'legal', priority: 55, label: 'Legal & SEC' },
             { id: 'contributors', priority: 50, label: 'Contributors' },
             { id: 'marketplace', priority: 40, label: 'Marketplace' },
             { id: 'notifications', priority: 20, label: 'Notifications' }
@@ -3505,6 +3520,16 @@ export default function OrganizationProfile() {
               isOwner={isOwner}
             />
           </div>
+        )}
+
+        {/* Legal & SEC Tab */}
+        {activeTab === 'legal' && organization && organizationId && (
+          <OrganizationLegalTab
+            organizationId={organizationId}
+            organization={organization}
+            isOwner={isOwner}
+            canEdit={canEdit}
+          />
         )}
       </div>
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CollapsibleWidget } from '../ui/CollapsibleWidget';
+import { useImageAnalysis } from '../../hooks/useImageAnalysis';
 
 type FieldPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -11,6 +12,19 @@ type DataGap = {
   gap_reason: string | null;
   points_reward: number | null;
   is_filled: boolean;
+};
+
+type ProofImage = {
+  id: string;
+  image_url: string;
+  thumbnail_url?: string | null;
+  medium_url?: string | null;
+  created_at?: string | null;
+  sensitive_type?: string | null;
+  is_document?: boolean | null;
+  document_category?: string | null;
+  ai_processing_status?: string | null;
+  ai_scan_metadata?: any;
 };
 
 function priorityLabel(priority: FieldPriority): string {
@@ -38,7 +52,17 @@ function prettyFieldName(fieldName: string): string {
     .trim();
 }
 
-export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: string; limit?: number }) {
+export function VehicleDataGapsCard({
+  vehicleId,
+  limit = 8,
+  canTriggerAnalysis = false,
+  canAdminOverride = false,
+}: {
+  vehicleId: string;
+  limit?: number;
+  canTriggerAnalysis?: boolean;
+  canAdminOverride?: boolean;
+}) {
   const [loading, setLoading] = useState(true);
   const [gaps, setGaps] = useState<DataGap[]>([]);
   const [openGap, setOpenGap] = useState<DataGap | null>(null);
@@ -48,6 +72,13 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<any | null>(null);
   const [showWhy, setShowWhy] = useState(false);
+  const [imagesLoading, setImagesLoading] = useState(false);
+  const [vehicleImages, setVehicleImages] = useState<ProofImage[]>([]);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisValue, setAnalysisValue] = useState<string | null>(null);
+
+  const { analyzeImage, analyzing: analysisRunning, analysisProgress } = useImageAnalysis();
 
   const sortedGaps = useMemo(() => {
     const order: Record<FieldPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -60,6 +91,111 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
       return br - ar;
     });
   }, [gaps]);
+
+  const selectedImage = useMemo(
+    () => vehicleImages.find((img) => img.id === selectedImageId) || null,
+    [vehicleImages, selectedImageId]
+  );
+
+  const proofImages = useMemo(() => {
+    const docCandidates = vehicleImages.filter(
+      (img) => img.sensitive_type || img.is_document || img.document_category
+    );
+    const list = docCandidates.length > 0 ? docCandidates : vehicleImages;
+    return list.slice(0, 24);
+  }, [vehicleImages]);
+
+  const extractValueFromAnalysis = (image: ProofImage, fieldName: string): string | null => {
+    const meta = (image?.ai_scan_metadata || {}) as any;
+    if (!meta || fieldName !== 'vin') return null;
+    const candidates = [
+      meta?.vin_tag?.vin,
+      meta?.spid?.vin,
+      meta?.spid?.extracted_data?.vin,
+      meta?.spid_data?.extracted_data?.vin,
+      meta?.appraiser?.extracted_data?.vin
+    ];
+    const vin = candidates.find((val) => typeof val === 'string' && val.trim().length >= 4);
+    return vin ? String(vin).trim() : null;
+  };
+
+  const inferSourceType = (image: ProofImage | null): string | null => {
+    if (!image) return null;
+    const st = String(image.sensitive_type || '').toLowerCase();
+    if (st === 'vin_plate') return 'vin_plate_photo';
+    if (st === 'title') return 'title_document';
+    if (st === 'registration') return 'registration_document';
+    if (st === 'bill_of_sale') return 'bill_of_sale_document';
+    if (image.is_document || image.document_category) return 'document_photo';
+    return null;
+  };
+
+  const loadProofImages = async (): Promise<ProofImage[]> => {
+    if (!vehicleId) return [];
+    setImagesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_images')
+        .select('id, image_url, thumbnail_url, medium_url, created_at, sensitive_type, is_document, document_category, ai_processing_status, ai_scan_metadata')
+        .eq('vehicle_id', vehicleId)
+        .order('created_at', { ascending: false })
+        .limit(60);
+
+      if (error) throw error;
+      const next = (data as ProofImage[]) || [];
+      setVehicleImages(next);
+      return next;
+    } catch (err) {
+      console.error('Failed to load vehicle images for proof:', err);
+      setVehicleImages([]);
+      return [];
+    } finally {
+      setImagesLoading(false);
+    }
+  };
+
+  const handleSelectImage = (image: ProofImage) => {
+    setSelectedImageId(image.id);
+    setEvidenceUrl(image.image_url || '');
+    if (openGap) {
+      const extracted = extractValueFromAnalysis(image, openGap.field_name);
+      setAnalysisValue(extracted);
+      if (extracted && !value.trim()) {
+        setValue(extracted);
+      }
+    }
+  };
+
+  const runSelectedAnalysis = async () => {
+    if (!selectedImage || !openGap) return;
+    setAnalysisError(null);
+    let userId: string | null = null;
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      userId = authData?.user?.id ?? null;
+    } catch {
+      userId = null;
+    }
+
+    const result = await analyzeImage(selectedImage.image_url, undefined, vehicleId, {
+      imageId: selectedImage.id,
+      userId,
+      forceReprocess: false
+    });
+
+    if (!result.success) {
+      setAnalysisError(result.error || 'Analysis failed');
+      return;
+    }
+
+    const refreshed = await loadProofImages();
+    const updated = refreshed.find((img) => img.id === selectedImage.id) || selectedImage;
+    const extracted = extractValueFromAnalysis(updated, openGap.field_name);
+    setAnalysisValue(extracted);
+    if (extracted && !value.trim()) {
+      setValue(extracted);
+    }
+  };
 
   const loadGaps = async () => {
     if (!vehicleId) return;
@@ -88,6 +224,14 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId, limit]);
 
+  useEffect(() => {
+    if (!openGap) return;
+    setSelectedImageId(null);
+    setAnalysisError(null);
+    setAnalysisValue(null);
+    loadProofImages();
+  }, [openGap?.id, vehicleId]);
+
   const closeModal = () => {
     setOpenGap(null);
     setValue('');
@@ -95,6 +239,9 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
     setContext('');
     setSubmitting(false);
     setSubmitResult(null);
+    setSelectedImageId(null);
+    setAnalysisError(null);
+    setAnalysisValue(null);
   };
 
   const submitEvidence = async () => {
@@ -108,11 +255,12 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
     setSubmitResult(null);
 
     try {
+      const sourceType = inferSourceType(selectedImage);
       const { data, error } = await supabase.rpc('submit_data_gap_evidence', {
         p_gap_id: openGap.id,
         p_proposed_value: proposed,
         p_evidence_url: url || null,
-        p_source_type: null,
+        p_source_type: sourceType,
         p_context: ctx || null
       });
 
@@ -123,10 +271,59 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
       // If the gap is now filled, close. Otherwise keep open and explain it needs more proof/consensus.
       if (data?.gap_filled) {
         closeModal();
+        setTimeout(() => window.location.reload(), 250);
       }
     } catch (err: any) {
       console.error('submit_data_gap_evidence failed:', err);
       alert(`Failed to submit proof: ${err?.message || String(err)}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const applyAdminOverride = async () => {
+    if (!openGap) return;
+    const proposed = value.trim();
+    if (!proposed) return;
+
+    const normalizedValue = (() => {
+      if (['year', 'mileage', 'horsepower', 'doors', 'seats'].includes(openGap.field_name)) {
+        const cleaned = proposed.replace(/[^\d]/g, '');
+        return cleaned ? parseInt(cleaned, 10) : null;
+      }
+      if (openGap.field_name === 'vin') {
+        const normalized = proposed.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        return normalized || null;
+      }
+      return proposed;
+    })();
+
+    setSubmitting(true);
+    setSubmitResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-vehicle-field', {
+        body: {
+          vehicle_id: vehicleId,
+          field_name: openGap.field_name,
+          field_value: normalizedValue,
+          source_url: evidenceUrl.trim() || null,
+          source_image_id: selectedImageId || null,
+          note: context.trim() || null
+        }
+      });
+
+      if (error) throw error;
+      if (!(data as any)?.ok) {
+        throw new Error((data as any)?.error || 'Admin update failed');
+      }
+
+      setSubmitResult({ gap_filled: true, admin_applied: true });
+      await loadGaps();
+      closeModal();
+      setTimeout(() => window.location.reload(), 250);
+    } catch (err: any) {
+      console.error('Admin apply failed:', err);
+      alert(`Failed to apply admin update: ${err?.message || String(err)}`);
     } finally {
       setSubmitting(false);
     }
@@ -242,6 +439,89 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
                   />
                 </label>
 
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ fontWeight: 700 }}>Use existing photos</div>
+                  <div className="text-small text-muted">
+                    Pick a VIN plate/title/registration photo from this vehicle, then optionally run analysis.
+                  </div>
+                  {imagesLoading ? (
+                    <div className="text-small text-muted">Loading images…</div>
+                  ) : proofImages.length === 0 ? (
+                    <div className="text-small text-muted">
+                      No images found yet. Upload a proof photo to enable AI analysis.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
+                      {proofImages.map((img) => {
+                        const thumb = img.thumbnail_url || img.medium_url || img.image_url;
+                        const isSelected = selectedImageId === img.id;
+                        return (
+                          <button
+                            key={img.id}
+                            type="button"
+                            onClick={() => handleSelectImage(img)}
+                            style={{
+                              border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-light)',
+                              padding: 0,
+                              background: 'var(--white)',
+                              cursor: 'pointer'
+                            }}
+                            title={img.sensitive_type || 'image'}
+                          >
+                            <div style={{ position: 'relative', width: '100%', paddingBottom: '70%', overflow: 'hidden' }}>
+                              <img
+                                src={thumb}
+                                alt="Proof candidate"
+                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            </div>
+                            <div style={{ fontSize: '7pt', padding: '4px 6px', textAlign: 'left' }}>
+                              <div style={{ fontWeight: 700 }}>
+                                {img.sensitive_type ? img.sensitive_type.replace(/_/g, ' ') : 'photo'}
+                              </div>
+                              {img.ai_processing_status && (
+                                <div style={{ color: 'var(--text-muted)' }}>{img.ai_processing_status}</div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('trigger_image_upload', { detail: { vehicleId } }));
+                      }}
+                    >
+                      Upload proof
+                    </button>
+                    {canTriggerAnalysis && selectedImage && (
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        onClick={runSelectedAnalysis}
+                        disabled={analysisRunning}
+                      >
+                        {analysisRunning ? 'Analyzing…' : 'Analyze selected'}
+                      </button>
+                    )}
+                  </div>
+                  {analysisRunning && analysisProgress && (
+                    <div className="text-small text-muted">{analysisProgress}</div>
+                  )}
+                  {analysisError && (
+                    <div className="text-small" style={{ color: 'var(--danger)' }}>{analysisError}</div>
+                  )}
+                  {analysisValue && (
+                    <div className="text-small" style={{ color: 'var(--success)' }}>
+                      Extracted from analysis: <strong>{analysisValue}</strong>
+                    </div>
+                  )}
+                </div>
+
                 <label className="text-small" style={{ display: 'grid', gap: 6 }}>
                   <div style={{ fontWeight: 700 }}>Context (optional)</div>
                   <textarea
@@ -272,11 +552,21 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
               <button className="button button-secondary" onClick={closeModal} disabled={submitting}>
                 Cancel
               </button>
+              {canAdminOverride && (
+                <button
+                  className="button button-secondary"
+                  onClick={applyAdminOverride}
+                  disabled={submitting || !value.trim()}
+                  style={{ marginLeft: 'auto' }}
+                >
+                  Apply now (admin)
+                </button>
+              )}
               <button
                 className="button button-primary"
                 onClick={submitEvidence}
                 disabled={submitting || !value.trim()}
-                style={{ marginLeft: 'auto' }}
+                style={{ marginLeft: canAdminOverride ? undefined : 'auto' }}
               >
                 {submitting ? 'Submitting…' : 'Submit proof'}
               </button>

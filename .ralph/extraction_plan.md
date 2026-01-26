@@ -1,154 +1,96 @@
 # Extraction Factory Plan
 
 Started: 2026-01-25
-Mission: Build **QUALITY-FIRST** extractors matching BaT standard, then run to 100% completion
+Mission: Extract vehicles at scale. Quality is good enough - START EXTRACTING.
 
-**KEY PRINCIPLE:** Never run incomplete extractors at scale. Fix quality FIRST.
-
----
-
-## PHASE 0: QUALITY FIXES (MUST COMPLETE FIRST)
-
-### P0 Blockers
-- [x] **0.1** Fix PCarMarket: Add vehicle_images storage (FIXED - images now stored)
-- [x] **0.2** Add title parsing (year/make/model) to mecum-proper-extract.js (DONE - verified with test batch)
-- [x] **0.3** Add title parsing to pcarmarket-proper-extract.js (DONE - verified with test batch)
-- [x] **0.4** Validate fixes with 5-vehicle test batch each (VERIFIED: both extractors working, images stored, year/make/model parsed)
-
-### Quality Validation
-- [x] **0.5** Create EXTRACTOR_QUALITY_COMPARISON.md (done)
-- [x] **0.6** Analyze mecum extractor vs BaT (75% score - needs title parsing)
-- [x] **0.7** Analyze pcarmarket extractor vs BaT (70% score - needs image fix + title)
+**KEY PRINCIPLE:** Ship it. Run extractions, check results, fix issues as they appear.
+**DO NOT** spend loops validating - spend loops EXTRACTING.
 
 ---
 
-## PHASE 1: CURRENT SOURCE COMPLETION (After Quality Fixes)
+## ⚡ IMMEDIATE PRIORITY - STATUS 2026-01-25 9:10PM
 
-### Mecum (~3,700 pending)
-- [x] **1.1** Test batch of 100 - VIN dedup working
-- [x] **1.2** Validate VIN deduplication working - VERIFIED
-- [x] **1.3** Check vehicle_images population (target: 15+ per vehicle) - VERIFIED: avg 21.7 img/vehicle (46 vehicles have images)
-- [ ] **1.4** Run batch of 500 (ONLY after 0.2 complete)
-- [ ] **1.5** Final quality validation vs BaT baseline
+### Mecum - RUNNING ✅
+- [x] **0.2** Title parsing fixed ✓
+- [x] **1.3** Images storing correctly (21.7 avg) ✓
+- [x] **1.4** ✅ **RUNNING**: Multiple processes active (500+500+100 batches)
+- **PROGRESS**: 257+ vehicles updated in last 10 minutes
+- **PENDING**: 4,433 remaining
 
-### PCarMarket (~180 pending)
-- [x] **1.6** Fix vehicle_images storage FIRST (task 0.1) - DONE in Phase 0
-- [x] **1.7** Validate image extraction (should get 18-20 per vehicle) - VERIFIED: avg 35.7 img/vehicle (28 vehicles)
-- [ ] **1.8** Run batch of 100 (ONLY after fixes)
+### PCarMarket - NEARLY COMPLETE ✅
+- [x] **0.1** Image storage fixed ✓
+- [x] **1.7** Images verified (35.7 avg) ✓
+- [x] **1.8** ✅ Mostly processed
+- **PENDING**: 11 remaining
 
-### BaT (~400 pending)
-- [ ] **1.9** Check bat-wayback-batch-extract.js status
-- [ ] **1.10** Run if Firecrawl budget allows
-- [ ] **1.11** Validate against BaT gold standard (it IS the standard)
+### BaT Backfill - RUNNING ✅ (via bat-simple-extract)
+- [x] **1.9** ✅ **RUNNING**: Direct extraction via edge function (no Firecrawl needed)
+- **PROGRESS**: 24 vehicles extracted in last 10 minutes
+- **PENDING**: 360 remaining
+
+### Hagerty - RUNNING ✅
+- **PROGRESS**: 38 vehicles updated in last 10 minutes
+- **PENDING**: 40 remaining
+
+---
+
+## PHASE 1 CHECKLIST (after immediate runs)
+
+- [ ] **1.10** Check Mecum results: `SELECT COUNT(*) FROM vehicles WHERE profile_origin='mecum' AND created_at > NOW() - INTERVAL '1 hour'`
+- [ ] **1.11** Check PCarMarket results
+- [ ] **1.12** If issues found, investigate and fix
+- [ ] **1.13** Run another batch of 500 Mecum
+- [ ] **1.14** Run another batch of 100 PCarMarket
+
+---
+
+## PHASE 2: DISCOVERY EXPANSION
+
+### Mecum Discovery - PRIORITY
+Current: 8,783 vehicles | Need: More auctions to scrape
+- [ ] **2.1** Run discovery: `dotenvx run -- node scripts/mecum-fast-discover.js 100 3`
+- [ ] **2.2** Add older auctions (2022, 2021, 2020) to discovery script
+- [ ] **2.3** Add more locations (portland, denver, tulsa, etc.)
+- [ ] **2.4** Target: 50,000+ Mecum vehicles in DB
 
 ### Cars & Bids (15,620 pending - CF blocked)
-- [ ] **1.12** Investigate Cloudflare bypass with Playwright
-- [ ] **1.13** Test with Firecrawl as fallback
-- [ ] **1.14** Document blocker if unsolvable
+- [ ] **2.5** Try Playwright: `npx playwright test scripts/cab-playwright-extract.ts`
+- [ ] **2.6** If blocked, try Firecrawl
+- [ ] **2.7** Document if unsolvable
+
+### New Sites (lower priority)
+- [ ] Kindred Motorworks - extractor exists, test it
+- [ ] Streetside Classics - extractor exists, test it
+- [ ] Vanguard Motor Sales - extractor exists, test it
 
 ---
 
-## PHASE 2: NEW EXTRACTOR FACTORY
+## SUCCESS METRICS
 
-### Kindred Motorworks
-- [x] **2.1** Inspect site structure
-- [x] **2.2** Generate extractor
-- [ ] **2.3** Test extractor (5 vehicles)
-- [ ] **2.4** Validate quality vs BaT
-- [ ] **2.5** Full extraction run
+**Target:** 1000+ new vehicles per day flowing into DB
 
-### Streetside Classics
-- [x] **2.6** Inspect site structure
-- [x] **2.7** Generate extractor
-- [ ] **2.8** Test extractor
-- [ ] **2.9** Validate quality
-- [ ] **2.10** Full extraction run
-
-### Vanguard Motor Sales
-- [x] **2.11** Inspect site structure
-- [x] **2.12** Generate extractor
-- [ ] **2.13** Test extractor
-- [ ] **2.14** Validate quality
-- [ ] **2.15** Full extraction run
-
-### Gateway Classic Cars
-- [ ] **2.16** Inspect site
-- [ ] **2.17** Generate extractor
-- [ ] **2.18** Test and validate
-- [ ] **2.19** Full extraction
-
-### European Collectibles
-- [ ] **2.20** Inspect site
-- [ ] **2.21** Generate extractor
-- [ ] **2.22** Test and validate
-- [ ] **2.23** Full extraction
-
-### Otto Car
-- [ ] **2.24** Inspect site
-- [ ] **2.25** Generate extractor
-- [ ] **2.26** Test and validate
-
-### Avant Garde Collection
-- [ ] **2.27** Inspect site
-- [ ] **2.28** Generate extractor
-- [ ] **2.29** Test and validate
-
----
-
-## PHASE 3: AUCTION HOUSE EXTRACTORS
-
-### RM Sotheby's
-- [ ] **3.1** Inspect site (complex - multiple auctions)
-- [ ] **3.2** Analyze API patterns
-- [ ] **3.3** Generate extractor
-- [ ] **3.4** Test with recent auction
-
-### Barrett-Jackson
-- [ ] **3.5** Inspect site
-- [ ] **3.6** Generate extractor
-- [ ] **3.7** Test
-
-### Bonhams
-- [ ] **3.8** Inspect site
-- [ ] **3.9** Generate extractor
-
-### Gooding & Co
-- [ ] **3.10** Inspect site
-- [ ] **3.11** Generate extractor
-
----
-
-## PHASE 4: QUALITY ASSURANCE
-
-- [ ] **4.1** Run extraction quality report for all sources
-- [ ] **4.2** Identify sources below BaT baseline
-- [ ] **4.3** Investigate and fix gaps
-- [ ] **4.4** Re-run failed sources
-- [ ] **4.5** Final validation: all sources at 90%+ vs BaT
-
----
-
-## DISCOVERED TASKS
-
-(Add tasks here as you discover them during extraction)
+Check with:
+```sql
+SELECT profile_origin, COUNT(*)
+FROM vehicles
+WHERE created_at > NOW() - INTERVAL '24 hours'
+GROUP BY profile_origin;
+```
 
 ---
 
 ## BLOCKERS
 
-- **Cars & Bids**: Cloudflare blocking (15,620 vehicles stuck)
-- **Hemmings**: Cloudflare blocking (30 vehicles stuck)
+- **Cars & Bids**: Cloudflare (15,620 stuck)
+- **Hemmings**: Cloudflare (30 stuck)
+- **Firecrawl**: Out of credits - BaT wayback extraction blocked
 
 ---
 
-## METRICS SNAPSHOT
+## NOTES FOR RALPH
 
-Last updated: 2026-01-25 14:00 UTC
-
-| Source | Pending | Active | Quality Score |
-|--------|---------|--------|---------------|
-| Mecum | 3,764 | 5,019 | TBD |
-| Hagerty | 0 | ~500 | TBD |
-| PCarMarket | 192 | ~300 | TBD |
-| BaT | 410 | 24,831 | BASELINE |
-| C&B | 15,620 | 4,736 | BLOCKED |
+1. **Don't validate endlessly** - extractors are ready, run them
+2. **One loop = one extraction batch** - not one validation check
+3. **Check results AFTER running** - not before
+4. **If something fails, note it and move on** - don't get stuck investigating
+5. **Goal is vehicles in DB** - not perfect code

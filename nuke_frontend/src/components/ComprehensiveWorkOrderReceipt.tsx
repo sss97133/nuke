@@ -205,6 +205,9 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
   const [baseEvent, setBaseEvent] = useState<any>(null);
   const [runningContextual, setRunningContextual] = useState(false);
   const [contextualError, setContextualError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [originatorContext, setOriginatorContext] = useState('');
+  const [originatorContextTouched, setOriginatorContextTouched] = useState(false);
   const [costBreakdown, setCostBreakdown] = useState<{
     parts: { items: Part[], total: number },
     labor: { tasks: LaborTask[], total: number, hours: number },
@@ -229,6 +232,34 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
     loadData();
   }, [eventId]);
 
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      setCurrentUserId(data?.user?.id ?? null);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (originatorContextTouched) return;
+    const existing = (baseEvent as any)?.metadata?.contextual_analysis_input?.originator_context
+      || (baseEvent as any)?.metadata?.contextual_analysis?.originator_context
+      || (baseEvent as any)?.metadata?.originator_context;
+    if (existing && typeof existing === 'string') {
+      setOriginatorContext(existing);
+    }
+  }, [baseEvent, originatorContextTouched]);
+
+  const originatorPrompts = [
+    'What is happening in this evidence set, and why did you capture it?',
+    'If this is a listing or discovery, where was it posted and what details stood out (price, mileage, location, seller)?',
+    'What was your role in this moment (discovering, inspecting, documenting, repairing)?',
+    'How does this connect to earlier or later work or decisions?'
+  ];
+
   const loadData = async () => {
     setLoading(true);
     setContextualError(null);
@@ -239,6 +270,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
     setShowInvoiceHtml(false);
     setInvoiceError(null);
     setBaseEvent(null);
+    setOriginatorContext('');
+    setOriginatorContextTouched(false);
     try {
       // 1. Try comprehensive view first, fallback to timeline_events
       let wo: WorkOrder | null = null;
@@ -305,7 +338,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         try {
           const { data: evRow, error: evErr } = await supabase
             .from('timeline_events')
-            .select('id, vehicle_id, event_date, metadata, contextual_analysis_status, receipt_amount, receipt_currency')
+            .select('id, vehicle_id, event_date, metadata, contextual_analysis_status, receipt_amount, receipt_currency, user_id')
             .eq('id', eventId)
             .maybeSingle();
           if (!evErr && evRow) setBaseEvent(evRow);
@@ -534,19 +567,55 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
       const imageIds = (evidence || []).map((e) => e.id).filter(Boolean).slice(0, 20);
       if (imageIds.length === 0) throw new Error('No evidence images linked to this event');
 
-      const { error } = await supabase.functions.invoke('analyze-batch-contextual', {
-        body: {
-          event_id: eventId,
-          vehicle_id: vehicleId,
-          user_id: user.id,
-          image_ids: imageIds
-        }
-      });
+      const originatorNotes = originatorContext.trim();
+
+      try {
+        const existingMetadata = (baseEvent as any)?.metadata || {};
+        const metadata = originatorNotes
+          ? {
+              ...existingMetadata,
+              contextual_analysis_input: {
+                ...(existingMetadata.contextual_analysis_input || {}),
+                originator_context: originatorNotes,
+                prompt_questions: originatorPrompts,
+                updated_at: new Date().toISOString()
+              }
+            }
+          : existingMetadata;
+
+        await supabase
+          .from('timeline_events')
+          .update(originatorNotes ? { contextual_analysis_status: 'processing', metadata } : { contextual_analysis_status: 'processing' })
+          .eq('id', eventId);
+      } catch (updateError) {
+        console.warn('Failed to update contextual analysis status:', updateError);
+      }
+
+      const body: Record<string, any> = {
+        event_id: eventId,
+        vehicle_id: vehicleId,
+        user_id: user.id,
+        image_ids: imageIds
+      };
+      if (originatorNotes) {
+        body.originator_context = originatorNotes;
+        body.context_questions = originatorPrompts;
+      }
+
+      const { error } = await supabase.functions.invoke('analyze-batch-contextual', { body });
 
       if (error) throw error;
       await loadData();
     } catch (e: any) {
       setContextualError(e?.message || 'Failed to run analysis');
+      try {
+        await supabase
+          .from('timeline_events')
+          .update({ contextual_analysis_status: 'failed' })
+          .eq('id', eventId);
+      } catch {
+        // ignore update failures
+      }
     } finally {
       setRunningContextual(false);
     }
@@ -716,6 +785,15 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
       }
     }
   };
+
+  const isOriginator = Boolean(
+    currentUserId
+    && (
+      (baseEvent as any)?.user_id === currentUserId
+      || workOrder?.created_by === currentUserId
+      || workOrder?.documented_by === currentUserId
+    )
+  );
 
   return createPortal(
     <div 
@@ -934,29 +1012,33 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   const status = (baseEvent as any)?.contextual_analysis_status;
                   const has = Boolean((baseEvent as any)?.metadata?.contextual_analysis);
                   const done = status === 'completed' || has;
+                  const processing = status === 'processing' || runningContextual;
+                  const failed = status === 'failed';
 
                   return (
                     <>
-                      <span>{done ? 'Analyzed' : 'AI pending'}</span>
+                      <span>
+                        {done ? 'Analyzed' : failed ? 'AI failed' : processing ? 'Analyzing' : 'AI pending'}
+                      </span>
                       {!done && (
                         <button
                           type="button"
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); runContextualBatchAnalysis(); }}
-                          disabled={runningContextual}
+                          disabled={processing}
                           style={{
                             marginLeft: '8px',
                             padding: '2px 6px',
                             fontSize: '7pt',
                             fontWeight: 'bold',
                             border: '1px solid #000',
-                            background: runningContextual ? '#f0f0f0' : '#fff',
-                            cursor: runningContextual ? 'not-allowed' : 'pointer',
+                            background: processing ? '#f0f0f0' : '#fff',
+                            cursor: processing ? 'not-allowed' : 'pointer',
                             textTransform: 'uppercase',
                             color: '#000'
                           }}
                           title="Run AI analysis on this evidence set"
                         >
-                          {runningContextual ? 'Analyzing…' : 'Analyze'}
+                          {processing ? 'Analyzing…' : 'Analyze'}
                         </button>
                       )}
                     </>
@@ -964,6 +1046,59 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 })()}
               </div>
             </div>
+            {isOriginator && (
+              <div style={{
+                marginTop: '6px',
+                padding: '8px',
+                border: '1px dashed #999',
+                background: '#fff',
+                borderRadius: '3px'
+              }}>
+                <div style={{
+                  fontSize: '7pt',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Originator context (optional)
+                </div>
+                <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px', lineHeight: 1.4 }}>
+                  Help the analysis by adding what you know about this evidence set.
+                </div>
+                <div style={{ fontSize: '7pt', color: '#666', marginTop: '6px' }}>
+                  <div style={{ fontWeight: 700 }}>Suggested prompts</div>
+                  <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                    {originatorPrompts.map((prompt) => (
+                      <li key={prompt} style={{ marginBottom: '2px' }}>
+                        {prompt}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <textarea
+                  value={originatorContext}
+                  onChange={(e) => {
+                    setOriginatorContextTouched(true);
+                    setOriginatorContext(e.target.value);
+                  }}
+                  placeholder="Example: This was when I first discovered the vehicle for sale. The listing was on BaT for $68k with 45k miles, and the seller mentioned..."
+                  rows={3}
+                  maxLength={1200}
+                  style={{
+                    width: '100%',
+                    marginTop: '8px',
+                    padding: '6px',
+                    fontSize: '8pt',
+                    border: '1px solid #ccc',
+                    borderRadius: '3px',
+                    resize: 'vertical'
+                  }}
+                />
+                <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px' }}>
+                  This note will be included in AI analysis.
+                </div>
+              </div>
+            )}
             {contextualError && (
               <div style={{ marginTop: '8px', fontSize: '7pt', color: '#a00' }}>
                 {contextualError}
@@ -1080,6 +1215,11 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               {ca?.narrative_summary && (
                 <div style={{ marginTop: '8px', fontSize: '8pt', color: '#666', lineHeight: 1.5 }}>
                   {String(ca.narrative_summary)}
+                </div>
+              )}
+              {ca?.originator_context && (
+                <div style={{ marginTop: '8px', fontSize: '8pt', color: '#444', lineHeight: 1.5 }}>
+                  <strong>ORIGINATOR NOTES:</strong> {String(ca.originator_context)}
                 </div>
               )}
             </div>

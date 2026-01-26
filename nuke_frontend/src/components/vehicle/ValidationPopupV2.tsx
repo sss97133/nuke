@@ -49,6 +49,20 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
     loadValidations();
   }, [vehicleId, fieldName]);
 
+  const normalizeEditedValue = () => {
+    const raw = String(editedValue ?? '').trim();
+    if (!raw) return null;
+    if (fieldName === 'vin') {
+      const normalized = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      return normalized || null;
+    }
+    if (['year', 'mileage', 'horsepower', 'doors', 'seats'].includes(fieldName)) {
+      const cleaned = raw.replace(/[^\d]/g, '');
+      return cleaned ? parseInt(cleaned, 10) : null;
+    }
+    return raw;
+  };
+
   const loadValidations = async () => {
     try {
       setLoading(true);
@@ -228,12 +242,13 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
       setSaving(true);
       
       const updates: any = {};
+      const normalizedValue = normalizeEditedValue();
       
       // Convert value to proper type
       if (fieldName === 'year' || fieldName === 'mileage' || fieldName === 'horsepower') {
-        updates[fieldName] = editedValue ? parseInt(editedValue) : null;
+        updates[fieldName] = normalizedValue;
       } else {
-        updates[fieldName] = editedValue || null;
+        updates[fieldName] = normalizedValue;
       }
       
       const { error } = await supabase
@@ -241,7 +256,19 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         .update(updates)
         .eq('id', vehicleId);
       
-      if (error) throw error;
+      if (error) {
+        const adminResult = await supabase.functions.invoke('admin-update-vehicle-field', {
+          body: {
+            vehicle_id: vehicleId,
+            field_name: fieldName,
+            field_value: normalizedValue
+          }
+        });
+        if (adminResult.error) throw adminResult.error;
+        if (!(adminResult.data as any)?.ok) {
+          throw new Error((adminResult.data as any)?.error || 'Admin update failed');
+        }
+      }
       
       // Success - close modal and trigger reload
       setSaving(false);
