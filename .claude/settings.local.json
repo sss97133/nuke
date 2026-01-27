@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotenvx run -- bash -c 'curl -s -X POST \"\"$VITE_SUPABASE_URL/functions/v1/ralph-wiggum-rlm-extraction-coordinator\"\" -H \"\"Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY\"\" -H \"\"Content-Type: application/json\"\" -d \"\"{\\\\\"\"action\\\\\"\": \\\\\"\"brief\\\\\"\"}\"\"')",
+      "Bash(jq:*)",
+      "Bash(dotenvx run -- bash -c 'curl -s \"\"${VITE_SUPABASE_URL}/functions/v1/db-stats\"\" -H \"\"Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}\"\"')",
+      "Bash(dotenvx run -- bash -c 'curl -s -X POST \"\"$VITE_SUPABASE_URL/functions/v1/process-import-queue\"\" -H \"\"Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY\"\" -H \"\"Content-Type: application/json\"\" -d \"\"{\\\\\"\"batch_size\\\\\"\": 1}\"\"')",
+      "mcp__supabase__execute_sql",
+      "Bash(dotenvx run:*)",
+      "mcp__supabase__get_logs",
+      "Bash(deno check:*)",
+      "Bash(open:*)",
+      "Bash(ping:*)",
+      "Bash(du:*)",
+      "Bash(scutil:*)",
+      "Bash(nslookup:*)",
+      "Bash(docker run:*)",
+      "Bash(sudo dscacheutil:*)",
+      "Bash(sudo killall:*)",
+      "Bash(networksetup:*)",
+      "Bash(dig:*)",
+      "Bash(host:*)",
+      "Bash(curl:*)",
+      "Bash(killall:*)",
+      "Bash(python3:*)",
+      "mcp__supabase__apply_migration"
+    ]
+  }
+}

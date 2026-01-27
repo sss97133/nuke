@@ -181,3 +181,9 @@ The next task (1.3) will check Mecum's vehicle_images population to ensure it's 
 [2026-01-25T18:49:18Z] ═══════════════════════════════════════════════════════════
 [2026-01-25T18:49:18Z] LOOP 6 - Sun Jan 25 14:49:18 AST 2026
 [2026-01-25T18:49:18Z] ═══════════════════════════════════════════════════════════
+This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch(). The promise rejected with the reason:
+Error: No messages returned
+    at $bK (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:6050:73)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[2026-01-27T02:19:07Z] >>> Unknown exit status
+[2026-01-27T02:19:07Z] >>> Sleeping 30s...
