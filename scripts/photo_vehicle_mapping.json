@@ -1091,5 +1091,12 @@
       "photo_count": 3,
       "parsed": "1970 Mercedes 280SL"
     }
-  ]
+  ],
+  "last_sync": "2026-01-26T18:50:12.686000",
+  "sync_stats": {
+    "vehicles": 24,
+    "uploaded": 91,
+    "skipped": 32,
+    "errors": 1056
+  }
 }

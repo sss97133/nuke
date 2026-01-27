@@ -18,6 +18,7 @@ import hashlib
 import tempfile
 import base64
 import time
+import warnings
 from pathlib import Path
 from datetime import datetime, timezone
 from collections import defaultdict
@@ -29,7 +30,18 @@ import pillow_heif
 pillow_heif.register_heif_opener()
 
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent.parent / '.env')
+import warnings
+warnings.filterwarnings('ignore', message='.*could not parse.*')
+try:
+    load_dotenv(Path(__file__).parent.parent / '.env')
+except:
+    # Fallback: manually load critical env vars
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        for line in env_path.read_text().split('\n'):
+            if '=' in line and not line.startswith('#') and ' ' not in line.split('=')[0]:
+                key, value = line.split('=', 1)
+                os.environ.setdefault(key.strip(), value.strip())
 
 SUPABASE_URL = os.getenv('VITE_SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')

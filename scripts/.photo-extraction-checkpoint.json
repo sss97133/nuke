@@ -1,0 +1,27 @@
+{
+  "sync_id": "20260126_214649",
+  "started": "2026-01-26T21:46:49.991858",
+  "last_album": "1971 Ford Bronco Coyote",
+  "last_photo_index": 0,
+  "processed_albums": [
+    "1932 Ford Roadster",
+    "1971 Ford Bronco Coyote"
+  ],
+  "stats": {
+    "started": "2026-01-26T21:46:49.991860",
+    "albums_found": 58,
+    "albums_processed": 2,
+    "photos_found": 9109,
+    "photos_processed": 200,
+    "uploaded": 0,
+    "duplicates": 0,
+    "skipped": 76,
+    "errors": 124,
+    "vins_detected": 0,
+    "ai_analyzed": 0,
+    "elapsed_seconds": 0,
+    "errors_by_type": {
+      "HTTPSConnectionPool(host='qkgaybvrernstplzjaam.supabase.co', port=443)": 124
+    }
+  }
+}
