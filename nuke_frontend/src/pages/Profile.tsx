@@ -58,6 +58,7 @@ import { ProfileCommentsTab } from '../components/profile/ProfileCommentsTab';
 import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
 import { getUserProfileData } from '../services/profileStatsService';
 import ConnectedPlatforms from '../components/bidding/ConnectedPlatforms';
+import SocialConnections from '../components/profile/SocialConnections';
 
 const Profile: React.FC = () => {
   const { userId, externalIdentityId } = useParams<{ userId?: string; externalIdentityId?: string }>();
@@ -810,6 +811,9 @@ const Profile: React.FC = () => {
 
                 {/* Connected Auction Platforms */}
                 <ConnectedPlatforms />
+
+                {/* Social Connections (OAuth) */}
+                <SocialConnections userId={profile.id} />
 
                 {/* Password Change */}
                 <div className="card">

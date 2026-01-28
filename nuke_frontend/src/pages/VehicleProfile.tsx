@@ -38,7 +38,7 @@ import WiringQueryContextBar from '../components/wiring/WiringQueryContextBar';
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
 import LiveAuctionBanner from '../components/auction/LiveAuctionBanner';
 import ExternalAuctionLiveBanner from '../components/auction/ExternalAuctionLiveBanner';
-import { resolveCurrencyCode } from '../utils/currency';
+import { resolveCurrencyCode, formatCurrencyAmount } from '../utils/currency';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
 import { BATListingManager } from '../components/vehicle/BATListingManager';
