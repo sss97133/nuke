@@ -1,22 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import GrokTerminal from '../components/GrokTerminal';
 
-interface FeedItem {
+interface Vehicle {
   id: string;
-  type: 'viral_opportunity' | 'engagement_update' | 'trending_topic' | 'queued_post' | 'alert';
-  source_account?: string;
-  content: string;
-  engagement?: {
-    likes: number;
-    retweets: number;
-    replies: number;
-    views?: number;
-  };
-  url?: string;
-  suggested_reply?: string;
-  urgency?: 'now' | 'soon' | 'when_ready';
-  relevance_score?: number;
-  timestamp: string;
+  year: number;
+  make: string;
+  model: string;
+  thumbnail?: string;
+  engine?: string;
+  transmission?: string;
+  exterior_color?: string;
+  mileage?: number;
+  notes?: string;
+}
+
+interface VehicleImage {
+  id: string;
+  url: string;
+  vehicle_id: string;
+}
+
+interface ContentSuggestion {
+  id: string;
+  text: string;
+  images: string[];
+  source: string;
+  vehicle?: Vehicle;
 }
 
 interface ConnectedAccount {
@@ -25,69 +35,140 @@ interface ConnectedAccount {
   connected: boolean;
 }
 
-interface EngagementStats {
-  total_posts: number;
-  viral_posts: number;
-  total_likes: number;
-  total_retweets: number;
-  total_views: number;
-}
-
 export default function SocialWorkspace() {
-  const [activeTab, setActiveTab] = useState<'feed' | 'compose' | 'queue' | 'analytics'>('feed');
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
-  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [recentImages, setRecentImages] = useState<VehicleImage[]>([]);
+  const [suggestions, setSuggestions] = useState<ContentSuggestion[]>([]);
+  const [selectedContent, setSelectedContent] = useState<ContentSuggestion | null>(null);
   const [composeText, setComposeText] = useState('');
-  const [replyingTo, setReplyingTo] = useState<FeedItem | null>(null);
+  const [composeImages, setComposeImages] = useState<string[]>([]);
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [feedLoading, setFeedLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [stats, setStats] = useState<EngagementStats | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [posting, setPosting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'create' | 'engage' | 'grok'>('create');
+  const [engagementPosts, setEngagementPosts] = useState<any[]>([]);
+  const [loadingEngagement, setLoadingEngagement] = useState(false);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [grokMessages, setGrokMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [grokInput, setGrokInput] = useState('');
+  const [grokLoading, setGrokLoading] = useState(false);
 
   useEffect(() => {
-    loadUserAndAccounts();
+    loadUserData();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadLiveFeed();
-      // Auto-refresh every 60 seconds
-      const interval = setInterval(loadLiveFeed, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [userId]);
-
-  const loadUserAndAccounts = async () => {
+  const loadUserData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setUserId(user.id);
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-      const { data: identities } = await supabase
-        .from('external_identities')
-        .select('platform, handle, metadata')
-        .eq('claimed_by_user_id', user.id)
-        .in('platform', ['x', 'instagram', 'threads', 'tiktok', 'youtube']);
+    setUserId(user.id);
 
-      if (identities) {
-        setAccounts(identities.map(i => ({
-          platform: i.platform,
-          handle: i.handle,
-          connected: !!i.metadata?.access_token
-        })));
+    // Load connected accounts
+    const { data: identities } = await supabase
+      .from('external_identities')
+      .select('platform, handle, metadata')
+      .eq('claimed_by_user_id', user.id)
+      .in('platform', ['x']);
+
+    if (identities) {
+      setAccounts(identities.map(i => ({
+        platform: i.platform,
+        handle: i.handle,
+        connected: !!i.metadata?.access_token
+      })));
+    }
+
+    // Load user's vehicles with all details
+    const { data: userVehicles, error: vehiclesError } = await supabase
+      .from('vehicles')
+      .select('id, year, make, model, engine, transmission, exterior_color, mileage, notes')
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (vehiclesError) {
+      console.error('Failed to load vehicles:', vehiclesError);
+    }
+
+    if (userVehicles) {
+      // Get thumbnails
+      const vehiclesWithThumbs = await Promise.all(
+        userVehicles.map(async (v) => {
+          const { data: img } = await supabase
+            .from('vehicle_images')
+            .select('url')
+            .eq('vehicle_id', v.id)
+            .limit(1)
+            .single();
+          return { ...v, thumbnail: img?.url };
+        })
+      );
+      setVehicles(vehiclesWithThumbs);
+
+      if (vehiclesWithThumbs.length > 0) {
+        setSelectedVehicle(vehiclesWithThumbs[0]);
       }
     }
+
+    // Load recent images across all vehicles (only if we have vehicles)
+    if (userVehicles && userVehicles.length > 0) {
+      const vehicleIds = userVehicles.map(v => v.id);
+      const { data: images, error: imagesError } = await supabase
+        .from('vehicle_images')
+        .select('id, url, vehicle_id')
+        .in('vehicle_id', vehicleIds)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (imagesError) {
+        console.error('Failed to load vehicle images:', imagesError);
+      } else if (images) {
+        setRecentImages(images);
+      }
+    }
+
     setLoading(false);
   };
 
-  const loadLiveFeed = useCallback(async () => {
-    if (!userId) return;
-    setFeedLoading(true);
+  const generateContent = async () => {
+    if (!selectedVehicle || !userId) return;
+    setGenerating(true);
 
     try {
+      // Get full vehicle details
+      const { data: fullVehicle } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('id', selectedVehicle.id)
+        .single();
+
+      // Get vehicle images
+      const { data: vehicleImages } = await supabase
+        .from('vehicle_images')
+        .select('url')
+        .eq('vehicle_id', selectedVehicle.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const images = vehicleImages?.map(i => i.url) || [];
+
+      // Build detailed vehicle context
+      const vehicleDetails: string[] = [];
+      if (fullVehicle?.engine) vehicleDetails.push(`Engine: ${fullVehicle.engine}`);
+      if (fullVehicle?.transmission) vehicleDetails.push(`Trans: ${fullVehicle.transmission}`);
+      if (fullVehicle?.exterior_color) vehicleDetails.push(`Color: ${fullVehicle.exterior_color}`);
+      if (fullVehicle?.mileage) vehicleDetails.push(`${fullVehicle.mileage.toLocaleString()} miles`);
+      if (fullVehicle?.notes) vehicleDetails.push(fullVehicle.notes);
+
+      // Call AI to generate content
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-live-feed`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-viral-content`,
         {
           method: 'POST',
           headers: {
@@ -95,40 +176,137 @@ export default function SocialWorkspace() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            user_id: userId,
-            sections: ['viral', 'engagement', 'trending', 'alerts'],
-            generate_replies: true
+            topic: `${selectedVehicle.year} ${selectedVehicle.make} ${selectedVehicle.model}`,
+            vehicle: {
+              year: selectedVehicle.year,
+              make: selectedVehicle.make,
+              model: selectedVehicle.model,
+              details: vehicleDetails.join(', ')
+            },
+            style: 'flex'
           })
         }
       );
 
-      const data = await response.json();
-      if (data.feed) {
-        setFeedItems(data.feed);
+      const result = await response.json();
+
+      if (result.posts) {
+        const newSuggestions: ContentSuggestion[] = result.posts.map((post: any, i: number) => ({
+          id: `gen-${Date.now()}-${i}`,
+          text: post.text,
+          images: images.slice(0, 2),
+          source: post.hook_type || 'AI Generated',
+          vehicle: selectedVehicle
+        }));
+
+        setSuggestions(newSuggestions);
+
+        // Auto-select first suggestion and attach images
+        if (newSuggestions.length > 0) {
+          setSelectedContent(newSuggestions[0]);
+          setComposeText(newSuggestions[0].text);
+          setComposeImages(images.slice(0, 2));
+        }
       }
-      if (data.summary) {
-        setStats({
-          total_posts: data.summary.total_items || 0,
-          viral_posts: data.summary.viral_opportunities || 0,
-          total_likes: 0,
-          total_retweets: 0,
-          total_views: 0
-        });
-      }
-      setLastRefresh(new Date());
     } catch (err) {
-      console.error('Failed to load feed:', err);
+      console.error('Failed to generate:', err);
     } finally {
-      setFeedLoading(false);
+      setGenerating(false);
     }
-  }, [userId]);
+  };
 
-  const loadEngagementStats = useCallback(async () => {
+  const generateMeme = async () => {
+    if (!selectedVehicle || !userId) return;
+    setGenerating(true);
+    setGeneratedImage(null);
+
+    try {
+      // Get vehicle images as fallback
+      const { data: vehicleImages } = await supabase
+        .from('vehicle_images')
+        .select('url')
+        .eq('vehicle_id', selectedVehicle.id)
+        .limit(4);
+
+      const images = vehicleImages?.map(i => i.url) || [];
+
+      // Call Grok meme generator
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-meme`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            vehicle: {
+              year: selectedVehicle.year,
+              make: selectedVehicle.make,
+              model: selectedVehicle.model,
+              details: selectedVehicle.engine || ''
+            },
+            style: 'flex',
+            include_image: true
+          })
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error) {
+        console.error('Meme generation error:', result.error);
+        // Fall back to regular generation
+        await generateContent();
+        return;
+      }
+
+      if (result.posts) {
+        const newSuggestions: ContentSuggestion[] = result.posts.map((post: any, i: number) => ({
+          id: `meme-${Date.now()}-${i}`,
+          text: post.text,
+          images: images.slice(0, 2),
+          source: `Meme: ${post.format}`,
+          vehicle: selectedVehicle
+        }));
+
+        setSuggestions(newSuggestions);
+
+        // Use Grok-generated image if available, otherwise use vehicle images
+        if (result.images?.[0]?.url) {
+          setGeneratedImage(result.images[0].url);
+          setComposeImages([result.images[0].url]);
+        } else {
+          setComposeImages(images.slice(0, 2));
+        }
+
+        if (newSuggestions.length > 0) {
+          setSelectedContent(newSuggestions[0]);
+          setComposeText(newSuggestions[0].text);
+        }
+      }
+    } catch (err) {
+      console.error('Meme generation failed:', err);
+      // Fall back to regular generation
+      await generateContent();
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const selectSuggestion = (suggestion: ContentSuggestion) => {
+    setSelectedContent(suggestion);
+    setComposeText(suggestion.text);
+    setComposeImages(suggestion.images);
+  };
+
+  const findPostsToEngage = async () => {
     if (!userId) return;
+    setLoadingEngagement(true);
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-engagement-tracker`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-engagement-agent`,
         {
           method: 'POST',
           headers: {
@@ -137,39 +315,134 @@ export default function SocialWorkspace() {
           },
           body: JSON.stringify({
             user_id: userId,
-            mode: 'recent',
-            hours_back: 168 // 7 days
+            mode: 'find_posts',
+            max_replies: 10
           })
         }
       );
 
-      const data = await response.json();
-      if (data.summary) {
-        setStats({
-          total_posts: data.summary.total_posts || 0,
-          viral_posts: data.summary.viral_posts || 0,
-          total_likes: data.summary.total_likes || 0,
-          total_retweets: data.summary.total_retweets || 0,
-          total_views: data.summary.total_views || 0
-        });
+      const result = await response.json();
+      if (result.posts) {
+        setEngagementPosts(result.posts);
       }
     } catch (err) {
-      console.error('Failed to load stats:', err);
+      console.error('Failed to find posts:', err);
+    } finally {
+      setLoadingEngagement(false);
     }
-  }, [userId]);
+  };
 
-  useEffect(() => {
-    if (activeTab === 'analytics' && userId) {
-      loadEngagementStats();
-    }
-  }, [activeTab, userId, loadEngagementStats]);
+  const generateReplyForPost = async (post: any) => {
+    if (!userId) return;
 
-  const quickReply = (item: FeedItem) => {
-    setReplyingTo(item);
-    if (item.suggested_reply) {
-      setComposeText(item.suggested_reply);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-engagement-agent`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            mode: 'generate_reply',
+            tweet_id: post.id,
+            tweet_text: post.text
+          })
+        }
+      );
+
+      const result = await response.json();
+      if (result.replies?.[0]) {
+        setReplyDrafts(prev => ({
+          ...prev,
+          [post.id]: result.replies[0].text
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to generate reply:', err);
     }
-    setActiveTab('compose');
+  };
+
+  const postReply = async (post: any, replyText: string) => {
+    if (!userId || !replyText.trim()) return;
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-post`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            text: replyText,
+            reply_to: post.id
+          })
+        }
+      );
+
+      const result = await response.json();
+      if (result.success) {
+        // Remove from list
+        setEngagementPosts(prev => prev.filter(p => p.id !== post.id));
+        setReplyDrafts(prev => {
+          const next = { ...prev };
+          delete next[post.id];
+          return next;
+        });
+        alert(`Replied! ${result.url}`);
+      } else {
+        alert(`Failed: ${result.error}`);
+      }
+    } catch (err) {
+      console.error('Failed to post reply:', err);
+    }
+  };
+
+  const sendToGrok = async () => {
+    if (!userId || !grokInput.trim()) return;
+
+    const userMessage = grokInput.trim();
+    setGrokInput('');
+    setGrokLoading(true);
+
+    // Add user message immediately
+    const newMessages = [...grokMessages, { role: 'user' as const, content: userMessage }];
+    setGrokMessages(newMessages);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grok-agent`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            message: userMessage,
+            conversation_history: grokMessages
+          })
+        }
+      );
+
+      const result = await response.json();
+      if (result.reply) {
+        setGrokMessages(prev => [...prev, { role: 'assistant', content: result.reply }]);
+      } else if (result.error) {
+        setGrokMessages(prev => [...prev, { role: 'assistant', content: `Error: ${result.error}` }]);
+      }
+    } catch (err) {
+      console.error('Grok chat failed:', err);
+      setGrokMessages(prev => [...prev, { role: 'assistant', content: 'Failed to connect to Grok' }]);
+    } finally {
+      setGrokLoading(false);
+    }
   };
 
   const postNow = async () => {
@@ -177,13 +450,6 @@ export default function SocialWorkspace() {
     setPosting(true);
 
     try {
-      // Extract tweet ID from URL if replying
-      let replyToId: string | undefined;
-      if (replyingTo?.url) {
-        const match = replyingTo.url.match(/status\/(\d+)/);
-        if (match) replyToId = match[1];
-      }
-
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-post`,
         {
@@ -195,7 +461,7 @@ export default function SocialWorkspace() {
           body: JSON.stringify({
             user_id: userId,
             text: composeText,
-            reply_to: replyToId
+            image_urls: composeImages.length > 0 ? composeImages : undefined
           })
         }
       );
@@ -203,11 +469,11 @@ export default function SocialWorkspace() {
       const result = await response.json();
       if (result.success) {
         setComposeText('');
-        setReplyingTo(null);
-        // Refresh feed to show our new post
-        loadLiveFeed();
+        setComposeImages([]);
+        setSelectedContent(null);
+        alert(`Posted! ${result.url}`);
       } else {
-        console.error('Post failed:', result.error);
+        alert(`Failed: ${result.error}`);
       }
     } catch (err) {
       console.error('Post failed:', err);
@@ -216,645 +482,539 @@ export default function SocialWorkspace() {
     }
   };
 
-  const formatNumber = (n: number): string => {
-    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-    return String(n);
-  };
-
-  const formatTime = (timestamp: string): string => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'now';
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h`;
-    return `${Math.floor(hours / 24)}d`;
-  };
-
-  const viralItems = feedItems.filter(f => f.type === 'viral_opportunity');
-  const trendingItems = feedItems.filter(f => f.type === 'trending_topic');
-  const engagementItems = feedItems.filter(f => f.type === 'engagement_update');
-  const alertItems = feedItems.filter(f => f.type === 'alert');
+  const xAccount = accounts.find(a => a.platform === 'x');
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: '#0a0a0a',
-        color: '#737373'
-      }}>
-        Loading workspace...
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#fafafa' }}>
+        Loading your content...
       </div>
     );
   }
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '280px 1fr 320px',
-      height: '100vh',
-      background: '#0a0a0a',
-      color: '#e5e5e5'
-    }}>
-      {/* Left Sidebar - Accounts & Navigation */}
+    <div style={{ minHeight: '100vh', background: '#fafafa' }}>
+      {/* Header */}
       <div style={{
-        borderRight: '1px solid #262626',
-        padding: '20px',
+        borderBottom: '1px solid #e5e5e5',
+        background: '#fff',
+        padding: '16px 24px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: '24px'
+        alignItems: 'center',
+        justifyContent: 'space-between'
       }}>
-        <div>
-          <h1 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>Social</h1>
-          <p style={{ fontSize: '12px', color: '#737373', margin: '4px 0 0 0' }}>Workspace</p>
-        </div>
-
-        {/* Connected Accounts */}
-        <div>
-          <h3 style={{ fontSize: '11px', fontWeight: 600, color: '#737373', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Accounts
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {accounts.length > 0 ? accounts.map(acc => (
-              <div key={acc.platform} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 12px',
-                background: '#171717',
-                borderRadius: '8px'
-              }}>
-                <span style={{ fontSize: '16px' }}>
-                  {acc.platform === 'x' ? 'X' : acc.platform === 'instagram' ? 'IG' : acc.platform}
-                </span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 500 }}>@{acc.handle}</div>
-                  <div style={{ fontSize: '10px', color: acc.connected ? '#22c55e' : '#737373' }}>
-                    {acc.connected ? 'Connected' : 'Disconnected'}
-                  </div>
-                </div>
-              </div>
-            )) : (
-              <div style={{ padding: '20px', textAlign: 'center', color: '#525252', fontSize: '12px' }}>
-                No accounts connected
-              </div>
-            )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+          <div>
+            <h1 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Content Studio</h1>
+            <div style={{ fontSize: '12px', color: '#737373', marginTop: '2px' }}>
+              {xAccount ? `@${xAccount.handle} ${xAccount.connected ? '· Ready' : '· Reconnect needed'}` : 'Connect X to post'}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', background: '#f5f5f5', padding: '4px', borderRadius: '8px' }}>
             <button
-              onClick={() => window.location.href = '/profile'}
+              onClick={() => setActiveTab('create')}
               style={{
-                padding: '10px',
-                background: 'transparent',
-                border: '1px dashed #404040',
-                borderRadius: '8px',
-                color: '#737373',
-                fontSize: '12px',
+                padding: '8px 16px',
+                background: activeTab === 'create' ? '#000' : 'transparent',
+                color: activeTab === 'create' ? '#fff' : '#666',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 500,
                 cursor: 'pointer'
               }}
             >
-              + Connect Account
+              Create
+            </button>
+            <button
+              onClick={() => { setActiveTab('engage'); if (engagementPosts.length === 0) findPostsToEngage(); }}
+              style={{
+                padding: '8px 16px',
+                background: activeTab === 'engage' ? '#000' : 'transparent',
+                color: activeTab === 'engage' ? '#fff' : '#666',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              Engage
+            </button>
+            <button
+              onClick={() => setActiveTab('grok')}
+              style={{
+                padding: '8px 16px',
+                background: activeTab === 'grok' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+                color: activeTab === 'grok' ? '#fff' : '#666',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              Grok
             </button>
           </div>
         </div>
-
-        {/* Navigation */}
-        <div>
-          <h3 style={{ fontSize: '11px', fontWeight: 600, color: '#737373', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Workspace
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {[
-              { id: 'feed', label: 'Viral Feed', badge: viralItems.length > 0 ? viralItems.filter(v => v.urgency === 'now').length : 0 },
-              { id: 'compose', label: 'Compose', badge: 0 },
-              { id: 'queue', label: 'Queue', badge: 0 },
-              { id: 'analytics', label: 'Analytics', badge: 0 }
-            ].map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id as any)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 12px',
-                  background: activeTab === item.id ? '#262626' : 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: activeTab === item.id ? '#fff' : '#a3a3a3',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  textAlign: 'left'
-                }}
-              >
-                {item.label}
-                {item.badge > 0 && (
-                  <span style={{
-                    padding: '2px 6px',
-                    background: '#ef4444',
-                    borderRadius: '10px',
-                    fontSize: '10px',
-                    fontWeight: 600,
-                    color: '#fff'
-                  }}>{item.badge}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Alerts */}
-        {alertItems.length > 0 && (
-          <div>
-            <h3 style={{ fontSize: '11px', fontWeight: 600, color: '#737373', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Alerts
-            </h3>
-            {alertItems.slice(0, 3).map(alert => (
-              <div key={alert.id} style={{
-                padding: '10px',
-                background: '#171717',
-                borderRadius: '8px',
-                borderLeft: '3px solid #f59e0b',
-                marginBottom: '8px',
-                fontSize: '12px'
-              }}>
-                {alert.content}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Main Content Area */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Tab Content */}
-        {activeTab === 'feed' && (
-          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Viral Feed</h2>
-                <p style={{ fontSize: '12px', color: '#737373', margin: '4px 0 0 0' }}>
-                  {feedLoading ? 'Refreshing...' : `Updated ${formatTime(lastRefresh.toISOString())} ago`}
-                </p>
-              </div>
-              <button
-                onClick={loadLiveFeed}
-                disabled={feedLoading}
-                style={{
-                  padding: '8px 16px',
-                  background: '#262626',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#e5e5e5',
-                  fontSize: '12px',
-                  cursor: feedLoading ? 'not-allowed' : 'pointer',
-                  opacity: feedLoading ? 0.5 : 1
-                }}
-              >
-                Refresh
-              </button>
-            </div>
+      {activeTab === 'create' ? (
+      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr 400px', height: 'calc(100vh - 65px)' }}>
 
-            {viralItems.length === 0 && !feedLoading ? (
-              <div style={{
-                padding: '40px',
-                textAlign: 'center',
-                color: '#525252',
-                background: '#171717',
-                borderRadius: '12px'
-              }}>
-                <div style={{ fontSize: '32px', marginBottom: '12px' }}>No opportunities found</div>
-                <div style={{ fontSize: '14px' }}>Connect your X account to see viral content</div>
-              </div>
+        {/* Left: Your Vehicles & Images */}
+        <div style={{ borderRight: '1px solid #e5e5e5', background: '#fff', overflow: 'auto' }}>
+          <div style={{ padding: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#737373', marginBottom: '12px', textTransform: 'uppercase' }}>
+              Your Vehicles
+            </div>
+            {vehicles.length === 0 ? (
+              <div style={{ fontSize: '13px', color: '#999', padding: '20px 0' }}>No vehicles yet</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {viralItems.map(item => (
-                  <div key={item.id} style={{
-                    padding: '16px',
-                    background: '#171717',
-                    borderRadius: '12px',
-                    border: item.urgency === 'now' ? '1px solid #f59e0b' : '1px solid #262626'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: '#262626',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '14px',
-                        fontWeight: 600
-                      }}>
-                        {item.source_account?.[0]?.toUpperCase() || '?'}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600 }}>@{item.source_account}</div>
-                        <div style={{ fontSize: '11px', color: '#737373' }}>{formatTime(item.timestamp)}</div>
-                      </div>
-                      {item.urgency === 'now' && (
-                        <span style={{
-                          padding: '4px 8px',
-                          background: '#f59e0b',
-                          borderRadius: '4px',
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          color: '#000'
-                        }}>HOT</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '14px', lineHeight: 1.5, marginBottom: '12px' }}>
-                      {item.content}
-                    </div>
-                    {item.engagement && (
-                      <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '12px', color: '#737373' }}>
-                        <span>{formatNumber(item.engagement.likes)} likes</span>
-                        <span>{formatNumber(item.engagement.retweets)} RTs</span>
-                        <span>{formatNumber(item.engagement.replies)} replies</span>
-                        {item.engagement.views && <span>{formatNumber(item.engagement.views)} views</span>}
-                      </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {vehicles.map(v => (
+                  <div
+                    key={v.id}
+                    onClick={() => setSelectedVehicle(v)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: selectedVehicle?.id === v.id ? '#f0f0f0' : 'transparent',
+                      border: selectedVehicle?.id === v.id ? '1px solid #ddd' : '1px solid transparent'
+                    }}
+                  >
+                    {v.thumbnail ? (
+                      <img src={v.thumbnail} alt="" style={{ width: '48px', height: '48px', borderRadius: '6px', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: '#e5e5e5' }} />
                     )}
-                    {item.suggested_reply && (
-                      <div style={{
-                        padding: '10px',
-                        background: '#262626',
-                        borderRadius: '6px',
-                        marginBottom: '12px',
-                        fontSize: '13px',
-                        fontStyle: 'italic',
-                        color: '#a3a3a3'
-                      }}>
-                        Suggested: "{item.suggested_reply}"
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => quickReply(item)}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#3b82f6',
-                          border: 'none',
-                          borderRadius: '6px',
-                          color: '#fff',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {item.suggested_reply ? 'Use Reply' : 'Quick Reply'}
-                      </button>
-                      {item.url && (
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            padding: '8px 16px',
-                            background: 'transparent',
-                            border: '1px solid #404040',
-                            borderRadius: '6px',
-                            color: '#a3a3a3',
-                            fontSize: '12px',
-                            textDecoration: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          View on X
-                        </a>
-                      )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 500 }}>{v.year} {v.make}</div>
+                      <div style={{ fontSize: '12px', color: '#737373' }}>{v.model}</div>
+                      {v.engine && <div style={{ fontSize: '10px', color: '#999', marginTop: '2px' }}>{v.engine}</div>}
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        )}
 
-        {activeTab === 'compose' && (
-          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Compose</h2>
-              <p style={{ fontSize: '12px', color: '#737373', margin: '4px 0 0 0' }}>
-                Create and schedule posts
-              </p>
+          <div style={{ padding: '16px', borderTop: '1px solid #f0f0f0' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#737373', marginBottom: '12px', textTransform: 'uppercase' }}>
+              Recent Photos
             </div>
-
-            {replyingTo && (
-              <div style={{
-                padding: '12px',
-                background: '#171717',
-                borderRadius: '8px',
-                marginBottom: '16px',
-                borderLeft: '3px solid #3b82f6'
-              }}>
-                <div style={{ fontSize: '11px', color: '#737373', marginBottom: '6px' }}>
-                  Replying to @{replyingTo.source_account}
-                </div>
-                <div style={{ fontSize: '13px', color: '#a3a3a3' }}>
-                  {replyingTo.content.substring(0, 150)}...
-                </div>
-                <button
-                  onClick={() => { setReplyingTo(null); setComposeText(''); }}
-                  style={{
-                    marginTop: '8px',
-                    padding: '4px 8px',
-                    background: 'transparent',
-                    border: '1px solid #404040',
-                    borderRadius: '4px',
-                    color: '#737373',
-                    fontSize: '11px',
-                    cursor: 'pointer'
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+              {recentImages.slice(0, 9).map(img => (
+                <img
+                  key={img.id}
+                  src={img.url}
+                  alt=""
+                  onClick={() => {
+                    if (!composeImages.includes(img.url)) {
+                      setComposeImages(prev => [...prev, img.url]);
+                    }
                   }}
-                >
-                  Cancel reply
-                </button>
-              </div>
-            )}
-
-            <div style={{
-              background: '#171717',
-              borderRadius: '12px',
-              border: '1px solid #262626',
-              overflow: 'hidden'
-            }}>
-              <textarea
-                value={composeText}
-                onChange={(e) => setComposeText(e.target.value)}
-                placeholder={replyingTo ? "Write your reply..." : "What's happening?"}
-                style={{
-                  width: '100%',
-                  minHeight: '150px',
-                  padding: '16px',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#e5e5e5',
-                  fontSize: '15px',
-                  lineHeight: 1.5,
-                  resize: 'none',
-                  outline: 'none'
-                }}
-              />
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px 16px',
-                borderTop: '1px solid #262626'
-              }}>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button style={{
-                    padding: '8px',
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#737373',
+                  style={{
+                    width: '100%',
+                    aspectRatio: '1',
+                    objectFit: 'cover',
+                    borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '16px'
-                  }}>IMG</button>
-                  <button style={{
-                    padding: '8px',
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#737373',
-                    cursor: 'pointer',
-                    fontSize: '16px'
-                  }}>VID</button>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    color: composeText.length > 280 ? '#ef4444' : '#737373'
-                  }}>
-                    {composeText.length}/280
-                  </span>
-                  <button
-                    onClick={postNow}
-                    disabled={!composeText.trim() || composeText.length > 280 || posting}
-                    style={{
-                      padding: '8px 20px',
-                      background: composeText.trim() && composeText.length <= 280 && !posting ? '#3b82f6' : '#262626',
-                      border: 'none',
-                      borderRadius: '20px',
-                      color: '#fff',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: composeText.trim() && composeText.length <= 280 && !posting ? 'pointer' : 'not-allowed'
-                    }}
-                  >
-                    {posting ? 'Posting...' : 'Post'}
-                  </button>
-                </div>
-              </div>
+                    opacity: composeImages.includes(img.url) ? 0.5 : 1,
+                    border: composeImages.includes(img.url) ? '2px solid #000' : 'none'
+                  }}
+                />
+              ))}
             </div>
+          </div>
+        </div>
 
-            <div style={{ marginTop: '20px' }}>
-              <h3 style={{ fontSize: '12px', color: '#737373', marginBottom: '12px' }}>Quick responses</h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        {/* Center: Composer & Preview */}
+        <div style={{ overflow: 'auto', padding: '24px' }}>
+          {/* Quick Actions */}
+          {selectedVehicle && (
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#737373', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Quick Post Templates
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                 {[
-                  "...to buy some trucks",
-                  "this is the way",
-                  "she ready",
-                  "if you know you know",
-                  "LS swap everything"
-                ].map(q => (
+                  `${selectedVehicle.year} ${selectedVehicle.make} ${selectedVehicle.model}${selectedVehicle.engine ? ` - ${selectedVehicle.engine}` : ''}`,
+                  `she ready 🔥`,
+                  `${selectedVehicle.year} vibes`,
+                ].map((template, i) => (
                   <button
-                    key={q}
-                    onClick={() => setComposeText(composeText ? `${composeText} ${q}` : q)}
+                    key={i}
+                    onClick={() => {
+                      setComposeText(template);
+                      // Auto-attach first 2 images
+                      const vehicleImgs = recentImages.filter(img => img.vehicle_id === selectedVehicle.id);
+                      setComposeImages(vehicleImgs.slice(0, 2).map(i => i.url));
+                    }}
                     style={{
                       padding: '8px 12px',
-                      background: '#262626',
-                      border: 'none',
-                      borderRadius: '20px',
-                      color: '#a3a3a3',
+                      background: '#f5f5f5',
+                      border: '1px solid #e5e5e5',
+                      borderRadius: '6px',
                       fontSize: '12px',
                       cursor: 'pointer'
                     }}
                   >
-                    {q}
+                    {template.length > 30 ? template.substring(0, 30) + '...' : template}
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'queue' && (
-          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Queue</h2>
-              <p style={{ fontSize: '12px', color: '#737373', margin: '4px 0 0 0' }}>
-                Scheduled posts
-              </p>
-            </div>
-            <div style={{
-              padding: '40px',
-              textAlign: 'center',
-              color: '#525252',
-              background: '#171717',
-              borderRadius: '12px'
-            }}>
-              <div style={{ fontSize: '32px', marginBottom: '12px' }}>No scheduled posts</div>
-              <div style={{ fontSize: '12px', color: '#404040', marginTop: '4px' }}>
-                Schedule posts for optimal times
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={generateContent}
+                  disabled={generating}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    background: '#000',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: generating ? 'not-allowed' : 'pointer',
+                    opacity: generating ? 0.7 : 1
+                  }}
+                >
+                  {generating ? 'Generating...' : 'Generate Content'}
+                </button>
+                <button
+                  onClick={generateMeme}
+                  disabled={generating}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: generating ? 'not-allowed' : 'pointer',
+                    opacity: generating ? 0.7 : 1
+                  }}
+                >
+                  {generating ? 'Creating...' : 'Grok Meme'}
+                </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'analytics' && (
-          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Analytics</h2>
-              <p style={{ fontSize: '12px', color: '#737373', margin: '4px 0 0 0' }}>
-                Track engagement (last 7 days)
-              </p>
-            </div>
+          {/* Composer */}
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            border: '1px solid #e5e5e5',
+            overflow: 'hidden'
+          }}>
+            <textarea
+              value={composeText}
+              onChange={(e) => setComposeText(e.target.value)}
+              placeholder="Write your post or generate from your vehicle..."
+              style={{
+                width: '100%',
+                minHeight: '120px',
+                padding: '16px',
+                border: 'none',
+                fontSize: '15px',
+                lineHeight: 1.5,
+                resize: 'none',
+                outline: 'none',
+                fontFamily: 'inherit'
+              }}
+            />
+
+            {composeImages.length > 0 && (
+              <div style={{ padding: '0 16px 12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {composeImages.map((img, i) => (
+                  <div key={i} style={{ position: 'relative' }}>
+                    <img src={img} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px' }} />
+                    <button
+                      onClick={() => setComposeImages(prev => prev.filter((_, idx) => idx !== i))}
+                      style={{
+                        position: 'absolute', top: '-6px', right: '-6px',
+                        width: '20px', height: '20px', borderRadius: '50%',
+                        background: '#000', color: '#fff', border: 'none',
+                        cursor: 'pointer', fontSize: '12px'
+                      }}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '12px'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 16px',
+              borderTop: '1px solid #f0f0f0'
             }}>
-              {[
-                { label: 'Posts', value: stats?.total_posts || 0 },
-                { label: 'Viral Posts', value: stats?.viral_posts || 0 },
-                { label: 'Total Likes', value: stats?.total_likes || 0 },
-                { label: 'Total Views', value: stats?.total_views || 0 }
-              ].map(stat => (
-                <div key={stat.label} style={{
-                  padding: '20px',
-                  background: '#171717',
-                  borderRadius: '12px'
-                }}>
-                  <div style={{ fontSize: '12px', color: '#737373' }}>{stat.label}</div>
-                  <div style={{ fontSize: '28px', fontWeight: 600, marginTop: '4px' }}>
-                    {formatNumber(stat.value)}
+              <span style={{ fontSize: '13px', color: composeText.length > 280 ? '#dc2626' : '#737373' }}>
+                {composeText.length}/280
+              </span>
+              <button
+                onClick={postNow}
+                disabled={!composeText.trim() || composeText.length > 280 || posting || !xAccount?.connected}
+                style={{
+                  padding: '10px 24px',
+                  background: composeText.trim() && composeText.length <= 280 && !posting && xAccount?.connected ? '#000' : '#ccc',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: composeText.trim() && composeText.length <= 280 && !posting && xAccount?.connected ? 'pointer' : 'not-allowed'
+                }}
+              >
+                {posting ? 'Posting...' : 'Post to X'}
+              </button>
+            </div>
+          </div>
+
+          {/* Grok Generated Image */}
+          {generatedImage && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#667eea', marginBottom: '8px', textTransform: 'uppercase' }}>
+                AI Generated Image (Grok)
+              </div>
+              <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '2px solid #667eea' }}>
+                <img src={generatedImage} alt="Generated" style={{ width: '100%', display: 'block' }} />
+                <button
+                  onClick={() => {
+                    if (!composeImages.includes(generatedImage)) {
+                      setComposeImages(prev => [generatedImage, ...prev]);
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    bottom: '8px',
+                    right: '8px',
+                    padding: '8px 16px',
+                    background: composeImages.includes(generatedImage) ? '#22c55e' : '#000',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {composeImages.includes(generatedImage) ? 'Added' : 'Use This'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Preview */}
+          {composeText && (
+            <div style={{ marginTop: '24px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#737373', marginBottom: '8px', textTransform: 'uppercase' }}>Preview</div>
+              <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e5e5e5', padding: '16px' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#e5e5e5', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '15px' }}>
+                      {xAccount?.handle || 'You'} <span style={{ fontWeight: 400, color: '#737373' }}>@{xAccount?.handle || 'handle'}</span>
+                    </div>
+                    <div style={{ marginTop: '4px', fontSize: '15px', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{composeText}</div>
+                    {composeImages.length > 0 && (
+                      <div style={{
+                        marginTop: '12px',
+                        display: 'grid',
+                        gridTemplateColumns: composeImages.length === 1 ? '1fr' : 'repeat(2, 1fr)',
+                        gap: '4px',
+                        borderRadius: '12px',
+                        overflow: 'hidden'
+                      }}>
+                        {composeImages.slice(0, 4).map((img, i) => (
+                          <img key={i} src={img} alt="" style={{ width: '100%', height: composeImages.length === 1 ? '280px' : '140px', objectFit: 'cover' }} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Suggestions */}
+        <div style={{ borderLeft: '1px solid #e5e5e5', background: '#fff', overflow: 'auto' }}>
+          <div style={{ padding: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#737373', marginBottom: '12px', textTransform: 'uppercase' }}>
+              Generated Content
+            </div>
+            {suggestions.length === 0 ? (
+              <div style={{ fontSize: '13px', color: '#999', padding: '20px 0', textAlign: 'center' }}>
+                Select a vehicle and click Generate
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {suggestions.map(s => (
+                  <div
+                    key={s.id}
+                    onClick={() => selectSuggestion(s)}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: selectedContent?.id === s.id ? '2px solid #000' : '1px solid #e5e5e5',
+                      cursor: 'pointer',
+                      background: selectedContent?.id === s.id ? '#fafafa' : '#fff'
+                    }}
+                  >
+                    <div style={{ fontSize: '14px', lineHeight: 1.4, marginBottom: '8px' }}>
+                      {s.text.length > 150 ? s.text.substring(0, 150) + '...' : s.text}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#737373' }}>
+                      {s.text.length}/280 · Click to use
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      ) : activeTab === 'engage' ? (
+        /* Engagement Tab */
+        <div style={{ height: 'calc(100vh - 65px)', overflow: 'auto', padding: '24px' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>Find Posts to Engage With</h2>
+                <p style={{ fontSize: '13px', color: '#737373', marginTop: '4px' }}>
+                  Reply to relevant posts to build your following
+                </p>
+              </div>
+              <button
+                onClick={findPostsToEngage}
+                disabled={loadingEngagement}
+                style={{
+                  padding: '10px 20px',
+                  background: '#000',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  cursor: loadingEngagement ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {loadingEngagement ? 'Searching...' : 'Find Posts'}
+              </button>
             </div>
 
-            {engagementItems.length > 0 && (
-              <div style={{ marginTop: '24px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Recent Performance</h3>
-                {engagementItems.slice(0, 5).map(item => (
-                  <div key={item.id} style={{
-                    padding: '12px',
-                    background: '#171717',
-                    borderRadius: '8px',
-                    marginBottom: '8px'
-                  }}>
-                    <div style={{ fontSize: '13px', marginBottom: '8px' }}>
-                      {item.content.substring(0, 100)}...
+            {engagementPosts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#999' }}>
+                {loadingEngagement ? 'Finding posts to engage with...' : 'Click "Find Posts" to discover relevant conversations'}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {engagementPosts.map(post => (
+                  <div
+                    key={post.id}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e5e5e5',
+                      borderRadius: '12px',
+                      padding: '16px'
+                    }}
+                  >
+                    <div style={{ fontSize: '14px', lineHeight: 1.5, marginBottom: '12px' }}>
+                      {post.text}
                     </div>
-                    {item.engagement && (
-                      <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#737373' }}>
-                        <span>{formatNumber(item.engagement.likes)} likes</span>
-                        <span>{formatNumber(item.engagement.retweets)} RTs</span>
-                        {item.engagement.views && <span>{formatNumber(item.engagement.views)} views</span>}
+                    <div style={{ fontSize: '12px', color: '#737373', marginBottom: '12px' }}>
+                      {post.likes} likes · {post.retweets} retweets
+                    </div>
+
+                    {replyDrafts[post.id] ? (
+                      <div style={{ marginTop: '12px' }}>
+                        <textarea
+                          value={replyDrafts[post.id]}
+                          onChange={(e) => setReplyDrafts(prev => ({ ...prev, [post.id]: e.target.value }))}
+                          style={{
+                            width: '100%',
+                            padding: '12px',
+                            border: '1px solid #e5e5e5',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            minHeight: '60px',
+                            resize: 'none'
+                          }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                          <span style={{ fontSize: '12px', color: replyDrafts[post.id].length > 280 ? '#dc2626' : '#737373' }}>
+                            {replyDrafts[post.id].length}/280
+                          </span>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => generateReplyForPost(post)}
+                              style={{
+                                padding: '8px 12px',
+                                background: '#f5f5f5',
+                                border: '1px solid #e5e5e5',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Regenerate
+                            </button>
+                            <button
+                              onClick={() => postReply(post, replyDrafts[post.id])}
+                              disabled={!replyDrafts[post.id].trim() || replyDrafts[post.id].length > 280}
+                              style={{
+                                padding: '8px 16px',
+                                background: '#000',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Reply
+                            </button>
+                          </div>
+                        </div>
                       </div>
+                    ) : (
+                      <button
+                        onClick={() => generateReplyForPost(post)}
+                        style={{
+                          padding: '10px 16px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Generate Reply with Grok
+                      </button>
                     )}
                   </div>
                 ))}
               </div>
             )}
           </div>
-        )}
-      </div>
-
-      {/* Right Sidebar - Context & Trends */}
-      <div style={{
-        borderLeft: '1px solid #262626',
-        padding: '20px',
-        overflow: 'auto'
-      }}>
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Trending Now</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {trendingItems.length > 0 ? trendingItems.slice(0, 10).map(t => (
-              <div key={t.id} style={{
-                padding: '12px',
-                background: '#171717',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }} onClick={() => {
-                if (t.url) window.open(t.url, '_blank');
-              }}>
-                <div style={{ fontSize: '13px', fontWeight: 500 }}>{t.content}</div>
-                {t.engagement?.views && t.engagement.views > 0 && (
-                  <div style={{ fontSize: '11px', color: '#737373' }}>
-                    {formatNumber(t.engagement.views)} posts
-                  </div>
-                )}
-              </div>
-            )) : (
-              ['#SquareBody', '#ClassicCars', '#Restomod', '#ProjectCar', '#CarTwitter'].map(topic => (
-                <div key={topic} style={{
-                  padding: '12px',
-                  background: '#171717',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{ fontSize: '13px', fontWeight: 500 }}>{topic}</div>
-                </div>
-              ))
-            )}
-          </div>
         </div>
-
-        <div>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Watch List</h3>
-          <p style={{ fontSize: '11px', color: '#525252', marginBottom: '12px' }}>
-            High-value accounts being monitored
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {['elonmusk', 'DougDeMuro', 'VINwiki', 'Hagerty', 'bringatrailer'].map(handle => (
-              <div key={handle} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px',
-                background: '#171717',
-                borderRadius: '8px'
-              }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: '#262626',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px'
-                }}>
-                  {handle[0].toUpperCase()}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 500 }}>@{handle}</div>
-                </div>
-                <a
-                  href={`https://x.com/${handle}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    fontSize: '10px',
-                    color: '#3b82f6',
-                    textDecoration: 'none'
-                  }}
-                >
-                  View
-                </a>
-              </div>
-            ))}
-          </div>
+      ) : userId ? (
+        /* Grok Terminal */
+        <div style={{ height: 'calc(100vh - 65px)' }}>
+          <GrokTerminal userId={userId} />
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
