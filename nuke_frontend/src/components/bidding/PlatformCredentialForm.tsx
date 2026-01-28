@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -61,7 +62,15 @@ function PlatformFavicon({
   background?: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const label = getPlatformLabel(platform);
+
+  useEffect(() => {
+    setFailed(false);
+    setLoaded(false);
+  }, [platform.domain]);
+
+  const showImage = Boolean(platform.domain) && !failed;
 
   return (
     <div
@@ -70,26 +79,45 @@ function PlatformFavicon({
         height: containerSize,
         borderRadius: '6px',
         background,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: 'grid',
+        placeItems: 'center',
+        position: 'relative',
         overflow: 'hidden',
         flexShrink: 0
       }}
     >
-      {!failed && platform.domain ? (
+      <span
+        style={{
+          fontSize: '8pt',
+          fontWeight: 700,
+          color: platform.color,
+          opacity: showImage && loaded ? 0 : 1,
+          transition: 'opacity 120ms ease'
+        }}
+      >
+        {label}
+      </span>
+      {showImage && (
         <img
           src={faviconFor(platform.domain)}
           alt={`${platform.name} favicon`}
-          style={{ width: size, height: size }}
+          style={{
+            width: size,
+            height: size,
+            position: 'absolute',
+            inset: 0,
+            margin: 'auto',
+            opacity: loaded ? 1 : 0,
+            transition: 'opacity 120ms ease'
+          }}
           loading="lazy"
           referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            setFailed(true);
+            setLoaded(false);
+          }}
         />
-      ) : (
-        <span style={{ fontSize: '8pt', fontWeight: 700, color: platform.color }}>
-          {label}
-        </span>
       )}
     </div>
   );
@@ -204,7 +232,7 @@ export default function PlatformCredentialForm({
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div
       style={{
         position: 'fixed',
@@ -213,7 +241,7 @@ export default function PlatformCredentialForm({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 9999,
         padding: '20px'
       }}
       onClick={(e) => {
@@ -227,7 +255,9 @@ export default function PlatformCredentialForm({
           maxWidth: '450px',
           width: '100%',
           maxHeight: '90vh',
-          overflow: 'auto'
+          overflow: 'auto',
+          position: 'relative',
+          zIndex: 1
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -606,4 +636,8 @@ export default function PlatformCredentialForm({
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return modalContent;
+
+  return createPortal(modalContent, document.body);
 }

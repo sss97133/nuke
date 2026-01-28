@@ -60,7 +60,15 @@ function PlatformFavicon({
   background?: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const label = getPlatformLabel(platform);
+
+  useEffect(() => {
+    setFailed(false);
+    setLoaded(false);
+  }, [platform.domain]);
+
+  const showImage = Boolean(platform.domain) && !failed;
 
   return (
     <div
@@ -69,26 +77,45 @@ function PlatformFavicon({
         height: containerSize,
         borderRadius: '8px',
         background,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: 'grid',
+        placeItems: 'center',
+        position: 'relative',
         overflow: 'hidden',
         flexShrink: 0
       }}
     >
-      {!failed && platform.domain ? (
+      <span
+        style={{
+          fontSize: '8pt',
+          fontWeight: 700,
+          color: platform.color,
+          opacity: showImage && loaded ? 0 : 1,
+          transition: 'opacity 120ms ease'
+        }}
+      >
+        {label}
+      </span>
+      {showImage && (
         <img
           src={faviconFor(platform.domain)}
           alt={`${platform.name} favicon`}
-          style={{ width: size, height: size }}
+          style={{
+            width: size,
+            height: size,
+            position: 'absolute',
+            inset: 0,
+            margin: 'auto',
+            opacity: loaded ? 1 : 0,
+            transition: 'opacity 120ms ease'
+          }}
           loading="lazy"
           referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            setFailed(true);
+            setLoaded(false);
+          }}
         />
-      ) : (
-        <span style={{ fontSize: '8pt', fontWeight: 700, color: platform.color }}>
-          {label}
-        </span>
       )}
     </div>
   );

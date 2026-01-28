@@ -120,9 +120,34 @@ export default function SocialConnections({ userId }: Props) {
     }
   };
 
+  const syncXTokens = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-x-tokens`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const result = await response.json();
+      console.log('[SocialConnections] Token sync result:', result);
+    } catch (err) {
+      console.error('[SocialConnections] Token sync failed:', err);
+    }
+  };
+
   useEffect(() => {
     if (userId) {
       loadConnections();
+      // Sync X tokens on load (in case OAuth just completed)
+      syncXTokens();
     }
 
     // Check URL for OAuth callback result
@@ -131,7 +156,7 @@ export default function SocialConnections({ userId }: Props) {
       const handle = params.get('handle');
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
-      loadConnections();
+      syncXTokens().then(() => loadConnections());
     }
   }, [userId]);
 
