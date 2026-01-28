@@ -14,48 +14,150 @@ interface SocialConnection {
   };
 }
 
+interface SocialPlatformMeta {
+  id: string;
+  name: string;
+  domain?: string;
+  color: string;
+  oauthEndpoint: string | null;
+  description: string;
+  shortLabel?: string;
+}
+
 const SOCIAL_PLATFORMS = [
   {
     id: 'x',
     name: 'X (Twitter)',
-    icon: '𝕏',
+    domain: 'x.com',
     color: '#000000',
     oauthEndpoint: 'twitter', // Uses Supabase built-in provider
-    description: 'Auto-post insights and updates'
+    description: 'Auto-post insights and updates',
+    shortLabel: 'X'
   },
   {
     id: 'instagram',
     name: 'Instagram',
-    icon: '📸',
+    domain: 'instagram.com',
     color: '#E4405F',
     oauthEndpoint: null, // Coming soon
-    description: 'Share to Instagram (coming soon)'
+    description: 'Share to Instagram (coming soon)',
+    shortLabel: 'IG'
   },
   {
     id: 'threads',
     name: 'Threads',
-    icon: '🧵',
+    domain: 'threads.net',
     color: '#000000',
     oauthEndpoint: null,
-    description: 'Post to Threads (coming soon)'
+    description: 'Post to Threads (coming soon)',
+    shortLabel: 'TH'
   },
   {
     id: 'linkedin',
     name: 'LinkedIn',
-    icon: '💼',
+    domain: 'linkedin.com',
     color: '#0A66C2',
     oauthEndpoint: null,
-    description: 'Professional updates (coming soon)'
+    description: 'Professional updates (coming soon)',
+    shortLabel: 'IN'
   },
   {
     id: 'youtube',
     name: 'YouTube',
-    icon: '▶️',
+    domain: 'youtube.com',
     color: '#FF0000',
     oauthEndpoint: null,
-    description: 'Video content (coming soon)'
+    description: 'Video content (coming soon)',
+    shortLabel: 'YT'
   },
-];
+] as SocialPlatformMeta[];
+
+const faviconFor = (domain?: string) =>
+  domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : '';
+
+const getPlatformLabel = (platform: SocialPlatformMeta) => {
+  if (platform.shortLabel) return platform.shortLabel;
+  const cleaned = platform.name.replace(/[^A-Za-z0-9 ]+/g, ' ').trim();
+  const initials = cleaned
+    .split(/\s+/)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase();
+  return (initials || platform.name).slice(0, 2).toUpperCase();
+};
+
+function PlatformFavicon({
+  platform,
+  size = 20,
+  containerSize = 36,
+  background = 'var(--surface)'
+}: {
+  platform: SocialPlatformMeta;
+  size?: number;
+  containerSize?: number;
+  background?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const label = getPlatformLabel(platform);
+
+  useEffect(() => {
+    setFailed(false);
+    setLoaded(false);
+  }, [platform.domain]);
+
+  const showImage = Boolean(platform.domain) && !failed;
+
+  return (
+    <div
+      style={{
+        width: containerSize,
+        height: containerSize,
+        borderRadius: '8px',
+        background,
+        display: 'grid',
+        placeItems: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        flexShrink: 0
+      }}
+    >
+      <span
+        style={{
+          fontSize: '8pt',
+          fontWeight: 700,
+          color: platform.color,
+          opacity: showImage && loaded ? 0 : 1,
+          transition: 'opacity 120ms ease'
+        }}
+      >
+        {label}
+      </span>
+      {showImage && (
+        <img
+          src={faviconFor(platform.domain)}
+          alt={`${platform.name} favicon`}
+          style={{
+            width: size,
+            height: size,
+            position: 'absolute',
+            inset: 0,
+            margin: 'auto',
+            opacity: loaded ? 1 : 0,
+            transition: 'opacity 120ms ease'
+          }}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            setFailed(true);
+            setLoaded(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
 interface Props {
   userId: string;
@@ -276,10 +378,11 @@ export default function SocialConnections({ userId }: Props) {
     return SOCIAL_PLATFORMS.find(p => p.id === platformId) || {
       id: platformId,
       name: platformId,
-      icon: '🔗',
+      shortLabel: platformId.slice(0, 2).toUpperCase(),
       color: '#6b7280',
       oauthEndpoint: null,
-      description: ''
+      description: '',
+      domain: undefined
     };
   };
 
@@ -336,19 +439,12 @@ export default function SocialConnections({ userId }: Props) {
                     border: isExpired ? '2px solid #f59e0b' : '1px solid var(--border)'
                   }}
                 >
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    background: platform.color + '20',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '16pt',
-                    flexShrink: 0
-                  }}>
-                    {platform.icon}
-                  </div>
+                  <PlatformFavicon
+                    platform={platform}
+                    containerSize={36}
+                    size={20}
+                    background={platform.color + '20'}
+                  />
 
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -427,20 +523,12 @@ export default function SocialConnections({ userId }: Props) {
                   border: '1px dashed var(--border)'
                 }}
               >
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: platform.color + '10',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '16pt',
-                  flexShrink: 0,
-                  opacity: platform.oauthEndpoint ? 1 : 0.5
-                }}>
-                  {platform.icon}
-                </div>
+                <PlatformFavicon
+                  platform={platform}
+                  containerSize={36}
+                  size={20}
+                  background={platform.color + '10'}
+                />
 
                 <div style={{ flex: 1, opacity: platform.oauthEndpoint ? 1 : 0.6 }}>
                   <div style={{ fontSize: '9pt', fontWeight: 600 }}>
