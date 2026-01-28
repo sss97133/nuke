@@ -275,15 +275,24 @@ async function refreshToken(identityId: string, refreshToken: string, supabase: 
   const tokens = await response.json();
   const expiresIn = tokens.expires_in || 7200;
 
-  // Update stored tokens
+  // Get current metadata and merge with new tokens
+  const { data: current } = await supabase
+    .from('external_identities')
+    .select('metadata')
+    .eq('id', identityId)
+    .single();
+
+  const updatedMetadata = {
+    ...(current?.metadata || {}),
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString()
+  };
+
   await supabase
     .from('external_identities')
     .update({
-      metadata: supabase.sql`metadata || ${JSON.stringify({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString()
-      })}::jsonb`,
+      metadata: updatedMetadata,
       updated_at: new Date().toISOString()
     })
     .eq('id', identityId);
