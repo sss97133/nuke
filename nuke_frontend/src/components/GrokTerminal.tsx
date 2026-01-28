@@ -2,14 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 interface Message {
+  id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
-  metadata?: {
-    tweet_analyzed?: boolean;
-    images?: string[];
-    links?: string[];
-  };
+  loading?: boolean;
 }
 
 interface Props {
@@ -17,18 +14,12 @@ interface Props {
 }
 
 export default function GrokTerminal({ userId }: Props) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'system',
-      content: `grok v3 • connected as @1991skylar • type /help for commands`,
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,13 +30,16 @@ export default function GrokTerminal({ userId }: Props) {
     inputRef.current?.focus();
   }, []);
 
-  const extractLinks = (text: string): string[] => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return text.match(urlRegex) || [];
-  };
+  // Auto-resize textarea
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
+    }
+  }, [input]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!input.trim() || loading) return;
 
     const userInput = input.trim();
@@ -53,19 +47,24 @@ export default function GrokTerminal({ userId }: Props) {
     setHistory(prev => [...prev, userInput]);
     setHistoryIndex(-1);
 
-    // Handle local commands
-    if (userInput.startsWith('/')) {
-      handleCommand(userInput);
-      return;
-    }
+    const userMsgId = `user-${Date.now()}`;
+    const assistantMsgId = `assistant-${Date.now()}`;
 
     // Add user message
-    const links = extractLinks(userInput);
     setMessages(prev => [...prev, {
+      id: userMsgId,
       role: 'user',
       content: userInput,
+      timestamp: new Date()
+    }]);
+
+    // Add loading message
+    setMessages(prev => [...prev, {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
       timestamp: new Date(),
-      metadata: { links }
+      loading: true
     }]);
 
     setLoading(true);
@@ -84,7 +83,7 @@ export default function GrokTerminal({ userId }: Props) {
             user_id: userId,
             message: userInput,
             conversation_history: messages
-              .filter(m => m.role !== 'system')
+              .filter(m => m.role !== 'system' && !m.loading)
               .map(m => ({ role: m.role, content: m.content }))
           })
         }
@@ -92,123 +91,35 @@ export default function GrokTerminal({ userId }: Props) {
 
       const result = await response.json();
 
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: result.reply || result.error || 'No response',
-        timestamp: new Date(),
-        metadata: { tweet_analyzed: result.tweet_analyzed }
-      }]);
+      // Update the loading message with actual content
+      setMessages(prev => prev.map(m =>
+        m.id === assistantMsgId
+          ? { ...m, content: result.reply || result.error || 'No response', loading: false }
+          : m
+      ));
     } catch (err: any) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `error: ${err.message}`,
-        timestamp: new Date()
-      }]);
+      setMessages(prev => prev.map(m =>
+        m.id === assistantMsgId
+          ? { ...m, content: `Error: ${err.message}`, loading: false }
+          : m
+      ));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCommand = (cmd: string) => {
-    const [command, ...args] = cmd.slice(1).split(' ');
-
-    switch (command.toLowerCase()) {
-      case 'help':
-        setMessages(prev => [...prev, {
-          role: 'system',
-          content: `commands:
-  /help           show this help
-  /clear          clear conversation
-  /viral          what's trending now
-  /analyze <url>  analyze a tweet/post
-  /draft          draft a long-form post
-  /thread         plan a thread
-  /style          content style guide
-
-just type naturally to chat with grok about:
-  • meme trends and viral content
-  • content strategy
-  • analyzing posts (paste links)
-  • drafting threads and long-form`,
-          timestamp: new Date()
-        }]);
-        break;
-
-      case 'clear':
-        setMessages([{
-          role: 'system',
-          content: 'conversation cleared',
-          timestamp: new Date()
-        }]);
-        break;
-
-      case 'viral':
-        setInput('what content is going viral right now in car culture and memes?');
-        break;
-
-      case 'analyze':
-        if (args.length > 0) {
-          setInput(`analyze this post: ${args.join(' ')}`);
-        } else {
-          setMessages(prev => [...prev, {
-            role: 'system',
-            content: 'usage: /analyze <url>',
-            timestamp: new Date()
-          }]);
-        }
-        break;
-
-      case 'draft':
-        setInput('help me draft a long-form post or thread about my K5 Blazer build');
-        break;
-
-      case 'thread':
-        setInput('help me plan a thread about ');
-        break;
-
-      case 'style':
-        setMessages(prev => [...prev, {
-          role: 'system',
-          content: `content style guide:
-
-short posts (under 280):
-  • minimal captions: "she ready", "finally", "built not bought"
-  • let photos speak
-  • no meme formats, no cringe
-
-long-form / threads:
-  • story arcs work: before/after, journey, lessons learned
-  • educational content: how-tos, breakdowns, comparisons
-  • hot takes with substance
-  • numbered threads for builds/projects
-
-what's working now:
-  • raw authenticity over polish
-  • behind-the-scenes > finished product
-  • engagement bait that delivers value
-  • community callouts and collaborations`,
-          timestamp: new Date()
-        }]);
-        break;
-
-      default:
-        setMessages(prev => [...prev, {
-          role: 'system',
-          content: `unknown command: ${command}. type /help for commands`,
-          timestamp: new Date()
-        }]);
-    }
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowUp') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    } else if (e.key === 'ArrowUp' && !input) {
       e.preventDefault();
       if (history.length > 0) {
         const newIndex = historyIndex < history.length - 1 ? historyIndex + 1 : historyIndex;
         setHistoryIndex(newIndex);
         setInput(history[history.length - 1 - newIndex] || '');
       }
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowDown' && !input) {
       e.preventDefault();
       if (historyIndex > 0) {
         const newIndex = historyIndex - 1;
@@ -221,46 +132,71 @@ what's working now:
     }
   };
 
-  const formatContent = (content: string) => {
-    // Handle code blocks
-    const parts = content.split(/(```[\s\S]*?```)/g);
+  const renderContent = (content: string) => {
+    // Simple markdown-ish rendering
+    const lines = content.split('\n');
 
-    return parts.map((part, i) => {
-      if (part.startsWith('```')) {
-        const code = part.slice(3, -3).replace(/^\w+\n/, '');
+    return lines.map((line, i) => {
+      // Headers
+      if (line.startsWith('### ')) {
+        return <div key={i} style={{ fontWeight: 600, marginTop: '16px', marginBottom: '8px', color: '#fff' }}>{line.slice(4)}</div>;
+      }
+      if (line.startsWith('## ')) {
+        return <div key={i} style={{ fontWeight: 600, fontSize: '15px', marginTop: '20px', marginBottom: '8px', color: '#fff' }}>{line.slice(3)}</div>;
+      }
+
+      // Bullet points
+      if (line.startsWith('- ') || line.startsWith('• ')) {
+        return <div key={i} style={{ paddingLeft: '16px', position: 'relative' }}><span style={{ position: 'absolute', left: 0 }}>•</span>{line.slice(2)}</div>;
+      }
+
+      // Numbered lists
+      const numMatch = line.match(/^(\d+)\.\s+\*\*(.+?)\*\*:?\s*(.*)/);
+      if (numMatch) {
         return (
-          <pre key={i} style={{
-            background: 'rgba(255,255,255,0.05)',
-            padding: '12px',
-            borderRadius: '4px',
-            overflow: 'auto',
-            margin: '8px 0'
-          }}>
-            {code}
-          </pre>
+          <div key={i} style={{ marginTop: '12px' }}>
+            <span style={{ color: '#737373' }}>{numMatch[1]}.</span>{' '}
+            <span style={{ fontWeight: 600, color: '#e5e5e5' }}>{numMatch[2]}</span>
+            {numMatch[3] && <span style={{ color: '#a3a3a3' }}>: {numMatch[3]}</span>}
+          </div>
         );
       }
 
-      // Handle inline links
-      const linkRegex = /(https?:\/\/[^\s]+)/g;
-      const textParts = part.split(linkRegex);
+      // Bold text
+      const boldParts = line.split(/\*\*(.+?)\*\*/g);
+      if (boldParts.length > 1) {
+        return (
+          <div key={i}>
+            {boldParts.map((part, j) =>
+              j % 2 === 1
+                ? <strong key={j} style={{ color: '#e5e5e5' }}>{part}</strong>
+                : <span key={j}>{part}</span>
+            )}
+          </div>
+        );
+      }
 
-      return textParts.map((text, j) => {
-        if (text.match(linkRegex)) {
-          return (
-            <a
-              key={`${i}-${j}`}
-              href={text}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#60a5fa', textDecoration: 'underline' }}
-            >
-              {text}
-            </a>
-          );
-        }
-        return <span key={`${i}-${j}`}>{text}</span>;
-      });
+      // Links
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      if (urlRegex.test(line)) {
+        const parts = line.split(urlRegex);
+        return (
+          <div key={i}>
+            {parts.map((part, j) =>
+              part.match(urlRegex)
+                ? <a key={j} href={part} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>{part}</a>
+                : <span key={j}>{part}</span>
+            )}
+          </div>
+        );
+      }
+
+      // Empty line = paragraph break
+      if (!line.trim()) {
+        return <div key={i} style={{ height: '12px' }} />;
+      }
+
+      return <div key={i}>{line}</div>;
     });
   };
 
@@ -269,118 +205,139 @@ what's working now:
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: '#0d0d0d',
-      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-      fontSize: '13px',
-      color: '#e5e5e5'
+      background: '#000',
+      color: '#a3a3a3',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontSize: '14px',
+      lineHeight: 1.6
     }}>
-      {/* Terminal Header */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: '1px solid #262626',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        background: '#171717'
-      }}>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }} />
-          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#eab308' }} />
-          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#22c55e' }} />
-        </div>
-        <span style={{ color: '#737373', flex: 1 }}>grok — social strategy agent</span>
-        <span style={{
-          padding: '2px 8px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '4px',
-          fontSize: '11px',
-          fontWeight: 600
-        }}>
-          LIVE
-        </span>
-      </div>
-
-      {/* Messages */}
+      {/* Content Area */}
       <div
         ref={scrollRef}
         style={{
           flex: 1,
           overflow: 'auto',
-          padding: '16px'
+          padding: '24px 32px'
         }}
         onClick={() => inputRef.current?.focus()}
       >
-        {messages.map((msg, i) => (
-          <div key={i} style={{ marginBottom: '16px' }}>
-            {msg.role === 'user' ? (
-              <div>
-                <span style={{ color: '#22c55e' }}>❯ </span>
-                <span style={{ color: '#fafafa' }}>{msg.content}</span>
-              </div>
-            ) : msg.role === 'system' ? (
-              <div style={{ color: '#737373', whiteSpace: 'pre-wrap' }}>
-                {msg.content}
-              </div>
-            ) : (
-              <div style={{
-                paddingLeft: '16px',
-                borderLeft: '2px solid #404040',
-                marginTop: '8px',
-                whiteSpace: 'pre-wrap',
-                lineHeight: 1.6
-              }}>
-                {msg.metadata?.tweet_analyzed && (
-                  <div style={{
-                    color: '#60a5fa',
-                    fontSize: '11px',
-                    marginBottom: '8px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    ◆ tweet analyzed
+        {messages.length === 0 ? (
+          <div style={{ maxWidth: '600px' }}>
+            <div style={{ color: '#525252', marginBottom: '32px' }}>
+              <div style={{ color: '#737373', fontWeight: 500, marginBottom: '8px' }}>grok</div>
+              <div>Your social media strategist. I have access to your vehicles, photos, and posts.</div>
+            </div>
+
+            <div style={{ color: '#525252' }}>
+              <div style={{ marginBottom: '16px' }}>Try:</div>
+              {[
+                "what content should I post this week?",
+                "analyze https://x.com/...",
+                "write me a thread about my K5 build",
+                "what's going viral in car culture?",
+                "draft a post showcasing my LS swap"
+              ].map((suggestion, i) => (
+                <div
+                  key={i}
+                  onClick={() => setInput(suggestion)}
+                  style={{
+                    padding: '8px 0',
+                    cursor: 'pointer',
+                    color: '#525252',
+                    borderBottom: '1px solid #1a1a1a'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = '#a3a3a3'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = '#525252'}
+                >
+                  {suggestion}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div style={{ maxWidth: '800px' }}>
+            {messages.map((msg) => (
+              <div key={msg.id} style={{ marginBottom: '24px' }}>
+                {msg.role === 'user' ? (
+                  <div style={{ color: '#e5e5e5' }}>
+                    <span style={{ color: '#525252', marginRight: '8px' }}>›</span>
+                    {msg.content}
+                  </div>
+                ) : msg.loading ? (
+                  <div style={{ color: '#525252', paddingLeft: '20px' }}>
+                    <span style={{ animation: 'pulse 1.5s infinite' }}>thinking...</span>
+                  </div>
+                ) : (
+                  <div style={{ paddingLeft: '20px', borderLeft: '1px solid #262626' }}>
+                    {renderContent(msg.content)}
                   </div>
                 )}
-                {formatContent(msg.content)}
               </div>
-            )}
-          </div>
-        ))}
-
-        {loading && (
-          <div style={{ color: '#737373' }}>
-            <span style={{ color: '#667eea' }}>⟳</span> thinking...
+            ))}
           </div>
         )}
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} style={{
-        padding: '16px',
-        borderTop: '1px solid #262626',
-        background: '#171717'
+      {/* Input Area */}
+      <div style={{
+        borderTop: '1px solid #1a1a1a',
+        padding: '16px 32px',
+        background: '#000'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: '#22c55e' }}>❯</span>
-          <input
+        <div style={{ maxWidth: '800px', display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
+          <span style={{ color: '#525252', paddingBottom: '8px' }}>›</span>
+          <textarea
             ref={inputRef}
-            type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="ask grok anything... paste links to analyze... /help for commands"
+            placeholder="ask grok..."
             disabled={loading}
+            rows={1}
             style={{
               flex: 1,
               background: 'transparent',
               border: 'none',
               outline: 'none',
-              color: '#fafafa',
-              fontSize: '13px',
-              fontFamily: 'inherit'
+              color: '#e5e5e5',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+              resize: 'none',
+              padding: '8px 0',
+              lineHeight: 1.6
             }}
           />
+          {input.trim() && (
+            <button
+              onClick={() => handleSubmit()}
+              disabled={loading}
+              style={{
+                background: '#262626',
+                border: 'none',
+                color: '#a3a3a3',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '13px'
+              }}
+            >
+              send
+            </button>
+          )}
         </div>
-      </form>
+        <div style={{ maxWidth: '800px', paddingLeft: '20px', marginTop: '8px' }}>
+          <span style={{ color: '#333', fontSize: '12px' }}>
+            shift+enter for new line • paste x links to analyze
+          </span>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

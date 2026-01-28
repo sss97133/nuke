@@ -73,16 +73,56 @@ serve(async (req) => {
     const accessToken = identity?.metadata?.access_token;
     const userHandle = identity?.handle || 'user';
 
-    // Get user's vehicle context
+    // Get user's full profile context
     const { data: vehicles } = await supabase
       .from('vehicles')
-      .select('year, make, model, engine')
-      .eq('owner_id', user_id)
-      .limit(1);
+      .select('id, year, make, model, engine_type, transmission, color, mileage, notes, description')
+      .eq('owner_id', user_id);
 
-    const vehicleContext = vehicles?.[0]
-      ? `${vehicles[0].year} ${vehicles[0].make} ${vehicles[0].model}${vehicles[0].engine ? ` (${vehicles[0].engine})` : ''}`
+    const { data: recentPosts } = await supabase
+      .from('social_posts')
+      .select('content, post_url, posted_at, engagement_metrics')
+      .eq('platform', 'x')
+      .order('posted_at', { ascending: false })
+      .limit(5);
+
+    // Get vehicle images
+    let vehicleImages: any[] = [];
+    if (vehicles && vehicles.length > 0) {
+      const { data: images } = await supabase
+        .from('vehicle_images')
+        .select('image_url, vehicle_id, category, angle')
+        .in('vehicle_id', vehicles.map(v => v.id))
+        .order('created_at', { ascending: false })
+        .limit(20);
+      vehicleImages = images || [];
+    }
+
+    // Build rich vehicle context
+    const vehicleContext = vehicles && vehicles.length > 0
+      ? vehicles.map(v => {
+          const make = v.make || '';
+          const model = v.model || '';
+          const details = [
+            `${v.year} ${make} ${model}`.trim(),
+            v.engine_type ? `Engine: ${v.engine_type}` : null,
+            v.transmission ? `Trans: ${v.transmission}` : null,
+            v.color ? `Color: ${v.color}` : null,
+            v.mileage ? `${v.mileage.toLocaleString()} miles` : null,
+          ].filter(Boolean).join(' | ');
+          return `• ${details}`;
+        }).join('\n')
       : null;
+
+    const postsContext = recentPosts && recentPosts.length > 0
+      ? recentPosts.map(p => {
+          const metrics = p.engagement_metrics as any;
+          const engagement = metrics ? `(${metrics.likes || 0} likes, ${metrics.retweets || 0} RTs)` : '';
+          return `"${p.content}" ${engagement}`;
+        }).join('\n')
+      : null;
+
+    const imageCount = vehicleImages.length;
 
     // Check if user shared an X link
     const tweetId = extractTweetId(message);
@@ -114,14 +154,21 @@ Engagement: ${metrics.like_count || 0} likes, ${metrics.retweet_count || 0} RTs,
       }
     }
 
-    // Build system prompt
-    const systemPrompt = `You are a social media strategist who helps ${userHandle} dominate X.
+    // Build system prompt with full context
+    const systemPrompt = `You are a social media strategist who helps @${userHandle} dominate X.
 
 Your vibe: Direct, tactical, no bullshit. You understand meme culture, car culture, and what actually goes viral.
 
-User context:
-- X handle: @${userHandle}
-${vehicleContext ? `- Their build: ${vehicleContext}` : ''}
+=== USER PROFILE ===
+X Handle: @${userHandle}
+
+${vehicleContext ? `VEHICLES/BUILDS:
+${vehicleContext}` : 'No vehicles registered yet.'}
+
+${imageCount > 0 ? `PHOTOS: ${imageCount} images in gallery. Categories: ${[...new Set(vehicleImages.map(i => i.category).filter(Boolean))].join(', ') || 'various'}` : ''}
+
+${postsContext ? `RECENT POSTS:
+${postsContext}` : 'No posts yet.'}
 
 WHAT YOU HELP WITH:
 
