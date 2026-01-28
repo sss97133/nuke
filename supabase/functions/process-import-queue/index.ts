@@ -18,8 +18,9 @@ serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const { batch_size = 10, priority_only = false, source_id } = body;
+    const { batch_size = 10, priority_only = false, source_id, use_intelligence = false } = body;
     const workerId = 'process-import-queue:' + Date.now();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
 
     const { data: queueItems, error: queueError } = await supabase.rpc('claim_import_queue_batch', {
       p_batch_size: batch_size,
@@ -42,7 +43,7 @@ serve(async (req) => {
         let extractorUrl = null;
 
         if (url.includes('bringatrailer.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-bat-core';
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/bat-simple-extract';
         } else if (url.includes('carsandbids.com')) {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-cars-and-bids-core';
         } else if (url.includes('pcarmarket.com')) {
@@ -59,18 +60,84 @@ serve(async (req) => {
             'Authorization': 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ url }),
+          body: JSON.stringify({ url, save_to_db: true }),
         });
 
         const extractData = await extractResponse.json();
 
         if (extractData.success) {
+          const extractedVehicle = extractData.extracted || extractData;
+          let vehicleId = extractedVehicle.vehicle_id || null;
+          let intelligenceDecision = null;
+
+          // INTELLIGENCE LAYER: Validate before accepting
+          if (use_intelligence && extractedVehicle) {
+            try {
+              const intelligenceResponse = await fetch(supabaseUrl + '/functions/v1/intelligence-evaluate', {
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  extracted_data: extractedVehicle,
+                  source_url: url,
+                  persist_decision: true
+                }),
+              });
+              intelligenceDecision = await intelligenceResponse.json();
+
+              // If DOUBT or REJECT, don't mark as complete
+              if (intelligenceDecision.decision === 'REJECT') {
+                await supabase.from('import_queue').update({
+                  status: 'rejected',
+                  error_message: `Intelligence REJECT: ${intelligenceDecision.reject_reasons.join(', ')}`,
+                  attempts: item.attempts + 1,
+                }).eq('id', item.id);
+                results.push({
+                  id: item.id,
+                  status: 'rejected',
+                  url,
+                  decision: 'REJECT',
+                  reasons: intelligenceDecision.reject_reasons
+                });
+                continue;
+              }
+
+              if (intelligenceDecision.decision === 'DOUBT') {
+                await supabase.from('import_queue').update({
+                  status: 'pending_review',
+                  error_message: `Intelligence DOUBT: ${intelligenceDecision.doubts.map((d: any) => d.reason).join(', ')}`,
+                  attempts: item.attempts + 1,
+                }).eq('id', item.id);
+                results.push({
+                  id: item.id,
+                  status: 'pending_review',
+                  url,
+                  decision: 'DOUBT',
+                  doubts: intelligenceDecision.doubts
+                });
+                continue;
+              }
+            } catch (intError: any) {
+              console.error('Intelligence evaluation failed:', intError.message);
+              // Continue without intelligence if it fails
+            }
+          }
+
           await supabase.from('import_queue').update({
             status: 'complete',
             processed_at: new Date().toISOString(),
             attempts: item.attempts + 1,
+            vehicle_id: vehicleId,
           }).eq('id', item.id);
-          results.push({ id: item.id, status: 'complete', url });
+          results.push({
+            id: item.id,
+            status: 'complete',
+            url,
+            vehicle_id: vehicleId,
+            decision: intelligenceDecision?.decision || 'N/A'
+          });
         } else {
           await supabase.from('import_queue').update({
             status: 'failed',

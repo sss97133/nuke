@@ -15,17 +15,85 @@ interface PlatformCredentialFormProps {
   onSaved?: () => void;
 }
 
+interface PlatformMeta {
+  id: string;
+  name: string;
+  domain?: string;
+  color: string;
+  shortLabel?: string;
+}
+
 const PLATFORMS = [
-  { id: 'bat', name: 'Bring a Trailer', icon: '🚗' },
-  { id: 'cars_and_bids', name: 'Cars & Bids', icon: '🏎️' },
-  { id: 'pcarmarket', name: 'PCarMarket', icon: '🏁' },
-  { id: 'collecting_cars', name: 'Collecting Cars', icon: '🇬🇧' },
-  { id: 'broad_arrow', name: 'Broad Arrow', icon: '🎯' },
-  { id: 'rmsothebys', name: "RM Sotheby's", icon: '🔨' },
-  { id: 'gooding', name: 'Gooding & Company', icon: '✨' },
-  { id: 'sbx', name: 'SBX Cars', icon: '💎' },
-  { id: 'ebay_motors', name: 'eBay Motors', icon: '🛒' },
+  { id: 'bat', name: 'Bring a Trailer', domain: 'bringatrailer.com', color: '#d97706', shortLabel: 'BaT' },
+  { id: 'cars_and_bids', name: 'Cars & Bids', domain: 'carsandbids.com', color: '#dc2626', shortLabel: 'CB' },
+  { id: 'pcarmarket', name: 'PCarMarket', domain: 'pcarmarket.com', color: '#16a34a', shortLabel: 'PCM' },
+  { id: 'collecting_cars', name: 'Collecting Cars', domain: 'collectingcars.com', color: '#2563eb', shortLabel: 'CC' },
+  { id: 'broad_arrow', name: 'Broad Arrow', domain: 'broadarrowauctions.com', color: '#7c3aed', shortLabel: 'BA' },
+  { id: 'rmsothebys', name: "RM Sotheby's", domain: 'rmsothebys.com', color: '#0891b2', shortLabel: 'RM' },
+  { id: 'gooding', name: 'Gooding & Company', domain: 'goodingco.com', color: '#ca8a04', shortLabel: 'GC' },
+  { id: 'sbx', name: 'SBX Cars', domain: 'sbxcars.com', color: '#db2777', shortLabel: 'SBX' },
+  { id: 'ebay_motors', name: 'eBay Motors', domain: 'ebay.com', color: '#0284c7', shortLabel: 'EB' },
 ];
+
+const faviconFor = (domain?: string) =>
+  domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : '';
+
+const getPlatformLabel = (platform: PlatformMeta) => {
+  if (platform.shortLabel) return platform.shortLabel;
+  const cleaned = platform.name.replace(/[^A-Za-z0-9 ]+/g, ' ').trim();
+  const initials = cleaned
+    .split(/\s+/)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase();
+  return (initials || platform.name).slice(0, 3).toUpperCase();
+};
+
+function PlatformFavicon({
+  platform,
+  size = 20,
+  containerSize = 28,
+  background = 'var(--surface)'
+}: {
+  platform: PlatformMeta;
+  size?: number;
+  containerSize?: number;
+  background?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const label = getPlatformLabel(platform);
+
+  return (
+    <div
+      style={{
+        width: containerSize,
+        height: containerSize,
+        borderRadius: '6px',
+        background,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        flexShrink: 0
+      }}
+    >
+      {!failed && platform.domain ? (
+        <img
+          src={faviconFor(platform.domain)}
+          alt={`${platform.name} favicon`}
+          style={{ width: size, height: size }}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span style={{ fontSize: '8pt', fontWeight: 700, color: platform.color }}>
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function PlatformCredentialForm({
   isOpen,
@@ -43,6 +111,9 @@ export default function PlatformCredentialForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'form' | 'validating' | 'success' | '2fa'>('form');
+  const selectedPlatformInfo = initialPlatform ? PLATFORMS.find(p => p.id === initialPlatform) : undefined;
+  const existingPlatformInfo = existingCredential ? PLATFORMS.find(p => p.id === existingCredential.platform) : undefined;
+  const activePlatformInfo = PLATFORMS.find(p => p.id === platform);
 
   useEffect(() => {
     if (isOpen) {
@@ -225,7 +296,14 @@ export default function PlatformCredentialForm({
                           textAlign: 'center'
                         }}
                       >
-                        <div style={{ fontSize: '16pt', marginBottom: '4px' }}>{p.icon}</div>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+                          <PlatformFavicon
+                            platform={p}
+                            containerSize={28}
+                            size={18}
+                            background="transparent"
+                          />
+                        </div>
                         <div style={{ fontSize: '7pt', fontWeight: 600 }}>{p.name}</div>
                       </button>
                     ))}
@@ -244,12 +322,17 @@ export default function PlatformCredentialForm({
                   alignItems: 'center',
                   gap: '10px'
                 }}>
-                  <span style={{ fontSize: '20pt' }}>
-                    {PLATFORMS.find(p => p.id === initialPlatform)?.icon}
-                  </span>
+                  {selectedPlatformInfo && (
+                    <PlatformFavicon
+                      platform={selectedPlatformInfo}
+                      containerSize={32}
+                      size={20}
+                      background={selectedPlatformInfo.color + '20'}
+                    />
+                  )}
                   <div>
                     <div style={{ fontSize: '10pt', fontWeight: 600 }}>
-                      Connect to {PLATFORMS.find(p => p.id === initialPlatform)?.name}
+                      Connect to {selectedPlatformInfo?.name}
                     </div>
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                       Enter your login credentials to enable automated bidding
@@ -267,12 +350,17 @@ export default function PlatformCredentialForm({
                   marginBottom: '16px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '14pt' }}>
-                      {PLATFORMS.find(p => p.id === existingCredential.platform)?.icon}
-                    </span>
+                    {existingPlatformInfo && (
+                      <PlatformFavicon
+                        platform={existingPlatformInfo}
+                        containerSize={24}
+                        size={16}
+                        background={existingPlatformInfo.color + '20'}
+                      />
+                    )}
                     <div>
                       <div style={{ fontSize: '9pt', fontWeight: 600 }}>
-                        {PLATFORMS.find(p => p.id === existingCredential.platform)?.name}
+                        {existingPlatformInfo?.name}
                       </div>
                       <div style={{
                         fontSize: '8pt',
@@ -381,7 +469,7 @@ export default function PlatformCredentialForm({
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', flexWrap: 'wrap', alignItems: 'center' }}>
                 {existingCredential && (
                   <button
                     type="button"
@@ -400,7 +488,7 @@ export default function PlatformCredentialForm({
                     Delete
                   </button>
                 )}
-                <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
+                <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={onClose}
@@ -438,7 +526,7 @@ export default function PlatformCredentialForm({
                 Validating Credentials
               </div>
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                Attempting to log in to {PLATFORMS.find(p => p.id === platform)?.name}...
+                Attempting to log in to {activePlatformInfo?.name}...
               </div>
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
@@ -455,9 +543,12 @@ export default function PlatformCredentialForm({
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                fontSize: '24pt'
+                fontSize: '11pt',
+                fontWeight: 700,
+                color: '#92400e',
+                letterSpacing: '0.5px'
               }}>
-                🔐
+                2FA
               </div>
               <h3 style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '8px' }}>
                 2FA Required
@@ -499,7 +590,7 @@ export default function PlatformCredentialForm({
                 Credentials Saved
               </h3>
               <p style={{ fontSize: '9pt', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                Your {PLATFORMS.find(p => p.id === platform)?.name} login is ready for automated bidding.
+                Your {activePlatformInfo?.name} login is ready for automated bidding.
               </p>
               <button
                 type="button"

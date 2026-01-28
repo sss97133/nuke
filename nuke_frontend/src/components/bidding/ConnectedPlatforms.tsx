@@ -14,17 +14,85 @@ interface PlatformCredential {
   created_at: string;
 }
 
+interface PlatformMeta {
+  id: string;
+  name: string;
+  domain?: string;
+  color: string;
+  shortLabel?: string;
+}
+
 const PLATFORMS = [
-  { id: 'bat', name: 'Bring a Trailer', icon: '🚗', color: '#d97706' },
-  { id: 'cars_and_bids', name: 'Cars & Bids', icon: '🏎️', color: '#dc2626' },
-  { id: 'pcarmarket', name: 'PCarMarket', icon: '🏁', color: '#16a34a' },
-  { id: 'collecting_cars', name: 'Collecting Cars', icon: '🇬🇧', color: '#2563eb' },
-  { id: 'broad_arrow', name: 'Broad Arrow', icon: '🎯', color: '#7c3aed' },
-  { id: 'rmsothebys', name: "RM Sotheby's", icon: '🔨', color: '#0891b2' },
-  { id: 'gooding', name: 'Gooding & Company', icon: '✨', color: '#ca8a04' },
-  { id: 'sbx', name: 'SBX Cars', icon: '💎', color: '#db2777' },
-  { id: 'ebay_motors', name: 'eBay Motors', icon: '🛒', color: '#0284c7' },
+  { id: 'bat', name: 'Bring a Trailer', domain: 'bringatrailer.com', color: '#d97706', shortLabel: 'BaT' },
+  { id: 'cars_and_bids', name: 'Cars & Bids', domain: 'carsandbids.com', color: '#dc2626', shortLabel: 'CB' },
+  { id: 'pcarmarket', name: 'PCarMarket', domain: 'pcarmarket.com', color: '#16a34a', shortLabel: 'PCM' },
+  { id: 'collecting_cars', name: 'Collecting Cars', domain: 'collectingcars.com', color: '#2563eb', shortLabel: 'CC' },
+  { id: 'broad_arrow', name: 'Broad Arrow', domain: 'broadarrowauctions.com', color: '#7c3aed', shortLabel: 'BA' },
+  { id: 'rmsothebys', name: "RM Sotheby's", domain: 'rmsothebys.com', color: '#0891b2', shortLabel: 'RM' },
+  { id: 'gooding', name: 'Gooding & Company', domain: 'goodingco.com', color: '#ca8a04', shortLabel: 'GC' },
+  { id: 'sbx', name: 'SBX Cars', domain: 'sbxcars.com', color: '#db2777', shortLabel: 'SBX' },
+  { id: 'ebay_motors', name: 'eBay Motors', domain: 'ebay.com', color: '#0284c7', shortLabel: 'EB' },
 ];
+
+const faviconFor = (domain?: string) =>
+  domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : '';
+
+const getPlatformLabel = (platform: PlatformMeta) => {
+  if (platform.shortLabel) return platform.shortLabel;
+  const cleaned = platform.name.replace(/[^A-Za-z0-9 ]+/g, ' ').trim();
+  const initials = cleaned
+    .split(/\s+/)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase();
+  return (initials || platform.name).slice(0, 3).toUpperCase();
+};
+
+function PlatformFavicon({
+  platform,
+  size = 20,
+  containerSize = 36,
+  background = 'var(--surface)'
+}: {
+  platform: PlatformMeta;
+  size?: number;
+  containerSize?: number;
+  background?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const label = getPlatformLabel(platform);
+
+  return (
+    <div
+      style={{
+        width: containerSize,
+        height: containerSize,
+        borderRadius: '8px',
+        background,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        flexShrink: 0
+      }}
+    >
+      {!failed && platform.domain ? (
+        <img
+          src={faviconFor(platform.domain)}
+          alt={`${platform.name} favicon`}
+          style={{ width: size, height: size }}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span style={{ fontSize: '8pt', fontWeight: 700, color: platform.color }}>
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function ConnectedPlatforms() {
   const [credentials, setCredentials] = useState<PlatformCredential[]>([]);
@@ -126,7 +194,7 @@ export default function ConnectedPlatforms() {
     return PLATFORMS.find(p => p.id === platformId) || {
       id: platformId,
       name: platformId,
-      icon: '🔗',
+      shortLabel: platformId.slice(0, 3).toUpperCase(),
       color: '#6b7280'
     };
   };
@@ -167,7 +235,22 @@ export default function ConnectedPlatforms() {
             background: 'var(--surface-hover)',
             borderRadius: '4px'
           }}>
-            <div style={{ fontSize: '24pt', marginBottom: '8px' }}>🔐</div>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '8pt',
+              fontWeight: 700,
+              color: 'var(--text-muted)',
+              margin: '0 auto 8px'
+            }}>
+              LOGIN
+            </div>
             <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px' }}>
               No platforms connected
             </div>
@@ -193,52 +276,47 @@ export default function ConnectedPlatforms() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
+                    flexWrap: 'wrap',
                     padding: '10px 12px',
                     background: 'var(--surface-hover)',
                     borderRadius: '4px',
                     border: cred.status === '2fa_required' ? '2px solid #f59e0b' : '1px solid var(--border)'
                   }}
                 >
-                  {/* Platform icon */}
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    background: platform.color + '20',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '16pt',
-                    flexShrink: 0
-                  }}>
-                    {platform.icon}
-                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 200px', minWidth: 0 }}>
+                    <PlatformFavicon
+                      platform={platform}
+                      containerSize={36}
+                      size={20}
+                      background={platform.color + '20'}
+                    />
 
-                  {/* Platform info */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '9pt', fontWeight: 600 }}>{platform.name}</span>
-                      {getStatusBadge(cred)}
+                    {/* Platform info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '9pt', fontWeight: 600 }}>{platform.name}</span>
+                        {getStatusBadge(cred)}
+                      </div>
+                      {cred.status === 'active' && cred.last_validated_at && (
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                          Last verified: {new Date(cred.last_validated_at).toLocaleDateString()}
+                        </div>
+                      )}
+                      {cred.status === 'invalid' && cred.validation_error && (
+                        <div style={{ fontSize: '7pt', color: '#dc2626' }}>
+                          {cred.validation_error}
+                        </div>
+                      )}
+                      {cred.status === '2fa_required' && (
+                        <div style={{ fontSize: '7pt', color: '#d97706' }}>
+                          Two-factor authentication code required
+                        </div>
+                      )}
                     </div>
-                    {cred.status === 'active' && cred.last_validated_at && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                        Last verified: {new Date(cred.last_validated_at).toLocaleDateString()}
-                      </div>
-                    )}
-                    {cred.status === 'invalid' && cred.validation_error && (
-                      <div style={{ fontSize: '7pt', color: '#dc2626' }}>
-                        {cred.validation_error}
-                      </div>
-                    )}
-                    {cred.status === '2fa_required' && (
-                      <div style={{ fontSize: '7pt', color: '#d97706' }}>
-                        Two-factor authentication code required
-                      </div>
-                    )}
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                     {cred.status === '2fa_required' && (
                       <button
                         className="button button-small"
@@ -312,7 +390,12 @@ export default function ConnectedPlatforms() {
                     cursor: 'pointer'
                   }}
                 >
-                  <span>{p.icon}</span>
+                  <PlatformFavicon
+                    platform={p}
+                    containerSize={18}
+                    size={14}
+                    background="transparent"
+                  />
                   <span>{p.name}</span>
                 </button>
               ))}

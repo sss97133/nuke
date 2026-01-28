@@ -22,6 +22,9 @@ const OAuthCallback = React.lazy(() => import('../components/auth/OAuthCallback'
 const ResetPassword = React.lazy(() => import('../pages/ResetPassword'));
 const DropboxCallback = React.lazy(() => import('../pages/DropboxCallback'));
 
+// ASCII samples (dev / preview)
+const LivingAsciiSamplesPage = React.lazy(() => import('../pages/LivingAsciiSamplesPage'));
+
 // Curation and receipts
 const CurationQueue = React.lazy(() => import('../pages/CurationQueue'));
 const UnlinkedReceipts = React.lazy(() => import('../pages/UnlinkedReceipts'));
@@ -60,6 +63,7 @@ const Notifications = React.lazy(() => import('../pages/Notifications'));
 const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIdentity'));
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
+const SocialWorkspace = React.lazy(() => import('../pages/SocialWorkspace'));
 const Search = React.lazy(() => import('../pages/Search').catch((error) => {
   console.error('Failed to load Search component:', error);
   // Return a fallback component
@@ -125,6 +129,9 @@ export const DomainRoutes = () => {
         <Route path="/members" element={<BaTMembers />} />
         <Route path="/search" element={<Search />} />
 
+        {/* Social Media Workspace */}
+        <Route path="/social" element={<SocialWorkspace />} />
+
         {/* Investment Platform */}
         <Route path="/invest" element={<Invest />} />
         <Route path="/invest/offering/:offeringId" element={<OfferingDetail />} />
@@ -142,6 +149,9 @@ export const DomainRoutes = () => {
         {/* Business Management */}
         <Route path="/business/settings" element={<BusinessSettings />} />
         <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
+
+        {/* ASCII samples (preview shape / identity / pulse) */}
+        <Route path="/ascii-samples" element={<LivingAsciiSamplesPage />} />
 
         {/* Curation & receipts */}
         <Route path="/curation-queue" element={<CurationQueue />} />

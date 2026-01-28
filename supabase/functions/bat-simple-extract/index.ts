@@ -384,20 +384,30 @@ function extractSpecs(html: string): {
   const title = titleMatch?.[1] || '';
   const fullText = title + ' ' + descText;
   
-  if (fullText.match(/PDK|dual-clutch/i)) {
-    const speedMatch = fullText.match(/(\d+)-speed\s+PDK/i);
+  // Map spelled-out numbers to digits
+  const speedWords: Record<string, string> = {
+    'three': '3', 'four': '4', 'five': '5', 'six': '6', 'seven': '7', 'eight': '8'
+  };
+  // Normalize spelled-out speeds: "four-speed" -> "4-speed"
+  let normalizedText = fullText;
+  for (const [word, digit] of Object.entries(speedWords)) {
+    normalizedText = normalizedText.replace(new RegExp(`\\b${word}[- ]speed`, 'gi'), `${digit}-speed`);
+  }
+
+  if (normalizedText.match(/PDK|dual-clutch/i)) {
+    const speedMatch = normalizedText.match(/(\d+)-speed\s+PDK/i);
     transmission = speedMatch ? `${speedMatch[1]}-Speed PDK` : 'PDK Dual-Clutch';
-  } else if (fullText.match(/(\d+)[- ]speed\s+manual/i)) {
-    const speedMatch = fullText.match(/(\d+)[- ]speed\s+manual/i);
+  } else if (normalizedText.match(/(\d+)[- ]speed\s+manual/i)) {
+    const speedMatch = normalizedText.match(/(\d+)[- ]speed\s+manual/i);
     transmission = speedMatch ? `${speedMatch[1]}-Speed Manual` : 'Manual';
-  } else if (fullText.match(/(\d+)[- ]speed/i) && !fullText.match(/automatic/i)) {
+  } else if (normalizedText.match(/(\d+)[- ]speed/i) && !normalizedText.match(/automatic/i)) {
     // Title often just has "4-Speed" meaning manual
-    const speedMatch = fullText.match(/(\d+)[- ]speed/i);
+    const speedMatch = normalizedText.match(/(\d+)[- ]speed/i);
     transmission = speedMatch ? `${speedMatch[1]}-Speed Manual` : 'Manual';
-  } else if (fullText.match(/automatic/i)) {
-    const speedMatch = fullText.match(/(\d+)-speed\s+automatic/i);
+  } else if (normalizedText.match(/automatic/i)) {
+    const speedMatch = normalizedText.match(/(\d+)-speed\s+automatic/i);
     transmission = speedMatch ? `${speedMatch[1]}-Speed Automatic` : 'Automatic';
-  } else if (fullText.match(/manual\s+transmission/i)) {
+  } else if (normalizedText.match(/manual\s+trans(?:mission|axle)/i)) {
     transmission = 'Manual';
   }
   
