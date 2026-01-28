@@ -127,7 +127,7 @@ Return JSON only:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'grok-4',
+        model: 'grok-4.1',
         messages: [
           {
             role: 'system',
