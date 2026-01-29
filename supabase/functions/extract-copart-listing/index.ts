@@ -651,52 +651,51 @@ serve(async (req) => {
 
     let html: string;
 
-    // Use provided HTML or fetch via Firecrawl
+    // Copart has Incapsula bot protection - direct fetch won't work
+    // This extractor is "HTML-in" - provide HTML from Playwright, Firecrawl, or manual save
+
     if (providedHtml && providedHtml.length > 1000) {
       console.log(`Using provided HTML (${providedHtml.length} chars)`);
       html = providedHtml;
-    } else if (firecrawlApiKey) {
-      console.log("Fetching via Firecrawl...");
-
-      const firecrawlResult = await firecrawlScrape(
-        {
-          url: listingUrlNorm,
-          formats: ['html', 'markdown'],
-          onlyMainContent: false,
-          waitFor: 5000, // Copart may have JS-rendered content
-          actions: [
-            { type: 'scroll', direction: 'down', pixels: 2000 },
-            { type: 'wait', milliseconds: 2000 },
-          ],
+    } else {
+      // Try direct fetch first (will fail on bot protection but worth trying)
+      console.log("Attempting direct fetch (likely to fail due to Incapsula)...");
+      try {
+        const directResponse = await fetch(listingUrlNorm, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
           },
-        },
-        {
-          apiKey: firecrawlApiKey,
-          timeoutMs: 45000,
-          maxAttempts: 2,
+        });
+        const directHtml = await directResponse.text();
+
+        // Check if we got real content or bot protection page
+        if (directHtml.length > 5000 && !directHtml.includes('_Incapsula_Resource') && !directHtml.includes('challenge-platform')) {
+          console.log(`Direct fetch succeeded: ${directHtml.length} chars`);
+          html = directHtml;
+        } else {
+          throw new Error("Bot protection detected");
         }
-      );
+      } catch (fetchError) {
+        console.log(`Direct fetch failed: ${fetchError}`);
 
-      if (!firecrawlResult.data?.html || firecrawlResult.data.html.length < 1000) {
-        throw new Error(
-          firecrawlResult.error ||
-          `Firecrawl returned insufficient HTML (${firecrawlResult.data?.html?.length || 0} chars)`
-        );
+        // Return helpful error with instructions
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Copart has bot protection. Provide HTML manually.",
+          instructions: {
+            option_1: "Use Playwright MCP to fetch the page with browser automation",
+            option_2: "Save page HTML manually and pass via 'html' parameter",
+            option_3: "Use Firecrawl with 'use_firecrawl: true' parameter (costs credits)",
+            note: "NMVTIS ($10k) provides official salvage records without scraping"
+          },
+          url: listingUrlCanonical
+        }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-
-      html = firecrawlResult.data.html;
-      console.log(`Firecrawl returned ${html.length} chars`);
-    } else {
-      return new Response(JSON.stringify({
-        error: "No HTML provided and FIRECRAWL_API_KEY not configured. Either provide HTML in request body or configure Firecrawl."
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     // Extract data
