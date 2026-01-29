@@ -13,6 +13,18 @@ interface Props {
   userId: string;
 }
 
+const IconSparkle = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/>
+  </svg>
+);
+
+const IconSend = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+  </svg>
+);
+
 export default function GrokTerminal({ userId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -30,7 +42,6 @@ export default function GrokTerminal({ userId }: Props) {
     inputRef.current?.focus();
   }, []);
 
-  // Auto-resize textarea
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
@@ -50,7 +61,6 @@ export default function GrokTerminal({ userId }: Props) {
     const userMsgId = `user-${Date.now()}`;
     const assistantMsgId = `assistant-${Date.now()}`;
 
-    // Add user message
     setMessages(prev => [...prev, {
       id: userMsgId,
       role: 'user',
@@ -58,7 +68,6 @@ export default function GrokTerminal({ userId }: Props) {
       timestamp: new Date()
     }]);
 
-    // Add loading message
     setMessages(prev => [...prev, {
       id: assistantMsgId,
       role: 'assistant',
@@ -91,7 +100,6 @@ export default function GrokTerminal({ userId }: Props) {
 
       const result = await response.json();
 
-      // Update the loading message with actual content
       setMessages(prev => prev.map(m =>
         m.id === assistantMsgId
           ? { ...m, content: result.reply || result.error || 'No response', loading: false }
@@ -136,51 +144,38 @@ export default function GrokTerminal({ userId }: Props) {
     const lines = content.split('\n');
 
     return lines.map((line, i) => {
-      // Headers
       if (line.startsWith('### ')) {
-        return (
-          <div key={i} style={{ fontWeight: 700, marginTop: '16px', marginBottom: '8px', color: '#e7e9ea', fontSize: '16px' }}>
-            {line.slice(4)}
-          </div>
-        );
+        return <div key={i} style={{ fontWeight: 700, marginTop: '12px', marginBottom: '6px', fontSize: 'var(--fs-11)' }}>{line.slice(4)}</div>;
       }
       if (line.startsWith('## ')) {
-        return (
-          <div key={i} style={{ fontWeight: 700, fontSize: '18px', marginTop: '20px', marginBottom: '8px', color: '#e7e9ea' }}>
-            {line.slice(3)}
-          </div>
-        );
+        return <div key={i} style={{ fontWeight: 700, marginTop: '16px', marginBottom: '8px', fontSize: 'var(--fs-11)' }}>{line.slice(3)}</div>;
       }
 
-      // Bullet points
       if (line.startsWith('- ') || line.startsWith('* ')) {
         return (
-          <div key={i} style={{ paddingLeft: '20px', position: 'relative', marginBottom: '4px' }}>
-            <span style={{ position: 'absolute', left: '8px', color: '#1d9bf0' }}>•</span>
+          <div key={i} style={{ paddingLeft: '12px', position: 'relative', marginBottom: '4px' }}>
+            <span style={{ position: 'absolute', left: '4px' }}>-</span>
             {renderInlineFormatting(line.slice(2))}
           </div>
         );
       }
 
-      // Numbered lists
       const numMatch = line.match(/^(\d+)\.\s+(.+)/);
       if (numMatch) {
         return (
-          <div key={i} style={{ marginTop: '8px', marginBottom: '4px' }}>
-            <span style={{ color: '#1d9bf0', marginRight: '8px' }}>{numMatch[1]}.</span>
+          <div key={i} style={{ marginTop: '6px', marginBottom: '4px' }}>
+            <span style={{ color: 'var(--text-secondary)', marginRight: '6px' }}>{numMatch[1]}.</span>
             {renderInlineFormatting(numMatch[2])}
           </div>
         );
       }
 
-      // Code blocks (inline)
       if (line.startsWith('```') || line.endsWith('```')) {
-        return null; // Skip code fence markers
+        return null;
       }
 
-      // Empty line = paragraph break
       if (!line.trim()) {
-        return <div key={i} style={{ height: '12px' }} />;
+        return <div key={i} style={{ height: '8px' }} />;
       }
 
       return <div key={i} style={{ marginBottom: '4px' }}>{renderInlineFormatting(line)}</div>;
@@ -188,20 +183,18 @@ export default function GrokTerminal({ userId }: Props) {
   };
 
   const renderInlineFormatting = (text: string) => {
-    // Bold text
     const boldParts = text.split(/\*\*(.+?)\*\*/g);
     if (boldParts.length > 1) {
       return (
         <>
           {boldParts.map((part, j) =>
             j % 2 === 1
-              ? <strong key={j} style={{ color: '#e7e9ea', fontWeight: 600 }}>{part}</strong>
+              ? <strong key={j} style={{ fontWeight: 600 }}>{part}</strong>
               : <span key={j}>{renderLinks(part)}</span>
           )}
         </>
       );
     }
-
     return renderLinks(text);
   };
 
@@ -213,7 +206,7 @@ export default function GrokTerminal({ userId }: Props) {
         <>
           {parts.map((part, j) =>
             part.match(urlRegex)
-              ? <a key={j} href={part} target="_blank" rel="noopener noreferrer" style={{ color: '#1d9bf0', textDecoration: 'none' }}>{part}</a>
+              ? <a key={j} href={part} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>{part}</a>
               : <span key={j}>{part}</span>
           )}
         </>
@@ -227,56 +220,45 @@ export default function GrokTerminal({ userId }: Props) {
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: '#000',
-      color: '#e7e9ea',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      fontSize: '15px',
-      lineHeight: 1.6
+      background: 'var(--bg)',
+      color: 'var(--text)',
+      fontFamily: 'var(--font-family)',
+      fontSize: 'var(--fs-10)'
     }}>
-      {/* Content Area */}
       <div
         ref={scrollRef}
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '24px 32px'
-        }}
+        style={{ flex: 1, overflow: 'auto', padding: '16px' }}
         onClick={() => inputRef.current?.focus()}
       >
         {messages.length === 0 ? (
-          <div style={{ maxWidth: '600px' }}>
-            <div style={{ marginBottom: '32px' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '16px'
-              }}>
+          <div style={{ maxWidth: '500px' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                 <div style={{
-                  width: '48px',
-                  height: '48px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)',
+                  background: 'var(--text)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '24px'
+                  color: 'var(--surface)'
                 }}>
-                  ✨
+                  <IconSparkle />
                 </div>
                 <div>
-                  <div style={{ fontSize: '20px', fontWeight: 700 }}>Grok</div>
-                  <div style={{ color: '#71767b', fontSize: '14px' }}>Your social media strategist</div>
+                  <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>Grok</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-9)' }}>Social media strategist</div>
                 </div>
               </div>
-              <div style={{ color: '#71767b', fontSize: '15px' }}>
-                I have access to your vehicles, photos, and posts. Ask me anything about content strategy, viral trends, or what to post next.
+              <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-10)' }}>
+                I have access to your vehicles, photos, and posts. Ask about content strategy, viral trends, or what to post.
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#71767b', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Try these
+              <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Try
               </div>
               {[
                 "what content should I post this week?",
@@ -288,18 +270,13 @@ export default function GrokTerminal({ userId }: Props) {
                 <div
                   key={i}
                   onClick={() => setInput(suggestion)}
+                  className="card"
                   style={{
-                    padding: '14px 16px',
+                    padding: '10px 12px',
                     cursor: 'pointer',
-                    color: '#e7e9ea',
-                    background: '#16181c',
-                    borderRadius: '12px',
-                    marginBottom: '8px',
-                    transition: 'background 0.15s',
-                    fontSize: '15px'
+                    marginBottom: '4px',
+                    fontSize: 'var(--fs-10)'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#1d1f23'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#16181c'}
                 >
                   {suggestion}
                 </div>
@@ -307,65 +284,55 @@ export default function GrokTerminal({ userId }: Props) {
             </div>
           </div>
         ) : (
-          <div style={{ maxWidth: '800px' }}>
+          <div style={{ maxWidth: '600px' }}>
             {messages.map((msg) => (
-              <div key={msg.id} style={{ marginBottom: '24px' }}>
+              <div key={msg.id} style={{ marginBottom: '16px' }}>
                 {msg.role === 'user' ? (
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      background: '#2f3336',
-                      flexShrink: 0
-                    }} />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>You</div>
-                      <div style={{ color: '#e7e9ea' }}>{msg.content}</div>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--fs-9)', marginBottom: '4px' }}>You</div>
+                      <div>{msg.content}</div>
                     </div>
                   </div>
                 ) : msg.loading ? (
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <div style={{
-                      width: '32px',
-                      height: '32px',
+                      width: '24px',
+                      height: '24px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)',
+                      background: 'var(--text)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '16px',
+                      color: 'var(--surface)',
                       flexShrink: 0
                     }}>
-                      ✨
+                      <IconSparkle />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>Grok</div>
-                      <div style={{ color: '#71767b' }}>
-                        <span style={{ animation: 'pulse 1.5s infinite' }}>thinking...</span>
-                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--fs-9)', marginBottom: '4px' }}>Grok</div>
+                      <div style={{ color: 'var(--text-secondary)' }}>thinking...</div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <div style={{
-                      width: '32px',
-                      height: '32px',
+                      width: '24px',
+                      height: '24px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)',
+                      background: 'var(--text)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '16px',
+                      color: 'var(--surface)',
                       flexShrink: 0
                     }}>
-                      ✨
+                      <IconSparkle />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '8px' }}>Grok</div>
-                      <div style={{ color: '#e7e9ea' }}>
-                        {renderContent(msg.content)}
-                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--fs-9)', marginBottom: '6px' }}>Grok</div>
+                      <div>{renderContent(msg.content)}</div>
                     </div>
                   </div>
                 )}
@@ -375,78 +342,43 @@ export default function GrokTerminal({ userId }: Props) {
         )}
       </div>
 
-      {/* Input Area */}
-      <div style={{
-        borderTop: '1px solid #2f3336',
-        padding: '16px 32px',
-        background: '#000'
-      }}>
-        <div style={{
-          maxWidth: '800px',
-          background: '#16181c',
-          borderRadius: '16px',
-          border: '1px solid #2f3336',
-          overflow: 'hidden'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', padding: '12px 16px', gap: '12px' }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask Grok anything..."
+      <div style={{ borderTop: '2px solid var(--border)', padding: '12px 16px', background: 'var(--surface)' }}>
+        <div className="card" style={{ display: 'flex', alignItems: 'flex-end', padding: '8px 12px', gap: '8px' }}>
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask Grok..."
+            disabled={loading}
+            rows={1}
+            style={{
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: 'var(--text)',
+              fontSize: 'var(--fs-10)',
+              fontFamily: 'var(--font-family)',
+              resize: 'none',
+              padding: '4px 0'
+            }}
+          />
+          {input.trim() && (
+            <button
+              onClick={() => handleSubmit()}
               disabled={loading}
-              rows={1}
-              style={{
-                flex: 1,
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: '#e7e9ea',
-                fontSize: '15px',
-                fontFamily: 'inherit',
-                resize: 'none',
-                padding: '4px 0',
-                lineHeight: 1.5
-              }}
-            />
-            {input.trim() && (
-              <button
-                onClick={() => handleSubmit()}
-                disabled={loading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: '#1d9bf0',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '16px',
-                  flexShrink: 0
-                }}
-              >
-                ↑
-              </button>
-            )}
-          </div>
+              className="btn-utility"
+              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <IconSend /> Send
+            </button>
+          )}
         </div>
-        <div style={{ maxWidth: '800px', paddingLeft: '4px', marginTop: '8px' }}>
-          <span style={{ color: '#536471', fontSize: '13px' }}>
-            shift+enter for new line · paste X links to analyze
-          </span>
+        <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-disabled)', marginTop: '6px' }}>
+          shift+enter for new line / paste X links to analyze
         </div>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }
