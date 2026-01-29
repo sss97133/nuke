@@ -6,10 +6,9 @@ We turn scattered car history into structured, tradable intelligence.
 
 ## What It Does
 
-- **Autonomous extraction** from auctions, marketplaces, and forums
-- **AI-powered analysis** of comments, descriptions, and images
-- **Verified timelines** that owners and shops contribute to
-- **Provenance reports** for buyers, insurers, and auction houses
+- **Aggregates** vehicle history from auctions, forums, and marketplaces
+- **Structures** provenance into verified timelines
+- **Connects** owners, shops, buyers, and insurers around shared records
 
 ---
 
@@ -18,9 +17,9 @@ We turn scattered car history into structured, tradable intelligence.
 | Metric | Count |
 |--------|-------|
 | Vehicle profiles | 18,000+ |
-| Auction comments extracted | 364,000+ |
-| Images indexed | 1,000,000+ |
-| Data sources | BaT, Cars & Bids, Hagerty, RM Sotheby's, + more |
+| Data points indexed | 364,000+ |
+| Images | 1,000,000+ |
+| Platform integrations | BaT, Cars & Bids, Hagerty, RM Sotheby's |
 
 ---
 
@@ -28,10 +27,10 @@ We turn scattered car history into structured, tradable intelligence.
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React, TypeScript, Vercel |
-| Backend | Elixir/Phoenix, Supabase Edge Functions |
-| Database | PostgreSQL (Supabase) |
-| AI | Claude, GPT-4, Gemini |
+| Frontend | React, TypeScript |
+| Backend | Elixir/Phoenix, Supabase |
+| Database | PostgreSQL |
+| Deploy | Vercel, Supabase |
 
 ---
 
@@ -44,5 +43,3 @@ cd nuke_frontend && npm install && npm run dev
 # Backend
 cd nuke_api && mix deps.get && mix phx.server
 ```
-
-See `docs/ENV_QUICKREF.md` for environment setup.
