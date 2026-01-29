@@ -1,0 +1,1513 @@
+{
+  "startedAt": "2026-01-29T11:51:09.721Z",
+  "limit": 300,
+  "delayMs": 3500,
+  "dryRun": false,
+  "processed": 300,
+  "vinFound": 5,
+  "vinUpdated": 5,
+  "errors": [
+    {
+      "id": "6e0df9fe-0086-4127-8eae-79c185565966",
+      "url": "https://carsandbids.com/auctions/kdxbnoer/2024-range-rover-p530-autobiography-lwb",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7eb781fa-7153-46ad-8e26-c5f8a4e28452",
+      "url": "https://carsandbids.com/auctions/km1d5pjd/2021-rolls-royce-wraith",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a74c849c-33d1-4a6f-838e-11a6c5f91189",
+      "url": "https://carsandbids.com/auctions/9eg5bwja/1999-toyota-crown-royal-saloon-anniversary-package",
+      "message": "404 or not found"
+    },
+    {
+      "id": "013c0da2-46a1-48d0-bb98-1f86001429a6",
+      "url": "https://carsandbids.com/auctions/rjyr2axy/1999-porsche-911-carrera-cabriolet",
+      "message": "404 or not found"
+    },
+    {
+      "id": "bf881fdb-9f0f-471e-8c74-15d354d0e3b1",
+      "url": "https://carsandbids.com/auctions/9enaaayg/2000-audi-a4-18t-avant-quattro",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f842153e-f534-4680-83cb-918832f19119",
+      "url": "https://carsandbids.com/auctions/rwyb0egy/1999-toyota-altezza-rs200-modellista-qualitat",
+      "message": "404 or not found"
+    },
+    {
+      "id": "208ca393-61fc-45f4-b274-b9c0adbf2eb1",
+      "url": "https://carsandbids.com/auctions/3rpezdpq/1998-infiniti-qx4-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "61203bea-32f2-4eea-80ed-da82c5963166",
+      "url": "https://carsandbids.com/auctions/kd6xmqq1/2013-audi-tt-20t-quattro-coupe-premium-plus%20%222013%20audi%20tt%202.0t%20quattro%20coupe%20premium%20plus%20%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d4da2d8f-602f-4277-a28e-be8717f5e757",
+      "url": "https://carsandbids.com/auctions/rnvay1gw/2018-mazda-mx-5-miata-club",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a022e0c9-d710-44ac-8899-e53b535561f4",
+      "url": "https://carsandbids.com/auctions/rwbw5ldz/2021-mercedes-amg-gt-roadster",
+      "message": "404 or not found"
+    },
+    {
+      "id": "5fd0d37c-7ffa-4c88-aaf4-2904dbc8a03f",
+      "url": "https://carsandbids.com/auctions/reokxblk/1991-bmw-850i",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1bc41ac6-492e-420d-898d-138f2db3192d",
+      "url": "https://carsandbids.com/auctions/3p65alzy/2013-bmw-550i-xdrive",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d971dec7-fb30-430c-9091-5f71484730a3",
+      "url": "https://carsandbids.com/auctions/kpvemoxz/1999-honda-s2000",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c52dc300-0f73-4efd-bb43-9aaef9de1c7e",
+      "url": "https://carsandbids.com/auctions/rej1opnp/2021-jeep-wrangler-rubicon-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d2697b73-fd47-47ae-9986-0b624cc5d5af",
+      "url": "https://carsandbids.com/auctions/rennlg0v/2021-audi-s5-sportback",
+      "message": "404 or not found"
+    },
+    {
+      "id": "922c1dcf-de18-4918-bb1a-7475ce3b8515",
+      "url": "https://carsandbids.com/auctions/35wgwyjz/2009-bmw-m3-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "684ab7c5-1b83-4999-a15e-28ee6d832917",
+      "url": "https://carsandbids.com/auctions/kvmjqpwx/2019-ford-fiesta-st",
+      "message": "404 or not found"
+    },
+    {
+      "id": "0f4eb1df-05fd-4594-bc07-8adf129d5947",
+      "url": "https://carsandbids.com/auctions/rjnxmyav/2008-porsche-cayenne-turbo",
+      "message": "404 or not found"
+    },
+    {
+      "id": "3b110359-dceb-4518-930d-d6c91205620d",
+      "url": "https://carsandbids.com/auctions/kzpevaxo/2018-audi-s5-sportback",
+      "message": "404 or not found"
+    },
+    {
+      "id": "3b150804-0202-4c58-99df-3008eb014beb",
+      "url": "https://carsandbids.com/auctions/30ab6pal/2017-aston-martin-vantage-gt4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "104d039b-4875-45a6-a1b6-31574eb08582",
+      "url": "https://carsandbids.com/auctions/rxmbdnv9/1990-porsche-911-carrera-2-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "95df97d2-44da-4dd4-a938-e8f9078ef76b",
+      "url": "https://carsandbids.com/auctions/rebwlpro/2016-jaguar-f-type-r-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "099b85e9-42aa-46db-8976-1292a3c6877d",
+      "url": "https://carsandbids.com/auctions/kp0qvzb2/1996-honda-acty-sdx-4wd",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4e71bb9c-a46c-4943-89e5-d48f7a6afcba",
+      "url": "https://carsandbids.com/auctions/30xroxzm/1996-mitsubishi-pajero-junior-zr-ii-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "21867a23-4e3f-42a3-a509-0d7687fc66ae",
+      "url": "https://carsandbids.com/auctions/rnmbmqzg/1997-toyota-celsior",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1633af8c-2939-4ceb-96f6-329b4c689e21",
+      "url": "https://carsandbids.com/auctions/3zxenpvj/2001-toyota-tacoma-sr5-regular-cab-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e0c0d5e0-e2e4-486e-ba1a-7011fd05e185",
+      "url": "https://carsandbids.com/auctions/3yglj77r/2022-rivian-r1t-launch-edition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1bb51d1e-48b2-4665-b619-9ad71d612b69",
+      "url": "https://carsandbids.com/auctions/relolryk/1975-volkswagen-bus",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a3cf0fdf-3c5c-4182-8eb7-c195006afaa3",
+      "url": "https://carsandbids.com/auctions/92q2pz26/1991-mazda-mx-5-miata",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ee0dca54-7ffe-4f00-8093-325bc5bc0784",
+      "url": "https://carsandbids.com/auctions/rxlylonb/2002-acura-rsx-type-s",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ef491b79-b6bb-47c3-859e-f6c4594ae917",
+      "url": "https://carsandbids.com/auctions/92wponbb/2007-porsche-cayman",
+      "message": "404 or not found"
+    },
+    {
+      "id": "bff9fea7-bcc6-4286-9427-1366d19edfbd",
+      "url": "https://carsandbids.com/auctions/3v2plqzo/2007-saab-9-3-aero-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "75eaeba5-fcca-40c2-9fdb-ff7ef43c3d6f",
+      "url": "https://carsandbids.com/auctions/rwloapjz/2016-land-rover-lr4-hse-landmark-edition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9e4b63c3-cdfa-4f14-8519-2f652ec5828f",
+      "url": "https://carsandbids.com/auctions/rjqaemp7/2003-bmw-540i-touring",
+      "message": "404 or not found"
+    },
+    {
+      "id": "277307da-6f48-463f-b81f-c67d70d1fc5f",
+      "url": "https://carsandbids.com/auctions/rkvgg1nk/2004-chevrolet-suburban-2500-lt-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "50fad24f-543d-4540-9249-d636be8a35fe",
+      "url": "https://carsandbids.com/auctions/km20kqwd/2022-audi-rs6-avant",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e15c2487-14bc-460a-969f-7ebe8a4d29e3",
+      "url": "https://carsandbids.com/auctions/kyayajxl/2022-tesla-model-x-plaid",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4ef06dbd-9ca9-420d-92c3-f0369cd794fa",
+      "url": "https://carsandbids.com/auctions/9le5yqwg/2012-mercedes-benz-s65-amg",
+      "message": "404 or not found"
+    },
+    {
+      "id": "58b8b961-7404-4f5e-975f-b45788982224",
+      "url": "https://carsandbids.com/auctions/30wxzxbr/1993-mazda-eunos-roadster-s-special",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b69689bb-9f1e-4451-b33f-de1e0c268997",
+      "url": "https://carsandbids.com/auctions/rx2aodyz/2010-bmw-m3-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "45a0b1cc-aba0-4e9d-a4ca-3ceb69ac0532",
+      "url": "https://carsandbids.com/auctions/36gbb2da/2001-bmw-z3-25i-roadster",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7ed7ad42-65bc-4809-a677-72bd6ee128e1",
+      "url": "https://carsandbids.com/auctions/3l5gjrmg/2018-ford-f-150-xlt-4x4-supercrew",
+      "message": "404 or not found"
+    },
+    {
+      "id": "dfdca12a-4c3b-4eb0-8695-44c83f5f5c54",
+      "url": "https://carsandbids.com/auctions/36ybd7xx/1997-honda-integra-type-r",
+      "message": "404 or not found"
+    },
+    {
+      "id": "bfffede0-a6b3-40c6-b57e-6f8046e12464",
+      "url": "https://carsandbids.com/auctions/36e6xz7z/2016-volkswagen-golf-r",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b45a7279-b431-446a-9318-d918c7343c1e",
+      "url": "https://carsandbids.com/auctions/3la4q5yv/1965-chevrolet-chevy-ii-nova",
+      "message": "404 or not found"
+    },
+    {
+      "id": "94befd2d-75ed-4bf5-a4f7-1111bd9d16e2",
+      "url": "https://carsandbids.com/auctions/9ekyzn2q/2023-jeep-wrangler-sport-s-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "90153806-7f71-4738-9b7e-61a076c0d460",
+      "url": "https://carsandbids.com/auctions/rkew4dvq/1968-ford-mustang-fastback",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8300f830-842a-4e0c-9e63-6796a51d7f3b",
+      "url": "https://carsandbids.com/auctions/37vooyn7/1973-detomaso-pantera",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8e0abe27-f49c-4b66-a115-b22fbea7af48",
+      "url": "https://carsandbids.com/auctions/9xmrrdkq/2008-mercedes-benz-e550-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "2143e455-6445-4829-a7a6-450d8186c159",
+      "url": "https://carsandbids.com/auctions/92ooqvoq/1994-toyota-land-cruiser-vx-limited",
+      "message": "404 or not found"
+    },
+    {
+      "id": "db0223f7-9112-4855-959b-ebb752cf8bba",
+      "url": "https://carsandbids.com/auctions/rjqkjxdz/2000-mercedes-benz-e430-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "22f816cb-5d9a-42de-b6bf-270b0104128e",
+      "url": "https://carsandbids.com/auctions/rk40xapg/2013-dodge-challenger-r-t",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9608bb54-c0f3-4662-b17a-daa9ab1bac5b",
+      "url": "https://carsandbids.com/auctions/rbv0eddr/2014-bentley-flying-spur",
+      "message": "404 or not found"
+    },
+    {
+      "id": "544af9f1-68c5-4456-b631-ce9c1c9dafe5",
+      "url": "https://carsandbids.com/auctions/30egbmeg/2019-porsche-911-turbo-s-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1b9a8cf7-f971-42df-aba4-6d57bc4cd2bf",
+      "url": "https://carsandbids.com/auctions/9xagygzg/2013-chevrolet-camaro-zl1-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e1a19ec2-4281-4e90-8a4c-359dddf41e37",
+      "url": "https://carsandbids.com/auctions/rjegoknk/1999-toyota-hilux-surf-ssr-x-wide-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fc131d2e-b52d-4834-88a8-bef6c58a52cc",
+      "url": "https://carsandbids.com/auctions/rjdjg72w/2016-porsche-macan-turbo",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fd6447a7-e11d-44c0-95a0-4c6672a98831",
+      "url": "https://carsandbids.com/auctions/3pqg4nde/2008-bmw-m3-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9361e61d-dca3-4dcf-87c9-82d77e6087c6",
+      "url": "https://carsandbids.com/auctions/37oozvyk/1997-toyota-century",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4bebfd91-406b-4395-8a61-b365e1beadcf",
+      "url": "https://carsandbids.com/auctions/9lzzmdyg/2005-toyota-corolla-le%20%222005%20toyota%20corolla%20le%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e91531de-a97e-4f44-874d-36f2c5bdda50",
+      "url": "https://carsandbids.com/auctions/36lzqvmp/2015-tesla-model-s-p90d",
+      "message": "404 or not found"
+    },
+    {
+      "id": "aa2208ec-5ab2-4c2c-bbfe-b9d997b40c83",
+      "url": "https://carsandbids.com/auctions/9nl4eeeb/2020-bmw-m2-competition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8e04615f-a928-4403-b412-f434fbd144c4",
+      "url": "https://carsandbids.com/auctions/37oawajd/2007-acura-tsx",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d1bcfa57-2b9a-4225-9706-a5012a6ca98b",
+      "url": "https://carsandbids.com/auctions/9emyzqqg/2017-mercedes-benz-s550-4matic-coupe-night-edition%20%222017%20mercedes-benz%20s550%204matic%20coupe%20night%20edition%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f9962e37-2d27-41dd-82e7-b8ad4903c0e1",
+      "url": "https://carsandbids.com/auctions/rbzkpmll/2003-saab-9-5-30t-wagon%20%222003%20saab%209-5%203.0t%20wagon%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1e7f3f0e-029a-4353-bfd7-1ed54fd8bcd2",
+      "url": "https://carsandbids.com/auctions/3gzym0y9/1996-toyota-hiace-super-custom-limited-4wd",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8492c4cd-98d3-45c7-9534-06b41916ed81",
+      "url": "https://carsandbids.com/auctions/rmvaloz4/1991-nissan-skyline-gts-4-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "72d85758-a147-4f3c-8401-ee0d60ec5ae3",
+      "url": "https://carsandbids.com/auctions/3bjmzble/1998-subaru-impreza-25rs-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "da9ada31-46cb-4920-8b18-e549abd0ac00",
+      "url": "https://carsandbids.com/auctions/3ymrmqy7/2012-maserati-granturismo-s%20%222012%20maserati%20granturismo%20s%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8826bac5-e077-4550-ad6b-3b65b934a9af",
+      "url": "https://carsandbids.com/auctions/kderyvqr/2020-mercedes-benz-e450-4matic-wagon",
+      "message": "404 or not found"
+    },
+    {
+      "id": "68b9ecac-bd4f-4a72-b0ce-aefcb4e3b60f",
+      "url": "https://carsandbids.com/auctions/rnjnngyp/2012-mini-cooper-s-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "70905ac3-f8ce-4c78-927a-aa0b44e597cb",
+      "url": "https://carsandbids.com/auctions/kvbamo7l/2008-hummer-h3-alpha",
+      "message": "404 or not found"
+    },
+    {
+      "id": "2de3e676-1208-4640-b0c6-77267e10557e",
+      "url": "https://carsandbids.com/auctions/9axz61zd/2000-suzuki-carry-truck-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f69d437d-2515-45db-a58a-652a5ea0382a",
+      "url": "https://carsandbids.com/auctions/3vw7pv0b/2002-lexus-lx-470",
+      "message": "404 or not found"
+    },
+    {
+      "id": "965cee8d-7f89-4d6d-8152-a819bf2a98e7",
+      "url": "https://carsandbids.com/auctions/356j8o2l/2011-jaguar-xf-supercharged",
+      "message": "404 or not found"
+    },
+    {
+      "id": "665899b9-db73-4a49-bd4e-20ce7ff22b94",
+      "url": "https://carsandbids.com/auctions/rnj1zp24/2013-audi-rs5-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "03c1d5cb-860c-415d-a3c8-f8066c8ea2e7",
+      "url": "https://carsandbids.com/auctions/9xmqnoro/2018-mercedes-benz-e400-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c5d54c62-767e-47ec-93d1-d76285f49fa2",
+      "url": "https://carsandbids.com/auctions/35gqnqwp/2012-tesla-model-s-signature",
+      "message": "404 or not found"
+    },
+    {
+      "id": "49aac1b3-1484-442d-8b60-6ff25da8b165",
+      "url": "https://carsandbids.com/auctions/3ye4bab7/2023-tesla-model-s-plaid",
+      "message": "404 or not found"
+    },
+    {
+      "id": "bd3aa6d6-bf2b-494b-b1b9-9b6d11d4c104",
+      "url": "https://carsandbids.com/auctions/3y72jrzm/2021-mercedes-amg-c63-s-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "94d14489-2b46-411c-be7b-107ca23f8fd8",
+      "url": "https://carsandbids.com/auctions/9lzbbrxz/2020-ford-shelby-f-150-supercrew-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f9d59e8c-bb51-441b-bf9b-ba1d45a3a915",
+      "url": "https://carsandbids.com/auctions/kd4aynz0/2013-fiat-500-abarth",
+      "message": "404 or not found"
+    },
+    {
+      "id": "65e93fc2-9b3a-4ded-9104-16fad99b9add",
+      "url": "https://carsandbids.com/auctions/k1eyx8bx/2003-bmw-530i-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "64162ccc-4551-4e2b-b442-ae312d912d85",
+      "url": "https://carsandbids.com/auctions/kmnx8e6d/2004-honda-s2000",
+      "message": "404 or not found"
+    },
+    {
+      "id": "bd24c8cd-373c-4415-ab5b-bbb0ec4d57f4",
+      "url": "https://carsandbids.com/auctions/3vdpm78b/2004-honda-s2000",
+      "message": "404 or not found"
+    },
+    {
+      "id": "037e0372-51a1-4eea-ad67-1b88803d7386",
+      "url": "https://carsandbids.com/auctions/36qnm5ya/1989-jaguar-xjs",
+      "message": "404 or not found"
+    },
+    {
+      "id": "30b01739-3027-4d7d-b5cc-33f897309714",
+      "url": "https://carsandbids.com/auctions/3ldo27yy/2007-porsche-911-turbo-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ad3893d1-5a59-484e-b272-6d468678819a",
+      "url": "https://carsandbids.com/auctions/92x4wqdj/2021-toyota-supra-30-premium",
+      "message": "404 or not found"
+    },
+    {
+      "id": "806ec9aa-1414-42ff-9aac-b599f928ccdf",
+      "url": "https://carsandbids.com/auctions/9eavz5k9/2007-volkswagen-gti",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b372c571-3ccc-4cbe-b2e5-f1d8a33e8c59",
+      "url": "https://carsandbids.com/auctions/rkgzawln/2012-smart-fortwo",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7fecfd8a-9697-4dd9-8ad7-3a97098e3bc1",
+      "url": "https://carsandbids.com/auctions/3pylgojz/2016-maserati-granturismo-mc",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9397748a-dd30-43e5-be5e-0b93ea99633a",
+      "url": "https://carsandbids.com/auctions/kv4ye2k6/2011-ferrari-458-italia",
+      "message": "404 or not found"
+    },
+    {
+      "id": "037dd986-9c83-4859-b0f4-7bb3b19266a4",
+      "url": "https://carsandbids.com/auctions/9n2rdp8x/2006-lexus-gx-470",
+      "message": "404 or not found"
+    },
+    {
+      "id": "de77dd03-cc35-42e0-af3d-de1f72c69bbd",
+      "url": "https://carsandbids.com/auctions/3zjl4bp1/1994-subaru-impreza-wrx-sti-version-i-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "be854ba2-a84b-4bea-8392-554d2d86ec90",
+      "url": "https://carsandbids.com/auctions/r4qxjypp/2001-bmw-540i-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c8feb435-ba73-47c5-929b-b62f1737368d",
+      "url": "https://carsandbids.com/auctions/rgjxxl8o/2008-mercedes-benz-cl63-amg",
+      "message": "404 or not found"
+    },
+    {
+      "id": "70f0b4b8-55c9-4771-b355-b54b524accf9",
+      "url": "https://carsandbids.com/auctions/kmne4zam/2005-honda-s2000",
+      "message": "404 or not found"
+    },
+    {
+      "id": "24d91492-e18f-42fe-a003-c56a36103802",
+      "url": "https://carsandbids.com/auctions/rwnjo6ya/2007-mini-cooper-s-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "dfffca88-fc0e-4037-89d2-2dbfd6775660",
+      "url": "https://carsandbids.com/auctions/92o4wqj6/2022-chevrolet-corvette-stingray-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "6befa7b8-16d8-4ddf-ab0b-74205d76c920",
+      "url": "https://carsandbids.com/auctions/rwxa4kxp/2013-tesla-model-s-85",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b112d51f-e56f-4faa-bd21-58864fc978bc",
+      "url": "https://carsandbids.com/auctions/rwypjpva/1997-toyota-hiace-super-custom-limited-4wd",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f694bef9-76ca-4fad-860c-3d01499a6154",
+      "url": "https://carsandbids.com/auctions/rklmo6qb/2020-bmw-m550i-xdrive",
+      "message": "404 or not found"
+    },
+    {
+      "id": "dc9c20d8-9502-4c5d-a841-f366c2bc925b",
+      "url": "https://carsandbids.com/auctions/3qleyav5/1990-chevrolet-454-ss",
+      "message": "404 or not found"
+    },
+    {
+      "id": "915a66d9-2735-4d68-8425-a94a3ba6a2e0",
+      "url": "https://carsandbids.com/auctions/9ldr5jle/1996-porsche-911-carrera-4-cabriolet",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1e73f5c6-f1dc-4399-882b-113751591b9f",
+      "url": "https://carsandbids.com/auctions/35dgrylk/2004-porsche-boxster-s-550-anniversary-edition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "0749cf6f-8ced-449c-8711-ad1d87f7a4cd",
+      "url": "https://carsandbids.com/auctions/3g5wramo/2001-bmw-z3-30i-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "226b9337-3cee-45e2-8041-afca2a769dd5",
+      "url": "https://carsandbids.com/auctions/3bvmmbxd/2019-bmw-x5-xdrive50i",
+      "message": "404 or not found"
+    },
+    {
+      "id": "03c0db91-985c-4ba1-99ce-1eb961b5797c",
+      "url": "https://carsandbids.com/auctions/9xpeaq8l/1972-datsun-240z",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a01a16c6-03cf-4e36-b8ef-1b6263a97232",
+      "url": "https://carsandbids.com/auctions/3ovbx6mk/2007-jaguar-xkr-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "0135f8cf-2b8d-44a5-9b40-76754a6aabc1",
+      "url": "https://carsandbids.com/auctions/re76nppr/2016-audi-rs7",
+      "message": "404 or not found"
+    },
+    {
+      "id": "652070c5-85e8-4996-9135-3227db5653a6",
+      "url": "https://carsandbids.com/auctions/rnd0rgxx/2010-porsche-cayman-s",
+      "message": "404 or not found"
+    },
+    {
+      "id": "94cd6d7c-c1b5-4245-8ca3-bc14a587469f",
+      "url": "https://carsandbids.com/auctions/rb1mbwoj/2010-toyota-tundra-limited-crewmax-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "2cc1d187-fd86-4b8c-822f-4f9f2589bc6f",
+      "url": "https://carsandbids.com/auctions/30xb5dzj/2015-bmw-328i-xdrive-sports-wagon",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1dd187bf-1662-41c8-96c9-d9615d1993c6",
+      "url": "https://carsandbids.com/auctions/92pwbovw/2006-lexus-lx-470",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b84bd5ce-49a5-498c-a958-b18bacfc661e",
+      "url": "https://carsandbids.com/auctions/3bz5v8r4/2021-tesla-model-s-plaid",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9a84a937-c619-4aa3-b4bd-b6cb576c5f6c",
+      "url": "https://carsandbids.com/auctions/36vjmxnx/2018-fiat-500e",
+      "message": "404 or not found"
+    },
+    {
+      "id": "833b0722-4094-4851-833c-cc570ac0827a",
+      "url": "https://carsandbids.com/auctions/30x2w78j/2018-porsche-718-cayman-gts",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7ed83b9d-353e-4428-9e61-1329669871a8",
+      "url": "https://carsandbids.com/auctions/rkbyajgw/2011-bmw-1m",
+      "message": "404 or not found"
+    },
+    {
+      "id": "572bb972-1398-44c4-b3f8-46a539952547",
+      "url": "https://carsandbids.com/auctions/9qyl5jmy/2015-toyota-tundra-trd-pro",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fc0f1884-913c-497c-9a6b-7de99fbff128",
+      "url": "https://carsandbids.com/auctions/rkekpdpn/1996-nissan-cima-grand-touring",
+      "message": "404 or not found"
+    },
+    {
+      "id": "41f65d79-d971-49fe-8538-9d8891afb5df",
+      "url": "https://carsandbids.com/auctions/3voppekk/2013-audi-s7",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b4c7c334-8b5b-4928-bef4-89545e051645",
+      "url": "https://carsandbids.com/auctions/re147lyv/2015-chevrolet-ss",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a0b86117-5d1e-4075-93ae-9cc7d5b2f013",
+      "url": "https://carsandbids.com/auctions/kybyddrj/1991-toyota-soarer-25gt-tl",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a2779392-830d-407d-b141-ce96cf5efbd7",
+      "url": "https://carsandbids.com/auctions/3zjbmdwj/2021-audi-tt-rs",
+      "message": "404 or not found"
+    },
+    {
+      "id": "25fd308a-1e43-493e-beb7-b4fdb2b8ec46",
+      "url": "https://carsandbids.com/auctions/rkzzownk/2008-lamborghini-gallardo-spyder",
+      "message": "404 or not found"
+    },
+    {
+      "id": "030a80e9-d4b7-4e9f-977d-af4854f65a7f",
+      "url": "https://carsandbids.com/auctions/35v65yyj/1992-volvo-240-dl-wagon",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4353b983-7733-4a30-a969-53be5a10dedc",
+      "url": "https://carsandbids.com/auctions/renvgogo/2010-audi-r8-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "977bc64b-7f1e-4ce2-98b0-b5c4908a50dd",
+      "url": "https://carsandbids.com/auctions/3o2enwd2/2014-audi-s4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "89247029-9d89-4f5a-8716-906a33bb6f30",
+      "url": "https://carsandbids.com/auctions/9qzbojdx/2007-toyota-fj-cruiser",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c8e10439-5334-445e-ba43-ede861e2a537",
+      "url": "https://carsandbids.com/auctions/rxpxypxq/2005-ferrari-575-superamerica",
+      "message": "404 or not found"
+    },
+    {
+      "id": "760701e7-9795-44fa-8bb5-26bf687a49b8",
+      "url": "https://carsandbids.com/auctions/3yykx1ll/2013-bmw-m3-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fc05b46d-f807-4d1c-89a2-2b8dd73e2866",
+      "url": "https://carsandbids.com/auctions/kdanoj0x/2016-porsche-cayenne-gts",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b0d90816-7a5b-4bee-a016-e09e00a1f309",
+      "url": "https://carsandbids.com/auctions/kdeyobbq/2022-tesla-model-x-plaid",
+      "message": "404 or not found"
+    },
+    {
+      "id": "dc4791c5-3849-497a-aff1-08fad55847c6",
+      "url": "https://carsandbids.com/auctions/9qqllj1e/2016-audi-rs7",
+      "message": "404 or not found"
+    },
+    {
+      "id": "3b5f51a0-515c-4d66-8f32-498c6e44731e",
+      "url": "https://carsandbids.com/auctions/3yxwk74e/1983-lada-niva-1600",
+      "message": "404 or not found"
+    },
+    {
+      "id": "0abab5b4-a0db-4180-a669-055f72023b23",
+      "url": "https://carsandbids.com/auctions/9xvjojdz/1990-toyota-land-cruiser",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8a494a8c-2ca4-4b54-858f-6122dbb185be",
+      "url": "https://carsandbids.com/auctions/3y7k0eor/2019-mercedes-benz-sprinter-2500-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b9b31e4b-e639-4695-8a2c-7289ced4dc2f",
+      "url": "https://carsandbids.com/auctions/9ezjyp76/1998-nissan-leopard-xv",
+      "message": "404 or not found"
+    },
+    {
+      "id": "604c4e54-78c5-410c-b8a1-2bd240324630",
+      "url": "https://carsandbids.com/auctions/3bw508az/2009-bmw-535i-xdrive-sports-wagon",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7ee56eab-0c6f-4aa6-bdfe-0b2bc402413e",
+      "url": "https://carsandbids.com/auctions/r40xjxnx/2013-smart-fortwo-brabus",
+      "message": "404 or not found"
+    },
+    {
+      "id": "3f1e42d7-d513-4011-92a4-bb50f5f9906d",
+      "url": "https://carsandbids.com/auctions/kpya05o7/1984-suzuki-carry-truck-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "29ea8ae9-2172-4926-8217-8dd281a21edd",
+      "url": "https://carsandbids.com/auctions/3ryl61er/2025-rivian-r1t-adventure-edition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fbd8de47-6d09-450b-a606-2ed1fbf4e125",
+      "url": "https://carsandbids.com/auctions/30dwlr0r/1999-porsche-boxster",
+      "message": "404 or not found"
+    },
+    {
+      "id": "6ce9c025-7a00-4b6d-8812-0a07a13b491c",
+      "url": "https://carsandbids.com/auctions/rnb6q2be/2013-mercedes-benz-sl550",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ae512b18-0dea-487d-aea5-e0d24949f144",
+      "url": "https://carsandbids.com/auctions/kdkqdpz1/1993-toyota-hilux-ssr-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b012492a-5e79-46d5-a074-1580aa57fc39",
+      "url": "https://carsandbids.com/auctions/kmzg6g6x/2013-bmw-x5-m",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b3b931fe-d4b9-4d55-bf0c-cecda3ba9c61",
+      "url": "https://carsandbids.com/auctions/9aqewzow/1998-ferrari-355-f1-berlinetta",
+      "message": "404 or not found"
+    },
+    {
+      "id": "773e20d6-3b06-4275-89da-d2f12d36466b",
+      "url": "https://carsandbids.com/auctions/3zgrmejk/2012-volkswagen-gti-autobahn",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1c95fa19-db4c-4fbc-95f5-959442050718",
+      "url": "https://carsandbids.com/auctions/3bopv4ax/2020-honda-civic-type-r-tc",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8b8e9e1d-0d89-4821-9646-70b6a82f1f71",
+      "url": "https://carsandbids.com/auctions/kdggm7rm/1991-acura-nsx",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1e90a6d6-171a-4c09-b42d-4ef4e5465c5d",
+      "url": "https://carsandbids.com/auctions/3y24ejxe/2024-porsche-911-carrera-gts-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "16bb131a-43aa-42a6-ae1d-2c34dfad2399",
+      "url": "https://carsandbids.com/auctions/30x0l62l",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ccb40d66-5dc4-431d-98c5-43d0f8a920ab",
+      "url": "https://carsandbids.com/auctions/rgpoxabx/1991-mercedes-benz-560sec",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7e8587d1-f7a9-48d4-aa33-70e54d736a6d",
+      "url": "https://carsandbids.com/auctions/9lyjwmp5/2024-tesla-cybertruck-cyberbeast",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4700a3cf-9600-453d-a332-3deead5fc00c",
+      "url": "https://carsandbids.com/auctions/3oo5ygee/2017-audi-a4-allroad-quattro",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d6f282d6-2e6c-4fae-8678-f49ed1961da2",
+      "url": "https://carsandbids.com/auctions/30ermxmk/1998-nissan-skyline-25gt-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "341b466f-0d9c-4deb-b6cc-0cd0a9ec1d84",
+      "url": "https://carsandbids.com/auctions/kpmy8e47/2009-saab-9-3-20t-sportcombi",
+      "message": "404 or not found"
+    },
+    {
+      "id": "052b5290-1c18-4fc0-a870-155af08c9c61",
+      "url": "https://carsandbids.com/auctions/rjabm8dp/1979-pontiac-firebird-trans-am",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8bece83a-7ed9-4c95-958c-d26b141c5cd4",
+      "url": "https://carsandbids.com/auctions/kmzb6vdd/1964-chevrolet-corvette-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9444534e-a541-4d83-8620-988f1352e45e",
+      "url": "https://carsandbids.com/auctions/rnbvmzy5/1993-mazda-mx-5-miata",
+      "message": "404 or not found"
+    },
+    {
+      "id": "09ca1f2a-7d50-4a89-91e4-63a18914b76a",
+      "url": "https://carsandbids.com/auctions/36ljrzpz/2006-lexus-lx-470",
+      "message": "404 or not found"
+    },
+    {
+      "id": "25391224-f826-4af3-a780-955bef767cae",
+      "url": "https://carsandbids.com/auctions/3owq0dkr/1994-toyota-land-cruiser",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fda19ea4-ad83-4d22-bd1d-073b2aed12c1",
+      "url": "https://carsandbids.com/auctions/rwl8db0a/1993-volkswagen-corrado-slc",
+      "message": "404 or not found"
+    },
+    {
+      "id": "5dbcb0d6-3f7a-4a5d-ab42-6b1a2b91675c",
+      "url": "https://carsandbids.com/auctions/rxvyxoyw/2019-ford-gt-carbon-series",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e021145b-6b28-45c6-85a0-34cdaddc1131",
+      "url": "https://carsandbids.com/auctions/kpmjvwyq/1998-toyota-land-cruiser-vx-limited",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fbb1d731-94d1-453e-8dda-f637c7e968a8",
+      "url": "https://carsandbids.com/auctions/9enq1kl8/1976-chevrolet-cosworth-vega",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d27685ff-4bf2-4ee8-a7b6-a7f2dfa2f9eb",
+      "url": "https://carsandbids.com/auctions/3pjrpmn6/2014-porsche-cayenne-diesel",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4ec7c266-0378-46a6-a565-cb9ff518d943",
+      "url": "https://carsandbids.com/auctions/kdyv18oe/2005-porsche-boxster",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7e12a7fe-03c4-4508-ab01-5c2f9b913a26",
+      "url": "https://carsandbids.com/auctions/rbl4ggzj/2013-scion-fr-s",
+      "message": "404 or not found"
+    },
+    {
+      "id": "eaf52133-f505-4653-bc50-cfac24b686ed",
+      "url": "https://carsandbids.com/auctions/3le4wm8r/1998-nissan-silvia-autech-version-ks-mf-t",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8ece6c19-8c40-4dc5-a5f2-96203a830195",
+      "url": "https://carsandbids.com/auctions/kydzbom0/2023-tesla-model-y-long-range-awd",
+      "message": "404 or not found"
+    },
+    {
+      "id": "6eca4ec9-5940-4d95-9e59-5d20a1b1a38c",
+      "url": "https://carsandbids.com/auctions/3ojbemgo/1995-stewart-and-stevenson-lmtv-m1078-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "67766a51-8c9e-4b9f-b7c1-32e217e098fb",
+      "url": "https://carsandbids.com/auctions/3porv5qz/2016-bmw-x6-m",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b6733c5b-271a-4040-acdf-e395d4197124",
+      "url": "https://carsandbids.com/auctions/rbm2djpl/2008-volkswagen-eos",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e688b27f-a1d6-46dc-b070-55141c5e757c",
+      "url": "https://carsandbids.com/auctions/r4oemzmg/2013-audi-q7-tdi",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f3fce8e1-4410-45b0-bd7e-5ac74225b91c",
+      "url": "https://carsandbids.com/auctions/kddpzx4y/2022-bmw-m3",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a01f2bfd-1609-41bd-963f-c779a5cab54e",
+      "url": "https://carsandbids.com/auctions/3qynl7aa/2016-bmw-m2",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9e8f01fe-a5c8-431d-9122-a66cc53ed021",
+      "url": "https://carsandbids.com/auctions/9e5lejb6/2017-fiat-500e",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8f3c77b3-4ac5-4913-b32a-4230c3a31c00",
+      "url": "https://carsandbids.com/auctions/r4vaqerv/2023-mercedes-amg-c63-s-final-edition-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7eab34ca-7c36-495d-b1cd-a6d2a5cc1d88",
+      "url": "https://carsandbids.com/auctions/9a7mlnjm/2011-mercedes-benz-sls-amg-coupe%20%222011%20mercedes-benz%20sls%20amg%20coupe%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fdc70efd-feec-4cb1-b91d-c050da6b93b9",
+      "url": "https://carsandbids.com/auctions/rnvlobwr/1985-chevrolet-k10-silverado-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fb0bab94-caff-4752-bd9b-83a8ced61c5e",
+      "url": "https://carsandbids.com/auctions/36rjpdvp/1997-nissan-stagea-rs-four",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b5513b42-165d-4cd4-9e64-b9d1b1a688e5",
+      "url": "https://carsandbids.com/auctions/rnj08g1w/2008-porsche-cayenne-s",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4532e1d6-e8ff-4b0b-bb5d-9769a4e12797",
+      "url": "https://carsandbids.com/auctions/98owaqx2/2009-mercedes-benz-cl600",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d907da87-26c3-44fa-9cd0-4198529ea6bd",
+      "url": "https://carsandbids.com/auctions/rkjazalr/2000-nissan-stagea-rs-four",
+      "message": "404 or not found"
+    },
+    {
+      "id": "0bdbb0d0-8b90-410e-a799-5fc57f70d24d",
+      "url": "https://carsandbids.com/auctions/98lalzg2/2002-mercedes-benz-s500",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8034def0-3814-4fb8-beec-670fbb7fda02",
+      "url": "https://carsandbids.com/auctions/3vjjkdyd/2015-audi-s4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "6a7a590d-94cb-4c87-bbd8-b62907fd7743",
+      "url": "https://carsandbids.com/auctions/9n7rywld/2014-mercedes-benz-gl550",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d9484fc0-8c19-4acf-bfac-71b64927cb19",
+      "url": "https://carsandbids.com/auctions/3vqdq7dd/2018-dodge-charger-r-t-scat-pack",
+      "message": "404 or not found"
+    },
+    {
+      "id": "0a272417-8883-4989-a0ce-335f891e0c8b",
+      "url": "https://carsandbids.com/auctions/rmyggydk/2014-mercedes-benz-sprinter-2500%20%222014%20mercedes-benz%20sprinter%202500%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ea153c21-d0f9-44c4-9b57-fbb4b755edca",
+      "url": "https://carsandbids.com/auctions/kmo8lwyn/2020-chevrolet-corvette-stingray-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1d7a22cb-9a29-4838-aff8-d9adf535a323",
+      "url": "https://carsandbids.com/auctions/92wznl2a/2011-mazda-mx-5-miata-grand-touring-special-edition%20%222011%20mazda%20mx-5%20miata%20grand%20touring%20special%20edition%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a41191ea-6ae1-41b2-a335-4c0e0b4df58d",
+      "url": "https://carsandbids.com/auctions/356q0qwb/2015-tesla-model-s-85d",
+      "message": "404 or not found"
+    },
+    {
+      "id": "31e931b7-0428-4798-88c2-793bc956eef0",
+      "url": "https://carsandbids.com/auctions/rby2wyvd/2006-bmw-m5",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9d582bf5-9071-4690-ae31-ac23850a0614",
+      "url": "https://carsandbids.com/auctions/kpl48pzo/2023-toyota-gr-corolla-core",
+      "message": "404 or not found"
+    },
+    {
+      "id": "79be25ed-3d6e-4800-8f41-b48fbbf20501",
+      "url": "https://carsandbids.com/auctions/9labqnkz/2011-audi-s4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "96e5a8ee-ba16-4079-b96e-df9d2f6ad7ee",
+      "url": "https://carsandbids.com/auctions/9llblngg/1985-dodge-daytona",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a7624b93-5a13-4c8c-a090-949d712090b6",
+      "url": "https://carsandbids.com/auctions/9ld5jlzg/2003-jeep-wrangler-sport-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a6465c31-005a-4732-9571-42a497a2a14c",
+      "url": "https://carsandbids.com/auctions/3oaa8jxr/1997-toyota-century",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e94abbc0-13ab-4c82-8d24-9cdac1d027b2",
+      "url": "https://carsandbids.com/auctions/9xy71x6o/2012-volvo-xc70",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c7f69fbe-b41e-4752-be1a-3f5b522ef4e6",
+      "url": "https://carsandbids.com/auctions/92ny7xda/2022-audi-a4-20t-quattro-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e24c36e9-8f97-4c9a-be4f-4f2c9cd49b6f",
+      "url": "https://carsandbids.com/auctions/kvzp248y/2019-mercedes-amg-glc-63",
+      "message": "404 or not found"
+    },
+    {
+      "id": "2b4ebfcf-c5b2-4637-9452-8f6d9317b1d0",
+      "url": "https://carsandbids.com/auctions/rgmp50n2/2008-subaru-forester-25xt-limited",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7e719f84-7a08-4714-9675-c9c1ef33e3a4",
+      "url": "https://carsandbids.com/auctions/9lb0pvoe/1989-am-general-m998",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ab524fe5-1408-4cec-8ca7-a97c454ee5b7",
+      "url": "https://carsandbids.com/auctions/kmalneg0/2016-ford-focus-rs",
+      "message": "404 or not found"
+    },
+    {
+      "id": "496ea00e-1fef-4dbf-888c-fc2617e31fc3",
+      "url": "https://carsandbids.com/auctions/kznwxzvg/2008-ford-f-350-super-duty-lariat-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1ded77d1-19a2-4bf3-8990-b3d9a72f5edc",
+      "url": "https://carsandbids.com/auctions/kzaqggwk/2015-volkswagen-jetta-gli",
+      "message": "404 or not found"
+    },
+    {
+      "id": "28ae79c0-c2ad-4f2d-92da-08cacca0f0c0",
+      "url": "https://carsandbids.com/auctions/3ggd0gyg/1999-suzuki-every-turbo",
+      "message": "404 or not found"
+    },
+    {
+      "id": "28d7d837-70dd-4ad3-8d65-ce3b3608fbe1",
+      "url": "https://carsandbids.com/auctions/rnyob2a7/2020-bmw-m340i",
+      "message": "404 or not found"
+    },
+    {
+      "id": "798610d6-9146-4b42-bd6a-e7f44afe8f41",
+      "url": "https://carsandbids.com/auctions/kd1pvxxm/2004-porsche-cayenne-s",
+      "message": "404 or not found"
+    },
+    {
+      "id": "372c7265-8c75-418f-b0c3-d74a9d69cb9d",
+      "url": "https://carsandbids.com/auctions/3bqpgqpa/2016-porsche-panamera-4-edition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7b35ee3b-7a3a-4929-93c8-61b32e752eee",
+      "url": "https://carsandbids.com/auctions/kvxpaboq",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e56a0c21-b170-40ff-b03e-6446f88fccf3",
+      "url": "https://carsandbids.com/auctions/kmy8zw46/2019-audi-rs5-sportback",
+      "message": "404 or not found"
+    },
+    {
+      "id": "dac4689c-1a48-47d5-80fa-c1c2d7a61089",
+      "url": "https://carsandbids.com/auctions/3g7rl068/1990-jeep-comanche-eliminator-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "0e934dd7-13fd-4ee2-bf60-2b4a0fda206b",
+      "url": "https://carsandbids.com/auctions/rj2jq0zn/2019-kia-stinger-gt2-awd",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f98cef48-25e9-4622-a913-08fd4dc6edc4",
+      "url": "https://carsandbids.com/auctions/kdkjga2p/2018-bmw-m3-competition-package",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d5784ea4-8246-4cef-8dc0-ffefeb186935",
+      "url": "https://carsandbids.com/auctions/kml2wywd/2008-mercedes-benz-clk63-amg-black-series",
+      "message": "404 or not found"
+    },
+    {
+      "id": "27cf3b34-e3e3-4acb-8efa-e4fad00dce89",
+      "url": "https://carsandbids.com/auctions/37wqnnxx/1984-tvr-280i-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "2253b882-36e5-400a-91c9-b51cf20fd2ed",
+      "url": "https://carsandbids.com/auctions/3opqler7/2019-mazda-mx-5-miata-club",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c039b92f-312c-4587-8f9b-d235c2e557a3",
+      "url": "https://carsandbids.com/auctions/92v4pqzb/2017-porsche-cayenne-platinum-edition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "b754e15a-d7aa-47b7-b349-c57de7a2c0ba",
+      "url": "https://carsandbids.com/auctions/kd16vow1/2018-subaru-wrx-limited",
+      "message": "404 or not found"
+    },
+    {
+      "id": "66724feb-aaf9-4bcd-95f2-c746fc4b5a65",
+      "url": "https://carsandbids.com/auctions/92ypvywr/2020-bmw-x3-m",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a696e4b1-b01d-4fd2-abf3-fe9db4ba2139",
+      "url": "https://carsandbids.com/auctions/30mxwbqg/2006-bmw-650i-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8abdd149-f98b-47e7-ae11-7c1bd7cdd430",
+      "url": "https://carsandbids.com/auctions/3v8nokor/2020-chevrolet-corvette-stingray-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "6451e2c1-1c6c-4283-b325-b42fbbc64f02",
+      "url": "https://carsandbids.com/auctions/9lbjyvng/2015-tesla-model-s-85d",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fab84159-7e57-4683-b2e0-e9c0ab58a7cd",
+      "url": "https://carsandbids.com/auctions/3vemljxb/2019-bmw-m2-competition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "85eaa7b2-6d21-4183-96ac-d702c04c75dd",
+      "url": "https://carsandbids.com/auctions/kmxb7pq6/2014-porsche-boxster-s",
+      "message": "404 or not found"
+    },
+    {
+      "id": "57bf8edb-2a80-4702-846c-12526f5cd721",
+      "url": "https://carsandbids.com/auctions/rk6jqvno/1999-ford-f-350-super-duty-xlt",
+      "message": "404 or not found"
+    },
+    {
+      "id": "79870dce-0dd7-4bdd-a987-b93fc3a7a818",
+      "url": "https://carsandbids.com/auctions/3zqponlj/2004-audi-s4-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "70d37b39-1271-4366-85fa-b57f0a1b0842",
+      "url": "https://carsandbids.com/auctions/rkgzzdgl/2005-mercedes-benz-g55-amg-grand-edition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c8b4b942-2a8f-4531-894e-d9dc122143b7",
+      "url": "https://carsandbids.com/auctions/kmlz4x63/2016-alfa-romeo-4c-spider",
+      "message": "404 or not found"
+    },
+    {
+      "id": "25ee3700-5e85-4798-a443-41124559da4d",
+      "url": "https://carsandbids.com/auctions/3g6pwbzr/2011-range-rover-sport-hse",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ba9a60d1-b68c-4857-b147-daa3adbd7af4",
+      "url": "https://carsandbids.com/auctions/3laoq7wy/2001-audi-s4-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "07dec053-b95a-4516-a312-50ea65f4f8ba",
+      "url": "https://carsandbids.com/auctions/9aqeekyq/2018-mercedes-amg-glc-43",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9483c038-6f5d-44c7-8dbc-5ccd329b4503",
+      "url": "https://carsandbids.com/auctions/rnybjqpx/2003-bmw-325i-touring",
+      "message": "404 or not found"
+    },
+    {
+      "id": "de227479-c64a-4af1-8bb4-2090de667b51",
+      "url": "https://carsandbids.com/auctions/3olbkxre/2011-volkswagen-jetta-sportwagen-tdi",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d94d1626-0d79-42ce-9829-c7f731700643",
+      "url": "https://carsandbids.com/auctions/3olavwnv/2015-porsche-cayenne-s%20%222015%20porsche%20cayenne%20s%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "fdb39fbe-8aa9-4b26-b22b-324e03a8e21c",
+      "url": "https://carsandbids.com/auctions/3polr0vn/1970-detomaso-mangusta",
+      "message": "404 or not found"
+    },
+    {
+      "id": "59ff419a-379e-4529-a15f-b1984282935d",
+      "url": "https://carsandbids.com/auctions/r4peezdv/2016-tesla-model-s-p90d",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d6d97043-2f61-4350-b805-dd3352c45c68",
+      "url": "https://carsandbids.com/auctions/3oqmnwov/1997-mercedes-benz-g320",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4f7c4533-519d-4a7a-955d-58665eb85556",
+      "url": "https://carsandbids.com/auctions/9ea56rxg/1998-toyota-land-cruiser-prado-tx",
+      "message": "404 or not found"
+    },
+    {
+      "id": "bebefccd-7ca3-481f-a935-178509bf3fd6",
+      "url": "https://carsandbids.com/auctions/kpb8zm2n/2013-maserati-granturismo-sport-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "912d680a-711c-4b44-9b51-975bbbd5b139",
+      "url": "https://carsandbids.com/auctions/3oropgr2/1988-bmw-535is",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9c5744ca-648d-4355-8f1d-12f0661c21b3",
+      "url": "https://carsandbids.com/auctions/3ommndyr/1970-datsun-510-2-door-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "42769279-dd4f-4514-b385-c089a99b998c",
+      "url": "https://carsandbids.com/auctions/3lglxnx0",
+      "message": "404 or not found"
+    },
+    {
+      "id": "bb50a128-ca8d-446d-8ed7-456f205b80b7",
+      "url": "https://carsandbids.com/auctions/kdlnz6yb/2008-porsche-cayman",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f9ce82fb-0606-4b8b-affe-c05ca7e02585",
+      "url": "https://carsandbids.com/auctions/kdjxjq15",
+      "message": "404 or not found"
+    },
+    {
+      "id": "983ca754-8541-4fb7-8c88-6ec90336504b",
+      "url": "https://carsandbids.com/auctions/kypqlgoe/2012-acura-tl-sh-awd",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ef72ad8e-f477-40e8-a9cc-6add12ab5287",
+      "url": "https://carsandbids.com/auctions/re1n5nba/2004-acura-nsx",
+      "message": "404 or not found"
+    },
+    {
+      "id": "64c3b6af-988f-4d24-96ae-44c58430f736",
+      "url": "https://carsandbids.com/auctions/36yen0x9/2023-nissan-z-proto-spec",
+      "message": "404 or not found"
+    },
+    {
+      "id": "39da7b14-6bc9-482b-989e-99c76d63fb66",
+      "url": "https://carsandbids.com/auctions/3oq6dd6v/2019-mercedes-amg-c43-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e0a6af09-d38e-49db-9243-51d21a8c5d9a",
+      "url": "https://carsandbids.com/auctions/9x6ebqqx",
+      "message": "404 or not found"
+    },
+    {
+      "id": "669372cd-c326-4105-915c-ef0c636f3f1a",
+      "url": "https://carsandbids.com/auctions/kpb2my8q/2024-volkswagen-golf-r",
+      "message": "404 or not found"
+    },
+    {
+      "id": "aa03cd21-7ecc-4b34-a5d8-f581971cb38d",
+      "url": "https://carsandbids.com/auctions/rmv7badg/2018-alfa-romeo-giulia-sport",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a888190b-247c-43dc-b4db-de571e158b85",
+      "url": "https://carsandbids.com/auctions/kdvlqxly/2012-bmw-128i-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "41d2ca4e-6718-4c62-81b4-d1a36c252963",
+      "url": "https://carsandbids.com/auctions/rgwvnden/2015-audi-s4-nogaro-blue-edition%20%222015%20audi%20s4%20nogaro%20blue%20edition%22",
+      "message": "404 or not found"
+    },
+    {
+      "id": "5aeec3c0-0946-4fb0-a7a5-fb0db121ea46",
+      "url": "https://carsandbids.com/auctions/ree4ql2b/2006-bmw-330ci-zhp-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "06b50348-65cc-4ccc-9205-540e41c18657",
+      "url": "https://carsandbids.com/auctions/36ovdpra/2022-rivian-r1t-launch-edition",
+      "message": "404 or not found"
+    },
+    {
+      "id": "d648a071-6f50-4c07-86c0-f85a87534fc3",
+      "url": "https://carsandbids.com/auctions/k1eppvxk/2004-bmw-m3-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a97c7698-f151-4286-9f3b-28e53b0eb1bd",
+      "url": "https://carsandbids.com/auctions/rgjpw4bn/2022-tesla-model-3-long-range-awd",
+      "message": "404 or not found"
+    },
+    {
+      "id": "656d7dca-d8bf-42ef-89ce-ba8901ea3ba0",
+      "url": "https://carsandbids.com/auctions/rmb57lb4/2009-bmw-328i-sports-wagon",
+      "message": "404 or not found"
+    },
+    {
+      "id": "503310f7-0743-4fc4-aad2-089ca1579616",
+      "url": "https://carsandbids.com/auctions/3odqdxnm/2017-chevrolet-ss",
+      "message": "404 or not found"
+    },
+    {
+      "id": "5eafc9ab-1878-4fd7-b1b5-6c8a3eb1c689",
+      "url": "https://carsandbids.com/auctions/36bzvvgw/2001-bmw-z3-m-roadster",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4ba15cca-f851-4708-87fa-9f121be1d262",
+      "url": "https://carsandbids.com/auctions/3r0n0enq/2007-volvo-s80-v8",
+      "message": "404 or not found"
+    },
+    {
+      "id": "8d6a9748-edcc-4afc-88e5-ea0c1a1f8b7b",
+      "url": "https://carsandbids.com/auctions/98yamzky/1999-bmw-z3-28i-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "64eb4c0b-c463-4b2e-ab5d-800b15a1b5e8",
+      "url": "https://carsandbids.com/auctions/kmjbxd8p/2004-jeep-wrangler-x-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "31220767-4f63-4b5e-8f9d-a01233c34b66",
+      "url": "https://carsandbids.com/auctions/3o7j5yo7",
+      "message": "404 or not found"
+    },
+    {
+      "id": "bc24a548-3e77-4e49-a25c-08881d308996",
+      "url": "https://carsandbids.com/auctions/3oybvxzg/2009-subaru-impreza-wrx-sti-hatchback",
+      "message": "404 or not found"
+    },
+    {
+      "id": "5df4d79c-9ef6-4b13-95bd-f1ed00e745ec",
+      "url": "https://carsandbids.com/auctions/kpl8lvwv/1974-porsche-914",
+      "message": "404 or not found"
+    },
+    {
+      "id": "3bbb3f33-5693-4931-bfc2-9593eb875e84",
+      "url": "https://carsandbids.com/auctions/9lebyq5m/2011-bmw-1m",
+      "message": "404 or not found"
+    },
+    {
+      "id": "530c990e-e487-4909-8f05-7069136bde5b",
+      "url": "https://carsandbids.com/auctions/kda6kopl/2010-mercedes-benz-e63-amg-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "079ec4b8-167c-4c6e-9727-581cbb44ad5b",
+      "url": "https://carsandbids.com/auctions/36y2pqdw/2003-bmw-525i-touring",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e2717355-e607-4904-8eb7-884d76ecffea",
+      "url": "https://carsandbids.com/auctions/9a7kzone/1993-mazda-rx-7-r1",
+      "message": "404 or not found"
+    },
+    {
+      "id": "415053a9-b5fb-40f0-8be6-0b17a5dca554",
+      "url": "https://carsandbids.com/auctions/r4pjebwy/1988-bmw-m5",
+      "message": "404 or not found"
+    },
+    {
+      "id": "6fa5fb46-c8dc-409f-9849-ee7b3a2fde1b",
+      "url": "https://carsandbids.com/auctions/rjyjzar0/2014-bmw-i3-range-extender",
+      "message": "404 or not found"
+    },
+    {
+      "id": "e67b47c1-ca1f-448b-a74d-63f0c52a4a52",
+      "url": "https://carsandbids.com/auctions/kvmdq1rm/2021-toyota-supra-30-premium",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c13baa17-e53f-4c7f-88d3-5d628a5f0485",
+      "url": "https://carsandbids.com/auctions/9xpydoxn/1983-toyota-land-cruiser",
+      "message": "404 or not found"
+    },
+    {
+      "id": "a4cc496a-b283-4057-9215-f002656b447c",
+      "url": "https://carsandbids.com/auctions/3rzlpmrv/2015-alfa-romeo-4c",
+      "message": "404 or not found"
+    },
+    {
+      "id": "87e05704-4399-4c88-8515-3243b7e89f20",
+      "url": "https://carsandbids.com/auctions/3l2rjday/2002-porsche-911-carrera-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "c76d54b2-a2ac-4975-8ce6-1e5589b3b983",
+      "url": "https://carsandbids.com/auctions/92wrb8zx/2016-bmw-alpina-b6-gran-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "4fc3f343-48c1-41da-bb22-5a7cf34e5075",
+      "url": "https://carsandbids.com/auctions/3qlb5zye/1992-pontiac-firebird-trans-am-convertible",
+      "message": "404 or not found"
+    },
+    {
+      "id": "34f48a7f-4d39-4e12-b136-a30ff17c07f5",
+      "url": "https://carsandbids.com/auctions/rmdqdzgk/2014-lexus-gx-460",
+      "message": "404 or not found"
+    },
+    {
+      "id": "860ee803-32a7-415e-84fe-a7861db4f5e8",
+      "url": "https://carsandbids.com/auctions/9ajgwq8v/1999-suzuki-carry-truck-4x4",
+      "message": "404 or not found"
+    },
+    {
+      "id": "5d4efd1d-5966-43a4-9100-6fd3de868baa",
+      "url": "https://carsandbids.com/auctions/3bpplqw6/2013-bmw-335i-sedan",
+      "message": "404 or not found"
+    },
+    {
+      "id": "1bc8e0c8-e0d4-42e7-91d0-2fe9c1ebe6a4",
+      "url": "https://carsandbids.com/auctions/3b0enx0z/1999-honda-life",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9e0a3fbb-ef91-44ce-8275-7aa036cc9d25",
+      "url": "https://carsandbids.com/auctions/rgqo1eme/2005-honda-s2000",
+      "message": "404 or not found"
+    },
+    {
+      "id": "7311edb8-cc30-4f11-9769-e98f6366f289",
+      "url": "https://carsandbids.com/auctions/rwoov1a5/2000-toyota-4runner-sr5",
+      "message": "404 or not found"
+    },
+    {
+      "id": "2295af01-b79e-4615-be68-36223695e44d",
+      "url": "https://carsandbids.com/auctions/3zwv52xa/2013-fiat-500-abarth",
+      "message": "404 or not found"
+    },
+    {
+      "id": "ebce0a44-d8d2-45c0-94e1-c94fbb31500e",
+      "url": "https://carsandbids.com/auctions/kdxjoygy/1999-porsche-911-carrera-4-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9fae52a8-108d-4f18-80ad-0745a4bcdf9c",
+      "url": "https://carsandbids.com/auctions/3vyzzpmm/1925-ford-model-t",
+      "message": "404 or not found"
+    },
+    {
+      "id": "acd407e4-37a2-484f-890f-d09bead626d8",
+      "url": "https://carsandbids.com/auctions/rnjnj7y4/2008-porsche-911-turbo-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "9f026345-2031-441e-b001-a45cc9cc3232",
+      "url": "https://carsandbids.com/auctions/kvmrrvlq/1993-mazda-mx-5-miata",
+      "message": "404 or not found"
+    },
+    {
+      "id": "219674b9-52d1-4be4-b698-a9b1c5f92947",
+      "url": "https://carsandbids.com/auctions/reen81zv/2006-noble-m400",
+      "message": "404 or not found"
+    },
+    {
+      "id": "f3d1cfc0-867c-4446-9c26-e23ef351db1b",
+      "url": "https://carsandbids.com/auctions/9xpglgjj/2012-porsche-911-carrera-4-gts-coupe",
+      "message": "404 or not found"
+    },
+    {
+      "id": "197b4758-ef0c-4502-9b58-301cf353c1a6",
+      "url": "https://carsandbids.com/auctions/kzlyegq9/2008-international-mxt",
+      "message": "404 or not found"
+    }
+  ],
+  "samples": [
+    {
+      "id": "d59350a4-43ba-4d9b-8d59-c6a8bdfd0c84",
+      "url": "https://carsandbids.com/auctions/98m27lyw/2011-bmw-328i-sedan",
+      "vin": "WBAPH5G52BNM76985"
+    },
+    {
+      "id": "25f93e6e-106e-4155-a40e-8b2669205928",
+      "url": "https://carsandbids.com/auctions/9ny8g8nr/2004-mercedes-benz-e55-amg-sedan",
+      "vin": "WDBUF76J94A459583"
+    },
+    {
+      "id": "8d1889f7-0856-473a-bd94-24774fed7beb",
+      "url": "https://carsandbids.com/auctions/rwnazmmy/2021-bentley-continental-gtc-v8",
+      "vin": "SCBDG4ZG7MC089769"
+    },
+    {
+      "id": "a2036e7b-3c93-4e60-a801-c32971178218",
+      "url": "https://carsandbids.com/auctions/3olqb442/1998-suzuki-jimny-4x4",
+      "vin": "JB23W102297"
+    },
+    {
+      "id": "e28c405b-b140-433b-a9c8-f2993f1b0abe",
+      "url": "https://carsandbids.com/auctions/3ggmn77b/2018-lexus-ls-500-f-sport",
+      "vin": "JTHB51FF3J5002744"
+    }
+  ]
+}
