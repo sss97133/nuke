@@ -1,0 +1,35 @@
+{
+  "startedAt": "2026-01-29T06:22:35.065Z",
+  "options": {
+    "hours": 7,
+    "batchSize": 25,
+    "delayMs": 2500,
+    "dryRun": false
+  },
+  "elapsedMs": 17048747,
+  "elapsedHours": 4.735763055555555,
+  "vehiclesProcessed": 325,
+  "galleryRepairs": 0,
+  "vinBackfilledFromMetadata": 0,
+  "vinReextractInvoked": 9,
+  "errors": [
+    {
+      "vehicleId": "1dc6fc1a-79a9-464d-8c29-29c5ea97dbd6",
+      "message": "canceling statement due to statement timeout",
+      "at": "2026-01-29T07:03:26.749Z"
+    },
+    {
+      "vehicleId": "",
+      "message": "fetchBatch: canceling statement due to statement timeout",
+      "at": "2026-01-29T08:13:38.599Z"
+    },
+    {
+      "vehicleId": "0c200f4e-25d0-441f-b9c1-f61f17c85156",
+      "message": "canceling statement due to statement timeout",
+      "at": "2026-01-29T09:05:43.561Z"
+    }
+  ],
+  "lastVehicleId": "1b1058a3-82ec-4c57-ac6d-12ec64587a6b",
+  "lastBatchAt": "2026-01-29T11:00:39.010Z",
+  "nextBatchPreview": 7
+}

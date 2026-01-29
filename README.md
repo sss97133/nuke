@@ -1,60 +1,88 @@
-# N-Zero Granular data Management Platform
+# N-Zero
 
-A comprehensive vehicle management system with photo analysis, timeline tracking, and valuation capabilities.
+**The living VIN for every build.**
 
-## Project Structure
+Every car has a VIN that tells where it came from. We're building the platform that tells where it's been and why it matters.
 
-```
-nuke/                           # Main project root
-├── nuke_frontend/             # React frontend application
-├── nuke_api/                  # Elixir/Phoenix backend API
-├── supabase/                  # Database schema and functions
-├── ops/                       # Operational scripts and tools
-├── scripts/                   # Utility and migration scripts
-└── docs/                      # Documentation and archives
-```
+---
+
+## What We Do
+
+We ingest and normalize vehicle data at scale—turning fragmented history across garages, invoices, forums, and auctions into structured, verifiable provenance.
+
+**For Builders:** Stream your builds. Document the craft. Create verified timelines that follow the car forever.
+
+**For Buyers & Collectors:** Access trusted provenance reports. Know the full story before you buy.
+
+**For the Market:** Clean, liquid, investable vehicle data powering trading, auditing, and escrow.
+
+---
+
+## The Problem
+
+A car's history after the factory is scattered across receipts, forum posts, auction comments, and Instagram stories. Buyers can't verify claims. Collectors can't prove value. Insurers can't assess risk accurately.
+
+The VIN tells you where a car started. Nothing tells you where it's been.
+
+---
+
+## Our Solution
+
+N-Zero creates a **living digital lineage** for vehicles:
+
+- **Autonomous data extraction** from auctions, marketplaces, and forums
+- **AI-powered analysis** of comments, descriptions, and images
+- **Verified build timelines** that owners and shops can contribute to
+- **Provenance reports** for buyers, insurers, and auction houses
+
+---
+
+## Traction
+
+- **18,000+** vehicle profiles
+- **364,000+** extracted auction comments
+- **1M+** images indexed
+- **181** edge functions powering autonomous extraction
+- Integrations with BaT, Cars & Bids, Hagerty, RM Sotheby's, and more
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React, TypeScript, Vercel |
+| Backend | Elixir/Phoenix, Supabase Edge Functions |
+| Database | PostgreSQL (Supabase) |
+| AI | Claude, GPT-4, Gemini |
+| Infrastructure | Supabase, Vercel, Firecrawl |
+
+---
 
 ## Quick Start
 
-### Frontend Development
 ```bash
-cd nuke_frontend
-npm install
-npm run dev
+# Frontend
+cd nuke_frontend && npm install && npm run dev
+
+# Backend
+cd nuke_api && mix deps.get && mix phx.server
 ```
 
-### Backend Development
-```bash
-cd nuke_api
-mix deps.get
-mix phx.server
-```
+See `docs/ENV_QUICKREF.md` for environment setup.
 
-### Database Operations
-```bash
-# Run from project root
-npm run db:run -- path/to/script.sql
-```
+---
 
-### Bring a Trailer import
+## Team
 
-To import a Bring a Trailer listing (data + all images) into a vehicle profile, see `docs/IMPORT_BAT_LISTING.md`.
+Building the provenance infrastructure for automobiles.
 
-## Deployment
+---
 
-The frontend deploys automatically to Vercel on push to main branch.
-Backend is deployed via [deployment method TBD].
+## Contact
 
-## Environment Setup
+[Contact information]
 
-The repo is wired into **Supabase** (DB/Auth/Storage/Edge Functions) and deploys the **frontend to Vercel**.
+---
 
-1. Review `docs/ENV_QUICKREF.md` (canonical “what vars exist + where they live”)
-2. For frontend local dev, set `VITE_*` variables in `nuke_frontend/.env.local`
-3. Run the env sanity checker from repo root:
-
-```bash
-npm run env:doctor
-```
-
-For detailed setup instructions, see `docs/archive/SETUP_CHECKLIST.md`
+*N-Zero: Where builds become assets.*
