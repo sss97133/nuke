@@ -631,21 +631,16 @@ async function fetchIAAPage(url: string): Promise<{ html: string; source: string
     }
   }
 
-  // Fallback to Firecrawl (handles JS rendering)
-  console.log(`[iaa] Fetching via Firecrawl: ${url}`);
-
-  const result = await firecrawlScrape({
-    url,
-    formats: ['html'],
-    onlyMainContent: false,
-    waitFor: 3000,
-  });
-
-  if (!result.data.html) {
-    throw new Error(`Firecrawl failed: ${result.error || 'No HTML returned'}`);
-  }
-
-  return { html: result.data.html, source: 'firecrawl' };
+  // Don't auto-fallback to Firecrawl - it burns credits
+  // Return error with instructions instead
+  throw new Error(JSON.stringify({
+    error: "IAA has bot protection. Direct fetch failed.",
+    instructions: {
+      option_1: "Use Playwright MCP to fetch with browser automation",
+      option_2: "Save page HTML manually and POST with 'html' in body",
+      option_3: "NMVTIS ($10k) provides official salvage records without scraping"
+    }
+  }));
 }
 
 // ============================================================================
