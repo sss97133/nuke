@@ -1,17 +1,19 @@
 /**
- * Moving logos: Cursor-quality 3D cube only.
- * All kinds use the same wireframe cube; optional label below (no 2D drawings).
+ * Moving logos: 3D wireframe cube and tire (torus).
+ * Kinds map to cube or tire; optional label below.
  */
 
 import { CURSOR_CUBE_FRAMES } from './cursorCube';
+import { TIRE_FRAMES } from './asciiTire';
 
 export const CUBE_FRAMES: string[][] = CURSOR_CUBE_FRAMES;
+export const TIRE_LOGO_FRAMES: string[][] = TIRE_FRAMES;
 
-export type MovingLogoKind = 'cursor' | 'mustang' | 'corvette' | 'gm' | 'plymouth';
+export type MovingLogoKind = 'cursor' | 'tire' | 'mustang' | 'corvette' | 'gm' | 'plymouth';
 
-/** Every kind uses the same 3D cube. Labels are optional (add in component if needed). */
 const FRAME_SETS: Record<MovingLogoKind, string[][]> = {
   cursor: CUBE_FRAMES,
+  tire: TIRE_LOGO_FRAMES,
   mustang: CUBE_FRAMES,
   corvette: CUBE_FRAMES,
   gm: CUBE_FRAMES,

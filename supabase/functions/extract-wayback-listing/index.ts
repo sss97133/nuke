@@ -112,17 +112,52 @@ const HISTORICAL_DOMAINS: Record<string, {
     name: 'eBay Motors',
     priority: 1,  // Old listings gone, especially pre-2015
     goldRushYears: [2003, 2012],
-    patterns: [/\/itm\/|motors\.ebay|ebaymotors/],
+    patterns: [/\/itm\/|motors\.ebay|ebaymotors|cgi\.ebay\.com/],
     pricePatterns: [
+      // Modern eBay (2010+)
       /itemprop="price"[^>]*content="([0-9.]+)"/i,
+      // Old eBay format (2003-2010)
+      /id="prcIsum"[^>]*>\s*US\s*\$([0-9,]+\.?\d*)/i,
+      /class="vi-price"[^>]*>\$([0-9,]+\.?\d*)/i,
+      /BIN\s*price:?\s*\$([0-9,]+)/i,
+      /Starting\s*bid:?\s*\$([0-9,]+)/i,
+      // Generic patterns
       /\$([0-9,]+\.\d{2})/,
       /US\s*\$([0-9,]+)/i,
       /Buy It Now.*?\$([0-9,]+)/i,
       /Current bid:?\s*\$([0-9,]+)/i,
-      /Winning bid:?\s*\$([0-9,]+)/i
+      /Winning bid:?\s*\$([0-9,]+)/i,
+      /Reserve\s*(?:not\s*)?met.*?\$([0-9,]+)/i
     ],
     titlePatterns: [
+      // Modern
       /<h1[^>]*id="itemTitle"[^>]*>([^<]+)/i,
+      // Old eBay (2003-2008) - title in page title after item number
+      /<title>[^:]+:\s*([^|<]+)/i,
+      // Very old format
+      /class="it-ttl"[^>]*>([^<]+)/i,
+      /<title>([^<]+)/i
+    ]
+  },
+  // Old eBay CGI domain (separate entry for priority matching)
+  'cgi.ebay.com': {
+    name: 'eBay Motors (Classic)',
+    priority: 1,  // 2003-2008 era listings
+    goldRushYears: [2003, 2008],
+    patterns: [/ebaymotors/],
+    pricePatterns: [
+      /id="prcIsum"[^>]*>\s*US\s*\$([0-9,]+\.?\d*)/i,
+      /class="vi-price"[^>]*>\$([0-9,]+\.?\d*)/i,
+      /BIN\s*price:?\s*\$([0-9,]+)/i,
+      /Starting\s*bid:?\s*\$([0-9,]+)/i,
+      /Current\s*bid:?\s*\$([0-9,]+)/i,
+      /\$([0-9,]+\.\d{2})/,
+      /US\s*\$([0-9,]+)/i
+    ],
+    titlePatterns: [
+      /<title>[^:]+:\s*([^|<]+)/i,
+      /class="it-ttl"[^>]*>([^<]+)/i,
+      /<b[^>]*class="[^"]*vi-title[^"]*"[^>]*>([^<]+)/i,
       /<title>([^<]+)/i
     ]
   },
