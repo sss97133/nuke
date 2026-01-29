@@ -16,10 +16,9 @@ We turn scattered car history into structured, tradable intelligence.
 
 | Metric | Count |
 |--------|-------|
-| Vehicle profiles | 18,000+ |
-| Data points indexed | 364,000+ |
-| Images | 1,000,000+ |
-| Platform integrations | BaT, Cars & Bids, Hagerty, RM Sotheby's |
+| Vehicle profiles | 136,000+ |
+| Data points indexed | 4,500,000+ |
+| Images | 10,000,000+ |
 
 ---
 
