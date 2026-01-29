@@ -158,6 +158,14 @@ export function LivingVehicleAsciiSamples() {
         <MovingLogoCanvas kind="cursor" ariaLabel="3D rotating cube" />
       </div>
 
+      <h2 style={{ fontSize: 16, marginBottom: 12 }}>3D rotating tire (torus)</h2>
+      <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+        Wireframe torus: two rings + spokes, same isometric projection and grid.
+      </p>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+        <MovingLogoCanvas kind="tire" ariaLabel="3D rotating tire" />
+      </div>
+
       <h2 style={{ fontSize: 16, marginBottom: 12 }}>Terminal + badge states</h2>
       <div
         style={{
