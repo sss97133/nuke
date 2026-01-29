@@ -4,21 +4,26 @@ We turn scattered car history into structured, tradable intelligence.
 
 ---
 
-## What It Does
+## What Structured Data Enables
 
-- **Aggregates** vehicle history from auctions, forums, and marketplaces
-- **Structures** provenance into verified timelines
-- **Connects** owners, shops, buyers, and insurers around shared records
+- **Faster sales** — Verified history closes deals. Buyers trust documented provenance.
+- **Automated marketing** — Rich vehicle data powers social posts, listings, and alerts without manual work.
+- **Transparent accounting** — Every transaction, service record, and ownership change in one auditable trail.
+- **Accurate valuations** — Real market data, not guesses. Comps, trends, condition factors.
 
 ---
 
-## Traction
+## How It Works
 
-| Metric | Count |
-|--------|-------|
-| Vehicle profiles | 136,000+ |
-| Data points indexed | 4,500,000+ |
-| Images | 10,000,000+ |
+1. **Aggregate** — Pull history from auctions, forums, registries, service records
+2. **Structure** — Normalize into verified timelines with confidence scores
+3. **Connect** — Owners, shops, buyers, insurers share one source of truth
+
+---
+
+## Scale
+
+136,000+ vehicles. 4.5M+ data points. 10M+ images.
 
 ---
 
@@ -29,7 +34,6 @@ We turn scattered car history into structured, tradable intelligence.
 | Frontend | React, TypeScript |
 | Backend | Elixir/Phoenix, Supabase |
 | Database | PostgreSQL |
-| Deploy | Vercel, Supabase |
 
 ---
 
