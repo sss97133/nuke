@@ -1,53 +1,30 @@
-# N-Zero
+# Vehicle Data Infrastructure
 
-**The living VIN for every build.**
-
-Every car has a VIN that tells where it came from. We're building the platform that tells where it's been and why it matters.
+We turn scattered car history into structured, tradable intelligence.
 
 ---
 
-## What We Do
+## What It Does
 
-We ingest and normalize vehicle data at scale—turning fragmented history across garages, invoices, forums, and auctions into structured, verifiable provenance.
-
-**For Builders:** Stream your builds. Document the craft. Create verified timelines that follow the car forever.
-
-**For Buyers & Collectors:** Access trusted provenance reports. Know the full story before you buy.
-
-**For the Market:** Clean, liquid, investable vehicle data powering trading, auditing, and escrow.
-
----
-
-## The Problem
-
-A car's history after the factory is scattered across receipts, forum posts, auction comments, and Instagram stories. Buyers can't verify claims. Collectors can't prove value. Insurers can't assess risk accurately.
-
-The VIN tells you where a car started. Nothing tells you where it's been.
-
----
-
-## Our Solution
-
-N-Zero creates a **living digital lineage** for vehicles:
-
-- **Autonomous data extraction** from auctions, marketplaces, and forums
+- **Autonomous extraction** from auctions, marketplaces, and forums
 - **AI-powered analysis** of comments, descriptions, and images
-- **Verified build timelines** that owners and shops can contribute to
+- **Verified timelines** that owners and shops contribute to
 - **Provenance reports** for buyers, insurers, and auction houses
 
 ---
 
 ## Traction
 
-- **18,000+** vehicle profiles
-- **364,000+** extracted auction comments
-- **1M+** images indexed
-- **181** edge functions powering autonomous extraction
-- Integrations with BaT, Cars & Bids, Hagerty, RM Sotheby's, and more
+| Metric | Count |
+|--------|-------|
+| Vehicle profiles | 18,000+ |
+| Auction comments extracted | 364,000+ |
+| Images indexed | 1,000,000+ |
+| Data sources | BaT, Cars & Bids, Hagerty, RM Sotheby's, + more |
 
 ---
 
-## Tech Stack
+## Stack
 
 | Layer | Technology |
 |-------|------------|
@@ -55,7 +32,6 @@ N-Zero creates a **living digital lineage** for vehicles:
 | Backend | Elixir/Phoenix, Supabase Edge Functions |
 | Database | PostgreSQL (Supabase) |
 | AI | Claude, GPT-4, Gemini |
-| Infrastructure | Supabase, Vercel, Firecrawl |
 
 ---
 
@@ -70,19 +46,3 @@ cd nuke_api && mix deps.get && mix phx.server
 ```
 
 See `docs/ENV_QUICKREF.md` for environment setup.
-
----
-
-## Team
-
-Building the provenance infrastructure for automobiles.
-
----
-
-## Contact
-
-[Contact information]
-
----
-
-*N-Zero: Where builds become assets.*
