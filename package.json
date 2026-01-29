@@ -1,4 +1,8 @@
 {
+  "name": "vehicle-data-infrastructure",
+  "version": "0.1.0",
+  "description": "We turn scattered car history into structured, tradable intelligence.",
+  "private": true,
   "scripts": {
     "build": "cd nuke_frontend && npm install && npm run build && mv dist ../dist",
     "env:doctor": "node scripts/tools/env-doctor.cjs",
