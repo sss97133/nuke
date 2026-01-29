@@ -4,6 +4,14 @@ We turn scattered car history into structured, tradable intelligence.
 
 ---
 
+## Why This Matters
+
+Vehicle history reports only capture what's formally reported — title transfers, accidents, dealer service. They miss what's actually known: the forum threads documenting a rebuild, the auction comments debating originality, the shop records from independent mechanics.
+
+We capture the institutional knowledge that lives outside the paperwork.
+
+---
+
 ## What Structured Data Enables
 
 - **Faster sales** — Verified history closes deals. Buyers trust documented provenance.
