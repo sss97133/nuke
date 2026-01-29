@@ -1,0 +1,4427 @@
+{
+  "summary": [
+    {
+      "source_label": "Cars & Bids",
+      "missing_vin_count": 31825,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "Mecum",
+      "missing_vin_count": 21072,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "Bring a Trailer",
+      "missing_vin_count": 1760,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "Collecting Cars",
+      "missing_vin_count": 82,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "PCarMarket",
+      "missing_vin_count": 78,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "Broad Arrow",
+      "missing_vin_count": 75,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "Hemmings",
+      "missing_vin_count": 48,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "RM Sothebys",
+      "missing_vin_count": 24,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "Gooding",
+      "missing_vin_count": 21,
+      "vin_likelihood": "High (auction)",
+      "order": 0
+    },
+    {
+      "source_label": "Classic.com",
+      "missing_vin_count": 49,
+      "vin_likelihood": "Medium",
+      "order": 1
+    },
+    {
+      "source_label": "SBX Cars",
+      "missing_vin_count": 12,
+      "vin_likelihood": "Medium",
+      "order": 1
+    },
+    {
+      "source_label": "Craigslist",
+      "missing_vin_count": 5362,
+      "vin_likelihood": "Low",
+      "order": 2
+    },
+    {
+      "source_label": "Beverly Hills Car Club",
+      "missing_vin_count": 1965,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "L'Art de l'Automobile",
+      "missing_vin_count": 978,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "User Submission",
+      "missing_vin_count": 704,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "bat",
+      "missing_vin_count": 459,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Collective Auto",
+      "missing_vin_count": 97,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Unknown Source",
+      "missing_vin_count": 68,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Motorious",
+      "missing_vin_count": 59,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Hagerty",
+      "missing_vin_count": 40,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Blue Chip Fleet",
+      "missing_vin_count": 33,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Sweet Cars",
+      "missing_vin_count": 33,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "111 Motorcars",
+      "missing_vin_count": 20,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Advantage Auto Direct",
+      "missing_vin_count": 18,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Streetside Classics",
+      "missing_vin_count": 18,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "ClassicCars.com",
+      "missing_vin_count": 18,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "KSL Cars",
+      "missing_vin_count": 14,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Motorcars International",
+      "missing_vin_count": 11,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "American Supercars",
+      "missing_vin_count": 9,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Design Auto",
+      "missing_vin_count": 9,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Otto Markt",
+      "missing_vin_count": 8,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Exclusive Motor Club",
+      "missing_vin_count": 8,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Velocity Restorations",
+      "missing_vin_count": 7,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "DNA Autohaus",
+      "missing_vin_count": 6,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Colombo & Co",
+      "missing_vin_count": 6,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Pfaff Reserve",
+      "missing_vin_count": 6,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "ATP Restoration",
+      "missing_vin_count": 6,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "TBTFW",
+      "missing_vin_count": 5,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Firehouse Vintage",
+      "missing_vin_count": 5,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Petrol Lounge",
+      "missing_vin_count": 4,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Hillbank Motorsports",
+      "missing_vin_count": 4,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Volo Cars",
+      "missing_vin_count": 4,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Mohr Imports",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "P1 Motorcars",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "The Shop Clubs",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Geneva Motorcars",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Hartek",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Veloce 1600",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Affordable Classics",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Crown Concepts",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Midwest Performance Cars",
+      "missing_vin_count": 3,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Car Need",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "AGC",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Garage Kept Motors",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Motor Vault",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "City of Cars",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Worldwide Vintage Autos",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "2K Motors",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Griots Motors",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Throttle Stop",
+      "missing_vin_count": 2,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "McLaren Toronto",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "DuPont Registry",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Cantech Automotive",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Bond Group USA",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Highline Classics",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Barrett-Jackson",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "4-Wheel Classics",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "McLaren Vancouver",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Icon 4x4",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    },
+    {
+      "source_label": "Autosport Designs",
+      "missing_vin_count": 1,
+      "vin_likelihood": "Examine",
+      "order": 2
+    }
+  ],
+  "high_likelihood_count": 54714,
+  "high_likelihood_sample": [
+    {
+      "id": "14aeaf27-5238-495c-bcbe-a51480740478",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/sign-347"
+    },
+    {
+      "id": "0b0a7713-46e2-4ea0-9fb6-8d74ba5fd274",
+      "year": 2025,
+      "make": "Ferrari",
+      "model": "Website Navigation",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1969-ferrari-365"
+    },
+    {
+      "id": "fc133af8-227a-4b0b-9b25-00c22445c99c",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/sign-337"
+    },
+    {
+      "id": "9e07bd12-fe65-4080-acf9-7449138556f0",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/sign-340"
+    },
+    {
+      "id": "1ebdd7f5-4e43-478e-9fa9-9f89d0df7c92",
+      "year": 2025,
+      "make": "No",
+      "model": "458 spider",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/two-piece-458-spider-set"
+    },
+    {
+      "id": "c385bf30-f4ec-4b4f-bcc7-48e949fd1595",
+      "year": 2025,
+      "make": "No",
+      "model": "Audi R8 (Type 4S)",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/sign-367"
+    },
+    {
+      "id": "e812a771-50ef-430a-8f22-d9704b03316f",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/display-model-5"
+    },
+    {
+      "id": "99997642-3530-479d-b14f-006e09fe4cdb",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/sign-331"
+    },
+    {
+      "id": "a06fb6fc-c2f5-4a5e-9cc4-b84423551a2b",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/sign-349"
+    },
+    {
+      "id": "dfe731ed-6145-4fcc-b156-16cff4f29d20",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/lombard-industries-centaur"
+    },
+    {
+      "id": "f4791603-3efd-4b9a-91d4-d1970b39e076",
+      "year": 2025,
+      "make": "No",
+      "model": "911",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/parts-52"
+    },
+    {
+      "id": "e092843b-d6c7-45e7-9c3a-1db336b87dda",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/go-kart-57"
+    },
+    {
+      "id": "553700ca-541f-4248-bda1-6c08ac0a07e5",
+      "year": 2025,
+      "make": "No",
+      "model": "Scale Models",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/scale-model-55"
+    },
+    {
+      "id": "84b09291-9d04-42f2-b5a3-79883c33b5ed",
+      "year": 2025,
+      "make": "No",
+      "model": "a Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/illuminated-harley-davidson-sign-clock-sign"
+    },
+    {
+      "id": "2d32acac-8a20-413b-8640-bd67dac0f655",
+      "year": 2024,
+      "make": "No",
+      "model": "car care kits and accessories",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/accessories-2"
+    },
+    {
+      "id": "37f21e90-727c-4871-9a9a-584bb9811e30",
+      "year": 2024,
+      "make": "No",
+      "model": "911sc",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/fuchs-168"
+    },
+    {
+      "id": "c9c15de3-05a0-4b3d-9fb1-082ea0610f32",
+      "year": 2024,
+      "make": "No",
+      "model": "3000",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/hardtop-91"
+    },
+    {
+      "id": "5b91593c-00f0-4206-845f-a2fceacb12c7",
+      "year": 2024,
+      "make": "Jaguar",
+      "model": "Furniture",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/jaguar-v12-coffee-table-2"
+    },
+    {
+      "id": "2dc98fe4-f089-44e0-9f27-61d3bf85c6cd",
+      "year": 2024,
+      "make": "Sim",
+      "model": "Experience Stage 5 Racing Simulator",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2024-sim-experience-stage-5-racing-simulator"
+    },
+    {
+      "id": "9632d055-3540-49e6-a984-93a3a4db61cd",
+      "year": 2023,
+      "make": "No",
+      "model": "Sabelt Titan Carbonio XXL Seats",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/ferrari-458-challenge-seats"
+    },
+    {
+      "id": "0b50aa0b-a09d-4944-bdfa-16b289867f4a",
+      "year": 2023,
+      "make": "No",
+      "model": "488 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/full-luggage-set-for-ferrari"
+    },
+    {
+      "id": "6807eb3a-4714-4aaf-8062-5602321beba7",
+      "year": 2023,
+      "make": "Chevrolet",
+      "model": "Camaro",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2022-chevrolet-camaro-coupe-19"
+    },
+    {
+      "id": "0d4eadbd-2c59-405c-92f2-b088e00df0e5",
+      "year": 2020,
+      "make": "Porsche",
+      "model": "Carrera S Cabriolet",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2020-porsche-911-carrera-s-cabriolet-19"
+    },
+    {
+      "id": "9c09a6a0-ec7f-43d8-8a26-7e68c1db24b0",
+      "year": 2008,
+      "make": "Porsche",
+      "model": "Cayenne Turbo",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2008-porsche-cayenne-turbo-69"
+    },
+    {
+      "id": "fae62150-a6ef-4723-b21f-ff265f4dce00",
+      "year": 2008,
+      "make": "Saturn",
+      "model": "sky",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2008-saturn-sky-42/"
+    },
+    {
+      "id": "0b564d55-8d5d-4b50-bfb8-f6fce027d438",
+      "year": 2006,
+      "make": "Ford",
+      "model": "GT",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/chevrolet/c10"
+    },
+    {
+      "id": "d034f2bf-a71a-42e9-8624-b12a4972eedc",
+      "year": 2006,
+      "make": "Chevrolet",
+      "model": "Corvette Z06",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2006-chevrolet-corvette-z06-85"
+    },
+    {
+      "id": "ea79182c-9830-49e4-928c-fa972de993a6",
+      "year": 2005,
+      "make": "Trident",
+      "model": "& 2014 P50",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1965-peel-replicas-trident-p-50"
+    },
+    {
+      "id": "f090f2ed-8d3f-410e-8371-25ca530fbf8a",
+      "year": 2004,
+      "make": "Ford",
+      "model": "F- Super",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2004-ford-f-350-26"
+    },
+    {
+      "id": "fb2db421-6245-4501-9cbf-7309901375d8",
+      "year": 2004,
+      "make": "Stohr",
+      "model": "Cars WF1 D Sports Racer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2004-dsr-d-sports-racer-stohr"
+    },
+    {
+      "id": "81671a12-eebd-4762-9557-38616fe6dd92",
+      "year": 2004,
+      "make": "Beck",
+      "model": "550RS Spyder",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2004-beck-550rs-spyder-3"
+    },
+    {
+      "id": "6b848581-3e4a-4d40-b370-a91b5581e6c8",
+      "year": 2003,
+      "make": "Porsche",
+      "model": "911 Carrera 4S Coupe 6-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2003-porsche-911-carrera-4s-102"
+    },
+    {
+      "id": "47c93f88-b4e3-43a2-bf0b-064dac96aa90",
+      "year": 2003,
+      "make": "Custom",
+      "model": "Gentleman’s Racer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2003-custom-gentlemens-racer-2"
+    },
+    {
+      "id": "88038f2e-34fe-4db9-848a-ac87f95b6bfc",
+      "year": 2003,
+      "make": "Audi",
+      "model": "RS6",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2003-audi-rs6-2"
+    },
+    {
+      "id": "4254c9ac-e67c-4acf-8ed2-b850e12fadd1",
+      "year": 2003,
+      "make": "Custom",
+      "model": "Gentleman’s Racer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2003-custom-gentlemens-racer"
+    },
+    {
+      "id": "c4621719-2117-4bf4-bcee-930b2049dbc8",
+      "year": 2003,
+      "make": "Chevrolet",
+      "model": "Monte Carlo NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2003-chevrolet-monte-carlo-13"
+    },
+    {
+      "id": "58c2e3d8-6b59-4eeb-bc72-03137dd07188",
+      "year": 2002,
+      "make": "Bmw",
+      "model": "M3 Convertible 6-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2002-bmw-m3-convertible-41"
+    },
+    {
+      "id": "ce03e062-71b2-4cae-954a-39ed10b2cc4c",
+      "year": 2002,
+      "make": "Mazda",
+      "model": "Protege5",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2002-mazda-protege5-3"
+    },
+    {
+      "id": "5a64acb9-9bf6-42eb-a34f-18f9c66791de",
+      "year": 2002,
+      "make": "Chevrolet",
+      "model": "Suburban 1500 Z71",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/chevrolet/suburban"
+    },
+    {
+      "id": "597e20ed-22dd-42b9-b128-830bea981a0c",
+      "year": 2002,
+      "make": "Parts",
+      "model": "Collection",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-bmw-2002-parts-collection"
+    },
+    {
+      "id": "3d145217-e81a-4b00-8650-211ca196a1f0",
+      "year": 2002,
+      "make": "Fountain",
+      "model": "Fever Twin 29 w/Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2002-fountain-powerboats-29-fever"
+    },
+    {
+      "id": "97b64838-d436-46d1-9261-a57807a2bba1",
+      "year": 2002,
+      "make": "Radical",
+      "model": "SR3",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2002-radical-sr3-2"
+    },
+    {
+      "id": "a4bfc489-9b95-4b7e-90be-6bd2e473c171",
+      "year": 2001,
+      "make": "Beck",
+      "model": "550 Spyder",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1955-porsche-beck-s550-spyder-replicar"
+    },
+    {
+      "id": "a2f84444-b721-4b66-93e0-84700d94d046",
+      "year": 2001,
+      "make": "GMC",
+      "model": "Yukon XL",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2001-gmc-yukon-xl-11"
+    },
+    {
+      "id": "73532c73-8cdd-4678-b5ac-49f08bcad795",
+      "year": 2000,
+      "make": "Ford",
+      "model": "SVT Mustang Cobra R Wheels",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/18x9-5%e2%80%b3-2000-ford-svt-mustang-cobra-r-wheels"
+    },
+    {
+      "id": "bd03178b-9579-4c25-a97a-657e4c8f3d38",
+      "year": 2000,
+      "make": "Ford",
+      "model": "SVT Mustang Cobra R Wheels",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/18x9-5%e2%80%b3-2000-ford-svt-mustang-cobra-r-wheels-2"
+    },
+    {
+      "id": "a909d3a1-6f6e-447b-8369-30cd45533189",
+      "year": 2000,
+      "make": "Formula",
+      "model": "Mazda Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2000-mazda-star-formula-mazda"
+    },
+    {
+      "id": "b148f4ab-80f0-4f71-b2ec-d29d620395ac",
+      "year": 2000,
+      "make": "Street",
+      "model": "Beasts Cabriolet",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1934-kit-1934-replica-ford-roadster"
+    },
+    {
+      "id": "b1b599ce-cccc-4925-bbff-c9da532df89c",
+      "year": 2000,
+      "make": "BMW",
+      "model": "Z3 Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2000-bmw-z3-coupe"
+    },
+    {
+      "id": "2997ded0-bed5-4d5f-9d6f-23ecacf94ef7",
+      "year": 1999,
+      "make": "Mitsubishi",
+      "model": "Lancer Evolution VI GSR",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-mitsubishi-lancer-evolution-vi-6"
+    },
+    {
+      "id": "9f4ff641-a742-4074-9804-ddf0bea14a20",
+      "year": 1999,
+      "make": "No",
+      "model": "Ferrari F355 Challenge",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/arcade-game-7"
+    },
+    {
+      "id": "ef6421ac-fd7d-4255-9b73-6e2cadb9a2ee",
+      "year": 1999,
+      "make": "Mazda",
+      "model": "Miata",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-mazda-miata-2"
+    },
+    {
+      "id": "8d6b2ccc-9d78-4d19-8694-b30276025773",
+      "year": 1999,
+      "make": "Ford",
+      "model": "Mustang GT Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-ford-mustang-8"
+    },
+    {
+      "id": "18775a8a-1bd3-425f-b25b-ac824d499414",
+      "year": 1999,
+      "make": "Honda",
+      "model": "Civic Si",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-honda-civic-21"
+    },
+    {
+      "id": "85ecc83d-60c5-4966-9975-733045533595",
+      "year": 1999,
+      "make": "Jordan",
+      "model": "199 F1 Roller",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-jordan-199-f1-roller"
+    },
+    {
+      "id": "9669fefb-4329-4f08-bba0-991ccbb18777",
+      "year": 1999,
+      "make": "Nissan",
+      "model": "Skyline GT-R V-Spec",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-nissan-skyline-gt-r-10"
+    },
+    {
+      "id": "6eff80f1-6779-424a-b732-e9aa8ec43ab1",
+      "year": 1999,
+      "make": "Honda",
+      "model": "Reynard Champ Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-honda-reynard-champ"
+    },
+    {
+      "id": "912ba73f-bdf9-4dd0-9293-5f1eca81e585",
+      "year": 1999,
+      "make": "Lola",
+      "model": "B2K/40",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-lola-b2k-40"
+    },
+    {
+      "id": "95ac4057-c17c-4c28-972e-04337ca3dc5f",
+      "year": 1998,
+      "make": "Nascar",
+      "model": "Sabco",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1998-nascar-sabco"
+    },
+    {
+      "id": "9102d4fd-5c57-402d-af60-4640b2041a51",
+      "year": 1998,
+      "make": "Ferrari",
+      "model": "F355 Wheels by Speedline",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-ferrari-f355-5"
+    },
+    {
+      "id": "c93183c4-f198-461f-854f-8083c7860da1",
+      "year": 1998,
+      "make": "Panoz",
+      "model": "GT-WC",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1998-panoz-gt-wc"
+    },
+    {
+      "id": "011993f6-200f-4e99-b802-b5c3d4fd5d7b",
+      "year": 1998,
+      "make": "Ford",
+      "model": "Taurus NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1998-ford-taurus-nascar-race-car"
+    },
+    {
+      "id": "461482ed-3bc8-457f-9e4b-7286a030f567",
+      "year": 1997,
+      "make": "Jim",
+      "model": "Moss Taylorcraft MT-1 Clipwing",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1997-taylorcraft-jim-moss-clipped-wing"
+    },
+    {
+      "id": "5264da4b-fd8e-4a91-8790-44c6b3e58926",
+      "year": 1997,
+      "make": "Porsche",
+      "model": "911 Carrera Cabriolet 6-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1997-porsche-911-carrera-cabriolet-25"
+    },
+    {
+      "id": "0e0c45c4-203b-4c61-afb8-192a6998b060",
+      "year": 1997,
+      "make": "Formula",
+      "model": "Mazda Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1997-formula-mazda-fm"
+    },
+    {
+      "id": "45eff774-7082-488d-bf94-746d377bd44f",
+      "year": 1997,
+      "make": "Aviat",
+      "model": "Husky A-1",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1997-aviat-husky-a1"
+    },
+    {
+      "id": "d442668f-ff23-4cda-92df-d57a0b112a9f",
+      "year": 1996,
+      "make": "Porsche",
+      "model": "911 Carrera Engine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1996-porsche-porsche-993-3-6-liter-engine-with-documented-top-end-rebulid"
+    },
+    {
+      "id": "5e900c41-7982-4bd5-88e0-e4b75ab1dce7",
+      "year": 1996,
+      "make": "Porsche",
+      "model": "911 Press Photographs and Literature",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-porsche-993-and-rs-press-info-including-werksfotos-and-slides"
+    },
+    {
+      "id": "3acd6011-d378-4cba-88e9-9ac54ef0ebdd",
+      "year": 1995,
+      "make": "Honda",
+      "model": "NSX-R",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-honda-nsx-r-3"
+    },
+    {
+      "id": "868f2c31-220c-4334-8605-17d887f3dcdd",
+      "year": 1995,
+      "make": "Porsche",
+      "model": "911 Carrera 6-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-porsche-911-carrera-41"
+    },
+    {
+      "id": "664296c8-8dd4-4d64-8636-d3469e082cd9",
+      "year": 1995,
+      "make": "Toyota",
+      "model": "Celica SS-II 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-toyota-celica-7-2"
+    },
+    {
+      "id": "67b45393-7dc6-48ad-b87b-ece377577843",
+      "year": 1995,
+      "make": "Merlin",
+      "model": "MP CN Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-merlin-1600-honda-race-car"
+    },
+    {
+      "id": "78f0d010-9ee4-4df4-883d-d10e7dc16543",
+      "year": 1995,
+      "make": "Porsche",
+      "model": "911 Carrera 4 Cabriolet 6-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-carrera-4-porsche"
+    },
+    {
+      "id": "460854d2-dc61-4f04-b732-8a8a379094c3",
+      "year": 1995,
+      "make": "Merlin",
+      "model": "MP Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-merlin-poly-racing-sport-prototype-race-car"
+    },
+    {
+      "id": "16081208-649c-4b1d-a8bc-4615fc2b5f1a",
+      "year": 1995,
+      "make": "Ferrari",
+      "model": "F50 Workshop Manual, Parts Catalog, and Service Schedule",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-ferrari-f50-service-manual-spare-parts-catalogue-and-service-time-schedule"
+    },
+    {
+      "id": "a22e9121-5766-428b-b7b4-d0fbf7878559",
+      "year": 1995,
+      "make": "BMW",
+      "model": "540i Touring 6-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1995-bmw-540i-touring-6-speed"
+    },
+    {
+      "id": "7047a224-d37c-40ea-b4b2-462f40a629a9",
+      "year": 1994,
+      "make": "Ford",
+      "model": "Thunderbird NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1994-ford-thunderbird-5"
+    },
+    {
+      "id": "f8378634-e0f0-43c6-8d8f-f3a792ff650b",
+      "year": 1994,
+      "make": "A-Mac",
+      "model": "AM-6 Race Car w/Enclosed Trailer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1994-a-mac-am-6"
+    },
+    {
+      "id": "d69ca948-b4a7-42c9-b610-70d8a13c76cb",
+      "year": 1994,
+      "make": "Ford",
+      "model": "Thunderbird NASCAR",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1994-ford-thunderbird"
+    },
+    {
+      "id": "d921940e-9bde-4e4d-8e29-fe3f46f70b3c",
+      "year": 1993,
+      "make": "Toyota",
+      "model": "Supra Turbo",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1993-toyota-supra-107"
+    },
+    {
+      "id": "439326d1-1cd2-43fb-931c-de2a0729a015",
+      "year": 1993,
+      "make": "Mercedes",
+      "model": "Benz 500SL",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1993-mercedes-benz-500sl-amg-renntech-6-0-litre"
+    },
+    {
+      "id": "eaa69432-37ec-4a7d-b2ec-01b6faa6defd",
+      "year": 1993,
+      "make": "Ford",
+      "model": "Thunderbird NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1993-ford-thunderbird-9"
+    },
+    {
+      "id": "553a97ff-af5d-4b9f-a44d-3a8ebeb609bc",
+      "year": 1993,
+      "make": "Pilbeam",
+      "model": "MP64 Formula Renault Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1999-pilbeam-single-seater"
+    },
+    {
+      "id": "9643f019-c901-43ca-857f-58c9e3e0fbe6",
+      "year": 1993,
+      "make": "Porsche",
+      "model": "911 Turbo 17×9″ and 17×10″ RUF Wheels by Speedline",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1993-porsche-911"
+    },
+    {
+      "id": "1484daae-279d-4d4a-8032-2fa5a7af420d",
+      "year": 1992,
+      "make": "Chevrolet",
+      "model": "Lumina NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1992-chevrolet-lumina-5"
+    },
+    {
+      "id": "0d7f16bd-2d81-4498-b613-37ae8d45ba51",
+      "year": 1992,
+      "make": "Porsche",
+      "model": "911 Turbo S2",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1992-porsche-911-turbo-3"
+    },
+    {
+      "id": "98ada96b-e4b6-4d3e-b849-9d9ade0a6187",
+      "year": 1992,
+      "make": "Ford",
+      "model": "Thunderbird NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1992-ford-thunderbird-nascar-race-car"
+    },
+    {
+      "id": "20df7a35-5ff7-4c09-afcc-81b71b934290",
+      "year": 1992,
+      "make": "Porsche",
+      "model": "Carrera 4 Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1992-porsche-carrera-4"
+    },
+    {
+      "id": "f482c646-41a4-40b4-93d3-95d5ba3427d9",
+      "year": 1992,
+      "make": "ERA",
+      "model": "GT",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1992-era-gt"
+    },
+    {
+      "id": "f9f5bddf-a470-49bf-a23b-1f235f7113f2",
+      "year": 1992,
+      "make": "Pontiac",
+      "model": "SLP Firehawk Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1992-pontiac-slp-firehawk-imsa-racecar"
+    },
+    {
+      "id": "93b4c76d-b3e3-4755-8505-4aeff71d5197",
+      "year": 1992,
+      "make": "Ford",
+      "model": "Thunderbird NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1993-ford-thunderbird-10"
+    },
+    {
+      "id": "386f95db-bc1d-4b6c-ac53-f9edd33f0a05",
+      "year": 1991,
+      "make": "Data",
+      "model": "East Checkpoint Pinball Machine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1991-checkpoint"
+    },
+    {
+      "id": "ab8c2174-2c9e-4544-abcf-65c0d5334231",
+      "year": 1991,
+      "make": "Porsche",
+      "model": "911 17×7″ and 17×9″ Cup 1 Wheels by Speedline",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1992-porsche-911-turbo-4"
+    },
+    {
+      "id": "68d8db08-665a-431d-80fc-2782a45a3f51",
+      "year": 1991,
+      "make": "Honda",
+      "model": "Beat",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1991-honda-beat"
+    },
+    {
+      "id": "ca9bb813-5a48-40c5-9f37-da7d99ba7047",
+      "year": 1991,
+      "make": "Data",
+      "model": "East Checkpoint Pinball Machine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1991-data-east-checkpoint-pinball"
+    },
+    {
+      "id": "0776bf13-0db8-417d-8339-a9b83c72162a",
+      "year": 1991,
+      "make": "Ford",
+      "model": "Thunderbird NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1991-ford-thunderbird-nascar"
+    },
+    {
+      "id": "6825b533-931f-4bcd-8ab1-6ead2815d36e",
+      "year": 1991,
+      "make": "Toyota",
+      "model": "Land Cruiser FJ80",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1991-toyota-land-cruiser-fj80-13"
+    },
+    {
+      "id": "8901d9cd-32ef-4aae-a2b3-c1e5031909a3",
+      "year": 1991,
+      "make": "Jeep",
+      "model": "Grand Wagoneer Final Edition",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1991-jeep-grand-wagoneer-17"
+    },
+    {
+      "id": "9ee49272-3f09-4ba8-9487-e330b004f9b2",
+      "year": 1991,
+      "make": "Ford",
+      "model": "GT Mustang Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1991-ford-mustang-41"
+    },
+    {
+      "id": "81fe4118-b181-4d5e-bfaf-35721735ce4b",
+      "year": 1991,
+      "make": "Ferrari",
+      "model": "348 Engine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1991-ferrari-348-4"
+    },
+    {
+      "id": "9b8ef252-5828-4831-8f7e-e9398d8a838a",
+      "year": 1990,
+      "make": "Nissan",
+      "model": "NPT-90 GTP Display Roller",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-nissan-npt-90-race-car-display"
+    },
+    {
+      "id": "fe067e86-664d-43fe-a051-05cbe42168c1",
+      "year": 1990,
+      "make": "Toyota",
+      "model": "Hilux Surf Turbo Diesel 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-toyota-hilux-surf"
+    },
+    {
+      "id": "28900d27-bce7-4336-9951-cf03c8a454ad",
+      "year": 1990,
+      "make": "Nissan",
+      "model": "Skyline GT-R",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-nissan-skyline-gt-r"
+    },
+    {
+      "id": "cf8b0887-bd4c-4df8-853a-51cd03f24aba",
+      "year": 1990,
+      "make": "Reynard",
+      "model": "903 F3A",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-reynard-f3"
+    },
+    {
+      "id": "53c52fec-6947-443b-9ae8-70675996390b",
+      "year": 1990,
+      "make": "Jaguar",
+      "model": "XJ-S V12 Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-jaguar-xjs-coupe"
+    },
+    {
+      "id": "fc5dc18e-d87b-49d9-9ab1-06d651b3939a",
+      "year": 1990,
+      "make": "Reynard",
+      "model": "R90D/022",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-reynard-r90d-022"
+    },
+    {
+      "id": "de87d061-7305-47c6-a895-0c926ee27fe7",
+      "year": 1990,
+      "make": "Citroen",
+      "model": "XM",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-citroen-xm"
+    },
+    {
+      "id": "7ec496a1-ebc1-4af3-a4b0-a397125da4ab",
+      "year": 1990,
+      "make": "Honda",
+      "model": "XRV650 Africa Twin RD03",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-honda-650-xrv650-africa-twin"
+    },
+    {
+      "id": "16a70cb4-3644-44bb-805f-382f35334255",
+      "year": 1990,
+      "make": "Caterham",
+      "model": "Super Seven",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-caterham-super-seven"
+    },
+    {
+      "id": "1cae1c38-267c-49d1-b89c-ebe3baa140f7",
+      "year": 1989,
+      "make": "Porsche",
+      "model": "930 Turbo S A Real One",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-porsche-930-turbo-s-a-real-one"
+    },
+    {
+      "id": "51a65ae0-6d3f-4080-bf0a-1c742b888c10",
+      "year": 1989,
+      "make": "Cadillac",
+      "model": "Eldorado",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-cadillac-eldorado-biarritz-6"
+    },
+    {
+      "id": "e560db04-e9b0-4c48-bc50-348213d60adc",
+      "year": 1989,
+      "make": "Chevrolet",
+      "model": "Camaro Gt1 Trans Am Racecar",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-chevrolet-camaro-gt1-trans-am-racecar"
+    },
+    {
+      "id": "77d31bed-9c15-4f4b-8455-c9d30b4109d3",
+      "year": 1989,
+      "make": "Lola",
+      "model": "T88/90",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-lola-t88-90"
+    },
+    {
+      "id": "1d59b740-f0ef-437b-9388-70493e50ec5b",
+      "year": 1989,
+      "make": "Shelby",
+      "model": "Can-Am Prototype",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-shelby-can-am-prototype"
+    },
+    {
+      "id": "71dd909b-2d56-4f40-9998-96c7fdf468e7",
+      "year": 1989,
+      "make": "Honda",
+      "model": "XRV650 Africa Twin RD03",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-honda-xrv650-africa-twin-rd03-3"
+    },
+    {
+      "id": "8184fe12-9b11-4868-8c1c-f1e7deb9b73e",
+      "year": 1989,
+      "make": "Pontiac",
+      "model": "Grand Prix NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-pontiac-rusty-wallace-nascar"
+    },
+    {
+      "id": "2651e2e5-80d0-4968-b973-4d2e2303b33d",
+      "year": 1989,
+      "make": "Swift",
+      "model": "DB-1 Formula Ford",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-swift-db-1-formula-ford-race-car"
+    },
+    {
+      "id": "aa934854-68f9-43d4-9ed9-0aa26806e0ea",
+      "year": 1989,
+      "make": "Volkswagen",
+      "model": "Corrado Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1990-volkswagen-corrado-1-8-17"
+    },
+    {
+      "id": "cadbc557-9da0-4b31-90f2-e7f3fae88b9e",
+      "year": 1989,
+      "make": "NSG",
+      "model": "BMW 635CSi-Style Pedal Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1989-generous-industrial-company-bmw-635csi-style-pedal-car"
+    },
+    {
+      "id": "0669c58b-10a2-43fe-b678-0e9d9f0329be",
+      "year": 1988,
+      "make": "BMW",
+      "model": "M3 Group A Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1988-bmw-m3-267"
+    },
+    {
+      "id": "97b1b82c-bed8-4517-92fd-e93d99676e60",
+      "year": 1988,
+      "make": "Norton",
+      "model": "Classic",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1988-norton-classic"
+    },
+    {
+      "id": "dd21dfd5-88e0-4b2f-8a73-83d6602d8823",
+      "year": 1988,
+      "make": "USAG",
+      "model": "Tool Cabinet and Tools",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1988-ferrari-usag-tool-cabinet-652-v"
+    },
+    {
+      "id": "89a2b611-8063-4cf2-8f92-175249cf75f6",
+      "year": 1988,
+      "make": "Morgan",
+      "model": "4/4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1988-morgan-4-4"
+    },
+    {
+      "id": "22c2bd8c-6af3-4d5a-97e8-1e686a413e78",
+      "year": 1988,
+      "make": "Italdesign",
+      "model": "Aztec Project & Parts",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1988-italdesign-aztec-project"
+    },
+    {
+      "id": "9412d263-e8e7-4c15-8c69-6d8ac0f3d88f",
+      "year": 1987,
+      "make": "Stimula",
+      "model": "Bugatti 55 Junior Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1987-bugatti-by-stimula-type-55-junior-de-la-chapelle"
+    },
+    {
+      "id": "a379651e-80bf-4d63-95e7-9af4056c3cae",
+      "year": 1987,
+      "make": "Porsche",
+      "model": "962 IMSA GTP",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1987-porsche-962-3"
+    },
+    {
+      "id": "44444ce3-657c-47bc-85bc-e1e1c496e3d6",
+      "year": 1987,
+      "make": "Baker",
+      "model": "Formula One Sidecar",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1987-baker-formula-one-sidecar-land-speed-racing"
+    },
+    {
+      "id": "0b294267-1723-4d1f-b0f3-3aa2a5397d3d",
+      "year": 1987,
+      "make": "GMC",
+      "model": "Suburban V2500",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1987-gmc-suburban-3"
+    },
+    {
+      "id": "188ccbe9-799e-45b6-8885-35302c837e45",
+      "year": 1987,
+      "make": "Toyota",
+      "model": "Land Cruiser BJ74",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1987-toyota-land-cruiser-70-series"
+    },
+    {
+      "id": "cce029f4-c5ba-4561-a17a-d721f4400e56",
+      "year": 1987,
+      "make": "Baird",
+      "model": "Trivette Mazda RX 7 Gt2 3 Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1987-baird-trivette-mazda-rx-7-gt2-3-race-car"
+    },
+    {
+      "id": "bb45fec4-42f0-4590-8108-48834f433f3d",
+      "year": 1986,
+      "make": "Tiga",
+      "model": "GT286",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1986-tiga-gt286-2"
+    },
+    {
+      "id": "9e3d1707-a613-4013-a097-d3a245393000",
+      "year": 1986,
+      "make": "Pontiac",
+      "model": "Grand Prix",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1986-pontiac-grand-prix-5"
+    },
+    {
+      "id": "aaac85bf-91b3-46b8-823d-9f2fb2597293",
+      "year": 1986,
+      "make": "Urba",
+      "model": "Sport Trimuter Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1986-urba-sport-trimuter"
+    },
+    {
+      "id": "84d352e4-dc85-44f1-8601-0ec7c3cf0a9d",
+      "year": 1986,
+      "make": "Oldsmobile",
+      "model": "Delta 88 Winston Cup Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1986-oldsmobile-delta-88-2"
+    },
+    {
+      "id": "6d0101b5-6588-440e-a949-10ee0bcde10f",
+      "year": 1986,
+      "make": "Buick",
+      "model": "LeSabre NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1986-buick-lesabre"
+    },
+    {
+      "id": "5b23bc50-4772-4ee2-8c91-80bcd4826675",
+      "year": 1985,
+      "make": "Lola",
+      "model": "T711 Corvette GTP Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1985-lola-corvette-gtp"
+    },
+    {
+      "id": "4421608c-5715-4987-b24f-b3b92e692f7e",
+      "year": 1985,
+      "make": "Porsche",
+      "model": "911 Carrera Targa",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1985-porsche-911-carrera-targa-66"
+    },
+    {
+      "id": "3d966877-66bd-493c-8852-4d3fe26bec50",
+      "year": 1985,
+      "make": "Porsche",
+      "model": "911 16×6″ and 7″ Fuchs Wheels",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1985-porsche-911-carrera-30"
+    },
+    {
+      "id": "18a7f135-2e81-49e7-93c4-c4e83e5aa521",
+      "year": 1985,
+      "make": "Lola",
+      "model": "T900s Race CAR",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1985-lola-t900s-race-car"
+    },
+    {
+      "id": "82db953d-b5a1-4e66-9234-90cd0dfdf755",
+      "year": 1985,
+      "make": "Renault",
+      "model": "R5 Turbo 2",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1985-renault-r5-turbo-2-10"
+    },
+    {
+      "id": "940832ac-18d1-4cca-8624-4980116e160c",
+      "year": 1984,
+      "make": "Ferrari",
+      "model": "288 GTO Wheels by Speedline",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-ferrari-288-gto-wheels-and-tool-kit"
+    },
+    {
+      "id": "ba8b43c9-13e3-4295-8fce-c257d9ebba5a",
+      "year": 1984,
+      "make": "BMW",
+      "model": "R100",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-bmw-r100rt-3"
+    },
+    {
+      "id": "ca60eca6-58c1-45f5-a391-9f9b8924d687",
+      "year": 1984,
+      "make": "Tiga",
+      "model": "SC84 Sports 2000",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-tiga-sc84"
+    },
+    {
+      "id": "78e1ebc4-c016-4a2e-b4b7-7597a3d510a9",
+      "year": 1984,
+      "make": "GMC",
+      "model": "Jimmy Sierra Classic",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/gmc/jimmy"
+    },
+    {
+      "id": "12b3f95f-70d7-4c37-916b-09dda2746720",
+      "year": 1984,
+      "make": "Ford",
+      "model": "Bronco",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-ford-bronco-60"
+    },
+    {
+      "id": "88e8be7f-f065-469f-a48d-604533fa4619",
+      "year": 1984,
+      "make": "BMW",
+      "model": "633CSi Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-bmw-633csi-31"
+    },
+    {
+      "id": "3fc0ac45-43d9-48d6-9d96-f830f242b5d7",
+      "year": 1984,
+      "make": "Porsche",
+      "model": "911 Carrera Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-porsche-911-carrera"
+    },
+    {
+      "id": "2cb77d45-b0cb-4c57-9d0a-3f067ba24bc8",
+      "year": 1984,
+      "make": "Westfield",
+      "model": "Seven",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-westfield-seven"
+    },
+    {
+      "id": "b5612863-6334-44ea-9ae7-08cd25a5bb9c",
+      "year": 1984,
+      "make": "Chevrolet",
+      "model": "Corvette IMSA GTO Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-chevrolet-corvette-7"
+    },
+    {
+      "id": "330e1edb-f216-47b8-9642-cd30a880e791",
+      "year": 1984,
+      "make": "Comet",
+      "model": "Kart Mach 1 Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-mach-1-mach-1-twin"
+    },
+    {
+      "id": "df309ecd-f007-43ef-9eea-22f81473fe92",
+      "year": 1984,
+      "make": "Mercedes-Benz",
+      "model": "500SL",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1984-500sl"
+    },
+    {
+      "id": "e8e861c4-e6a8-4ac8-885b-7fb25ed92d63",
+      "year": 1983,
+      "make": "Morgan",
+      "model": "Plus 8",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1983-morgan-plus-8"
+    },
+    {
+      "id": "70b55e64-a5f6-4e6e-981f-bec94b39a276",
+      "year": 1983,
+      "make": "Mazda",
+      "model": "RX-7 GSL",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1983-mazda-rx-7-11"
+    },
+    {
+      "id": "40a6406c-09f9-4cf6-9892-bafe0603889a",
+      "year": 1983,
+      "make": "BMW",
+      "model": "320i Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-bmw-320"
+    },
+    {
+      "id": "05bfac22-0f1f-420a-a6be-08774b3c1026",
+      "year": 1983,
+      "make": "AAR",
+      "model": "Eagle-Cosworth Indy Car Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1983-all-american-racing-eagle"
+    },
+    {
+      "id": "e538f91a-59eb-4539-a368-feddaad4bc40",
+      "year": 1983,
+      "make": "Grid",
+      "model": "S2 Group C Prototype",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1985-grid-group-c-racecar-002-ran-lemans-24-hr-race-and-imsa"
+    },
+    {
+      "id": "d66a1cf1-5321-4998-9ec9-f634d82bd989",
+      "year": 1983,
+      "make": "Mercedes-Benz",
+      "model": "240D 4-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1983-mercedes-benz-240d-5"
+    },
+    {
+      "id": "782f5044-1e15-4bf1-8993-51a17220584c",
+      "year": 1982,
+      "make": "Margay",
+      "model": "Bandito Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-twin-engine-margay-pro-x-go-kart"
+    },
+    {
+      "id": "9452c881-a806-4a0e-8220-0e276ad72c6f",
+      "year": 1982,
+      "make": "Laverda",
+      "model": "1200 TS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1982-laverda-1200-ts-2"
+    },
+    {
+      "id": "85b98ffc-c817-41bc-a8bb-5aecdba31692",
+      "year": 1982,
+      "make": "March-Chevrolet",
+      "model": "82G IMSA GTP",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1982-march-82g"
+    },
+    {
+      "id": "c226a395-f7b3-4666-9622-909240ea720d",
+      "year": 1982,
+      "make": "Chrimilton",
+      "model": "Formula Vee",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1982-chrimilton-formula-vee"
+    },
+    {
+      "id": "d3eacec9-8917-493a-a026-f4ecc8944dc5",
+      "year": 1982,
+      "make": "Porsche",
+      "model": "924 Carrera GTR",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1982-porsche-924-carrera-gtr"
+    },
+    {
+      "id": "656d4520-5d04-4385-9222-2ea9394795c3",
+      "year": 1982,
+      "make": "Toyota",
+      "model": "Supra Celica–Style Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1982-go-kart-f-w-associates"
+    },
+    {
+      "id": "5c21310f-c019-44a3-b948-3018633d0fd2",
+      "year": 1981,
+      "make": "Porsche",
+      "model": "911SC 3.2L Track Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1981-porsche-911sc-17"
+    },
+    {
+      "id": "f243b96e-b343-4ae1-ad7e-f362c48e8e04",
+      "year": 1981,
+      "make": "Crossle",
+      "model": "Formula Ford 50F Prototype",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1981-crossle-formula-ford-50f-prototype"
+    },
+    {
+      "id": "686d4dd7-2e2d-40bb-b086-09eca69172c6",
+      "year": 1981,
+      "make": "Ferrari",
+      "model": "512 BB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1981-ferrari-512-bb-4"
+    },
+    {
+      "id": "c1c357de-22d1-45db-bb62-91091b0ae609",
+      "year": 1981,
+      "make": "Chrysler",
+      "model": "Sno-Runners",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1981-chrysler-sno-runner-6"
+    },
+    {
+      "id": "a843a39f-bc21-462e-97c1-e1bccb46a902",
+      "year": 1981,
+      "make": "Margay",
+      "model": "Expert Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1981-margay-expert"
+    },
+    {
+      "id": "cee4e19d-67e0-422a-8d82-e3f6dc4b2641",
+      "year": 1981,
+      "make": "Ocelot",
+      "model": "MK-8A",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1981-ocelot-mk-8a"
+    },
+    {
+      "id": "2843bea6-4842-4c93-8257-f92c6a74a26a",
+      "year": 1981,
+      "make": "Porsche",
+      "model": "Kremer DP 935",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1981-porsche-935"
+    },
+    {
+      "id": "231b583d-2016-44f6-8b7c-7240b9fdfeea",
+      "year": 1981,
+      "make": "DeLorean",
+      "model": "DMC-12 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1981-delorean-dmc-12-41"
+    },
+    {
+      "id": "bfa4d25c-d96f-4c84-a7c3-73dad8d119a4",
+      "year": 1980,
+      "make": "Porsche",
+      "model": "911SC Targa",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-porsche-911sc-targa-17"
+    },
+    {
+      "id": "e307d096-91d7-4a40-88d4-2a7916c1e29e",
+      "year": 1980,
+      "make": "Cadillac",
+      "model": "Eldorado Biarritz",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-cadillac-eldorado-6"
+    },
+    {
+      "id": "5cc9744b-ba7b-40ca-adb8-dc16422059c2",
+      "year": 1980,
+      "make": "Honda",
+      "model": "Prelude",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-honda-prelude"
+    },
+    {
+      "id": "806714aa-6387-4b7c-bba6-a800434950a9",
+      "year": 1980,
+      "make": "Fiat",
+      "model": "X1/9",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-fiat-x19"
+    },
+    {
+      "id": "159eabd0-f5a6-4fea-a3af-3c1cc0b8b426",
+      "year": 1980,
+      "make": "Lola",
+      "model": "T590",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-lola-t590"
+    },
+    {
+      "id": "3fe19402-8aac-496c-a23b-597e1dca9613",
+      "year": 1980,
+      "make": "Datsun",
+      "model": "280ZX 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-datsun-280-zx"
+    },
+    {
+      "id": "f47fe792-795b-459e-a265-7360b138314c",
+      "year": 1980,
+      "make": "No",
+      "model": "Wheels: Other",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/cool-wheels"
+    },
+    {
+      "id": "009211e7-6dc7-4958-9acf-9ee8acedfb97",
+      "year": 1980,
+      "make": "BMW",
+      "model": "R100S Exclusive Sport",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-bmw-r100s-exclusive-sport-ed"
+    },
+    {
+      "id": "19829bc8-eb41-4c1c-bf41-165c389c724c",
+      "year": 1980,
+      "make": "Osella",
+      "model": "PA8 Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-1980-osella-pa8-race-car-1980-osella-pa8-race-car"
+    },
+    {
+      "id": "2a53c78c-4c56-4f8e-98d6-5839e5afab4d",
+      "year": 1980,
+      "make": "FV4201",
+      "model": "Chieftain Mk. 10",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-cheiftan-mk-10"
+    },
+    {
+      "id": "672ee3bf-163e-4f3c-871e-439dc2ad70fe",
+      "year": 1980,
+      "make": "Porsche",
+      "model": "911SC Targa",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-porsche-911sc-targa-44"
+    },
+    {
+      "id": "503bd636-e98a-42f5-b772-8edeb3c23b4e",
+      "year": 1980,
+      "make": "Vespa",
+      "model": "P200E",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-vespa-p200"
+    },
+    {
+      "id": "8a25dda9-50f2-4038-9dc0-808a7680ba3c",
+      "year": 1980,
+      "make": "Morgan",
+      "model": "4/4 1600 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-morgan-4-4"
+    },
+    {
+      "id": "99e82baf-ca38-43e0-a74a-3a05a038fbc5",
+      "year": 1980,
+      "make": "Porsche",
+      "model": "911SC Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-porsche-911-2"
+    },
+    {
+      "id": "12eae363-54f2-4c01-ab37-6e4a528b2453",
+      "year": 1980,
+      "make": "Triumph",
+      "model": "TR8 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-triumph-tr8-25"
+    },
+    {
+      "id": "26d51175-dc58-4d51-91f7-06cbd98984d9",
+      "year": 1979,
+      "make": "Porsche",
+      "model": "16×6″ and 7″ Fuchs Wheels",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1980-porsche-fuchs-wheels"
+    },
+    {
+      "id": "71390dff-70ac-4f8a-9559-d9f95cb9b8a2",
+      "year": 1979,
+      "make": "Ford",
+      "model": "F-350 SuperCab 4×4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-ford-ford-f350-supercab-4x4-pickup"
+    },
+    {
+      "id": "f859f26e-ebfc-4837-8d8e-75a0b20d1b19",
+      "year": 1979,
+      "make": "Triumph",
+      "model": "Bonneville T140",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-triumph-bonneville-t140v-8"
+    },
+    {
+      "id": "5e85eb4a-1970-44b6-8da3-d9c83db847e6",
+      "year": 1979,
+      "make": "Chevrolet",
+      "model": "Camaro Movie Car for Charity",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-chevrolet-camaro-37"
+    },
+    {
+      "id": "73b9954c-7998-41e6-91aa-3f24224e41c5",
+      "year": 1979,
+      "make": "Porsche",
+      "model": "911SC",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-porsche-911sc-87"
+    },
+    {
+      "id": "c6169f22-dfba-4f1a-83e9-d4e99865596d",
+      "year": 1979,
+      "make": "Jeep",
+      "model": "CJ-7",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-jeep-cj7-35"
+    },
+    {
+      "id": "8221c9ca-607b-4aab-aaab-3f9f2cdb3695",
+      "year": 1979,
+      "make": "Ferrari",
+      "model": "512 BB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-ferrari-512-bb-4"
+    },
+    {
+      "id": "1d675ff1-4d54-4e18-9bab-2990a30782ff",
+      "year": 1979,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-ferrari-308-gts-12"
+    },
+    {
+      "id": "e4ceb184-e714-4778-8b87-3a13763d965e",
+      "year": 1979,
+      "make": "Porsche",
+      "model": "911SC Targa",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-porsche-911sc-targa-64"
+    },
+    {
+      "id": "7306d0e5-d2ad-4951-b494-9a7c03981ad2",
+      "year": 1979,
+      "make": "Mercedes-Benz",
+      "model": "450SL",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-mercedes-benz-450sl-33"
+    },
+    {
+      "id": "a9a3327c-36c5-413b-8e54-d49047bfd953",
+      "year": 1979,
+      "make": "Chevrolet",
+      "model": "K5 Blazer Cheyenne",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-chevrolet-k5-blazer-16/"
+    },
+    {
+      "id": "e98151af-1d6d-4568-ab9c-dc1fe004fbae",
+      "year": 1979,
+      "make": "Margay",
+      "model": "Expert Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-margay-expert-ii-dual-engine"
+    },
+    {
+      "id": "071b1ec5-f3ad-4432-b35e-d2d5c3e7974c",
+      "year": 1979,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-ferrari-308-gtb-10"
+    },
+    {
+      "id": "4ace55b1-021d-42fc-bf65-3857807f7382",
+      "year": 1979,
+      "make": "Mercedes-Benz",
+      "model": "300TD",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-mercedes-benz-300td-4"
+    },
+    {
+      "id": "b9f9a3db-2840-47b6-b5aa-2f24cc5a80c6",
+      "year": 1979,
+      "make": "Jeep",
+      "model": "CJ-5 V8",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-jeep-cj5-30"
+    },
+    {
+      "id": "1dd7b7d8-9bf1-4235-a006-6de81bcc692b",
+      "year": 1979,
+      "make": "Maserati",
+      "model": "Merak SS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-maserati-merak"
+    },
+    {
+      "id": "bd3e3b4a-c5d0-4955-96b6-b8f6d969c497",
+      "year": 1979,
+      "make": "Alfa",
+      "model": "Alfetta Sport Sedan",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-alfa-alfetta-sport-sedan"
+    },
+    {
+      "id": "582169e5-1fb5-48ef-87f7-09431fca6924",
+      "year": 1979,
+      "make": "Datsun",
+      "model": "280ZX Racer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-datsun-280zx-3"
+    },
+    {
+      "id": "e77228c7-dfc7-41ae-b624-27c367c12477",
+      "year": 1979,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-ferrari-308-gts-19"
+    },
+    {
+      "id": "56f3abc4-4b88-49fe-b67d-9b60d8d96561",
+      "year": 1979,
+      "make": "Fiat",
+      "model": "Spider 2000",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-fiat-spider-2000-9"
+    },
+    {
+      "id": "f0140b4f-c9ab-42ef-ab32-f1861e56c902",
+      "year": 1979,
+      "make": "Laverda",
+      "model": "1000 Jarama",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-laverda-1000-jarama"
+    },
+    {
+      "id": "410e73ac-a3a0-4d8e-b5b2-beaf4a852008",
+      "year": 1978,
+      "make": "Porsche",
+      "model": "928",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-porsche-928-16"
+    },
+    {
+      "id": "e0253abb-01f6-41d2-96ea-646fecb2746f",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gtb-2"
+    },
+    {
+      "id": "f954b287-c481-4f7e-8006-69b56a11a496",
+      "year": 1978,
+      "make": "Ford",
+      "model": "Bronco Ranger XLT",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ford-bronco-63"
+    },
+    {
+      "id": "433728b8-695a-4d8b-9a37-f1a06e531bab",
+      "year": 1978,
+      "make": "Chevrolet",
+      "model": "K5 Blazer Cheyenne",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-chevrolet-k5-blazer-10"
+    },
+    {
+      "id": "8748d862-ddb7-4d03-891e-ecd7af939ca2",
+      "year": 1978,
+      "make": "Porsche",
+      "model": "928 5-Speed Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-porsche-928-65"
+    },
+    {
+      "id": "dc5ee5dc-cb5f-417c-9e5f-8268e3659093",
+      "year": 1978,
+      "make": "Mercedes-Benz",
+      "model": "300D",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-mercedes-benz-300d-12"
+    },
+    {
+      "id": "6938e4ff-3be8-4ad0-a90b-f24069667dab",
+      "year": 1978,
+      "make": "Ford",
+      "model": "Thunderbird Diamond Jubilee Edition",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ford-thunderbird-17"
+    },
+    {
+      "id": "a7121a91-e86f-4466-a0b8-d428117914b2",
+      "year": 1978,
+      "make": "Honda",
+      "model": "CT70 Trail",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-honda-ct-70-trail"
+    },
+    {
+      "id": "a6a14234-f96a-4b7b-a877-a7c051dce385",
+      "year": 1978,
+      "make": "Honda",
+      "model": "Z50A Mini Trail",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-honda-z50a-9"
+    },
+    {
+      "id": "68a3adf7-227d-484f-917b-7347c9a7b46d",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gtb-10"
+    },
+    {
+      "id": "621dacce-8c2a-4d58-81d5-37288c9ffe65",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gts-16"
+    },
+    {
+      "id": "a9a406f4-e867-416f-9d66-3ef711bc5f51",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gts-30"
+    },
+    {
+      "id": "a3e029b5-b67b-45ae-be5f-1b9374368f94",
+      "year": 1978,
+      "make": "Morgan",
+      "model": "Plus 8 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-morgan-plus-8-2-2"
+    },
+    {
+      "id": "a8a03aea-2998-4abb-ab39-3caaaaa3116d",
+      "year": 1978,
+      "make": "Morgan",
+      "model": "Plus 8 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-morgan-plus-8-2"
+    },
+    {
+      "id": "4ba96724-ef27-49d4-a798-cab26c328cc9",
+      "year": 1978,
+      "make": "Lola",
+      "model": "T333 Can-Am Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-lola-t333-frisbee"
+    },
+    {
+      "id": "1c505f7b-0649-4f8b-a9e9-7b8d6a7732a4",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTB Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gtb-23"
+    },
+    {
+      "id": "ac6f5040-6b20-4efb-b8e3-3188897afd30",
+      "year": 1978,
+      "make": "Porsche",
+      "model": "930 Turbo Engine and Transaxle",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-porsche-930-turbo-engine-transmission"
+    },
+    {
+      "id": "e74445a1-7e93-4310-99d0-e34f78213da6",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-ferrari-308-gts"
+    },
+    {
+      "id": "298ec336-aafb-476f-81c1-227287200fc4",
+      "year": 1978,
+      "make": "Morgan",
+      "model": "Plus 8",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-morgan-plus-8"
+    },
+    {
+      "id": "8d448110-983d-45d8-b05c-e145fb5eae95",
+      "year": 1978,
+      "make": "Lola",
+      "model": "T492 Sports Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-lola-t492-2"
+    },
+    {
+      "id": "79e2c097-eb68-4fb5-9f99-0b1e5e5e4b65",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gts-23"
+    },
+    {
+      "id": "56225e90-8bea-4b71-b919-1115a27ca336",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gts-26"
+    },
+    {
+      "id": "bb59897b-c8d9-4480-bebc-2215fb28b87e",
+      "year": 1978,
+      "make": "Chevrolet",
+      "model": "Caprice Classic Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-chevrolet-caprice"
+    },
+    {
+      "id": "4bf11230-ac5a-4109-9d45-2b2b7700bf6a",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gtb-6"
+    },
+    {
+      "id": "117f7266-05ca-46dc-883b-58b1e1b6bf4d",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gts-28"
+    },
+    {
+      "id": "08d09576-b18a-47cc-9ee5-52ce586d6096",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gt4-9"
+    },
+    {
+      "id": "fc94c9b2-dd66-4a52-b1c4-3ba2cdabe9c2",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gts-24"
+    },
+    {
+      "id": "81d39e68-2019-4625-9290-15035682e85c",
+      "year": 1978,
+      "make": "Moto",
+      "model": "Guzzi 850 Le Mans",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-moto-guzzi-850-le-mans"
+    },
+    {
+      "id": "00cc3846-6ffa-4af5-b157-b9e02aff689f",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gts-8"
+    },
+    {
+      "id": "43a42667-0504-4238-9b74-596f554af0f3",
+      "year": 1978,
+      "make": "Dnepr",
+      "model": "MT10-36 w/Sidecar",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-dnepr-mt10-36"
+    },
+    {
+      "id": "61b1f67b-afd0-44ab-8d3d-e7a14447fb5d",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gt4-3"
+    },
+    {
+      "id": "a731f5fd-b0b4-4b65-8f23-d0b6b494e40d",
+      "year": 1978,
+      "make": "Vetter",
+      "model": "Streamliner Skatecar",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-vetter-streamliner-skatecar"
+    },
+    {
+      "id": "408f5a48-becc-4a45-9276-fbb9025af80b",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "308 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-308-gts-13"
+    },
+    {
+      "id": "d6b74805-ad3f-4a80-908e-c16a303de4a1",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "512 BB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-512-bb"
+    },
+    {
+      "id": "64cb9b5d-b7ae-4ed3-8494-b224cb09f271",
+      "year": 1978,
+      "make": "Ferrari",
+      "model": "400 GT 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-ferrari-400-3"
+    },
+    {
+      "id": "db02dfe3-c48e-4230-bb10-223d5be26fcb",
+      "year": 1978,
+      "make": "Mercedes-Benz",
+      "model": "300D",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-mercedes-benz-300d-5"
+    },
+    {
+      "id": "052a77b9-5826-417d-941d-10f211bb98d2",
+      "year": 1978,
+      "make": "Yamaha",
+      "model": "TT500",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1978-yamaha-tt500-2"
+    },
+    {
+      "id": "2f4519ff-f435-4277-9d9d-e3047f2c35df",
+      "year": 1977,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-ferrari-308-gtb-27"
+    },
+    {
+      "id": "165172c1-1b1a-4670-9298-4e215a4bc351",
+      "year": 1977,
+      "make": "Honda",
+      "model": "CB550F Super Sport",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-honda-cb550f-super-sport-4"
+    },
+    {
+      "id": "4d9441c8-c77f-4f2a-87b2-3c10051496d6",
+      "year": 1977,
+      "make": "Porsche",
+      "model": "911S Targa 3.2L",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-porsche-911s-targa"
+    },
+    {
+      "id": "dc4c3654-d5c9-4615-ab63-a5a017e3e753",
+      "year": 1977,
+      "make": "Morgan",
+      "model": "4/4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-morgan-4-4"
+    },
+    {
+      "id": "63beb7e4-f588-49a0-af3b-4157473697df",
+      "year": 1977,
+      "make": "Moto",
+      "model": "Guzzi 850 Le Mans",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-moto-guzzi-850-le-mans-7"
+    },
+    {
+      "id": "64235e0c-d39f-474a-b63c-2c2df3ae5f1a",
+      "year": 1977,
+      "make": "Moto",
+      "model": "Guzzi 850 Le Mans",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-moto-guzzi-850-le-mans-3"
+    },
+    {
+      "id": "c6e669ee-a4b5-4285-bf53-c478b8b87c48",
+      "year": 1977,
+      "make": "ItalyCar",
+      "model": "La Ferrarina 77 Go Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-italicar-nikki-lauda-replica-child-go-kart"
+    },
+    {
+      "id": "e9fe5c09-b711-4d27-bd40-df7320e98ff1",
+      "year": 1977,
+      "make": "Morgan",
+      "model": "Plus 8 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-morgan-plus-8"
+    },
+    {
+      "id": "c0e082b9-2b21-4e60-933a-ec0d88196070",
+      "year": 1977,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-ferrari-308-gtb-39"
+    },
+    {
+      "id": "b3e72fa4-7302-4914-861d-0dfbf46022b6",
+      "year": 1977,
+      "make": "Avanti",
+      "model": "II Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-avanti-ii-project"
+    },
+    {
+      "id": "afcd5e66-1fb7-4842-b2d2-f49f2bb26411",
+      "year": 1977,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-ferrari-308-gtb-5"
+    },
+    {
+      "id": "d11f3ebe-7d8e-4fbe-aa53-684e5d40a415",
+      "year": 1977,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-ferrari-308-gtb-42"
+    },
+    {
+      "id": "ef15812f-0e59-429e-854e-179477e0868f",
+      "year": 1977,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-ferrari-308-gtb-26"
+    },
+    {
+      "id": "05c28d46-7c9f-4320-b55a-cf82049a4e50",
+      "year": 1977,
+      "make": "Moto",
+      "model": "Guzzi 850 Le Mans",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-moto-guzzi-850-le-mans-8"
+    },
+    {
+      "id": "2d6fbdeb-26dc-46b7-abed-7c86a9ebf185",
+      "year": 1977,
+      "make": "Ford",
+      "model": "Bronco",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-ford-bronco-102"
+    },
+    {
+      "id": "01091166-2b23-4789-9d3e-81e8d15340dd",
+      "year": 1977,
+      "make": "Bug",
+      "model": "Works Wasp Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-go-kart-wasp-by-bug"
+    },
+    {
+      "id": "2f75c179-e865-4b79-9f73-03cec4dea70a",
+      "year": 1977,
+      "make": "Osella",
+      "model": "Formula Ford 2000 Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-osella-formula-ford-2000-race-car"
+    },
+    {
+      "id": "80b74bd0-2ab5-42db-b854-8273f6fb89e7",
+      "year": 1977,
+      "make": "Avanti",
+      "model": "II",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-avanti-avanti-ii"
+    },
+    {
+      "id": "578ccbcc-c7e1-4f0a-b78b-5a9cff389a63",
+      "year": 1977,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-ferrari-308-gtb-16"
+    },
+    {
+      "id": "80468cc2-db17-40fe-8195-c9ac9b84cc45",
+      "year": 1977,
+      "make": "Hartman",
+      "model": "Blue Streak Sprint Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-yamaha-hartman-blue-streak-dual-sprinter"
+    },
+    {
+      "id": "2054e653-a011-44b4-92e9-f7bcf739ec6d",
+      "year": 1977,
+      "make": "Mercedes-Benz",
+      "model": "450 SEL 6.9",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-mercedes-450-sel-6-9"
+    },
+    {
+      "id": "bf5815ab-1165-49d1-9028-ca0f6e52baa7",
+      "year": 1977,
+      "make": "Maserati",
+      "model": "Khamsin 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-maserati-khamsin"
+    },
+    {
+      "id": "c2f95dae-47f6-46fe-abde-6b7238e1c2ef",
+      "year": 1977,
+      "make": "Porsche",
+      "model": "15×9″ Fuchs Wheels",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-porsche-15x9-fuchs-wheels"
+    },
+    {
+      "id": "37ca3dbd-7deb-4ee2-8b61-65060653f9a8",
+      "year": 1977,
+      "make": "Ferrari",
+      "model": "308 GTB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-ferrari-308-gtb-28"
+    },
+    {
+      "id": "30c7472e-7700-4d84-9939-d24e70210b0e",
+      "year": 1977,
+      "make": "Benelli",
+      "model": "750 Sei",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-benelli-750-sei-2"
+    },
+    {
+      "id": "c005bf19-1e67-4240-88a9-2124be1ded4b",
+      "year": 1977,
+      "make": "Volvo",
+      "model": "264GL",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1977-volvo-264gl"
+    },
+    {
+      "id": "b6948370-72a0-4de0-b5cb-b466c3ecd02d",
+      "year": 1976,
+      "make": "Toyota",
+      "model": "Corolla SR5 Liftback 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-toyota-corolla"
+    },
+    {
+      "id": "f652e584-eaa2-40c6-9739-160d1f4e0099",
+      "year": 1976,
+      "make": "Cadillac",
+      "model": "Eldorado Convertible",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-cadillac-eldorado-102"
+    },
+    {
+      "id": "2ee496f6-f388-4f00-ac39-db24713f08a3",
+      "year": 1976,
+      "make": "Jeep",
+      "model": "Cherokee Chief 4×4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-jeep-cherokee-2"
+    },
+    {
+      "id": "aa7b0646-e809-48d6-ac58-fa99624f6399",
+      "year": 1976,
+      "make": "Volkswagen",
+      "model": "Super Beetle",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-volkswagen-super-beetle-2"
+    },
+    {
+      "id": "47273aea-8ab6-49a5-8030-77b5177b4222",
+      "year": 1976,
+      "make": "Cadillac",
+      "model": "Eldorado",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-cadillac-eldorado-convertible-121"
+    },
+    {
+      "id": "54f6a618-c1a8-42b8-854b-52223243259b",
+      "year": 1976,
+      "make": "Triumph",
+      "model": "TR6",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-triumph-tr6-60"
+    },
+    {
+      "id": "5ecb0ba6-7f5e-42f4-88fd-241b450deb09",
+      "year": 1976,
+      "make": "Benelli",
+      "model": "750 Sei",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-benelli-750-sei-3"
+    },
+    {
+      "id": "f1a91820-8122-4f59-94f5-67ddec082ded",
+      "year": 1976,
+      "make": "BMW",
+      "model": "2002",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-bmw-2002"
+    },
+    {
+      "id": "4a9e1dfa-dae8-43b8-ac5d-1a76e74c88f1",
+      "year": 1976,
+      "make": "Yamaha",
+      "model": "DT125 Enduro",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-yamaha-dt125c"
+    },
+    {
+      "id": "27201c5d-3487-4ea5-a962-b52cdb0c4455",
+      "year": 1976,
+      "make": "Triumph",
+      "model": "TR6",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-triumph-tr6-75"
+    },
+    {
+      "id": "f8c54d14-5af5-4fa6-96c0-fd099d2d2690",
+      "year": 1976,
+      "make": "Porsche",
+      "model": "911S 2.7L Engine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2-7-liter-air-cooled-engine"
+    },
+    {
+      "id": "fbb50f55-8736-45fd-9287-25c69cc315b6",
+      "year": 1976,
+      "make": "Lamborghini",
+      "model": "Urraco P200",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-lamborghini-urraco-p200"
+    },
+    {
+      "id": "48650250-fc97-41b3-ade3-04ddef44a26e",
+      "year": 1976,
+      "make": "Ferrari",
+      "model": "Dino 308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1976-ferrari-dino-308-gt4"
+    },
+    {
+      "id": "84b3b646-dbe4-46a5-8414-d5c035557fd6",
+      "year": 1975,
+      "make": "Chevrolet",
+      "model": "K20 Suburban 4×4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-chevrolet-suburban-3"
+    },
+    {
+      "id": "66d3ddcd-b70d-4fde-9b61-094bb74c2ad6",
+      "year": 1975,
+      "make": "Pedrazzini",
+      "model": "Super Aquamar 28′",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-pedrazzini-super-aquamar"
+    },
+    {
+      "id": "3cf0ec7d-ce8d-474b-90ce-663ecca8606e",
+      "year": 1975,
+      "make": "Toyota",
+      "model": "Land Cruiser FJ40",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-toyota-land-cruiser-fj40-55"
+    },
+    {
+      "id": "20396571-735f-4a92-94b4-048da35d7ab6",
+      "year": 1975,
+      "make": "Margay",
+      "model": "Concept II Sprint Dual Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-margay-concept-ii-sprint-dual"
+    },
+    {
+      "id": "423cb7cb-3412-44d7-9636-79e89d95fca7",
+      "year": 1975,
+      "make": "Chevrolet",
+      "model": "C10 Silverado 4×4 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-chevrolet-c10-4"
+    },
+    {
+      "id": "7c013dd4-f5d2-4c58-a95d-192645f45231",
+      "year": 1975,
+      "make": "Cadillac",
+      "model": "Eldorado Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-cadillac-eldorado-23"
+    },
+    {
+      "id": "fb4ba615-c8a6-4490-8068-d7b0d04bb7f0",
+      "year": 1975,
+      "make": "Ducati",
+      "model": "In",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ducati-900"
+    },
+    {
+      "id": "e10a183c-5096-4829-b6d0-b146600c76c8",
+      "year": 1975,
+      "make": "Triumph",
+      "model": "TR6",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-triumph-tr6-2"
+    },
+    {
+      "id": "5d16f2b0-4124-4344-a744-a874e27eb499",
+      "year": 1975,
+      "make": "Volvo",
+      "model": "C303 4×4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-volvo-c303-3"
+    },
+    {
+      "id": "c46d4a3f-6ad0-4b0c-bda6-17374d1ca9b4",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "Dino 308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-46"
+    },
+    {
+      "id": "7251cf7e-14ee-4877-90e1-9fca94e07a3c",
+      "year": 1975,
+      "make": "Fuchs",
+      "model": "15×6″ Wheels for Porsche 911",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/15x6-fuchs-wheels-for-porsche-911"
+    },
+    {
+      "id": "37113e74-a67d-49d9-a1ed-c0b41247a6e0",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-10"
+    },
+    {
+      "id": "81e38da2-1a69-428f-8edc-6d9f404bd246",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-16"
+    },
+    {
+      "id": "79ed5a1a-326f-448c-b82c-6f1e3436329a",
+      "year": 1975,
+      "make": "Lamborghini",
+      "model": "Urraco P250",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-lamborghini-urraco-3"
+    },
+    {
+      "id": "ff63a66f-50eb-4db5-b73d-64d8a6e7afa7",
+      "year": 1975,
+      "make": "Astech",
+      "model": "D Sports Racer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-astech-dsr"
+    },
+    {
+      "id": "eb93bf28-ac2a-4c29-a633-eb4c88a455a4",
+      "year": 1975,
+      "make": "Maserati",
+      "model": "Merak",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-maserati-merak-4"
+    },
+    {
+      "id": "a6a6c682-b393-44ef-920f-d1337746ce59",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-15"
+    },
+    {
+      "id": "e00c9aa6-a01f-41d2-b0d9-7ac83c057fab",
+      "year": 1975,
+      "make": "Cadillac",
+      "model": "Eldorado Wagon",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-cadillac-eldorado-18"
+    },
+    {
+      "id": "a291a4b1-7521-46a9-854c-151942275776",
+      "year": 1975,
+      "make": "Isuzu",
+      "model": "117 GT XC",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-isuzu-117-gt-xc"
+    },
+    {
+      "id": "b2c9f433-17f4-48e0-afc5-37f59c8cfcec",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-24"
+    },
+    {
+      "id": "447f4a8d-b97e-4453-803b-643e23085583",
+      "year": 1975,
+      "make": "Mercedes-Benz",
+      "model": "450SLC",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-mercedes-benz-450-slc-7"
+    },
+    {
+      "id": "8cdb1c52-ca4e-4f09-86a4-6d8a4875f853",
+      "year": 1975,
+      "make": "Porsche",
+      "model": "914",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-porsche-914-18"
+    },
+    {
+      "id": "41a73167-fded-40c1-83e4-1b775091b444",
+      "year": 1975,
+      "make": "Lamborghini",
+      "model": "Urraco P250",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-lamborghini-urraco-2"
+    },
+    {
+      "id": "e62eb1e3-ed2e-4319-b4af-9cbf92e7ccbf",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "Dino 308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-40"
+    },
+    {
+      "id": "33f50cb4-1bcd-49fd-9a7d-63ea1ca74b2e",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "Dino 308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-43"
+    },
+    {
+      "id": "2d5a3233-7a90-4742-9b4b-76ad5d58c4dd",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-28"
+    },
+    {
+      "id": "ce47fce4-3d7d-4810-b1a3-90b537b60c05",
+      "year": 1975,
+      "make": "Rickman",
+      "model": "Honda CR750",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-rickman-honda-cr750"
+    },
+    {
+      "id": "8074daad-39bb-4a4d-8ed3-1c80101b48c9",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "Dino 208 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-208-2"
+    },
+    {
+      "id": "f8eea5c3-066b-44bb-9b59-ad72d65f2d83",
+      "year": 1975,
+      "make": "Jensen-Healey",
+      "model": "JH5",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-jensen-healey-2"
+    },
+    {
+      "id": "593148bd-afbe-4376-a0b5-f0242386885b",
+      "year": 1975,
+      "make": "Lamborghini",
+      "model": "Espada Series III 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-lamborghini-espada-series-iii"
+    },
+    {
+      "id": "09e86d69-24ee-4eee-806b-718df5d03a20",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-13"
+    },
+    {
+      "id": "e7808dd0-e8f0-46cf-aa5f-25ef47b6841a",
+      "year": 1975,
+      "make": "Porsche",
+      "model": "914",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-porsche-914-96"
+    },
+    {
+      "id": "9c213ae4-80f9-4794-b2e8-a9d8747bacb3",
+      "year": 1975,
+      "make": "Rokon",
+      "model": "FT340 Automatic Flat-Track Racer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-rokon-ft340"
+    },
+    {
+      "id": "5b7c9fc7-a790-441b-84e9-54ff39bd01f6",
+      "year": 1975,
+      "make": "Ferrari",
+      "model": "Dino 308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-ferrari-308-gt4-38"
+    },
+    {
+      "id": "ee8f49a5-05e3-4f39-bc83-d00b869aa9e4",
+      "year": 1975,
+      "make": "Lamborghini",
+      "model": "Espada Series III 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-lamborghini-espada-5"
+    },
+    {
+      "id": "9dffdfcf-7577-429c-bf6d-0794a10c9c72",
+      "year": 1975,
+      "make": "Porsche",
+      "model": "911 Carrera Type 911/83 2.7L MFI Engine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/engine-225"
+    },
+    {
+      "id": "2d286b52-6e6f-4de8-974f-73b9bfc05e1b",
+      "year": 1974,
+      "make": "DeTomaso",
+      "model": "Pantera",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-detomaso-pantera-55"
+    },
+    {
+      "id": "73594259-280f-453b-9a24-6efb73a17f61",
+      "year": 1974,
+      "make": "Bobsy",
+      "model": "SR6",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-bobsy-race-car-sr6"
+    },
+    {
+      "id": "333c4cd9-ad26-4240-a701-3af8365ed47f",
+      "year": 1974,
+      "make": "Triumph",
+      "model": "TR6",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-triumph-tr6-110"
+    },
+    {
+      "id": "72ffb921-4970-40f3-8981-3b65850de57e",
+      "year": 1974,
+      "make": "Volkswagen",
+      "model": "Thing",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-volkswagen-thing-92"
+    },
+    {
+      "id": "2f4a624a-f724-41db-8f50-89b16481e829",
+      "year": 1974,
+      "make": "Cadillac",
+      "model": "Fleetwood Brougham Talisman",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-cadillac-fleetwood-talisman-2"
+    },
+    {
+      "id": "73d1b14d-c155-44cf-a150-f6234cc5cbba",
+      "year": 1974,
+      "make": "Porsche",
+      "model": "911 RSR Engine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-porsche-911-35"
+    },
+    {
+      "id": "7f516d86-c9b9-40da-b985-769036804820",
+      "year": 1974,
+      "make": "Lotus",
+      "model": "Europa Twin Cam Special",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-lotus-europa-twin-cam-5"
+    },
+    {
+      "id": "2acda9d5-eba0-4eda-b10a-5656cb2867f6",
+      "year": 1974,
+      "make": "Honda",
+      "model": "CR250M Elsinore",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-honda-cr250m-elsinore"
+    },
+    {
+      "id": "a2f21011-a18d-4723-9d7c-35a9cffb0ab5",
+      "year": 1974,
+      "make": "Jensen-Healey",
+      "model": "MkII Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-jensen-healey-mark-2-roadster-2"
+    },
+    {
+      "id": "716a09cc-d9e8-45f8-831d-fd12c4abf962",
+      "year": 1974,
+      "make": "Alfa",
+      "model": "Romeo 2000 Spider Veloce",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-alfa-romeo-2000-spider-veloce-10"
+    },
+    {
+      "id": "ad69346e-c6a6-41a9-a689-a0fb80fe22d9",
+      "year": 1974,
+      "make": "Pontiac",
+      "model": "Firebird Trans Am 4-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-pontiac-firebird-trans-am-3"
+    },
+    {
+      "id": "828a1d21-fbe5-472d-9b28-9d7557395c97",
+      "year": 1974,
+      "make": "Chevrolet",
+      "model": "C10",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-chevrolet-c10-3"
+    },
+    {
+      "id": "51570d2b-114d-4d69-b812-9a35b6ac5675",
+      "year": 1974,
+      "make": "Alfa Romeo",
+      "model": "GTV",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-alfa-romeo-gtv-75"
+    },
+    {
+      "id": "201cdca4-4f26-46ee-80af-e13c1e2dd98f",
+      "year": 1974,
+      "make": "Benelli",
+      "model": "Volcano",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-benelli-volcano"
+    },
+    {
+      "id": "8ab7d699-5b89-46c6-b713-f7e24dbae701",
+      "year": 1974,
+      "make": "Lotus",
+      "model": "Europa Twin Cam Special Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-lotus-europa"
+    },
+    {
+      "id": "a76491c4-76d7-4723-8439-6a911ef99f07",
+      "year": 1974,
+      "make": "Ferrari",
+      "model": "365 GT4 BB",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-ferrari-365-gt4-bb-2"
+    },
+    {
+      "id": "6a6e126d-08dc-458a-aef2-53816877ca54",
+      "year": 1974,
+      "make": "Lamborghini",
+      "model": "Urraco P250S",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-lamborghini-urraco-5"
+    },
+    {
+      "id": "13263ff9-1d7f-489a-b703-645e7f6aef37",
+      "year": 1974,
+      "make": "Rickman",
+      "model": "Honda CR750",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-honda-1974-rickman-cr750-honda-motorcycle"
+    },
+    {
+      "id": "d39fe86b-745b-4375-88d3-45c394d601a0",
+      "year": 1974,
+      "make": "Honda",
+      "model": "CT90",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-honda-ct90-3"
+    },
+    {
+      "id": "042648ec-51aa-4f8d-b842-089c662f76fe",
+      "year": 1974,
+      "make": "Jensen-Healey",
+      "model": "Mk II",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-jensen-healey-mark-2-roadster-13"
+    },
+    {
+      "id": "45c94a1c-1c4b-4be3-8cd7-e36d4e7e3bc2",
+      "year": 1974,
+      "make": "Jensen-Healey",
+      "model": "Mk II Roadster",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-jensen-healey-mark-2-roadster-43"
+    },
+    {
+      "id": "cbe3d00d-b54b-4b66-a955-5721e9a9255e",
+      "year": 1974,
+      "make": "Jensen-Healey",
+      "model": "Mk II",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-jensen-healey-mark-2-roadster-7"
+    },
+    {
+      "id": "9d25b53a-17f1-47ee-8e50-3fb56d18225b",
+      "year": 1974,
+      "make": "Alfa",
+      "model": "Romeo GTV 2000",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-alfa-romeo-gtv-2000-41"
+    },
+    {
+      "id": "f52f1289-cb8a-481c-8e37-a0fde23a87e0",
+      "year": 1974,
+      "make": "Jensen-Healey",
+      "model": "Mk II Roadster",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-jensen-healey-13"
+    },
+    {
+      "id": "488ec554-1190-4499-a3fa-bfa8be382854",
+      "year": 1974,
+      "make": "Dodge",
+      "model": "Charger NASCAR Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-dodge-charger-5"
+    },
+    {
+      "id": "e7f827c8-9771-45ac-a51e-d57a0063590b",
+      "year": 1974,
+      "make": "Ferrari",
+      "model": "308 GT4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-ferrari-308-gt4-5"
+    },
+    {
+      "id": "893b8e11-48b4-4b21-9ef8-f8282c695ce8",
+      "year": 1974,
+      "make": "Chevrolet",
+      "model": "Camaro IROC Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-chevrolet-camaro-13"
+    },
+    {
+      "id": "45590817-891d-4db5-a195-ed5a2c74aa7b",
+      "year": 1974,
+      "make": "Cadillac",
+      "model": "eldorado convertible",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-cadillac-eldorado-convertible-16"
+    },
+    {
+      "id": "8c2cff0c-00fb-4256-826b-f4bf2e31c254",
+      "year": 1974,
+      "make": "Jensen-Healey",
+      "model": "Mk II Roadster",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-jensen-healey-mark-2-roadster-36"
+    },
+    {
+      "id": "aaf61875-2c80-4684-8e5e-64f4c709eb77",
+      "year": 1974,
+      "make": "BMW",
+      "model": "2002 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-bmw-2002-77"
+    },
+    {
+      "id": "ec9dcc8c-b1ad-4ebc-aa54-670402bb4d36",
+      "year": 1974,
+      "make": "Ford",
+      "model": "Bronco 302",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1979-ford-bronco-188"
+    },
+    {
+      "id": "a5e0cd4a-be8d-436a-a32d-272706e19b7f",
+      "year": 1974,
+      "make": "Porsche",
+      "model": "911 2.7L Engine and Transaxle",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-porsche-911-s-2-7-ltr-engine-and-915-gearbox"
+    },
+    {
+      "id": "baafe3d2-ab5b-454d-909b-6671506bd2fc",
+      "year": 1974,
+      "make": "Alfa",
+      "model": "Romeo GTV 2000 Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-alfa-romeo-gt-veloce-2000"
+    },
+    {
+      "id": "88ade8a3-6086-48da-83f4-685fa9bc2b0d",
+      "year": 1974,
+      "make": "Morgan",
+      "model": "Plus 8 Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-morgan-plus-8"
+    },
+    {
+      "id": "8e28cbca-10a7-4b66-8640-f345f53e05af",
+      "year": 1974,
+      "make": "Alfa",
+      "model": "Romeo GTV Parts Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-alfa-romeo-gtv-44"
+    },
+    {
+      "id": "74d06924-d657-47fd-96e7-535a5c0aa04e",
+      "year": 1974,
+      "make": "Ferrari",
+      "model": "Dino 246 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-ferrari-dino-10"
+    },
+    {
+      "id": "735e4037-771c-4f6d-88bf-2457fa86caec",
+      "year": 1974,
+      "make": "Yamaha",
+      "model": "RD125Bs",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1975-yamaha-pair-of-rd125bs"
+    },
+    {
+      "id": "8967900a-4ad0-4c04-bc5a-1140cb63e749",
+      "year": 1974,
+      "make": "Lamborghini",
+      "model": "Espada Series III 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-lamborghini-espada-6"
+    },
+    {
+      "id": "6de5c474-cbb0-4368-8d60-ddca05529669",
+      "year": 1974,
+      "make": "Lamborghini",
+      "model": "Espada Series III Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-lamborghini-espada-11"
+    },
+    {
+      "id": "704fd212-6c05-468f-b1ac-850aaed5941b",
+      "year": 1974,
+      "make": "Ferrari",
+      "model": "Dino 246 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1974-ferrari-dino-246-gts-6"
+    },
+    {
+      "id": "85bd6d52-f397-40ca-9c01-bf884abb52ac",
+      "year": 1973,
+      "make": "BMW",
+      "model": "2002 4-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-bmw-2002-115"
+    },
+    {
+      "id": "a2ae7cee-6617-4162-935f-5c71cf88d8ae",
+      "year": 1973,
+      "make": "Chevrolet",
+      "model": "Corvette Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-chevrolet-corvette-coupe-48"
+    },
+    {
+      "id": "41f068d5-c921-4984-84d3-7ce39847054b",
+      "year": 1973,
+      "make": "Mercedes-Benz",
+      "model": "450SL",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-mercedes-benz-450sl-39"
+    },
+    {
+      "id": "1b2c2db1-c863-4bde-9cec-aaddf07f1e9b",
+      "year": 1973,
+      "make": "Ford",
+      "model": "F-250 Ranger XLT 4×4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-ford-f-250-66"
+    },
+    {
+      "id": "544d48f7-6022-48d7-931a-dc3f6d477336",
+      "year": 1973,
+      "make": "Jaguar",
+      "model": "XKE Coupe 2+2",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-jaguar-e-type"
+    },
+    {
+      "id": "ddff789f-e9de-44ac-929d-293098f62cca",
+      "year": 1973,
+      "make": "Lancia",
+      "model": "Fulvia 1.3",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-lancia-fulvia"
+    },
+    {
+      "id": "80fdc94b-7206-4889-a2b2-a8c31bfb3af9",
+      "year": 1973,
+      "make": "Chevrolet",
+      "model": "Camaro Z28",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-chevrolet-camaro-z-28-11"
+    },
+    {
+      "id": "bffee5f9-7a73-4272-afb1-1c201da76265",
+      "year": 1973,
+      "make": "Jaguar",
+      "model": "XKE Roadster 4-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-jaguar-xke-roadster-2"
+    },
+    {
+      "id": "06c2a4ec-5455-4c63-b29b-5442d9614968",
+      "year": 1973,
+      "make": "TVR",
+      "model": "2500M",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-tvr-2500m"
+    },
+    {
+      "id": "ff7fe770-d84f-4f0d-9c1d-43652eeb5ca4",
+      "year": 1973,
+      "make": "Lotus",
+      "model": "Europa Twin Cam Special 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-lotus-europa-twin-cam-special-12"
+    },
+    {
+      "id": "8d021f51-c9ce-4e6a-8349-f7ba3a9f4959",
+      "year": 1973,
+      "make": "Datsun",
+      "model": "240Z",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-datsun-240z-54"
+    },
+    {
+      "id": "fb9be5f2-0a6e-4f1d-ad09-030f8eaf2d8e",
+      "year": 1973,
+      "make": "Chevrolet",
+      "model": "Corvette Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-chevrolet-corvette-coupe-49"
+    },
+    {
+      "id": "2b4515c2-e19c-4e94-9ec9-5e3c9463de8e",
+      "year": 1973,
+      "make": "Datsun",
+      "model": "240Z Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-datsun-240z-race-car"
+    },
+    {
+      "id": "9cdae2be-101d-4aaa-b298-b4923dc755d1",
+      "year": 1973,
+      "make": "MG",
+      "model": "MGB Roadster",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-mg-mgb-21"
+    },
+    {
+      "id": "6fb93538-d822-4e61-8b74-35dfd0d7c236",
+      "year": 1973,
+      "make": "Ford",
+      "model": "Bronco Ranger 302",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-ford-bronco-292"
+    },
+    {
+      "id": "d3269544-a17f-4722-b6a8-1cd2bb407b60",
+      "year": 1973,
+      "make": "15×6″",
+      "model": "Fuchs Wheels for Porsche 911",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-flat-six-fuchs"
+    },
+    {
+      "id": "ca9e79ca-3106-4451-9eb9-8f771e357aed",
+      "year": 1973,
+      "make": "Ford",
+      "model": "Mustang Convertible 4-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-ford-mustang-convertible-33"
+    },
+    {
+      "id": "af089349-c774-45c1-87d4-09b70a93c719",
+      "year": 1973,
+      "make": "Jensen-Healey",
+      "model": "Mk I",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-jensen-healey-mki"
+    },
+    {
+      "id": "7dbac125-a998-42b8-ba64-b78cd094db95",
+      "year": 1973,
+      "make": "TVR",
+      "model": "Vixen V8",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-tvr-tuscan-clone"
+    },
+    {
+      "id": "168530f7-addd-4f3f-9c07-a0823f0a46ba",
+      "year": 1973,
+      "make": "Ford",
+      "model": "Bronco",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-ford-bronco-289"
+    },
+    {
+      "id": "016b2eec-5897-4543-ae29-26599d0c1c3a",
+      "year": 1973,
+      "make": "Jaguar",
+      "model": "XKE V12 Roadster",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-jaguar-e-type-xke-convertible-2"
+    },
+    {
+      "id": "bca081d1-e892-4b25-ab77-c0a5dea0bb0c",
+      "year": 1973,
+      "make": "Jawa",
+      "model": "250 ISDT Enduro",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-jawa-250cc-enduro"
+    },
+    {
+      "id": "48ad451e-bb17-451e-ae5e-272755bff3fc",
+      "year": 1973,
+      "make": "Jaguar",
+      "model": "XKE V12 Roadster",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-jaguar-e-type-xke-convertible"
+    },
+    {
+      "id": "360549fd-7481-4e47-9c26-3816decf4047",
+      "year": 1973,
+      "make": "Volvo",
+      "model": "1800ES",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-volvo-1800es-49"
+    },
+    {
+      "id": "992fb704-85d4-4358-9631-8f11fe9b5f47",
+      "year": 1973,
+      "make": "Ferrari",
+      "model": "Dino 246 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-ferrari-dino-246-gts-10"
+    },
+    {
+      "id": "99d54e7f-6bcf-4145-b36d-17cee81b5c2c",
+      "year": 1973,
+      "make": "Toyota",
+      "model": "Land Cruiser FJ40",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-toyota-land-cruiser-fj40-125"
+    },
+    {
+      "id": "888fea9a-5533-435a-831b-81cf720cec48",
+      "year": 1973,
+      "make": ".5",
+      "model": "Porsche 911T Targa",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-porsche-911t-targa-25"
+    },
+    {
+      "id": "0dc7ca56-e30a-4677-ba4f-ac1dba294879",
+      "year": 1973,
+      "make": "Moto",
+      "model": "Guzzi V7 Sport",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-moto-guzzi-v7-sport-750cc"
+    },
+    {
+      "id": "618886b0-197f-4014-8b5e-d6cbbc7cb7a9",
+      "year": 1973,
+      "make": "Porsche",
+      "model": "911S 2.4L Engine w/ MFI",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-porsche-2-4l-s-w-mfi"
+    },
+    {
+      "id": "028be9cc-6e27-4fd9-b158-90ba5fc4a30b",
+      "year": 1973,
+      "make": "Ford",
+      "model": "Bronco",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-ford-bronco-105"
+    },
+    {
+      "id": "69d3b862-8b0d-4110-a8d2-07688929b1a6",
+      "year": 1973,
+      "make": "Maserati",
+      "model": "Bora 4.9",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-maserati-bora-2"
+    },
+    {
+      "id": "497c62d0-d716-48e1-93da-b73443ad94bb",
+      "year": 1973,
+      "make": "Ferrari",
+      "model": "365 GTB/4 Daytona",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-ferrari-365-gtb4"
+    },
+    {
+      "id": "cdc958b6-0eda-4839-93ae-7f33174ea14d",
+      "year": 1973,
+      "make": "Jaguar",
+      "model": "V12 2+2",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-jaguar-xke-22-3"
+    },
+    {
+      "id": "0a42643e-aa2f-4121-8ea4-4f0e9231762e",
+      "year": 1973,
+      "make": "Alpine",
+      "model": "Renault A310 1600 VF",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-renault-a310-6-lights"
+    },
+    {
+      "id": "497a0c41-2ff2-4019-9904-adc4a8b2cf8d",
+      "year": 1972,
+      "make": "Porsche",
+      "model": "911T Coupe 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-porsche-911t-coupe-33"
+    },
+    {
+      "id": "635732ed-3d92-4ff9-abc8-d59fb4d42299",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "Dino 246 GT",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-dino-246-gt-12"
+    },
+    {
+      "id": "54332418-1879-413c-b199-2f694b727438",
+      "year": 1972,
+      "make": "Datsun",
+      "model": "240Z Land Speed Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-datsun-240z-190"
+    },
+    {
+      "id": "eafeec56-97b8-4529-8719-c965dd8e5392",
+      "year": 1972,
+      "make": "Rupp",
+      "model": "Chevy Junior Go-Kart Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-rupp-chevy-jr-go-kart"
+    },
+    {
+      "id": "a403f9d9-097f-4d31-b68a-a3f94ece2790",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "Dino 246 GT",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-dino-4"
+    },
+    {
+      "id": "bbc3a4ab-2d6d-46c0-a2a5-c8b09b11efeb",
+      "year": 1972,
+      "make": "Honda",
+      "model": "CB750",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-honda-cb750-50"
+    },
+    {
+      "id": "3b87bbbc-9434-4fc0-b494-c3ffaafd4178",
+      "year": 1972,
+      "make": "Royale",
+      "model": "RP17 Sports Racer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-royale-racecar-royale-rp-17-racecar"
+    },
+    {
+      "id": "4114f484-2603-48ae-8533-2aba82a535bf",
+      "year": 1972,
+      "make": "Nissan",
+      "model": "Skyline 2000GT-X",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-nissan-skyline-2000gt-x-gt-r-clone"
+    },
+    {
+      "id": "6ec22733-59a2-4bf8-8679-261eee7aa937",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "Dino 246 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-dino-15"
+    },
+    {
+      "id": "1576dd8f-ae53-4a46-b63c-4786bedfb4b8",
+      "year": 1972,
+      "make": "Stutz",
+      "model": "Bearcat",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-stutz-bearcat"
+    },
+    {
+      "id": "f2811d3c-6f39-4a62-9033-52138f142995",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "Dino 246 GT",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-dino-246-gt-11"
+    },
+    {
+      "id": "55f6a099-40ce-4c07-b809-18077b73980f",
+      "year": 1972,
+      "make": "Yamaha",
+      "model": "JT2-MX",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-yamaha-jt2mx"
+    },
+    {
+      "id": "24f6d228-1ea1-4a52-a9bb-d880210b4eab",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "Dino 246 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-dino-9"
+    },
+    {
+      "id": "e8ca69b0-fa3b-4441-b39d-700f82dafe6b",
+      "year": 1972,
+      "make": "Lola",
+      "model": "T212 Race CAR",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-lola-t212-race-car"
+    },
+    {
+      "id": "0db2d066-d12b-46da-b911-e58cbd864705",
+      "year": 1972,
+      "make": "Chevrolet",
+      "model": "K5 Blazer CST",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-chevrolet-k5-blazer-144/"
+    },
+    {
+      "id": "c5221d1d-e4f1-4635-8f31-aea6b7404a4d",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "365 GTC/4 Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-365-gtc-4-12"
+    },
+    {
+      "id": "dea87eb8-8692-4708-961d-f8b369d698a1",
+      "year": 1972,
+      "make": "Honda",
+      "model": "CT70H Trails",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-honda-ct-70h-trail-3"
+    },
+    {
+      "id": "14c22001-4e2d-46c0-917c-6a237a4282dd",
+      "year": 1972,
+      "make": "Grumman",
+      "model": "AA-1A Trainer",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-grumman-aa-1a"
+    },
+    {
+      "id": "21778bf5-34c1-470b-893c-a31c9fa7b106",
+      "year": 1972,
+      "make": "Cadillac",
+      "model": "Eldorado Convertible",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-cadillac-eldorado-9"
+    },
+    {
+      "id": "34518502-58b0-4a4f-829a-a00520554fd7",
+      "year": 1972,
+      "make": "Tatra",
+      "model": "T603",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-tatra-t603"
+    },
+    {
+      "id": "326e4aec-bb57-4567-b847-5736ad3d86d0",
+      "year": 1972,
+      "make": "Chevrolet",
+      "model": "K5 Blazer 4×4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/chevrolet/blazer"
+    },
+    {
+      "id": "57351e44-aea9-4236-a7ad-61476e215558",
+      "year": 1972,
+      "make": "BSA",
+      "model": "B50SS Gold Star",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-bsa-b50ss"
+    },
+    {
+      "id": "95d3e851-4215-4912-8bb7-c925536a9f23",
+      "year": 1972,
+      "make": "Porsche",
+      "model": "911T 2.4L Engine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-porsche-911-t-e-2-4l"
+    },
+    {
+      "id": "e1f84364-927f-49b7-b2fe-42d542fec564",
+      "year": 1972,
+      "make": "Honda",
+      "model": "CB750",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-honda-cb750-2"
+    },
+    {
+      "id": "7820a577-d8b8-4feb-a8ec-ff6f5c67f00e",
+      "year": 1972,
+      "make": "Datsun",
+      "model": "510 Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-datsun-510-31"
+    },
+    {
+      "id": "5406293a-13cd-4a98-8c92-b792113ad4b7",
+      "year": 1972,
+      "make": "Lotus",
+      "model": "Europa Modified Twin Cam",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-lotus-europa-twin-cam-3"
+    },
+    {
+      "id": "edc42e81-5e06-4e6c-93cd-6c328f448d3a",
+      "year": 1972,
+      "make": "Chevrolet",
+      "model": "Camaro 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-chevrolet-camaro-z28-3"
+    },
+    {
+      "id": "04162a84-f896-4bd8-8cef-a92099e19331",
+      "year": 1972,
+      "make": "Lancia",
+      "model": "Fulvia 1.3S Montecarlo",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-lancia-special-edition-fulvia-1-3s-montecarlo-coupe"
+    },
+    {
+      "id": "22e2483c-2480-4a2e-b347-672509be5489",
+      "year": 1972,
+      "make": "Rover",
+      "model": "3500S 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-rover-3500-s"
+    },
+    {
+      "id": "832638ea-9cd8-4402-a964-e8d6c34abf80",
+      "year": 1972,
+      "make": "March-Cosworth",
+      "model": "722 Formula 2 Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-march-722-8"
+    },
+    {
+      "id": "91a4b829-d1a1-45ee-a10a-f2c51d6acb99",
+      "year": 1972,
+      "make": "McLaren",
+      "model": "M8F Nose Panel",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-mclaren-m8f-front-clip"
+    },
+    {
+      "id": "8feef4d8-1d7b-49aa-a63b-f5c47551e81a",
+      "year": 1972,
+      "make": "Lotus",
+      "model": "Elan Sprint",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-lotus-elan-sprint-12"
+    },
+    {
+      "id": "c7141a58-2003-4f70-94bc-b42975067b2c",
+      "year": 1972,
+      "make": "VW",
+      "model": "Karmann Ghia",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-vw-karman-ghia"
+    },
+    {
+      "id": "cb85577c-9082-487c-9c9c-78c6a4dc00ec",
+      "year": 1972,
+      "make": "Porsche",
+      "model": "911T 2.4L Engine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/2-4l-911t-engine"
+    },
+    {
+      "id": "df4533ee-5f43-41a2-8ab0-f4861e29d85c",
+      "year": 1972,
+      "make": "Porsche",
+      "model": "914 Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-porsche-914-2-0-3"
+    },
+    {
+      "id": "6f9adb90-e136-4acb-a433-a95c8b582c0c",
+      "year": 1972,
+      "make": "DeTomaso",
+      "model": "Pantera",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-detomaso-pantera-2"
+    },
+    {
+      "id": "d9b2681c-0daa-4259-8edd-12b096ec3ec6",
+      "year": 1972,
+      "make": "Norton",
+      "model": "Combat Commando 750 Roadster for Charity",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-norton-commando-750-roadster-4"
+    },
+    {
+      "id": "b2d715aa-b9dc-4154-8e72-715da983d6a9",
+      "year": 1972,
+      "make": "Lotus",
+      "model": "Europa Twin Cam",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-lotus-europa-twin-cam-5"
+    },
+    {
+      "id": "be8704a5-e44b-4828-b723-fccbfd261f15",
+      "year": 1972,
+      "make": "Mercedes-Benz",
+      "model": "250C Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-mercedes-benz-250c-3"
+    },
+    {
+      "id": "c89c3e15-c7c1-4df9-9b63-c9af5af389ad",
+      "year": 1972,
+      "make": "Lotus",
+      "model": "Europa Twin Cam",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-lotus-europa-twin-cam-17"
+    },
+    {
+      "id": "f88fdea2-18a9-47c4-a488-1082046c116a",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "365 GTB/4 Daytona Berlinetta",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-365-gtb4-daytona"
+    },
+    {
+      "id": "6a6e2bfe-d7a0-441c-9e0d-0cd9d0d34955",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "365 GTC/4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-365-gtc-6"
+    },
+    {
+      "id": "2bfc2423-68d9-4a92-baba-5d4e72b981af",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "365 GTB/4 Daytona Spyder Conversion",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1973-ferrari-365-gtb-4-a"
+    },
+    {
+      "id": "d60aec4c-a463-4e4d-aa73-c5633d8a2fce",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "Dino 246 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-dino-246-gts-2"
+    },
+    {
+      "id": "0c435de2-7b31-4789-9016-1cfbee9da3da",
+      "year": 1972,
+      "make": "Honda",
+      "model": "Z50A Mini Trail",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-honda-z50a-mini-trail"
+    },
+    {
+      "id": "05c32538-cb48-45c8-afed-cdd9f28ccf97",
+      "year": 1972,
+      "make": "Perfect",
+      "model": "Circle – Victor “Project Rotary” Dragster Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-perfect-circle-victor-project-rotary-dragster"
+    },
+    {
+      "id": "005cf152-ffaf-413f-a8c1-a8560e66f736",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "Dino 246 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-dino-20"
+    },
+    {
+      "id": "c3a61f65-5f83-4b98-9468-ef95f6589552",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "365 GTC/4 Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-365-gtc-4-3"
+    },
+    {
+      "id": "93549c0b-4b3a-4277-a87a-b8e430239753",
+      "year": 1972,
+      "make": "Volvo",
+      "model": "1800E",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-volvo-1800e-15"
+    },
+    {
+      "id": "96c913a4-d9d5-44a5-a0ef-7c1f829c64c9",
+      "year": 1972,
+      "make": "Porsche",
+      "model": "911T 2.4L Flat-Six",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-porsche-911t-engine"
+    },
+    {
+      "id": "262485a1-cf83-4613-ac2d-ea2720ec213c",
+      "year": 1972,
+      "make": "Ferrari",
+      "model": "Dino 246 GTS",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-ferrari-dino-12"
+    },
+    {
+      "id": "88ba4be9-3d6c-4bf7-8111-8b7d4b008e75",
+      "year": 1972,
+      "make": "Lancia",
+      "model": "Fulvia 1,3S",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-lancia-fulvia-2"
+    },
+    {
+      "id": "cf27acc3-2f53-454e-9163-37f10aefb3b5",
+      "year": 1972,
+      "make": "Triumph",
+      "model": "Trackmaster Road Race Replica",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-triumph-trackmster-road-racer"
+    },
+    {
+      "id": "2b16f495-4025-4a24-8b85-40b8c7866da3",
+      "year": 1971,
+      "make": "Morgan",
+      "model": "Plus 8",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-morgan-plus-8-2"
+    },
+    {
+      "id": "42b1a489-206d-44e7-8d16-760391295333",
+      "year": 1971,
+      "make": "Innocenti",
+      "model": "Mini Matic 1000",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-innocenti-mini-2"
+    },
+    {
+      "id": "60c259a3-55b8-4218-ae59-f1aa7df49051",
+      "year": 1971,
+      "make": "Mercury",
+      "model": "Capri B Sedan Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-mercury-capri-race-car"
+    },
+    {
+      "id": "6923e946-efb9-4e89-8ed0-915b72b0ac6e",
+      "year": 1971,
+      "make": "Schwinn",
+      "model": "Stingray Cotton Picker Krate Bicycle",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-schwinn-stingray-cotton-picker-krate-bicycle"
+    },
+    {
+      "id": "9a78c6a9-bcef-412a-a9a9-ce0fca7dbe01",
+      "year": 1971,
+      "make": "Porsche",
+      "model": "911T Type 911/03 Engine",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/engine-227"
+    },
+    {
+      "id": "5b577bec-142b-44d2-9b40-7d034495e70a",
+      "year": 1971,
+      "make": "Lotus",
+      "model": "Europa",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-lotus-europa-12"
+    },
+    {
+      "id": "e7bb7f9b-7770-47fc-bf80-37639d92fce1",
+      "year": 1971,
+      "make": "Lamborghini",
+      "model": "Espada Series II 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-lamborghini-espada-6"
+    },
+    {
+      "id": "75ff0cf3-2d8f-4afc-a472-ffb2c8f6448c",
+      "year": 1971,
+      "make": "Fimco",
+      "model": "Little Butch",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-fimco-little-butch"
+    },
+    {
+      "id": "29afd383-fa35-4d51-880e-fa9675fa6b8a",
+      "year": 1971,
+      "make": "Alfa",
+      "model": "Romeo Giulia Super 1300",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-alfa-romeo-giulia-super-1300"
+    },
+    {
+      "id": "e71230c1-974d-4dad-9f82-4e3436852f54",
+      "year": 1971,
+      "make": "TVR",
+      "model": "Vixen 2500 Roller Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-tvr-vixen-2"
+    },
+    {
+      "id": "9bef5047-137e-4df4-a236-3177120b0e25",
+      "year": 1971,
+      "make": "Volkswagen",
+      "model": "Type 2 Camper",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-volkswagen-bus-62-2"
+    },
+    {
+      "id": "271e9581-27be-45bf-b378-01651056f185",
+      "year": 1971,
+      "make": "Yamaha",
+      "model": "JT1 Mini Enduro 60",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1972-yamaha-jt1-mini-enduro-60"
+    },
+    {
+      "id": "50b0910d-c523-421b-b130-81afb8d90bfe",
+      "year": 1971,
+      "make": "Datsun",
+      "model": "240Z",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-datsun-240z-4"
+    },
+    {
+      "id": "11e60ed9-8b37-4082-bc5d-85366b46a0db",
+      "year": 1971,
+      "make": "MG",
+      "model": "Midget",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-mg-midget-14"
+    },
+    {
+      "id": "b8377b11-a86c-4718-8404-912d403b3a83",
+      "year": 1971,
+      "make": "Lancia",
+      "model": "Fulvia 1600HF Lusso",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-lancia-fulvia"
+    },
+    {
+      "id": "d0341504-faa2-430e-a84c-38834278c656",
+      "year": 1971,
+      "make": "Detomaso",
+      "model": "Pantera",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-detomaso-pantera-62"
+    },
+    {
+      "id": "2d7d456c-0bcf-4944-9ac8-c889207e30c0",
+      "year": 1971,
+      "make": "Jensen",
+      "model": "Interceptor",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-jensen-interceptor-5"
+    },
+    {
+      "id": "3fdf4d21-cfad-4987-8e6b-0f7fe06d548e",
+      "year": 1971,
+      "make": "Moto",
+      "model": "Guzzi Ambassador 750",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-moto-guzzi-750-ambassador-3"
+    },
+    {
+      "id": "e580abdf-9b5d-4aba-9bbd-760f52eafded",
+      "year": 1971,
+      "make": "Ferrari",
+      "model": "Dino 246 GT",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-ferrari-dino-246gt-2"
+    },
+    {
+      "id": "882ba8ef-b249-42d1-8e99-2c9b9b2c5ee6",
+      "year": 1971,
+      "make": "Lotus",
+      "model": "Europa",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-lotus-europa-8"
+    },
+    {
+      "id": "fe49f87e-3519-44a0-8c7d-145975b85dbb",
+      "year": 1971,
+      "make": "AMC",
+      "model": "Javelin Trans-Am Tribute Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-amc-javelin-7"
+    },
+    {
+      "id": "19cb3913-b961-474c-8712-b7c603144311",
+      "year": 1971,
+      "make": "Morgan",
+      "model": "Plus 8",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-morgan-plus-8-3"
+    },
+    {
+      "id": "36d8eb08-04bf-464b-9222-cb43b3d812c3",
+      "year": 1971,
+      "make": "Ford",
+      "model": "Bronco Sport 302",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-ford-bronco-3"
+    },
+    {
+      "id": "8fdbd46b-a10d-4863-91b7-981b60ca8681",
+      "year": 1971,
+      "make": "Gilbern",
+      "model": "Invader MkII 4-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-gilbern-invader-mkii"
+    },
+    {
+      "id": "628a7c8f-d6bb-487a-b8cd-1d0ba82a6686",
+      "year": 1971,
+      "make": "Lotus",
+      "model": "Elan S4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-lotus-elan-s4-6"
+    },
+    {
+      "id": "642554f1-3bec-42f7-9193-78255a9ccddc",
+      "year": 1971,
+      "make": "Ferrari",
+      "model": "365 GTB/4 Daytona Berlinetta",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-ferrari-365-gtb-4-daytona-coupe-6"
+    },
+    {
+      "id": "6886b42b-1c14-4068-a0e4-984f1c2d625a",
+      "year": 1971,
+      "make": "Mercedes-Benz",
+      "model": "280SE 3.5 Coupe Project",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-mercedes-benz-280se-3-5-coupe-9"
+    },
+    {
+      "id": "747cb7e5-241f-49c2-9c71-6ff259a62f57",
+      "year": 1971,
+      "make": "Toyota",
+      "model": "Land Cruiser FJ40",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-fj40"
+    },
+    {
+      "id": "3b236a86-5ce5-40eb-b5c1-6028a9c07ba3",
+      "year": 1971,
+      "make": "OTAS",
+      "model": "Grand Prix",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-otas-grand-prix"
+    },
+    {
+      "id": "cb1df367-d331-4869-8cca-d1c8051a10f6",
+      "year": 1971,
+      "make": "GAZ",
+      "model": "69",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-gaz-69-a"
+    },
+    {
+      "id": "b406a68e-2f26-4305-83ed-20ef7a8f15ee",
+      "year": 1971,
+      "make": "FKE",
+      "model": "Mole Enduro Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-go-kart-custom"
+    },
+    {
+      "id": "c3fa9ca3-1ef9-4bf3-8bde-539a17678919",
+      "year": 1971,
+      "make": "Alpine",
+      "model": "A110 1600S VB Rally Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-alpine-a-110-2"
+    },
+    {
+      "id": "6f8c377e-5553-4846-a2e2-c0ded3b273ce",
+      "year": 1971,
+      "make": "Chevron",
+      "model": "B19",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-chevron-b19-3"
+    },
+    {
+      "id": "9bc1995c-3a30-4949-a6de-cad861aac6c0",
+      "year": 1971,
+      "make": "Lotus",
+      "model": "Elan Plus 2S Race Car",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-elan-plus-2-race-car"
+    },
+    {
+      "id": "8fd6c811-0452-407d-b2ef-2c06722ecea5",
+      "year": 1971,
+      "make": "Mercedes-Benz",
+      "model": "280SE 3.5 Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-mercedes-benz-280se-coupe-3-5-10"
+    },
+    {
+      "id": "4b0688db-2a68-4126-8868-75573a00f493",
+      "year": 1971,
+      "make": "Jaguar",
+      "model": "XKE Roadster 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-jaguar-xke-roadster-series-ii"
+    },
+    {
+      "id": "2a63be5d-8d4f-44cf-b3ab-e6dbfb2720f1",
+      "year": 1971,
+      "make": "TVR",
+      "model": "Vixen 2500 V8 5-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-tvr-2500-v8-conversion-2"
+    },
+    {
+      "id": "038fee4b-39ad-4cbc-b7bb-a85ea2f662ad",
+      "year": 1971,
+      "make": "Moto",
+      "model": "Guzzi Ambassador",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-moto-guzzi-750-ambassador"
+    },
+    {
+      "id": "c8327c95-56e4-494f-ab06-1809f33c159b",
+      "year": 1971,
+      "make": "Honda",
+      "model": "CB350",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-honda-cb350-k3-2"
+    },
+    {
+      "id": "b32e22c8-8132-40d7-a742-ee072227faca",
+      "year": 1971,
+      "make": "Mercedes-Benz",
+      "model": "280SE 3.5 Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-mercedes-benz-280se-coupe-3"
+    },
+    {
+      "id": "b4aa4b6d-7b4e-4a2e-9889-32132eb72d65",
+      "year": 1971,
+      "make": "Penton",
+      "model": "Six-Day 125",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-penton-125cc-six-days"
+    },
+    {
+      "id": "a105dd44-8cd4-4bfb-877f-5c8a0ca490cf",
+      "year": 1971,
+      "make": "Rupp",
+      "model": "D-301 Go-Kart",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-rupp-d-301"
+    },
+    {
+      "id": "51d5fce7-905c-4820-a01e-3c37166060ca",
+      "year": 1971,
+      "make": "Mercedes-Benz",
+      "model": "280SL",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1971-mercedes-benz-280sl-15"
+    },
+    {
+      "id": "d690b2ce-3689-499c-a01f-cb9de0c03347",
+      "year": 1970,
+      "make": "Porsche",
+      "model": "914-6",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-porsche-914-6-116"
+    },
+    {
+      "id": "83cad428-445d-42be-bd3a-cac77dc00f00",
+      "year": 1970,
+      "make": "Alfa Romeo",
+      "model": "Junior Z 3",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-alfa-romeo-junior-z-3"
+    },
+    {
+      "id": "a88b4f4b-3e4d-49b6-aa4f-0c1ad84843fa",
+      "year": 1970,
+      "make": "Chevrolet",
+      "model": "Camaro Z28 4-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-chevrolet-camaro-61"
+    },
+    {
+      "id": "f3c134b9-629d-4cb8-9e9d-5cf881ea8ae2",
+      "year": 1970,
+      "make": "Honda",
+      "model": "N600 4-Speed",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-honda-n600-5"
+    },
+    {
+      "id": "8a9a59b3-4e19-40b7-bb92-ebf9c09ee3fd",
+      "year": 1970,
+      "make": "Honda",
+      "model": "CT70 Trail",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-honda-ct70-trail-5"
+    },
+    {
+      "id": "68dd8827-95d2-4c6f-bcf5-50840be41660",
+      "year": 1970,
+      "make": "Buick",
+      "model": "GSX Stage 1",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-buick-gsx"
+    },
+    {
+      "id": "4d2fbf80-4654-4264-9b82-e8242dd0b21d",
+      "year": 1970,
+      "make": "Yamaha",
+      "model": "R5 350",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-yamaha-r5"
+    },
+    {
+      "id": "30f7fa66-8272-4186-ac48-11e67d5e8d41",
+      "year": 1970,
+      "make": "Moto",
+      "model": "Guzzi Ambassador 750",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-moto-guzzi-ambassador-750-3"
+    },
+    {
+      "id": "3abcf9c7-2c11-4686-b4e5-cb6930518d05",
+      "year": 1970,
+      "make": "Moto",
+      "model": "Guzzi Ambassador 750",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-moto-guzzi-ambassador-750-6"
+    },
+    {
+      "id": "5858ef19-d091-4829-ae18-2c1d32f1ab73",
+      "year": 1970,
+      "make": "Royale",
+      "model": "RP4",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-royale-rp4-3"
+    },
+    {
+      "id": "712363a2-3aef-449d-8d52-58a0b2fda908",
+      "year": 1970,
+      "make": "Jaguar",
+      "model": "XKE 4.2 Fixed Head Coupe",
+      "source_label": "Bring a Trailer",
+      "url": "https://bringatrailer.com/listing/1970-jaguar-e-type-4-2-series-2-fhc"
+    }
+  ]
+}
