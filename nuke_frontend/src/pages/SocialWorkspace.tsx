@@ -41,35 +41,89 @@ interface ConnectedAccount {
 interface ViralPost {
   id: string;
   author: string;
-  author_avatar?: string;
   handle: string;
   text: string;
   likes: number;
   retweets: number;
   replies: number;
-  posted_at: string;
-  url?: string;
 }
 
+// X Icons as simple SVG components
+const IconX = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+  </svg>
+);
+
+const IconImage = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <circle cx="8.5" cy="8.5" r="1.5"/>
+    <path d="M21 15l-5-5L5 21"/>
+  </svg>
+);
+
+const IconSend = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+  </svg>
+);
+
+const IconReply = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+  </svg>
+);
+
+const IconRetweet = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+    <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+  </svg>
+);
+
+const IconHeart = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+  </svg>
+);
+
+const IconSparkle = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/>
+  </svg>
+);
+
 // Resizable panel hook
-function useResizable(initialWidth: number, minWidth: number, maxWidth: number) {
+function useResizable(initialWidth: number, minWidth: number, maxWidth: number, side: 'left' | 'right' = 'left') {
   const [width, setWidth] = useState(initialWidth);
   const isResizing = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(initialWidth);
 
   const startResize = useCallback((e: React.MouseEvent) => {
     isResizing.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
     e.preventDefault();
-  }, []);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [width]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing.current) return;
-      const newWidth = Math.min(maxWidth, Math.max(minWidth, e.clientX));
+      const delta = side === 'left'
+        ? e.clientX - startX.current
+        : startX.current - e.clientX;
+      const newWidth = Math.min(maxWidth, Math.max(minWidth, startWidth.current + delta));
       setWidth(newWidth);
     };
 
     const handleMouseUp = () => {
       isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -79,7 +133,7 @@ function useResizable(initialWidth: number, minWidth: number, maxWidth: number) 
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [minWidth, maxWidth]);
+  }, [minWidth, maxWidth, side]);
 
   return { width, startResize };
 }
@@ -108,8 +162,8 @@ export default function SocialWorkspace() {
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Resizable panels
-  const leftPanel = useResizable(280, 200, 400);
-  const rightPanel = useResizable(360, 280, 500);
+  const leftPanel = useResizable(240, 180, 360, 'left');
+  const rightPanel = useResizable(320, 240, 440, 'right');
 
   useEffect(() => {
     loadUserData();
@@ -124,7 +178,6 @@ export default function SocialWorkspace() {
 
     setUserId(user.id);
 
-    // Load connected accounts
     const { data: identities } = await supabase
       .from('external_identities')
       .select('platform, handle, metadata')
@@ -140,19 +193,13 @@ export default function SocialWorkspace() {
       })));
     }
 
-    // Load user's vehicles with correct column names
-    const { data: userVehicles, error: vehiclesError } = await supabase
+    const { data: userVehicles } = await supabase
       .from('vehicles')
       .select('id, year, make, model, engine_type, transmission, color, mileage, notes')
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (vehiclesError) {
-      console.error('Failed to load vehicles:', vehiclesError);
-    }
-
     if (userVehicles) {
-      // Get all images for vehicles
       const vehicleIds = userVehicles.map(v => v.id);
       let allImages: VehicleImage[] = [];
 
@@ -167,7 +214,6 @@ export default function SocialWorkspace() {
         setRecentImages(allImages);
       }
 
-      // Add thumbnails and image arrays to vehicles
       const vehiclesWithImages = userVehicles.map(v => {
         const vehicleImgs = allImages.filter(img => img.vehicle_id === v.id);
         return {
@@ -178,7 +224,6 @@ export default function SocialWorkspace() {
       });
 
       setVehicles(vehiclesWithImages);
-
       if (vehiclesWithImages.length > 0) {
         setSelectedVehicle(vehiclesWithImages[0]);
       }
@@ -197,7 +242,6 @@ export default function SocialWorkspace() {
       if (selectedVehicle.transmission) vehicleDetails.push(`Trans: ${selectedVehicle.transmission}`);
       if (selectedVehicle.color) vehicleDetails.push(`Color: ${selectedVehicle.color}`);
       if (selectedVehicle.mileage) vehicleDetails.push(`${selectedVehicle.mileage.toLocaleString()} miles`);
-      if (selectedVehicle.notes) vehicleDetails.push(selectedVehicle.notes);
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-viral-content`,
@@ -228,12 +272,11 @@ export default function SocialWorkspace() {
           id: `gen-${Date.now()}-${i}`,
           text: post.text,
           images: images,
-          source: post.hook_type || 'AI Generated',
+          source: post.hook_type || 'AI',
           vehicle: selectedVehicle
         }));
 
         setSuggestions(newSuggestions);
-
         if (newSuggestions.length > 0) {
           setSelectedContent(newSuggestions[0]);
           setComposeText(newSuggestions[0].text);
@@ -278,18 +321,12 @@ export default function SocialWorkspace() {
 
       const result = await response.json();
 
-      if (result.error) {
-        console.error('Meme generation error:', result.error);
-        await generateContent();
-        return;
-      }
-
       if (result.posts) {
         const newSuggestions: ContentSuggestion[] = result.posts.map((post: any, i: number) => ({
           id: `meme-${Date.now()}-${i}`,
           text: post.text,
           images: images,
-          source: `Grok: ${post.format}`,
+          source: `Grok`,
           vehicle: selectedVehicle
         }));
 
@@ -309,7 +346,6 @@ export default function SocialWorkspace() {
       }
     } catch (err) {
       console.error('Meme generation failed:', err);
-      await generateContent();
     } finally {
       setGenerating(false);
     }
@@ -336,18 +372,14 @@ export default function SocialWorkspace() {
           },
           body: JSON.stringify({
             user_id: userId,
-            message: "What are the top 5 viral car posts on X right now? Give me the authors, engagement numbers, and what makes them work. Format as a list.",
+            message: "What are the top 5 viral car posts on X right now? Give me the authors, engagement numbers, and what makes them work.",
             conversation_history: []
           })
         }
       );
 
       const result = await response.json();
-
-      // Parse Grok's response into viral posts (mock structure since we can't fetch real posts without premium API)
-      // In production, this would use X API v2 with academic/enterprise access
       if (result.reply) {
-        // Store as a single "insight" post for now
         setViralPosts([{
           id: 'grok-insight',
           author: 'Grok Analysis',
@@ -355,8 +387,7 @@ export default function SocialWorkspace() {
           text: result.reply,
           likes: 0,
           retweets: 0,
-          replies: 0,
-          posted_at: new Date().toISOString()
+          replies: 0
         }]);
       }
     } catch (err) {
@@ -421,10 +452,7 @@ export default function SocialWorkspace() {
 
       const result = await response.json();
       if (result.replies?.[0]) {
-        setReplyDrafts(prev => ({
-          ...prev,
-          [post.id]: result.replies[0].text
-        }));
+        setReplyDrafts(prev => ({ ...prev, [post.id]: result.replies[0].text }));
       }
     } catch (err) {
       console.error('Failed to generate reply:', err);
@@ -508,14 +536,7 @@ export default function SocialWorkspace() {
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: '#000',
-        color: '#71767b'
-      }}>
+      <div className="flex items-center justify-center h-screen" style={{ background: 'var(--bg)', color: 'var(--text-secondary)' }}>
         Loading...
       </div>
     );
@@ -524,13 +545,12 @@ export default function SocialWorkspace() {
   const hoveredVehicleData = vehicles.find(v => v.id === hoveredVehicle);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#000', color: '#e7e9ea' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-family)', fontSize: 'var(--fs-10)' }}>
       {/* Header */}
       <div style={{
-        borderBottom: '1px solid #2f3336',
-        background: 'rgba(0,0,0,0.65)',
-        backdropFilter: 'blur(12px)',
-        padding: '12px 20px',
+        borderBottom: '2px solid var(--border)',
+        background: 'var(--surface)',
+        padding: '8px 12px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -538,23 +558,19 @@ export default function SocialWorkspace() {
         top: 0,
         zIndex: 100
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {xAccount?.avatar ? (
-              <img src={xAccount.avatar} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-            ) : (
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#333' }} />
-            )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <IconX />
             <div>
-              <div style={{ fontSize: '15px', fontWeight: 700 }}>Content Studio</div>
-              <div style={{ fontSize: '13px', color: '#71767b' }}>
+              <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>Content Studio</div>
+              <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)' }}>
                 {xAccount ? `@${xAccount.handle}` : 'Connect X'}
-                {xAccount?.connected && <span style={{ color: '#00ba7c', marginLeft: '6px' }}>●</span>}
+                {xAccount?.connected && <span style={{ color: 'var(--success)', marginLeft: '4px' }}>connected</span>}
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '2px', background: '#16181c', padding: '4px', borderRadius: '9999px' }}>
+          <div style={{ display: 'flex', gap: '2px', background: 'var(--bg)', padding: '2px', borderRadius: 'var(--radius)', border: '2px solid var(--border)' }}>
             {(['create', 'engage', 'viral', 'grok'] as const).map(tab => (
               <button
                 key={tab}
@@ -563,61 +579,47 @@ export default function SocialWorkspace() {
                   if (tab === 'engage' && engagementPosts.length === 0) findPostsToEngage();
                   if (tab === 'viral' && viralPosts.length === 0) findViralPosts();
                 }}
+                className="btn-utility"
                 style={{
-                  padding: '8px 16px',
-                  background: activeTab === tab ? '#eff3f4' : 'transparent',
-                  color: activeTab === tab ? '#0f1419' : '#71767b',
+                  background: activeTab === tab ? 'var(--text)' : 'transparent',
+                  color: activeTab === tab ? 'var(--surface)' : 'var(--text-secondary)',
                   border: 'none',
-                  borderRadius: '9999px',
-                  fontSize: '14px',
-                  fontWeight: activeTab === tab ? 700 : 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  padding: '4px 12px',
+                  fontSize: 'var(--fs-9)',
+                  fontWeight: 600
                 }}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab}
               </button>
             ))}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ fontSize: '13px', color: '#71767b' }}>
-            {vehicles.length} vehicles · {recentImages.length} photos
-          </div>
+        <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)' }}>
+          {vehicles.length} vehicles / {recentImages.length} photos
         </div>
       </div>
 
       {activeTab === 'create' ? (
-        <div style={{ display: 'flex', height: 'calc(100vh - 57px)' }}>
+        <div style={{ display: 'flex', height: 'calc(100vh - 49px)' }}>
           {/* Left Panel - Vehicles */}
-          <div
-            style={{
-              width: leftPanel.width,
-              borderRight: '1px solid #2f3336',
-              background: '#000',
-              overflow: 'auto',
-              flexShrink: 0
-            }}
-          >
-            <div style={{ padding: '16px' }}>
-              <div style={{
-                fontSize: '13px',
-                fontWeight: 700,
-                color: '#71767b',
-                marginBottom: '16px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                Your Builds
+          <div style={{
+            width: leftPanel.width,
+            borderRight: '2px solid var(--border)',
+            background: 'var(--surface)',
+            overflow: 'auto',
+            flexShrink: 0,
+            position: 'relative'
+          }}>
+            <div style={{ padding: '12px' }}>
+              <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Vehicles
               </div>
 
               {vehicles.length === 0 ? (
-                <div style={{ color: '#71767b', fontSize: '14px', padding: '20px 0' }}>
-                  No vehicles yet
-                </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-9)', padding: '12px 0' }}>No vehicles</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {vehicles.map(v => (
                     <div
                       key={v.id}
@@ -627,105 +629,39 @@ export default function SocialWorkspace() {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px',
-                        borderRadius: '12px',
+                        gap: '8px',
+                        padding: '8px',
+                        borderRadius: 'var(--radius)',
                         cursor: 'pointer',
-                        background: selectedVehicle?.id === v.id ? '#1d9bf0' : 'transparent',
-                        transition: 'background 0.15s'
-                      }}
-                      onMouseOver={(e) => {
-                        if (selectedVehicle?.id !== v.id) {
-                          e.currentTarget.style.background = '#16181c';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (selectedVehicle?.id !== v.id) {
-                          e.currentTarget.style.background = 'transparent';
-                        }
+                        background: selectedVehicle?.id === v.id ? 'var(--text)' : 'transparent',
+                        color: selectedVehicle?.id === v.id ? 'var(--surface)' : 'var(--text)',
+                        border: '2px solid transparent',
+                        transition: 'var(--transition)'
                       }}
                     >
                       {v.thumbnail ? (
-                        <img
-                          src={v.thumbnail}
-                          alt=""
-                          style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '8px',
-                            objectFit: 'cover',
-                            border: selectedVehicle?.id === v.id ? '2px solid #fff' : 'none'
-                          }}
-                        />
+                        <img src={v.thumbnail} alt="" style={{ width: '36px', height: '36px', borderRadius: 'var(--radius)', objectFit: 'cover' }} />
                       ) : (
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '8px',
-                          background: '#2f3336',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '20px'
-                        }}>
-                          🚗
-                        </div>
+                        <div style={{ width: '36px', height: '36px', borderRadius: 'var(--radius)', background: 'var(--border)' }} />
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: '15px',
-                          fontWeight: 700,
-                          color: selectedVehicle?.id === v.id ? '#fff' : '#e7e9ea'
-                        }}>
+                        <div style={{ fontSize: 'var(--fs-10)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {v.year} {v.make}
                         </div>
-                        <div style={{
-                          fontSize: '13px',
-                          color: selectedVehicle?.id === v.id ? 'rgba(255,255,255,0.8)' : '#71767b'
-                        }}>
-                          {v.model}
-                        </div>
-                        {v.engine_type && (
-                          <div style={{
-                            fontSize: '12px',
-                            color: selectedVehicle?.id === v.id ? 'rgba(255,255,255,0.6)' : '#536471',
-                            marginTop: '2px'
-                          }}>
-                            {v.engine_type}
-                          </div>
-                        )}
+                        <div style={{ fontSize: 'var(--fs-9)', opacity: 0.7 }}>{v.model}</div>
                       </div>
-                      <div style={{
-                        fontSize: '12px',
-                        color: selectedVehicle?.id === v.id ? 'rgba(255,255,255,0.6)' : '#536471'
-                      }}>
-                        {v.images?.length || 0}
-                      </div>
+                      <div style={{ fontSize: 'var(--fs-8)', opacity: 0.5 }}>{v.images?.length || 0}</div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Photo Grid */}
-            <div style={{ padding: '16px', borderTop: '1px solid #2f3336' }}>
-              <div style={{
-                fontSize: '13px',
-                fontWeight: 700,
-                color: '#71767b',
-                marginBottom: '12px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+            <div style={{ padding: '12px', borderTop: '2px solid var(--border)' }}>
+              <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Photos
               </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '2px',
-                borderRadius: '12px',
-                overflow: 'hidden'
-              }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px' }}>
                 {recentImages.slice(0, 9).map(img => (
                   <img
                     key={img.id}
@@ -740,9 +676,10 @@ export default function SocialWorkspace() {
                       width: '100%',
                       aspectRatio: '1',
                       objectFit: 'cover',
+                      borderRadius: 'var(--radius)',
                       cursor: 'pointer',
                       opacity: composeImages.includes(img.image_url) ? 0.5 : 1,
-                      transition: 'opacity 0.15s'
+                      border: composeImages.includes(img.image_url) ? '2px solid var(--accent)' : '2px solid transparent'
                     }}
                   />
                 ))}
@@ -757,334 +694,154 @@ export default function SocialWorkspace() {
                 right: 0,
                 top: 0,
                 bottom: 0,
-                width: '4px',
+                width: '6px',
                 cursor: 'col-resize',
                 background: 'transparent'
               }}
-              onMouseOver={(e) => e.currentTarget.style.background = '#1d9bf0'}
-              onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-dim)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             />
           </div>
 
           {/* Center - Composer */}
-          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-            {/* Generate Buttons */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
             {selectedVehicle && (
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginBottom: '16px'
-                }}>
-                  <div style={{
-                    fontSize: '18px',
-                    fontWeight: 700
-                  }}>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>
                     {selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}
                   </div>
                   {selectedVehicle.engine_type && (
-                    <span style={{
-                      fontSize: '13px',
-                      color: '#71767b',
-                      background: '#16181c',
-                      padding: '4px 10px',
-                      borderRadius: '9999px'
-                    }}>
+                    <span style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', background: 'var(--bg)', padding: '2px 6px', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
                       {selectedVehicle.engine_type}
                     </span>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button
-                    onClick={generateContent}
-                    disabled={generating}
-                    style={{
-                      flex: 1,
-                      padding: '14px 20px',
-                      background: '#eff3f4',
-                      color: '#0f1419',
-                      border: 'none',
-                      borderRadius: '9999px',
-                      fontSize: '15px',
-                      fontWeight: 700,
-                      cursor: generating ? 'not-allowed' : 'pointer',
-                      opacity: generating ? 0.5 : 1,
-                      transition: 'opacity 0.15s'
-                    }}
-                  >
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={generateContent} disabled={generating} className="btn-primary" style={{ flex: 1, opacity: generating ? 0.5 : 1 }}>
                     {generating ? 'Generating...' : 'Generate Captions'}
                   </button>
-                  <button
-                    onClick={generateMeme}
-                    disabled={generating}
-                    style={{
-                      flex: 1,
-                      padding: '14px 20px',
-                      background: 'linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '9999px',
-                      fontSize: '15px',
-                      fontWeight: 700,
-                      cursor: generating ? 'not-allowed' : 'pointer',
-                      opacity: generating ? 0.5 : 1,
-                      transition: 'opacity 0.15s'
-                    }}
-                  >
-                    {generating ? 'Creating...' : 'Ask Grok'}
+                  <button onClick={generateMeme} disabled={generating} className="btn-primary" style={{ flex: 1, opacity: generating ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                    <IconSparkle /> {generating ? 'Creating...' : 'Ask Grok'}
                   </button>
                 </div>
               </div>
             )}
 
             {/* Composer */}
-            <div style={{
-              background: '#16181c',
-              borderRadius: '16px',
-              border: '1px solid #2f3336',
-              overflow: 'hidden'
-            }}>
-              <div style={{ display: 'flex', padding: '16px', gap: '12px' }}>
-                {xAccount?.avatar ? (
-                  <img src={xAccount.avatar} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                ) : (
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#2f3336' }} />
-                )}
-                <div style={{ flex: 1 }}>
-                  <textarea
-                    value={composeText}
-                    onChange={(e) => setComposeText(e.target.value)}
-                    placeholder="What's happening?"
-                    style={{
-                      width: '100%',
-                      minHeight: '120px',
-                      background: 'transparent',
-                      border: 'none',
-                      fontSize: '20px',
-                      color: '#e7e9ea',
-                      resize: 'none',
-                      outline: 'none',
-                      fontFamily: 'inherit',
-                      lineHeight: 1.4
-                    }}
-                  />
+            <div className="card">
+              <div style={{ padding: '12px' }}>
+                <textarea
+                  value={composeText}
+                  onChange={(e) => setComposeText(e.target.value)}
+                  placeholder="What's happening?"
+                  style={{
+                    width: '100%',
+                    minHeight: '100px',
+                    background: 'var(--bg)',
+                    border: '2px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    padding: '8px',
+                    fontSize: 'var(--fs-10)',
+                    color: 'var(--text)',
+                    resize: 'vertical',
+                    fontFamily: 'var(--font-family)'
+                  }}
+                />
 
-                  {composeImages.length > 0 && (
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: composeImages.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-                      gap: '4px',
-                      marginTop: '12px',
-                      borderRadius: '16px',
-                      overflow: 'hidden'
-                    }}>
-                      {composeImages.map((img, i) => (
-                        <div key={i} style={{ position: 'relative' }}>
-                          <img
-                            src={img}
-                            alt=""
-                            style={{
-                              width: '100%',
-                              height: composeImages.length === 1 ? '300px' : '150px',
-                              objectFit: 'cover'
-                            }}
-                          />
-                          <button
-                            onClick={() => setComposeImages(prev => prev.filter((_, idx) => idx !== i))}
-                            style={{
-                              position: 'absolute',
-                              top: '8px',
-                              right: '8px',
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '50%',
-                              background: 'rgba(15,20,25,0.75)',
-                              color: '#fff',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '16px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {composeImages.length > 0 && (
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
+                    {composeImages.map((img, i) => (
+                      <div key={i} style={{ position: 'relative' }}>
+                        <img src={img} alt="" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: 'var(--radius)' }} />
+                        <button
+                          onClick={() => setComposeImages(prev => prev.filter((_, idx) => idx !== i))}
+                          style={{
+                            position: 'absolute',
+                            top: '-4px',
+                            right: '-4px',
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            background: 'var(--text)',
+                            color: 'var(--surface)',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >x</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px 16px',
-                borderTop: '1px solid #2f3336'
-              }}>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#1d9bf0',
-                    cursor: 'pointer',
-                    fontSize: '18px'
-                  }}>
-                    🖼️
-                  </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderTop: '2px solid var(--border)' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <IconImage />
+                  <span style={{ fontSize: 'var(--fs-9)', color: composeText.length > 280 ? 'var(--error)' : 'var(--text-secondary)' }}>
+                    {composeText.length}/280
+                  </span>
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    border: `2px solid ${composeText.length > 280 ? '#f4212e' : composeText.length > 260 ? '#ffd400' : '#2f3336'}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '10px',
-                    color: composeText.length > 280 ? '#f4212e' : '#71767b'
-                  }}>
-                    {composeText.length > 260 && (280 - composeText.length)}
-                  </div>
-
-                  <button
-                    onClick={postNow}
-                    disabled={!composeText.trim() || composeText.length > 280 || posting || !xAccount?.connected}
-                    style={{
-                      padding: '10px 20px',
-                      background: composeText.trim() && composeText.length <= 280 && !posting && xAccount?.connected
-                        ? '#eff3f4'
-                        : '#787a7a',
-                      color: composeText.trim() && composeText.length <= 280 && !posting && xAccount?.connected
-                        ? '#0f1419'
-                        : '#0f1419',
-                      border: 'none',
-                      borderRadius: '9999px',
-                      fontSize: '15px',
-                      fontWeight: 700,
-                      cursor: composeText.trim() && composeText.length <= 280 && !posting && xAccount?.connected
-                        ? 'pointer'
-                        : 'not-allowed',
-                      opacity: composeText.trim() && composeText.length <= 280 && !posting && xAccount?.connected ? 1 : 0.5
-                    }}
-                  >
-                    {posting ? 'Posting...' : 'Post'}
-                  </button>
-                </div>
+                <button
+                  onClick={postNow}
+                  disabled={!composeText.trim() || composeText.length > 280 || posting || !xAccount?.connected}
+                  className="btn-primary"
+                  style={{ opacity: (!composeText.trim() || composeText.length > 280 || posting || !xAccount?.connected) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <IconSend /> {posting ? 'Posting...' : 'Post'}
+                </button>
               </div>
             </div>
 
-            {/* AI Generated Image */}
+            {/* Generated Image */}
             {generatedImage && (
-              <div style={{ marginTop: '20px' }}>
-                <div style={{
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  color: '#7856ff',
-                  marginBottom: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span>✨</span> Grok Generated
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <IconSparkle /> Grok Generated
                 </div>
-                <div style={{
-                  position: 'relative',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  border: '2px solid #7856ff'
-                }}>
+                <div className="card" style={{ overflow: 'hidden' }}>
                   <img src={generatedImage} alt="Generated" style={{ width: '100%', display: 'block' }} />
-                  <button
-                    onClick={() => {
-                      if (!composeImages.includes(generatedImage)) {
-                        setComposeImages(prev => [generatedImage, ...prev]);
-                      }
-                    }}
-                    style={{
-                      position: 'absolute',
-                      bottom: '12px',
-                      right: '12px',
-                      padding: '10px 20px',
-                      background: composeImages.includes(generatedImage) ? '#00ba7c' : '#eff3f4',
-                      color: composeImages.includes(generatedImage) ? '#fff' : '#0f1419',
-                      border: 'none',
-                      borderRadius: '9999px',
-                      fontSize: '14px',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {composeImages.includes(generatedImage) ? '✓ Added' : 'Use This'}
-                  </button>
+                  <div style={{ padding: '8px' }}>
+                    <button
+                      onClick={() => {
+                        if (!composeImages.includes(generatedImage)) {
+                          setComposeImages(prev => [generatedImage, ...prev]);
+                        }
+                      }}
+                      className="btn-utility"
+                      style={{ width: '100%' }}
+                    >
+                      {composeImages.includes(generatedImage) ? 'Added' : 'Use This'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Preview */}
             {composeText && (
-              <div style={{ marginTop: '24px' }}>
-                <div style={{
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  color: '#71767b',
-                  marginBottom: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Preview
                 </div>
-                <div style={{
-                  background: '#16181c',
-                  borderRadius: '16px',
-                  border: '1px solid #2f3336',
-                  padding: '16px'
-                }}>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    {xAccount?.avatar ? (
-                      <img src={xAccount.avatar} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                    ) : (
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#2f3336' }} />
-                    )}
+                <div className="card" style={{ padding: '12px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--border)' }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontWeight: 700, fontSize: '15px' }}>{xAccount?.handle || 'You'}</span>
-                        <span style={{ color: '#71767b', fontSize: '15px' }}>@{xAccount?.handle || 'handle'}</span>
-                        <span style={{ color: '#71767b' }}>·</span>
-                        <span style={{ color: '#71767b', fontSize: '15px' }}>now</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: 700, fontSize: 'var(--fs-10)' }}>{xAccount?.handle || 'You'}</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-9)' }}>@{xAccount?.handle || 'handle'}</span>
                       </div>
-                      <div style={{ marginTop: '4px', fontSize: '15px', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-                        {composeText}
-                      </div>
+                      <div style={{ fontSize: 'var(--fs-10)', whiteSpace: 'pre-wrap' }}>{composeText}</div>
                       {composeImages.length > 0 && (
-                        <div style={{
-                          marginTop: '12px',
-                          display: 'grid',
-                          gridTemplateColumns: composeImages.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-                          gap: '4px',
-                          borderRadius: '16px',
-                          overflow: 'hidden'
-                        }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: composeImages.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: '2px', marginTop: '8px', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                           {composeImages.slice(0, 4).map((img, i) => (
-                            <img
-                              key={i}
-                              src={img}
-                              alt=""
-                              style={{
-                                width: '100%',
-                                height: composeImages.length === 1 ? '280px' : '140px',
-                                objectFit: 'cover'
-                              }}
-                            />
+                            <img key={i} src={img} alt="" style={{ width: '100%', height: composeImages.length === 1 ? '200px' : '100px', objectFit: 'cover' }} />
                           ))}
                         </div>
                       )}
@@ -1098,104 +855,53 @@ export default function SocialWorkspace() {
           {/* Right Panel - Suggestions */}
           <div style={{
             width: rightPanel.width,
-            borderLeft: '1px solid #2f3336',
-            background: '#000',
+            borderLeft: '2px solid var(--border)',
+            background: 'var(--surface)',
             overflow: 'auto',
             flexShrink: 0,
             position: 'relative'
           }}>
             {/* Resize Handle */}
             <div
-              onMouseDown={(e) => {
-                e.preventDefault();
-                const startX = e.clientX;
-                const startWidth = rightPanel.width;
-
-                const handleMouseMove = (e: MouseEvent) => {
-                  const delta = startX - e.clientX;
-                  const newWidth = Math.min(500, Math.max(280, startWidth + delta));
-                  // Can't update rightPanel width directly, need to manage differently
-                };
-
-                document.addEventListener('mousemove', handleMouseMove);
-                document.addEventListener('mouseup', () => {
-                  document.removeEventListener('mousemove', handleMouseMove);
-                }, { once: true });
-              }}
+              onMouseDown={rightPanel.startResize}
               style={{
                 position: 'absolute',
                 left: 0,
                 top: 0,
                 bottom: 0,
-                width: '4px',
+                width: '6px',
                 cursor: 'col-resize',
                 background: 'transparent'
               }}
-              onMouseOver={(e) => e.currentTarget.style.background = '#1d9bf0'}
-              onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-dim)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             />
 
-            <div style={{ padding: '16px' }}>
-              <div style={{
-                fontSize: '13px',
-                fontWeight: 700,
-                color: '#71767b',
-                marginBottom: '16px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                Generated Content
+            <div style={{ padding: '12px' }}>
+              <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Generated
               </div>
 
               {suggestions.length === 0 ? (
-                <div style={{
-                  color: '#71767b',
-                  fontSize: '14px',
-                  padding: '40px 20px',
-                  textAlign: 'center',
-                  background: '#16181c',
-                  borderRadius: '16px'
-                }}>
-                  Select a vehicle and generate content
+                <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-9)', padding: '20px', textAlign: 'center', background: 'var(--bg)', borderRadius: 'var(--radius)', border: '2px solid var(--border)' }}>
+                  Select a vehicle and generate
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {suggestions.map(s => (
                     <div
                       key={s.id}
                       onClick={() => selectSuggestion(s)}
+                      className="card"
                       style={{
-                        padding: '16px',
-                        borderRadius: '16px',
-                        border: selectedContent?.id === s.id ? '2px solid #1d9bf0' : '1px solid #2f3336',
+                        padding: '10px',
                         cursor: 'pointer',
-                        background: selectedContent?.id === s.id ? '#16181c' : 'transparent',
-                        transition: 'all 0.15s'
+                        border: selectedContent?.id === s.id ? '2px solid var(--accent)' : '2px solid var(--border)'
                       }}
                     >
-                      <div style={{
-                        fontSize: '15px',
-                        lineHeight: 1.4,
-                        marginBottom: '8px',
-                        color: '#e7e9ea'
-                      }}>
-                        {s.text}
-                      </div>
-                      <div style={{
-                        fontSize: '13px',
-                        color: '#71767b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        <span style={{
-                          background: '#16181c',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontSize: '12px'
-                        }}>
-                          {s.source}
-                        </span>
+                      <div style={{ fontSize: 'var(--fs-10)', marginBottom: '6px' }}>{s.text}</div>
+                      <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', display: 'flex', gap: '8px' }}>
+                        <span>{s.source}</span>
                         <span>{s.text.length}/280</span>
                       </div>
                     </div>
@@ -1206,174 +912,73 @@ export default function SocialWorkspace() {
           </div>
         </div>
       ) : activeTab === 'engage' ? (
-        <div style={{ height: 'calc(100vh - 57px)', overflow: 'auto', padding: '20px' }}>
-          <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '24px'
-            }}>
+        <div style={{ height: 'calc(100vh - 49px)', overflow: 'auto', padding: '16px' }}>
+          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>Engage</h2>
-                <p style={{ fontSize: '14px', color: '#71767b', marginTop: '4px' }}>
-                  Reply to posts to grow your following
-                </p>
+                <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>Engage</div>
+                <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)' }}>Reply to grow your following</div>
               </div>
-              <button
-                onClick={findPostsToEngage}
-                disabled={loadingEngagement}
-                style={{
-                  padding: '10px 20px',
-                  background: '#eff3f4',
-                  color: '#0f1419',
-                  border: 'none',
-                  borderRadius: '9999px',
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  cursor: loadingEngagement ? 'not-allowed' : 'pointer'
-                }}
-              >
+              <button onClick={findPostsToEngage} disabled={loadingEngagement} className="btn-primary">
                 {loadingEngagement ? 'Searching...' : 'Find Posts'}
               </button>
             </div>
 
             {engagementPosts.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '80px 20px',
-                color: '#71767b',
-                background: '#16181c',
-                borderRadius: '16px'
-              }}>
+              <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                 {loadingEngagement ? 'Finding posts...' : 'Click "Find Posts" to discover conversations'}
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {engagementPosts.map(post => (
-                  <div
-                    key={post.id}
-                    style={{
-                      background: '#16181c',
-                      border: '1px solid #2f3336',
-                      borderRadius: '16px',
-                      padding: '16px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: '#2f3336',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '16px'
-                      }}>
-                        👤
-                      </div>
+                  <div key={post.id} className="card" style={{ padding: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--border)' }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 700, fontSize: '15px' }}>{post.author || 'User'}</span>
-                          <span style={{ color: '#71767b', fontSize: '14px' }}>@{post.handle || 'handle'}</span>
+                          <span style={{ fontWeight: 700, fontSize: 'var(--fs-10)' }}>{post.author || 'User'}</span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-9)' }}>@{post.handle || 'handle'}</span>
                         </div>
-                        <div style={{ fontSize: '15px', lineHeight: 1.4 }}>{post.text}</div>
-                        <div style={{
-                          display: 'flex',
-                          gap: '16px',
-                          marginTop: '12px',
-                          color: '#71767b',
-                          fontSize: '13px'
-                        }}>
-                          <span>💬 {post.replies || 0}</span>
-                          <span>🔁 {post.retweets || 0}</span>
-                          <span>❤️ {post.likes || 0}</span>
+                        <div style={{ fontSize: 'var(--fs-10)' }}>{post.text}</div>
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px', color: 'var(--text-secondary)', fontSize: 'var(--fs-9)' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><IconReply /> {post.replies || 0}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><IconRetweet /> {post.retweets || 0}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><IconHeart /> {post.likes || 0}</span>
                         </div>
                       </div>
                     </div>
 
                     {replyDrafts[post.id] ? (
-                      <div style={{ marginTop: '16px', marginLeft: '52px' }}>
+                      <div style={{ marginTop: '12px', marginLeft: '40px' }}>
                         <textarea
                           value={replyDrafts[post.id]}
                           onChange={(e) => setReplyDrafts(prev => ({ ...prev, [post.id]: e.target.value }))}
                           style={{
                             width: '100%',
-                            padding: '12px',
-                            background: '#000',
-                            border: '1px solid #2f3336',
-                            borderRadius: '12px',
-                            fontSize: '15px',
-                            color: '#e7e9ea',
-                            minHeight: '80px',
-                            resize: 'none',
-                            outline: 'none'
+                            padding: '8px',
+                            background: 'var(--bg)',
+                            border: '2px solid var(--border)',
+                            borderRadius: 'var(--radius)',
+                            fontSize: 'var(--fs-10)',
+                            color: 'var(--text)',
+                            minHeight: '60px',
+                            resize: 'vertical'
                           }}
                         />
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginTop: '12px'
-                        }}>
-                          <span style={{
-                            fontSize: '13px',
-                            color: replyDrafts[post.id].length > 280 ? '#f4212e' : '#71767b'
-                          }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                          <span style={{ fontSize: 'var(--fs-9)', color: replyDrafts[post.id].length > 280 ? 'var(--error)' : 'var(--text-secondary)' }}>
                             {replyDrafts[post.id].length}/280
                           </span>
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              onClick={() => generateReplyForPost(post)}
-                              style={{
-                                padding: '8px 16px',
-                                background: 'transparent',
-                                border: '1px solid #536471',
-                                borderRadius: '9999px',
-                                color: '#e7e9ea',
-                                fontSize: '14px',
-                                fontWeight: 700,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Regenerate
-                            </button>
-                            <button
-                              onClick={() => postReply(post, replyDrafts[post.id])}
-                              disabled={!replyDrafts[post.id].trim() || replyDrafts[post.id].length > 280}
-                              style={{
-                                padding: '8px 16px',
-                                background: '#eff3f4',
-                                color: '#0f1419',
-                                border: 'none',
-                                borderRadius: '9999px',
-                                fontSize: '14px',
-                                fontWeight: 700,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Reply
-                            </button>
+                            <button onClick={() => generateReplyForPost(post)} className="btn-utility">Regenerate</button>
+                            <button onClick={() => postReply(post, replyDrafts[post.id])} disabled={!replyDrafts[post.id].trim() || replyDrafts[post.id].length > 280} className="btn-primary">Reply</button>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ marginTop: '16px', marginLeft: '52px' }}>
-                        <button
-                          onClick={() => generateReplyForPost(post)}
-                          style={{
-                            padding: '10px 20px',
-                            background: 'linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '9999px',
-                            fontSize: '14px',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Generate Reply
+                      <div style={{ marginTop: '12px', marginLeft: '40px' }}>
+                        <button onClick={() => generateReplyForPost(post)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <IconSparkle /> Generate Reply
                         </button>
                       </div>
                     )}
@@ -1384,85 +989,36 @@ export default function SocialWorkspace() {
           </div>
         </div>
       ) : activeTab === 'viral' ? (
-        <div style={{ height: 'calc(100vh - 57px)', overflow: 'auto', padding: '20px' }}>
-          <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '24px'
-            }}>
+        <div style={{ height: 'calc(100vh - 49px)', overflow: 'auto', padding: '16px' }}>
+          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>Viral Posts</h2>
-                <p style={{ fontSize: '14px', color: '#71767b', marginTop: '4px' }}>
-                  Learn from what's working on X right now
-                </p>
+                <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>Viral Posts</div>
+                <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)' }}>Learn from what works</div>
               </div>
-              <button
-                onClick={findViralPosts}
-                disabled={loadingViral}
-                style={{
-                  padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '9999px',
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  cursor: loadingViral ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {loadingViral ? 'Analyzing...' : 'Ask Grok'}
+              <button onClick={findViralPosts} disabled={loadingViral} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <IconSparkle /> {loadingViral ? 'Analyzing...' : 'Ask Grok'}
               </button>
             </div>
 
             {viralPosts.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '80px 20px',
-                color: '#71767b',
-                background: '#16181c',
-                borderRadius: '16px'
-              }}>
+              <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                 {loadingViral ? 'Analyzing viral content...' : 'Click "Ask Grok" to see what\'s trending'}
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {viralPosts.map(post => (
-                  <div
-                    key={post.id}
-                    style={{
-                      background: '#16181c',
-                      border: '1px solid #2f3336',
-                      borderRadius: '16px',
-                      padding: '20px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '20px'
-                      }}>
-                        ✨
+                  <div key={post.id} className="card" style={{ padding: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--surface)' }}>
+                        <IconSparkle />
                       </div>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '15px' }}>{post.author}</div>
-                        <div style={{ color: '#71767b', fontSize: '14px' }}>@{post.handle}</div>
+                        <div style={{ fontWeight: 700, fontSize: 'var(--fs-10)' }}>{post.author}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-9)' }}>@{post.handle}</div>
                       </div>
                     </div>
-                    <div style={{
-                      fontSize: '15px',
-                      lineHeight: 1.6,
-                      whiteSpace: 'pre-wrap'
-                    }}>
-                      {post.text}
-                    </div>
+                    <div style={{ fontSize: 'var(--fs-10)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{post.text}</div>
                   </div>
                 ))}
               </div>
@@ -1470,7 +1026,7 @@ export default function SocialWorkspace() {
           </div>
         </div>
       ) : userId ? (
-        <div style={{ height: 'calc(100vh - 57px)' }}>
+        <div style={{ height: 'calc(100vh - 49px)' }}>
           <GrokTerminal userId={userId} />
         </div>
       ) : null}
@@ -1480,52 +1036,32 @@ export default function SocialWorkspace() {
         <div
           style={{
             position: 'fixed',
-            left: hoverPosition.x + 20,
-            top: hoverPosition.y - 100,
-            background: '#16181c',
-            border: '1px solid #2f3336',
-            borderRadius: '16px',
-            padding: '12px',
+            left: Math.min(hoverPosition.x + 16, window.innerWidth - 220),
+            top: Math.max(16, hoverPosition.y - 80),
+            background: 'var(--surface)',
+            border: '2px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            padding: '8px',
             zIndex: 1000,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-            maxWidth: '300px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            width: '200px',
             pointerEvents: 'none'
           }}
         >
-          {hoveredVehicleData.images && hoveredVehicleData.images.length > 0 ? (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '4px',
-              marginBottom: '12px',
-              borderRadius: '12px',
-              overflow: 'hidden'
-            }}>
+          {hoveredVehicleData.images && hoveredVehicleData.images.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2px', marginBottom: '8px', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
               {hoveredVehicleData.images.slice(0, 4).map((img, i) => (
-                <img
-                  key={i}
-                  src={img}
-                  alt=""
-                  style={{
-                    width: '100%',
-                    height: '80px',
-                    objectFit: 'cover'
-                  }}
-                />
+                <img key={i} src={img} alt="" style={{ width: '100%', height: '48px', objectFit: 'cover' }} />
               ))}
             </div>
-          ) : null}
-          <div style={{ fontWeight: 700, fontSize: '14px' }}>
+          )}
+          <div style={{ fontWeight: 700, fontSize: 'var(--fs-10)' }}>
             {hoveredVehicleData.year} {hoveredVehicleData.make} {hoveredVehicleData.model}
           </div>
           {hoveredVehicleData.engine_type && (
-            <div style={{ fontSize: '13px', color: '#71767b', marginTop: '4px' }}>
-              {hoveredVehicleData.engine_type}
-            </div>
+            <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', marginTop: '2px' }}>{hoveredVehicleData.engine_type}</div>
           )}
-          <div style={{ fontSize: '12px', color: '#536471', marginTop: '4px' }}>
-            {hoveredVehicleData.images?.length || 0} photos
-          </div>
+          <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-disabled)', marginTop: '2px' }}>{hoveredVehicleData.images?.length || 0} photos</div>
         </div>
       )}
     </div>
