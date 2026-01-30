@@ -97,30 +97,38 @@ CREATE TABLE IF NOT EXISTS vehicles (
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vehicles ENABLE ROW LEVEL SECURITY;
 
--- Create policies for profiles
+-- Create policies for profiles (drop if exists to handle re-runs)
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
 CREATE POLICY "Public profiles are viewable by everyone" ON profiles
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON profiles;
 CREATE POLICY "Users can insert their own profile" ON profiles
     FOR INSERT WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
 CREATE POLICY "Users can update their own profile" ON profiles
     FOR UPDATE USING (auth.uid() = id);
 
 -- Create policies for vehicles
+DROP POLICY IF EXISTS "Users can view their own vehicles" ON vehicles;
 CREATE POLICY "Users can view their own vehicles" ON vehicles
     FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own vehicles" ON vehicles;
 CREATE POLICY "Users can insert their own vehicles" ON vehicles
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own vehicles" ON vehicles;
 CREATE POLICY "Users can update their own vehicles" ON vehicles
     FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own vehicles" ON vehicles;
 CREATE POLICY "Users can delete their own vehicles" ON vehicles
     FOR DELETE USING (auth.uid() = user_id);
 
 -- Public vehicles are viewable by everyone
+DROP POLICY IF EXISTS "Public vehicles are viewable by everyone" ON vehicles;
 CREATE POLICY "Public vehicles are viewable by everyone" ON vehicles
     FOR SELECT USING (is_public = true);
 
@@ -148,6 +156,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create trigger to automatically create profile on user signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -162,11 +171,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers to automatically update updated_at
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at
     BEFORE UPDATE ON profiles
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_vehicles_updated_at ON vehicles;
 CREATE TRIGGER update_vehicles_updated_at
     BEFORE UPDATE ON vehicles
     FOR EACH ROW

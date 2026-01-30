@@ -113,15 +113,25 @@ serve(async (req) => {
   }
 
   try {
-    const { 
+    const {
       max_regions = 60, // Increased for upgraded compute/RAM
       max_listings_per_search = 90, // Increased for upgraded compute/RAM
       user_id,
       regions = null, // Optional: specific regions to search
       chain_depth = 0, // Function chaining: number of remaining self-invocations (0 = no chaining)
       regions_processed = [], // Track which regions have been processed (for chaining)
-      skip_regions = [] // Regions to skip (already processed)
+      skip_regions = [], // Regions to skip (already processed)
+      enable_jitter = false, // Add random delays to avoid detection patterns
+      base_delay = 300 // Base delay between requests in ms (default reduced from 500)
     } = await req.json()
+
+    // Helper function to add jitter to delays
+    const getDelay = (baseMs: number): number => {
+      if (!enable_jitter) return baseMs
+      // Add ±30% jitter
+      const jitter = baseMs * 0.3
+      return Math.floor(baseMs + (Math.random() * jitter * 2) - jitter)
+    }
 
     // Use service role key to bypass RLS policies
     // Get URL and key - use actual project URL if SUPABASE_URL is a hash
@@ -262,12 +272,16 @@ serve(async (req) => {
               let foundInThisSearch = 0
               
               // Try different selectors for Craigslist search results
+              // CL updated their HTML in 2024/2025 - new selectors first
               const selectors = [
+                '.cl-static-search-result a',
+                'a.cl-app-anchor',
+                '.title a',
+                'a[href*="/cto/d/"]',
+                'a[href*="/cta/d/"]',
                 'a.result-title',
                 'a[class*="result-title"]',
                 '.result-row a',
-                'a[href*="/cto/d/"]',
-                'a[href*="/cta/d/"]',
                 'li.result-row a',
                 '.cl-search-result a'
               ]
@@ -338,7 +352,7 @@ serve(async (req) => {
             }
 
             // Reduced rate limiting - wait 1 second between searches
-            await new Promise(resolve => setTimeout(resolve, 800)) // Slightly increased delay for better reliability
+            await new Promise(resolve => setTimeout(resolve, getDelay(base_delay * 2))) // Delay between search terms with optional jitter
 
           } catch (error) {
             console.error(`    ❌ Error searching ${searchTerm} in ${region}:`, error)
@@ -347,7 +361,7 @@ serve(async (req) => {
         }
 
         // Reduced rate limiting - wait 1 second between regions
-        await new Promise(resolve => setTimeout(resolve, 500)) // Reduced delay
+        await new Promise(resolve => setTimeout(resolve, getDelay(base_delay))) // Delay between regions with optional jitter
 
       } catch (error) {
         console.error(`❌ Error processing region ${region}:`, error)
@@ -637,15 +651,19 @@ serve(async (req) => {
                     discovery_source: 'craigslist_scrape',
                     discovery_url: listingUrl,
                     profile_origin: 'craigslist_scrape',
+                    listing_title: scrapeData.data.title || null, // Store the listing title
+                    description: scrapeData.data.description || null, // Store description properly
                     origin_metadata: {
                       listing_url: listingUrl,
                       asking_price_raw: rawPrice, // Store raw scraped value
                       asking_price_normalized: normalizedPrice.price,
                       price_was_corrected: normalizedPrice.corrected,
                       imported_at: new Date().toISOString(),
-                      image_urls: scrapeData.data.images || [] // Store image URLs for future backfill
+                      image_urls: scrapeData.data.images || [], // Store image URLs for future backfill
+                      attrgroup: scrapeData.data.attrgroup || null, // Store raw attrgroup data
+                      location: scrapeData.data.location || null,
+                      posted_date: scrapeData.data.posted_date || null
                     },
-                    notes: scrapeData.data.description || null,
                     is_public: true,
                     status: 'active' // Set to 'active' so vehicles show up in homepage feed
                   }
@@ -1294,12 +1312,18 @@ function scrapeCraigslistInline(doc: any, url: string): any {
     }
   }
   
-  // Extract attributes
+  // Extract attributes and store raw attrgroup data
   const attrGroups = doc.querySelectorAll('.attrgroup')
+  const rawAttrgroup: Record<string, string> = {}
   attrGroups.forEach((group: any) => {
     const spans = group.querySelectorAll('span')
     spans.forEach((span: any) => {
-      const text = span.textContent.trim()
+      const text = span.textContent.trim().toLowerCase()
+      // Store all raw attrgroup values
+      if (text.includes(':')) {
+        const [key, ...valueParts] = text.split(':')
+        rawAttrgroup[key.trim()] = valueParts.join(':').trim()
+      }
       if (text.includes('condition:')) data.condition = text.replace('condition:', '').trim()
       else if (text.includes('cylinders:')) {
         const cylMatch = text.match(/(\d+)\s+cylinders/)
@@ -1315,25 +1339,72 @@ function scrapeCraigslistInline(doc: any, url: string): any {
       else if (text.includes('title status:')) data.title_status = text.replace('title status:', '').trim()
       else if (text.includes('transmission:')) data.transmission = text.replace('transmission:', '').trim()
       else if (text.includes('type:')) data.body_style = text.replace('type:', '').trim()
+      else if (text.includes('size:')) data.engine_size = text.replace('size:', '').trim()
+      else if (text.includes('interior color:')) data.interior_color = text.replace('interior color:', '').trim()
     })
   })
-  
-  // Fallback regex parsing
+  data.attrgroup = rawAttrgroup
+
+  // Fallback regex parsing from full text
   if (!data.condition) {
     const condMatch = fullText.match(/condition:\s*(\w+)/i)
     if (condMatch) data.condition = condMatch[1]
   }
   if (!data.mileage) {
-    const odoMatch = fullText.match(/odometer:\s*([\d,]+)/i)
-    if (odoMatch) data.mileage = parseInt(odoMatch[1].replace(/,/g, ''))
+    // Try multiple mileage patterns
+    const mileagePatterns = [
+      /odometer:\s*([\d,]+)/i,                              // "odometer: 125,000"
+      /(\d{1,3}(?:,\d{3})+)\s*(?:original\s+)?miles?\b/i,   // "125,000 miles"
+      /(\d{1,3})k\s*(?:original\s+)?mi(?:les?)?\b/i,        // "125k miles" or "70k mi"
+      /(?:shows?|has|reads?|only)\s*(\d{1,3})k\s*miles?/i,  // "shows 70k miles"
+      /(?:shows?|has|reads?|only)\s*([\d,]+)\s*miles?/i,    // "shows 70,000 miles"
+      /\b([\d,]+)\s*(?:actual|original)\s*miles?\b/i,       // "68,075 original miles"
+    ]
+    for (const pattern of mileagePatterns) {
+      const match = fullText.match(pattern)
+      if (match?.[1]) {
+        const numStr = match[1].replace(/,/g, '')
+        let mileage: number
+        if (numStr.length <= 3 && /k\s*mi/i.test(match[0])) {
+          // "125k miles" format
+          mileage = parseInt(numStr) * 1000
+        } else {
+          mileage = parseInt(numStr)
+        }
+        if (mileage > 0 && mileage <= 500000) {
+          data.mileage = mileage
+          break
+        }
+      }
+    }
   }
   if (!data.transmission) {
     const transMatch = fullText.match(/transmission:\s*(\w+)/i)
     if (transMatch) data.transmission = transMatch[1]
+    // Also check for common transmission mentions
+    if (!data.transmission) {
+      if (/\b(automatic|auto)\s*(trans|transmission)?/i.test(fullText)) {
+        data.transmission = 'automatic'
+      } else if (/\b(manual|stick|standard)\s*(trans|transmission)?/i.test(fullText)) {
+        data.transmission = 'manual'
+      } else if (/\b(th350|th400|turbo\s*350|turbo\s*400|4l60|4l80|700r4|powerglide)\b/i.test(fullText)) {
+        data.transmission = 'automatic'
+      } else if (/\b(4[- ]?speed|5[- ]?speed|6[- ]?speed)\s*manual/i.test(fullText)) {
+        data.transmission = 'manual'
+      }
+    }
   }
   if (!data.drivetrain) {
     const driveMatch = fullText.match(/drive:\s*([\w\d]+)/i)
     if (driveMatch) data.drivetrain = driveMatch[1]
+    // Also check for common drivetrain mentions
+    if (!data.drivetrain) {
+      if (/\b(4x4|4wd|four wheel drive)\b/i.test(fullText)) {
+        data.drivetrain = '4wd'
+      } else if (/\b(2wd|rwd|rear wheel drive)\b/i.test(fullText)) {
+        data.drivetrain = 'rwd'
+      }
+    }
   }
 
   // Extract description

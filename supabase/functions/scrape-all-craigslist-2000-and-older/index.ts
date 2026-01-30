@@ -250,17 +250,51 @@ serve(async (req) => {
               }
 
               // Extract listing URLs from search results
+              // CL changed their HTML - now uses cl-static-search-result class
+              // Use regex as fallback since DOM selectors may not work
               const listingUrls: string[] = []
-              const links = doc.querySelectorAll('a.result-title')
-              
-              for (const link of links) {
-                const href = link.getAttribute('href')
-                if (href) {
-                  // Convert relative URLs to absolute
-                  const fullUrl = href.startsWith('http') 
-                    ? href 
-                    : `https://${region}.craigslist.org${href}`
-                  listingUrls.push(fullUrl)
+              const seenUrls = new Set<string>()
+
+              // Method 1: Try new CL selectors
+              const selectors = [
+                '.cl-static-search-result a',
+                'a.cl-app-anchor',
+                '.title a',
+                'a[href*="/cto/d/"]',
+                'a[href*="/cta/d/"]'
+              ]
+
+              for (const selector of selectors) {
+                try {
+                  const links = doc.querySelectorAll(selector)
+                  for (const link of links) {
+                    const href = link.getAttribute('href')
+                    if (href && (href.includes('/cto/d/') || href.includes('/cta/d/'))) {
+                      const fullUrl = href.startsWith('http')
+                        ? href
+                        : `https://${region}.craigslist.org${href}`
+                      if (!seenUrls.has(fullUrl)) {
+                        seenUrls.add(fullUrl)
+                        listingUrls.push(fullUrl)
+                      }
+                    }
+                  }
+                } catch (e) {
+                  // Selector failed, try next
+                }
+                if (listingUrls.length > 0) break
+              }
+
+              // Method 2: Regex fallback for href patterns
+              if (listingUrls.length === 0) {
+                const urlPattern = /href="(https?:\/\/[^"]+\/ct[ao]\/d\/[^"]+)"/g
+                let match
+                while ((match = urlPattern.exec(html)) !== null) {
+                  const url = match[1]
+                  if (!seenUrls.has(url)) {
+                    seenUrls.add(url)
+                    listingUrls.push(url)
+                  }
                 }
               }
 

@@ -346,9 +346,57 @@ serve(async (req) => {
     let resolvedVehicleId = vehicle_id;
     let vehicleCreated = false;
 
+    // Extract original URL without Wayback timestamp for deduplication
+    const originalUrlMatch = listing.snapshot_url.match(/\/web\/\d+\/(.+)$/);
+    const originalUrl = originalUrlMatch ? originalUrlMatch[1] : listing.original_url;
+
+    // Create a unique key for this listing (original URL without protocol/port variations)
+    const normalizedUrl = originalUrl
+      .replace(/^https?:\/\//, '')
+      .replace(/:80\//, '/')
+      .replace(/\?.*$/, '');  // Strip query params for matching
+
     if (!resolvedVehicleId && !dry_run) {
-      // Try to find existing vehicle
-      if (listing.vin) {
+      // FIRST: Check if we already processed this exact listing URL
+      const { data: existingObs } = await supabase
+        .from('vehicle_observations')
+        .select('vehicle_id')
+        .eq('kind', 'listing')
+        .ilike('source_url', `%${normalizedUrl.slice(-80)}%`)
+        .limit(1);
+
+      if (existingObs?.length) {
+        resolvedVehicleId = existingObs[0].vehicle_id;
+        warnings.push('Already processed this listing URL - returning existing vehicle');
+        result.vehicle_id = resolvedVehicleId;
+        result.vehicle_created = false;
+        return new Response(
+          JSON.stringify(result),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // SECOND: Check for existing Wayback vehicle with same YMM + price
+      if (listing.year && listing.make && listing.price) {
+        const priceNote = `$${listing.price.toLocaleString()}`;
+        const { data: existingWayback } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('year', listing.year)
+          .ilike('make', listing.make)
+          .ilike('notes', `%Wayback%`)
+          .ilike('notes', `%${priceNote}%`)
+          .not('notes', 'ilike', '%[DUPLICATE]%')
+          .limit(1);
+
+        if (existingWayback?.length) {
+          resolvedVehicleId = existingWayback[0].id;
+          warnings.push('Matched existing Wayback vehicle by year/make/price');
+        }
+      }
+
+      // THIRD: Try VIN match
+      if (!resolvedVehicleId && listing.vin) {
         const { data: existingByVin } = await supabase
           .from('vehicles')
           .select('id')
@@ -360,7 +408,7 @@ serve(async (req) => {
         }
       }
 
-      // If no VIN match, try year/make/model (only if highly specific)
+      // FOURTH: Try year/make/model match (relaxed - any match is fine for Wayback)
       if (!resolvedVehicleId && listing.year && listing.make && listing.model) {
         const { data: existingByYMM } = await supabase
           .from('vehicles')
@@ -368,12 +416,12 @@ serve(async (req) => {
           .eq('year', listing.year)
           .ilike('make', listing.make)
           .ilike('model', listing.model)
-          .limit(2);
+          .not('notes', 'ilike', '%[DUPLICATE]%')
+          .limit(1);
 
-        // Only match if exactly one result (to avoid false matches)
-        if (existingByYMM?.length === 1) {
+        if (existingByYMM?.length) {
           resolvedVehicleId = existingByYMM[0].id;
-          warnings.push('Matched by year/make/model only - verify this is correct vehicle');
+          warnings.push('Matched by year/make/model - verify this is correct vehicle');
         }
       }
 

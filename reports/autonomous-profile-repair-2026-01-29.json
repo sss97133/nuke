@@ -6,9 +6,9 @@
     "delayMs": 2500,
     "dryRun": false
   },
-  "elapsedMs": 22404886,
-  "elapsedHours": 6.223579444444445,
-  "vehiclesProcessed": 425,
+  "elapsedMs": 22782646,
+  "elapsedHours": 6.328512777777778,
+  "vehiclesProcessed": 430,
   "galleryRepairs": 0,
   "vinBackfilledFromMetadata": 0,
   "vinReextractInvoked": 9,
@@ -34,7 +34,7 @@
       "at": "2026-01-29T11:13:21.499Z"
     }
   ],
-  "lastVehicleId": "12a3c44c-65e9-4597-b80a-d28f8b0af7b1",
-  "lastBatchAt": "2026-01-29T12:29:55.373Z",
-  "nextBatchPreview": 8
+  "lastVehicleId": "10a32060-42fb-425c-baf4-0d8bf4fb6c17",
+  "lastBatchAt": "2026-01-29T12:36:13.290Z",
+  "nextBatchPreview": 5
 }

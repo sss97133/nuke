@@ -1,0 +1,24 @@
+Metric,Value,Category
+Total URLs Tested,30,Overview
+,,
+Naive Success Rate,50.0%,Success Rates
+Playwright Success Rate,96.7%,Success Rates
+Success Rate Delta,46.7%,Success Rates
+,,
+Naive Avg Quality,33.3,Quality Scores
+Playwright Avg Quality,58.4,Quality Scores
+Quality Improvement,+25.1,Quality Scores
+,,
+Naive Fetch Success,50.0%,Method Breakdown
+Playwright Success,96.7%,Method Breakdown
+,,
+Avg Time Naive (ms),603,Timing
+Avg Time Playwright (ms),6411,Timing
+,,
+Easy Sites (naive works),8,Site Difficulty
+Medium Sites (need PW),7,Site Difficulty
+Hard Sites (neither great),15,Site Difficulty
+,,
+URLs Only Playwright Succeeded,14,Value Proposition
+URLs PW 20+ Points Better,16,Value Proposition
+URLs Naive Was Better,7,Value Proposition

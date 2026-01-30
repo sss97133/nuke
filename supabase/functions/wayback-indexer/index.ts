@@ -59,12 +59,13 @@ interface IndexProgress {
 // Sleep helper for rate limiting
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Search CDX with rate limiting
+// Search CDX with rate limiting - returns UNIQUE original URLs with one snapshot each
 async function searchCDX(
   url: string,
   from: number,
   to: number,
-  limit: number = 50
+  limit: number = 50,
+  offset: number = 0
 ): Promise<string[]> {
   const params = new URLSearchParams({
     url,
@@ -72,8 +73,9 @@ async function searchCDX(
     from: `${from}0101`,
     to: `${to}1231`,
     output: 'json',
-    limit: String(limit),
+    limit: String(limit + offset + 100),  // Get extra to allow deduping
     filter: 'statuscode:200',
+    collapse: 'urlkey',  // CRITICAL: collapse by URL to get unique listings
     fl: 'timestamp,original'
   });
 
@@ -96,14 +98,45 @@ async function searchCDX(
     const data = await response.json();
     if (!Array.isArray(data) || data.length < 2) return [];
 
-    // Return snapshot URLs (skip header row)
-    return data.slice(1).map((row: string[]) =>
-      `https://web.archive.org/web/${row[0]}/${row[1]}`
-    );
+    // Dedupe by original URL (not snapshot URL) - keep first snapshot of each
+    const seen = new Set<string>();
+    const uniqueUrls: string[] = [];
+
+    for (const row of data.slice(1)) {
+      const originalUrl = row[1]
+        .replace(/^https?:\/\//, '')
+        .replace(/:80\//, '/')
+        .replace(/\?.*$/, '');  // Normalize URL
+
+      if (!seen.has(originalUrl)) {
+        seen.add(originalUrl);
+        uniqueUrls.push(`https://web.archive.org/web/${row[0]}/${row[1]}`);
+      }
+    }
+
+    // Apply offset and limit
+    return uniqueUrls.slice(offset, offset + limit);
   } catch (e) {
     console.error('[wayback-indexer] CDX fetch error:', e);
     return [];
   }
+}
+
+// Check if URL was already processed
+async function isUrlProcessed(supabase: any, snapshotUrl: string): Promise<boolean> {
+  const normalizedUrl = snapshotUrl
+    .replace(/.*\/web\/\d+\//, '')  // Strip wayback prefix
+    .replace(/^https?:\/\//, '')
+    .replace(/:80\//, '/')
+    .slice(-60);  // Last 60 chars for matching
+
+  const { data } = await supabase
+    .from('vehicle_observations')
+    .select('id')
+    .ilike('source_url', `%${normalizedUrl}%`)
+    .limit(1);
+
+  return (data?.length || 0) > 0;
 }
 
 serve(async (req) => {
@@ -235,6 +268,10 @@ serve(async (req) => {
         const maxRunTime = 50000;  // 50 seconds max (edge function limit is 60s)
         let pagesProcessed = 0;
         let vehiclesExtracted = 0;
+        let skippedAlreadyProcessed = 0;
+
+        // Use random offset to get different URLs each batch
+        const randomOffset = Math.floor(Math.random() * 500);
 
         const targets = INDEX_TARGETS.filter(t => t.priority === 1);  // High priority only
 
@@ -245,11 +282,18 @@ serve(async (req) => {
             `${target.domain}/${target.pattern}`,
             target.years[0],
             target.years[1],
-            5
+            10,  // Get more URLs
+            randomOffset  // Random offset to avoid repeating
           );
 
           for (const url of urls) {
             if (Date.now() - startTime > maxRunTime) break;
+
+            // Skip already processed URLs
+            if (await isUrlProcessed(supabase, url)) {
+              skippedAlreadyProcessed++;
+              continue;
+            }
 
             try {
               const response = await fetch(
@@ -284,18 +328,26 @@ serve(async (req) => {
             mode: 'batch',
             run_time_ms: Date.now() - startTime,
             pages_processed: pagesProcessed,
-            vehicles_extracted: vehiclesExtracted
+            vehicles_extracted: vehiclesExtracted,
+            skipped_duplicates: skippedAlreadyProcessed,
+            offset_used: randomOffset
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       case 'status': {
-        // Get indexing status
+        // Get indexing status (exclude duplicates marked with [DUPLICATE])
         const { count: vehicleCount } = await supabase
           .from('vehicles')
           .select('*', { count: 'exact', head: true })
-          .ilike('notes', '%Wayback%');
+          .ilike('notes', '%Wayback%')
+          .not('notes', 'ilike', '%[DUPLICATE]%');
+
+        const { count: dupeCount } = await supabase
+          .from('vehicles')
+          .select('*', { count: 'exact', head: true })
+          .ilike('notes', '%[DUPLICATE]%Wayback%');
 
         const { count: observationCount } = await supabase
           .from('vehicle_observations')
@@ -306,6 +358,7 @@ serve(async (req) => {
           JSON.stringify({
             mode: 'status',
             wayback_vehicles: vehicleCount || 0,
+            wayback_duplicates_marked: dupeCount || 0,
             wayback_observations: observationCount || 0,
             index_targets: INDEX_TARGETS.length,
             rate_limit: `${1000 / RATE_LIMIT_MS} requests/second`

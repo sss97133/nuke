@@ -1,0 +1,17 @@
+domain,urls_tested,naive_success_rate,playwright_success_rate,avg_naive_score,avg_playwright_score,avg_score_delta,recommendation
+collectingcars.com,2,0.0%,100.0%,0.0,88.5,88.5,PLAYWRIGHT_REQUIRED
+www.hemmings.com,1,0.0%,100.0%,0.0,84.0,84.0,PLAYWRIGHT_REQUIRED
+www.carsandbids.com,2,0.0%,100.0%,0.0,64.5,64.5,PLAYWRIGHT_REQUIRED
+www.hagerty.com,3,0.0%,100.0%,0.0,46.0,46.0,PLAYWRIGHT_REQUIRED
+www.pcarmarket.com,2,50.0%,100.0%,18.5,53.5,35.0,PLAYWRIGHT_RECOMMENDED
+rfrm.com,1,0.0%,100.0%,0.0,34.0,34.0,PLAYWRIGHT_REQUIRED
+rmsothebys.com,1,0.0%,100.0%,0.0,33.0,33.0,PLAYWRIGHT_REQUIRED
+www.bonhams.com,1,0.0%,100.0%,0.0,33.0,33.0,PLAYWRIGHT_REQUIRED
+www.mecum.com,1,100.0%,100.0%,53.0,81.0,28.0,PLAYWRIGHT_RECOMMENDED
+www.ebay.com,1,100.0%,100.0%,64.0,90.0,26.0,PLAYWRIGHT_RECOMMENDED
+www.streetsideclassics.com,2,50.0%,100.0%,31.0,48.5,17.5,PLAYWRIGHT_HELPFUL
+www.classicdriver.com,2,50.0%,50.0%,16.5,33.5,17.0,PLAYWRIGHT_HELPFUL
+classics.autotrader.com,1,0.0%,100.0%,0.0,5.0,5.0,PLAYWRIGHT_REQUIRED
+bringatrailer.com,8,100.0%,100.0%,82.0,76.5,-5.5,NAIVE_OK
+www.autotrader.com,1,100.0%,100.0%,28.0,18.0,-10.0,NAIVE_OK
+www.dupontregistry.com,1,100.0%,100.0%,67.0,47.0,-20.0,NAIVE_OK

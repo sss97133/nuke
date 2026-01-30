@@ -1,0 +1,80 @@
+#!/bin/bash
+# BAT Continuous Extractor - runs until queue empty
+cd /Users/skylar/nuke
+
+LOG="logs/bat-continuous-$(date '+%Y%m%d-%H%M%S').log"
+mkdir -p logs
+
+log() { echo "[$(date '+%H:%M:%S')] $1" | tee -a "$LOG"; }
+
+total=0
+ok=0
+fail=0
+skip=0
+
+log "=== BAT CONTINUOUS EXTRACTOR ==="
+log "Stop: pkill -f bat-continuous"
+
+while true; do
+  # Get ONE item at a time to avoid subshell issues
+  ITEM=$(dotenvx run --quiet -- bash -c 'curl -s "$VITE_SUPABASE_URL/rest/v1/import_queue?status=eq.pending&listing_url=ilike.*bringatrailer*&select=id,listing_url&limit=1&order=created_at.asc" \
+    -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY"' 2>/dev/null)
+
+  ID=$(echo "$ITEM" | jq -r '.[0].id // empty')
+  URL=$(echo "$ITEM" | jq -r '.[0].listing_url // empty')
+  
+  if [ -z "$ID" ] || [ "$ID" = "null" ]; then
+    log "=== QUEUE EMPTY - DONE ==="
+    log "Total: $total | OK: $ok | Fail: $fail | Skip: $skip"
+    exit 0
+  fi
+
+  # Dedup check
+  EXISTING=$(dotenvx run --quiet -- bash -c 'curl -s "$VITE_SUPABASE_URL/rest/v1/vehicles?or=(bat_auction_url.eq.'"$URL"',discovery_url.eq.'"$URL"')&select=id&limit=1" \
+    -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY"' 2>/dev/null | jq -r '.[0].id // empty')
+
+  if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+    dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
+      -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
+      -H \"Content-Type: application/json\" -d '{\"status\":\"duplicate\",\"vehicle_id\":\"$EXISTING\"}'" > /dev/null 2>&1
+    skip=$((skip + 1))
+    total=$((total + 1))
+    continue
+  fi
+
+  # Mark processing
+  dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
+    -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
+    -H \"Content-Type: application/json\" -d '{\"status\":\"processing\"}'" > /dev/null 2>&1
+
+  # Extract
+  RESULT=$(dotenvx run --quiet -- bash -c "curl -s -m 90 -X POST \"\$VITE_SUPABASE_URL/functions/v1/bat-simple-extract\" \
+    -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"Content-Type: application/json\" \
+    -d '{\"url\":\"$URL\",\"save_to_db\":true}'" 2>/dev/null)
+
+  VID=$(echo "$RESULT" | jq -r '.extracted.vehicle_id // empty')
+  
+  if [ -n "$VID" ] && [ "$VID" != "null" ]; then
+    dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
+      -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
+      -H \"Content-Type: application/json\" -d '{\"status\":\"complete\",\"vehicle_id\":\"$VID\"}'" > /dev/null 2>&1
+    ok=$((ok + 1))
+  else
+    dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
+      -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
+      -H \"Content-Type: application/json\" -d '{\"status\":\"failed\"}'" > /dev/null 2>&1
+    fail=$((fail + 1))
+  fi
+  
+  total=$((total + 1))
+  
+  # Progress every 50
+  if [ $((total % 50)) -eq 0 ]; then
+    REMAINING=$(dotenvx run --quiet -- bash -c 'curl -sI "$VITE_SUPABASE_URL/rest/v1/import_queue?status=eq.pending&listing_url=ilike.*bringatrailer*&select=id" \
+      -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+      -H "Prefer: count=exact" 2>/dev/null | grep -i content-range | sed "s/.*\///" | tr -d "\r\n"')
+    log "[$total] OK:$ok Fail:$fail Skip:$skip | Remaining: $REMAINING"
+  fi
+done

@@ -950,6 +950,9 @@ Use spherical coordinates:
 - azimuth_deg: 0° = directly in front, 90° = driver side, 180° = directly behind, 270° = passenger side
 - elevation_deg: 0° = level with vehicle center, positive = camera above, negative = camera below
 - distance_mm: distance from vehicle center to camera in millimeters
+If discernible from perspective, also estimate:
+- lens_angle_of_view_deg: horizontal FOV in degrees (e.g. wide ~70–90, normal ~50, telephoto ~20–35), or null
+- focal_length_mm: equivalent 35mm focal length in mm (e.g. 24, 50, 85), or null
 
 SUBJECT IDENTIFICATION:
 Identify the PRIMARY subject/focus of this photograph using the taxonomy:
@@ -1001,7 +1004,9 @@ Return a JSON object:
     "azimuth_deg": number (0-360),
     "elevation_deg": number (-90 to 90),
     "distance_mm": number (how far camera is from vehicle center),
-    "confidence": number (0.0-1.0, how certain you are about position)
+    "confidence": number (0.0-1.0, how certain you are about position),
+    "lens_angle_of_view_deg": number or null,
+    "focal_length_mm": number or null
   },
   "subject_position": {
     "x_mm": number (subject center X relative to vehicle center),
@@ -1138,6 +1143,10 @@ CAMERA POSITION (estimate in spherical coordinates):
 - elevation_deg: 0° = level with vehicle center, positive = above, negative = below
 - distance_mm: distance from vehicle center to camera in millimeters
 
+LENS / FOV (estimate if discernible from perspective; null if unknown):
+- lens_angle_of_view_deg: horizontal field of view in degrees (e.g. wide ~70–90, normal ~50, telephoto ~20–35)
+- focal_length_mm: equivalent 35mm focal length in mm if inferrable from perspective (e.g. 24, 50, 85), else null
+
 SUBJECT TAXONOMY (use these exact keys):
 - vehicle (full exterior shot)
 - exterior.panel.fender.front.driver / .front.passenger / .rear.driver / .rear.passenger
@@ -1178,7 +1187,9 @@ Return ONLY valid JSON with this exact structure:
     "azimuth_deg": number,
     "elevation_deg": number,
     "distance_mm": number,
-    "confidence": number
+    "confidence": number,
+    "lens_angle_of_view_deg": number|null,
+    "focal_length_mm": number|null
   },
   "subject_position": {
     "x_mm": number,
@@ -1569,6 +1580,8 @@ async function insertCameraPosition(
         category: appraiserResult?.category || null,
         description: appraiserResult?.description || null,
         is_close_up: appraiserResult?.is_close_up || false,
+        lens_angle_of_view_deg: aiCameraPos?.lens_angle_of_view_deg ?? null,
+        focal_length_mm: aiCameraPos?.focal_length_mm ?? null,
       }
     }, {
       onConflict: 'image_id,subject_key,source,source_version',

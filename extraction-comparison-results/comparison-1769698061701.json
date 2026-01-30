@@ -1,0 +1,522 @@
+{
+  "generated_at": "2026-01-29T14:47:41.701Z",
+  "total_urls": 9,
+  "comparisons": [
+    {
+      "url": "https://bringatrailer.com/listing/1988-porsche-911-carrera-targa-50/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T14:46:14.354Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 679,
+          "content_length": 448176,
+          "markdown_length": 176642,
+          "image_count": 70,
+          "has_structured_data": true,
+          "quality_score": 95,
+          "title": "1988 Porsche 911 Carrera Targa G50 for sale on BaT Auctions - closed on May 9, 2022 (Lot #72,851) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 1988,
+            "make": "Porsche",
+            "model": "911 Carrera",
+            "price": 50000,
+            "vin": "WP0EB0918JS160483",
+            "images": [
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ecd55ed0-3a6a-4fc9-aead-f394c8db4f90-57368.jpeg?fit=940%2C627",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_67465eb5-25cc-4572-9b63-bb224ffdf318-57399.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_cf35bff7-9e4b-4e75-889b-4713407a2fa8-57428.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_1c6f52e9-2320-4bc8-89d5-3e617c5bcce1-57527.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ca4e955e-783c-4a0e-a03a-6821f7595a4c-57592.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_a96db75e-2117-4d39-8635-d370b56060e7-57622.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_086f3d81-fd22-4efc-a249-78da6cd091df-57667.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ecd55ed0-3a6a-4fc9-aead-f394c8db4f90-57368.jpeg?fit=144%2C96",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/image13-75890-e1764175927164.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/03/QoTW-Winner-Template171-47667.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/QoTW-Winner-Template170-70290.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/5a-70680-e1764170754888.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/weekly-weird-wonderful123263-89474.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/lead-image-2-18533.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1967_ford_mustang_1967_ford_mustang_b65098d4-a986-4b4d-999a-c169c60a8569-Yz0DM9-55450-55451-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/10/1975_pedrazzini_super-aquamar_dsc_7998-21256.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_porsche_boxster-rs-60-spyder_img_1354-06779.jpeg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2023_porsche_718-boxster_2023-Porsche-Boxter-Spyder-718-006-29350-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_mercedes-benz_sl65-amg_p1149869-99331.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1991_jeep_grand-wagoneer_1991_jeep_grand-wagoneer_5d56e8b9-cd81-47b9-9163-68b23b0837bd-s6ipnl-60692-02694.jpg?resize=235%2C159"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 8867,
+          "content_length": 683609,
+          "markdown_length": 11626,
+          "image_count": 132,
+          "has_structured_data": true,
+          "quality_score": 95,
+          "title": "1988 Porsche 911 Carrera Targa G50 for sale on BaT Auctions - closed on May 9, 2022 (Lot #72,851) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 1988,
+            "make": "Porsche",
+            "model": "911 Carrera",
+            "price": 50000,
+            "vin": "WP0EB0918JS160483",
+            "images": [
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/countries/us.svg",
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/listings/comments.svg",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ecd55ed0-3a6a-4fc9-aead-f394c8db4f90-57368.jpeg?fit=940%2C627",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_67465eb5-25cc-4572-9b63-bb224ffdf318-57399.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_cf35bff7-9e4b-4e75-889b-4713407a2fa8-57428.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_1c6f52e9-2320-4bc8-89d5-3e617c5bcce1-57527.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ca4e955e-783c-4a0e-a03a-6821f7595a4c-57592.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_a96db75e-2117-4d39-8635-d370b56060e7-57622.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_086f3d81-fd22-4efc-a249-78da6cd091df-57667.jpeg?w=620&resize=620%2C413",
+              "https://i.ytimg.com/vi/BDGz3jKZb4A/sddefault.jpg",
+              "https://i.ytimg.com/vi/8bCEUgqp3Lo/sddefault.jpg",
+              "https://i.ytimg.com/vi/W2oP1gqmdZQ/sddefault.jpg",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ecd55ed0-3a6a-4fc9-aead-f394c8db4f90-57368.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/E623C646-9E78-4A1C-ACE4-80EE852E4F15-38849-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/621163CE-D97C-4ECF-88D7-01F12778DC8C-38981-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_cf35bff7-9e4b-4e75-889b-4713407a2fa8-57428.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/B3050713-4E80-47E8-8FBB-6C3FCCE5081C-38929-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1384F6C2-FA25-4DB9-8560-75FF7D7D0C37-39181-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_67465eb5-25cc-4572-9b63-bb224ffdf318-57399.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/46F6DB88-5B57-4A5D-A65E-A6F5D5C27817-38950-scaled.jpeg?resize=155%2C105"
+            ]
+          }
+        }
+      ],
+      "naive_score": 95,
+      "playwright_score": 95,
+      "score_delta": 0,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://www.carsandbids.com/auctions/rlYwNdkZ/2011-mercedes-benz-e63-amg-wagon",
+      "domain": "www.carsandbids.com",
+      "timestamp": "2026-01-29T14:46:20.870Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 834,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 403"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 6515,
+          "content_length": 41825,
+          "markdown_length": 946,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 44,
+          "title": "404 - Cars & Bids",
+          "vehicle_data": {
+            "year": 2025,
+            "make": "BMW",
+            "price": 700,
+            "images": [
+              "https://carsandbids.com/static/media/404@2x.a03209c6.png",
+              "data:image/png;base64,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"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 44,
+      "score_delta": 44,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.hemmings.com/classifieds/dealer/chevrolet/c10/2729389.html",
+      "domain": "www.hemmings.com",
+      "timestamp": "2026-01-29T14:46:39.627Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 486,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 403"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 18756,
+          "content_length": 1098684,
+          "markdown_length": 15999,
+          "image_count": 37,
+          "has_structured_data": true,
+          "quality_score": 84,
+          "title": "Chevrolet C10 for Sale - Hemmings",
+          "vehicle_data": {
+            "year": 2027,
+            "make": "Porsche",
+            "price": 5,
+            "images": [
+              "https://hmnimages.hemmings.com/hemmings-logo.svg",
+              "https://hmnimages.hemmings.com/hemmings-logo-mobile.svg",
+              "https://hmnimages.hemmings.com/membership/hmc-logo-nav.svg",
+              "https://assets.hemmings.com/stories-dist/images/HMC.svg",
+              "https://thumbor-auction.hmn.com/boYLduny-bSXlTOaDG45bwnXCtI=/450x300/filters:format(webp)/4160792/156511828.jpg",
+              "https://thumbor-auction.hmn.com/zXBjpHHksutkzUPaybanvmwJhno=/450x300/filters:format(webp)/4152383/156366612.jpg",
+              "https://thumbor-auction.hmn.com/CixN6nqIO-AAcSNgF5rUhd4DMoI=/450x300/filters:format(webp)/4133750/156095983.jpg",
+              "https://thumbor-auction.hmn.com/X4dGTssdjpLCr8zuAqojkxYxWSg=/450x300/filters:format(webp)/4120852/155896993.jpg",
+              "https://thumbor-auction.hmn.com/Xok1AsVnlu89ifJJfjakPncXY-4=/450x300/filters:format(webp)/4106266/154550269.jpg",
+              "https://thumbor-auction.hmn.com/41IC0YhmyfLpFZ0Tt37OUmtDUxI=/450x300/filters:format(webp)/4098627/155709076.jpg",
+              "https://thumbor-auction.hmn.com/x4RmYlKoDIhTGIh0Ij44TpS0DfY=/450x300/filters:format(webp)/4089784/154594988.jpg",
+              "https://thumbor-auction.hmn.com/YRaD0pgrB8JsyZrNsRZwBgvi4OU=/450x300/filters:format(webp)/3978368/154382078.jpg",
+              "https://image.hmn.com/1QvbImu491OHtwAG2ipF-Dr3lNw=/450x300/filters:format(webp)/uimage/157112466.jpg",
+              "https://image.hmn.com/3rL9hQcw_2oqWn0Zi-JsgVggirk=/450x300/filters:format(webp)/uimage/157111573.jpg",
+              "https://image.hmn.com/gpMUje9rKcvpeN37iDgn84d6b_8=/450x300/filters:format(webp)/uimage/157110262.jpg",
+              "https://image.hmn.com/h9HB8_g8yCH3F1KU1RPjHKs-I2M=/450x300/filters:format(webp)/uimage/156948770.jpg",
+              "https://image.hmn.com/F7qldBLtVzKpxsdQDEf6eCbXm_Q=/450x300/filters:format(webp)/uimage/156947665.jpg",
+              "https://image.hmn.com/TM2YjTWhR5CVkOfrZXBAXMhhCr8=/450x300/filters:format(webp)/uimage/156985061.jpg",
+              "https://image.hmn.com/w0WFS2u9o26R9RNs0sEfPqdy6OE=/450x300/filters:format(webp)/uimage/156983848.jpg",
+              "https://image.hmn.com/_qGr8dGZd2hK8I3iCq-hqKgh1d0=/450x300/filters:format(webp)/uimage/156970578.jpg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 84,
+      "score_delta": 84,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "medium"
+    },
+    {
+      "url": "https://www.streetsideclassics.com/vehicles/1234-cha/1969-chevrolet-camaro",
+      "domain": "www.streetsideclassics.com",
+      "timestamp": "2026-01-29T14:47:09.671Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 10501,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "fetch failed"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": false,
+          "timing_ms": 30042,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "page.goto: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.streetsideclassics.com/vehicles/1234-cha/1969-chevrolet-camaro\", waiting until \"domcontentloaded\"\u001b[22m\n"
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 0,
+      "score_delta": 0,
+      "naive_success": false,
+      "playwright_success": false,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.dupontregistry.com/autos/listing/2024/porsche/911/4016155",
+      "domain": "www.dupontregistry.com",
+      "timestamp": "2026-01-29T14:47:16.987Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 1071,
+          "content_length": 177050,
+          "markdown_length": 122532,
+          "image_count": 10,
+          "has_structured_data": false,
+          "quality_score": 67,
+          "title": "2024 Porsche 911 | duPont REGISTRY",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "model": "911 For",
+            "images": [
+              "/_next/static/chunks/webpack-2a1eebb50883eb5a.js"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 7314,
+          "content_length": 209773,
+          "markdown_length": 779,
+          "image_count": 6,
+          "has_structured_data": false,
+          "quality_score": 47,
+          "title": "2024 Porsche 911 | duPont REGISTRY",
+          "vehicle_data": {
+            "year": 2024,
+            "make": "Porsche",
+            "model": "911 For",
+            "images": [
+              "data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20version=%271.1%27%20width=%27144%27%20height=%2751%27/%3e",
+              "https://www.dupontregistry.com/_next/static/media/dark_logo.5c6e3ca3.svg",
+              "data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20version=%271.1%27%20width=%2712%27%20height=%2714%27/%3e",
+              "https://www.dupontregistry.com/_next/static/media/arrow_grey_right.a6badccb.svg",
+              "data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20version=%271.1%27%20width=%27144%27%20height=%2751%27/%3e",
+              "https://www.dupontregistry.com/_next/static/media/dark_logo.5c6e3ca3.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 67,
+      "playwright_score": 47,
+      "score_delta": -20,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://www.classicdriver.com/en/car/porsche/911/1973/1023456",
+      "domain": "www.classicdriver.com",
+      "timestamp": "2026-01-29T14:47:22.210Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 1098,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 404"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": false,
+          "timing_ms": 5219,
+          "content_length": 39,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "title": "",
+          "error": "Insufficient content extracted"
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 0,
+      "score_delta": 0,
+      "naive_success": false,
+      "playwright_success": false,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://rfrm.com/inventory/",
+      "domain": "rfrm.com",
+      "timestamp": "2026-01-29T14:47:26.629Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 400,
+          "content_length": 114,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "Failed to extract content"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 4416,
+          "content_length": 170826,
+          "markdown_length": 194,
+          "image_count": 1,
+          "has_structured_data": false,
+          "quality_score": 34,
+          "title": "rfrm.com",
+          "vehicle_data": {
+            "year": 1970,
+            "make": "MG",
+            "price": 100,
+            "images": [
+              "https://www.afternic.com/forsale/imgs/afternic/AfternicLogoV2.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 34,
+      "score_delta": 34,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.pcarmarket.com/auction/1990-porsche-964-c4-cabriolet/",
+      "domain": "www.pcarmarket.com",
+      "timestamp": "2026-01-29T14:47:32.009Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 390,
+          "content_length": 4663,
+          "markdown_length": 1344,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 37,
+          "title": "PCARMARKET",
+          "vehicle_data": {
+            "year": 2024,
+            "make": "Porsche",
+            "model": "and other",
+            "images": []
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 5379,
+          "content_length": 26261,
+          "markdown_length": 437,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 32,
+          "title": "Error | PCARMARKET",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "model": "and other",
+            "images": [
+              "https://www.pcarmarket.com/pcar-logo-dark.svg",
+              "https://www.pcarmarket.com/pcar-logo-linear-light.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 37,
+      "playwright_score": 32,
+      "score_delta": -5,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://collectingcars.com/for-sale/1989-porsche-911-carrera-3-2-targa-g50",
+      "domain": "collectingcars.com",
+      "timestamp": "2026-01-29T14:47:41.652Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 371,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 403"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 9642,
+          "content_length": 487889,
+          "markdown_length": 8829,
+          "image_count": 340,
+          "has_structured_data": false,
+          "quality_score": 90,
+          "title": "1989 PORSCHE 911 CARRERA 3.2 TARGA G50 for sale in Los Angeles, CA, USA",
+          "vehicle_data": {
+            "year": 1989,
+            "make": "Porsche",
+            "model": "Ferrari\nBMW",
+            "price": 1000,
+            "vin": "WP0EB091XKS160731",
+            "mileage": 155850,
+            "images": [
+              "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzgwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMzgwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8ZyBjbGlwLXBhdGg9InVybCgjY2xpcDBfOTkxXzI0KSI+CjxwYXRoIGQ9Ik03NS4zNTAxIDEwLjYyMDFWMTQuNDEwMUM3My41MDAxIDEyLjg2MDEgNzEuNTkwMSAxMi4wOTAxIDY5LjYxMDEgMTIuMDkwMUM2Ny40MzAxIDEyLjA5MDEgNjUuNjAwMSAxMi44NzAxIDY0LjEwMDEgMTQuNDQwMUM2Mi42MDAxIDE2LjAwMDEgNjEuODUwMSAxNy45MDAxIDYxLjg1MDEgMjAuMTUwMUM2MS44NTAxIDIyLjQwMDEgNjIuNjAwMSAyNC4yNTAxIDY0LjEwMDEgMjUuNzgwMUM2NS42MDAxIDI3LjMxMDEgNjcuNDQwMSAyOC4wNzAxIDY5LjYyMDEgMjguMDcwMUM3MC43NTAxIDI4LjA3MDEgNzEuNzAwMSAyNy44OTAxIDcyLjQ5MDEgMjcuNTIwMUM3Mi45MzAxIDI3LjM0MDEgNzMuMzgwMSAyNy4wOTAxIDczLjg2MDEgMjYuNzgwMUM3NC4zMzAxIDI2LjQ3MDEgNzQuODMwMSAyNi4wOTAxIDc1LjM1MDEgMjUuNjUwMVYyOS41MTAxQzczLjUyMDEgMzAuNTQwMSA3MS42MDAxIDMxLjA2MDEgNjkuNTgwMSAzMS4wNjAxQzY2LjU1MDEgMzEuMDYwMSA2My45NjAxIDMwLjAwMDEgNjEuODIwMSAyNy44OTAxQzU5LjY5MDEgMjUuNzYwMSA1OC42MjAxIDIzLjE5MDEgNTguNjIwMSAyMC4xNzAxQzU4LjYyMDEgMTcuNDcwMSA1OS41MTAxIDE1LjA2MDEgNjEuMzAwMSAxMi45NTAxQzYzLjUwMDEgMTAuMzYwMSA2Ni4zNDAxIDkuMDYwMDYgNjkuODMwMSA5LjA2MDA2QzcxLjczMDEgOS4wNjAwNiA3My41NzAxIDkuNTgwMDYgNzUuMzUwMSAxMC42MTAxVjEwLjYyMDFaIiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNODMuMTcwMiAxOS45ODAxQzgzLjE3MDIgMTcuMDAwMSA4NC4yNjAxIDE0LjQzMDEgODYuNDUwMSAxMi4yOTAxQzg4LjYzMDEgMTAuMTUwMSA5MS4yNTAyIDkuMDgwMDggOTQuMzAwMiA5LjA4MDA4Qzk3LjM1MDIgOS4wODAwOCA5OS45MTAyIDEwLjE2MDEgMTAyLjA3IDEyLjMyMDFDMTA0LjI0IDE0LjQ4MDEgMTA1LjMyIDE3LjA4MDEgMTA1LjMyIDIwLjExMDFDMTA1LjMyIDIzLjE0MDEgMTA0LjIzIDI1Ljc0MDEgMTAyLjA1IDI3Ljg3MDFDOTkuODYwMiAzMC4wMDAxIDk3LjIyMDEgMzEuMDcwMSA5NC4xMzAxIDMxLjA3MDFDOTEuMzkwMSAzMS4wNzAxIDg4Ljk0MDIgMzAuMTIwMSA4Ni43NjAyIDI4LjIzMDFDODQuMzYwMiAyNi4xMzAxIDgzLjE2MDIgMjMuMzkwMSA4My4xNjAyIDE5Ljk5MDFMODMuMTcwMiAxOS45ODAxWk04Ni40MDAyIDIwLjAyMDFDODYuNDAwMiAyMi4zNjAxIDg3LjE5MDIgMjQuMjkwMSA4OC43NjAyIDI1LjgwMDFDOTAuMzMwMiAyNy4zMTAxIDkyLjEzMDIgMjguMDcwMSA5NC4xODAyIDI4LjA3MDFDOTYuNDAwMiAyOC4wNzAxIDk4LjI4MDIgMjcuMzAwMSA5OS44MTAyIDI1Ljc2MDFDMTAxLjM0IDI0LjIwMDEgMTAyLjEgMjIuMzEwMSAxMDIuMSAyMC4wODAxQzEwMi4xIDE3Ljg1MDEgMTAxLjM0IDE1LjkyMDEgOTkuODMwMiAxNC40MDAxQzk4LjMzMDIgMTIuODYwMSA5Ni40NzAyIDEyLjA5MDEgOTQuMjYwMiAxMi4wOTAxQzkyLjA1MDIgMTIuMDkwMSA5MC4xOTAyIDEyLjg2MDEgODguNjcwMiAxNC40MDAxQzg3LjE1MDIgMTUuOTIwMSA4Ni4zOTAyIDE3LjgwMDEgODYuMzkwMiAyMC4wMzAxTDg2LjQwMDIgMjAuMDIwMVoiIGZpbGw9ImJsYWNrIi8+CjxwYXRoIGQ9Ik0xMTcuNzcgOS40Nzk5OFYyNy42N0gxMjRWMzAuNjhIMTE0LjU3VjkuNDc5OThIMTE3Ljc3WiIgZmlsbD0iYmxhY2siLz4KPHBhdGggZD0iTTEzNS40IDkuNDc5OThWMjcuNjdIMTQxLjYzVjMwLjY4SDEzMi4yVjkuNDc5OThIMTM1LjRaIiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMTYxLjUzIDEyLjQ4MDFIMTUzLjAzVjE3LjU3MDFIMTYxLjI4VjIwLjU4MDFIMTUzLjAzVjI3LjY2MDFIMTYxLjUzVjMwLjY3MDFIMTQ5LjgzVjkuNDcwMDlIMTYxLjUzVjEyLjQ4MDFaIiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMTg2LjM4IDEwLjYyMDFWMTQuNDEwMUMxODQuNTMgMTIuODYwMSAxODIuNjIgMTIuMDkwMSAxODAuNjQgMTIuMDkwMUMxNzguNDYgMTIuMDkwMSAxNzYuNjMgMTIuODcwMSAxNzUuMTMgMTQuNDQwMUMxNzMuNjMgMTYuMDAwMSAxNzIuODggMTcuOTAwMSAxNzIuODggMjAuMTUwMUMxNzIuODggMjIuNDAwMSAxNzMuNjMgMjQuMjUwMSAxNzUuMTMgMjUuNzgwMUMxNzYuNjMgMjcuMzEwMSAxNzguNDcgMjguMDcwMSAxODAuNjUgMjguMDcwMUMxODEuNzggMjguMDcwMSAxODIuNzMgMjcuODkwMSAxODMuNTIgMjcuNTIwMUMxODMuOTYgMjcuMzQwMSAxODQuNDEgMjcuMDkwMSAxODQuODkgMjYuNzgwMUMxODUuMzYgMjYuNDcwMSAxODUuODYgMjYuMDkwMSAxODYuMzggMjUuNjUwMVYyOS41MTAxQzE4NC41NSAzMC41NDAxIDE4Mi42MyAzMS4wNjAxIDE4MC42MSAzMS4wNjAxQzE3Ny41OCAzMS4wNjAxIDE3NC45OSAzMC4wMDAxIDE3Mi44NSAyNy44OTAxQzE3MC43MiAyNS43NjAxIDE2OS42NSAyMy4xOTAxIDE2OS42NSAyMC4xNzAxQzE2OS42NSAxNy40NzAxIDE3MC41NCAxNS4wNjAxIDE3Mi4zMyAxMi45NTAxQzE3NC41MyAxMC4zNjAxIDE3Ny4zNyA5LjA2MDA2IDE4MC44NiA5LjA2MDA2QzE4Mi43NiA5LjA2MDA2IDE4NC42IDkuNTgwMDYgMTg2LjM4IDEwLjYxMDFWMTAuNjIwMVoiIGZpbGw9ImJsYWNrIi8+CjxwYXRoIGQ9Ik0yMDIuMDkgMTIuNDgwMVYzMC42NzAxSDE5OC44OVYxMi40ODAxSDE5NC4wMlY5LjQ3MDA5SDIwNi45NVYxMi40ODAxSDIwMi4wOVoiIGZpbGw9ImJsYWNrIi8+CjxwYXRoIGQ9Ik0yMTguMjcgOS40Nzk5OFYzMC42OEgyMTUuMDdWOS40Nzk5OEgyMTguMjdaIiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMjI4LjYyIDMwLjY4VjguMDQwMDRMMjQ0LjA4IDI0LjIxVjkuNDgwMDRIMjQ3LjI4VjMxLjk3TDIzMS44MiAxNS44NFYzMC42OEgyMjguNjJaIiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMjY4LjQ4IDE5LjY0MDFIMjc3LjI0VjIwLjM0MDFDMjc3LjI0IDIxLjkzMDEgMjc3LjA1IDIzLjM0MDEgMjc2LjY4IDI0LjU3MDFDMjc2LjMxIDI1LjcxMDEgMjc1LjcgMjYuNzcwMSAyNzQuODMgMjcuNzYwMUMyNzIuODYgMjkuOTgwMSAyNzAuMzYgMzEuMDgwMSAyNjcuMzIgMzEuMDgwMUMyNjQuMjggMzEuMDgwMSAyNjEuODEgMzAuMDEwMSAyNTkuNyAyNy44NzAxQzI1Ny41OSAyNS43MjAxIDI1Ni41MyAyMy4xNDAxIDI1Ni41MyAyMC4xMzAxQzI1Ni41MyAxNy4xMjAxIDI1Ny42MSAxNC40NTAxIDI1OS43NiAxMi4zMDAxQzI2MS45MSAxMC4xNTAxIDI2NC41MyA5LjA3MDA3IDI2Ny42MSA5LjA3MDA3QzI2OS4yNyA5LjA3MDA3IDI3MC44MSA5LjQxMDA2IDI3Mi4yNSAxMC4wOTAxQzI3My42MiAxMC43NzAxIDI3NC45NyAxMS44NzAxIDI3Ni4zIDEzLjM5MDFMMjc0LjAyIDE1LjU3MDFDMjcyLjI4IDEzLjI1MDEgMjcwLjE2IDEyLjEwMDEgMjY3LjY2IDEyLjEwMDFDMjY1LjQyIDEyLjEwMDEgMjYzLjU0IDEyLjg3MDEgMjYyLjAyIDE0LjQyMDFDMjYwLjUgMTUuOTQwMSAyNTkuNzQgMTcuODQwMSAyNTkuNzQgMjAuMTMwMUMyNTkuNzQgMjIuNDIwMSAyNjAuNTkgMjQuNDQwMSAyNjIuMjggMjUuOTcwMUMyNjMuODYgMjcuMzkwMSAyNjUuNTggMjguMTAwMSAyNjcuNDMgMjguMTAwMUMyNjkgMjguMTAwMSAyNzAuNDIgMjcuNTcwMSAyNzEuNjcgMjYuNTEwMUMyNzIuOTIgMjUuNDQwMSAyNzMuNjIgMjQuMTYwMSAyNzMuNzcgMjIuNjcwMUgyNjguNDhWMTkuNjYwMVYxOS42NDAxWiIgZmlsbD0iYmxhY2siLz4KPHBhdGggZD0iTTMwOS4xNyAxMC42MjAxVjE0LjQxMDFDMzA3LjMyIDEyLjg2MDEgMzA1LjQxIDEyLjA5MDEgMzAzLjQzIDEyLjA5MDFDMzAxLjI1IDEyLjA5MDEgMjk5LjQyIDEyLjg3MDEgMjk3LjkyIDE0LjQ0MDFDMjk2LjQyIDE2LjAwMDEgMjk1LjY3IDE3LjkwMDEgMjk1LjY3IDIwLjE1MDFDMjk1LjY3IDIyLjQwMDEgMjk2LjQyIDI0LjI1MDEgMjk3LjkyIDI1Ljc4MDFDMjk5LjQyIDI3LjMxMDEgMzAxLjI2IDI4LjA3MDEgMzAzLjQ0IDI4LjA3MDFDMzA0LjU3IDI4LjA3MDEgMzA1LjUyIDI3Ljg5MDEgMzA2LjMxIDI3LjUyMDFDMzA2Ljc1IDI3LjM0MDEgMzA3LjIgMjcuMDkwMSAzMDcuNjggMjYuNzgwMUMzMDguMTUgMjYuNDcwMSAzMDguNjUgMjYuMDkwMSAzMDkuMTcgMjUuNjUwMVYyOS41MTAxQzMwNy4zNCAzMC41NDAxIDMwNS40MiAzMS4wNjAxIDMwMy40IDMxLjA2MDFDMzAwLjM3IDMxLjA2MDEgMjk3Ljc4IDMwLjAwMDEgMjk1LjY0IDI3Ljg5MDFDMjkzLjUxIDI1Ljc2MDEgMjkyLjQ0IDIzLjE5MDEgMjkyLjQ0IDIwLjE3MDFDMjkyLjQ0IDE3LjQ3MDEgMjkzLjMzIDE1LjA2MDEgMjk1LjEyIDEyLjk1MDFDMjk3LjMyIDEwLjM2MDEgMzAwLjE2IDkuMDYwMDYgMzAzLjY1IDkuMDYwMDZDMzA1LjU1IDkuMDYwMDYgMzA3LjM5IDkuNTgwMDYgMzA5LjE3IDEwLjYxMDFWMTAuNjIwMVoiIGZpbGw9ImJsYWNrIi8+CjxwYXRoIGQ9Ik0zMzEuNDEgMjUuNTNIMzIyLjMzTDMxOS45NyAzMC42OEgzMTYuNTJMMzI3LjAxIDguMTUwMDJMMzM3LjEzIDMwLjY4SDMzMy42M0wzMzEuNDEgMjUuNTNaTTMzMC4xIDIyLjUyTDMyNi45NiAxNS4zMUwzMjMuNjYgMjIuNTJIMzMwLjFaIiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMzUyLjMzIDIxLjY0MDFMMzU4Ljg5IDMwLjY3MDFIMzU0Ljk4TDM0OC45MiAyMS45OTAxSDM0OC4zNFYzMC42NzAxSDM0NS4xNFY5LjQ3MDA5SDM0OC44OUMzNTEuNjkgOS40NzAwOSAzNTMuNzEgMTAuMDAwMSAzNTQuOTYgMTEuMDUwMUMzNTYuMzMgMTIuMjIwMSAzNTcuMDIgMTMuNzcwMSAzNTcuMDIgMTUuNjkwMUMzNTcuMDIgMTcuMTkwMSAzNTYuNTkgMTguNDgwMSAzNTUuNzMgMTkuNTYwMUMzNTQuODcgMjAuNjQwMSAzNTMuNzMgMjEuMzMwMSAzNTIuMzIgMjEuNjMwMUwzNTIuMzMgMjEuNjQwMVpNMzQ4LjM1IDE5LjIxMDFIMzQ5LjM3QzM1Mi40IDE5LjIxMDEgMzUzLjkxIDE4LjA1MDEgMzUzLjkxIDE1Ljc0MDFDMzUzLjkxIDEzLjU3MDEgMzUyLjQ0IDEyLjQ5MDEgMzQ5LjQ5IDEyLjQ5MDFIMzQ4LjM1VjE5LjIyMDFWMTkuMjEwMVoiIGZpbGw9ImJsYWNrIi8+CjxwYXRoIGQ9Ik0zNzguNjIgMTIuNjMwMUwzNzYuMDIgMTQuMTcwMUMzNzUuNTMgMTMuMzMwMSAzNzUuMDcgMTIuNzgwMSAzNzQuNjMgMTIuNTIwMUMzNzQuMTcgMTIuMjMwMSAzNzMuNTggMTIuMDgwMSAzNzIuODYgMTIuMDgwMUMzNzEuOTcgMTIuMDgwMSAzNzEuMjQgMTIuMzMwMSAzNzAuNjUgMTIuODQwMUMzNzAuMDYgMTMuMzMwMSAzNjkuNzcgMTMuOTYwMSAzNjkuNzcgMTQuNzEwMUMzNjkuNzcgMTUuNzQwMSAzNzAuNTQgMTYuNTgwMSAzNzIuMDggMTcuMjEwMUwzNzQuMTkgMTguMDcwMUMzNzUuOTEgMTguNzcwMSAzNzcuMTcgMTkuNjEwMSAzNzcuOTcgMjAuNjIwMUMzNzguNzcgMjEuNjIwMSAzNzkuMTYgMjIuODUwMSAzNzkuMTYgMjQuMzEwMUMzNzkuMTYgMjYuMjYwMSAzNzguNTEgMjcuODcwMSAzNzcuMjEgMjkuMTQwMUMzNzUuOSAzMC40MjAxIDM3NC4yOCAzMS4wNjAxIDM3Mi4zNCAzMS4wNjAxQzM3MC41IDMxLjA2MDEgMzY4Ljk4IDMwLjUyMDEgMzY3Ljc4IDI5LjQzMDFDMzY2LjYgMjguMzQwMSAzNjUuODYgMjYuODEwMSAzNjUuNTcgMjQuODMwMUwzNjguODEgMjQuMTIwMUMzNjguOTYgMjUuMzYwMSAzNjkuMjEgMjYuMjMwMSAzNjkuNTggMjYuNzAwMUMzNzAuMjQgMjcuNjIwMSAzNzEuMiAyOC4wNzAxIDM3Mi40NiAyOC4wNzAxQzM3My40NiAyOC4wNzAxIDM3NC4yOSAyNy43NDAxIDM3NC45NSAyNy4wNzAxQzM3NS42MSAyNi40MDAxIDM3NS45NCAyNS41NjAxIDM3NS45NCAyNC41MzAxQzM3NS45NCAyNC4xMjAxIDM3NS44OCAyMy43NDAxIDM3NS43NyAyMy40MDAxQzM3NS42NiAyMy4wNjAxIDM3NS40OCAyMi43NDAxIDM3NS4yMyAyMi40NTAxQzM3NC45OSAyMi4xNjAxIDM3NC42NyAyMS44OTAxIDM3NC4yOSAyMS42NDAxQzM3My45MSAyMS4zOTAxIDM3My40NSAyMS4xNTAxIDM3Mi45MiAyMC45MjAxTDM3MC44NyAyMC4wNzAxQzM2Ny45NyAxOC44NDAxIDM2Ni41MiAxNy4wNTAxIDM2Ni41MiAxNC42OTAxQzM2Ni41MiAxMy4xMDAxIDM2Ny4xMyAxMS43NzAxIDM2OC4zNSAxMC42OTAxQzM2OS41NyA5LjYxMDA3IDM3MS4wOCA5LjA3MDA3IDM3Mi44OSA5LjA3MDA3QzM3NS4zMyA5LjA3MDA3IDM3Ny4yNCAxMC4yNjAxIDM3OC42MiAxMi42NDAxVjEyLjYzMDFaIiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMjAuNjgwMSA3LjA5OTk2QzIxLjE3MDEgOS4yNDk5NiAyMS42NjAxIDExLjQgMjIuMTUwMSAxMy41NUMxOS45NDAxIDEzLjMxIDE3Ljc0MDEgMTMuMDQgMTUuNTMwMSAxMi42MkMxMy4zMjAxIDEyLjIxIDExLjEyMDEgMTEuNjUgOC45MTAwNyAxMC44NEM5LjQwMDA3IDEzLjExIDkuODkwMDcgMTUuMzggMTAuMzgwMSAxNy42M0MxMi41OTAxIDE4LjMzIDE0Ljc5MDEgMTguOCAxNy4wMDAxIDE5LjE2QzE5LjIxMDEgMTkuNTEgMjEuNDEwMSAxOS43NSAyMy42MjAxIDE5Ljk5QzIzLjEzMDEgMTcuODQgMjIuNjQwMSAxNS43IDIyLjE1MDEgMTMuNTVDMjQuMzYwMSAxMy43OSAyNi41NjAxIDE0LjAxIDI4Ljc3MDEgMTQuMzJDMzAuOTgwMSAxNC42MyAzMy4xODAxIDE1LjAzIDM1LjM5MDEgMTUuNjNDMzcuNjAwMSAxNi4yNCAzOS44MDAxIDE3LjA1IDQyLjAxMDEgMTguMThDNDIuNTAwMSAyMC41MyA0Mi45OTAxIDIyLjg5IDQzLjQ4MDEgMjUuMjdDNDMuOTcwMSAyNy42NSA0NC40NjAxIDMwLjA1IDQ0Ljk1MDEgMzIuNDZDNDUuNDQwMSAzNC44OCA0NS45MzAxIDM3LjMxIDQ2LjQyMDEgMzkuNzZDNDQuMjEwMSAzOC4xNCA0Mi4wMTAxIDM2LjkzIDM5LjgwMDEgMzUuOTlDMzcuNTkwMSAzNS4wNiAzNS4zOTAxIDM0LjQxIDMzLjE4MDEgMzMuOTNDMzAuOTcwMSAzMy40NSAyOC43NzAxIDMzLjE0IDI2LjU2MDEgMzIuODdDMjYuMDcwMSAzMC43MiAyNS41ODAxIDI4LjU3IDI1LjA5MDEgMjYuNDJDMjcuMzAwMSAyNi42NiAyOS41MDAxIDI2LjkzIDMxLjcxMDEgMjcuMzVDMzMuOTIwMSAyNy43NiAzNi4xMjAxIDI4LjMyIDM4LjMzMDEgMjkuMTNDMzcuODQwMSAyNi44NiAzNy4zNTAxIDI0LjU5IDM2Ljg2MDEgMjIuMzRDMzQuNjUwMSAyMS42NCAzMi40NTAxIDIxLjE3IDMwLjI0MDEgMjAuODFDMjguMDMwMSAyMC40NiAyNS44MzAxIDIwLjIyIDIzLjYyMDEgMTkuOThDMjQuMTEwMSAyMi4xMyAyNC42MDAxIDI0LjI3IDI1LjA5MDEgMjYuNDJDMjIuODgwMSAyNi4xOCAyMC42ODAxIDI1Ljk2IDE4LjQ3MDEgMjUuNjVDMTYuMjYwMSAyNS4zNCAxNC4wNjAxIDI0Ljk0IDExLjg1MDEgMjQuMzRDOS42NDAwNyAyMy43MyA3LjQ0MDA3IDIyLjkyIDUuMjMwMDcgMjEuNzlDNC43NDAwNyAxOS40NCA0LjI1MDA3IDE3LjA4IDMuNzYwMDcgMTQuN0MzLjI3MDA3IDEyLjMyIDIuNzgwMDcgOS45MTk5NiAyLjI5MDA3IDcuNTA5OTZDMS44MDAwNyA1LjA4OTk2IDEuMzEwMDcgMi42NTk5NiAwLjgyMDA2OCAwLjIwOTk2MUMzLjAzMDA3IDEuODI5OTYgNS4yMzAwNyAzLjAzOTk3IDcuNDQwMDcgMy45Nzk5N0M5LjY1MDA3IDQuOTA5OTcgMTEuODUwMSA1LjU1OTk2IDE0LjA2MDEgNi4wMzk5NkMxNi4yNzAxIDYuNTE5OTYgMTguNDcwMSA2LjgyOTk2IDIwLjY4MDEgNy4wOTk5NloiIGZpbGw9IiM1RjdGOUIiLz4KPHBhdGggZD0iTTIzLjYxMDEgMjBDMjQuMTAwMSAyMi4xNSAyNC41OTAxIDI0LjI5IDI1LjA4MDEgMjYuNDRDMjIuODcwMSAyNi4yIDIwLjY3MDEgMjUuOTggMTguNDYwMSAyNS42N0MxNi4yNTAxIDI1LjM2IDE0LjA1MDEgMjQuOTYgMTEuODQwMSAyNC4zNkM5LjYzMDA2IDIzLjc1IDcuNDMwMDYgMjIuOTQgNS4yMjAwNiAyMS44MUM0LjczMDA2IDE5LjQ2IDQuMjQwMDYgMTcuMSAzLjc1MDA2IDE0LjcyQzMuMjYwMDYgMTIuMzQgMi43NzAwNiA5LjkzOTk4IDIuMjgwMDYgNy41Mjk5OEMxLjc5MDA2IDUuMTA5OTggMS4zMDAwNiAyLjY3OTk4IDAuODEwMDU5IDAuMjI5OThDMy4wMjAwNiAxLjg0OTk4IDUuMjIwMDYgMy4wNTk5OCA3LjQzMDA2IDMuOTk5OThDOS42NDAwNiA0LjkyOTk4IDExLjg0MDEgNS41Nzk5NyAxNC4wNTAxIDYuMDU5OTdDMTYuMjYwMSA2LjUzOTk3IDE4LjQ2MDEgNi44NDk5OCAyMC42NzAxIDcuMTE5OThDMjEuMTYwMSA5LjI2OTk4IDIxLjY1MDEgMTEuNDIgMjIuMTQwMSAxMy41N0MxOS45MzAxIDEzLjMzIDE3LjczMDEgMTMuMDYgMTUuNTIwMSAxMi42NEMxMy4zMTAxIDEyLjIzIDExLjExMDEgMTEuNjcgOC45MDAwNiAxMC44NkM5LjM5MDA2IDEzLjEzIDkuODgwMDYgMTUuNCAxMC4zNzAxIDE3LjY1QzEyLjU4MDEgMTguMzUgMTQuNzgwMSAxOC44MiAxNi45OTAxIDE5LjE4QzE5LjIwMDEgMTkuNTMgMjEuNDAwMSAxOS43NyAyMy42MTAxIDIwLjAxIiBmaWxsPSIjMEIxNDI0Ii8+CjwvZz4KPGRlZnM+CjxjbGlwUGF0aCBpZD0iY2xpcDBfOTkxXzI0Ij4KPHJlY3Qgd2lkdGg9IjM4MCIgaGVpZ2h0PSI0MCIgZmlsbD0id2hpdGUiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K",
+              "https://collectingcars.com/assets/img/flags/GB.svg",
+              "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2LjU4NSIgaGVpZ2h0PSIxMS4xNzUiIHZpZXdCb3g9IjAgMCA2LjU4NSAxMS4xNzUiPg0KICA8cGF0aCBpZD0iUGF0aF80NSIgZGF0YS1uYW1lPSJQYXRoIDQ1IiBkPSJNMTQuNzEsNi43MWExLDEsMCwwLDAtMS40MSwwTDguNzEsMTEuM2ExLDEsMCwwLDAsMCwxLjQxTDEzLjMsMTcuM2ExLDEsMCwwLDAsMS40MS0xLjQxTDEwLjgzLDEybDMuODgtMy44OEExLDEsMCwwLDAsMTQuNzEsNi43MVoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC04LjQxNyAtNi40MTgpIiBmaWxsPSIjMTdBMzk4Ii8+DQo8L3N2Zz4NCg==",
+              "https://images.collectingcars.com/007461/-DSC1496.jpg?w=1263&fit=fillmax&crop=edges&auto=format,compress&cs=srgb&q=85",
+              "https://collectingcars.com/placeholder",
+              "https://collectingcars.com/placeholder",
+              "https://collectingcars.com/placeholder",
+              "https://collectingcars.com/placeholder",
+              "https://collectingcars.com/placeholder",
+              "https://images.collectingcars.com/007461/-DSC1343.jpg?w=189&fit=fillmax&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1349.jpg?w=189&fit=fillmax&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1447.jpg?w=189&fit=fillmax&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1469.jpg?w=189&fit=fillmax&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1429.jpg?w=189&fit=fillmax&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1430.jpg?w=189&fit=fillmax&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1405.jpg?w=189&fit=fillmax&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1414.jpg?w=189&fit=fillmax&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1343.jpg?w=315&h=230&fit=crop&crop=edges&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1349.jpg?w=315&h=230&fit=crop&crop=edges&auto=format,compress&cs=srgb&q=85",
+              "https://images.collectingcars.com/007461/-DSC1364.jpg?w=315&h=230&fit=crop&crop=edges&auto=format,compress&cs=srgb&q=85"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 90,
+      "score_delta": 90,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "medium"
+    }
+  ],
+  "summary": {
+    "naive_success_rate": 33.33333333333333,
+    "playwright_success_rate": 77.77777777777779,
+    "naive_avg_quality": 22,
+    "playwright_avg_quality": 47,
+    "avg_score_delta": 25,
+    "avg_timing_naive": 1759,
+    "avg_timing_playwright": 10683,
+    "easy_count": 2,
+    "medium_count": 2,
+    "hard_count": 5,
+    "urls_only_playwright_succeeded": 4,
+    "urls_playwright_significantly_better": 4
+  }
+}

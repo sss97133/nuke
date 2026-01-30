@@ -1109,69 +1109,549 @@ function cleanCraigslistTitle(raw: string | null | undefined): string {
   return cleaned
 }
 
+// ============================================================================
+// ENHANCED CRAIGSLIST PARSING UTILITIES
+// ============================================================================
+
+// Remove emojis and special characters from text
+function removeEmojis(text: string): string {
+  return text
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // Emoticons
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // Misc Symbols and Pictographs
+    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // Transport and Map
+    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // Flags
+    .replace(/[\u{2600}-\u{26FF}]/gu, '')   // Misc symbols
+    .replace(/[\u{2700}-\u{27BF}]/gu, '')   // Dingbats
+    .replace(/[\u{FE00}-\u{FE0F}]/gu, '')   // Variation Selectors
+    .replace(/[\u{1F900}-\u{1F9FF}]/gu, '') // Supplemental Symbols
+    .replace(/[\u{1FA00}-\u{1FA6F}]/gu, '') // Chess Symbols
+    .replace(/[\u{1FA70}-\u{1FAFF}]/gu, '') // Symbols and Pictographs Extended-A
+    .replace(/[\u{231A}-\u{231B}]/gu, '')   // Watch, Hourglass
+    .replace(/[\u{23E9}-\u{23F3}]/gu, '')   // Various symbols
+    .replace(/[\u{23F8}-\u{23FA}]/gu, '')   // Various symbols
+    .replace(/[\u{25AA}-\u{25AB}]/gu, '')   // Squares
+    .replace(/[\u{25B6}]/gu, '')            // Play button
+    .replace(/[\u{25C0}]/gu, '')            // Reverse button
+    .replace(/[\u{25FB}-\u{25FE}]/gu, '')   // Squares
+    .replace(/[\u{2614}-\u{2615}]/gu, '')   // Umbrella, Hot beverage
+    .replace(/[\u{2648}-\u{2653}]/gu, '')   // Zodiac
+    .replace(/[\u{267F}]/gu, '')            // Wheelchair
+    .replace(/[\u{2693}]/gu, '')            // Anchor
+    .replace(/[\u{26A1}]/gu, '')            // High voltage
+    .replace(/[\u{26AA}-\u{26AB}]/gu, '')   // Circles
+    .replace(/[\u{26BD}-\u{26BE}]/gu, '')   // Soccer, Baseball
+    .replace(/[\u{26C4}-\u{26C5}]/gu, '')   // Snowman, Sun
+    .replace(/[\u{26CE}]/gu, '')            // Ophiuchus
+    .replace(/[\u{26D4}]/gu, '')            // No entry
+    .replace(/[\u{26EA}]/gu, '')            // Church
+    .replace(/[\u{26F2}-\u{26F3}]/gu, '')   // Fountain, Golf
+    .replace(/[\u{26F5}]/gu, '')            // Sailboat
+    .replace(/[\u{26FA}]/gu, '')            // Tent
+    .replace(/[\u{26FD}]/gu, '')            // Fuel pump
+    .replace(/[★☆✓✔✗✘●○◆◇▶►▷◀◁←→↑↓↔↕⇐⇒⇑⇓⬆⬇⬅➡]/g, '') // Common symbols
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Model to make inference map (when title only has model)
+const MODEL_TO_MAKE_MAP: Record<string, string> = {
+  // Chevrolet/GMC trucks
+  'c10': 'Chevrolet', 'c20': 'Chevrolet', 'c30': 'Chevrolet',
+  'k10': 'Chevrolet', 'k20': 'Chevrolet', 'k30': 'Chevrolet',
+  'c/k': 'Chevrolet', 'ck': 'Chevrolet',
+  'silverado': 'Chevrolet', 'cheyenne': 'Chevrolet', 'scottsdale': 'Chevrolet',
+  'blazer': 'Chevrolet', 'k5': 'Chevrolet', 'k5 blazer': 'Chevrolet',
+  'suburban': 'Chevrolet', 'tahoe': 'Chevrolet',
+  'jimmy': 'GMC', 'sierra': 'GMC', 'yukon': 'GMC',
+  'squarebody': 'Chevrolet',
+  // Ford
+  'f100': 'Ford', 'f150': 'Ford', 'f250': 'Ford', 'f350': 'Ford',
+  'f-100': 'Ford', 'f-150': 'Ford', 'f-250': 'Ford', 'f-350': 'Ford',
+  'bronco': 'Ford', 'ranger': 'Ford', 'explorer': 'Ford', 'expedition': 'Ford',
+  'mustang': 'Ford', 'thunderbird': 'Ford', 'falcon': 'Ford', 'fairlane': 'Ford',
+  // Dodge/Ram
+  'd100': 'Dodge', 'd150': 'Dodge', 'd200': 'Dodge', 'd250': 'Dodge',
+  'w100': 'Dodge', 'w150': 'Dodge', 'w200': 'Dodge', 'w250': 'Dodge',
+  'ramcharger': 'Dodge', 'power wagon': 'Dodge',
+  'challenger': 'Dodge', 'charger': 'Dodge', 'dart': 'Dodge',
+  // Jeep
+  'wrangler': 'Jeep', 'cherokee': 'Jeep', 'grand cherokee': 'Jeep',
+  'cj5': 'Jeep', 'cj7': 'Jeep', 'cj-5': 'Jeep', 'cj-7': 'Jeep',
+  'gladiator': 'Jeep', 'comanche': 'Jeep', 'wagoneer': 'Jeep',
+  // Toyota
+  'tacoma': 'Toyota', 'tundra': 'Toyota', '4runner': 'Toyota',
+  'land cruiser': 'Toyota', 'fj40': 'Toyota', 'fj60': 'Toyota', 'fj80': 'Toyota',
+  'hilux': 'Toyota', 'pickup': 'Toyota', // context dependent
+  'camry': 'Toyota', 'corolla': 'Toyota', 'supra': 'Toyota', 'celica': 'Toyota',
+  // Nissan/Datsun
+  '240z': 'Datsun', '260z': 'Datsun', '280z': 'Datsun', '280zx': 'Datsun',
+  '300zx': 'Nissan', '350z': 'Nissan', '370z': 'Nissan',
+  'pathfinder': 'Nissan', 'xterra': 'Nissan', 'frontier': 'Nissan',
+  // Honda
+  'civic': 'Honda', 'accord': 'Honda', 'prelude': 'Honda', 'crx': 'Honda',
+  's2000': 'Honda', 'nsx': 'Honda', 'cr-v': 'Honda', 'pilot': 'Honda',
+  // International
+  'scout': 'International', 'scout ii': 'International', 'travelall': 'International',
+  // Land Rover
+  'defender': 'Land Rover', 'discovery': 'Land Rover', 'range rover': 'Land Rover',
+  // Porsche
+  '911': 'Porsche', '912': 'Porsche', '914': 'Porsche', '924': 'Porsche',
+  '928': 'Porsche', '944': 'Porsche', '968': 'Porsche', 'boxster': 'Porsche',
+  'cayman': 'Porsche', 'cayenne': 'Porsche', 'panamera': 'Porsche',
+  // BMW
+  'm3': 'BMW', 'm5': 'BMW', 'e30': 'BMW', 'e36': 'BMW', 'e46': 'BMW',
+  '2002': 'BMW', '3 series': 'BMW', '5 series': 'BMW',
+  // Mercedes
+  'sl': 'Mercedes-Benz', 'slk': 'Mercedes-Benz', 'cls': 'Mercedes-Benz',
+  'g-wagon': 'Mercedes-Benz', 'g wagon': 'Mercedes-Benz', 'g class': 'Mercedes-Benz',
+  'w123': 'Mercedes-Benz', 'w124': 'Mercedes-Benz', 'w126': 'Mercedes-Benz',
+  // Volkswagen
+  'beetle': 'Volkswagen', 'bug': 'Volkswagen', 'bus': 'Volkswagen',
+  'golf': 'Volkswagen', 'gti': 'Volkswagen', 'jetta': 'Volkswagen',
+  'vanagon': 'Volkswagen', 'westfalia': 'Volkswagen', 'thing': 'Volkswagen',
+  // Classics
+  'corvette': 'Chevrolet', 'camaro': 'Chevrolet', 'chevelle': 'Chevrolet',
+  'nova': 'Chevrolet', 'impala': 'Chevrolet', 'bel air': 'Chevrolet',
+  'el camino': 'Chevrolet', 'monte carlo': 'Chevrolet',
+  'gto': 'Pontiac', 'firebird': 'Pontiac', 'trans am': 'Pontiac',
+  'cutlass': 'Oldsmobile', '442': 'Oldsmobile',
+  'skylark': 'Buick', 'grand national': 'Buick', 'riviera': 'Buick',
+  'cuda': 'Plymouth', 'barracuda': 'Plymouth', 'road runner': 'Plymouth',
+}
+
+// Extract location from Craigslist URL (e.g., "sfbay" from sfbay.craigslist.org)
+function extractLocationFromUrl(url: string): string | null {
+  const match = url.match(/https?:\/\/([^.]+)\.craigslist\.org/)
+  if (match && match[1]) {
+    const regionCode = match[1]
+    // Map common region codes to readable names
+    const regionMap: Record<string, string> = {
+      'sfbay': 'San Francisco Bay Area',
+      'losangeles': 'Los Angeles',
+      'sandiego': 'San Diego',
+      'sacramento': 'Sacramento',
+      'fresno': 'Fresno',
+      'bakersfield': 'Bakersfield',
+      'seattle': 'Seattle',
+      'portland': 'Portland',
+      'phoenix': 'Phoenix',
+      'tucson': 'Tucson',
+      'denver': 'Denver',
+      'dallas': 'Dallas',
+      'houston': 'Houston',
+      'austin': 'Austin',
+      'sanantonio': 'San Antonio',
+      'chicago': 'Chicago',
+      'detroit': 'Detroit',
+      'atlanta': 'Atlanta',
+      'miami': 'Miami',
+      'tampa': 'Tampa',
+      'orlando': 'Orlando',
+      'boston': 'Boston',
+      'newyork': 'New York',
+      'philadelphia': 'Philadelphia',
+      'washingtondc': 'Washington DC',
+      'baltimore': 'Baltimore',
+      'minneapolis': 'Minneapolis',
+      'stlouis': 'St. Louis',
+      'kansascity': 'Kansas City',
+      'lasvegas': 'Las Vegas',
+      'saltlakecity': 'Salt Lake City',
+      'albuquerque': 'Albuquerque',
+      'honolulu': 'Honolulu',
+      'anchorage': 'Anchorage',
+      'inlandempire': 'Inland Empire',
+      'orangecounty': 'Orange County',
+      'ventura': 'Ventura',
+      'santabarbara': 'Santa Barbara',
+      'reno': 'Reno',
+      'modesto': 'Modesto',
+      'stockton': 'Stockton',
+      'monterey': 'Monterey',
+      'slo': 'San Luis Obispo',
+      'palmsprings': 'Palm Springs',
+    }
+    return regionMap[regionCode.toLowerCase()] || regionCode.replace(/([a-z])([A-Z])/g, '$1 $2')
+  }
+  return null
+}
+
+// Parse attrgroup field with flexible matching
+function parseAttrgroupField(text: string): { key: string; value: string } | null {
+  // Normalize the text
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim()
+
+  // Try colon-separated format first: "key: value" or "key:value"
+  const colonMatch = normalized.match(/^([^:]+):\s*(.+)$/)
+  if (colonMatch) {
+    return { key: colonMatch[1].trim(), value: colonMatch[2].trim() }
+  }
+
+  // Try space-separated format for known fields: "8 cylinders", "4wd", etc.
+  const cylinderMatch = normalized.match(/^(\d+)\s*cylinders?$/)
+  if (cylinderMatch) {
+    return { key: 'cylinders', value: cylinderMatch[1] }
+  }
+
+  // Drive types without colon
+  if (/^(4wd|awd|fwd|rwd|4x4|2wd)$/i.test(normalized)) {
+    return { key: 'drive', value: normalized }
+  }
+
+  // Transmission without colon
+  if (/^(automatic|manual|cvt|semi-?auto)$/i.test(normalized)) {
+    return { key: 'transmission', value: normalized }
+  }
+
+  return null
+}
+
+// Enhanced description parsing for vehicle details
+function parseDescriptionForDetails(description: string): {
+  vin: string | null
+  mileage: number | null
+  condition: string | null
+  engine: string | null
+  transmission: string | null
+  drivetrain: string | null
+  title_status: string | null
+  modifications: string[]
+  confidence: Record<string, number>
+} {
+  const result = {
+    vin: null as string | null,
+    mileage: null as number | null,
+    condition: null as string | null,
+    engine: null as string | null,
+    transmission: null as string | null,
+    drivetrain: null as string | null,
+    title_status: null as string | null,
+    modifications: [] as string[],
+    confidence: {} as Record<string, number>
+  }
+
+  if (!description) return result
+
+  const text = description.replace(/\s+/g, ' ')
+  const textLower = text.toLowerCase()
+
+  // VIN extraction (standard 17-char, but also try to find partial/labeled VINs)
+  const vinPatterns = [
+    /\bvin[:#\s]*([A-HJ-NPR-Z0-9]{17})\b/i,  // "VIN: XXXXX" or "VIN#XXXXX"
+    /\b([A-HJ-NPR-Z0-9]{17})\b/,              // Standard 17-char VIN
+    /\bvin[:#\s]*([A-HJ-NPR-Z0-9]{11,16})\b/i // Partial VIN with label
+  ]
+  for (const pattern of vinPatterns) {
+    const match = text.toUpperCase().match(pattern)
+    if (match?.[1] && match[1].length >= 11) {
+      result.vin = match[1]
+      result.confidence['vin'] = match[1].length === 17 ? 0.95 : 0.6
+      break
+    }
+  }
+
+  // Mileage extraction - multiple patterns
+  const mileagePatterns = [
+    /(\d{1,3}(?:,\d{3})*)\s*(?:original\s+)?miles?\b/i,        // "125,000 miles" or "125000 original miles"
+    /\b(?:odometer|odo)[:\s]*(\d{1,3}(?:,\d{3})*)/i,           // "odometer: 125,000"
+    /(\d{1,3}(?:\.\d)?)\s*k\s*(?:original\s+)?mi(?:les?)?\b/i, // "125k miles" or "125.5k mi"
+    /\bmileage[:\s]*(\d{1,3}(?:,\d{3})*)/i,                    // "mileage: 125,000"
+    /(\d{1,3}(?:,\d{3})*)\s*(?:actual|showing|indicated)/i,    // "125,000 actual"
+  ]
+  for (const pattern of mileagePatterns) {
+    const match = textLower.match(pattern)
+    if (match?.[1]) {
+      let mileage: number
+      const numStr = match[1].replace(/,/g, '')
+      if (numStr.includes('.') || textLower.includes('k mi') || textLower.includes('k miles')) {
+        // Handle "125k" or "125.5k" format
+        mileage = Math.round(parseFloat(numStr) * 1000)
+      } else {
+        mileage = parseInt(numStr)
+      }
+      // Sanity check: mileage should be reasonable (0 to 500,000)
+      if (mileage >= 0 && mileage <= 500000) {
+        result.mileage = mileage
+        result.confidence['mileage'] = 0.8
+        break
+      }
+    }
+  }
+
+  // Condition signals
+  const conditionSignals = {
+    excellent: ['excellent', 'pristine', 'perfect', 'immaculate', 'showroom', 'concours', 'museum quality', 'mint'],
+    good: ['good', 'great', 'nice', 'solid', 'clean', 'well maintained', 'runs great', 'runs and drives', 'daily driver'],
+    fair: ['fair', 'decent', 'okay', 'ok', 'runs', 'drives', 'needs tlc', 'needs work', 'minor issues'],
+    poor: ['poor', 'rough', 'project', 'parts car', 'barn find', 'needs restoration', 'non-running', 'not running', 'doesn\'t run'],
+    salvage: ['salvage', 'rebuilt', 'reconstructed', 'flood', 'fire damage', 'totaled']
+  }
+
+  for (const [condition, signals] of Object.entries(conditionSignals)) {
+    for (const signal of signals) {
+      if (textLower.includes(signal)) {
+        result.condition = condition
+        result.confidence['condition'] = 0.7
+        break
+      }
+    }
+    if (result.condition) break
+  }
+
+  // Engine extraction
+  const enginePatterns = [
+    /\b(\d{3,4})\s*(?:ci|cubic inch)/i,                        // "350ci" or "454 cubic inch"
+    /\b(\d\.\d)\s*(?:l|liter)\s*(v?\d+|inline|i\d+)?/i,        // "5.7L V8" or "2.0L inline 4"
+    /\b(ls[1-9x]|lt[1-5]|lsx|coyote|hemi|flathead|windsor|cleveland|boss)/i, // Engine names
+    /\b(small\s*block|big\s*block|sbc|bbc)\s*(\d{3})?/i,       // "small block 350"
+    /\b(v6|v8|v10|v12|inline[- ]?[46]|i[46]|flat[- ]?[46])\b/i, // Engine config
+    /\bstraight[- ]?([468])\b/i,                               // "straight 6"
+  ]
+
+  for (const pattern of enginePatterns) {
+    const match = text.match(pattern)
+    if (match) {
+      result.engine = match[0].trim()
+      result.confidence['engine'] = 0.75
+      break
+    }
+  }
+
+  // Transmission
+  const transPatterns = [
+    /\b(automatic|auto|at)\b/i,
+    /\b(manual|stick|standard|mt)\b/i,
+    /\b(\d)[- ]?speed\s*(auto|manual|trans)?/i,  // "4-speed" or "5 speed manual"
+    /\b(th350|th400|turbo\s*350|turbo\s*400|4l60|4l80|700r4|t5|t56|tremec|muncie|saginaw)\b/i,
+    /\b(powerglide|hydramatic|overdrive)\b/i
+  ]
+
+  for (const pattern of transPatterns) {
+    const match = textLower.match(pattern)
+    if (match) {
+      // Normalize common abbreviations
+      let trans = match[0]
+      if (/\bauto(?:matic)?\b/i.test(trans)) trans = 'automatic'
+      else if (/\bmanual|stick|standard\b/i.test(trans)) trans = 'manual'
+      result.transmission = trans
+      result.confidence['transmission'] = 0.75
+      break
+    }
+  }
+
+  // Drivetrain
+  const drivePatterns = [
+    /\b(4x4|4wd|four wheel drive|4 wheel drive)\b/i,
+    /\b(awd|all wheel drive|all-wheel drive)\b/i,
+    /\b(2wd|rwd|rear wheel drive|rear-wheel drive)\b/i,
+    /\b(fwd|front wheel drive|front-wheel drive)\b/i,
+  ]
+
+  for (const pattern of drivePatterns) {
+    const match = textLower.match(pattern)
+    if (match) {
+      // Normalize
+      const m = match[0].toLowerCase()
+      if (m.includes('4x4') || m.includes('4wd') || m.includes('four wheel')) result.drivetrain = '4wd'
+      else if (m.includes('awd') || m.includes('all wheel')) result.drivetrain = 'awd'
+      else if (m.includes('rwd') || m.includes('rear wheel')) result.drivetrain = 'rwd'
+      else if (m.includes('fwd') || m.includes('front wheel')) result.drivetrain = 'fwd'
+      result.confidence['drivetrain'] = 0.8
+      break
+    }
+  }
+
+  // Title status
+  const titlePatterns = [
+    /\b(clean title|clear title)\b/i,
+    /\b(salvage title|salvage)\b/i,
+    /\b(rebuilt title|reconstructed title)\b/i,
+    /\b(no title|lost title|title lost|missing title)\b/i,
+    /\b(lien|lienholder)\b/i,
+    /\b(bill of sale|bos only)\b/i,
+  ]
+
+  for (const pattern of titlePatterns) {
+    const match = textLower.match(pattern)
+    if (match) {
+      const m = match[0].toLowerCase()
+      if (m.includes('clean') || m.includes('clear')) result.title_status = 'clean'
+      else if (m.includes('salvage')) result.title_status = 'salvage'
+      else if (m.includes('rebuilt') || m.includes('reconstructed')) result.title_status = 'rebuilt'
+      else if (m.includes('no title') || m.includes('lost') || m.includes('missing')) result.title_status = 'missing'
+      else if (m.includes('lien')) result.title_status = 'lien'
+      else if (m.includes('bill of sale')) result.title_status = 'bill of sale only'
+      result.confidence['title_status'] = 0.8
+      break
+    }
+  }
+
+  // Modifications detection
+  const modPatterns = [
+    /\b(ls\s*swap|engine\s*swap|motor\s*swap)\b/i,
+    /\b(lowered|lifted|leveled)\b/i,
+    /\b(custom|aftermarket|upgraded|modified)\s*(exhaust|intake|suspension|wheels|interior)/i,
+    /\b(headers|cam|intake|carb|fuel injection|efi)\b/i,
+    /\b(disc brake|power steering|ac|air conditioning)\s*(conversion|swap|upgrade)/i,
+  ]
+
+  for (const pattern of modPatterns) {
+    const match = text.match(pattern)
+    if (match) {
+      result.modifications.push(match[0].trim())
+    }
+  }
+
+  return result
+}
+
 // Inline Craigslist scraping function (same as scrape-all-craigslist-squarebodies)
 function scrapeCraigslistInline(doc: any, url: string): any {
 const data: any = {
     source: 'Craigslist',
-    listing_url: url
+    listing_url: url,
+    extraction_confidence: {} as Record<string, number>,
+    raw_attrgroup: {} as Record<string, string>
   }
 
   const titleElement = doc.querySelector('h1, .postingtitletext #titletextonly')
   if (titleElement) {
-    data.title = cleanCraigslistTitle(titleElement.textContent)
-    
+    // Clean the title: remove emojis, normalize whitespace
+    const rawTitle = titleElement.textContent || ''
+    data.raw_title = rawTitle.trim()
+    data.title = removeEmojis(cleanCraigslistTitle(rawTitle))
+
     // Step 1: Extract year from title
     const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
     if (yearMatch) {
       data.year = yearMatch[0]
+      data.extraction_confidence['year'] = 0.95
     }
-    
-    // Step 2: Extract make (common makes) - only set if found
+
+    // Step 2: Extract make (common makes) - expanded list
     const makePatterns = [
-      /\b(19|20)\d{2}\s+(Ford|Chevrolet|Chevy|GMC|Toyota|Honda|Nissan|Dodge|Jeep|BMW|Mercedes|Audi|Volkswagen|VW|Lexus|Acura|Infiniti|Mazda|Subaru|Mitsubishi|Hyundai|Kia|Volvo|Porsche|Jaguar|Land Rover|Range Rover|Tesla|Genesis|Alfa Romeo|Fiat|Mini|Cadillac|Buick|Pontiac|Oldsmobile|Lincoln|Chrysler)\b/i
+      /\b(19|20)\d{2}\s+(Ford|Chevrolet|Chevy|GMC|Toyota|Honda|Nissan|Datsun|Dodge|Ram|Jeep|BMW|Mercedes|Mercedes-Benz|Benz|Audi|Volkswagen|VW|Lexus|Acura|Infiniti|Mazda|Subaru|Mitsubishi|Hyundai|Kia|Volvo|Porsche|Jaguar|Land Rover|Range Rover|Tesla|Genesis|Alfa Romeo|Fiat|Mini|Cadillac|Buick|Pontiac|Oldsmobile|Lincoln|Chrysler|Plymouth|AMC|International|IH|Scout|Willys|Kaiser|Studebaker|Hudson|Nash|Packard|DeSoto|Edsel|Mercury|Saturn|Geo|Isuzu|Suzuki|Saab|Triumph|MG|Austin|Morris|Sunbeam|Jensen|Lotus|Aston Martin|Ferrari|Lamborghini|Maserati|Bentley|Rolls-Royce|Rolls Royce)\b/i
     ]
-    
+
     let makeFound = false
     for (const pattern of makePatterns) {
       const match = data.title.match(pattern)
       if (match && match[2]) {
         data.make = match[2].charAt(0).toUpperCase() + match[2].slice(1).toLowerCase()
         // Normalize common variations
-        if (data.make.toLowerCase() === 'chevy') data.make = 'Chevrolet'
-        if (data.make.toLowerCase() === 'vw') data.make = 'Volkswagen'
+        const makeLower = data.make.toLowerCase()
+        if (makeLower === 'chevy') data.make = 'Chevrolet'
+        if (makeLower === 'vw') data.make = 'Volkswagen'
+        if (makeLower === 'benz') data.make = 'Mercedes-Benz'
+        if (makeLower === 'ih') data.make = 'International'
+        if (makeLower === 'rolls royce') data.make = 'Rolls-Royce'
+        data.extraction_confidence['make'] = 0.9
         makeFound = true
         break
       }
     }
-    
+
     // Step 3: Extract model - everything between make and price/location
-    // Only set model if we found a make (don't guess)
+    let modelText = ''
     if (makeFound && data.make) {
       // Remove year and make from title
       const afterMake = data.title.replace(new RegExp(`\\b(19|20)\\d{2}\\s+${data.make}\\s+`, 'i'), '')
-      
-      // Strategy: Extract everything until we hit price ($) or end, then clean up
-      // Handle titles like: "F-150 Super Crew Harley-Davidson Edition 4x4 (Edition #2798) - $14,995"
-      let modelText = afterMake
-      
-      // Remove price if present (everything from $ onwards)
-      modelText = modelText.replace(/\s*-\s*\$.*$/, '').replace(/\s*\$.*$/, '')
-      
-      // Remove location in parens at the end (but keep model name with dashes)
-      // Pattern: (Location) or (Edition #123) at the end
-      modelText = modelText.replace(/\s*\([^)]+\)\s*$/, '')
-      
-      // Remove common suffixes that aren't part of model name
-      modelText = modelText.replace(/\s+(4x4|4wd|2wd|diesel|gas|automatic|manual)\s*$/i, '').trim()
-      
-      // Remove emojis and special characters that might be in the title
-      modelText = modelText.replace(/[🚨🏁🏍️✨🧰⚙️🕒🛞🔥💺🧵🌞📡📷🧼🧷🏷️🏢🤝📍📞🌐💳🪙🧾]/g, '').trim()
-      
-      // Only set model if we have meaningful text (at least 2 chars)
-      if (modelText && modelText.length >= 2) {
-        data.model = modelText
+      modelText = afterMake
+    } else {
+      // No make found - try to extract model and infer make from it
+      // Remove year first
+      modelText = data.title.replace(/\b(19|20)\d{2}\s+/i, '')
+    }
+
+    // Clean up model text
+    // Remove price if present (everything from $ onwards)
+    modelText = modelText.replace(/\s*-\s*\$.*$/, '').replace(/\s*\$.*$/, '')
+
+    // Remove location in parens at the end
+    modelText = modelText.replace(/\s*\([^)]+\)\s*$/, '')
+
+    // Remove common suffixes that aren't part of model name (but keep meaningful ones)
+    modelText = modelText.replace(/\s+(diesel|gas|gasoline)\s*$/i, '').trim()
+
+    // Clean any remaining special characters
+    modelText = removeEmojis(modelText).trim()
+
+    // If we have model text, try to extract meaningful parts
+    if (modelText && modelText.length >= 2) {
+      // Try to infer make from model if not found
+      if (!makeFound) {
+        const modelLower = modelText.toLowerCase()
+        for (const [knownModel, inferredMake] of Object.entries(MODEL_TO_MAKE_MAP)) {
+          if (modelLower.includes(knownModel)) {
+            data.make = inferredMake
+            data.extraction_confidence['make'] = 0.75 // Lower confidence for inference
+            makeFound = true
+            break
+          }
+        }
       }
-      // If modelText is empty or too short, leave data.model undefined (don't fill)
+
+      // Clean model text: remove make if it's duplicated at the start
+      if (data.make) {
+        const makeRegex = new RegExp(`^${data.make}\\s+`, 'i')
+        modelText = modelText.replace(makeRegex, '').trim()
+      }
+
+      // Only set model if meaningful
+      if (modelText.length >= 2) {
+        data.model = modelText
+        data.extraction_confidence['model'] = makeFound ? 0.8 : 0.6
+      }
+    }
+
+    // Step 4: Try to extract from URL slug if title parsing failed
+    if (!data.make || !data.model) {
+      const urlSlug = url.match(/\/([^\/]+)\.html$/)?.[1]
+      if (urlSlug) {
+        // URL slugs look like: "plano-2016-kia-soul-with-only-miles" or "1977-chevrolet-c10-stepside"
+        const slugParts = urlSlug.toLowerCase().split('-')
+
+        // Find year in slug
+        if (!data.year) {
+          for (const part of slugParts) {
+            if (/^(19|20)\d{2}$/.test(part)) {
+              data.year = part
+              data.extraction_confidence['year'] = 0.85
+              break
+            }
+          }
+        }
+
+        // Find make in slug
+        if (!data.make) {
+          const makeTerms = ['chevrolet', 'chevy', 'ford', 'gmc', 'toyota', 'honda', 'dodge', 'jeep', 'nissan', 'bmw', 'mercedes', 'audi', 'volkswagen', 'porsche']
+          for (const part of slugParts) {
+            if (makeTerms.includes(part)) {
+              data.make = part === 'chevy' ? 'Chevrolet' : part.charAt(0).toUpperCase() + part.slice(1)
+              data.extraction_confidence['make'] = 0.7
+              break
+            }
+          }
+        }
+
+        // Try to extract model from slug (word after make)
+        if (data.make && !data.model) {
+          const makeIndex = slugParts.findIndex(p =>
+            p === data.make.toLowerCase() ||
+            (data.make === 'Chevrolet' && p === 'chevy')
+          )
+          if (makeIndex >= 0 && makeIndex < slugParts.length - 1) {
+            const modelCandidate = slugParts.slice(makeIndex + 1).join(' ')
+              .replace(/\bwith\b.*$/i, '')
+              .replace(/\bonly\b.*$/i, '')
+              .trim()
+            if (modelCandidate.length >= 2) {
+              data.model = modelCandidate
+              data.extraction_confidence['model'] = 0.6
+            }
+          }
+        }
+      }
     }
 const priceMatch = data.title.match(/\$\s*([\d,]+)/)
     if (priceMatch) data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
@@ -1325,26 +1805,127 @@ break
       }
     }
   }
-const attrGroups = doc.querySelectorAll('.attrgroup')
+// Enhanced attrgroup parsing - case-insensitive, whitespace-tolerant
+  const attrGroups = doc.querySelectorAll('.attrgroup')
   attrGroups.forEach((group: any) => {
     const spans = group.querySelectorAll('span')
     spans.forEach((span: any) => {
-      const text = span.textContent.trim()
-      if (text.includes('condition:')) data.condition = text.replace('condition:', '').trim()
-      else if (text.includes('cylinders:')) {
-        const cylMatch = text.match(/(\d+)\s+cylinders/)
-        if (cylMatch) data.cylinders = parseInt(cylMatch[1])
+      const rawText = (span.textContent || '').trim()
+      if (!rawText) return
+
+      // Store raw attrgroup data for audit trail
+      const parsed = parseAttrgroupField(rawText)
+      if (parsed) {
+        data.raw_attrgroup[parsed.key] = parsed.value
+
+        // Map to our schema fields with flexible matching
+        const key = parsed.key.toLowerCase().replace(/\s+/g, '')
+        const value = parsed.value
+
+        switch (key) {
+          case 'condition':
+            data.condition = value
+            data.extraction_confidence['condition'] = 0.9
+            break
+          case 'cylinders':
+            const cylNum = parseInt(value)
+            if (!isNaN(cylNum)) {
+              data.cylinders = cylNum
+              data.extraction_confidence['cylinders'] = 0.95
+            }
+            break
+          case 'drive':
+            data.drivetrain = value
+            data.extraction_confidence['drivetrain'] = 0.9
+            break
+          case 'fuel':
+          case 'fueltype':
+            data.fuel_type = value
+            data.extraction_confidence['fuel_type'] = 0.9
+            break
+          case 'odometer':
+            // Handle various formats: "125,000", "125000", "125k"
+            let odoValue = value.replace(/,/g, '').replace(/\s*miles?\s*/gi, '')
+            if (odoValue.toLowerCase().endsWith('k')) {
+              odoValue = String(parseFloat(odoValue) * 1000)
+            }
+            const mileage = parseInt(odoValue)
+            if (!isNaN(mileage) && mileage >= 0 && mileage <= 999999) {
+              data.mileage = mileage
+              data.extraction_confidence['mileage'] = 0.95
+            }
+            break
+          case 'paintcolor':
+          case 'exteriorcolor':
+          case 'color':
+            data.color = value
+            data.extraction_confidence['color'] = 0.9
+            break
+          case 'interiorcolor':
+            data.interior_color = value
+            data.extraction_confidence['interior_color'] = 0.9
+            break
+          case 'titlestatus':
+          case 'title':
+            data.title_status = value
+            data.extraction_confidence['title_status'] = 0.9
+            break
+          case 'transmission':
+            data.transmission = value
+            data.extraction_confidence['transmission'] = 0.9
+            break
+          case 'type':
+          case 'bodytype':
+          case 'bodystyle':
+            data.body_style = value
+            data.extraction_confidence['body_style'] = 0.9
+            break
+          case 'vin':
+            if (value.length >= 11) {
+              data.vin = value.toUpperCase()
+              data.extraction_confidence['vin'] = value.length === 17 ? 0.95 : 0.7
+            }
+            break
+          case 'size':
+          case 'enginesize':
+            data.engine_size = value
+            data.extraction_confidence['engine_size'] = 0.85
+            break
+          case 'make':
+            data.make = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+            data.extraction_confidence['make'] = 0.95
+            break
+          case 'model':
+            data.model = value
+            data.extraction_confidence['model'] = 0.9
+            break
+        }
+      } else {
+        // Try to extract from unstructured text (e.g., "8 cylinders", "4wd")
+        const textLower = rawText.toLowerCase()
+
+        // Cylinders without label
+        const cylMatch = textLower.match(/^(\d+)\s*cylinders?$/)
+        if (cylMatch) {
+          data.cylinders = parseInt(cylMatch[1])
+          data.extraction_confidence['cylinders'] = 0.85
+          data.raw_attrgroup['cylinders'] = cylMatch[1]
+        }
+
+        // Drive type without label
+        if (/^(4wd|awd|fwd|rwd|4x4|2wd)$/i.test(textLower)) {
+          data.drivetrain = textLower
+          data.extraction_confidence['drivetrain'] = 0.85
+          data.raw_attrgroup['drive'] = textLower
+        }
+
+        // Transmission without label
+        if (/^(automatic|manual|cvt)$/i.test(textLower)) {
+          data.transmission = textLower
+          data.extraction_confidence['transmission'] = 0.85
+          data.raw_attrgroup['transmission'] = textLower
+        }
       }
-      else if (text.includes('drive:')) data.drivetrain = text.replace('drive:', '').trim()
-      else if (text.includes('fuel:')) data.fuel_type = text.replace('fuel:', '').trim()
-      else if (text.includes('odometer:')) {
-        const odoMatch = text.match(/odometer:\s*([\d,]+)/)
-        if (odoMatch) data.mileage = parseInt(odoMatch[1].replace(/,/g, ''))
-      }
-      else if (text.includes('paint color:')) data.color = text.replace('paint color:', '').trim()
-      else if (text.includes('title status:')) data.title_status = text.replace('title status:', '').trim()
-      else if (text.includes('transmission:')) data.transmission = text.replace('transmission:', '').trim()
-      else if (text.includes('type:')) data.body_style = text.replace('type:', '').trim()
     })
   })
   
@@ -1407,10 +1988,74 @@ const attrGroups = doc.querySelectorAll('.attrgroup')
   // Canonical keys for UI: listing_posted_at mirrors posted_date for Craigslist.
   if (data.posted_date && !data.listing_posted_at) data.listing_posted_at = data.posted_date
 
-  // Best-effort VIN extraction from description if present.
+  // Enhanced description parsing - extract VIN, mileage, condition, engine, transmission, etc.
+  if (typeof data.description === 'string' && data.description.length > 0) {
+    const descDetails = parseDescriptionForDetails(data.description)
+
+    // VIN from description (if not already found in attrgroup)
+    if (!data.vin && descDetails.vin) {
+      data.vin = descDetails.vin
+      data.extraction_confidence['vin'] = descDetails.confidence['vin'] || 0.7
+    }
+
+    // Mileage from description (if not already found in attrgroup)
+    if (!data.mileage && descDetails.mileage) {
+      data.mileage = descDetails.mileage
+      data.extraction_confidence['mileage'] = descDetails.confidence['mileage'] || 0.7
+    }
+
+    // Condition from description (if not already found in attrgroup)
+    if (!data.condition && descDetails.condition) {
+      data.condition = descDetails.condition
+      data.extraction_confidence['condition'] = descDetails.confidence['condition'] || 0.6
+    }
+
+    // Engine from description
+    if (!data.engine && descDetails.engine) {
+      data.engine = descDetails.engine
+      data.extraction_confidence['engine'] = descDetails.confidence['engine'] || 0.7
+    }
+
+    // Transmission from description (if not already found)
+    if (!data.transmission && descDetails.transmission) {
+      data.transmission = descDetails.transmission
+      data.extraction_confidence['transmission'] = descDetails.confidence['transmission'] || 0.65
+    }
+
+    // Drivetrain from description (if not already found)
+    if (!data.drivetrain && descDetails.drivetrain) {
+      data.drivetrain = descDetails.drivetrain
+      data.extraction_confidence['drivetrain'] = descDetails.confidence['drivetrain'] || 0.7
+    }
+
+    // Title status from description (if not already found)
+    if (!data.title_status && descDetails.title_status) {
+      data.title_status = descDetails.title_status
+      data.extraction_confidence['title_status'] = descDetails.confidence['title_status'] || 0.7
+    }
+
+    // Modifications detected
+    if (descDetails.modifications.length > 0) {
+      data.modifications = descDetails.modifications
+    }
+  }
+
+  // Fallback VIN extraction if still not found (simple regex)
   if (!data.vin && typeof data.description === 'string') {
     const vinMatch = data.description.toUpperCase().match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
-    if (vinMatch?.[1]) data.vin = vinMatch[1]
+    if (vinMatch?.[1]) {
+      data.vin = vinMatch[1]
+      data.extraction_confidence['vin'] = 0.6
+    }
+  }
+
+  // Extract location from URL if not found in listing
+  if (!data.location) {
+    const urlLocation = extractLocationFromUrl(url)
+    if (urlLocation) {
+      data.location = urlLocation
+      data.extraction_confidence['location'] = 0.6
+    }
   }
 // Comprehensive image extraction - multiple methods
   const images: string[] = []

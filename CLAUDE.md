@@ -2,6 +2,49 @@
 
 Autonomous extraction system for collector vehicle data. Pipeline: **Link → Entity Recognition → Vehicle Linking → Timeline Storage → Discovery Agent**
 
+---
+
+## MULTI-AGENT COORDINATION (READ FIRST)
+
+**You are likely one of multiple Claude agents working concurrently.** Before starting any significant work:
+
+### 1. Check Active Sessions
+```bash
+# See all running Claude Code terminals
+ps aux | grep "claude" | grep -v grep | awk '{print "PID:", $2, "TTY:", $7, "Time:", $10}'
+
+# See what each is working on
+cat /Users/skylar/nuke/.claude/ACTIVE_AGENTS.md
+```
+
+### 2. Register Yourself
+Add your session to the file with:
+- What you're working on
+- Which files/areas you're touching
+- Timestamp
+
+### 3. Claim Work Before Starting
+If another agent is working on a file/area, **pick something else**. Coordinate via:
+- The `ACTIVE_AGENTS.md` file
+- Database: check `import_queue` claims and `processing_status`
+
+### 4. Check Recent Session Logs
+See what other sessions did recently:
+```bash
+# Last 3 sessions with summaries
+cat ~/.claude/projects/-Users-skylar-nuke/sessions-index.json | jq '.entries[-3:] | .[] | {modified, summary: .firstPrompt[0:100]}'
+
+# Debug log from current/latest session
+tail -50 ~/.claude/debug/latest
+```
+
+### 5. Deconflict File Edits
+- **Database migrations**: Only one agent creates migrations at a time
+- **Edge functions**: Check git status before editing shared files
+- **Scripts**: Coordinate via ACTIVE_AGENTS.md
+
+---
+
 ## IMPORTANT: Auto-Execute Behavior
 
 **If the user's message is just a URL (or starts with a URL):**
@@ -16,12 +59,30 @@ This is the default behavior. Just do it.
 
 ## Available Tools
 
-### MCP Servers (use these first)
-- **supabase** - Direct database queries and edge function calls
-- **firecrawl** - Web scraping for new sources (handles JS rendering)
-- **playwright** - Browser automation for complex interactions
-- **supabase-edge-orchestrator** - Custom edge function orchestration
-- **huggingface** - ML models if needed
+### MCP Servers (USE THESE - you have direct access)
+
+**supabase** - Database and edge functions
+```
+mcp__supabase__execute_sql     # Run SQL directly
+mcp__supabase__get_logs        # Check function logs
+mcp__supabase__apply_migration # Apply schema changes
+```
+
+**firecrawl** - Web scraping (handles JS)
+```
+mcp__firecrawl__scrape_url     # Scrape single page
+mcp__firecrawl__crawl_url      # Crawl multiple pages
+mcp__firecrawl__map_url        # Get site structure
+```
+
+**playwright** - Browser automation
+```
+mcp__playwright__navigate      # Go to URL
+mcp__playwright__click         # Click elements
+mcp__playwright__screenshot    # Capture page
+```
+
+You can call these directly - no curl needed for basic operations.
 
 ### CLI Tools
 - `dotenvx` - Encrypted secrets management (`dotenvx run -- [command]`)
@@ -236,6 +297,25 @@ Follow pattern in `bat-simple-extract`:
 - Deploy to Supabase directly
 - Use Firecrawl for unknown sources
 - **Ask first** only for: schema changes, deleting data, changing auth
+
+### Pre-Approved Bash Commands (200+)
+You have blanket approval for these - just run them:
+- `dotenvx run -- [anything]` - secrets injection
+- `supabase *` - all supabase CLI commands
+- `psql` with project credentials
+- `curl`, `jq`, `node`, `npx tsx`, `python3`
+- `git add`, `git commit`, `git push`
+- `npm *`, `vercel *`, `gh *`
+- `docker run`, `deno check`
+- Full list in `~/.claude/settings.local.json`
+
+### Database Direct Access
+```bash
+# Direct psql connection (pre-approved)
+PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres
+```
+
+Or use the MCP: `mcp__supabase__execute_sql`
 
 ## Common Tasks
 
