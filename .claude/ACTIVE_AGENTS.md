@@ -21,7 +21,7 @@ ps aux | grep "claude" | grep -v grep | awk '{print $2, $7, $10}'
 | TTY | PID | Status | Working On |
 |-----|-----|--------|------------|
 | s000 | 68738 | active | BaT queue processing & failure retry |
-| s001 | 68890 | done | BaT profile scraping + vehicle location propagation |
+| s001 | 68890 | active | Comment sentiment backfill (~71k remaining) |
 | s002 | 69152 | active | Multi-server inference + overnight batch |
 | s005 | 69351 | ? | (unclaimed) |
 | s006 | 69467 | active | Forum extraction overnight run (monitoring) |
@@ -83,4 +83,20 @@ If editing these files, announce it here first:
 - 8 workers processing: `ps aux | grep bat-continuous`
 - Queue: 79.6k complete, 15k pending, 20k failed remaining
 - Failed breakdown: VIN dupes (resales), null make (non-vehicles), transient errors
+
+---
+
+## FLIGHT CHECKPOINT @ 10:30
+
+**All sessions pausing. Resume when landed:**
+
+| Task | Status | Resume |
+|------|--------|--------|
+| BaT queue | 79.6k done, 15k pending, 20k failed | Queue in DB, workers restart |
+| Sentiment backfill | s001 running, 71k remaining | Check progress |
+| Forum extraction | ~56k posts, ~30 mins out | Check logs |
+| Inference batch | 241 remaining | Check PID 63236 |
+| CL Archive | 379/538 | Checkpoint in sqlite |
+
+**DB at pause:** 175k vehicles, 72.6k BaT, 843 AI analyzed
 
