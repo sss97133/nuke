@@ -1,0 +1,38 @@
+{
+  "servers": [
+    {
+      "name": "local",
+      "url": "http://localhost:11434",
+      "type": "ollama",
+      "model": "llama3.1:8b",
+      "priority": 2,
+      "rateLimit": null,
+      "timeout": 120000,
+      "enabled": true
+    },
+    {
+      "name": "friend-gpu",
+      "url": "http://CONFIGURE_ME:11434",
+      "type": "ollama",
+      "model": "llama3.1:70b",
+      "priority": 1,
+      "rateLimit": 30,
+      "timeout": 60000,
+      "enabled": false
+    },
+    {
+      "name": "groq-fallback",
+      "url": "https://api.groq.com/openai/v1/chat/completions",
+      "type": "openai",
+      "model": "llama-3.1-70b-versatile",
+      "priority": 3,
+      "rateLimit": 30,
+      "timeout": 30000,
+      "apiKeyEnv": "GROQ_API_KEY",
+      "enabled": false
+    }
+  ],
+  "strategy": "priority",
+  "retryAttempts": 2,
+  "healthCheckInterval": 60000
+}

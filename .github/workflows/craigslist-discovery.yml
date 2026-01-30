@@ -2,19 +2,23 @@ name: Craigslist Discovery (All Regions)
 
 on:
   schedule:
-    # Every 4 hours - covers 100+ regions
-    - cron: '0 */4 * * *'
+    # Every hour - faster discovery of new listings
+    - cron: '0 * * * *'
   workflow_dispatch:
     inputs:
       max_per_region:
         description: 'Max listings per region'
         required: false
         default: '10'
+      skip_health_check:
+        description: 'Skip pre-flight health check'
+        required: false
+        default: 'false'
 
 jobs:
   discover-craigslist:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Validate Secrets
@@ -28,46 +32,138 @@ jobs:
           fi
           echo "✅ Secrets validated"
 
+      - name: Check Scraping Health (Circuit Breaker)
+        if: ${{ github.event.inputs.skip_health_check != 'true' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "🏥 Checking scraping health..."
+
+          # Check recent failure rate from scraping_health table
+          HEALTH_RESPONSE=$(curl -sS -X GET \
+            "${SUPABASE_URL%/}/rest/v1/scraping_health?source=eq.craigslist&order=checked_at.desc&limit=10" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            --max-time 10 2>/dev/null || echo "[]")
+
+          # Parse failure rate (simple check - if more than 50% failures in last 10 checks, back off)
+          FAILURES=$(echo "$HEALTH_RESPONSE" | grep -c '"status":"failed"' || echo "0")
+          TOTAL=$(echo "$HEALTH_RESPONSE" | grep -c '"source":"craigslist"' || echo "1")
+
+          if [ "$TOTAL" -gt 0 ]; then
+            FAILURE_RATE=$((FAILURES * 100 / TOTAL))
+            echo "Recent failure rate: ${FAILURE_RATE}% ($FAILURES/$TOTAL)"
+
+            if [ "$FAILURE_RATE" -gt 50 ]; then
+              echo "⚠️ High failure rate detected. Circuit breaker triggered."
+              echo "Waiting 30 minutes before next attempt..."
+              # Don't fail the job, just skip scraping
+              echo "CIRCUIT_OPEN=true" >> $GITHUB_ENV
+            else
+              echo "✅ Health check passed"
+              echo "CIRCUIT_OPEN=false" >> $GITHUB_ENV
+            fi
+          else
+            echo "✅ No health data yet, proceeding"
+            echo "CIRCUIT_OPEN=false" >> $GITHUB_ENV
+          fi
+
       - name: Run Craigslist Squarebody Discovery
+        if: env.CIRCUIT_OPEN != 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "🔍 Starting Craigslist discovery..."
 
-          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
-            "${SUPABASE_URL%/}/functions/v1/scrape-all-craigslist-squarebodies" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{"max_per_region": ${{ github.event.inputs.max_per_region || 10 }}}' \
-            --max-time 300)
+          # Add jitter to avoid predictable patterns (0-60 seconds)
+          JITTER=$((RANDOM % 60))
+          echo "Adding ${JITTER}s jitter..."
+          sleep $JITTER
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
-          BODY=$(echo "$RESPONSE" | sed '$d')
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+          ATTEMPT=1
 
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Response (truncated):"
-          echo "$BODY" | head -c 2000
+          while [ $ATTEMPT -le $MAX_RETRIES ]; do
+            echo "Attempt $ATTEMPT of $MAX_RETRIES..."
 
-          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-            echo "✅ Craigslist discovery completed"
-          else
-            echo "❌ Craigslist discovery failed (HTTP $HTTP_CODE)"
-            exit 1
-          fi
+            RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+              "${SUPABASE_URL%/}/functions/v1/scrape-all-craigslist-squarebodies" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{"max_per_region": ${{ github.event.inputs.max_per_region || 10 }}, "enable_jitter": true}' \
+              --max-time 300)
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            echo "HTTP Status: $HTTP_CODE"
+            echo "Response (truncated):"
+            echo "$BODY" | head -c 2000
+
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "✅ Craigslist discovery completed"
+              break
+            elif [ "$HTTP_CODE" -eq 429 ] || [ "$HTTP_CODE" -eq 403 ]; then
+              echo "⚠️ Rate limited or blocked (HTTP $HTTP_CODE)"
+              if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+                # Exponential backoff: 30s, 60s, 120s
+                BACKOFF=$((RETRY_DELAY * (2 ** (ATTEMPT - 1))))
+                echo "Backing off for ${BACKOFF}s..."
+                sleep $BACKOFF
+              fi
+            else
+              echo "❌ Craigslist discovery failed (HTTP $HTTP_CODE)"
+              if [ $ATTEMPT -eq $MAX_RETRIES ]; then
+                exit 1
+              fi
+            fi
+
+            ATTEMPT=$((ATTEMPT + 1))
+          done
 
       - name: Run Craigslist Pre-2000 Discovery
+        if: env.CIRCUIT_OPEN != 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "🔍 Starting Craigslist pre-2000 discovery..."
 
+          # Small delay between scrapers
+          sleep 10
+
           curl -sS -X POST \
             "${SUPABASE_URL%/}/functions/v1/scrape-all-craigslist-2000-and-older" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
-            -d '{"max_per_region": 5}' \
+            -d '{"max_per_region": 5, "enable_jitter": true}' \
             --max-time 300 || echo "Pre-2000 scrape timed out or failed (non-blocking)"
 
           echo "✅ Pre-2000 discovery attempted"
+
+      - name: Process Craigslist Queue
+        if: env.CIRCUIT_OPEN != 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📋 Processing Craigslist queue..."
+
+          curl -sS -X POST \
+            "${SUPABASE_URL%/}/functions/v1/process-cl-queue" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"batch_size": 30}' \
+            --max-time 120 || echo "Queue processing timed out (non-blocking)"
+
+          echo "✅ Queue processing attempted"
+
+      - name: Report Skipped (Circuit Open)
+        if: env.CIRCUIT_OPEN == 'true'
+        run: |
+          echo "⏸️ Scraping skipped due to circuit breaker"
+          echo "High failure rate detected in recent scraping attempts"
+          echo "Will retry in next scheduled run"

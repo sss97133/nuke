@@ -1,0 +1,32 @@
+# Curated extraction comparison URLs
+# Updated 2026-01-29 - removed login-required BaT listings
+
+# Easy - BaT public listings (verified accessible)
+https://bringatrailer.com/listing/1988-porsche-911-carrera-targa-50/
+https://bringatrailer.com/listing/2006-ford-gt-heritage-edition/
+https://bringatrailer.com/listing/1995-porsche-993-carrera-4/
+https://bringatrailer.com/listing/1971-datsun-240z-51/
+https://bringatrailer.com/listing/1965-shelby-cobra-csx4000/
+
+# Medium - JS heavy
+https://www.carsandbids.com/auctions/
+https://www.hemmings.com/classifieds/dealer/chevrolet/c10/2729389.html
+https://www.dupontregistry.com/autos/listing/2024/porsche/911/4016155
+https://www.hagerty.com/apps/valuationtools/market-trends/1973/Porsche/911%20S
+https://www.hagerty.com/apps/valuationtools/market-trends/1967/Chevrolet/Corvette
+https://www.hagerty.com/apps/valuationtools/market-trends/1965/Ford/Mustang
+
+# Hard - SPAs, lazy loading
+https://www.pcarmarket.com/auctions/
+https://collectingcars.com/for-sale/
+https://rfrm.com/inventory/
+https://www.streetsideclassics.com/vehicles/
+https://www.classicdriver.com/en/cars
+
+# Additional auction sites
+https://www.mecum.com/lots/
+https://rmsothebys.com/en/home/lots/
+https://www.bonhams.com/departments/mot-cmc/
+
+# Marketplace sites
+https://www.ebay.com/b/Classic-Cars/6001/bn_1865149

@@ -8,7 +8,7 @@
 
 import { chromium } from 'playwright';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const BATCH_SIZE = parseInt(process.argv[2]) || 100;
 const PARALLEL = parseInt(process.argv[3]) || 2;

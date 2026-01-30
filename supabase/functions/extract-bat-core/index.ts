@@ -1115,7 +1115,7 @@ serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, source_listing_category, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
+        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
         .in("discovery_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -1127,7 +1127,7 @@ serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, source_listing_category, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
+        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
         .in("bat_auction_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -1159,7 +1159,6 @@ serve(async (req) => {
         listing_url: listingUrlCanonical,
         listing_source: "bat",
         listing_kind: listingKind,
-        source_listing_category: batCategory,
         discovery_url: listingUrlCanonical,
         discovery_source: "bat_core",
         profile_origin: "url_scraper",
@@ -1198,7 +1197,7 @@ serve(async (req) => {
       if (!existing) {
         const { data } = await supabase
           .from("vehicles")
-          .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, source_listing_category, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
+          .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
           .eq("id", vehicleId)
           .maybeSingle();
         existing = data || null;
@@ -1211,7 +1210,6 @@ serve(async (req) => {
         listing_source: existing?.listing_source || "bat",
         // Prefer to only mark non-vehicle, never downgrade.
         ...(listingKind === "non_vehicle_item" ? { listing_kind: "non_vehicle_item" } : {}),
-        ...(batCategory ? { source_listing_category: batCategory } : {}),
         updated_at: new Date().toISOString(),
       };
 

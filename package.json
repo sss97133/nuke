@@ -46,16 +46,26 @@
     "detective:live-auctions:dry": "tsx scripts/auction-live-detective.ts --dry-run",
     "detective:vehicle": "tsx scripts/ai-detective-vehicle.ts",
     "ingest:classic-auctions": "tsx scripts/classic-import-auctions.ts",
+    "compare:free-vs-paid": "tsx scripts/parallel-free-vs-paid-extractor.ts",
+    "compare:test-sites": "tsx scripts/parallel-free-vs-paid-extractor.ts --test-sites",
+    "compare:report": "tsx scripts/parallel-free-vs-paid-extractor.ts --generate-report",
+    "compare:export-csv": "tsx scripts/export-comparison-csv.ts",
+    "extract:hybrid": "tsx scripts/hybrid-extractor.ts",
+    "extract:hybrid:batch": "tsx scripts/hybrid-extractor.ts --batch",
     "extract-all-orgs": "tsx scripts/extract-all-orgs.ts",
     "extract-inventory": "node scripts/invoke-extract-inventory.js",
     "trickle-backfill-images": "tsx scripts/trickle-backfill-images.ts",
     "import:memes": "tsx scripts/import-popular-memes.ts",
     "smoke:bat-comments": "tsx scripts/smoke-bat-comments.ts",
-    "test:invoice-cashflow": "tsx scripts/integration/test-invoice-cashflow.ts"
+    "test:invoice-cashflow": "tsx scripts/integration/test-invoice-cashflow.ts",
+    "import:craigslist": "tsx scripts/craigslist-import/index.ts",
+    "import:craigslist:dry-run": "tsx scripts/craigslist-import/index.ts --dry-run --verbose"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.8.2",
+    "@mozilla/readability": "^0.5.0",
     "@supabase/supabase-js": "^2.86.0",
+    "better-sqlite3": "^12.6.2",
     "canvas": "^3.2.0",
     "cheerio": "^1.1.2",
     "cors": "^2.8.5",
@@ -66,7 +76,8 @@
     "openai": "^6.10.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.449",
-    "playwright": "^1.57.0"
+    "playwright": "^1.57.0",
+    "plist": "^3.1.0"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

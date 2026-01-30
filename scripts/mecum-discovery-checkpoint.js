@@ -10,7 +10,7 @@
 import { chromium } from 'playwright';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CHECKPOINT_FILE = '.ralph/mecum_checkpoint.json';
 const WORKERS = parseInt(process.argv[2]) || 2;

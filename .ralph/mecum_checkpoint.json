@@ -39,8 +39,243 @@
       "lastPage": 95,
       "complete": true,
       "vehiclesFound": 2269
+    },
+    "kissimmee-2018": {
+      "lastPage": 104,
+      "complete": true,
+      "vehiclesFound": 1975
+    },
+    "kissimmee-2017": {
+      "lastPage": 35,
+      "complete": true,
+      "vehiclesFound": 823
+    },
+    "kissimmee-2016": {
+      "lastPage": 87,
+      "complete": true,
+      "vehiclesFound": 1746
+    },
+    "kissimmee-2015": {
+      "lastPage": 41,
+      "complete": true,
+      "vehiclesFound": 958
+    },
+    "kissimmee-2014": {
+      "lastPage": 82,
+      "complete": true,
+      "vehiclesFound": 1719
+    },
+    "kissimmee-2013": {
+      "lastPage": 83,
+      "complete": true,
+      "vehiclesFound": 1626
+    },
+    "kissimmee-2012": {
+      "lastPage": 97,
+      "complete": true,
+      "vehiclesFound": 1923
+    },
+    "kissimmee-2011": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "kissimmee-2010": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "monterey-2026": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "monterey-2025": {
+      "lastPage": 19,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "monterey-2024": {
+      "lastPage": 17,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "monterey-2023": {
+      "lastPage": 22,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "monterey-2022": {
+      "lastPage": 19,
+      "complete": true,
+      "vehiclesFound": 417
+    },
+    "monterey-2021": {
+      "lastPage": 22,
+      "complete": true,
+      "vehiclesFound": 486
+    },
+    "monterey-2020": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "monterey-2019": {
+      "lastPage": 25,
+      "complete": true,
+      "vehiclesFound": 552
+    },
+    "monterey-2018": {
+      "lastPage": 29,
+      "complete": true,
+      "vehiclesFound": 676
+    },
+    "monterey-2017": {
+      "lastPage": 32,
+      "complete": true,
+      "vehiclesFound": 647
+    },
+    "monterey-2016": {
+      "lastPage": 31,
+      "complete": true,
+      "vehiclesFound": 674
+    },
+    "monterey-2015": {
+      "lastPage": 33,
+      "complete": true,
+      "vehiclesFound": 649
+    },
+    "monterey-2014": {
+      "lastPage": 37,
+      "complete": true,
+      "vehiclesFound": 583
+    },
+    "monterey-2013": {
+      "lastPage": 36,
+      "complete": true,
+      "vehiclesFound": 578
+    },
+    "monterey-2012": {
+      "lastPage": 24,
+      "complete": true,
+      "vehiclesFound": 465
+    },
+    "monterey-2011": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "monterey-2010": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2026": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2025": {
+      "lastPage": 70,
+      "complete": true,
+      "vehiclesFound": 478
+    },
+    "indy-2024": {
+      "lastPage": 147,
+      "complete": true,
+      "vehiclesFound": 1429
+    },
+    "indy-2023": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2022": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2021": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2020": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2019": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2018": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2017": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2016": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2015": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2014": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2013": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2012": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2011": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "indy-2010": {
+      "lastPage": 0,
+      "complete": true,
+      "vehiclesFound": 0
+    },
+    "glendale-2026": {
+      "lastPage": 7,
+      "complete": true,
+      "vehiclesFound": 150
+    },
+    "glendale-2025": {
+      "lastPage": 66,
+      "complete": true,
+      "vehiclesFound": 256
+    },
+    "glendale-2024": {
+      "lastPage": 65,
+      "complete": true,
+      "vehiclesFound": 218
+    },
+    "glendale-2023": {
+      "lastPage": 55,
+      "complete": true,
+      "vehiclesFound": 1154
     }
   },
-  "totalDiscovered": 975,
-  "lastUpdated": "2026-01-26T04:34:07.043Z"
+  "totalDiscovered": 4968,
+  "lastUpdated": "2026-01-30T03:46:06.880Z"
 }

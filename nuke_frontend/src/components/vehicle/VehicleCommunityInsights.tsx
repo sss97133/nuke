@@ -1,7 +1,179 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { MessageCircle, TrendingUp, AlertTriangle, Star, Quote, DollarSign } from 'lucide-react';
+import { MessageCircle, TrendingUp, AlertTriangle, Star, Quote, DollarSign, X, Wrench, Search, ExternalLink } from 'lucide-react';
 import '../../design-system.css';
+
+// Issue detail popup for red flags and highlights
+interface IssuePopupProps {
+  issue: string;
+  type: 'concern' | 'highlight';
+  vehicleId: string;
+  onClose: () => void;
+}
+
+const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
+  const isConcern = type === 'concern';
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '20px'
+    }} onClick={onClose}>
+      <div
+        className="card"
+        style={{
+          maxWidth: '400px',
+          width: '100%',
+          maxHeight: '80vh',
+          overflow: 'auto'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="card-header" style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {isConcern ? <AlertTriangle size={14} color="var(--error)" /> : <Star size={14} color="var(--success)" />}
+            <span style={{ fontSize: '10pt', fontWeight: 700 }}>
+              {isConcern ? 'Concern' : 'Highlight'}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+              padding: '2px 6px',
+              fontSize: '8pt'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Issue Text */}
+        <div style={{
+          padding: 'var(--space-3)',
+          borderBottom: '1px solid var(--border)',
+          background: isConcern ? 'var(--upload-red-light)' : 'var(--upload-green-light)'
+        }}>
+          <div style={{ fontSize: '10pt', fontWeight: 500, color: 'var(--text)' }}>{issue}</div>
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+            From community discussion
+          </div>
+        </div>
+
+        {/* Actions for Concerns */}
+        {isConcern && (
+          <div style={{ padding: 'var(--space-3)' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
+              Solutions
+            </div>
+
+            {/* Parts Search */}
+            <a
+              href={`https://www.google.com/search?q=${encodeURIComponent(issue + ' parts price')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 8px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                marginBottom: '6px',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                color: 'var(--text)'
+              }}
+            >
+              <Search size={12} />
+              <span style={{ flex: 1, fontSize: '8pt' }}>Search Parts Pricing</span>
+              <ExternalLink size={10} color="var(--text-muted)" />
+            </a>
+
+            {/* Forum Search */}
+            <a
+              href={`https://www.google.com/search?q=${encodeURIComponent(issue + ' fix forum')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 8px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                marginBottom: '6px',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                color: 'var(--text)'
+              }}
+            >
+              <MessageCircle size={12} />
+              <span style={{ flex: 1, fontSize: '8pt' }}>Forum Discussions</span>
+              <ExternalLink size={10} color="var(--text-muted)" />
+            </a>
+
+            {/* Get Quote */}
+            <button
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 8px',
+                background: 'var(--primary)',
+                border: '1px solid var(--primary)',
+                cursor: 'pointer',
+                color: 'white',
+                width: '100%',
+                fontSize: '8pt',
+                fontWeight: 600
+              }}
+              onClick={() => alert('Repair network coming soon')}
+            >
+              <Wrench size={12} />
+              <span>Get Repair Quote</span>
+            </button>
+
+            <div style={{ marginTop: '8px', fontSize: '7pt', color: 'var(--text-disabled)', textAlign: 'center' }}>
+              Technician network coming soon
+            </div>
+          </div>
+        )}
+
+        {/* Verification for Highlights */}
+        {!isConcern && (
+          <div style={{ padding: 'var(--space-3)' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
+              Verification
+            </div>
+            <div style={{
+              padding: '8px',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              fontSize: '8pt',
+              color: 'var(--text-muted)'
+            }}>
+              Owner verification coming soon.
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 interface VehicleCommunityInsightsProps {
   vehicleId: string;
@@ -10,8 +182,9 @@ interface VehicleCommunityInsightsProps {
 interface SentimentDiscovery {
   overall_sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
   sentiment_score: number;
-  themes: Array<{ theme: string; frequency: number; sentiment: string }>;
-  notable_quotes: string[];
+  // Supports both simple strings (from Ollama batch) and rich objects (from Claude)
+  themes: Array<string | { theme: string; frequency: number; sentiment: string }>;
+  notable_quotes?: string[];
   red_flags: string[];
   highlights: string[];
   confidence: number;
@@ -43,6 +216,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
   const [sourceCategories, setSourceCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [discoveredAt, setDiscoveredAt] = useState<string | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<{ issue: string; type: 'concern' | 'highlight' } | null>(null);
 
   useEffect(() => {
     loadDiscoveries();
@@ -219,39 +393,49 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
               </div>
             </div>
 
-            {/* Themes */}
+            {/* Themes - handles both string[] and {theme,frequency,sentiment}[] formats */}
             {sentimentData.themes && sentimentData.themes.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
                   Key Themes
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {sentimentData.themes.slice(0, 6).map((theme, i) => (
-                    <div key={i} style={{
-                      background: '#f3f4f6',
-                      border: '1px solid #e5e7eb',
-                      padding: '4px 8px',
-                      borderRadius: '2px',
-                      fontSize: '8pt',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      <span style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        background: getSentimentColor(theme.sentiment)
-                      }} />
-                      <span>{theme.theme}</span>
-                      <span style={{ color: '#9ca3af' }}>({theme.frequency})</span>
-                    </div>
-                  ))}
+                  {sentimentData.themes.slice(0, 6).map((theme, i) => {
+                    // Handle both string and object formats
+                    const themeText = typeof theme === 'string' ? theme : theme.theme;
+                    const themeSentiment = typeof theme === 'string' ? 'neutral' : theme.sentiment;
+                    const themeFreq = typeof theme === 'string' ? null : theme.frequency;
+
+                    return (
+                      <div key={i} style={{
+                        background: '#f3f4f6',
+                        border: '1px solid #e5e7eb',
+                        padding: '4px 8px',
+                        borderRadius: '2px',
+                        fontSize: '8pt',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => console.log('Theme clicked:', themeText)}
+                      >
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: getSentimentColor(themeSentiment)
+                        }} />
+                        <span>{themeText}</span>
+                        {themeFreq && <span style={{ color: '#9ca3af' }}>({themeFreq})</span>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Red Flags */}
+            {/* Red Flags - clickable for repair/quote flow */}
             {sentimentData.red_flags && sentimentData.red_flags.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{
@@ -272,20 +456,34 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   borderRadius: '2px',
                   padding: '8px'
                 }}>
-                  {sentimentData.red_flags.slice(0, 3).map((flag, i) => (
-                    <div key={i} style={{
-                      fontSize: '8pt',
-                      color: '#991b1b',
-                      marginBottom: i < sentimentData.red_flags.length - 1 ? '4px' : 0
-                    }}>
-                      • {flag}
+                  {sentimentData.red_flags.slice(0, 5).map((flag, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: '8pt',
+                        color: '#991b1b',
+                        marginBottom: i < Math.min(sentimentData.red_flags.length, 5) - 1 ? '4px' : 0,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '2px 4px',
+                        borderRadius: '2px',
+                        transition: 'background 0.1s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      onClick={() => setSelectedIssue({ issue: flag, type: 'concern' })}
+                    >
+                      <span>• {flag}</span>
+                      <span style={{ fontSize: '7pt', color: '#b91c1c', opacity: 0.7 }}>Get Quote →</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Highlights */}
+            {/* Highlights - clickable to verify/add proof */}
             {sentimentData.highlights && sentimentData.highlights.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{
@@ -306,13 +504,27 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   borderRadius: '2px',
                   padding: '8px'
                 }}>
-                  {sentimentData.highlights.slice(0, 4).map((highlight, i) => (
-                    <div key={i} style={{
-                      fontSize: '8pt',
-                      color: '#166534',
-                      marginBottom: i < Math.min(sentimentData.highlights.length, 4) - 1 ? '4px' : 0
-                    }}>
-                      ✓ {highlight}
+                  {sentimentData.highlights.slice(0, 5).map((highlight, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: '8pt',
+                        color: '#166534',
+                        marginBottom: i < Math.min(sentimentData.highlights.length, 5) - 1 ? '4px' : 0,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '2px 4px',
+                        borderRadius: '2px',
+                        transition: 'background 0.1s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#dcfce7'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      onClick={() => setSelectedIssue({ issue: highlight, type: 'highlight' })}
+                    >
+                      <span>✓ {highlight}</span>
+                      <span style={{ fontSize: '7pt', color: '#15803d', opacity: 0.7 }}>Verify →</span>
                     </div>
                   ))}
                 </div>
@@ -364,6 +576,16 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Issue Detail Popup */}
+      {selectedIssue && (
+        <IssuePopup
+          issue={selectedIssue.issue}
+          type={selectedIssue.type}
+          vehicleId={vehicleId}
+          onClose={() => setSelectedIssue(null)}
+        />
       )}
 
       {/* Market Signals Card */}

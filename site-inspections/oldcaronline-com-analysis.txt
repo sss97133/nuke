@@ -1,0 +1,21 @@
+{
+  "SITE_TYPE": "dealer",
+  "CURRENT_INVENTORY_URL": "https://www.oldcaronline.com/Classic-Cars-For-Sale-On-OldCarOnline.com/results?",
+  "SOLD_INVENTORY_URL": null,
+  "LISTING_URL_PATTERN": "https://www.oldcaronline.com/",
+  "EXTRACTION_SELECTORS": {
+    "year": "\\b(19|20)\\d{2}\\b",
+    "make": "h1, .title",
+    "model": "h1, .title, .vehicle-title",
+    "price": "\\$[\\d,]+",
+    "vin": ".vin, [class*=\"vin\"]",
+    "mileage": ".mileage, [class*=\"mileage\"]",
+    "images": "img[src*=\"vehicle\"], .gallery img, .slider img, [class*=\"gallery\"] img"
+  },
+  "PAGINATION_PATTERN": "a[href*=\"page\"], .pagination a, [class*=\"next\"], [class*=\"load-more\"]",
+  "CHALLENGES": [
+    "lazy_loading",
+    "dynamic_content"
+  ],
+  "RECOMMENDED_APPROACH": "playwright"
+}

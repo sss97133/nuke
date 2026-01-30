@@ -1,0 +1,1593 @@
+{
+  "generated_at": "2026-01-29T15:05:05.060Z",
+  "total_urls": 25,
+  "comparisons": [
+    {
+      "url": "https://bringatrailer.com/listing/1988-porsche-911-carrera-targa-50/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T15:01:58.609Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 635,
+          "content_length": 448174,
+          "markdown_length": 176642,
+          "image_count": 70,
+          "has_structured_data": true,
+          "quality_score": 95,
+          "title": "1988 Porsche 911 Carrera Targa G50 for sale on BaT Auctions - closed on May 9, 2022 (Lot #72,851) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 1988,
+            "make": "Porsche",
+            "model": "911 Carrera",
+            "price": 50000,
+            "vin": "WP0EB0918JS160483",
+            "images": [
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ecd55ed0-3a6a-4fc9-aead-f394c8db4f90-57368.jpeg?fit=940%2C627",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_67465eb5-25cc-4572-9b63-bb224ffdf318-57399.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_cf35bff7-9e4b-4e75-889b-4713407a2fa8-57428.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_1c6f52e9-2320-4bc8-89d5-3e617c5bcce1-57527.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ca4e955e-783c-4a0e-a03a-6821f7595a4c-57592.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_a96db75e-2117-4d39-8635-d370b56060e7-57622.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_086f3d81-fd22-4efc-a249-78da6cd091df-57667.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ecd55ed0-3a6a-4fc9-aead-f394c8db4f90-57368.jpeg?fit=144%2C96",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/image13-75890-e1764175927164.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/03/QoTW-Winner-Template171-47667.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/QoTW-Winner-Template170-70290.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/5a-70680-e1764170754888.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/weekly-weird-wonderful123263-89474.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/lead-image-2-18533.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1967_ford_mustang_1967_ford_mustang_b65098d4-a986-4b4d-999a-c169c60a8569-Yz0DM9-55450-55451-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/10/1975_pedrazzini_super-aquamar_dsc_7998-21256.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_porsche_boxster-rs-60-spyder_img_1354-06779.jpeg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2023_porsche_718-boxster_2023-Porsche-Boxter-Spyder-718-006-29350-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_mercedes-benz_sl65-amg_p1149869-99331.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1991_jeep_grand-wagoneer_1991_jeep_grand-wagoneer_5d56e8b9-cd81-47b9-9163-68b23b0837bd-s6ipnl-60692-02694.jpg?resize=235%2C159"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 7275,
+          "content_length": 634957,
+          "markdown_length": 10505,
+          "image_count": 132,
+          "has_structured_data": true,
+          "quality_score": 95,
+          "title": "1988 Porsche 911 Carrera Targa G50 for sale on BaT Auctions - closed on May 9, 2022 (Lot #72,851) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 1988,
+            "make": "Porsche",
+            "model": "911 Carrera",
+            "price": 50000,
+            "vin": "WP0EB0918JS160483",
+            "images": [
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/countries/us.svg",
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/listings/comments.svg",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ecd55ed0-3a6a-4fc9-aead-f394c8db4f90-57368.jpeg?fit=940%2C627",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_67465eb5-25cc-4572-9b63-bb224ffdf318-57399.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_cf35bff7-9e4b-4e75-889b-4713407a2fa8-57428.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_1c6f52e9-2320-4bc8-89d5-3e617c5bcce1-57527.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ca4e955e-783c-4a0e-a03a-6821f7595a4c-57592.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_a96db75e-2117-4d39-8635-d370b56060e7-57622.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_086f3d81-fd22-4efc-a249-78da6cd091df-57667.jpeg?w=620&resize=620%2C413",
+              "https://i.ytimg.com/vi/BDGz3jKZb4A/sddefault.jpg",
+              "https://i.ytimg.com/vi/8bCEUgqp3Lo/sddefault.jpg",
+              "https://i.ytimg.com/vi/W2oP1gqmdZQ/sddefault.jpg",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_ecd55ed0-3a6a-4fc9-aead-f394c8db4f90-57368.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/E623C646-9E78-4A1C-ACE4-80EE852E4F15-38849-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/621163CE-D97C-4ECF-88D7-01F12778DC8C-38981-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_cf35bff7-9e4b-4e75-889b-4713407a2fa8-57428.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/B3050713-4E80-47E8-8FBB-6C3FCCE5081C-38929-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1384F6C2-FA25-4DB9-8560-75FF7D7D0C37-39181-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/1988_porsche_911-carrera-targa_67465eb5-25cc-4572-9b63-bb224ffdf318-57399.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2022/02/46F6DB88-5B57-4A5D-A65E-A6F5D5C27817-38950-scaled.jpeg?resize=155%2C105"
+            ]
+          }
+        }
+      ],
+      "naive_score": 95,
+      "playwright_score": 95,
+      "score_delta": 0,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://bringatrailer.com/listing/1973-porsche-911t-targa-3/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T15:02:07.126Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 1338,
+          "content_length": 91682,
+          "markdown_length": 11823,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 59,
+          "title": "Log In",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "price": 2500,
+            "images": []
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 8515,
+          "content_length": 144361,
+          "markdown_length": 1747,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 44,
+          "title": "Log In",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "price": 2500,
+            "images": [
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/icon-key.svg",
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/opt-out.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 59,
+      "playwright_score": 44,
+      "score_delta": -15,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://bringatrailer.com/listing/1967-chevrolet-c10/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T15:02:16.064Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 855,
+          "content_length": 91682,
+          "markdown_length": 11823,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 59,
+          "title": "Log In",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "price": 2500,
+            "images": []
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 8938,
+          "content_length": 144352,
+          "markdown_length": 1747,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 44,
+          "title": "Log In",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "price": 2500,
+            "images": [
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/icon-key.svg",
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/opt-out.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 59,
+      "playwright_score": 44,
+      "score_delta": -15,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://bringatrailer.com/listing/2006-ford-gt-heritage-edition/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T15:02:25.298Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 894,
+          "content_length": 845579,
+          "markdown_length": 552764,
+          "image_count": 72,
+          "has_structured_data": true,
+          "quality_score": 94,
+          "title": "No Reserve: 4k-Mile 2006 Ford GT Heritage Edition for sale on BaT Auctions - sold for $380,000 on May 29, 2020 (Lot #31,798) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 2006,
+            "make": "Porsche",
+            "price": 380000,
+            "vin": "1FAFP90SX6Y400885",
+            "mileage": 4500,
+            "images": [
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589586289eb1e1f8cbe183b9DSC_2017.jpg?fit=940%2C626",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15893205665a50cDSC04602.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15895862376ec4fa56eb1e1fDSC_1952.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589586565f8cbe183b9DSC04644.jpg?resize=620%2C414",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589322287920a492f3b2253e7DSC_1923.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589321460a50ce7DSC04543.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15893066984296cDSC_2077.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589308928f66e7dff9f98764daF1.jpg?resize=482%2C620",
+              "https://bringatrailer.com/wp-content/uploads/2023/04/2006_ford_gt-heritage-edition_p1000667-large-40108.jpeg?fit=144%2C96",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589586289eb1e1f8cbe183b9DSC_2017.jpg?fit=144%2C96",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/image13-75890-e1764175927164.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/03/QoTW-Winner-Template171-47667.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/QoTW-Winner-Template170-70290.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/5a-70680-e1764170754888.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/weekly-weird-wonderful123263-89474.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/lead-image-2-18533.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1967_ford_mustang_1967_ford_mustang_b65098d4-a986-4b4d-999a-c169c60a8569-Yz0DM9-55450-55451-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/10/1975_pedrazzini_super-aquamar_dsc_7998-21256.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_porsche_boxster-rs-60-spyder_img_1354-06779.jpeg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2023_porsche_718-boxster_2023-Porsche-Boxter-Spyder-718-006-29350-scaled.jpg?resize=470%2C318"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 9234,
+          "content_length": 1075275,
+          "markdown_length": 11268,
+          "image_count": 131,
+          "has_structured_data": true,
+          "quality_score": 100,
+          "title": "No Reserve: 4k-Mile 2006 Ford GT Heritage Edition for sale on BaT Auctions - sold for $380,000 on May 29, 2020 (Lot #31,798) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 2006,
+            "make": "Porsche",
+            "model": "boxster-rs-60-spyder-45",
+            "price": 380000,
+            "vin": "1FAFP90SX6Y400885",
+            "mileage": 4500,
+            "images": [
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/countries/us.svg",
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/listings/comments.svg",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589586289eb1e1f8cbe183b9DSC_2017.jpg?fit=940%2C626",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15893205665a50cDSC04602.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15895862376ec4fa56eb1e1fDSC_1952.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589586565f8cbe183b9DSC04644.jpg?resize=620%2C414",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589322287920a492f3b2253e7DSC_1923.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589321460a50ce7DSC04543.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15893066984296cDSC_2077.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589308928f66e7dff9f98764daF1.jpg?resize=482%2C620",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_158932255820a492f3b2253e7DSC_1984-scaled.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589320852492f3b2253e7DSC04677-scaled.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589586216a56eb1e1f8cbe183b9DSC_1983.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15895862376ec4fa56eb1e1fDSC_1952.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_158932191711b920a492f3b2253eDSC_1871-scaled.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589320866492f3b2253e7DSC04681-scaled.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15893218945a50cDSC_1870-scaled.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15893220012f3b2253e7DSC_1881-scaled.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_15893204720ce7401fDSC04572-scaled.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2020/05/2006_ford_gt_heritage_edition_1589322728a50ce7DSC_2010-scaled.jpg?resize=155%2C105"
+            ]
+          }
+        }
+      ],
+      "naive_score": 94,
+      "playwright_score": 100,
+      "score_delta": 6,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://bringatrailer.com/listing/1995-porsche-993-carrera-4/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T15:02:33.481Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 472,
+          "content_length": 224011,
+          "markdown_length": 71823,
+          "image_count": 60,
+          "has_structured_data": true,
+          "quality_score": 90,
+          "title": "1995 Porsche 993 Carrera 4 | Bring a Trailer",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "model": "993 Carrera",
+            "price": 127000,
+            "images": [
+              "https://bringatrailer.com/wp-content/uploads/2025/11/image13-75890-e1764175927164.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/03/QoTW-Winner-Template171-47667.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/QoTW-Winner-Template170-70290.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/5a-70680-e1764170754888.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/weekly-weird-wonderful123263-89474.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/lead-image-2-18533.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1967_ford_mustang_1967_ford_mustang_b65098d4-a986-4b4d-999a-c169c60a8569-Yz0DM9-55450-55451-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/10/1975_pedrazzini_super-aquamar_dsc_7998-21256.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_porsche_boxster-rs-60-spyder_img_1354-06779.jpeg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2023_porsche_718-boxster_2023-Porsche-Boxter-Spyder-718-006-29350-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_mercedes-benz_sl65-amg_p1149869-99331.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1991_jeep_grand-wagoneer_1991_jeep_grand-wagoneer_5d56e8b9-cd81-47b9-9163-68b23b0837bd-s6ipnl-60692-02694.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2019_mercedes-benz_e63-s-amg-sedan_img_1443-94403.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/05/2015_bmw_535d_img_8867-54229.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/1991_chevrolet_corvette-coupe_pxl_20260120_005142942-29936.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2005_lotus_elise_001_PurposeBuiltMedia_187A6988-34976.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2001_bmw_z8_36a5739-37372.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/1998_porsche_911-carrera-s-coupe_20260116_000329500_ios-99258.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/1971_mercedes-benz_309d_20260109_130014-70881.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1978_jeep_cj-5_00005760-32019.jpg?resize=235%2C159"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 8181,
+          "content_length": 275547,
+          "markdown_length": 3308,
+          "image_count": 59,
+          "has_structured_data": true,
+          "quality_score": 85,
+          "title": "1995 Porsche 993 Carrera 4 | Bring a Trailer",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "model": "993 Carrera",
+            "price": 2500,
+            "images": [
+              "https://bringatrailer.com/wp-content/uploads/2025/11/image13-75890-e1764175927164.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/03/QoTW-Winner-Template171-47667.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/QoTW-Winner-Template170-70290.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/5a-70680-e1764170754888.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/weekly-weird-wonderful123263-89474.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/lead-image-2-18533.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1967_ford_mustang_1967_ford_mustang_b65098d4-a986-4b4d-999a-c169c60a8569-Yz0DM9-55450-55451-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/10/1975_pedrazzini_super-aquamar_dsc_7998-21256.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_porsche_boxster-rs-60-spyder_img_1354-06779.jpeg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2023_porsche_718-boxster_2023-Porsche-Boxter-Spyder-718-006-29350-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_mercedes-benz_sl65-amg_p1149869-99331.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1991_jeep_grand-wagoneer_1991_jeep_grand-wagoneer_5d56e8b9-cd81-47b9-9163-68b23b0837bd-s6ipnl-60692-02694.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2019_mercedes-benz_e63-s-amg-sedan_img_1443-94403.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/05/2015_bmw_535d_img_8867-54229.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/1991_chevrolet_corvette-coupe_pxl_20260120_005142942-29936.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2005_lotus_elise_001_PurposeBuiltMedia_187A6988-34976.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2001_bmw_z8_36a5739-37372.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/1998_porsche_911-carrera-s-coupe_20260116_000329500_ios-99258.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/1971_mercedes-benz_309d_20260109_130014-70881.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1978_jeep_cj-5_00005760-32019.jpg?resize=235%2C159"
+            ]
+          }
+        }
+      ],
+      "naive_score": 90,
+      "playwright_score": 85,
+      "score_delta": -5,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://bringatrailer.com/listing/1989-bmw-325is-2/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T15:02:40.968Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 800,
+          "content_length": 91682,
+          "markdown_length": 11823,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 59,
+          "title": "Log In",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "price": 2500,
+            "images": []
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 7486,
+          "content_length": 144522,
+          "markdown_length": 1747,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 44,
+          "title": "Log In",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "price": 2500,
+            "images": [
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/icon-key.svg",
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/opt-out.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 59,
+      "playwright_score": 44,
+      "score_delta": -15,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://bringatrailer.com/listing/1971-datsun-240z-51/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T15:02:52.055Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 2668,
+          "content_length": 522707,
+          "markdown_length": 275504,
+          "image_count": 72,
+          "has_structured_data": true,
+          "quality_score": 95,
+          "title": "1971 Datsun 240Z Series I 2.8L 5-Speed for sale on BaT Auctions - sold for $40,000 on July 19, 2018 (Lot #11,000) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 1971,
+            "make": "Porsche",
+            "model": "boxster-rs-60-spyder-45",
+            "price": 40000,
+            "mileage": 1000,
+            "images": [
+              "https://bringatrailer.com/wp-content/uploads/2018/06/5b46a01eaf702_datsun_240z_153135266707a9cdc18d5DSC02555.jpg?fit=940%2C633",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_15312335337a9cdc18d516IMG_9882.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1531233529f6028IMG_9881.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1528156971ef66e7dff9f98764daIMG_9917.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_153123356128807a9cIMG_9899.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1528156961dff9f98764daIMG_9923.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_152815696365ef66e7dff9f9876IMG_9921.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1529338280f66e7dff9f98764daIMG_3722.jpg?resize=465%2C620",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_153123320607a9cdc18d5IMG_0809.jpg?resize=620%2C465",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/5b46a01eaf702_datsun_240z_153135266707a9cdc18d5DSC02555.jpg?fit=144%2C97",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/image13-75890-e1764175927164.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/03/QoTW-Winner-Template171-47667.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/QoTW-Winner-Template170-70290.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/5a-70680-e1764170754888.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/weekly-weird-wonderful123263-89474.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/lead-image-2-18533.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1967_ford_mustang_1967_ford_mustang_b65098d4-a986-4b4d-999a-c169c60a8569-Yz0DM9-55450-55451-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/10/1975_pedrazzini_super-aquamar_dsc_7998-21256.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_porsche_boxster-rs-60-spyder_img_1354-06779.jpeg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2023_porsche_718-boxster_2023-Porsche-Boxter-Spyder-718-006-29350-scaled.jpg?resize=470%2C318"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 11085,
+          "content_length": 755384,
+          "markdown_length": 16579,
+          "image_count": 131,
+          "has_structured_data": true,
+          "quality_score": 95,
+          "title": "1971 Datsun 240Z Series I 2.8L 5-Speed for sale on BaT Auctions - sold for $40,000 on July 19, 2018 (Lot #11,000) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 1971,
+            "make": "Porsche",
+            "model": "boxster-rs-60-spyder-45",
+            "price": 40000,
+            "mileage": 1000,
+            "images": [
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/countries/us.svg",
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/listings/comments.svg",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/5b46a01eaf702_datsun_240z_153135266707a9cdc18d5DSC02555.jpg?fit=940%2C633",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_15312335337a9cdc18d516IMG_9882.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1531233529f6028IMG_9881.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1528156971ef66e7dff9f98764daIMG_9917.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_153123356128807a9cIMG_9899.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1528156961dff9f98764daIMG_9923.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_152815696365ef66e7dff9f9876IMG_9921.jpg?resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1529338280f66e7dff9f98764daIMG_3722.jpg?resize=465%2C620",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_153123320607a9cdc18d5IMG_0809.jpg?resize=620%2C465",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1531233529f6028IMG_9881.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_15313526808d7973d90d4DSC02564.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1531233566a9cdc18d51623IMG_9904.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_15312335707973d90d4IMG_9906.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_15312335337a9cdc18d516IMG_9882.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/5b46482c8d418_datsun_240z_15312335107973d90d4IMG_9867.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_153123352138d7973d90d4IMG_9878.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/5b46a01eaf702_datsun_240z_153135266707a9cdc18d5DSC02555.jpg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2018/06/1971_datsun_240z_1531352682cdc18d516238d79DSC02565.jpg?resize=155%2C105"
+            ]
+          }
+        }
+      ],
+      "naive_score": 95,
+      "playwright_score": 95,
+      "score_delta": 0,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://bringatrailer.com/listing/1965-shelby-cobra-csx4000/",
+      "domain": "bringatrailer.com",
+      "timestamp": "2026-01-29T15:03:03.459Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 2531,
+          "content_length": 583064,
+          "markdown_length": 318357,
+          "image_count": 71,
+          "has_structured_data": true,
+          "quality_score": 90,
+          "title": "Aluminum-Bodied Shelby Cobra CSX4000 for sale on BaT Auctions - sold for $185,000 on February 8, 2024 (Lot #135,783) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 2001,
+            "make": "Porsche",
+            "model": "fileone",
+            "price": 185000,
+            "images": [
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0728-70425.jpeg?fit=940%2C627",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0719-70523.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0723-70553.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0738-70579.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0745-70615.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0698-70664.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0684-70693.jpeg?w=620&#038;resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0624-03500.jpeg?w=502&#038;resize=502%2C620",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0728-70425.jpeg?fit=144%2C96",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/image13-75890-e1764175927164.jpeg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/03/QoTW-Winner-Template171-47667.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/QoTW-Winner-Template170-70290.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/11/5a-70680-e1764170754888.jpg?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/weekly-weird-wonderful123263-89474.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/lead-image-2-18533.png?resize=235%2C159",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/1967_ford_mustang_1967_ford_mustang_b65098d4-a986-4b4d-999a-c169c60a8569-Yz0DM9-55450-55451-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/10/1975_pedrazzini_super-aquamar_dsc_7998-21256.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_porsche_boxster-rs-60-spyder_img_1354-06779.jpeg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2025/12/2023_porsche_718-boxster_2023-Porsche-Boxter-Spyder-718-006-29350-scaled.jpg?resize=470%2C318",
+              "https://bringatrailer.com/wp-content/uploads/2026/01/2008_mercedes-benz_sl65-amg_p1149869-99331.jpg?resize=235%2C159"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 11404,
+          "content_length": 769120,
+          "markdown_length": 11054,
+          "image_count": 133,
+          "has_structured_data": true,
+          "quality_score": 90,
+          "title": "Aluminum-Bodied Shelby Cobra CSX4000 for sale on BaT Auctions - sold for $185,000 on February 8, 2024 (Lot #135,783) | Bring a Trailer",
+          "vehicle_data": {
+            "year": 2001,
+            "make": "Porsche",
+            "model": "boxster-rs-60-spyder-45",
+            "price": 185000,
+            "images": [
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/countries/us.svg",
+              "https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/listings/comments.svg",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0728-70425.jpeg?fit=940%2C627",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0719-70523.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0723-70553.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0738-70579.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0745-70615.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0698-70664.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0684-70693.jpeg?w=620&resize=620%2C413",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_img_0624-03500.jpeg?w=502&resize=502%2C620",
+              "https://i.ytimg.com/vi/Jjax--1Rb_s/sddefault.jpg",
+              "https://i.ytimg.com/vi/udoRQHgHAAM/sddefault.jpg",
+              "https://i.ytimg.com/vi/yCtu9JhRDSM/sddefault.jpg",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_IMG_0724-56878-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_IMG_0712_06346d-57103-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_IMG_0726-56861-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_IMG_0725-56870-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_IMG_0727-56852-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_IMG_0728-56842-scaled.jpeg?resize=155%2C105",
+              "https://bringatrailer.com/wp-content/uploads/2024/01/1965_shelby_cobra-csx4000_IMG_0714-57084-scaled.jpeg?resize=155%2C105"
+            ]
+          }
+        }
+      ],
+      "naive_score": 90,
+      "playwright_score": 90,
+      "score_delta": 0,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://www.carsandbids.com/auctions/",
+      "domain": "www.carsandbids.com",
+      "timestamp": "2026-01-29T15:03:10.082Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 945,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 403"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 6622,
+          "content_length": 186709,
+          "markdown_length": 22245,
+          "image_count": 106,
+          "has_structured_data": false,
+          "quality_score": 85,
+          "title": "Cars & Bids: Auctions of cool cars, trucks, and SUVs",
+          "vehicle_data": {
+            "year": 1991,
+            "make": "Porsche",
+            "model": "Boxster\n\nNO",
+            "price": 45250,
+            "mileage": 33400,
+            "images": [
+              "https://media.carsandbids.com/cdn-cgi/image/width=2630,quality=70/e97164ee86c3a6ee5aaab17d395d231e5ea329d3/photos/3BLnly0V--j7MxIR-2-EiQok98cPE.jpg?t=176909873711",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/6bfeb99b501d648898611dc3f9aeb3f699ff6e04/photos/interior/3BLnly0V-jaIWXxU.jpg?t=176833418195",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/6bfeb99b501d648898611dc3f9aeb3f699ff6e04/photos/mechanical/3BLnly0V-apnu-cv.jpg?t=176833418195",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/e97164ee86c3a6ee5aaab17d395d231e5ea329d3/photos/3BLnly0V-zrSEKE_-pusZ4gTOsj.jpg?t=176909873711",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/6bfeb99b501d648898611dc3f9aeb3f699ff6e04/photos/exterior/3BLnly0V-0JSSrz7.jpg?t=176833418195",
+              "https://media.carsandbids.com/cdn-cgi/image/width=2630,quality=70/e97164ee86c3a6ee5aaab17d395d231e5ea329d3/photos/r4BzdzyL-MsABP2BBak.jpg?t=176920020019",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/39ba75f9b610a05237adc3ca976891cd48f5832c/photos/r4BzdzyL-VI6JAAeVcc/edit/sUC-J-dupe.jpg?t=176920020019",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/6ecff324d6a35c8b07adf7704b062aa5f7d497a5/photos/r4BzdzyL--NeeOpiS_C-dupe.jpg?t=176920020019",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/6ecff324d6a35c8b07adf7704b062aa5f7d497a5/photos/r4BzdzyL-JNIDfmGooI-dupe.jpg?t=176920020019",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/e99fe331c49195c189d2e9fcb2035a27bf0849f3/photos/interior/r4BzdzyL-FSeoG8Q-dupe.jpeg?t=176920020019",
+              "https://media.carsandbids.com/cdn-cgi/image/width=2630,quality=70/e97164ee86c3a6ee5aaab17d395d231e5ea329d3/photos/3z70qemA-RBvBLUCB0R-8mvN65U4Ox.jpg?t=176920028419",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/6ecff324d6a35c8b07adf7704b062aa5f7d497a5/photos/3z70qemA-QjTyvkLUM3-dupe.jpg?t=176920028419",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/6ecff324d6a35c8b07adf7704b062aa5f7d497a5/photos/3z70qemA-vgjTK2XxEL-dupe.jpg?t=176920028419",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/c7387fa5557775cb743f87fc02d6cb831afb20b2/photos/3z70qemA-ddU1v_ugXo/edit/icI4G-dupe.jpg?t=176920028419",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/6ecff324d6a35c8b07adf7704b062aa5f7d497a5/photos/3z70qemA-UdQ4OLq7dP-dupe.jpg?t=176920028419",
+              "https://media.carsandbids.com/cdn-cgi/image/width=2630,quality=70/20309e251cb7341d1fb94cb5d4546882260d2202/photos/exterior/365oY4NZ-bALa1rL/edit/8OG_B-dupe.jpg?t=176919753955",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/9a30d8612141f47529c5a6dc040722b8d30c422f/photos/interior/365oY4NZ-jRjgDOn-dupe.jpg?t=176919753955",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/9a30d8612141f47529c5a6dc040722b8d30c422f/photos/mechanical/365oY4NZ-Imp7h_h-dupe.jpeg?t=176919753955",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/20309e251cb7341d1fb94cb5d4546882260d2202/photos/exterior/365oY4NZ-RVitH4O/edit/ujpH0-dupe.jpg?t=176919753955",
+              "https://media.carsandbids.com/cdn-cgi/image/width=504,quality=70/20309e251cb7341d1fb94cb5d4546882260d2202/photos/interior/365oY4NZ-nKO3gRH/edit/1YZ2d-dupe.jpg?t=176919771638"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 85,
+      "score_delta": 85,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "medium"
+    },
+    {
+      "url": "https://www.hemmings.com/classifieds/dealer/chevrolet/c10/2729389.html",
+      "domain": "www.hemmings.com",
+      "timestamp": "2026-01-29T15:03:28.519Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 626,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 403"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 18435,
+          "content_length": 527517,
+          "markdown_length": 3295,
+          "image_count": 34,
+          "has_structured_data": true,
+          "quality_score": 79,
+          "title": "Chevrolet C10 for Sale - Hemmings",
+          "vehicle_data": {
+            "year": 1968,
+            "make": "Porsche",
+            "price": 58500,
+            "images": [
+              "https://hmnimages.hemmings.com/hemmings-logo.svg",
+              "https://hmnimages.hemmings.com/hemmings-logo-mobile.svg",
+              "https://hmnimages.hemmings.com/membership/hmc-logo-nav.svg",
+              "https://thumbor-auction.hmn.com/boYLduny-bSXlTOaDG45bwnXCtI=/450x300/filters:format(webp)/4160792/156511828.jpg",
+              "https://thumbor-auction.hmn.com/zXBjpHHksutkzUPaybanvmwJhno=/450x300/filters:format(webp)/4152383/156366612.jpg",
+              "https://thumbor-auction.hmn.com/CixN6nqIO-AAcSNgF5rUhd4DMoI=/450x300/filters:format(webp)/4133750/156095983.jpg",
+              "https://thumbor-auction.hmn.com/X4dGTssdjpLCr8zuAqojkxYxWSg=/450x300/filters:format(webp)/4120852/155896993.jpg",
+              "https://thumbor-auction.hmn.com/Xok1AsVnlu89ifJJfjakPncXY-4=/450x300/filters:format(webp)/4106266/154550269.jpg",
+              "https://thumbor-auction.hmn.com/41IC0YhmyfLpFZ0Tt37OUmtDUxI=/450x300/filters:format(webp)/4098627/155709076.jpg",
+              "https://thumbor-auction.hmn.com/x4RmYlKoDIhTGIh0Ij44TpS0DfY=/450x300/filters:format(webp)/4089784/154594988.jpg",
+              "https://thumbor-auction.hmn.com/YRaD0pgrB8JsyZrNsRZwBgvi4OU=/450x300/filters:format(webp)/3978368/154382078.jpg",
+              "https://image.hmn.com/1QvbImu491OHtwAG2ipF-Dr3lNw=/450x300/filters:format(webp)/uimage/157112466.jpg",
+              "https://image.hmn.com/3rL9hQcw_2oqWn0Zi-JsgVggirk=/450x300/filters:format(webp)/uimage/157111573.jpg",
+              "https://image.hmn.com/gpMUje9rKcvpeN37iDgn84d6b_8=/450x300/filters:format(webp)/uimage/157110262.jpg",
+              "https://image.hmn.com/h9HB8_g8yCH3F1KU1RPjHKs-I2M=/450x300/filters:format(webp)/uimage/156948770.jpg",
+              "https://image.hmn.com/F7qldBLtVzKpxsdQDEf6eCbXm_Q=/450x300/filters:format(webp)/uimage/156947665.jpg",
+              "https://image.hmn.com/TM2YjTWhR5CVkOfrZXBAXMhhCr8=/450x300/filters:format(webp)/uimage/156985061.jpg",
+              "https://image.hmn.com/w0WFS2u9o26R9RNs0sEfPqdy6OE=/450x300/filters:format(webp)/uimage/156983848.jpg",
+              "https://image.hmn.com/_qGr8dGZd2hK8I3iCq-hqKgh1d0=/450x300/filters:format(webp)/uimage/156970578.jpg",
+              "https://image.hmn.com/Db5cWE7Uuk8sLo35PoG5xxrgR40=/450x300/filters:format(webp)/uimage/156875214.jpg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 79,
+      "score_delta": 79,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "medium"
+    },
+    {
+      "url": "https://www.dupontregistry.com/autos/listing/2024/porsche/911/4016155",
+      "domain": "www.dupontregistry.com",
+      "timestamp": "2026-01-29T15:03:35.658Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 1145,
+          "content_length": 177042,
+          "markdown_length": 122526,
+          "image_count": 10,
+          "has_structured_data": false,
+          "quality_score": 67,
+          "title": "2024 Porsche 911 | duPont REGISTRY",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "model": "911 For",
+            "images": [
+              "/_next/static/chunks/webpack-2a1eebb50883eb5a.js"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 7138,
+          "content_length": 204893,
+          "markdown_length": 779,
+          "image_count": 6,
+          "has_structured_data": false,
+          "quality_score": 47,
+          "title": "2024 Porsche 911 | duPont REGISTRY",
+          "vehicle_data": {
+            "year": 2024,
+            "make": "Porsche",
+            "model": "911 For",
+            "images": [
+              "data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20version=%271.1%27%20width=%27144%27%20height=%2751%27/%3e",
+              "https://www.dupontregistry.com/_next/static/media/dark_logo.5c6e3ca3.svg",
+              "data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20version=%271.1%27%20width=%2712%27%20height=%2714%27/%3e",
+              "https://www.dupontregistry.com/_next/static/media/arrow_grey_right.a6badccb.svg",
+              "data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20version=%271.1%27%20width=%27144%27%20height=%2751%27/%3e",
+              "https://www.dupontregistry.com/_next/static/media/dark_logo.5c6e3ca3.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 67,
+      "playwright_score": 47,
+      "score_delta": -20,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://www.hagerty.com/apps/valuationtools/market-trends/1973/Porsche/911%20S",
+      "domain": "www.hagerty.com",
+      "timestamp": "2026-01-29T15:03:42.549Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 996,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 404"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 6890,
+          "content_length": 87097,
+          "markdown_length": 2088,
+          "image_count": 1,
+          "has_structured_data": false,
+          "quality_score": 46,
+          "title": "Page Not Found",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "images": [
+              "https://hagerty-hvt-frontend-picture.imgix.net/assets/images/BrokenCarError.svg?auto=format%2Ccompress&fit=max&w=3840&q=80"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 46,
+      "score_delta": 46,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.hagerty.com/apps/valuationtools/market-trends/1967/Chevrolet/Corvette",
+      "domain": "www.hagerty.com",
+      "timestamp": "2026-01-29T15:03:49.001Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 889,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 404"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 6451,
+          "content_length": 88126,
+          "markdown_length": 2088,
+          "image_count": 1,
+          "has_structured_data": false,
+          "quality_score": 46,
+          "title": "Page Not Found",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "images": [
+              "https://hagerty-hvt-frontend-picture.imgix.net/assets/images/BrokenCarError.svg?auto=format%2Ccompress&fit=max&w=3840&q=80"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 46,
+      "score_delta": 46,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.hagerty.com/apps/valuationtools/market-trends/1965/Ford/Mustang",
+      "domain": "www.hagerty.com",
+      "timestamp": "2026-01-29T15:03:54.019Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 453,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 404"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 5017,
+          "content_length": 88119,
+          "markdown_length": 2088,
+          "image_count": 1,
+          "has_structured_data": false,
+          "quality_score": 46,
+          "title": "Page Not Found",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "images": [
+              "https://hagerty-hvt-frontend-picture.imgix.net/assets/images/BrokenCarError.svg?auto=format%2Ccompress&fit=max&w=3840&q=80"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 46,
+      "score_delta": 46,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.pcarmarket.com/auctions/",
+      "domain": "www.pcarmarket.com",
+      "timestamp": "2026-01-29T15:03:59.284Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 322,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 404"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 5265,
+          "content_length": 75814,
+          "markdown_length": 2478,
+          "image_count": 27,
+          "has_structured_data": false,
+          "quality_score": 75,
+          "title": "Active Auctions | PCARMARKET",
+          "vehicle_data": {
+            "year": 2009,
+            "make": "Porsche",
+            "model": "Only\nEnding",
+            "price": 35250,
+            "images": [
+              "https://www.pcarmarket.com/pcar-logo-dark.svg",
+              "https://www.pcarmarket.com/section-header-icon.svg",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzOTQ3IC0gMjAwOSBQb3JzY2hlIDkxMSBDYXJyZXJhIDRTIiwic2x1ZyI6IjYzOTQ3LTIwMDktcG9yc2NoZS05MTEtY2FycmVyYS00cy02MTRjMTNiMCJ9/.thumbnails/03f2e9ac-38a1-44ec-998e-e7a8fab90a92.webp/03f2e9ac-38a1-44ec-998e-e7a8fab90a92-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzOTQ4IC0gMjAxNCBSb2xscy1Sb3ljZSBHaG9zdCBWIFNwZWNpZmljYXRpb24iLCJzbHVnIjoiNjM5NDgtMjAxNC1yb2xscy1yb3ljZS1naG9zdC12LXNwZWNpZmljYXRpb24tNzI5ZGE4NDQifQ/.thumbnails/5bb02da8-e29c-420e-ac63-df3b4aa92290.webp/5bb02da8-e29c-420e-ac63-df3b4aa92290-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzOTQ0IC0gMjAxMiBQb3JzY2hlIDkxMSBDYXJyZXJhIFMiLCJzbHVnIjoiNjM5NDQtMjAxMi1wb3JzY2hlLTkxMS1jYXJyZXJhLXMtNmMyZjdjMTcifQ/.thumbnails/aabd97e3-a93a-4646-a570-0f3b0a8752d4.webp/aabd97e3-a93a-4646-a570-0f3b0a8752d4-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzODk3IC0gMjAyMiBQb3JzY2hlIDcxOCBTcHlkZXIiLCJzbHVnIjoiNjM4OTctMjAyMi1wb3JzY2hlLTcxOC1zcHlkZXItNTRmMTIxNjMifQ/.thumbnails/86a359db-773e-4a97-a8f8-f997c45dad5b.webp/86a359db-773e-4a97-a8f8-f997c45dad5b-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/.thumbnails/166319ae-3f25-4cfc-a6b1-cf6c6a2cc837-92662fc1-a1d4-431c-ba74-108356d07306-tiny-2048x0.webp/166319ae-3f25-4cfc-a6b1-cf6c6a2cc837-92662fc1-a1d4-431c-ba74-108356d07306-tiny-2048x0-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/.thumbnails/781fc4dc-5ce8-46f9-a8f1-ef7572b07aac-ok.webp/781fc4dc-5ce8-46f9-a8f1-ef7572b07aac-ok-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzODQwIC0gU2NoaWxkZXJmZWUiLCJzbHVnIjoiNjM4NDAtc2NoaWxkZXJmZWUtMGEyMzllYWYifQ/.thumbnails/5db19674-6e47-4b1b-a833-69a58324a75f.webp/5db19674-6e47-4b1b-a833-69a58324a75f-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzODQ4IC0gMTk3NyBQb3JzY2hlIHJpbXMiLCJzbHVnIjoiNjM4NDgtMTk3Ny1wb3JzY2hlLXJpbXMtNzBhN2I1MGIifQ/.thumbnails/278a6fcd-915f-4df0-a1f5-521e29141cd6.webp/278a6fcd-915f-4df0-a1f5-521e29141cd6-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/.thumbnails/03b1623b-72e5-4e69-ac66-79aff7428837-ef8c1b4d-aacc-4bd2-b236-c9a50e6c18c9-IMG_7016-1.webp/03b1623b-72e5-4e69-ac66-79aff7428837-ef8c1b4d-aacc-4bd2-b236-c9a50e6c18c9-IMG_7016-1-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzNDkyIC0gcm9sbCBjYWdlIiwic2x1ZyI6IjYzNDkyLXJvbGwtY2FnZS0zMTBjOTc0YSJ9/.thumbnails/d4f27ce5-74c8-4fec-9d86-d2f02e03bf9e.webp/d4f27ce5-74c8-4fec-9d86-d2f02e03bf9e-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzNDkxIC0gcHJhY2VyIiwic2x1ZyI6IjYzNDkxLXByYWNlci0yMmZiM2M4YSJ9/.thumbnails/40d8acc2-36d3-4e7f-84b0-f23af7c3799f.webp/40d8acc2-36d3-4e7f-84b0-f23af7c3799f-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzNzcxIC0gMTk2MCBQb3JzY2hlIDM1NiBSb2Fkc3RlciBTYWZhcmkiLCJzbHVnIjoiNjM3NzEtMTk2MC1wb3JzY2hlLTM1Ni1yb2Fkc3Rlci1zYWZhcmktYWIwYzA3OGEifQ/.thumbnails/c832d906-b857-4aea-9006-93a9a893bd0d.webp/c832d906-b857-4aea-9006-93a9a893bd0d-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzOTQzIC0gMTk4OSBQb250aWFjIEZpcmViaXJkIFRyYW5zIEFNIEdUQSIsInNsdWciOiI2Mzk0My0xOTg5LXBvbnRpYWMtZmlyZWJpcmQtdHJhbnMtYW0tZ3RhLTMxMDAwMmI4In0/.thumbnails/bd35088f-0dbd-4fcd-9a3a-3fafcfe624bc.webp/bd35088f-0dbd-4fcd-9a3a-3fafcfe624bc-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzOTg5IC0gMTk3MiBQb3JzY2hlIDkxMSBDb3VwZSBHNTAgUmFjZSBDYXIiLCJzbHVnIjoiNjM5ODktMTk3Mi1wb3JzY2hlLTkxMS1jb3VwZS1nNTAtcmFjZS1jYXItZmRjNmIzZGIifQ/.thumbnails/c3b4e3ba-ba29-432e-8eeb-72d5f440e7f2.webp/c3b4e3ba-ba29-432e-8eeb-72d5f440e7f2-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/.thumbnails/ee8b7f2a-e422-4f38-8235-0e231d7dded2-DSC02271.webp/ee8b7f2a-e422-4f38-8235-0e231d7dded2-DSC02271-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzODExIC0gMjAxOCBCTVcgTTMgQ1MiLCJzbHVnIjoiNjM4MTEtMjAxOC1ibXctbTMtY3MtMTZjYzU4OWEifQ/.thumbnails/8f23045f-9a95-44b5-8177-8327a290da24.webp/8f23045f-9a95-44b5-8177-8327a290da24-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/prod/eyJ0aXRsZSI6IjYzOTAxIC0gMjAwNiBQb3JzY2hlIDkxMSBDYXJyZXJhIFMiLCJzbHVnIjoiNjM5MDEtMjAwNi1wb3JzY2hlLTkxMS1jYXJyZXJhLXMtMTYzNzAxZjcifQ/.thumbnails/07f742f4-389f-4a1a-a85b-49f8c1bc5779.webp/07f742f4-389f-4a1a-a85b-49f8c1bc5779-tiny-380x0.webp",
+              "https://d2niwqq19lf86s.cloudfront.net/htwritable/media/.thumbnails/4c379cf9-2f30-40ba-84e8-80a1fc1618b5-af7b4a1c-04a0-481e-8b82-9e99096cab4b-tiny-2048x0-1.webp/4c379cf9-2f30-40ba-84e8-80a1fc1618b5-af7b4a1c-04a0-481e-8b82-9e99096cab4b-tiny-2048x0-1-tiny-380x0.webp"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 75,
+      "score_delta": 75,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "medium"
+    },
+    {
+      "url": "https://collectingcars.com/for-sale/",
+      "domain": "collectingcars.com",
+      "timestamp": "2026-01-29T15:04:09.971Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 437,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 403"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 10685,
+          "content_length": 865653,
+          "markdown_length": 8455,
+          "image_count": 91,
+          "has_structured_data": true,
+          "quality_score": 95,
+          "title": "Collecting Cars · 24/7 Online Auctions",
+          "vehicle_data": {
+            "year": 1989,
+            "make": "Porsche",
+            "model": "Ferrari\nBMW",
+            "price": 31250,
+            "mileage": 12160,
+            "images": [
+              "https://collectingcars.com/images/logos/collecting-cars-logo.svg",
+              "https://flagcdn.com/gb.svg",
+              "https://flagcdn.com/gb.svg",
+              "https://flagcdn.com/gb.svg",
+              "https://flagcdn.com/cn.svg",
+              "https://flagcdn.com/cn.svg",
+              "https://flagcdn.com/de.svg",
+              "https://flagcdn.com/it.svg",
+              "https://flagcdn.com/es.svg",
+              "https://flagcdn.com/se.svg",
+              "https://flagcdn.com/fr.svg",
+              "https://flagcdn.com/nl.svg",
+              "https://images.collectingcars.com/084222/19-01-26-JJBB-07.jpg?w=828&q=75",
+              "https://flagcdn.com/de.svg",
+              "https://images.collectingcars.com/082552/AS-14-11-07.jpg?w=828&q=75",
+              "https://flagcdn.com/fr.svg",
+              "https://images.collectingcars.com/084068/AS-14-01-05.jpg?w=828&q=75",
+              "https://flagcdn.com/it.svg",
+              "https://images.collectingcars.com/083842/AS-05-01-08.jpg?w=828&q=75",
+              "https://flagcdn.com/gb.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 95,
+      "score_delta": 95,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "medium"
+    },
+    {
+      "url": "https://rfrm.com/inventory/",
+      "domain": "rfrm.com",
+      "timestamp": "2026-01-29T15:04:12.389Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 498,
+          "content_length": 114,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "Failed to extract content"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": false,
+          "timing_ms": 2418,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "page.evaluate: TypeError: Cannot read properties of null (reading 'scrollHeight')\n    at eval (eval at evaluate (:290:30), <anonymous>:1:38)\n    at UtilityScript.evaluate (<anonymous>:292:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 0,
+      "score_delta": 0,
+      "naive_success": false,
+      "playwright_success": false,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.streetsideclassics.com/vehicles/",
+      "domain": "www.streetsideclassics.com",
+      "timestamp": "2026-01-29T15:04:18.627Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 1554,
+          "content_length": 131311,
+          "markdown_length": 14665,
+          "image_count": 8,
+          "has_structured_data": false,
+          "quality_score": 62,
+          "title": "Streetside Classics - Classic Cars for Sale",
+          "vehicle_data": {
+            "year": 1983,
+            "make": "Porsche",
+            "model": "ReconstructionRenaultRockneRolls-RoyceShelbyStudebakerSunbeamSuzukiToyotaTriumphVintageVolkswagenWillys\n\n\n\n\n\n\n\n\nModel",
+            "price": 0,
+            "images": []
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 6238,
+          "content_length": 242158,
+          "markdown_length": 6682,
+          "image_count": 8,
+          "has_structured_data": false,
+          "quality_score": 64,
+          "title": "Streetside Classics - Classic Cars for Sale",
+          "vehicle_data": {
+            "year": 1983,
+            "make": "Porsche",
+            "price": 41995,
+            "images": [
+              "https://www.streetsideclassics.com/assets/streetside/ss-logo-blue-80677607bed9af959c5b3d2289a590ee.svg",
+              "https://www.streetsideclassics.com/assets/streetside/ss-logo-blue-80677607bed9af959c5b3d2289a590ee.svg",
+              "https://www.streetsideclassics.com/assets/streetside/fb-circle-8c31a21185e229cbed8a594ac0575401.svg",
+              "https://www.streetsideclassics.com/assets/streetside/twitter-circle-89038ee2213c1461890677c7f7f69862.svg",
+              "https://www.streetsideclassics.com/assets/streetside/ig-circle-7ee41f01b8acb3f2a644f7417db92c53.svg",
+              "https://www.streetsideclassics.com/assets/streetside/yt-circle-08c1e422d36f2fd455ab0cf9b939be78.svg",
+              "https://www.streetsideclassics.com/assets/streetside/gp-circle-687fc83cf402a619f9516aa38af16525.svg",
+              "https://www.streetsideclassics.com/assets/streetside/mtrs-circle-35c00020078633f00294c55844879468.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 62,
+      "playwright_score": 64,
+      "score_delta": 2,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    },
+    {
+      "url": "https://www.classicdriver.com/en/cars",
+      "domain": "www.classicdriver.com",
+      "timestamp": "2026-01-29T15:04:23.926Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 800,
+          "content_length": 35054,
+          "markdown_length": 4244,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 33,
+          "title": "Classic Cars for sale | Classic Driver",
+          "vehicle_data": {
+            "year": 2026,
+            "images": []
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 5298,
+          "content_length": 1187877,
+          "markdown_length": 3182,
+          "image_count": 85,
+          "has_structured_data": false,
+          "quality_score": 67,
+          "title": "Classic Cars for sale | Classic Driver",
+          "vehicle_data": {
+            "year": 2014,
+            "make": "Porsche",
+            "model": "911 -",
+            "images": [
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/229040/cars_images/229040-1094082-car-20260115_090305-dscf1756.jpeg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/154307/cars_images/154307-1095192-car-20260127_114209-citroen-ds-berline-exteriors-0.jpg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/194497/cars_images/feed_1093947/f0597422e7945f1e757d419fc11a2c7d.jpeg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/39150/cars_images/32120-1094681-car-20260122_164834-dsc09942.jpg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/32386/cars_images/32386-1086899-car-20251114_130539-front_left_high.jpg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/154307/cars_images/154307-1094608-car-20260121_191826-lamborghini-350-gt-coupe-exteriors-0.jpg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/39150/cars_images/233027-1094115-car-20260121_123029-bildschirmfoto_2026-01-21_um_12.29.55.png?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/32467/cars_images/feed_292131/cd9fb9ea414b12134250ce4fbc396bb6.jpeg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/125460/cars_images/125460-1094219-car-20260116_175131-abarth_131_rally_orange_-97.jpg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/69453/cars_images/69453-1094102-car-20260115_114622-dsc08799.jpg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/229040/cars_images/229040-1094082-car-20260115_090305-dscf1756.jpeg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=431,height=231/sites/default/files/users/154307/cars_images/154307-1095192-car-20260127_114209-citroen-ds-berline-exteriors-0.jpg?1769695602",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=contain,width=80,height=80/sites/default/files/make_logo/astonmartin_0.png?1769663180",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=contain,width=80,height=80/sites/default/files/make_logo/bentley_1.png?1769663180",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=contain,width=80,height=80/sites/default/files/make_logo/bmw_1.png?1769663180",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=contain,width=80,height=80/sites/default/files/make_logo/bugatti.png?1769663180",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=contain,width=80,height=80/sites/default/files/make_logo/Ferrari_0.png?1769663180",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=contain,width=80,height=80/sites/default/files/make_logo/jaguar_1.png?1769663180",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=contain,width=80,height=80/sites/default/files/make_logo/lamborghini_0.png?1769663180",
+              "https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=contain,width=80,height=80/sites/default/files/make_logo/landrover_0.png?1769663180"
+            ]
+          }
+        }
+      ],
+      "naive_score": 33,
+      "playwright_score": 67,
+      "score_delta": 34,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "medium"
+    },
+    {
+      "url": "https://www.mecum.com/lots/",
+      "domain": "www.mecum.com",
+      "timestamp": "2026-01-29T15:04:32.943Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 902,
+          "content_length": 112698,
+          "markdown_length": 57415,
+          "image_count": 4,
+          "has_structured_data": true,
+          "quality_score": 53,
+          "title": "Upcoming Lots - Mecum Auctions",
+          "vehicle_data": {
+            "year": 2026,
+            "images": [
+              "/_next/static/chunks/webpack-f27dc32746f79538.js",
+              "/_next/static/UCPng3mLVImY8UE17OZB9/_buildManifest.js",
+              "/_next/static/UCPng3mLVImY8UE17OZB9/_ssgManifest.js",
+              "/_next/static/media/footer-border.5beb747f.webp?w=1920&amp;q=75",
+              "/_next/static/media/footer-bg.13884790.webp?w=1920&amp;q=75"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 9016,
+          "content_length": 396415,
+          "markdown_length": 6205,
+          "image_count": 41,
+          "has_structured_data": true,
+          "quality_score": 81,
+          "title": "Upcoming Lots - Mecum Auctions",
+          "vehicle_data": {
+            "year": 2026,
+            "make": "Porsche",
+            "vin": "30630835759865769",
+            "images": [
+              "https://res.cloudinary.com/mecum/images/v1669417845/media/icon-angle-right/icon-angle-right.png?_i=AA",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1765227952/auctions/AZ26/1163607/477502.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1767048271/auctions/AZ26/1164830/202737.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1759959439/auctions/LV26/1155219/697657.jpg?",
+              "https://ignition.mecumauctions.com/wp-content/uploads/2026/01/893184.jpg?w=640&q=75",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1767731941/auctions/AZ26/1165378/755667.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1767711198/auctions/AZ26/1165377/642891.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1767710973/auctions/AZ26/1165376/320735.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1767710913/auctions/AZ26/1165375/720545.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1769635049/auctions/AZ26/1165374/695962.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1766449036/auctions/LV26/1164826/697957.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1768603309/auctions/LV26/1160836/397941.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1768603160/auctions/LV26/1160848/785228.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1768242297/auctions/LV26/1160847/942437.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1768602999/auctions/LV26/1158083/777511.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1769454524/auctions/LV26/1158079/212138.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1764947906/auctions/FL26/1159588/170650.jpg?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1768602328/auctions/LV26/1165982/106822.png?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1768604707/auctions/LV26/1165981/632778.png?",
+              "https://images.mecum.com/image/upload/c_fill,f_auto,g_center,q_auto,w_640,h_360/v1768920847/auctions/LV26/1165958/437429.jpg?"
+            ]
+          }
+        }
+      ],
+      "naive_score": 53,
+      "playwright_score": 81,
+      "score_delta": 28,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "medium"
+    },
+    {
+      "url": "https://rmsothebys.com/en/home/lots/",
+      "domain": "rmsothebys.com",
+      "timestamp": "2026-01-29T15:04:42.977Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 3379,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 404"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 10033,
+          "content_length": 164210,
+          "markdown_length": 735,
+          "image_count": 5,
+          "has_structured_data": false,
+          "quality_score": 33,
+          "title": "404 | RM Sotheby's",
+          "vehicle_data": {
+            "year": 2021,
+            "images": [
+              "https://rmsothebys.com/images/logo.svg",
+              "https://rmsothebys.com/media/Temp/40439/404.jpg",
+              "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
+              "https://cdn.cookielaw.org/logos/37698eaf-c325-4694-89c5-10a4743d7b9e/01912d93-53d8-75e6-894f-e39b8b61713b/8f8a56ec-fde1-4bcf-8cfb-8c64aaaaa2f9/RM_Sothebys_ROB_BLK.png",
+              "https://cdn.cookielaw.org/logos/static/powered_by_logo.svg"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 33,
+      "score_delta": 33,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.bonhams.com/departments/mot-cmc/",
+      "domain": "www.bonhams.com",
+      "timestamp": "2026-01-29T15:04:48.137Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 1193,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 404"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 5159,
+          "content_length": 68256,
+          "markdown_length": 591,
+          "image_count": 3,
+          "has_structured_data": false,
+          "quality_score": 28,
+          "title": "Bonhams",
+          "vehicle_data": {
+            "year": 2001,
+            "images": [
+              "https://www.bonhams.com/_next/image.jpg?url=%2Fweb-assets%2Fflags%2Feu.png&w=32&q=75",
+              "https://www.bonhams.com/_next/image.jpg?url=%2Fweb-assets%2Fflags%2Feu.png&w=32&q=75",
+              "https://www.bonhams.com/_next/image.jpg?url=%2Fweb-assets%2FerrorPlane.png&w=2400&q=75"
+            ]
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 28,
+      "score_delta": 28,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.autotrader.com/cars-for-sale/classic-cars",
+      "domain": "www.autotrader.com",
+      "timestamp": "2026-01-29T15:04:52.876Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 342,
+          "content_length": 3760,
+          "markdown_length": 777,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 28,
+          "title": "Autotrader - page unavailable",
+          "vehicle_data": {
+            "year": 1999,
+            "images": [
+              "/akamai-block/block-images/autotrader-logo-blue.png",
+              "./block-images/autotrader-logo-blue.png",
+              "/akamai-block/block-images/error-message-icon.png",
+              "./block-images/error-message-icon.png"
+            ]
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 4737,
+          "content_length": 4427,
+          "markdown_length": 163,
+          "image_count": 2,
+          "has_structured_data": false,
+          "quality_score": 18,
+          "title": "Autotrader - page unavailable",
+          "vehicle_data": {
+            "year": 1999,
+            "images": [
+              "https://www.autotrader.com/akamai-block/block-images/autotrader-logo-blue.png",
+              "https://www.autotrader.com/akamai-block/block-images/error-message-icon.png"
+            ]
+          }
+        }
+      ],
+      "naive_score": 28,
+      "playwright_score": 18,
+      "score_delta": -10,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://classics.autotrader.com/classic-cars",
+      "domain": "classics.autotrader.com",
+      "timestamp": "2026-01-29T15:04:57.392Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": false,
+          "timing_ms": 578,
+          "content_length": 0,
+          "markdown_length": 0,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 0,
+          "error": "HTTP 403"
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 4515,
+          "content_length": 313,
+          "markdown_length": 217,
+          "image_count": 0,
+          "has_structured_data": false,
+          "quality_score": 5,
+          "title": "Access Denied",
+          "vehicle_data": {
+            "images": []
+          }
+        }
+      ],
+      "naive_score": 0,
+      "playwright_score": 5,
+      "score_delta": 5,
+      "naive_success": false,
+      "playwright_success": true,
+      "difficulty": "hard"
+    },
+    {
+      "url": "https://www.ebay.com/b/Classic-Cars/6001/bn_1865149",
+      "domain": "www.ebay.com",
+      "timestamp": "2026-01-29T15:05:04.951Z",
+      "results": [
+        {
+          "method": "naive_fetch",
+          "tier": "basic",
+          "success": true,
+          "timing_ms": 3336,
+          "content_length": 1632371,
+          "markdown_length": 857619,
+          "image_count": 0,
+          "has_structured_data": true,
+          "quality_score": 64,
+          "title": "Finish Line Bicycle Lubrication and Cleaning for sale | eBay",
+          "vehicle_data": {
+            "year": 1995,
+            "make": "MG",
+            "price": 13,
+            "images": []
+          }
+        },
+        {
+          "method": "playwright",
+          "tier": "compute",
+          "success": true,
+          "timing_ms": 7558,
+          "content_length": 2838662,
+          "markdown_length": 13871,
+          "image_count": 112,
+          "has_structured_data": true,
+          "quality_score": 90,
+          "title": "Finish Line Bicycle Lubrication and Cleaning for sale | eBay",
+          "vehicle_data": {
+            "year": 1995,
+            "make": "MG",
+            "model": "uploded",
+            "price": 479,
+            "images": [
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://i.ebayimg.com/images/g/mcoAAOSw4OdmOPiU/s-l960.webp",
+              "https://i.ebayimg.com/images/g/GSgAAeSwM75o7qWl/s-l960.webp",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://i.ebayimg.com/images/g/mv0AAeSwjkBpEhI8/s-l960.webp",
+              "https://i.ebayimg.com/images/g/w9wAAeSwGWlpSslo/s-l960.webp",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif",
+              "https://ir.ebaystatic.com/cr/v/c1/s_1x2.gif"
+            ]
+          }
+        }
+      ],
+      "naive_score": 64,
+      "playwright_score": 90,
+      "score_delta": 26,
+      "naive_success": true,
+      "playwright_success": true,
+      "difficulty": "easy"
+    }
+  ],
+  "summary": {
+    "naive_success_rate": 56.00000000000001,
+    "playwright_success_rate": 96,
+    "naive_avg_quality": 38,
+    "playwright_avg_quality": 60,
+    "avg_score_delta": 22,
+    "avg_timing_naive": 1144,
+    "avg_timing_playwright": 7744,
+    "easy_count": 8,
+    "medium_count": 6,
+    "hard_count": 11,
+    "urls_only_playwright_succeeded": 10,
+    "urls_playwright_significantly_better": 12
+  }
+}
