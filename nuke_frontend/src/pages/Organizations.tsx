@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { SUPABASE_URL } from '../lib/env';
 import { OrganizationSearchService } from '../services/organizationSearch';
 import { getOrgInvestorMetrics, type OrgMetricData } from '../utils/orgInvestorMetrics';
-import { FaviconIcon } from '../components/common/FaviconIcon';
+import { OrgLogo } from '../components/common/OrgLogo';
 
 interface Organization {
   id: string;
@@ -607,39 +607,25 @@ export default function Organizations() {
                 onClick={() => navigate(`/org/${org.id}`)}
                 style={{
                   height: '240px',
-                  background: primaryImage 
-                    ? `url(${primaryImage.large_url || primaryImage.image_url}) center/cover` 
-                    : 'linear-gradient(135deg, var(--surface) 0%, var(--border) 100%)',
-                  position: 'relative'
+                  position: 'relative',
+                  overflow: 'hidden'
                 }}
               >
-                {/* Logo overlay (if no primary image, show logo prominently) */}
-                {!primaryImage && org.logo_url && (
+                {primaryImage ? (
                   <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    maxWidth: '200px',
-                    maxHeight: '80px',
-                    background: 'transparent',
-                    padding: '12px',
-                    borderRadius: '4px'
-                  }}>
-                    <img
-                      src={org.logo_url}
-                      alt=""
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        objectFit: 'contain',
-                        display: 'block'
-                      }}
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
+                    width: '100%',
+                    height: '100%',
+                    background: `url(${primaryImage.large_url || primaryImage.image_url}) center/cover`
+                  }} />
+                ) : (
+                  <OrgLogo
+                    website={org.website}
+                    logoUrl={org.logo_url}
+                    businessType={org.business_type}
+                    businessName={org.business_name}
+                    variant="card"
+                    style={{ width: '100%', height: '100%' }}
+                  />
                 )}
                 
                 {/* Stock symbol badge */}
@@ -693,27 +679,14 @@ export default function Organizations() {
                 <div style={{ marginBottom: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
                     {/* Logo or Favicon */}
-                    {org.logo_url ? (
-                      <img
-                        src={org.logo_url}
-                        alt=""
-                        style={{
-                          height: '24px',
-                          maxWidth: '80px',
-                          objectFit: 'contain',
-                          display: 'block'
-                        }}
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    ) : org.website ? (
-                      <FaviconIcon
-                        url={org.website}
-                        size={16}
-                        style={{ flexShrink: 0 }}
-                      />
-                    ) : null}
+                    <OrgLogo
+                      website={org.website}
+                      logoUrl={org.logo_url}
+                      businessType={org.business_type}
+                      size={20}
+                      variant="icon"
+                      style={{ flexShrink: 0 }}
+                    />
                     
                     <h3 style={{ fontSize: '9pt', fontWeight: 700, margin: 0, flex: 1 }}>
                       {org.business_name}
