@@ -93,35 +93,35 @@ function sortNewestFirst(q: string): boolean {
   return /\b(newest|latest|most\s+recent)\b/.test(t) && !/\boldest|earliest\b/.test(t);
 }
 
-const MAKE_EXPANSIONS: Record<string, string[]> = {
+// Model names by make - used to detect when user specifies a model
+const MAKE_MODELS: Record<string, string[]> = {
   porsche: [
-    "911",
-    "carrera",
-    "gt3",
-    "turbo",
-    "rs",
-    "cayman",
-    "boxster",
-    "taycan",
-    "macan",
-    "cayenne",
-    "panamera",
-    "964",
-    "993",
-    "997",
-    "991",
-    "992",
-    "aircooled",
-    "air-cooled",
+    "911", "carrera", "gt3", "turbo", "rs", "cayman", "boxster",
+    "taycan", "macan", "cayenne", "panamera", "964", "993", "997", "991", "992",
   ],
+  chevrolet: ["c10", "camaro", "corvette", "impala", "chevelle", "nova", "bel air"],
+  ford: ["mustang", "bronco", "f100", "f150", "gt", "thunderbird", "falcon"],
+  bmw: ["m3", "m5", "2002", "e30", "e36", "e46", "e90", "z3", "z4"],
 };
 
+// Check if any model from a make is already in the query
+function queryHasModelForMake(terms: string[], make: string): boolean {
+  const models = MAKE_MODELS[make];
+  if (!models) return false;
+  return terms.some(t => models.includes(t));
+}
+
 function expandTerms(terms: string[]): string[] {
+  // Don't expand if user already specified a model - respect their intent
+  // e.g., "porsche 911" should NOT expand to include boxster, cayenne, etc.
   const out = new Set<string>(terms);
+
   for (const term of terms) {
-    const expansions = MAKE_EXPANSIONS[term];
-    if (expansions) {
-      expansions.forEach((e) => out.add(e.toLowerCase()));
+    const models = MAKE_MODELS[term];
+    if (models && !queryHasModelForMake(terms, term)) {
+      // Only expand make to models if user didn't specify a model
+      // This helps single-term searches like "porsche" find more results
+      models.forEach((m) => out.add(m.toLowerCase()));
     }
   }
   return Array.from(out);
@@ -129,14 +129,27 @@ function expandTerms(terms: string[]): string[] {
 
 function scoreText(terms: string[], hay: string): number {
   const h = (hay || "").toLowerCase();
-  if (!h) return 0;
+  if (!h || terms.length === 0) return 0;
+
   let hits = 0;
+  let misses = 0;
   for (const t of terms) {
     if (!t) continue;
-    if (h.includes(t)) hits += 1;
+    if (h.includes(t)) {
+      hits += 1;
+    } else {
+      misses += 1;
+    }
   }
+
   if (terms.length === 0) return 0;
-  return hits / terms.length;
+
+  // Penalize missing terms more heavily
+  // All terms match: 1.0, missing 1 of 2: 0.25, missing 1 of 3: 0.44
+  // This ensures "porsche 911" ranks 911s much higher than Boxsters
+  const matchRatio = hits / terms.length;
+  const penalty = misses > 0 ? Math.pow(0.5, misses) : 1;
+  return matchRatio * penalty;
 }
 
 function clamp01(x: number): number {
