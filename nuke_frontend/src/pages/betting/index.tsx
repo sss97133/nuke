@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { Link } from 'react-router-dom';
+import { PredictionBadge } from '@/components/betting/PredictionBadge';
+import { PredictionPopup } from '@/components/betting/PredictionPopup';
+import { cn } from '@/lib/utils';
 
 interface Market {
   id: string;
   title: string;
   description: string;
+  market_type: string;
   line_value: number;
   line_description: string;
   status: string;
@@ -14,201 +18,316 @@ interface Market {
   total_yes_amount: number;
   total_no_amount: number;
   total_bettors: number;
-  year?: number;
-  make?: string;
-  model?: string;
+  min_bet: number;
+  max_bet: number;
+  rake_percent: number;
+  vehicle_id?: string;
+  vehicles?: {
+    year: number;
+    make: string;
+    model: string;
+    vehicle_images?: { url: string }[];
+  };
 }
 
-interface Wallet {
-  balance: number;
-  total_wagered: number;
-  total_won: number;
-  bets_won: number;
-  bets_lost: number;
+interface UserBet {
+  market_id: string;
+  side: 'yes' | 'no';
+  amount: number;
 }
+
+type FilterType = 'all' | 'auction_over_under' | 'auction_will_sell' | 'make_vs_make' | 'daily_gross' | 'record_breaker';
 
 export default function BettingPage() {
   const { user } = useAuth();
   const [markets, setMarkets] = useState<Market[]>([]);
-  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [userBets, setUserBets] = useState<Record<string, UserBet>>({});
+  const [balance, setBalance] = useState(0);
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [expandedMarket, setExpandedMarket] = useState<Market | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'high-value' | 'closing-soon'>('all');
 
   useEffect(() => {
     loadMarkets();
-    if (user) loadWallet();
-  }, [user]);
+    if (user) loadUserData();
+  }, [user, filter]);
 
   async function loadMarkets() {
-    const { data } = await supabase
+    setLoading(true);
+    let query = supabase
       .from('betting_markets')
-      .select('*')
+      .select(`
+        *,
+        vehicles(year, make, model, vehicle_images(url))
+      `)
       .eq('status', 'open')
       .order('locks_at', { ascending: true });
 
+    if (filter !== 'all') {
+      query = query.eq('market_type', filter);
+    }
+
+    const { data } = await query.limit(100);
     setMarkets(data || []);
     setLoading(false);
   }
 
-  async function loadWallet() {
-    const { data } = await supabase
+  async function loadUserData() {
+    // Wallet
+    const { data: wallet } = await supabase
       .from('betting_wallets')
-      .select('*')
+      .select('balance')
       .eq('user_id', user?.id)
       .single();
+    setBalance(wallet?.balance || 0);
 
-    setWallet(data);
+    // User bets
+    const { data: bets } = await supabase
+      .from('bets')
+      .select('market_id, side, amount')
+      .eq('user_id', user?.id)
+      .eq('status', 'active');
+
+    const betsMap: Record<string, UserBet> = {};
+    bets?.forEach(b => {
+      betsMap[b.market_id] = b;
+    });
+    setUserBets(betsMap);
   }
 
-  const filteredMarkets = markets.filter(m => {
-    if (filter === 'high-value') return m.line_value >= 100000;
-    if (filter === 'closing-soon') {
-      const hoursLeft = (new Date(m.locks_at).getTime() - Date.now()) / 3600000;
-      return hoursLeft < 24;
+  async function handleTogglePrediction(marketId: string, side: 'over' | 'under') {
+    if (!user) {
+      window.location.href = '/login';
+      return;
     }
-    return true;
-  });
 
-  const totalPool = markets.reduce((s, m) => s + m.total_yes_amount + m.total_no_amount, 0);
+    const market = markets.find(m => m.id === marketId);
+    if (!market) return;
 
-  if (loading) {
-    return <div className="p-8 text-center">Loading markets...</div>;
+    // Quick bet with minimum amount
+    const { error } = await supabase.rpc('place_bet', {
+      p_user_id: user.id,
+      p_market_id: marketId,
+      p_side: side === 'over' ? 'yes' : 'no',
+      p_amount: market.min_bet,
+    });
+
+    if (!error) {
+      loadMarkets();
+      loadUserData();
+    }
   }
+
+  async function handlePredict(side: 'over' | 'under', amount: number) {
+    if (!user || !expandedMarket) return;
+
+    const { error } = await supabase.rpc('place_bet', {
+      p_user_id: user.id,
+      p_market_id: expandedMarket.id,
+      p_side: side === 'over' ? 'yes' : 'no',
+      p_amount: amount,
+    });
+
+    if (!error) {
+      loadMarkets();
+      loadUserData();
+      setExpandedMarket(null);
+    }
+  }
+
+  const filterTabs: { key: FilterType; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'auction_over_under', label: 'Price O/U' },
+    { key: 'auction_will_sell', label: 'Will Sell?' },
+    { key: 'make_vs_make', label: 'vs Matchups' },
+    { key: 'daily_gross', label: 'Daily Totals' },
+    { key: 'record_breaker', label: 'Records' },
+  ];
+
+  const groupedMarkets = markets.reduce((acc, m) => {
+    const type = m.market_type;
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(m);
+    return acc;
+  }, {} as Record<string, Market[]>);
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <div className="flex justify-between items-start mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">Mecum Kissimmee 2026</h1>
-          <p className="text-gray-600 mt-1">Bet on auction outcomes</p>
-        </div>
-
-        {user && wallet && (
-          <div className="bg-gray-100 rounded-lg p-4 text-right">
-            <div className="text-sm text-gray-600">Your Balance</div>
-            <div className="text-2xl font-bold text-green-600">
-              ${(wallet.balance / 100).toFixed(2)}
+      <div className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-bold">Predictions</h1>
+              <span className="text-sm text-gray-500">Mecum Kissimmee 2026</span>
+              <Link
+                to="/betting/live"
+                className="text-xs bg-red-600 hover:bg-red-500 px-2 py-1 rounded flex items-center gap-1"
+              >
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                Live View
+              </Link>
             </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {wallet.bets_won}W - {wallet.bets_lost}L
+
+            <div className="flex items-center gap-4">
+              {user ? (
+                <div className="text-sm">
+                  <span className="text-gray-500">Balance:</span>
+                  <span className="font-mono font-bold ml-1 text-green-400">
+                    ${(balance / 100).toFixed(2)}
+                  </span>
+                </div>
+              ) : (
+                <Link to="/login" className="text-sm text-blue-400 hover:underline">
+                  Sign in to predict
+                </Link>
+              )}
             </div>
           </div>
+
+          {/* Filter tabs */}
+          <div className="flex gap-1 mt-3 overflow-x-auto pb-1">
+            {filterTabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key)}
+                className={cn(
+                  "px-3 py-1.5 text-sm rounded-full transition-colors whitespace-nowrap",
+                  filter === tab.key
+                    ? "bg-white text-black font-medium"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading markets...</div>
+        ) : markets.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">No markets found</div>
+        ) : filter === 'all' ? (
+          // Grouped view
+          <div className="space-y-8">
+            {Object.entries(groupedMarkets).map(([type, typeMarkets]) => (
+              <section key={type}>
+                <h2 className="text-lg font-bold text-gray-300 mb-3 capitalize">
+                  {type.replace(/_/g, ' ')}
+                  <span className="text-gray-600 font-normal ml-2">{typeMarkets.length}</span>
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {typeMarkets.slice(0, 20).map(market => {
+                    const pool = market.total_yes_amount + market.total_no_amount;
+                    const yesPercent = pool > 0 ? (market.total_yes_amount / pool) * 100 : 50;
+                    const userBet = userBets[market.id];
+
+                    return (
+                      <PredictionBadge
+                        key={market.id}
+                        marketId={market.id}
+                        title={market.vehicles
+                          ? `${market.vehicles.year} ${market.vehicles.make}`
+                          : market.title.slice(0, 15)}
+                        lineValue={market.line_value || 0}
+                        yesPercent={yesPercent}
+                        noPercent={100 - yesPercent}
+                        userPrediction={userBet?.side === 'yes' ? 'over' : userBet?.side === 'no' ? 'under' : undefined}
+                        totalPool={pool}
+                        onToggle={(side) => handleTogglePrediction(market.id, side)}
+                        onExpand={() => setExpandedMarket(market)}
+                      />
+                    );
+                  })}
+                  {typeMarkets.length > 20 && (
+                    <button
+                      onClick={() => setFilter(type as FilterType)}
+                      className="px-3 py-2 text-sm text-gray-500 hover:text-white"
+                    >
+                      +{typeMarkets.length - 20} more
+                    </button>
+                  )}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          // Single category grid
+          <div className="flex flex-wrap gap-3">
+            {markets.map(market => {
+              const pool = market.total_yes_amount + market.total_no_amount;
+              const yesPercent = pool > 0 ? (market.total_yes_amount / pool) * 100 : 50;
+              const userBet = userBets[market.id];
+
+              return (
+                <div key={market.id} className="flex items-center gap-2">
+                  {market.vehicles && (
+                    <div className="text-xs text-gray-500 max-w-[120px] truncate">
+                      {market.vehicles.year} {market.vehicles.make} {market.vehicles.model}
+                    </div>
+                  )}
+                  <PredictionBadge
+                    marketId={market.id}
+                    title={market.vehicles
+                      ? `${market.vehicles.make}`
+                      : market.title.slice(0, 12)}
+                    lineValue={market.line_value || 0}
+                    yesPercent={yesPercent}
+                    noPercent={100 - yesPercent}
+                    userPrediction={userBet?.side === 'over' ? 'over' : userBet?.side === 'no' ? 'under' : undefined}
+                    totalPool={pool}
+                    onToggle={(side) => handleTogglePrediction(market.id, side)}
+                    onExpand={() => setExpandedMarket(market)}
+                  />
+                </div>
+              );
+            })}
+          </div>
         )}
-
-        {!user && (
-          <Link
-            to="/login"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700"
-          >
-            Sign in to bet
-          </Link>
-        )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white border rounded-lg p-4">
-          <div className="text-2xl font-bold">{markets.length}</div>
-          <div className="text-sm text-gray-600">Open Markets</div>
-        </div>
-        <div className="bg-white border rounded-lg p-4">
-          <div className="text-2xl font-bold">${(totalPool / 100).toLocaleString()}</div>
-          <div className="text-sm text-gray-600">Total Pool</div>
-        </div>
-        <div className="bg-white border rounded-lg p-4">
-          <div className="text-2xl font-bold">Jan 6-18</div>
-          <div className="text-sm text-gray-600">Auction Dates</div>
+      {/* Stats Footer */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 py-2">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between text-xs text-gray-500">
+          <div className="flex gap-4">
+            <span>{markets.length} markets</span>
+            <span>
+              ${(markets.reduce((sum, m) => sum + m.total_yes_amount + m.total_no_amount, 0) / 100).toLocaleString()} total pool
+            </span>
+          </div>
+          <div>
+            5% rake • Pari-mutuel
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-6">
-        {(['all', 'high-value', 'closing-soon'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-full text-sm font-medium ${
-              filter === f
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {f === 'all' ? 'All Markets' : f === 'high-value' ? '$100k+' : 'Closing Soon'}
-          </button>
-        ))}
-      </div>
-
-      {/* Markets Grid */}
-      <div className="grid gap-4">
-        {filteredMarkets.map(market => (
-          <MarketCard key={market.id} market={market} />
-        ))}
-      </div>
-
-      {filteredMarkets.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          No markets match your filter
-        </div>
+      {/* Expanded Popup */}
+      {expandedMarket && (
+        <PredictionPopup
+          marketId={expandedMarket.id}
+          title={expandedMarket.title}
+          description={expandedMarket.description}
+          lineValue={expandedMarket.line_value || 0}
+          yesAmount={expandedMarket.total_yes_amount}
+          noAmount={expandedMarket.total_no_amount}
+          totalBettors={expandedMarket.total_bettors}
+          locksAt={expandedMarket.locks_at}
+          userPrediction={
+            userBets[expandedMarket.id]?.side === 'yes' ? 'over' :
+            userBets[expandedMarket.id]?.side === 'no' ? 'under' : undefined
+          }
+          userAmount={userBets[expandedMarket.id]?.amount}
+          vehicleYear={expandedMarket.vehicles?.year}
+          vehicleMake={expandedMarket.vehicles?.make}
+          vehicleModel={expandedMarket.vehicles?.model}
+          onClose={() => setExpandedMarket(null)}
+          onPredict={handlePredict}
+        />
       )}
     </div>
-  );
-}
-
-function MarketCard({ market }: { market: Market }) {
-  const pool = market.total_yes_amount + market.total_no_amount;
-  const yesPercent = pool > 0 ? (market.total_yes_amount / pool) * 100 : 50;
-  const noPercent = 100 - yesPercent;
-
-  const locksAt = new Date(market.locks_at);
-  const hoursLeft = Math.max(0, (locksAt.getTime() - Date.now()) / 3600000);
-
-  const timeDisplay = hoursLeft < 1
-    ? `${Math.round(hoursLeft * 60)}m left`
-    : hoursLeft < 24
-      ? `${Math.round(hoursLeft)}h left`
-      : locksAt.toLocaleDateString();
-
-  return (
-    <Link
-      to={`/betting/${market.id}`}
-      className="block bg-white border rounded-lg p-5 hover:shadow-md transition-shadow"
-    >
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
-          <h3 className="font-semibold text-lg">{market.title}</h3>
-          <p className="text-sm text-gray-600 mt-1">{market.line_description}</p>
-        </div>
-
-        <div className="text-right">
-          <div className="text-sm text-gray-500">{timeDisplay}</div>
-          <div className="text-sm font-medium mt-1">
-            ${(pool / 100).toLocaleString()} pool
-          </div>
-        </div>
-      </div>
-
-      {/* Odds bar */}
-      <div className="mt-4">
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-green-600 font-medium">OVER {yesPercent.toFixed(0)}%</span>
-          <span className="text-red-600 font-medium">UNDER {noPercent.toFixed(0)}%</span>
-        </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden flex">
-          <div
-            className="bg-green-500 transition-all"
-            style={{ width: `${yesPercent}%` }}
-          />
-          <div
-            className="bg-red-500 transition-all"
-            style={{ width: `${noPercent}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="mt-3 text-xs text-gray-500">
-        {market.total_bettors} bettor{market.total_bettors !== 1 ? 's' : ''}
-      </div>
-    </Link>
   );
 }

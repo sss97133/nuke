@@ -44,9 +44,10 @@ const SubscriptionSuccess = React.lazy(() => import('../pages/SubscriptionSucces
 // Trading
 const TradingPage = React.lazy(() => import('../pages/TradingPage'));
 
-// Betting
+// Betting / Predictions
 const BettingPage = React.lazy(() => import('../pages/betting'));
 const MarketDetail = React.lazy(() => import('../pages/betting/MarketDetail'));
+const LiveAuctionView = React.lazy(() => import('../components/betting/LiveAuctionView').then(m => ({ default: m.LiveAuctionView })));
 
 // Vault / Storage
 const VaultPage = React.lazy(() => import('../pages/VaultPage'));
@@ -147,8 +148,9 @@ export const DomainRoutes = () => {
         <Route path="/trading" element={<TradingPage />} />
         <Route path="/trading/:offeringId" element={<TradingPage />} />
 
-        {/* Betting */}
+        {/* Betting / Predictions */}
         <Route path="/betting" element={<BettingPage />} />
+        <Route path="/betting/live" element={<LiveAuctionView />} />
         <Route path="/betting/:id" element={<MarketDetail />} />
 
         {/* Vehicle Storage Vault */}
