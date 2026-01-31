@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { MessageCircle, TrendingUp, AlertTriangle, Star, Quote, DollarSign, X, Wrench, Search, ExternalLink } from 'lucide-react';
+import { MessageCircle, TrendingUp, AlertTriangle, Star, Quote, DollarSign, X, Wrench, Search, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
 import '../../design-system.css';
 
 // Issue detail popup for red flags and highlights
@@ -217,10 +217,62 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
   const [loading, setLoading] = useState(true);
   const [discoveredAt, setDiscoveredAt] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<{ issue: string; type: 'concern' | 'highlight' } | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generatingProgress, setGeneratingProgress] = useState(0);
 
   useEffect(() => {
     loadDiscoveries();
   }, [vehicleId]);
+
+  const generateInsights = async () => {
+    setGenerating(true);
+    setGeneratingProgress(0);
+
+    // Simulate progress for UX (actual process takes 30-60s)
+    const progressInterval = setInterval(() => {
+      setGeneratingProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 15;
+      });
+    }, 3000);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/discover-from-observations`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            vehicle_id: vehicleId,
+            discovery_types: ['sentiment', 'market_signals'],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate insights');
+      }
+
+      setGeneratingProgress(100);
+
+      // Reload the discoveries
+      await loadDiscoveries();
+    } catch (error) {
+      console.error('Error generating insights:', error);
+      alert('Failed to generate insights. Make sure there are observations for this vehicle.');
+    } finally {
+      clearInterval(progressInterval);
+      setGenerating(false);
+      setGeneratingProgress(0);
+    }
+  };
 
   const loadDiscoveries = async () => {
     try {
@@ -304,13 +356,75 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
 
   if (!sentimentData && !marketData) {
     return (
-      <div className="card" style={{ border: '1px solid #c0c0c0', padding: '16px' }}>
-        <div style={{ textAlign: 'center', color: '#666', fontSize: '10pt' }}>
-          No community insights available yet.
-          <div style={{ fontSize: '8pt', marginTop: '4px' }}>
-            Insights are generated from auction comments, forum discussions, and social media.
+      <div
+        className="card"
+        onClick={!generating ? generateInsights : undefined}
+        style={{
+          border: '1px solid #c0c0c0',
+          padding: '16px',
+          cursor: generating ? 'wait' : 'pointer',
+          transition: 'all 0.2s ease',
+          background: generating ? '#f9fafb' : undefined,
+        }}
+        onMouseEnter={(e) => !generating && (e.currentTarget.style.borderColor = '#3b82f6')}
+        onMouseLeave={(e) => !generating && (e.currentTarget.style.borderColor = '#c0c0c0')}
+      >
+        {generating ? (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} color="#3b82f6" />
+              <span style={{ fontSize: '10pt', fontWeight: 600, color: '#3b82f6' }}>
+                Generating Insights...
+              </span>
+            </div>
+            <div style={{
+              height: '4px',
+              background: '#e5e7eb',
+              borderRadius: '2px',
+              overflow: 'hidden',
+              marginBottom: '8px'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${generatingProgress}%`,
+                background: '#3b82f6',
+                transition: 'width 0.5s ease',
+                borderRadius: '2px'
+              }} />
+            </div>
+            <div style={{ fontSize: '8pt', color: '#666' }}>
+              Analyzing auction comments, forum discussions, and social media...
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#666', fontSize: '10pt' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '4px' }}>
+              <Sparkles size={14} color="#3b82f6" />
+              <span>No community insights available yet.</span>
+            </div>
+            <div style={{ fontSize: '8pt', marginTop: '4px' }}>
+              Insights are generated from auction comments, forum discussions, and social media.
+            </div>
+            <div style={{
+              marginTop: '12px',
+              padding: '6px 12px',
+              background: '#3b82f6',
+              color: 'white',
+              borderRadius: '2px',
+              fontSize: '8pt',
+              fontWeight: 600,
+              display: 'inline-block'
+            }}>
+              Click to Generate
+            </div>
+          </div>
+        )}
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }
