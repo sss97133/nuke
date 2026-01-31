@@ -1,15 +1,16 @@
-name: Enrich Concierge Businesses
+name: Enrich via Firecrawl
 
 on:
   workflow_dispatch:  # Manual trigger
   schedule:
-    # Playwright version - runs until Feb 1, then Firecrawl takes over
-    - cron: '0 */6 * 1 *'  # January only
+    # Starts Feb 2, 2026 - runs every 4 hours
+    - cron: '0 */4 2-28 2 *'   # Feb 2-28
+    - cron: '0 */4 * 3-12 *'   # Mar onwards
 
 jobs:
   enrich:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -22,11 +23,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install chromium
-
-      - name: Run enrichment
+      - name: Run Firecrawl enrichment
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: npx tsx scripts/concierge/enrich-cloud.ts
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+        run: npx tsx scripts/concierge/enrich-firecrawl.ts
