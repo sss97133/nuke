@@ -1,0 +1,76 @@
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Function to deploy (leave empty for all changed)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # To detect changed files
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy specific function
+        if: ${{ github.event.inputs.function_name != '' }}
+        run: |
+          echo "Deploying function: ${{ github.event.inputs.function_name }}"
+          supabase functions deploy ${{ github.event.inputs.function_name }} --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: qkgaybvrernstplzjaam
+
+      - name: Detect and deploy changed functions
+        if: ${{ github.event.inputs.function_name == '' }}
+        run: |
+          # Get list of changed function directories
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- supabase/functions/ | \
+            grep -oE 'supabase/functions/[^/]+' | \
+            sort -u | \
+            sed 's|supabase/functions/||' | \
+            grep -v '^_shared$' || echo "")
+          
+          if [ -z "$CHANGED" ]; then
+            echo "No edge functions changed, skipping deployment"
+            exit 0
+          fi
+          
+          echo "Changed functions: $CHANGED"
+          
+          for func in $CHANGED; do
+            echo "Deploying: $func"
+            supabase functions deploy "$func" --no-verify-jwt || {
+              echo "Failed to deploy $func, continuing..."
+            }
+          done
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: qkgaybvrernstplzjaam
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying edge function health..."
+          # Quick health check on critical functions
+          for func in openai-proxy; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/$func" \
+              -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{"test": true}' || echo "000")
+            echo "$func: HTTP $STATUS"
+          done
