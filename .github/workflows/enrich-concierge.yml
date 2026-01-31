@@ -3,8 +3,12 @@ name: Enrich Concierge Businesses
 on:
   workflow_dispatch:  # Manual trigger
   schedule:
-    # Playwright version - runs until Feb 1, then Firecrawl takes over
-    - cron: '0 */6 * 1 *'  # January only
+    # Run every hour until Feb 2 when Firecrawl takes over
+    - cron: '0 * * * *'  # Every hour
+
+concurrency:
+  group: concierge-enrichment
+  cancel-in-progress: false  # Let running jobs finish
 
 jobs:
   enrich:
