@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { WatchMomentButton, MomentThumbnail, MomentPlayer } from './WatchMomentButton';
 
 interface BetHistory {
   timestamp: Date;
@@ -25,6 +26,9 @@ interface PredictionPopupProps {
   vehicleYear?: number;
   vehicleMake?: string;
   vehicleModel?: string;
+  broadcastVideoId?: string;
+  broadcastTimestampStart?: number;
+  broadcastTimestampEnd?: number;
   onClose: () => void;
   onPredict: (side: 'over' | 'under', amount: number) => void;
 }
@@ -44,9 +48,13 @@ export function PredictionPopup({
   vehicleYear,
   vehicleMake,
   vehicleModel,
+  broadcastVideoId,
+  broadcastTimestampStart,
+  broadcastTimestampEnd,
   onClose,
   onPredict,
 }: PredictionPopupProps) {
+  const [showVideo, setShowVideo] = useState(false);
   const [history, setHistory] = useState<BetHistory[]>([]);
   const [selectedSide, setSelectedSide] = useState<'over' | 'under'>(userPrediction || 'over');
   const [amount, setAmount] = useState(userAmount ? userAmount / 100 : 10);
@@ -195,6 +203,38 @@ export function PredictionPopup({
             <X size={20} />
           </button>
         </div>
+
+        {/* Broadcast Moment */}
+        {broadcastVideoId && broadcastTimestampStart !== undefined && (
+          <div className="p-4 border-b border-gray-700">
+            {showVideo ? (
+              <MomentPlayer
+                videoId={broadcastVideoId}
+                timestampStart={broadcastTimestampStart}
+                timestampEnd={broadcastTimestampEnd}
+                autoplay
+              />
+            ) : (
+              <div className="flex items-center gap-3">
+                <MomentThumbnail
+                  videoId={broadcastVideoId}
+                  timestampStart={broadcastTimestampStart}
+                  onClick={() => setShowVideo(true)}
+                  className="w-24 h-16 flex-shrink-0"
+                />
+                <div className="flex-1">
+                  <div className="text-xs text-gray-500 mb-1">Auction Footage</div>
+                  <WatchMomentButton
+                    videoId={broadcastVideoId}
+                    timestampStart={broadcastTimestampStart}
+                    timestampEnd={broadcastTimestampEnd}
+                    variant="compact"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Chart */}
         <div className="p-4 border-b border-gray-700">
