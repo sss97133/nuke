@@ -98,9 +98,9 @@ async function performGuardrailedResearch(
   specName: string,
   specValue: string
 ): Promise<any> {
-  const openAiKey = Deno.env.get('OPEN_AI_API_KEY')
+  const openAiKey = Deno.env.get('OPENAI_API_KEY') || Deno.env.get('OPEN_AI_API_KEY')
   if (!openAiKey) {
-    throw new Error('OPEN_AI_API_KEY not configured')
+    throw new Error('OPENAI_API_KEY not configured')
   }
 
   // Build guardrailed prompt
