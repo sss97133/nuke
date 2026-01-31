@@ -1,0 +1,10 @@
+{
+  "name": "lofficiel-concierge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Luxury concierge chat interface",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve ."
+  }
+}
