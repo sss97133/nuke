@@ -5133,6 +5133,33 @@ const CursorHomepage: React.FC = () => {
                             hideClassic: false,
                             hiddenSources: []
                           }));
+                        } else if (searchLower.length >= 3) {
+                          // Dynamic source search - filter to sources matching the search text
+                          const matchingSourceKeys = sourcePogs.all
+                            .filter(p =>
+                              p.title.toLowerCase().includes(searchLower) ||
+                              p.domain.toLowerCase().includes(searchLower) ||
+                              p.key.toLowerCase().includes(searchLower)
+                            )
+                            .map(p => p.key);
+
+                          if (matchingSourceKeys.length > 0) {
+                            // Hide all sources that DON'T match
+                            const nonMatchingKeys = sourcePogs.all
+                              .filter(p => !matchingSourceKeys.includes(p.key))
+                              .map(p => p.key);
+
+                            setFilters((prev) => ({
+                              ...prev,
+                              hideDealerListings: !matchingSourceKeys.some(k => k.includes('dealer')),
+                              hideCraigslist: !matchingSourceKeys.includes('craigslist'),
+                              hideDealerSites: !matchingSourceKeys.some(k => k.includes('dealer')),
+                              hideKsl: !matchingSourceKeys.includes('ksl'),
+                              hideBat: !matchingSourceKeys.includes('bat'),
+                              hideClassic: !matchingSourceKeys.includes('classic'),
+                              hiddenSources: nonMatchingKeys
+                            }));
+                          }
                         }
                       }}
                       style={{
