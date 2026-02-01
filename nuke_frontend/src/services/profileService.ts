@@ -41,12 +41,12 @@ export class ProfileService {
       ] = await Promise.all([
         supabase.from('profile_completion').select('*').eq('user_id', userId).single(),
         supabase.from('profile_stats').select('*').eq('user_id', userId).single(),
-        // Get recent timeline events (last 365 days) - OPTIMIZED with index
-        supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).gte('event_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]).order('event_date', { ascending: false }).limit(1000),
-        // Get recent images (last 365 days) - OPTIMIZED with index  
-        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).gte('taken_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()).order('taken_at', { ascending: false }).limit(2000),
-        // Get recent business events (last 365 days) - OPTIMIZED with index
-        supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).gte('event_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]).order('event_date', { ascending: false }).limit(1000)
+        // Get ALL timeline events - no date filter, user has historical data going back years
+        supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).order('event_date', { ascending: false }).limit(5000),
+        // Get ALL images - no date filter for full contribution history
+        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('taken_at', { ascending: false }).limit(5000),
+        // Get ALL business events - no date filter
+        supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).order('event_date', { ascending: false }).limit(5000)
       ]);
       
       // Skip achievements, activity, verifications (not displayed on optimized profile)
