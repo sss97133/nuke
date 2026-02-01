@@ -1,368 +1,332 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+/**
+ * DOCUMENT INTELLIGENCE PIPELINE
+ *
+ * Analyzes vehicle documents (receipts, invoices, service records) using vision AI.
+ * Extracts structured data and populates service_records table.
+ *
+ * POST /functions/v1/analyze-vehicle-documents
+ * {
+ *   "vehicle_id": "uuid",
+ *   "document_ids": ["uuid", ...],  // optional - specific docs, otherwise all unprocessed
+ *   "batch_size": 10                // optional - limit per run (default 10)
+ * }
+ *
+ * Returns extracted service records and processing stats.
+ */
 
-const corsHeaders: Record<string, string> = {
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Anthropic from "npm:@anthropic-ai/sdk@0.39.0";
+
+const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const isUuid = (s: string) =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+interface DocumentInput {
+  vehicle_id: string;
+  document_ids?: string[];
+  batch_size?: number;
+}
 
-const allowedCategories = new Set([
-  "audio",
-  "brakes",
-  "consumables",
-  "cooling",
-  "electrical",
-  "engine",
-  "exhaust",
-  "exterior",
-  "fee",
-  "fuel_system",
-  "hardware",
-  "hvac",
-  "interior",
-  "labor",
-  "lighting",
-  "maintenance",
-  "paint",
-  "safety",
-  "shipping",
-  "storage",
-  "suspension",
-  "tax",
-  "tools",
-  "transmission",
-]);
+interface ExtractedServiceRecord {
+  service_date: string | null;
+  mileage: number | null;
+  shop_name: string | null;
+  shop_location: string | null;
+  work_performed: string;
+  cost: number | null;
+  parts_replaced: string[];
+  service_type: string;
+  confidence_score: number;
+}
 
-const autoCategory = (desc?: string): string | null => {
-  const d = (desc || "").toLowerCase();
-  if (/labor|install|installation|service|hour|hrs\b/.test(d)) return "labor";
-  if (/engine|motor|intake|radiator|coolant|filter|spark/.test(d)) return "engine";
-  if (/brake|pad|rotor|caliper|master/.test(d)) return "brakes";
-  if (/suspension|shock|spring|coilover|strut/.test(d)) return "suspension";
-  if (/transmission|clutch|gear|drivetrain/.test(d)) return "transmission";
-  if (/tire|wheel|rim/.test(d)) return "tools";
-  if (/body|panel|fender|hood|bumper|paint|wrap/.test(d)) return "paint";
-  if (/interior|seat|trim|dash|carpet|stereo/.test(d)) return "interior";
-  if (/electrical|wiring|harness|battery|alternator/.test(d)) return "electrical";
-  if (/fuel|gas|tank|pump|injector/.test(d)) return "fuel_system";
-  if (/exhaust|muffler|pipe|header/.test(d)) return "exhaust";
-  if (/cooling|radiator|thermostat|water\s*pump/.test(d)) return "cooling";
-  if (/hvac|heating|air\s*conditioning|\bac\b|climate/.test(d)) return "hvac";
-  if (/light|bulb|led|halogen/.test(d)) return "lighting";
-  if (/audio|speaker|radio|head\s*unit/.test(d)) return "audio";
-  if (/safety|airbag|seatbelt|sensor/.test(d)) return "safety";
-  if (/maintenance|oil|fluid/.test(d)) return "maintenance";
-  if (/tax\b|taxes\b/.test(d)) return "tax";
-  if (/fee\b|fees\b|charge\b|charges\b/.test(d)) return "fee";
-  if (/shipping|freight|delivery/.test(d)) return "shipping";
-  if (/storage\b/.test(d)) return "storage";
-  return null;
-};
+// Well-structured prompt explaining the PROBLEM and expected output
+const RECEIPT_ANALYSIS_PROMPT = `You are a document intelligence system specialized in analyzing automotive service receipts and invoices.
 
-const normalizeCategory = (raw: unknown, desc?: string): string | null => {
-  const r = typeof raw === "string" ? raw.toLowerCase().trim() : "";
-  if (r && allowedCategories.has(r)) return r;
-  const inferred = autoCategory(desc);
-  if (inferred && allowedCategories.has(inferred)) return inferred;
-  return null;
-};
+## YOUR TASK
+Analyze this receipt/invoice image and extract structured service record data. This data will be used to build a comprehensive maintenance history for the vehicle.
+
+## CONTEXT
+- This is a receipt from automotive work (repair, maintenance, parts, restoration)
+- The vehicle owner needs accurate records for: resale value documentation, maintenance tracking, and cost analysis
+- Extract ALL relevant information visible in the document
+
+## EXTRACTION REQUIREMENTS
+
+Extract the following fields. Use null for fields you cannot determine with confidence:
+
+1. **service_date**: When was the work done? Format: YYYY-MM-DD
+2. **mileage**: Vehicle mileage at time of service (integer, no commas)
+3. **shop_name**: Name of the business/shop/vendor
+4. **shop_location**: City, State or full address if visible
+5. **work_performed**: Detailed description of ALL work done. Be thorough - list each service item.
+6. **cost**: Total amount paid (number only, no $ or commas). Include tax if shown as part of total.
+7. **parts_replaced**: Array of specific parts mentioned (e.g., ["oil filter", "brake pads", "spark plugs"])
+8. **service_type**: Categorize as ONE of:
+   - "maintenance" (oil changes, fluid services, filters, tune-ups)
+   - "repair" (fixing broken/worn components)
+   - "restoration" (rebuild, refinish, restore to original)
+   - "modification" (upgrades, aftermarket parts, custom work)
+   - "inspection" (safety inspection, pre-purchase inspection)
+   - "parts_purchase" (parts only, no labor)
+   - "other"
+9. **confidence_score**: How confident are you in this extraction? (0.0 to 1.0)
+   - 1.0 = crystal clear receipt, all fields readable
+   - 0.7 = most fields clear, some inference needed
+   - 0.5 = partial information, some guessing
+   - Below 0.5 = poor quality, significant uncertainty
+
+## OUTPUT FORMAT
+Respond with ONLY valid JSON, no markdown or explanation:
+{
+  "service_date": "YYYY-MM-DD" or null,
+  "mileage": number or null,
+  "shop_name": "string" or null,
+  "shop_location": "string" or null,
+  "work_performed": "detailed description of all work",
+  "cost": number or null,
+  "parts_replaced": ["part1", "part2"] or [],
+  "service_type": "maintenance|repair|restoration|modification|inspection|parts_purchase|other",
+  "confidence_score": 0.0-1.0,
+  "extraction_notes": "any relevant notes about what you found or couldn't read"
+}
+
+## IMPORTANT
+- If the image is NOT a receipt/invoice (wrong document type), return: {"error": "not_a_receipt", "detected_type": "what it actually is"}
+- If the image is unreadable/too blurry, return: {"error": "unreadable", "reason": "description"}
+- Be precise with costs - don't guess if numbers aren't clear
+- For parts_replaced, list actual parts not services (e.g., "oil filter" not "oil change")`;
+
+async function analyzeDocument(
+  anthropic: Anthropic,
+  imageUrl: string
+): Promise<ExtractedServiceRecord | { error: string; [key: string]: any }> {
+  try {
+    // Fetch the image and convert to base64
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      return { error: "fetch_failed", reason: `HTTP ${imageResponse.status}` };
+    }
+
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = btoa(
+      new Uint8Array(imageBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+
+    // Determine media type
+    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+    const mediaType = contentType.includes("png") ? "image/png" :
+                      contentType.includes("webp") ? "image/webp" :
+                      contentType.includes("gif") ? "image/gif" : "image/jpeg";
+
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1500,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: mediaType,
+              data: base64Image,
+            },
+          },
+          {
+            type: "text",
+            text: RECEIPT_ANALYSIS_PROMPT
+          }
+        ]
+      }]
+    });
+
+    const content = response.content[0];
+    if (content.type === "text") {
+      // Extract JSON from response
+      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+    }
+
+    return { error: "parse_failed", reason: "Could not extract JSON from response" };
+  } catch (e: any) {
+    return { error: "analysis_failed", reason: e.message };
+  }
+}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
-  const startedAt = Date.now();
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  );
+
+  const anthropic = new Anthropic({
+    apiKey: Deno.env.get("ANTHROPIC_API_KEY") ?? ""
+  });
 
   try {
-    const authHeader = req.headers.get("authorization") || "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const input: DocumentInput = await req.json();
 
-    const body: Record<string, unknown> = await req.json().catch(() => ({}));
-    const vehicleId = String(body.vehicleId || body.vehicle_id || "").trim();
-    const limitRaw = Number(body.limit ?? body.batch_size ?? 5);
-    const limit = Math.max(1, Math.min(Number.isFinite(limitRaw) ? limitRaw : 5, 15));
-    const dryRun = body.dry_run === true;
-    const retryFailed = body.retry_failed === true;
-
-    if (!isUuid(vehicleId)) {
-      return new Response(JSON.stringify({ success: false, error: "vehicleId must be a UUID" }), {
+    if (!input.vehicle_id) {
+      return new Response(JSON.stringify({ error: "vehicle_id required" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    if (!supabaseUrl || !serviceKey) throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+    const batchSize = input.batch_size || 10;
 
-    // Use service key for DB writes, but the request JWT for auth.getUser.
-    const supabase = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: userRes, error: userErr } = await supabase.auth.getUser();
-    const authedUserId = !userErr ? userRes?.user?.id || null : null;
-    if (!authedUserId) {
-      return new Response(JSON.stringify({ success: false, error: "Unable to resolve authenticated user" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Ownership gate
-    const { data: vehicle, error: vehicleErr } = await supabase
-      .from("vehicles")
-      .select("id,user_id,owner_id,uploaded_by")
-      .eq("id", vehicleId)
-      .maybeSingle();
-    if (vehicleErr) throw vehicleErr;
-    if (!vehicle) {
-      return new Response(JSON.stringify({ success: false, error: "Vehicle not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const owners = [vehicle.user_id, vehicle.owner_id, vehicle.uploaded_by].filter((x) => typeof x === "string") as string[];
-    if (!owners.includes(authedUserId)) {
-      return new Response(JSON.stringify({ success: false, error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Load vehicle documents (cap to avoid runaway)
-    const { data: docs, error: docsErr } = await supabase
+    // Fetch documents to process
+    let query = supabase
       .from("vehicle_documents")
-      .select("id,file_url,file_type,title,created_at")
-      .eq("vehicle_id", vehicleId)
-      .order("created_at", { ascending: true })
-      .limit(500);
-    if (docsErr) throw docsErr;
-    const docList: any[] = Array.isArray(docs) ? docs : [];
+      .select("id, file_url, file_type, document_type, title, vendor_name")
+      .eq("vehicle_id", input.vehicle_id)
+      .eq("document_type", "receipt")
+      .not("file_url", "is", null);
 
-    // Load existing receipts for these docs
-    const { data: existingReceipts, error: receiptsErr } = await supabase
-      .from("receipts")
-      .select("id,source_document_id,processing_status,updated_at,created_at")
-      .eq("source_document_table", "vehicle_documents")
-      .eq("scope_type", "vehicle")
-      .eq("scope_id", vehicleId)
-      .limit(2000);
-    if (receiptsErr) throw receiptsErr;
-    const receiptRows: any[] = Array.isArray(existingReceipts) ? existingReceipts : [];
-    const receiptByDocId = new Map<string, any>();
-    for (const r of receiptRows) {
-      if (r?.source_document_id) receiptByDocId.set(String(r.source_document_id), r);
+    // If specific document IDs provided, use those
+    if (input.document_ids?.length) {
+      query = query.in("id", input.document_ids);
+    } else {
+      // Only get unprocessed documents (vendor_name is null means not yet analyzed)
+      query = query.is("vendor_name", null);
     }
 
-    const remainingDocs = docList.filter((d) => {
-      const rec = receiptByDocId.get(String(d?.id || ""));
-      if (!rec) return true;
-      // If a receipt exists but is still stuck in "processing", treat it as incomplete and re-run.
-      // This unblocks cases where a previous worker crashed mid-flight.
-      if (String(rec.processing_status || "").toLowerCase() === "processing") return true;
-      if (retryFailed && String(rec.processing_status || "").toLowerCase() === "failed") return true;
-      return false;
-    });
+    const { data: documents, error: docsError } = await query.limit(batchSize);
 
-    const batchDocs = remainingDocs.slice(0, limit);
+    if (docsError) {
+      throw new Error(`Failed to fetch documents: ${docsError.message}`);
+    }
+
+    if (!documents?.length) {
+      // Check total documents for context
+      const { count } = await supabase
+        .from("vehicle_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("vehicle_id", input.vehicle_id)
+        .eq("document_type", "receipt");
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: count ? "All documents have been processed" : "No receipt documents found",
+        processed: 0,
+        service_records_created: 0,
+        total_receipts: count || 0
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Process each document
     const results: any[] = [];
-    let succeeded = 0;
-    let failed = 0;
+    let serviceRecordsCreated = 0;
+    let errors = 0;
 
-    for (const doc of batchDocs) {
-      const documentId = String(doc.id || "");
-      const fileUrl = typeof doc.file_url === "string" ? doc.file_url : "";
-      const mimeType = typeof doc.file_type === "string" && doc.file_type ? doc.file_type : "application/octet-stream";
+    for (const doc of documents) {
+      console.log(`Processing document ${doc.id}: ${doc.file_url}`);
 
-      if (!documentId || !fileUrl) {
-        failed++;
-        results.push({ document_id: documentId || null, status: "failed", error: "Missing document id or file_url" });
-        continue;
-      }
+      const extraction = await analyzeDocument(anthropic, doc.file_url);
 
-      if (dryRun) {
-        results.push({ document_id: documentId, status: "dry_run" });
-        continue;
-      }
-
-      let parsed: any = null;
-      let extractError: string | null = null;
-      try {
-        const resp = await fetch(`${supabaseUrl}/functions/v1/receipt-extract`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify({ url: fileUrl, mimeType }),
-        });
-        const text = await resp.text();
-        if (!resp.ok) throw new Error(`receipt-extract HTTP ${resp.status}: ${text}`);
-        parsed = text ? JSON.parse(text) : null;
-        if (parsed && typeof parsed === "object" && parsed.error) throw new Error(String(parsed.error));
-      } catch (e: any) {
-        extractError = e?.message || String(e);
-      }
-
-      // Create or update receipt row (so we don't retry forever)
-      const receiptPayload: Record<string, unknown> = {
-        user_id: authedUserId,
-        file_url: fileUrl,
-        file_name: typeof doc.title === "string" ? doc.title : null,
-        file_type: mimeType,
-        scope_type: "vehicle",
-        scope_id: vehicleId,
-        vehicle_id: vehicleId,
-        source_document_table: "vehicle_documents",
-        source_document_id: documentId,
-        created_by: authedUserId,
-        status: "processed",
-        // Align with DB functions (e.g. compute_vehicle_value) which treat 'parsed' as a valid parsed receipt state
-        processing_status: extractError ? "failed" : "parsed",
-        vendor_name: parsed?.vendor_name || null,
-        receipt_date: parsed?.receipt_date || null,
-        transaction_date: parsed?.receipt_date || null,
-        currency: parsed?.currency || "USD",
-        subtotal: parsed?.subtotal ?? null,
-        tax: parsed?.tax ?? null,
-        total: parsed?.total ?? null,
-        tax_amount: parsed?.tax ?? null,
-        total_amount: parsed?.total ?? null,
-        invoice_number: parsed?.invoice_number || null,
-        purchase_order: parsed?.purchase_order || null,
-        raw_json: parsed?.raw_json || parsed || null,
-        extraction_errors: extractError ? [extractError] : null,
-      };
-
-      const existing = receiptByDocId.get(documentId);
-      let receiptId: string | null = null;
-      try {
-        if (existing?.id) {
-          const { data: upd, error: updErr } = await supabase
-            .from("receipts")
-            .update({ ...receiptPayload, updated_at: new Date().toISOString() })
-            .eq("id", existing.id)
-            .select("id")
-            .single();
-          if (updErr) throw updErr;
-          receiptId = String(upd.id);
-
-          if (retryFailed) {
-            // Clear old items to avoid duplication
-            await supabase.from("receipt_items").delete().eq("receipt_id", receiptId);
-          }
-        } else {
-          const { data: ins, error: insErr } = await supabase
-            .from("receipts")
-            .insert(receiptPayload)
-            .select("id")
-            .single();
-          if (insErr) throw insErr;
-          receiptId = String(ins.id);
-          receiptByDocId.set(documentId, { id: receiptId, source_document_id: documentId, processing_status: receiptPayload.processing_status });
-        }
-      } catch (e: any) {
-        failed++;
-        results.push({ document_id: documentId, status: "failed", stage: "receipt_write", error: e?.message || String(e) });
-        continue;
-      }
-
-      // Insert receipt items (best-effort)
-      let itemCount = 0;
-      if (!extractError && receiptId && Array.isArray(parsed?.items) && parsed.items.length > 0) {
-        const confidence = typeof parsed?.confidence === "number" ? parsed.confidence : null;
-        const rows = parsed.items.map((it: any) => {
-          const desc = String(it?.description || "").trim() || "Line item";
-          const qty = typeof it?.quantity === "number" ? it.quantity : null;
-          const unit = typeof it?.unit_price === "number" ? it.unit_price : null;
-          const explicitTotal = typeof it?.total_price === "number" ? it.total_price : null;
-          const computedTotal = qty !== null && unit !== null ? qty * unit : null;
-          const lineTotal = explicitTotal ?? computedTotal ?? 0;
-          return {
-            receipt_id: receiptId,
-            vehicle_id: vehicleId,
-            description: desc,
-            part_number: it?.part_number ? String(it.part_number) : null,
-            sku: it?.vendor_sku ? String(it.vendor_sku) : null,
-            category: normalizeCategory(it?.category, desc),
-            quantity: qty,
-            unit_price: unit,
-            line_total: lineTotal,
-            extracted_by_ai: true,
-            confidence_score: confidence,
-          };
-        });
-
-        const { error: itemsErr } = await supabase.from("receipt_items").insert(rows as any);
-        if (itemsErr) {
-          failed++;
-          results.push({ document_id: documentId, receipt_id: receiptId, status: "failed", stage: "items_write", error: itemsErr.message });
-          continue;
-        }
-        itemCount = rows.length;
-      }
-
-      // Update vehicle_documents with quick ledger summary
-      try {
+      if ('error' in extraction) {
+        // Mark as processed with error by setting vendor_name to error indicator
         await supabase
           .from("vehicle_documents")
-          .update({
-            vendor_name: parsed?.vendor_name || null,
-            amount: typeof parsed?.total === "number" ? parsed.total : null,
-            currency: parsed?.currency || "USD",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", documentId);
-      } catch {
-        // ignore
+          .update({ vendor_name: `[ERROR: ${extraction.error}]` })
+          .eq("id", doc.id);
+
+        results.push({
+          document_id: doc.id,
+          status: "error",
+          error: extraction.error,
+          details: extraction
+        });
+        errors++;
+        continue;
       }
 
-      succeeded++;
+      // Valid extraction - create service record
+      const { data: serviceRecord, error: insertError } = await supabase
+        .from("service_records")
+        .insert({
+          vehicle_id: input.vehicle_id,
+          service_date: extraction.service_date,
+          mileage: extraction.mileage,
+          shop_name: extraction.shop_name,
+          shop_location: extraction.shop_location,
+          work_performed: extraction.work_performed,
+          cost: extraction.cost,
+          parts_replaced: extraction.parts_replaced,
+          service_type: extraction.service_type,
+          documentation_available: true,
+          source: `document:${doc.id}`,
+          confidence_score: extraction.confidence_score
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        results.push({
+          document_id: doc.id,
+          status: "insert_error",
+          error: insertError.message
+        });
+        errors++;
+        continue;
+      }
+
+      // Mark document as processed by updating extracted fields
+      await supabase
+        .from("vehicle_documents")
+        .update({
+          amount: extraction.cost,
+          vendor_name: extraction.shop_name || "[EXTRACTED]",
+          description: extraction.work_performed?.substring(0, 500)
+        })
+        .eq("id", doc.id);
+
       results.push({
-        document_id: documentId,
-        receipt_id: receiptId,
-        status: extractError ? "failed" : "processed",
-        items: itemCount,
-        error: extractError,
+        document_id: doc.id,
+        status: "success",
+        service_record_id: serviceRecord.id,
+        extraction: {
+          service_date: extraction.service_date,
+          shop_name: extraction.shop_name,
+          cost: extraction.cost,
+          service_type: extraction.service_type,
+          confidence: extraction.confidence_score
+        }
       });
-      if (extractError) failed++;
+      serviceRecordsCreated++;
     }
 
-    return new Response(
-      JSON.stringify(
-        {
-          success: true,
-          vehicle_id: vehicleId,
-          total_docs: docList.length,
-          existing_receipts: receiptRows.length,
-          processed_in_batch: batchDocs.length,
-          succeeded,
-          failed,
-          remaining: Math.max(0, remainingDocs.length - batchDocs.length),
-          duration_ms: Date.now() - startedAt,
-          results,
-        },
-        null,
-        2,
-      ),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    // Get remaining unprocessed count
+    const { count: remainingCount } = await supabase
+      .from("vehicle_documents")
+      .select("id", { count: "exact", head: true })
+      .eq("vehicle_id", input.vehicle_id)
+      .eq("document_type", "receipt")
+      .is("vendor_name", null);
+
+    return new Response(JSON.stringify({
+      success: true,
+      vehicle_id: input.vehicle_id,
+      processed: documents.length,
+      service_records_created: serviceRecordsCreated,
+      errors,
+      remaining_documents: remainingCount || 0,
+      results
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   } catch (e: any) {
-    return new Response(JSON.stringify({ success: false, error: e?.message || String(e) }), {
+    console.error("Error:", e);
+    return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });
-
