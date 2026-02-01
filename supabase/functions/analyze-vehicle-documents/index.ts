@@ -34,69 +34,104 @@ interface ExtractedServiceRecord {
   mileage: number | null;
   shop_name: string | null;
   shop_location: string | null;
+  shop_phone: string | null;
+  shop_email: string | null;
   work_performed: string;
   cost: number | null;
   parts_replaced: string[];
   service_type: string;
   confidence_score: number;
+  // New detailed fields
+  invoice_number: string | null;
+  labor_hours: number | null;
+  labor_rate: number | null;
+  labor_cost: number | null;
+  parts_cost: number | null;
+  tax_amount: number | null;
+  subtotal: number | null;
+  payment_method: string | null;
+  technician_name: string | null;
+  warranty_info: string | null;
 }
 
 // Well-structured prompt explaining the PROBLEM and expected output
 const RECEIPT_ANALYSIS_PROMPT = `You are a document intelligence system specialized in analyzing automotive service receipts and invoices.
 
 ## YOUR TASK
-Analyze this receipt/invoice image and extract structured service record data. This data will be used to build a comprehensive maintenance history for the vehicle.
+Analyze this receipt/invoice image and extract MAXIMUM structured data. This builds a comprehensive maintenance history for vehicle valuation and documentation.
 
 ## CONTEXT
 - This is a receipt from automotive work (repair, maintenance, parts, restoration)
-- The vehicle owner needs accurate records for: resale value documentation, maintenance tracking, and cost analysis
-- Extract ALL relevant information visible in the document
+- The vehicle owner needs accurate records for: resale value, maintenance tracking, cost analysis, warranty claims
+- Extract EVERY piece of information visible - be exhaustive
 
 ## EXTRACTION REQUIREMENTS
 
-Extract the following fields. Use null for fields you cannot determine with confidence:
+Extract ALL of the following. Use null for fields not visible or unclear:
 
+### Basic Info
 1. **service_date**: When was the work done? Format: YYYY-MM-DD
-2. **mileage**: Vehicle mileage at time of service (integer, no commas)
-3. **shop_name**: Name of the business/shop/vendor
-4. **shop_location**: City, State or full address if visible
-5. **work_performed**: Detailed description of ALL work done. Be thorough - list each service item.
-6. **cost**: Total amount paid (number only, no $ or commas). Include tax if shown as part of total.
-7. **parts_replaced**: Array of specific parts mentioned (e.g., ["oil filter", "brake pads", "spark plugs"])
-8. **service_type**: Categorize as ONE of:
-   - "maintenance" (oil changes, fluid services, filters, tune-ups)
-   - "repair" (fixing broken/worn components)
-   - "restoration" (rebuild, refinish, restore to original)
-   - "modification" (upgrades, aftermarket parts, custom work)
-   - "inspection" (safety inspection, pre-purchase inspection)
-   - "parts_purchase" (parts only, no labor)
-   - "other"
-9. **confidence_score**: How confident are you in this extraction? (0.0 to 1.0)
-   - 1.0 = crystal clear receipt, all fields readable
-   - 0.7 = most fields clear, some inference needed
-   - 0.5 = partial information, some guessing
-   - Below 0.5 = poor quality, significant uncertainty
+2. **mileage**: Vehicle mileage/odometer at time of service (integer)
+3. **invoice_number**: Receipt/invoice/work order number
+
+### Shop/Vendor Info
+4. **shop_name**: Business name
+5. **shop_location**: Full address or City, State
+6. **shop_phone**: Phone number if visible
+7. **shop_email**: Email if visible
+8. **technician_name**: Name of mechanic/technician if listed
+
+### Work Details
+9. **work_performed**: Detailed description of ALL work. List each line item.
+10. **parts_replaced**: Array of specific parts (e.g., ["oil filter", "brake pads"])
+11. **service_type**: One of: maintenance, repair, restoration, modification, inspection, parts_purchase, other
+
+### Cost Breakdown
+12. **parts_cost**: Parts/materials subtotal (number, no $)
+13. **labor_hours**: Total labor hours billed
+14. **labor_rate**: Hourly labor rate if shown
+15. **labor_cost**: Labor subtotal (number, no $)
+16. **subtotal**: Before tax total
+17. **tax_amount**: Tax amount (number, no $)
+18. **cost**: Final total amount paid (number, no $)
+19. **payment_method**: cash, credit, check, etc. if shown
+
+### Warranty & Notes
+20. **warranty_info**: Any warranty terms, guarantee period, or coverage notes
+21. **confidence_score**: Your confidence 0.0-1.0
 
 ## OUTPUT FORMAT
-Respond with ONLY valid JSON, no markdown or explanation:
+Respond with ONLY valid JSON, no markdown:
 {
   "service_date": "YYYY-MM-DD" or null,
   "mileage": number or null,
+  "invoice_number": "string" or null,
   "shop_name": "string" or null,
   "shop_location": "string" or null,
-  "work_performed": "detailed description of all work",
-  "cost": number or null,
+  "shop_phone": "string" or null,
+  "shop_email": "string" or null,
+  "technician_name": "string" or null,
+  "work_performed": "detailed description",
   "parts_replaced": ["part1", "part2"] or [],
   "service_type": "maintenance|repair|restoration|modification|inspection|parts_purchase|other",
+  "parts_cost": number or null,
+  "labor_hours": number or null,
+  "labor_rate": number or null,
+  "labor_cost": number or null,
+  "subtotal": number or null,
+  "tax_amount": number or null,
+  "cost": number or null,
+  "payment_method": "string" or null,
+  "warranty_info": "string" or null,
   "confidence_score": 0.0-1.0,
-  "extraction_notes": "any relevant notes about what you found or couldn't read"
+  "extraction_notes": "any relevant notes"
 }
 
 ## IMPORTANT
-- If the image is NOT a receipt/invoice (wrong document type), return: {"error": "not_a_receipt", "detected_type": "what it actually is"}
-- If the image is unreadable/too blurry, return: {"error": "unreadable", "reason": "description"}
-- Be precise with costs - don't guess if numbers aren't clear
-- For parts_replaced, list actual parts not services (e.g., "oil filter" not "oil change")`;
+- If NOT a receipt/invoice: {"error": "not_a_receipt", "detected_type": "what it is"}
+- If unreadable: {"error": "unreadable", "reason": "description"}
+- Be precise with numbers - don't guess
+- Capture EVERYTHING visible - this is for permanent vehicle records`;
 
 async function analyzeDocument(
   anthropic: Anthropic,
@@ -279,6 +314,55 @@ serve(async (req) => {
         continue;
       }
 
+      // Create timeline event with full extracted data
+      const eventType = extraction.service_type === 'maintenance' ? 'maintenance' :
+                        extraction.service_type === 'repair' ? 'repair' :
+                        extraction.service_type === 'modification' ? 'modification' : 'service';
+
+      // Create timeline event - ignore trigger errors
+      try {
+        await supabase
+        .from("timeline_events")
+        .insert({
+          vehicle_id: input.vehicle_id,
+          event_type: eventType,
+          source: 'receipt_extraction',
+          source_type: 'receipt',
+          title: `${extraction.shop_name || 'Service'} - ${extraction.service_type || 'service'}`,
+          description: extraction.work_performed,
+          event_date: extraction.service_date || new Date().toISOString().split('T')[0],
+          service_provider_name: extraction.shop_name,
+          service_provider_type: 'independent_shop',
+          location_name: extraction.shop_location,
+          cost_amount: extraction.cost,
+          mileage_at_event: extraction.mileage,
+          parts_mentioned: extraction.parts_replaced,
+          invoice_number: extraction.invoice_number,
+          labor_hours: extraction.labor_hours,
+          warranty_info: extraction.warranty_info ? { terms: extraction.warranty_info } : null,
+          receipt_data: {
+            invoice_number: extraction.invoice_number,
+            labor_hours: extraction.labor_hours,
+            labor_rate: extraction.labor_rate,
+            labor_cost: extraction.labor_cost,
+            parts_cost: extraction.parts_cost,
+            subtotal: extraction.subtotal,
+            tax_amount: extraction.tax_amount,
+            payment_method: extraction.payment_method,
+            technician_name: extraction.technician_name,
+            shop_phone: extraction.shop_phone,
+            shop_email: extraction.shop_email,
+            warranty_info: extraction.warranty_info
+          },
+          confidence_score: Math.round((extraction.confidence_score || 0.7) * 100),
+          data_source: 'ai_extraction',
+          event_category: 'maintenance'
+        });
+      } catch (timelineError) {
+        console.log('Timeline event creation failed (trigger issue):', timelineError);
+        // Continue anyway - service record was created
+      }
+
       // Mark document as processed by updating extracted fields
       await supabase
         .from("vehicle_documents")
@@ -298,6 +382,9 @@ serve(async (req) => {
           shop_name: extraction.shop_name,
           cost: extraction.cost,
           service_type: extraction.service_type,
+          invoice_number: extraction.invoice_number,
+          labor_hours: extraction.labor_hours,
+          tax_amount: extraction.tax_amount,
           confidence: extraction.confidence_score
         }
       });
