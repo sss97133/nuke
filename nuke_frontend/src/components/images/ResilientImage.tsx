@@ -1,4 +1,5 @@
 import React from 'react';
+import { optimizeImageUrl, type ImageSize } from '../../lib/imageOptimizer';
 
 type ObjectFit = 'cover' | 'contain';
 
@@ -15,14 +16,18 @@ export interface ResilientImageProps {
   objectFit?: ObjectFit;
   placeholderSrc?: string;
   placeholderOpacity?: number;
+  /** Image optimization size. Defaults to 'small' for grid display. Set to 'full' to disable optimization. */
+  optimizeSize?: ImageSize;
 }
 
-function normalizeSources(sources: Array<string | null | undefined>): string[] {
+function normalizeSources(sources: Array<string | null | undefined>, size: ImageSize): string[] {
   const out: string[] = [];
   for (const s of sources) {
     const v = typeof s === 'string' ? s.trim() : '';
     if (!v) continue;
-    if (!out.includes(v)) out.push(v);
+    // Apply CDN optimization (BaT ?w=, Supabase render API, etc.)
+    const optimized = optimizeImageUrl(v, size) || v;
+    if (!out.includes(optimized)) out.push(optimized);
   }
   return out;
 }
@@ -39,8 +44,9 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
   objectFit = 'contain',
   placeholderSrc = DEFAULT_PLACEHOLDER,
   placeholderOpacity = 0.3,
+  optimizeSize = 'small', // Default to small (300px) for grid cards
 }) => {
-  const sourceList = React.useMemo(() => normalizeSources(sources), [sources]);
+  const sourceList = React.useMemo(() => normalizeSources(sources, optimizeSize), [sources, optimizeSize]);
   const [idx, setIdx] = React.useState(0);
   const [failed, setFailed] = React.useState(false);
 
