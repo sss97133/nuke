@@ -4569,38 +4569,22 @@ const CursorHomepage: React.FC = () => {
                       toggleShowSoldOnly();
                     }}
                     title={filters.showSoldOnly
-                      ? `Showing ${salesByPeriod.count} sold vehicles (${salesByPeriod.label}). Click to ${salesPeriod === 'all' ? 'exit sold view' : 'change period'}.`
-                      : `${salesByPeriod.count} vehicles sold ${salesByPeriod.label === 'all' ? 'all time' : salesByPeriod.label === 'today' ? 'today' : 'in ' + salesByPeriod.label}. Click to filter grid to sold vehicles.`
+                      ? `Viewing ${salesByPeriod.count} sold (${salesByPeriod.label}). Click to change period.`
+                      : `${salesByPeriod.count} sold ${salesByPeriod.label}. Click to filter.`
                     }
                     style={{
-                      padding: '1px 6px',
-                      borderRadius: '999px',
-                      border: filters.showSoldOnly
-                        ? '1px solid rgba(168,85,247,0.55)'
-                        : '1px solid rgba(168,85,247,0.25)',
-                      background: filters.showSoldOnly
-                        ? 'rgba(168,85,247,0.22)'
-                        : 'rgba(168,85,247,0.10)',
-                      color: '#a855f7',
-                      fontSize: '7pt',
-                      fontWeight: 700,
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      margin: 0,
                       cursor: 'pointer',
                       fontFamily: '"MS Sans Serif", sans-serif',
-                      flex: '0 0 auto',
-                      lineHeight: 1.3,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = filters.showSoldOnly
-                        ? 'rgba(168,85,247,0.30)'
-                        : 'rgba(168,85,247,0.18)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = filters.showSoldOnly
-                        ? 'rgba(168,85,247,0.22)'
-                        : 'rgba(168,85,247,0.10)';
+                      fontSize: '7pt',
+                      color: filters.showSoldOnly ? '#7c3aed' : 'var(--text-muted)',
+                      fontWeight: filters.showSoldOnly ? 700 : 400,
                     }}
                   >
-                    {salesByPeriod.count.toLocaleString()} sold {salesByPeriod.label} · {formatCurrency(salesByPeriod.volume)}
+                    {salesByPeriod.count.toLocaleString()} sold {salesByPeriod.label}
                   </button>
                 </>
               )}
@@ -4986,37 +4970,22 @@ const CursorHomepage: React.FC = () => {
                       toggleShowSoldOnly();
                     }}
                     title={filters.showSoldOnly
-                      ? `Showing ${salesByPeriod.count} sold vehicles (${salesByPeriod.label}). Click to ${salesPeriod === 'all' ? 'exit sold view' : 'change period'}.`
-                      : `${salesByPeriod.count} vehicles sold ${salesByPeriod.label === 'all' ? 'all time' : salesByPeriod.label === 'today' ? 'today' : 'in ' + salesByPeriod.label}. Click to filter grid to sold vehicles.`
+                      ? `Viewing ${salesByPeriod.count} sold (${salesByPeriod.label}). Click to change period.`
+                      : `${salesByPeriod.count} sold ${salesByPeriod.label}. Click to filter.`
                     }
                     style={{
-                      padding: '2px 8px',
-                      borderRadius: '999px',
-                      border: filters.showSoldOnly
-                        ? '1px solid rgba(168,85,247,0.6)'
-                        : '1px solid rgba(168,85,247,0.35)',
-                      background: filters.showSoldOnly
-                        ? 'rgba(168,85,247,0.25)'
-                        : 'rgba(168,85,247,0.12)',
-                      color: '#a855f7',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      margin: 0,
+                      cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '7pt',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      margin: 0,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = filters.showSoldOnly
-                        ? 'rgba(168,85,247,0.35)'
-                        : 'rgba(168,85,247,0.22)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = filters.showSoldOnly
-                        ? 'rgba(168,85,247,0.25)'
-                        : 'rgba(168,85,247,0.12)';
+                      color: filters.showSoldOnly ? '#7c3aed' : 'var(--text)',
+                      fontWeight: filters.showSoldOnly ? 700 : 400,
                     }}
                   >
-                    <b>{salesByPeriod.count.toLocaleString()}</b> sold {salesByPeriod.label} · <b>{formatCurrency(salesByPeriod.volume)}</b>
+                    <b>{salesByPeriod.count.toLocaleString()}</b> sold {salesByPeriod.label}
                   </button>
                 </>
               )}
