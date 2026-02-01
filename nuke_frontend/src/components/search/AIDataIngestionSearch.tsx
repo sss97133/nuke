@@ -273,19 +273,19 @@ export default function AIDataIngestionSearch() {
   const isWiringIntent = (text: string) => {
     const t = (text || '').toLowerCase();
     if (!t) return false;
-    // Keep this permissive; chat will ask clarifying questions anyway.
+    // Wiring-specific keywords - be precise to avoid false positives.
+    // "can bus" is wiring, but "can I see" is not.
     return (
       t.includes('wiring') ||
-      t.includes('harness') ||
+      /\bharness\b/.test(t) ||  // "harness" but not "harness racing"
       t.includes('pdm') ||
       t.includes('ecu') ||
       t.includes('pinout') ||
       t.includes('bulkhead') ||
       t.includes('motec') ||
-      t.includes('loom') ||
-      t.includes('awg') ||
-      t.includes('can ') ||
-      t.includes('canbus') ||
+      /\bloom\b/.test(t) ||     // "loom" but not "looming"
+      /\bawg\b/.test(t) ||      // wire gauge
+      /\bcan\s*bus\b/.test(t) ||  // "can bus" or "canbus" - NOT "can I"
       t.includes('can-bus')
     );
   };
@@ -294,6 +294,22 @@ export default function AIDataIngestionSearch() {
     const t = (text || '').trim().toLowerCase();
     if (!t) return false;
 
+    // URL or VIN? Not a search query.
+    if (normalizeUrlInput(t)) return false;
+    if (/^[A-HJ-NPR-Z0-9]{17}$/i.test(t)) return false;
+
+    // Very short (1-2 chars)? Probably not useful for search.
+    if (t.length < 2) return false;
+
+    // SIMPLE HEURISTIC: If it's short text without special structure, it's a search.
+    // Most people typing "porsche", "c10", "mustang" want to search.
+    // Only route away from search for clear non-search patterns:
+    // - URLs (handled above)
+    // - VINs (handled above)
+    // - Very long freeform text (>200 chars) might be data to extract
+    if (t.length <= 200) return true;
+
+    // Legacy patterns still work for longer text
     if (t.includes('?')) return true;
     if (/^(what|why|how|when|where|who|which|are|is|do|does|did|can|should|could|would)\b/i.test(t)) return true;
     if (/\b(show|find|search|look|see|browse|list)\b/i.test(t)) return true;
