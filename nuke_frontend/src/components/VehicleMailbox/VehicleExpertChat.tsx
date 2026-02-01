@@ -7,8 +7,12 @@ import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react
 import { supabase } from '../../lib/supabase'
 import { MessageCircle, Send, Loader } from 'lucide-react'
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader'
-import { ModelHarnessAnnotator } from '../wiring/ModelHarnessAnnotator'
 import ErrorBoundary from '../ErrorBoundary'
+
+// Lazy load the 3D model annotator (2.7MB with Three.js) - only loads when user opens a 3D model
+const ModelHarnessAnnotator = React.lazy(() =>
+  import('../wiring/ModelHarnessAnnotator').then(m => ({ default: m.ModelHarnessAnnotator }))
+)
 
 interface Message {
   id: string

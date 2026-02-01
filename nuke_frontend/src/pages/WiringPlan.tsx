@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, Suspense } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ModelHarnessAnnotator } from '../components/wiring/ModelHarnessAnnotator';
+
+// Lazy load the 3D model annotator (2.7MB with Three.js) - only loads when user visits this page
+const ModelHarnessAnnotator = React.lazy(() =>
+  import('../components/wiring/ModelHarnessAnnotator').then(m => ({ default: m.ModelHarnessAnnotator }))
+);
 
 type WiringResult = {
   success?: boolean;
@@ -155,7 +159,9 @@ export default function WiringPlan() {
 
       {vehicleId && (
         <div style={{ marginTop: '12px' }}>
-          <ModelHarnessAnnotator vehicleId={vehicleId} />
+          <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading 3D viewer...</div>}>
+            <ModelHarnessAnnotator vehicleId={vehicleId} />
+          </Suspense>
         </div>
       )}
 
