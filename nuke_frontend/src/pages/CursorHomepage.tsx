@@ -2165,24 +2165,53 @@ const CursorHomepage: React.FC = () => {
   });
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
 
-  // Load database-wide stats using server-side RPC (no row limits!)
+  // Load database-wide stats - try cached table first (instant), then RPCs as fallback
   const loadDatabaseStats = async () => {
     try {
       setDbStatsLoading(true);
 
-      // Try fast stats first (simple counts, no timeout issues)
+      // FIRST: Try cached stats table (instant read, ~200ms)
+      const { data: cachedStats, error: cacheError } = await supabase
+        .from('portfolio_stats_cache')
+        .select('*')
+        .eq('id', 'global')
+        .single();
+
+      if (!cacheError && cachedStats) {
+        console.log('Cached stats loaded instantly:', {
+          totalVehicles: cachedStats.total_vehicles,
+          totalValue: cachedStats.total_value,
+          source: 'portfolio_stats_cache table'
+        });
+
+        setDbStats(prev => ({
+          ...prev,
+          totalVehicles: Number(cachedStats.total_vehicles) || prev.totalVehicles,
+          totalValue: Number(cachedStats.total_value) || prev.totalValue,
+          salesCountToday: Number(cachedStats.sales_count_today) || prev.salesCountToday,
+          salesVolume: Number(cachedStats.sales_volume_today) || prev.salesVolume,
+          forSaleCount: Number(cachedStats.for_sale_count) || prev.forSaleCount,
+          activeAuctions: Number(cachedStats.active_auctions) || prev.activeAuctions,
+          vehiclesAddedToday: Number(cachedStats.vehicles_added_today) || prev.vehiclesAddedToday,
+          valueRealizedTotal: Number(cachedStats.value_realized_total) || prev.valueRealizedTotal,
+          avgValue: cachedStats.total_vehicles > 0
+            ? Number(cachedStats.total_value) / Number(cachedStats.total_vehicles)
+            : prev.avgValue,
+        }));
+        setDbStatsLoading(false);
+        return; // Done - cache is authoritative
+      }
+
+      // FALLBACK: Try fast stats RPC (simple counts)
       const { data: fastStats, error: fastError } = await supabase.rpc('get_portfolio_stats_fast');
 
       if (!fastError && fastStats) {
-        // Fast stats only has core counts - PRESERVE existing detailed values (don't reset to 0)
         console.log('Fast stats loaded:', {
           totalVehicles: Number(fastStats.total_vehicles) || 0,
           forSaleCount: Number(fastStats.for_sale_count) || 0,
-          activeAuctions: Number(fastStats.active_auctions) || 0,
           source: 'get_portfolio_stats_fast RPC'
         });
 
-        // Merge fast stats with existing values (preserve totalValue, salesVolume, etc.)
         setDbStats(prev => ({
           ...prev,
           totalVehicles: Number(fastStats.total_vehicles) || prev.totalVehicles,
@@ -2193,7 +2222,7 @@ const CursorHomepage: React.FC = () => {
         }));
         setDbStatsLoading(false);
 
-        // Now try to get detailed values in the background (slower query)
+        // Try to get value in background
         supabase.rpc('calculate_portfolio_value_server').then(({ data: fullStats, error: fullError }) => {
           if (!fullError && fullStats) {
             setDbStats(prev => ({
@@ -2201,19 +2230,11 @@ const CursorHomepage: React.FC = () => {
               totalValue: Number(fullStats.total_value) || prev.totalValue,
               salesVolume: Number(fullStats.sales_volume_today) || prev.salesVolume,
               avgValue: Number(fullStats.avg_value) || prev.avgValue,
-              valueMarkTotal: Number(fullStats.value_mark_total) || prev.valueMarkTotal,
-              valueAskTotal: Number(fullStats.value_ask_total) || prev.valueAskTotal,
               valueRealizedTotal: Number(fullStats.value_realized_total) || prev.valueRealizedTotal,
-              valueCostTotal: Number(fullStats.value_cost_total) || prev.valueCostTotal,
-              valueImportedToday: Number(fullStats.value_imported_today) || prev.valueImportedToday,
-              valueImported24h: Number(fullStats.value_imported_24h) || prev.valueImported24h,
-              valueImported7d: Number(fullStats.value_imported_7d) || prev.valueImported7d,
             }));
             console.log('Full stats loaded in background');
           }
-        }).catch(() => {
-          // Ignore background error
-        });
+        }).catch(() => {});
 
         return;
       }
