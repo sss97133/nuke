@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { imageOptimizationService } from '../services/imageOptimizationService';
+import { optimizeImageUrl, type ImageSize } from '../lib/imageOptimizer';
 
 interface LazyImageProps {
   src: string;
@@ -33,14 +33,20 @@ const LazyImage: React.FC<LazyImageProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Determine which URL to use based on size and availability
-  const getOptimalUrl = () => {
-    const imageData = {
-      thumbnail_url: thumbnailUrl,
-      medium_url: mediumUrl,
-      large_url: largeUrl,
-      image_url: src
+  const getOptimalUrl = (): string => {
+    // Use pre-generated URLs if available
+    if (size === 'thumbnail' && thumbnailUrl) return thumbnailUrl;
+    if (size === 'medium' && mediumUrl) return mediumUrl;
+    if (size === 'large' && largeUrl) return largeUrl;
+
+    // Otherwise, optimize the source URL dynamically
+    const sizeMap: Record<string, ImageSize> = {
+      'thumbnail': 'thumbnail',
+      'medium': 'medium',
+      'large': 'large',
+      'full': 'full'
     };
-    return imageOptimizationService.getOptimizedUrl(imageData, size);
+    return optimizeImageUrl(src, sizeMap[size] || 'medium') || src;
   };
 
   // Set up Intersection Observer
