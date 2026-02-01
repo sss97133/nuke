@@ -6,68 +6,83 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Human concierges - they review and confirm bookings
-const CONCIERGE_TEAM = [
-  { name: 'Jenny', phone: '+17029304818' },
-  { name: 'Philippe', phone: '+33673313030' },
-]
-
 // Message templates
 const MESSAGES = {
-  // To guest - deposit received
+  // To Telegram channel - new deposit
+  telegram_new_booking: (quote: any, items: any[]) => {
+    const itemList = items.length > 0
+      ? items.map(i => `• ${i.service_name || i.name} (${i.service_type})`).join('\n')
+      : '• Services to be confirmed'
+
+    return `🔔 *NEW DEPOSIT RECEIVED*
+
+👤 *Guest:* ${quote.guest_name || 'Guest'}
+📞 ${quote.guest_phone || 'No phone'}
+📧 ${quote.guest_email || 'No email'}
+
+💰 *Deposit:* $${(quote.deposit_amount || 0).toLocaleString()}
+💵 *Total:* $${(quote.total || 0).toLocaleString()}
+
+📅 *Dates:* ${quote.arrival_date || 'TBD'} → ${quote.departure_date || 'TBD'}
+👥 *Guests:* ${quote.guest_count || 'TBD'}
+
+*REQUESTED BOOKINGS:*
+${itemList}
+
+_Reply to confirm with partners_
+
+🔗 Quote #${(quote.id || '').slice(0, 8)}`
+  },
+
+  // Guest deposit confirmation
   guest_deposit_received: (quote: any) => `L'Officiel Concierge ◈
 
-Your deposit of $${quote.deposit_amount?.toLocaleString()} has been received.
+Your deposit of $${(quote.deposit_amount || 0).toLocaleString()} has been received.
 
-We're now confirming your bookings:
-${quote.request_summary}
-
+We're now confirming your bookings.
 Dates: ${quote.arrival_date} - ${quote.departure_date}
 
 Our team will confirm each booking shortly.`,
 
-  // To concierge team - new deposit, review needed
-  concierge_new_booking: (quote: any, items: any[]) => {
-    const itemList = items.map(i => `• ${i.service_name || i.name} (${i.service_type})`).join('\n')
-    return `🔔 NEW DEPOSIT RECEIVED
+  // Booking confirmed
+  telegram_booking_confirmed: (booking: any) =>
+    `✅ *CONFIRMED*: ${booking.service_name}\n📅 ${booking.booking_date}${booking.confirmation_number ? `\n🔖 Ref: ${booking.confirmation_number}` : ''}`,
+}
 
-Guest: ${quote.guest_name || 'Guest'}
-Phone: ${quote.guest_phone || 'Not provided'}
-Email: ${quote.guest_email || 'Not provided'}
+async function sendTelegram(message: string, parseMode: string = 'Markdown') {
+  const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
+  const chatId = Deno.env.get('TELEGRAM_CHANNEL_ID')
 
-Deposit: $${quote.deposit_amount?.toLocaleString()}
-Total: $${quote.total?.toLocaleString()}
+  if (!botToken || !chatId) {
+    console.log('Telegram not configured')
+    return { success: false, reason: 'not_configured' }
+  }
 
-Dates: ${quote.arrival_date} → ${quote.departure_date}
-Guests: ${quote.guest_count}
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: parseMode,
+        }),
+      }
+    )
 
-REQUESTED BOOKINGS:
-${itemList}
+    const data = await response.json()
 
-Reply CONFIRM to push bookings to partners.
-Reply HOLD to pause.
+    if (!data.ok) {
+      throw new Error(data.description || 'Telegram send failed')
+    }
 
-Quote #${quote.id.slice(0, 8)}`
-  },
-
-  // To guest - booking confirmed
-  guest_booking_confirmed: (quote: any, booking: any) => `L'Officiel Concierge ◈
-
-✓ Confirmed: ${booking.service_name}
-Date: ${booking.booking_date}
-${booking.confirmation_number ? `Ref: ${booking.confirmation_number}` : ''}
-
-Booked under: L'Officiel Concierge`,
-
-  // To guest - quote ready
-  guest_quote_ready: (quote: any) => `L'Officiel Concierge ◈
-
-Your personalized quote is ready!
-
-Total: $${quote.total?.toLocaleString()}
-Deposit (30%): $${quote.deposit_amount?.toLocaleString()}
-
-View & pay: https://lofficiel-concierge.vercel.app/quote/${quote.id}`,
+    return { success: true, message_id: data.result.message_id }
+  } catch (error: any) {
+    console.error('Telegram error:', error)
+    return { success: false, error: error.message }
+  }
 }
 
 async function sendSMS(to: string, message: string) {
@@ -76,10 +91,8 @@ async function sendSMS(to: string, message: string) {
   const fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
 
   if (!accountSid || !authToken || !fromNumber || accountSid.startsWith('your-')) {
-    console.log('Twilio not configured, logging message instead:')
-    console.log(`TO: ${to}`)
-    console.log(`MESSAGE: ${message}`)
-    return { success: false, reason: 'not_configured', logged: true }
+    console.log('Twilio not configured, skipping SMS')
+    return { success: false, reason: 'not_configured' }
   }
 
   const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
@@ -123,7 +136,16 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { quote_id, type, booking_id } = await req.json()
+    const { quote_id, type, booking_id, message } = await req.json()
+
+    // Handle direct message to channel
+    if (type === 'direct') {
+      const result = await sendTelegram(message, 'Markdown')
+      return new Response(
+        JSON.stringify(result),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Get quote
     const { data: quote } = await supabase
@@ -149,26 +171,16 @@ serve(async (req) => {
           .select('*')
           .eq('quote_id', quote_id)
 
-        // 1. Notify guest
+        // 1. Send to Telegram channel (primary)
+        const telegramMsg = MESSAGES.telegram_new_booking(quote, items || [])
+        results.telegram = await sendTelegram(telegramMsg)
+
+        // 2. Try SMS to guest if configured
         if (quote.guest_phone) {
-          const guestResult = await sendSMS(
+          results.guest_sms = await sendSMS(
             quote.guest_phone,
             MESSAGES.guest_deposit_received(quote)
           )
-          results.guest_sms = guestResult
-        }
-
-        // 2. Notify concierge team (Jenny & Philippe)
-        const conciergeMessage = MESSAGES.concierge_new_booking(quote, items || [])
-        results.concierge_sms = []
-
-        for (const concierge of CONCIERGE_TEAM) {
-          const result = await sendSMS(concierge.phone, conciergeMessage)
-          results.concierge_sms.push({
-            name: concierge.name,
-            phone: concierge.phone,
-            ...result,
-          })
         }
 
         // 3. Update quote status
@@ -182,20 +194,6 @@ serve(async (req) => {
           })
           .eq('id', quote_id)
 
-        // 4. Log for audit
-        await supabase
-          .from('concierge_activity_log')
-          .insert({
-            quote_id,
-            action: 'deposit_received',
-            details: {
-              amount: quote.deposit_amount,
-              guest_notified: !!quote.guest_phone,
-              concierge_notified: CONCIERGE_TEAM.map(c => c.name),
-            },
-          })
-          .catch(() => {}) // Ignore if table doesn't exist
-
         break
       }
 
@@ -206,37 +204,19 @@ serve(async (req) => {
           .eq('id', booking_id)
           .single()
 
-        if (quote.guest_phone && booking) {
-          results.guest_sms = await sendSMS(
-            quote.guest_phone,
-            MESSAGES.guest_booking_confirmed(quote, booking)
+        if (booking) {
+          results.telegram = await sendTelegram(
+            MESSAGES.telegram_booking_confirmed(booking)
           )
         }
         break
       }
 
-      case 'quote_ready': {
-        if (quote.guest_phone) {
-          results.guest_sms = await sendSMS(
-            quote.guest_phone,
-            MESSAGES.guest_quote_ready(quote)
-          )
-        }
-        break
-      }
-
-      case 'concierge_alert': {
-        // Direct alert to concierge team
-        const { message } = await req.json()
-        results.concierge_sms = []
-
-        for (const concierge of CONCIERGE_TEAM) {
-          const result = await sendSMS(concierge.phone, message)
-          results.concierge_sms.push({
-            name: concierge.name,
-            ...result,
-          })
-        }
+      case 'test': {
+        // Test message
+        results.telegram = await sendTelegram(
+          `🧪 *Test from L'Officiel Concierge*\n\nNotifications are working!\n\n_${new Date().toISOString()}_`
+        )
         break
       }
 
