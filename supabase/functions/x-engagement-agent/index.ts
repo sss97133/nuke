@@ -291,7 +291,7 @@ Return JSON only:
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'grok-3',
+            model: 'grok-4.1',
             messages: [
               { role: 'system', content: 'You generate engaging Twitter replies. Keep them short, authentic, and valuable. Return only valid JSON.' },
               { role: 'user', content: prompt }
@@ -365,7 +365,7 @@ Return JSON only:
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                model: 'grok-3',
+                model: 'grok-4.1',
                 messages: [
                   { role: 'system', content: 'Generate a short, engaging reply (under 150 chars). Be authentic. Return only the reply text, no JSON.' },
                   { role: 'user', content: `Reply to: "${post.text.substring(0, 200)}"` }
