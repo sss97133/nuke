@@ -57,6 +57,35 @@ tail -50 ~/.claude/debug/latest
 
 This is the default behavior. Just do it.
 
+---
+
+## SCHEMA DISCOVERY PRINCIPLE (CRITICAL)
+
+**Never pre-define a schema before seeing the actual data.**
+
+Before building ANY extractor for a new document type or data source:
+
+1. **DISCOVERY FIRST**: Sample 20-50 documents, enumerate ALL fields that exist
+2. **AGGREGATE**: Compile field catalog with frequencies
+3. **THEN DESIGN**: Build schema based on what actually exists
+4. **THEN EXTRACT**: Extract once with complete schema
+
+```
+❌ Wrong: Define schema → Extract → Miss fields → Re-extract
+✅ Right: Discover fields → Design schema → Extract once
+```
+
+**This applies to:**
+- New document types (receipts, invoices, titles)
+- New data sources (new auction platform, forum)
+- User-uploaded content (format varies)
+
+**Full documentation:** `docs/architecture/SCHEMA_DISCOVERY_PRINCIPLE.md`
+
+> "The data knows what it contains. Ask it before you assume."
+
+---
+
 ## Available Tools
 
 ### MCP Servers (USE THESE - you have direct access)
@@ -116,6 +145,8 @@ When user says "extract [URL]":
 1. **Check for existing extractor** in `/Users/skylar/nuke/supabase/functions/`
 2. **If exists**: Call via Supabase MCP or curl
 3. **If not**: Use **Firecrawl MCP** to scrape, then process with AI
+
+⚠️ **Building a NEW extractor?** Read SCHEMA DISCOVERY PRINCIPLE above first. Run field discovery before defining your extraction schema.
 
 ### Key Edge Functions
 
