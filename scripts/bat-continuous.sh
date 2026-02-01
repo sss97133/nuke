@@ -54,13 +54,22 @@ while true; do
     -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"Content-Type: application/json\" \
     -d '{\"url\":\"$URL\",\"save_to_db\":true}'" 2>/dev/null)
 
-  VID=$(echo "$RESULT" | jq -r '.extracted.vehicle_id // empty')
-  
-  if [ -n "$VID" ] && [ "$VID" != "null" ]; then
-    dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
-      -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
-      -H \"Content-Type: application/json\" -d '{\"status\":\"complete\",\"vehicle_id\":\"$VID\"}'" > /dev/null 2>&1
-    ok=$((ok + 1))
+  # Check for success using grep (robust against control chars that break jq)
+  if echo "$RESULT" | grep -q '"success":true'; then
+    # Extract vehicle_id with grep (handles control chars)
+    VID=$(echo "$RESULT" | grep -o '"vehicle_id":"[^"]*"' | head -1 | sed 's/"vehicle_id":"//;s/"$//')
+    if [ -n "$VID" ]; then
+      dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
+        -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
+        -H \"Content-Type: application/json\" -d '{\"status\":\"complete\",\"vehicle_id\":\"$VID\"}'" > /dev/null 2>&1
+      ok=$((ok + 1))
+    else
+      # Success but no vehicle_id (rare edge case)
+      dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
+        -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
+        -H \"Content-Type: application/json\" -d '{\"status\":\"complete\"}'" > /dev/null 2>&1
+      ok=$((ok + 1))
+    fi
   else
     dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
       -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
