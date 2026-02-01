@@ -251,6 +251,7 @@ interface FilterState {
   addedTodayOnly: boolean; // Only vehicles created today
   forSale: boolean;
   hideSold: boolean;
+  showSoldOnly: boolean; // Filter to show ONLY sold vehicles (for sold stats view)
   privateParty: boolean; // Filter for private party listings
   dealer: boolean; // Filter for dealer listings
   // Source / dealer-ish filters
@@ -286,6 +287,7 @@ const DEFAULT_FILTERS: FilterState = {
   addedTodayOnly: false,
   forSale: false,
   hideSold: false,
+  showSoldOnly: false,
   privateParty: false,
   dealer: false,
   hideDealerListings: false,
@@ -604,6 +606,7 @@ const CursorHomepage: React.FC = () => {
       filters.addedTodayOnly ||
       filters.forSale ||
       filters.hideSold ||
+      filters.showSoldOnly ||
       filters.showPending ||
       filters.privateParty ||
       filters.dealer ||
@@ -1415,7 +1418,38 @@ const CursorHomepage: React.FC = () => {
         return !isSold;
       });
     }
-    
+
+    // Show ONLY sold vehicles (for sold stats view)
+    if (filters.showSoldOnly) {
+      const period = SALES_PERIODS.find(p => p.value === salesPeriod);
+      const cutoffDate = period && period.days !== null
+        ? new Date(Date.now() - period.days * 24 * 60 * 60 * 1000)
+        : null;
+
+      result = result.filter(v => {
+        const salePrice = Number((v as any).sale_price || 0) || 0;
+        if (salePrice < 500) return false; // Must have real sale price
+
+        const saleDateStr = (v as any).sale_date;
+        if (!saleDateStr) return false;
+
+        // Check if within time period
+        if (cutoffDate) {
+          const saleDate = new Date(saleDateStr);
+          if (isNaN(saleDate.getTime()) || saleDate < cutoffDate) return false;
+        }
+
+        return true;
+      });
+
+      // Sort by sale date (newest first) when showing sold
+      result.sort((a, b) => {
+        const aDate = new Date((a as any).sale_date || 0).getTime();
+        const bDate = new Date((b as any).sale_date || 0).getTime();
+        return bDate - aDate;
+      });
+    }
+
     // Private party filter - vehicles without organization_id or from private party sources
     if (filters.privateParty) {
       result = result.filter(v => {
@@ -1575,7 +1609,7 @@ const CursorHomepage: React.FC = () => {
     }
     
     setFilteredVehicles(result);
-  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, activeSources, domainToFilterKey, getDisplayPriceValue]);
+  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, activeSources, domainToFilterKey, getDisplayPriceValue, salesPeriod]);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
@@ -1597,6 +1631,7 @@ const CursorHomepage: React.FC = () => {
     if (filters.addedTodayOnly !== DEFAULT_FILTERS.addedTodayOnly) n++;
     if (filters.forSale !== DEFAULT_FILTERS.forSale) n++;
     if (filters.hideSold !== DEFAULT_FILTERS.hideSold) n++;
+    if (filters.showSoldOnly) n++;
     if (filters.privateParty !== DEFAULT_FILTERS.privateParty) n++;
     if (filters.dealer !== DEFAULT_FILTERS.dealer) n++;
     if (filters.hideDealerListings !== DEFAULT_FILTERS.hideDealerListings) n++;
@@ -1696,6 +1731,20 @@ const CursorHomepage: React.FC = () => {
         // Hide sold filter - vehicles that are NOT sold
         if (filters.hideSold) {
           query = query.or('sale_status.neq.sold,sale_status.is.null');
+        }
+
+        // Show ONLY sold vehicles (for sold stats view)
+        if (filters.showSoldOnly) {
+          // Filter to vehicles with sale_price > 0 AND sale_date within selected period
+          query = query.gt('sale_price', 500); // Must have a real sale price
+
+          // Apply time period filter based on salesPeriod
+          const period = SALES_PERIODS.find(p => p.value === salesPeriod);
+          if (period && period.days !== null) {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - period.days);
+            query = query.gte('sale_date', cutoffDate.toISOString().split('T')[0]);
+          }
         }
 
         return query;
@@ -3598,6 +3647,16 @@ const CursorHomepage: React.FC = () => {
         onRemove: () => setFilters({ ...filters, hideSold: false })
       });
     }
+    if (filters.showSoldOnly) {
+      const periodLabel = SALES_PERIODS.find(p => p.value === salesPeriod)?.label || 'today';
+      badges.push({
+        label: `Sold (${periodLabel})`,
+        onRemove: () => {
+          setFilters({ ...filters, showSoldOnly: false });
+          setSalesPeriod('today');
+        }
+      });
+    }
     if (filters.showPending) {
       badges.push({
         label: 'Show Pending',
@@ -3890,6 +3949,36 @@ const CursorHomepage: React.FC = () => {
     setSortBy('newest');
     setSortDirection('desc');
   }, []);
+
+  // Toggle sold-only filter and cycle through time periods
+  const toggleShowSoldOnly = useCallback(() => {
+    setFilters((prev) => {
+      if (!prev.showSoldOnly) {
+        // Turning ON sold filter - also turn off conflicting filters
+        return {
+          ...prev,
+          showSoldOnly: true,
+          hideSold: false, // Can't hide sold when showing only sold
+          forSale: false, // Sold items aren't for sale
+        };
+      } else {
+        // Already showing sold - cycle to next time period OR turn off if at end
+        const currentIndex = SALES_PERIODS.findIndex(p => p.value === salesPeriod);
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < SALES_PERIODS.length) {
+          // Cycle to next period
+          setSalesPeriod(SALES_PERIODS[nextIndex].value);
+          return prev; // Keep filter on
+        } else {
+          // At end of periods - turn off filter and reset to 'today'
+          setSalesPeriod('today');
+          return { ...prev, showSoldOnly: false };
+        }
+      }
+    });
+    setSortBy('newest'); // Sort by most recent sale
+    setSortDirection('desc');
+  }, [salesPeriod]);
 
   const openStatsPanel = useCallback((kind: StatsPanelKind) => {
     setStatsPanel(kind);
@@ -4477,14 +4566,21 @@ const CursorHomepage: React.FC = () => {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      cycleSalesPeriod();
+                      toggleShowSoldOnly();
                     }}
-                    title={`${salesByPeriod.count} vehicles sold ${salesByPeriod.label === 'all' ? 'all time' : salesByPeriod.label === 'today' ? 'today' : 'in ' + salesByPeriod.label} (click to change period)`}
+                    title={filters.showSoldOnly
+                      ? `Showing ${salesByPeriod.count} sold vehicles (${salesByPeriod.label}). Click to ${salesPeriod === 'all' ? 'exit sold view' : 'change period'}.`
+                      : `${salesByPeriod.count} vehicles sold ${salesByPeriod.label === 'all' ? 'all time' : salesByPeriod.label === 'today' ? 'today' : 'in ' + salesByPeriod.label}. Click to filter grid to sold vehicles.`
+                    }
                     style={{
                       padding: '1px 6px',
                       borderRadius: '999px',
-                      border: '1px solid rgba(168,85,247,0.25)',
-                      background: 'rgba(168,85,247,0.10)',
+                      border: filters.showSoldOnly
+                        ? '1px solid rgba(168,85,247,0.55)'
+                        : '1px solid rgba(168,85,247,0.25)',
+                      background: filters.showSoldOnly
+                        ? 'rgba(168,85,247,0.22)'
+                        : 'rgba(168,85,247,0.10)',
                       color: '#a855f7',
                       fontSize: '7pt',
                       fontWeight: 700,
@@ -4494,10 +4590,14 @@ const CursorHomepage: React.FC = () => {
                       lineHeight: 1.3,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(168,85,247,0.18)';
+                      e.currentTarget.style.background = filters.showSoldOnly
+                        ? 'rgba(168,85,247,0.30)'
+                        : 'rgba(168,85,247,0.18)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(168,85,247,0.10)';
+                      e.currentTarget.style.background = filters.showSoldOnly
+                        ? 'rgba(168,85,247,0.22)'
+                        : 'rgba(168,85,247,0.10)';
                     }}
                   >
                     {salesByPeriod.count.toLocaleString()} sold {salesByPeriod.label} · {formatCurrency(salesByPeriod.volume)}
@@ -4883,14 +4983,21 @@ const CursorHomepage: React.FC = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      cycleSalesPeriod();
+                      toggleShowSoldOnly();
                     }}
-                    title={`${salesByPeriod.count} vehicles sold ${salesByPeriod.label === 'all' ? 'all time' : salesByPeriod.label === 'today' ? 'today' : 'in ' + salesByPeriod.label} (click to change period)`}
+                    title={filters.showSoldOnly
+                      ? `Showing ${salesByPeriod.count} sold vehicles (${salesByPeriod.label}). Click to ${salesPeriod === 'all' ? 'exit sold view' : 'change period'}.`
+                      : `${salesByPeriod.count} vehicles sold ${salesByPeriod.label === 'all' ? 'all time' : salesByPeriod.label === 'today' ? 'today' : 'in ' + salesByPeriod.label}. Click to filter grid to sold vehicles.`
+                    }
                     style={{
                       padding: '2px 8px',
                       borderRadius: '999px',
-                      border: '1px solid rgba(168,85,247,0.35)',
-                      background: 'rgba(168,85,247,0.12)',
+                      border: filters.showSoldOnly
+                        ? '1px solid rgba(168,85,247,0.6)'
+                        : '1px solid rgba(168,85,247,0.35)',
+                      background: filters.showSoldOnly
+                        ? 'rgba(168,85,247,0.25)'
+                        : 'rgba(168,85,247,0.12)',
                       color: '#a855f7',
                       fontFamily: 'monospace',
                       fontSize: '7pt',
@@ -4899,10 +5006,14 @@ const CursorHomepage: React.FC = () => {
                       margin: 0,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(168,85,247,0.22)';
+                      e.currentTarget.style.background = filters.showSoldOnly
+                        ? 'rgba(168,85,247,0.35)'
+                        : 'rgba(168,85,247,0.22)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(168,85,247,0.12)';
+                      e.currentTarget.style.background = filters.showSoldOnly
+                        ? 'rgba(168,85,247,0.25)'
+                        : 'rgba(168,85,247,0.12)';
                     }}
                   >
                     <b>{salesByPeriod.count.toLocaleString()}</b> sold {salesByPeriod.label} · <b>{formatCurrency(salesByPeriod.volume)}</b>
