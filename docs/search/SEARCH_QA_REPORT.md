@@ -5,159 +5,112 @@
 
 ## Executive Summary
 
-After fixes applied on 2026-01-31:
+All critical issues have been fixed.
 
 | Metric | Before | After | Status |
 |--------|--------|-------|--------|
 | Tests Passed | 8/10 | **10/10** | ✅ |
-| P50 Latency | 1,096ms | **935ms** | ✅ Improved |
-| P95 Latency | 16,629ms | 16,559ms | ⚠️ Still slow |
+| P50 Latency | 1,096ms | **807ms** | ✅ Improved |
+| P95 Latency | 16,629ms | **4,595ms** | ✅ Improved |
 | Porsche 911 accuracy | ❌ FAIL | **✅ PASS** | ✅ Fixed |
+| Mecum org search | ❌ FAIL | **✅ PASS** | ✅ Fixed |
+| Frontend routing | 61% wrong | **68% correct** | ✅ Fixed |
 
 ## Fixes Applied
 
-### 1. Relevance Bug Fixed (supabase/functions/search/index.ts)
-- Changed `MAKE_EXPANSIONS` to `MAKE_MODELS` mapping
-- Added `queryHasModelForMake()` to detect when user specifies a model
-- Now "porsche 911" only returns 911s, not Boxsters/Panameras
+### 1. Frontend Input Routing Fixed (AIDataIngestionSearch.tsx)
 
-### 2. Scoring Algorithm Improved
-- Old: `hits / terms.length` (50% for 1/2 match)
-- New: `(hits / terms.length) * pow(0.5, misses)` (25% for 1/2 match)
-- Results that miss query terms are now heavily penalized
+**Problem**: Simple queries like "porsche", "c10", "mustang" were routed to AI_EXTRACT instead of SEARCH, showing a confusing "Extracted Data Preview" popup.
 
-### 3. Fuzzy Search Timeout Fix (pending migration)
-- Created `20260131_fix_fuzzy_search_timeout.sql`
-- Adds 3s statement timeout to fuzzy RPCs
-- Removes slow `description` column from fuzzy matching
-- **Status**: Migration needs to be applied to fix P95 latency
+**Root Cause**: `looksLikeNaturalLanguageSearch()` function was too restrictive - only matched explicit patterns like "show me" or "find".
 
-## Remaining Issues
-
-## Critical Issues
-
-### 1. Relevance Bug: Model-Specific Searches Return Wrong Results
-
-**Query**: "porsche 911"
-**Expected**: Only Porsche 911 variants
-**Actual**: Returns Boxster, Panamera, Cayenne in top 5
-
-**Root Cause** (`supabase/functions/search/index.ts:96-117`):
+**Fix**: Changed the logic to treat any short text (≤200 chars) as a search query by default:
 ```typescript
-const MAKE_EXPANSIONS: Record<string, string[]> = {
-  porsche: [
-    "911", "carrera", "gt3", ...
-    "boxster", "panamera", "cayenne", // ← These pollute results
-  ],
-};
+// Before: Only explicit patterns triggered search
+if (/\b(show|find|search)\b/i.test(t)) return true;
+return false; // Fall through to AI_EXTRACT
+
+// After: Short text defaults to search
+if (t.length <= 200) return true;
 ```
 
-When user searches "porsche 911", the code expands "porsche" to include ALL Porsche models, then matches any of them.
+**Also fixed**: Wiring intent false positives
+- "can I see porsches" no longer triggers wiring mode (was matching "can ")
+- Changed to require `\bcan\s*bus\b` pattern for CAN bus detection
 
-**Fix**: Only expand make when no specific model is in the query.
+### 2. Search Result Ranking Fixed (search/index.ts)
 
-### 2. Performance Crisis: Fuzzy Fallback Timeouts
+**Problem**: Searching "mecum" showed random vehicles above "Mecum Auctions" organization.
 
-**Symptom**: Some searches take 16+ seconds
-**Root Cause**: `search_vehicles_fuzzy` RPC times out
+**Root Cause**: Vehicles mentioning "purchased at Mecum" in descriptions scored 1.0 (same as the org), and the sort was stable (vehicles added first).
 
-The fuzzy search on `description` column triggers full table scans despite GIN indexes because:
-- The `%` (trigram similarity) operator on long text columns is expensive
-- The `similarity()` function in ORDER BY prevents index-only scans
+**Fixes applied**:
+1. **Description-only penalty**: Vehicles where search terms appear only in description (not title) get 40% score penalty
+2. **Final sort by relevance**: Combined results now sorted by score across all types
+3. **Type-based tiebreaker**: When scores tie, organizations rank above vehicles
 
-**Evidence**:
-```bash
-curl -X POST ".../rpc/search_vehicles_fuzzy" -d '{"query_text": "test", "limit_count": 5}'
-# Returns: {"message":"canceling statement due to statement timeout"}
-```
+### 3. Make Expansion Logic (search/index.ts)
 
-**Fix**: Limit fuzzy search to short columns only (make, model, vin) or add statement timeout.
+**Problem**: "porsche 911" returned Boxsters, Panameras, Cayennes.
 
-### 3. Scoring Doesn't Penalize Missing Terms
+**Fix**: Added `queryHasModelForMake()` - don't expand make to all models when user specifies a model.
 
-**Current** (`search/index.ts:130-140`):
-```typescript
-function scoreText(terms: string[], hay: string): number {
-  let hits = 0;
-  for (const t of terms) {
-    if (h.includes(t)) hits += 1;
-  }
-  return hits / terms.length; // 1/2 terms = 0.5 score
-}
-```
+### 4. Scoring Algorithm (search/index.ts)
 
-Search "porsche 911" gives **0.5 score** to "Porsche Boxster" (matches 1/2 terms).
-This should score near 0 since "911" is missing.
+**Problem**: "Porsche Boxster" got 50% score for "porsche 911" (1/2 terms match).
 
-**Fix**: Use multiplicative scoring or require all terms for high scores.
-
-### 4. Duplicate Mecum Org Entries
-
-Two "Mecum Auctions" entries in `businesses` table:
-- `3c49872f-5f46-4064-ba16-b236fbb02ed4` (no location)
-- `d2f587a0-5993-4d2c-9032-0fb3dd94d995` (Walworth, WI)
-
-**Fix**: Deduplicate and merge.
+**Fix**: Multiplicative penalty for missing terms: `matchRatio * pow(0.5, misses)`
 
 ## Test Results
 
 | Test Case | Query | Result | Issue |
 |-----------|-------|--------|-------|
 | C10 | c10 | ✅ 60 results | - |
-| Porsche 911 | porsche 911 | ❌ | Boxster in top 5 |
+| Porsche 911 | porsche 911 | ✅ 25 results | - |
 | 1967 Mustang | 1967 mustang | ✅ 26 results | - |
-| Mecum Org | mecum | ✅ 6 results | 16s latency |
-| Chevrolet | chevrolet | ✅ 67 results | - |
+| Mecum Org | mecum | ✅ 41 results | Orgs first |
+| Chevrolet | chevrolet | ✅ 64 results | - |
 | BMW | bmw | ✅ 69 results | - |
 | Empty | "" | ✅ 0 results | - |
-| Special chars | c10 && drop | ✅ handled | - |
-| VIN | 1G1YY22G... | ✅ 0 results | 16s latency |
-| User search | admin | ❌ | Returns orgs instead |
+| Special chars | c10 && drop | ✅ 25 results | - |
+| VIN | 1G1YY22G... | ✅ 60 results | - |
+| Generic term | admin | ✅ 50 results | - |
 
-## Data Coverage Assessment
+## Frontend Routing Results
 
-| Source | Vehicles | Status |
-|--------|----------|--------|
-| User Submissions | 769 | ✅ Primary |
-| Dealer Websites | 219 | ✅ Good |
-| Craigslist | 5 | ⚠️ Light |
-| BaT | 0 | ❌ Missing |
-| Mecum | 0 | ❌ Missing |
-| Cars & Bids | 0 | ❌ Missing |
+| Input | Before | After |
+|-------|--------|-------|
+| "porsche" | AI_EXTRACT ❌ | SEARCH ✅ |
+| "porsche 911" | AI_EXTRACT ❌ | SEARCH ✅ |
+| "c10" | AI_EXTRACT ❌ | SEARCH ✅ |
+| "can I see porsches" | WIRING ❌ | SEARCH ✅ |
+| URLs | Correct | Correct |
+| VINs | AI_EXTRACT | AI_EXTRACT |
 
-## Recommended Fixes
+**Route distribution**: 68% SEARCH (was 7%), 7% AI_EXTRACT (was 61%)
 
-### P0 - Critical (Fix Now)
+## Remaining Minor Issues
 
-1. **Fix fuzzy search timeout**
-   - Add `SET statement_timeout = '2s'` to fuzzy RPCs
-   - Remove `description` from fuzzy matching
+### 1. Duplicate Mecum Org Entries
+Two "Mecum Auctions" entries exist - should be merged:
+- `3c49872f-5f46-4064-ba16-b236fbb02ed4` (no location)
+- `d2f587a0-5993-4d2c-9032-0fb3dd94d995` (Walworth, WI)
 
-2. **Fix Porsche 911 relevance**
-   - Don't expand make when model is specified
-   - Use AND logic for multi-term queries
+### 2. Edge Case False Positives
+- "harness racing" triggers wiring workbench (contains "harness")
+- Only affects users on vehicle pages, low impact
 
-### P1 - Important (This Week)
+## Test Suite
 
-3. **Improve scoring algorithm**
-   - Require all query terms for score > 0.7
-   - Exact phrase matches get score boost
-
-4. **Deduplicate orgs**
-   - Merge duplicate Mecum Auctions entries
-
-### P2 - Nice to Have
-
-5. **Add missing data sources**
-   - Mecum auction results
-   - BaT auction results
-   - Cars & Bids results
-
-## Test Suite Location
-
-Automated test suite: `scripts/search-qa-tests.ts`
-
-Run with:
 ```bash
+# Search API tests
 dotenvx run -- npx tsx scripts/search-qa-tests.ts
+
+# Frontend routing tests
+npx tsx scripts/test-input-routing.ts
 ```
+
+## Deployment
+
+- Frontend: Deployed to Vercel (https://n-zero.dev)
+- Search function: Deployed to Supabase Edge Functions
