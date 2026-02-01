@@ -105,3 +105,62 @@ export function isOptimizableUrl(url: string | null | undefined): boolean {
     url.includes('/storage/v1/')
   );
 }
+
+// Preload cache to avoid duplicate preloads
+const preloadCache = new Set<string>();
+const activePreloads = new Map<string, HTMLImageElement>();
+
+/**
+ * Preload a single image URL into browser cache
+ */
+export function preloadImage(url: string | null | undefined, priority: 'high' | 'low' = 'low'): void {
+  if (!url || preloadCache.has(url)) return;
+  preloadCache.add(url);
+
+  const img = new Image();
+  // Use fetchpriority hint if available
+  (img as any).fetchPriority = priority;
+  img.decoding = 'async';
+  img.src = url;
+  activePreloads.set(url, img);
+
+  img.onload = img.onerror = () => {
+    activePreloads.delete(url);
+  };
+}
+
+/**
+ * Batch preload multiple images for smooth scrolling
+ * Optimizes URLs before preloading
+ *
+ * @param urls - Array of image URLs to preload
+ * @param size - Size to optimize to (default 'small' for grid)
+ * @param batchSize - How many to load concurrently (default 10)
+ */
+export function preloadImageBatch(
+  urls: Array<string | null | undefined>,
+  size: ImageSize = 'small',
+  batchSize: number = 10
+): void {
+  const optimizedUrls = urls
+    .map(url => optimizeImageUrl(url, size))
+    .filter((url): url is string => !!url && !preloadCache.has(url));
+
+  // Limit concurrent preloads
+  const toPreload = optimizedUrls.slice(0, batchSize);
+  toPreload.forEach(url => preloadImage(url));
+}
+
+/**
+ * Get the number of active preloads (for debugging/monitoring)
+ */
+export function getActivePreloadCount(): number {
+  return activePreloads.size;
+}
+
+/**
+ * Clear preload cache (useful for memory management on very long sessions)
+ */
+export function clearPreloadCache(): void {
+  preloadCache.clear();
+}
