@@ -1,0 +1,71 @@
+{
+  "agent": {
+    "name": "nuke-sentinel",
+    "version": "0.1.0",
+    "description": "24/7 monitoring agent for Nuke platform"
+  },
+  "orgo": {
+    "workspace_id": "f66d9a1b-240c-4a05-b61f-e5aad93d6fe9",
+    "api_key_env": "ORGO_API_KEY",
+    "vm_config": {
+      "boot_timeout_ms": 5000,
+      "idle_shutdown_mins": 0,
+      "persistent": true
+    }
+  },
+  "schedule": {
+    "tool_scout": {
+      "interval_hours": 6,
+      "enabled": true
+    },
+    "pipeline_health": {
+      "interval_mins": 30,
+      "enabled": true
+    },
+    "source_discovery": {
+      "interval_hours": 24,
+      "enabled": true
+    }
+  },
+  "sources": {
+    "hacker_news": {
+      "enabled": true,
+      "keywords": ["claude code", "anthropic", "mcp server", "ai agent", "claude api"],
+      "min_points": 10
+    },
+    "twitter": {
+      "enabled": true,
+      "accounts": ["@AnthropicAI", "@alexalbert__", "@swyx"],
+      "keywords": ["claude code", "mcp", "anthropic"]
+    },
+    "github": {
+      "enabled": true,
+      "repos": ["anthropics/claude-code", "anthropics/anthropic-sdk-python"],
+      "topics": ["claude", "mcp-server", "anthropic"]
+    },
+    "reddit": {
+      "enabled": true,
+      "subreddits": ["ClaudeAI", "LocalLLaMA"]
+    }
+  },
+  "alerts": {
+    "pipeline_error_threshold": 0.10,
+    "queue_stall_mins": 60,
+    "channels": {
+      "telegram": {
+        "enabled": false,
+        "bot_token_env": "TELEGRAM_BOT_TOKEN",
+        "chat_id_env": "TELEGRAM_CHAT_ID"
+      },
+      "supabase": {
+        "enabled": true,
+        "table": "sentinel_alerts"
+      }
+    }
+  },
+  "nuke": {
+    "supabase_url_env": "VITE_SUPABASE_URL",
+    "supabase_key_env": "SUPABASE_SERVICE_ROLE_KEY",
+    "coordinator_function": "ralph-wiggum-rlm-extraction-coordinator"
+  }
+}

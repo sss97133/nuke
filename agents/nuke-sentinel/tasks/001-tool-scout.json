@@ -1,0 +1,29 @@
+{
+  "id": "001",
+  "type": "tool-scout",
+  "priority": 1,
+  "schedule": "every 6 hours",
+  "params": {
+    "sources": [
+      "hn",
+      "github"
+    ],
+    "keywords": [
+      "claude code",
+      "claude swarms",
+      "mcp server",
+      "anthropic mcp",
+      "ai agent framework",
+      "claude skills"
+    ],
+    "hn_min_points": 5,
+    "github_sort": "updated"
+  },
+  "last_run": "2026-01-31T02:44:11.885173",
+  "status": "completed",
+  "notes": "Initial tool scout - find what's new in Claude ecosystem",
+  "last_result": {
+    "status": "completed",
+    "report": "/Users/skylar/nuke/agents/nuke-sentinel/reports/tool-scout-20260131-0244.json"
+  }
+}
