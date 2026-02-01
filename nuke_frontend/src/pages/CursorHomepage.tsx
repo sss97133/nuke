@@ -413,7 +413,7 @@ const CursorHomepage: React.FC = () => {
       return 'desc';
     }
   });
-  const [showFilters, setShowFilters] = useState<boolean>(true); // Visible by default
+  const [showFilters, setShowFilters] = useState<boolean>(false); // Collapsed by default
   const [generativeFilters, setGenerativeFilters] = useState<string[]>([]); // Track active generative filters
   // Start with completely clean filters - no saved state, no defaults
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -4698,27 +4698,6 @@ const CursorHomepage: React.FC = () => {
                 </div>
               </div>
               <button
-                type="button"
-                disabled={ralphLoading}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  void loadRalphPresets();
-                }}
-                style={{
-                  padding: '2px 6px',
-                  fontSize: '7pt',
-                  border: '1px solid var(--border)',
-                  background: ralphPresets.length > 0 ? 'rgba(59,130,246,0.10)' : 'transparent',
-                  cursor: ralphLoading ? 'not-allowed' : 'pointer',
-                  fontFamily: '"MS Sans Serif", sans-serif',
-                  opacity: ralphLoading ? 0.6 : 1
-                }}
-                title={ralphPresets.length > 0 ? 'Refresh Ralph presets' : 'Generate Ralph presets'}
-              >
-                {ralphLoading ? 'ralph…' : (ralphPresets.length > 0 ? 'ralph ✓' : 'ralph')}
-              </button>
-              <button
                 onClick={() => {
                   setShowFilters(false);
                   setFilterBarMinimized(true);
@@ -4735,53 +4714,6 @@ const CursorHomepage: React.FC = () => {
                 hide
               </button>
             </div>
-
-            {ralphError && (
-              <div
-                style={{
-                  padding: '6px 8px',
-                  borderBottom: '1px solid var(--border)',
-                  background: 'rgba(239,68,68,0.06)',
-                  color: '#b91c1c',
-                  fontFamily: 'monospace',
-                  fontSize: '7pt'
-                }}
-              >
-                ralph: {ralphError}
-              </div>
-            )}
-
-            {ralphPresets.length > 0 && (
-              <div
-                style={{
-                  padding: '6px',
-                  borderBottom: '1px solid var(--border)',
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '4px'
-                }}
-              >
-                {ralphPresets.map((p, idx) => (
-                  <button
-                    key={`${p.label}-${idx}`}
-                    type="button"
-                    className="button-win95"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      applyRalphPreset(p);
-                    }}
-                    title={p.rationale || 'Apply preset'}
-                    style={{
-                      padding: '3px 6px',
-                      fontSize: '7pt'
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Unified filter buttons row */}
             <div style={{
