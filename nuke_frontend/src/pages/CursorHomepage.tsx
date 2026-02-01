@@ -3980,6 +3980,18 @@ const CursorHomepage: React.FC = () => {
     setSortDirection('desc');
   }, [salesPeriod]);
 
+  // Toggle for-sale filter
+  const toggleForSale = useCallback(() => {
+    setFilters((prev) => ({
+      ...prev,
+      forSale: !prev.forSale,
+      showSoldOnly: false, // Can't show sold when filtering for sale
+      hideSold: !prev.forSale ? true : prev.hideSold, // Hide sold when showing for sale
+    }));
+    setSortBy('price_high'); // Sort by price when showing for sale
+    setSortDirection('desc');
+  }, []);
+
   const openStatsPanel = useCallback((kind: StatsPanelKind) => {
     setStatsPanel(kind);
   }, []);
@@ -4546,9 +4558,30 @@ const CursorHomepage: React.FC = () => {
               {displayStats.forSaleCount > 0 && (
                 <>
                   <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
-                  <div style={{ color: 'var(--text-muted)' }}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleForSale();
+                    }}
+                    title={filters.forSale
+                      ? `Showing ${displayStats.forSaleCount} for sale. Click to show all.`
+                      : `${displayStats.forSaleCount} for sale. Click to filter.`
+                    }
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      margin: 0,
+                      cursor: 'pointer',
+                      fontFamily: '"MS Sans Serif", sans-serif',
+                      fontSize: '7pt',
+                      color: filters.forSale ? '#059669' : 'var(--text-muted)',
+                      fontWeight: filters.forSale ? 700 : 400,
+                    }}
+                  >
                     {displayStats.forSaleCount.toLocaleString()} for sale
-                  </div>
+                  </button>
                 </>
               )}
               {displayStats.activeAuctions > 0 && (
@@ -4941,9 +4974,12 @@ const CursorHomepage: React.FC = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      openStatsPanel('for_sale');
+                      toggleForSale();
                     }}
-                    title="Vehicles marked for sale. Click to preview / filter."
+                    title={filters.forSale
+                      ? `Showing ${displayStats.forSaleCount} for sale. Click to show all.`
+                      : `${displayStats.forSaleCount} for sale. Click to filter.`
+                    }
                     style={{
                       border: 'none',
                       background: 'transparent',
@@ -4952,7 +4988,8 @@ const CursorHomepage: React.FC = () => {
                       cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '7pt',
-                      color: 'var(--text)'
+                      color: filters.forSale ? '#059669' : 'var(--text)',
+                      fontWeight: filters.forSale ? 700 : 400,
                     }}
                   >
                     <b>{displayStats.forSaleCount.toLocaleString()}</b> for sale
