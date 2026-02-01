@@ -20,7 +20,7 @@ ps aux | grep "claude" | grep -v grep | awk '{print $2, $7, $10}'
 
 | TTY | PID | Status | Working On |
 |-----|-----|--------|------------|
-| s000 | 68738 | active | BaT queue processing & failure retry |
+| s000 | 68738 | paused | BaT queue - 80.8k done, 29k pending, workers stopped |
 | s001 | 68890 | active | Comment sentiment backfill (~71k remaining) |
 | s002 | 69152 | active | Multi-server inference + overnight batch |
 | s005 | 69351 | ? | (unclaimed) |
@@ -100,3 +100,16 @@ If editing these files, announce it here first:
 
 **DB at pause:** 175k vehicles, 72.6k BaT, 843 AI analyzed
 
+
+## Session: Profile Data Fixes (skylar)
+- **Time**: $(date)
+- **Status**: Completed immediate DB fixes, pending code changes
+- **Done**:
+  - Created 5 vehicle_ownerships from approved verifications
+  - Linked skylarwilliams BaT identity
+  - Fixed gallery (removed 8856 scraped images)
+- **TODO (next session)**:
+  - Fix ContributionTimeline.tsx to show all time, not 365 days
+  - Investigate tool images (none exist)
+  - Extract remaining BaT auctions for skylarwilliams
+  - Profile tab performance optimization

@@ -49,8 +49,8 @@ while true; do
     -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
     -H \"Content-Type: application/json\" -d '{\"status\":\"processing\"}'" > /dev/null 2>&1
 
-  # Extract
-  RESULT=$(dotenvx run --quiet -- bash -c "curl -s -m 90 -X POST \"\$VITE_SUPABASE_URL/functions/v1/bat-simple-extract\" \
+  # Extract using bat-extract v2 (handles resales, versioned)
+  RESULT=$(dotenvx run --quiet -- bash -c "curl -s -m 90 -X POST \"\$VITE_SUPABASE_URL/functions/v1/bat-extract\" \
     -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"Content-Type: application/json\" \
     -d '{\"url\":\"$URL\",\"save_to_db\":true}'" 2>/dev/null)
 

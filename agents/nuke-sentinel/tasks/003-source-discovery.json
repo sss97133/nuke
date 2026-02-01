@@ -1,0 +1,34 @@
+{
+  "id": "003",
+  "type": "source-discovery",
+  "priority": 2,
+  "schedule": "daily",
+  "params": {
+    "target_types": [
+      "auction_site",
+      "forum",
+      "marketplace",
+      "social_account"
+    ],
+    "focus_marques": [
+      "porsche",
+      "ferrari",
+      "mercedes",
+      "bmw",
+      "land rover"
+    ],
+    "search_queries": [
+      "collector car auction site",
+      "vintage car forum",
+      "classic car marketplace",
+      "barn find cars"
+    ]
+  },
+  "last_run": "2026-01-31T02:44:11.885484",
+  "status": "completed",
+  "notes": "Find new vehicle data sources to add to Nuke",
+  "last_result": {
+    "status": "completed",
+    "count": 0
+  }
+}

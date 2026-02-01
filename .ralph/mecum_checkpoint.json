@@ -1,9 +1,9 @@
 {
   "auctions": {
     "kissimmee-2026": {
-      "lastPage": 72,
+      "lastPage": 161,
       "complete": true,
-      "vehiclesFound": 0
+      "vehiclesFound": 2
     },
     "kissimmee-2025": {
       "lastPage": 233,
@@ -274,8 +274,13 @@
       "lastPage": 55,
       "complete": true,
       "vehiclesFound": 1154
+    },
+    "glendale-2022": {
+      "lastPage": 30,
+      "complete": false,
+      "vehiclesFound": 690
     }
   },
-  "totalDiscovered": 4968,
-  "lastUpdated": "2026-01-30T03:46:06.880Z"
+  "totalDiscovered": 5110,
+  "lastUpdated": "2026-01-31T10:15:53.978Z"
 }

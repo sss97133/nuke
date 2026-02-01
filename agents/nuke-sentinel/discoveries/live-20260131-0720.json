@@ -1,0 +1,114 @@
+{
+  "timestamp": "2026-01-31T07:20:27.215149",
+  "count": 12,
+  "items": [
+    {
+      "title": "Claude on Mars",
+      "video_id": "kYJO0y8fVTA",
+      "published": "2026-01-30T19:09:11+00:00",
+      "link": "https://youtube.com/watch?v=kYJO0y8fVTA",
+      "source": "youtube",
+      "channel": "Anthropic",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Your tools are now interactive in Claude",
+      "video_id": "bluAmTHoEow",
+      "published": "2026-01-26T19:06:25+00:00",
+      "link": "https://youtube.com/watch?v=bluAmTHoEow",
+      "source": "youtube",
+      "channel": "Anthropic",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Introducing Cowork: Claude Code for the rest of your work",
+      "video_id": "UAmKyyZ-b9E",
+      "published": "2026-01-12T20:02:22+00:00",
+      "link": "https://youtube.com/watch?v=UAmKyyZ-b9E",
+      "source": "youtube",
+      "channel": "Anthropic",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Let Claude handle work in your browser",
+      "video_id": "rBJnWMD0Pho",
+      "published": "2025-12-18T18:52:03+00:00",
+      "link": "https://youtube.com/watch?v=rBJnWMD0Pho",
+      "source": "youtube",
+      "channel": "Anthropic",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Claude ran a business in our office",
+      "video_id": "5KTHvKCrQ00",
+      "published": "2025-12-18T12:04:53+00:00",
+      "link": "https://youtube.com/watch?v=5KTHvKCrQ00",
+      "source": "youtube",
+      "channel": "Anthropic",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Binti helps social workers license foster families faster with Claude",
+      "video_id": "i9U_b-8KKno",
+      "published": "2025-12-17T18:13:19+00:00",
+      "link": "https://youtube.com/watch?v=i9U_b-8KKno",
+      "source": "youtube",
+      "channel": "Anthropic",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Why we built\u2014and donated\u2014the Model Context Protocol (MCP)",
+      "video_id": "PLyCki2K0Lg",
+      "published": "2025-12-11T20:14:58+00:00",
+      "link": "https://youtube.com/watch?v=PLyCki2K0Lg",
+      "source": "youtube",
+      "channel": "Anthropic",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Getting started with connectors in Claude.ai",
+      "video_id": "_jjSS0qGFbI",
+      "published": "2025-12-11T17:07:09+00:00",
+      "link": "https://youtube.com/watch?v=_jjSS0qGFbI",
+      "source": "youtube",
+      "channel": "Anthropic",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Anthropic just bought your favorite JS runtime...",
+      "video_id": "5JMiNsV7P3Y",
+      "published": "2025-12-05T21:43:51+00:00",
+      "link": "https://youtube.com/watch?v=5JMiNsV7P3Y",
+      "source": "youtube",
+      "channel": "Fireship",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "AI agents are paying each other now\u2026",
+      "video_id": "S6wc6yvoZLY",
+      "published": "2025-11-26T18:20:32+00:00",
+      "link": "https://youtube.com/watch?v=S6wc6yvoZLY",
+      "source": "youtube",
+      "channel": "Fireship",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Claude AI Co-founder Publishes 4 Big Claims about Near Future: Breakdown",
+      "video_id": "Iar4yweKGoI",
+      "published": "2026-01-28T15:18:48+00:00",
+      "link": "https://youtube.com/watch?v=Iar4yweKGoI",
+      "source": "youtube",
+      "channel": "AI Explained",
+      "relevance": "keyword_match"
+    },
+    {
+      "title": "Anthropic: Our AI just created a tool that can \u2018automate all white collar work\u2019, Me:",
+      "video_id": "wYs6HWZ2FdM",
+      "published": "2026-01-14T16:26:37+00:00",
+      "link": "https://youtube.com/watch?v=wYs6HWZ2FdM",
+      "source": "youtube",
+      "channel": "AI Explained",
+      "relevance": "keyword_match"
+    }
+  ]
+}

@@ -446,7 +446,8 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               )}
             </div>
 
-            {(isAIGenerated || sourceInfo) && (
+            {/* AI-generated indicator (source URLs already shown in Description Entries above) */}
+            {isAIGenerated && (
               <div style={{
                 marginTop: '12px',
                 padding: '8px',
@@ -454,51 +455,10 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 borderRadius: '4px',
                 fontSize: '7pt',
                 color: 'var(--text-muted)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px'
               }}>
-                {(isAIGenerated || sourceInfo?.source === 'craigslist_listing') && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span>
-                      {sourceInfo?.source === 'craigslist_listing' 
-                        ? 'Extracted from listing' 
-                        : (generatedAt ? 'AI-generated from vehicle images' : 'AI-generated')
-                      }
-                    </span>
-                    {generatedAt && (
-                      <span>• {new Date(generatedAt).toLocaleDateString()}</span>
-                    )}
-                  </div>
-                )}
-                {sourceInfo?.url && (
-                  <div style={{ marginTop: sourceInfo.url ? '4px' : '0', paddingTop: sourceInfo.url ? '4px' : '0', borderTop: sourceInfo.url ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ fontSize: '6pt', marginBottom: '2px', fontWeight: 500 }}>Source:</div>
-                    <a 
-                      href={sourceInfo.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: 'var(--link-color, #0066cc)',
-                        textDecoration: 'underline',
-                        fontSize: '6pt',
-                        wordBreak: 'break-all',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}
-                    >
-                      {sourceInfo.url.includes('craigslist') && (
-                        <FaviconIcon url={sourceInfo.url} matchTextSize={true} textSize={6} />
-                      )}
-                      {sourceInfo.url.includes('craigslist') ? 'View Craigslist Listing' : sourceInfo.url}
-                    </a>
-                    {sourceInfo.date && (
-                      <div style={{ fontSize: '6pt', marginTop: '2px', color: 'var(--text-muted)' }}>
-                        Extracted {new Date(sourceInfo.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </div>
-                    )}
-                  </div>
+                <span>AI-generated from vehicle images</span>
+                {generatedAt && (
+                  <span> • {new Date(generatedAt).toLocaleDateString()}</span>
                 )}
               </div>
             )}
