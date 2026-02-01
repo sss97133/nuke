@@ -51,6 +51,7 @@ const LiveAuctionView = React.lazy(() => import('../components/betting/LiveAucti
 
 // Vault / Storage
 const VaultPage = React.lazy(() => import('../pages/VaultPage'));
+const VaultScanPage = React.lazy(() => import('../pages/VaultScanPage'));
 
 // Business management
 const BusinessSettings = React.lazy(() => import('../pages/BusinessSettings'));
@@ -155,6 +156,7 @@ export const DomainRoutes = () => {
 
         {/* Vehicle Storage Vault */}
         <Route path="/vault" element={<VaultPage />} />
+        <Route path="/vault/scan" element={<VaultScanPage />} />
 
         {/* Business Management */}
         <Route path="/business/settings" element={<BusinessSettings />} />
