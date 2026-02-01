@@ -7,6 +7,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { getCanonicalBodyStyle } from '../services/bodyStyleTaxonomy';
 import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
 import { parseMoneyNumber } from '../lib/auctionUtils';
+import { preloadImageBatch, optimizeImageUrl } from '../lib/imageOptimizer';
 
 interface HypeVehicle {
   id: string;
@@ -56,7 +57,20 @@ interface HypeVehicle {
 }
 
 type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
+type SalesTimePeriod = 'today' | '7d' | '30d' | '90d' | '1y' | '3y' | '5y' | '10y' | 'all';
 type ViewMode = 'gallery' | 'grid' | 'technical';
+
+const SALES_PERIODS: { value: SalesTimePeriod; label: string; days: number | null }[] = [
+  { value: 'today', label: 'today', days: 1 },
+  { value: '7d', label: '7d', days: 7 },
+  { value: '30d', label: '30d', days: 30 },
+  { value: '90d', label: '90d', days: 90 },
+  { value: '1y', label: '1y', days: 365 },
+  { value: '3y', label: '3y', days: 365 * 3 },
+  { value: '5y', label: '5y', days: 365 * 5 },
+  { value: '10y', label: '10y', days: 365 * 10 },
+  { value: 'all', label: 'all', days: null },
+];
 type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
 type SortDirection = 'asc' | 'desc';
 
@@ -396,6 +410,7 @@ const CursorHomepage: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('ALL'); // Default to ALL - no time filtering
+  const [salesPeriod, setSalesPeriod] = useState<SalesTimePeriod>('today'); // For "sold" stats display
   const [viewMode, setViewMode] = useState<ViewMode>('grid'); // Always grid mode
   const [sortBy, setSortBy] = useState<SortBy>(() => {
     try {
@@ -413,7 +428,7 @@ const CursorHomepage: React.FC = () => {
       return 'desc';
     }
   });
-  const [showFilters, setShowFilters] = useState<boolean>(false); // Collapsed by default
+  const [showFilters, setShowFilters] = useState<boolean>(true); // Filter bar visible, individual sections start collapsed
   const [generativeFilters, setGenerativeFilters] = useState<string[]>([]); // Track active generative filters
   // Start with completely clean filters - no saved state, no defaults
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -541,9 +556,10 @@ const CursorHomepage: React.FC = () => {
     sourcePogs: true, // Source pogs library collapsed by default
     makeFilters: true, // Make filters collapsed by default
     typeFilters: true, // Body type filters collapsed by default
-    priceFilters: false,
-    statusFilters: false,
-    locationFilters: false,
+    yearFilters: true, // Year filters collapsed by default
+    priceFilters: true, // Price filters collapsed by default
+    statusFilters: true, // Status filters collapsed by default
+    locationFilters: true, // Location filters collapsed by default
     advancedFilters: true, // Advanced filters collapsed by default
   });
 
@@ -551,6 +567,9 @@ const CursorHomepage: React.FC = () => {
   const [sourceSearchText, setSourceSearchText] = useState('');
   const [makeSearchText, setMakeSearchText] = useState('');
   const [showMakeSuggestions, setShowMakeSuggestions] = useState(false);
+  const [makeSuggestionIndex, setMakeSuggestionIndex] = useState(-1); // For arrow key navigation
+  const makeInputRef = useRef<HTMLInputElement>(null);
+  const modelInputRef = useRef<HTMLInputElement>(null);
 
   // Available makes from database for autocomplete
   const [availableMakes, setAvailableMakes] = useState<string[]>([]);
@@ -559,6 +578,7 @@ const CursorHomepage: React.FC = () => {
   // Model filter state (shown after make is selected)
   const [modelSearchText, setModelSearchText] = useState('');
   const [showModelSuggestions, setShowModelSuggestions] = useState(false);
+  const [modelSuggestionIndex, setModelSuggestionIndex] = useState(-1);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   const homepageDebugEnabled =
@@ -628,6 +648,64 @@ const CursorHomepage: React.FC = () => {
   const isRenderTruncated =
     (hasActiveFilters || debouncedSearchText) && vehiclesToRender.length < filteredVehicles.length;
 
+  // Preload images for smoother scrolling - prefetch next batch of images
+  useEffect(() => {
+    if (vehiclesToRender.length === 0) return;
+
+    // Get image URLs from vehicles about to render
+    // Preload current viewport + next 3 rows worth (at 16 columns = 48 images ahead)
+    const imagesToPreload = vehiclesToRender
+      .slice(0, Math.min(vehiclesToRender.length, cardsPerRow * 6)) // First 6 rows
+      .map((v: any) => v.primary_image_url || v.image_url)
+      .filter(Boolean);
+
+    // Batch preload with optimized URLs (small size for grid)
+    if (imagesToPreload.length > 0) {
+      preloadImageBatch(imagesToPreload, 'small', 20);
+    }
+  }, [vehiclesToRender, cardsPerRow]);
+
+  // Also preload when scrolling - prefetch images further down
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let rafId: number | null = null;
+
+    const handleScrollPreload = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        const currentScrollY = window.scrollY;
+        const scrollingDown = currentScrollY > lastScrollY;
+        lastScrollY = currentScrollY;
+
+        if (scrollingDown && vehiclesToRender.length > 0) {
+          // Estimate which row we're viewing based on scroll position
+          // Assume each card row is ~150px tall (varies with content)
+          const estimatedRowHeight = 150;
+          const viewportBottom = currentScrollY + window.innerHeight;
+          const estimatedCurrentRow = Math.floor(viewportBottom / estimatedRowHeight);
+          const startIdx = Math.max(0, estimatedCurrentRow * cardsPerRow);
+          const endIdx = Math.min(vehiclesToRender.length, startIdx + cardsPerRow * 5); // 5 rows ahead
+
+          const imagesToPreload = vehiclesToRender
+            .slice(startIdx, endIdx)
+            .map((v: any) => v.primary_image_url || v.image_url)
+            .filter(Boolean);
+
+          if (imagesToPreload.length > 0) {
+            preloadImageBatch(imagesToPreload, 'small', 15);
+          }
+        }
+      });
+    };
+
+    window.addEventListener('scroll', handleScrollPreload, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScrollPreload);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [vehiclesToRender, cardsPerRow]);
+
   useEffect(() => {
     loadSession();
     
@@ -663,11 +741,13 @@ const CursorHomepage: React.FC = () => {
           // ignore
         }
 
-        const suppressAutoMinimize = now < suppressAutoMinimizeUntilRef.current;
-        if (!suppressAutoMinimize && deltaY > 0 && showFilters && currentScrollY > 12 && !filterBarMinimized && !filterPanelStillVisible) {
-          setFilterBarMinimized(true);
-          setShowFilters(false);
-        }
+        // NOTE: Auto-minimize disabled - stats bar should ALWAYS be visible
+        // Only individual filter sections collapse, not the entire bar
+        // const suppressAutoMinimize = now < suppressAutoMinimizeUntilRef.current;
+        // if (!suppressAutoMinimize && deltaY > 0 && showFilters && currentScrollY > 12 && !filterBarMinimized && !filterPanelStillVisible) {
+        //   setFilterBarMinimized(true);
+        //   setShowFilters(false);
+        // }
       });
     };
     
@@ -992,8 +1072,38 @@ const CursorHomepage: React.FC = () => {
   // }, [thermalPricing]);
 
   // Debounce search to avoid clanky re-filtering on every keystroke.
+  // Also parse intelligent patterns like year ranges (1970-1975), single years (1970), etc.
   useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearchText(searchText.trim()), 150);
+    const t = window.setTimeout(() => {
+      const trimmed = searchText.trim();
+
+      // Check for year range pattern: "1970-1975" or "1970-1970"
+      const yearRangeMatch = trimmed.match(/^(\d{4})\s*[-–—to]\s*(\d{4})$/i);
+      if (yearRangeMatch) {
+        const yearMin = parseInt(yearRangeMatch[1], 10);
+        const yearMax = parseInt(yearRangeMatch[2], 10);
+        if (yearMin >= 1900 && yearMin <= 2030 && yearMax >= 1900 && yearMax <= 2030) {
+          // Apply as year filter instead of text search
+          setFilters(prev => ({ ...prev, yearMin, yearMax }));
+          setDebouncedSearchText(''); // Clear text search since we're using year filter
+          return;
+        }
+      }
+
+      // Check for single year pattern: "1970"
+      const singleYearMatch = trimmed.match(/^(\d{4})$/);
+      if (singleYearMatch) {
+        const year = parseInt(singleYearMatch[1], 10);
+        if (year >= 1900 && year <= 2030) {
+          // Apply as year filter (single year = both min and max)
+          setFilters(prev => ({ ...prev, yearMin: year, yearMax: year }));
+          setDebouncedSearchText(''); // Clear text search since we're using year filter
+          return;
+        }
+      }
+
+      setDebouncedSearchText(trimmed);
+    }, 150);
     return () => window.clearTimeout(t);
   }, [searchText]);
 
@@ -1240,9 +1350,22 @@ const CursorHomepage: React.FC = () => {
       result = result.filter(v => (v.year || 0) <= filters.yearMax!);
     }
     if (filters.makes.length > 0) {
-      result = result.filter(v => filters.makes.some(m => 
+      result = result.filter(v => filters.makes.some(m =>
         v.make?.toLowerCase().includes(m.toLowerCase())
       ));
+    }
+    // Model filter (requires make to be selected)
+    if (filters.models && filters.models.length > 0) {
+      // Use fuzzy matching: strip dashes/slashes/spaces for comparison
+      const normalize = (s: string) => s.toLowerCase().replace(/[-\/\s]/g, '');
+      result = result.filter(v => filters.models!.some(m => {
+        const modelLower = (v.model || '').toLowerCase();
+        const modelNorm = normalize(modelLower);
+        const filterLower = m.toLowerCase();
+        const filterNorm = normalize(m);
+        // Direct match, contains match, or normalized match
+        return modelLower.includes(filterLower) || modelNorm.includes(filterNorm);
+      }));
     }
     // Body style filter (car type)
     if (filters.bodyStyles.length > 0) {
@@ -1593,7 +1716,8 @@ const CursorHomepage: React.FC = () => {
 
       // Apply client-side filters that are harder to do in SQL
       let filtered = vehicles || [];
-      
+      let hasClientSideFilters = false;  // Track if we're reducing results beyond SQL
+
       // Source filters (client-side to match classifySource logic exactly)
       const hasSourceSelections =
         filters.hideDealerListings ||
@@ -1604,14 +1728,16 @@ const CursorHomepage: React.FC = () => {
         filters.hideClassic ||
         (filters.hiddenSources && filters.hiddenSources.length > 0);
       if (hasSourceSelections) {
+        hasClientSideFilters = true;
         filtered = filtered.filter((v: any) => {
           const src = getSourceFilterKey(v);
           return includedSources[src] === true;
         });
       }
-      
+
       // Price filters (client-side because we need to check multiple price fields)
       if (filters.priceMin || filters.priceMax) {
+        hasClientSideFilters = true;
         filtered = filtered.filter((v: any) => {
           // Calculate display price (same logic as in applyFiltersAndSort)
           let vehiclePrice = 0;
@@ -1628,7 +1754,7 @@ const CursorHomepage: React.FC = () => {
           } else if (v.purchase_price) {
             vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
           }
-          
+
           if (filters.priceMin && vehiclePrice < filters.priceMin) return false;
           if (filters.priceMax && vehiclePrice > filters.priceMax) return false;
           return true;
@@ -1637,11 +1763,13 @@ const CursorHomepage: React.FC = () => {
 
       // Has images filter
       if (filters.hasImages) {
+        hasClientSideFilters = true;
         filtered = filtered.filter((v: any) => (v.image_count || 0) > 0);
       }
 
       // Search text filter (client-side)
       if (debouncedSearchText) {
+        hasClientSideFilters = true;
         const terms = debouncedSearchText.toLowerCase().trim().split(/\s+/).filter(Boolean);
         filtered = filtered.filter((v: any) => {
           const hay = [
@@ -1653,6 +1781,24 @@ const CursorHomepage: React.FC = () => {
           ].filter(Boolean).join(' ').toLowerCase();
           return terms.every((t) => hay.includes(t));
         });
+      }
+
+      // Determine the accurate total count:
+      // - If no client-side filters: use the accurate `count` from Supabase
+      // - If client-side filters active: estimate using ratio (filtered/fetched * count)
+      let accurateTotalVehicles: number;
+      const fetchedCount = (vehicles || []).length;
+      if (!hasClientSideFilters) {
+        // No client-side reduction - use accurate DB count
+        accurateTotalVehicles = count || filtered.length;
+      } else if (fetchedCount > 0 && count && count > 0) {
+        // Client-side filters active - estimate true count using ratio
+        // If we fetched 15000 and client-side filtered to 10000, and DB count was 20000,
+        // the estimate is (10000/15000) * 20000 = 13333
+        const ratio = filtered.length / fetchedCount;
+        accurateTotalVehicles = Math.round(ratio * count);
+      } else {
+        accurateTotalVehicles = filtered.length;
       }
 
       // Calculate stats from filtered vehicles
@@ -1682,16 +1828,15 @@ const CursorHomepage: React.FC = () => {
       const last7dMs = nowMs - 7 * 24 * 60 * 60 * 1000;
 
       filtered.forEach((v: any) => {
-        // Count for sale
-        if (v.is_for_sale === true) {
+        // Count for sale: is_for_sale=true OR (asking_price > 0 AND not sold)
+        const hasAskingPrice = Number(v.asking_price || 0) > 0;
+        const isSold = v.sale_status === 'sold' || v.auction_outcome === 'sold';
+        if (v.is_for_sale === true || (hasAskingPrice && !isSold)) {
           forSaleCount++;
         }
 
-        // Count active auctions
-        const hasBids = (v.bid_count && Number(v.bid_count) > 0) || false;
-        const auctionOutcome = v.auction_outcome;
-        const isActiveAuction = auctionOutcome === 'active' || auctionOutcome === 'live';
-        if (hasBids || isActiveAuction) {
+        // Count active auctions: sale_status='auction_live' (currently live auctions)
+        if (v.sale_status === 'auction_live') {
           activeAuctions++;
         }
 
@@ -1760,7 +1905,7 @@ const CursorHomepage: React.FC = () => {
         }, 0);
 
       setFilteredStatsFromDb({
-        totalVehicles: filtered.length,
+        totalVehicles: accurateTotalVehicles,
         totalValue,
         salesVolume,
         salesCountToday,
@@ -1782,7 +1927,7 @@ const CursorHomepage: React.FC = () => {
     } finally {
       setFilteredStatsLoading(false);
     }
-  }, [hasActiveFilters, debouncedSearchText, filters]);
+  }, [hasActiveFilters, debouncedSearchText, filters, includedSources, getSourceFilterKey]);
 
   // Load filtered stats when filters change
   useEffect(() => {
@@ -1817,12 +1962,14 @@ const CursorHomepage: React.FC = () => {
 
   // Calculate filtered vehicle statistics (fallback for display, but we prefer DB stats)
   const filteredStats = useMemo(() => {
-    // If we have DB stats, use those (more accurate)
-    if (hasActiveFilters || debouncedSearchText) {
+    // If we have DB stats AND they've loaded (totalVehicles > 0 or totalValue > 0), use those (more accurate)
+    // Also use DB stats if filteredVehicles is empty (no local data to compute from)
+    if ((hasActiveFilters || debouncedSearchText) &&
+        (filteredStatsFromDb.totalVehicles > 0 || filteredStatsFromDb.totalValue > 0 || filteredVehicles.length === 0)) {
       return filteredStatsFromDb;
     }
-    
-    // Otherwise compute from filteredVehicles (for backwards compatibility)
+
+    // Otherwise compute from filteredVehicles (used while DB stats are loading, or as fallback)
     const totalVehicles = filteredVehicles.length;
     let totalValue = 0;
     let vehiclesWithValue = 0;
@@ -1850,19 +1997,18 @@ const CursorHomepage: React.FC = () => {
     const todayISO = todayStart.toISOString().split('T')[0]; // YYYY-MM-DD
     
     filteredVehicles.forEach((v) => {
-      // Count for sale
-      if (v.is_for_sale === true) {
+      // Count for sale: is_for_sale=true OR (asking_price > 0 AND not sold)
+      const hasAskingPrice = Number((v as any).asking_price || 0) > 0;
+      const isSold = (v as any).sale_status === 'sold' || (v as any).auction_outcome === 'sold';
+      if (v.is_for_sale === true || (hasAskingPrice && !isSold)) {
         forSaleCount++;
       }
-      
-      // Count active auctions
-      const hasBids = (v.bid_count && Number(v.bid_count) > 0) || false;
-      const auctionOutcome = (v as any).auction_outcome;
-      const isActiveAuction = auctionOutcome === 'active' || auctionOutcome === 'live';
-      if (hasBids || isActiveAuction) {
+
+      // Count active auctions: sale_status='auction_live' (currently live auctions)
+      if ((v as any).sale_status === 'auction_live') {
         activeAuctions++;
       }
-      
+
       // Sum total bids
       if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
         totalBids += Number(v.bid_count);
@@ -1975,11 +2121,69 @@ const CursorHomepage: React.FC = () => {
     try {
       setDbStatsLoading(true);
 
-      // Use server-side RPC for accurate stats (no 1000 row limit!)
+      // Try fast stats first (simple counts, no timeout issues)
+      const { data: fastStats, error: fastError } = await supabase.rpc('get_portfolio_stats_fast');
+
+      if (!fastError && fastStats) {
+        // Fast stats only has core counts, fill in zeros for detailed values
+        const stats = {
+          totalVehicles: Number(fastStats.total_vehicles) || 0,
+          totalValue: 0, // Will be computed from vehicles if needed
+          salesVolume: 0,
+          salesCountToday: Number(fastStats.sales_count_today) || 0,
+          forSaleCount: Number(fastStats.for_sale_count) || 0,
+          activeAuctions: Number(fastStats.active_auctions) || 0,
+          totalBids: 0,
+          avgValue: 0,
+          vehiclesAddedToday: Number(fastStats.vehicles_added_today) || 0,
+          valueMarkTotal: 0,
+          valueAskTotal: 0,
+          valueRealizedTotal: 0,
+          valueCostTotal: 0,
+          valueImportedToday: 0,
+          valueImported24h: 0,
+          valueImported7d: 0,
+        };
+
+        console.log('Fast stats loaded:', {
+          totalVehicles: stats.totalVehicles,
+          forSaleCount: stats.forSaleCount,
+          activeAuctions: stats.activeAuctions,
+          source: 'get_portfolio_stats_fast RPC'
+        });
+
+        setDbStats(stats);
+        setDbStatsLoading(false);
+
+        // Now try to get detailed values in the background (slower query)
+        supabase.rpc('calculate_portfolio_value_server').then(({ data: fullStats, error: fullError }) => {
+          if (!fullError && fullStats) {
+            setDbStats(prev => ({
+              ...prev,
+              totalValue: Number(fullStats.total_value) || prev.totalValue,
+              salesVolume: Number(fullStats.sales_volume_today) || prev.salesVolume,
+              avgValue: Number(fullStats.avg_value) || prev.avgValue,
+              valueMarkTotal: Number(fullStats.value_mark_total) || prev.valueMarkTotal,
+              valueAskTotal: Number(fullStats.value_ask_total) || prev.valueAskTotal,
+              valueRealizedTotal: Number(fullStats.value_realized_total) || prev.valueRealizedTotal,
+              valueCostTotal: Number(fullStats.value_cost_total) || prev.valueCostTotal,
+              valueImportedToday: Number(fullStats.value_imported_today) || prev.valueImportedToday,
+              valueImported24h: Number(fullStats.value_imported_24h) || prev.valueImported24h,
+              valueImported7d: Number(fullStats.value_imported_7d) || prev.valueImported7d,
+            }));
+            console.log('Full stats loaded in background');
+          }
+        }).catch(() => {
+          // Ignore background error
+        });
+
+        return;
+      }
+
+      // Fallback: Try the full RPC directly
       const { data: serverStats, error: rpcError } = await supabase.rpc('calculate_portfolio_value_server');
 
       if (!rpcError && serverStats) {
-        // Map RPC response to our state shape
         const stats = {
           totalVehicles: Number(serverStats.total_vehicles) || 0,
           totalValue: Number(serverStats.total_value) || 0,
@@ -1987,7 +2191,7 @@ const CursorHomepage: React.FC = () => {
           salesCountToday: Number(serverStats.sales_count_today) || 0,
           forSaleCount: Number(serverStats.for_sale_count) || 0,
           activeAuctions: Number(serverStats.active_auctions) || 0,
-          totalBids: 0, // Not tracked in RPC yet
+          totalBids: 0,
           avgValue: Number(serverStats.avg_value) || 0,
           vehiclesAddedToday: Number(serverStats.vehicles_added_today) || 0,
           valueMarkTotal: Number(serverStats.value_mark_total) || 0,
@@ -2002,7 +2206,6 @@ const CursorHomepage: React.FC = () => {
         console.log('Server-side stats loaded:', {
           totalVehicles: stats.totalVehicles,
           totalValue: stats.totalValue,
-          vehiclesWithValue: serverStats.vehicles_with_value,
           source: 'calculate_portfolio_value_server RPC'
         });
 
@@ -2011,8 +2214,8 @@ const CursorHomepage: React.FC = () => {
         return;
       }
 
-      // Fallback to client-side calculation if RPC fails
-      console.warn('RPC failed, falling back to client-side stats:', rpcError);
+      // Fallback to client-side calculation if both RPCs fail
+      console.warn('RPC failed, falling back to client-side stats:', fastError || rpcError);
 
       // Get total vehicle count
       const { count: totalCount, error: countError } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
@@ -2078,18 +2281,19 @@ const CursorHomepage: React.FC = () => {
       let valueImported7d = 0;
       
       (allVehicles || []).forEach((v) => {
-        // Count for sale
-        if (v.is_for_sale === true) {
+        // Count for sale: is_for_sale=true OR (asking_price > 0 AND not sold)
+        const hasAskingPrice = safeNum((v as any).asking_price) > 0;
+        const isSold = v.sale_status === 'sold' || (v as any).auction_outcome === 'sold';
+        if (v.is_for_sale === true || (hasAskingPrice && !isSold)) {
           forSaleCount++;
         }
-        
-        // Count active auctions (has bids or auction outcome is active)
-        const hasBids = (v.bid_count && Number(v.bid_count) > 0) || false;
-        const isActiveAuction = v.auction_outcome === 'active' || v.auction_outcome === 'live';
-        if (hasBids || isActiveAuction) {
+
+        // Count active auctions: sale_status='auction_live' (currently live auctions)
+        // NOT bid_count > 0 which includes historical auctions
+        if (v.sale_status === 'auction_live') {
           activeAuctions++;
         }
-        
+
         // Sum total bids
         if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
           totalBids += Number(v.bid_count);
@@ -2186,8 +2390,11 @@ const CursorHomepage: React.FC = () => {
         // ignore; keep heuristic
       }
       
+      // Use totalCount if available, otherwise fallback to processed vehicles count
+      // This ensures we show SOMETHING even if the count query fails
+      const vehicleCountFallback = (allVehicles || []).length;
       const stats = {
-        totalVehicles: totalCount || 0,
+        totalVehicles: totalCount || vehicleCountFallback || 0,
         totalValue,
         salesVolume,
         salesCountToday,
@@ -2308,6 +2515,71 @@ const CursorHomepage: React.FC = () => {
     // Priority 3: No filters but dbStats hasn't loaded yet - still use dbStats (will update when loaded)
     return dbStats;
   }, [hasActiveFilters, debouncedSearchText, dbStats, filteredStats]);
+
+  // Compute sales stats for the selected time period
+  const salesByPeriod = useMemo(() => {
+    const period = SALES_PERIODS.find(p => p.value === salesPeriod);
+    if (!period) return { count: 0, volume: 0, label: 'today' };
+
+    // For "today" with no filters, use database stats (accurate, covers all vehicles)
+    if (salesPeriod === 'today' && !hasActiveFilters && !debouncedSearchText) {
+      return {
+        count: displayStats.salesCountToday || 0,
+        volume: displayStats.salesVolume || 0,
+        label: 'today'
+      };
+    }
+
+    // For other periods or when filters active, compute from vehicles
+    const vehicles = hasActiveFilters || debouncedSearchText ? filteredVehicles : feedVehicles;
+    const now = new Date();
+    let cutoffDate: Date | null = null;
+
+    if (period.days !== null) {
+      cutoffDate = new Date(now);
+      cutoffDate.setDate(cutoffDate.getDate() - period.days);
+      cutoffDate.setHours(0, 0, 0, 0);
+    }
+
+    let count = 0;
+    let volume = 0;
+
+    vehicles.forEach((v: any) => {
+      const salePrice = Number(v.sale_price || 0) || 0;
+      if (salePrice < 500) return; // Skip low-value sales (likely errors)
+
+      const saleDateStr = v.sale_date;
+      if (!saleDateStr) return;
+
+      const saleDate = new Date(saleDateStr);
+      if (isNaN(saleDate.getTime())) return;
+
+      // Check if sale is within the period
+      if (cutoffDate === null || saleDate >= cutoffDate) {
+        count++;
+        volume += salePrice;
+      }
+    });
+
+    // If no sales found for this period and no filters, fall back to "today" DB stats
+    // This handles the case where vehicles haven't fully loaded yet
+    if (count === 0 && !hasActiveFilters && !debouncedSearchText && displayStats.salesCountToday > 0) {
+      return {
+        count: displayStats.salesCountToday,
+        volume: displayStats.salesVolume || 0,
+        label: 'today*' // Asterisk indicates fallback
+      };
+    }
+
+    return { count, volume, label: period.label };
+  }, [salesPeriod, hasActiveFilters, debouncedSearchText, filteredVehicles, feedVehicles, displayStats.salesCountToday, displayStats.salesVolume]);
+
+  // Cycle to next sales period
+  const cycleSalesPeriod = useCallback(() => {
+    const currentIndex = SALES_PERIODS.findIndex(p => p.value === salesPeriod);
+    const nextIndex = (currentIndex + 1) % SALES_PERIODS.length;
+    setSalesPeriod(SALES_PERIODS[nextIndex].value);
+  }, [salesPeriod]);
 
   const headerValueMetric = useMemo(() => {
     switch (valueMetricMode) {
@@ -4029,7 +4301,9 @@ const CursorHomepage: React.FC = () => {
                       <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '10px 0' }}>
                         {(statsPanelRows || []).map((v: any) => {
                           const title = `${v?.year ?? ''} ${v?.make ?? ''} ${v?.model ?? ''}`.trim() || 'Vehicle';
-                          const img = String(v?.primary_image_url || v?.image_url || '').trim() || '/n-zero.png';
+                          const rawImg = String(v?.primary_image_url || v?.image_url || '').trim();
+                          // Optimize image for 140px display - use thumbnail size (150px)
+                          const img = rawImg ? (optimizeImageUrl(rawImg, 'thumbnail') || rawImg) : '/n-zero.png';
 
                           const salePrice = typeof v?.sale_price === 'number' ? v.sale_price : Number(v?.sale_price || 0) || 0;
                           const ask = typeof v?.asking_price === 'number' ? v.asking_price : Number(v?.asking_price || 0) || 0;
@@ -4143,69 +4417,111 @@ const CursorHomepage: React.FC = () => {
             overflow: 'hidden',
             cursor: 'pointer'
           }}>
-            <div style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'baseline', gap: '10px', flex: '0 0 auto' }}>
-              <div style={{ fontSize: '8pt', fontWeight: 900, color: 'var(--text)' }}>
-                {displayStats.totalVehicles.toLocaleString()} vehicles
+            <div style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'baseline', gap: '6px', flex: '0 0 auto', fontSize: '7pt' }}>
+              <div style={{ fontWeight: 700, color: 'var(--text)' }}>
+                {displayStats.totalVehicles.toLocaleString()} veh
               </div>
               {displayStats.vehiclesAddedToday > 0 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleAddedTodayOnly();
-                  }}
-                  title={
-                    filters.addedTodayOnly
-                      ? 'Showing vehicles added today (click to clear)'
-                      : 'Show vehicles added today'
-                  }
-                  style={{
-                    padding: '1px 8px',
-                    borderRadius: '999px',
-                    border: filters.addedTodayOnly
-                      ? '1px solid rgba(16,185,129,0.55)'
-                      : '1px solid rgba(16,185,129,0.25)',
-                    background: filters.addedTodayOnly ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.10)',
-                    color: '#10b981',
-                    fontSize: '7pt',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    fontFamily: '"MS Sans Serif", sans-serif',
-                    flex: '0 0 auto',
-                    lineHeight: 1.4,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(16,185,129,0.22)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = filters.addedTodayOnly ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.10)';
-                  }}
-                >
-                  +{displayStats.vehiclesAddedToday} today
-                </button>
+                <>
+                  <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleAddedTodayOnly();
+                    }}
+                    title={
+                      filters.addedTodayOnly
+                        ? 'Showing vehicles added today (click to clear)'
+                        : 'Show vehicles added today'
+                    }
+                    style={{
+                      padding: '1px 6px',
+                      borderRadius: '999px',
+                      border: filters.addedTodayOnly
+                        ? '1px solid rgba(16,185,129,0.55)'
+                        : '1px solid rgba(16,185,129,0.25)',
+                      background: filters.addedTodayOnly ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.10)',
+                      color: '#10b981',
+                      fontSize: '7pt',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: '"MS Sans Serif", sans-serif',
+                      flex: '0 0 auto',
+                      lineHeight: 1.3,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(16,185,129,0.22)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = filters.addedTodayOnly ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.10)';
+                    }}
+                  >
+                    +{displayStats.vehiclesAddedToday} today
+                  </button>
+                </>
               )}
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+              <div style={{ color: 'var(--text-muted)' }}>
                 {formatCurrency(headerValueMetric.value)} {headerValueMetric.label}
               </div>
               {displayStats.forSaleCount > 0 && (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                  {displayStats.forSaleCount.toLocaleString()} for sale
-                </div>
+                <>
+                  <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    {displayStats.forSaleCount.toLocaleString()} for sale
+                  </div>
+                </>
               )}
               {displayStats.activeAuctions > 0 && (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                  {displayStats.activeAuctions} active auctions
-                </div>
+                <>
+                  <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    {displayStats.activeAuctions} auctions
+                  </div>
+                </>
               )}
-              {displayStats.salesCountToday > 0 && (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                  {displayStats.salesCountToday} sold today · {formatCurrency(displayStats.salesVolume)}
-                </div>
+              {salesByPeriod.count > 0 && (
+                <>
+                  <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      cycleSalesPeriod();
+                    }}
+                    title={`${salesByPeriod.count} vehicles sold ${salesByPeriod.label === 'all' ? 'all time' : salesByPeriod.label === 'today' ? 'today' : 'in ' + salesByPeriod.label} (click to change period)`}
+                    style={{
+                      padding: '1px 6px',
+                      borderRadius: '999px',
+                      border: '1px solid rgba(168,85,247,0.25)',
+                      background: 'rgba(168,85,247,0.10)',
+                      color: '#a855f7',
+                      fontSize: '7pt',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: '"MS Sans Serif", sans-serif',
+                      flex: '0 0 auto',
+                      lineHeight: 1.3,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(168,85,247,0.18)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(168,85,247,0.10)';
+                    }}
+                  >
+                    {salesByPeriod.count.toLocaleString()} sold {salesByPeriod.label} · {formatCurrency(salesByPeriod.volume)}
+                  </button>
+                </>
               )}
               {(hasActiveFilters || debouncedSearchText) && displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                  {formatCurrency(displayStats.avgValue)} avg
-                </div>
+                <>
+                  <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    {formatCurrency(displayStats.avgValue)} avg
+                  </div>
+                </>
               )}
             </div>
 
@@ -4447,35 +4763,7 @@ const CursorHomepage: React.FC = () => {
           </div>
         )}
 
-        {/* Show Filters Button - only when filters are hidden and no active filters */}
-        {!showFilters && !filterBarMinimized && !hasActiveFilters && (
-          <div style={{
-            marginBottom: '16px',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            alignItems: 'center'
-          }}>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-              {filteredVehicles.length} vehicles
-            </div>
-            <button
-              onClick={() => setShowFilters(true)}
-              style={{
-                padding: '4px 8px',
-                fontSize: '8pt',
-                border: '1px solid var(--border)',
-                background: 'var(--white)',
-                color: 'var(--text)',
-                cursor: 'pointer',
-                borderRadius: '2px',
-                fontFamily: '"MS Sans Serif", sans-serif'
-              }}
-            >
-              Show Filters
-            </button>
-          </div>
-        )}
+        {/* Stats bar is ALWAYS visible - removed minimal "Show Filters" fallback */}
 
         {/* Filter Panel - Redesigned clean version */}
         {showFilters && (
@@ -4598,7 +4886,7 @@ const CursorHomepage: React.FC = () => {
                   </button>
                 </>
               )}
-              {displayStats.salesCountToday > 0 && (
+              {salesByPeriod.count > 0 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
                   <button
@@ -4606,21 +4894,29 @@ const CursorHomepage: React.FC = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      openStatsPanel('sold_today');
+                      cycleSalesPeriod();
                     }}
-                    title={`Sold today (by sale_date): ${displayStats.salesCountToday} sold, ${formatCurrency(displayStats.salesVolume)} total. Click to preview.`}
+                    title={`${salesByPeriod.count} vehicles sold ${salesByPeriod.label === 'all' ? 'all time' : salesByPeriod.label === 'today' ? 'today' : 'in ' + salesByPeriod.label} (click to change period)`}
                     style={{
-                      border: 'none',
-                      background: 'transparent',
-                      padding: 0,
-                      margin: 0,
-                      cursor: 'pointer',
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      border: '1px solid rgba(168,85,247,0.35)',
+                      background: 'rgba(168,85,247,0.12)',
+                      color: '#a855f7',
                       fontFamily: 'monospace',
                       fontSize: '7pt',
-                      color: 'var(--text)'
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      margin: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(168,85,247,0.22)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(168,85,247,0.12)';
                     }}
                   >
-                    <b>{displayStats.salesCountToday}</b> sold · <b>{formatCurrency(displayStats.salesVolume)}</b>
+                    <b>{salesByPeriod.count.toLocaleString()}</b> sold {salesByPeriod.label} · <b>{formatCurrency(salesByPeriod.volume)}</b>
                   </button>
                 </>
               )}
@@ -5244,285 +5540,388 @@ const CursorHomepage: React.FC = () => {
                 </div>
               )}
 
-              {/* Make filter - expanded */}
-              {!collapsedSections.makeFilters && (
-                <div style={{
-                  marginBottom: '8px',
-                  padding: '6px',
-                  background: 'var(--grey-50)',
-                  border: '1px solid var(--border)',
-                  fontSize: '7pt'
-                }}>
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '6px', position: 'relative' }}>
-                    <div style={{ flex: 1, position: 'relative' }}>
-                      <input
-                        type="text"
-                        placeholder="search makes (Chevrolet, Ford...)"
-                        value={makeSearchText}
-                        onChange={(e) => {
-                          setMakeSearchText(e.target.value);
-                          setShowMakeSuggestions(true);
-                        }}
-                        onFocus={() => setShowMakeSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowMakeSuggestions(false), 150)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && makeSearchText.trim()) {
-                            const newMake = makeSearchText.trim();
-                            // Find exact match or use typed value
-                            const exactMatch = availableMakes.find(m => m.toLowerCase() === newMake.toLowerCase());
-                            const makeToAdd = exactMatch || newMake;
-                            if (!filters.makes.includes(makeToAdd)) {
-                              setFilters({...filters, makes: [...filters.makes, makeToAdd]});
-                            }
-                            setMakeSearchText('');
-                            setShowMakeSuggestions(false);
-                          } else if (e.key === 'Escape') {
-                            setShowMakeSuggestions(false);
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '3px 6px',
-                          fontSize: '7pt',
-                          border: '1px solid var(--border)',
-                          fontFamily: '"MS Sans Serif", sans-serif'
-                        }}
-                      />
-                      {/* Autocomplete dropdown */}
-                      {showMakeSuggestions && makeSearchText.length > 0 && (
-                        <div style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          maxHeight: '150px',
-                          overflowY: 'auto',
-                          background: 'var(--white)',
-                          border: '1px solid var(--border)',
-                          borderTop: 'none',
-                          zIndex: 100,
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}>
-                          {availableMakes
-                            .filter(m => 
-                              m.toLowerCase().startsWith(makeSearchText.toLowerCase()) &&
-                              !filters.makes.includes(m)
-                            )
-                            .slice(0, 10)
-                            .map((make) => (
-                              <div
-                                key={make}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setFilters({...filters, makes: [...filters.makes, make]});
-                                  setMakeSearchText('');
-                                  setShowMakeSuggestions(false);
-                                }}
-                                style={{
-                                  padding: '4px 8px',
-                                  cursor: 'pointer',
-                                  fontSize: '7pt',
-                                  borderBottom: '1px solid var(--grey-100)'
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--grey-100)')}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--white)')}
-                              >
-                                {make}
-                              </div>
-                            ))}
-                          {availableMakes.filter(m => 
-                            m.toLowerCase().startsWith(makeSearchText.toLowerCase()) &&
-                            !filters.makes.includes(m)
-                          ).length === 0 && (
-                            <div style={{ padding: '4px 8px', fontSize: '7pt', color: 'var(--text-muted)' }}>
-                              No matches - press Enter to add "{makeSearchText}"
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (makeSearchText.trim()) {
-                          const newMake = makeSearchText.trim();
-                          const exactMatch = availableMakes.find(m => m.toLowerCase() === newMake.toLowerCase());
-                          const makeToAdd = exactMatch || newMake;
-                          if (!filters.makes.includes(makeToAdd)) {
-                            setFilters({...filters, makes: [...filters.makes, makeToAdd]});
-                          }
-                          setMakeSearchText('');
-                          setShowMakeSuggestions(false);
-                        }
+              {/* Make filter - inline badge input */}
+              {!collapsedSections.makeFilters && (() => {
+                // Compute filtered suggestions for keyboard nav
+                const makeSuggestions = availableMakes
+                  .filter(m =>
+                    m.toLowerCase().startsWith(makeSearchText.toLowerCase()) &&
+                    !filters.makes.includes(m)
+                  )
+                  .slice(0, 8);
+
+                return (
+                  <div style={{
+                    marginBottom: '8px',
+                    position: 'relative'
+                  }}>
+                    {/* Inline badge input container */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 6px',
+                        background: 'var(--white)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '2px',
+                        minHeight: '24px',
+                        cursor: 'text'
                       }}
-                      className="button-win95"
-                      style={{ padding: '2px 8px', fontSize: '7pt' }}
+                      onClick={() => makeInputRef.current?.focus()}
                     >
-                      add
-                    </button>
-                    {filters.makes.length > 0 && (
-                      <button
-                        onClick={() => setFilters({...filters, makes: []})}
-                        className="button-win95"
-                        style={{ padding: '2px 6px', fontSize: '7pt' }}
-                      >
-                        clear
-                      </button>
-                    )}
-                  </div>
-                  {filters.makes.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {/* Selected make badges inline */}
                       {filters.makes.map((make) => (
                         <span
                           key={make}
                           style={{
-                            padding: '2px 6px',
+                            padding: '1px 5px',
                             background: 'var(--grey-600)',
                             color: 'var(--white)',
                             fontSize: '7pt',
                             borderRadius: '2px',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '3px',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           {make}
                           <button
-                            onClick={() => setFilters({...filters, makes: filters.makes.filter(m => m !== make)})}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFilters({...filters, makes: filters.makes.filter(m => m !== make)});
+                            }}
                             style={{
                               background: 'none',
                               border: 'none',
                               color: 'var(--white)',
                               cursor: 'pointer',
                               padding: 0,
-                              fontSize: '8pt',
-                              lineHeight: 1
+                              fontSize: '7pt',
+                              lineHeight: 1,
+                              opacity: 0.8
                             }}
                           >
                             x
                           </button>
                         </span>
                       ))}
-                    </div>
-                  )}
-                  {/* Quick make chips - show top makes from DB */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: filters.makes.length > 0 ? '6px' : 0 }}>
-                    {(availableMakes.length > 0 
-                      ? availableMakes.slice(0, 20) 
-                      : ['Chevrolet', 'Ford', 'Dodge', 'GMC', 'Plymouth', 'Pontiac', 'Buick', 'Cadillac', 'Toyota', 'Porsche', 'Mercedes-Benz', 'BMW']
-                    ).map((make) => (
-                      <button
-                        key={make}
-                        onClick={() => {
-                          if (filters.makes.includes(make)) {
-                            setFilters({...filters, makes: filters.makes.filter(m => m !== make)});
-                          } else {
-                            setFilters({...filters, makes: [...filters.makes, make]});
+                      {/* Text input */}
+                      <input
+                        ref={makeInputRef}
+                        type="text"
+                        value={makeSearchText}
+                        onChange={(e) => {
+                          setMakeSearchText(e.target.value);
+                          setShowMakeSuggestions(true);
+                          setMakeSuggestionIndex(-1);
+                        }}
+                        onFocus={() => setShowMakeSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowMakeSuggestions(false), 150)}
+                        onKeyDown={(e) => {
+                          // Arrow down - move selection down
+                          if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            if (makeSuggestions.length > 0) {
+                              setMakeSuggestionIndex(prev =>
+                                prev < makeSuggestions.length - 1 ? prev + 1 : 0
+                              );
+                            }
+                          }
+                          // Arrow up - move selection up
+                          else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            if (makeSuggestions.length > 0) {
+                              setMakeSuggestionIndex(prev =>
+                                prev > 0 ? prev - 1 : makeSuggestions.length - 1
+                              );
+                            }
+                          }
+                          // Enter - select highlighted or top match, or go to model
+                          else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (makeSearchText.trim()) {
+                              // Select highlighted suggestion or top match
+                              const makeToAdd = makeSuggestionIndex >= 0 && makeSuggestions[makeSuggestionIndex]
+                                ? makeSuggestions[makeSuggestionIndex]
+                                : makeSuggestions[0] || makeSearchText.trim();
+
+                              if (!filters.makes.includes(makeToAdd)) {
+                                setFilters({...filters, makes: [...filters.makes, makeToAdd]});
+                              }
+                              setMakeSearchText('');
+                              setShowMakeSuggestions(false);
+                              setMakeSuggestionIndex(-1);
+                            } else if (filters.makes.length > 0) {
+                              // Empty input + makes selected = focus model input
+                              setTimeout(() => modelInputRef.current?.focus(), 50);
+                            }
+                          }
+                          // Backspace when empty - remove last badge
+                          else if (e.key === 'Backspace' && !makeSearchText && filters.makes.length > 0) {
+                            setFilters({...filters, makes: filters.makes.slice(0, -1)});
+                          }
+                          // Escape - close dropdown
+                          else if (e.key === 'Escape') {
+                            setShowMakeSuggestions(false);
+                            setMakeSuggestionIndex(-1);
                           }
                         }}
-                        className="button-win95"
                         style={{
-                          padding: '2px 6px',
+                          flex: 1,
+                          minWidth: '60px',
+                          border: 'none',
+                          outline: 'none',
+                          padding: '2px 0',
                           fontSize: '7pt',
-                          background: filters.makes.includes(make) ? 'var(--grey-600)' : 'var(--white)',
-                          color: filters.makes.includes(make) ? 'var(--white)' : 'var(--text)'
+                          fontFamily: '"MS Sans Serif", sans-serif',
+                          background: 'transparent'
                         }}
-                      >
-                        {make}
-                      </button>
-                    ))}
-                    {availableMakes.length > 20 && (
-                      <span style={{ fontSize: '6pt', color: 'var(--text-muted)', alignSelf: 'center' }}>
-                        +{availableMakes.length - 20} more (type to search)
-                      </span>
+                      />
+                    </div>
+
+                    {/* Autocomplete dropdown */}
+                    {showMakeSuggestions && makeSearchText.length > 0 && makeSuggestions.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '150px',
+                        overflowY: 'auto',
+                        background: 'var(--white)',
+                        border: '1px solid var(--border)',
+                        borderTop: 'none',
+                        zIndex: 100,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}>
+                        {makeSuggestions.map((make, idx) => (
+                          <div
+                            key={make}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setFilters({...filters, makes: [...filters.makes, make]});
+                              setMakeSearchText('');
+                              setShowMakeSuggestions(false);
+                              setMakeSuggestionIndex(-1);
+                            }}
+                            onMouseEnter={() => setMakeSuggestionIndex(idx)}
+                            style={{
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontSize: '7pt',
+                              background: idx === makeSuggestionIndex ? 'var(--grey-200)' : 'var(--white)',
+                              borderBottom: '1px solid var(--grey-100)'
+                            }}
+                          >
+                            {make}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
-              {/* Model filter - only shows when makes are selected */}
-              {filters.makes.length > 0 && availableModels.length > 0 && (
-                <div style={{
-                  marginBottom: '8px',
-                  padding: '6px',
-                  background: 'var(--grey-50)',
-                  border: '1px solid var(--border)',
-                  fontSize: '7pt'
-                }}>
-                  <div style={{ fontSize: '7pt', fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>
-                    model (for {filters.makes.join(', ')})
-                  </div>
-                  {filters.models && filters.models.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
-                      {filters.models.map((model) => (
+              {/* Model filter - inline badge input (shows when makes are selected) */}
+              {filters.makes.length > 0 && availableModels.length > 0 && (() => {
+                // Fuzzy matching helper
+                const normalize = (s: string) => s.toLowerCase().replace(/[-\/\s]/g, '');
+                const searchLower = modelSearchText.toLowerCase().trim();
+                const searchNorm = normalize(searchLower);
+
+                // Compute filtered suggestions with fuzzy matching
+                const modelSuggestions = availableModels
+                  .filter(m => {
+                    if (filters.models?.includes(m)) return false;
+                    if (!searchLower) return false;
+                    const modelNorm = normalize(m);
+                    const modelLower = m.toLowerCase();
+                    // Normalized match (c10 = c-10)
+                    if (modelNorm.includes(searchNorm)) return true;
+                    // Contains match
+                    if (modelLower.includes(searchLower)) return true;
+                    // Category matching
+                    const truckTerms = ['truck', 'pickup', 'c10', 'c20', 'c30', 'k10', 'k20', 'k5'];
+                    if (truckTerms.some(t => searchLower.includes(t))) {
+                      if (truckTerms.some(t => modelLower.includes(t))) return true;
+                    }
+                    return false;
+                  })
+                  .slice(0, 8);
+
+                return (
+                  <div style={{
+                    marginBottom: '8px',
+                    position: 'relative'
+                  }}>
+                    {/* Inline badge input container */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 6px',
+                        background: 'var(--white)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '2px',
+                        minHeight: '24px',
+                        cursor: 'text'
+                      }}
+                      onClick={() => modelInputRef.current?.focus()}
+                    >
+                      {/* Selected model badges inline */}
+                      {(filters.models || []).map((model) => (
                         <span
                           key={model}
                           style={{
-                            padding: '2px 6px',
+                            padding: '1px 5px',
                             background: 'var(--grey-600)',
                             color: 'var(--white)',
                             fontSize: '7pt',
                             borderRadius: '2px',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '3px',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           {model}
                           <button
-                            onClick={() => setFilters({...filters, models: filters.models.filter(m => m !== model)})}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFilters({...filters, models: filters.models.filter(m => m !== model)});
+                            }}
                             style={{
                               background: 'none',
                               border: 'none',
                               color: 'var(--white)',
                               cursor: 'pointer',
                               padding: 0,
-                              fontSize: '8pt',
-                              lineHeight: 1
+                              fontSize: '7pt',
+                              lineHeight: 1,
+                              opacity: 0.8
                             }}
                           >
                             x
                           </button>
                         </span>
                       ))}
-                      <button
-                        onClick={() => setFilters({...filters, models: []})}
-                        className="button-win95"
-                        style={{ padding: '2px 6px', fontSize: '6pt' }}
-                      >
-                        clear
-                      </button>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {availableModels.slice(0, 15).map((model) => (
-                      <button
-                        key={model}
-                        onClick={() => {
-                          if (filters.models?.includes(model)) {
-                            setFilters({...filters, models: filters.models.filter(m => m !== model)});
-                          } else {
-                            setFilters({...filters, models: [...(filters.models || []), model]});
+                      {/* Text input */}
+                      <input
+                        ref={modelInputRef}
+                        type="text"
+                        value={modelSearchText}
+                        onChange={(e) => {
+                          setModelSearchText(e.target.value);
+                          setShowModelSuggestions(true);
+                          setModelSuggestionIndex(-1);
+                        }}
+                        onFocus={() => setShowModelSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowModelSuggestions(false), 150)}
+                        onKeyDown={(e) => {
+                          // Arrow down
+                          if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            if (modelSuggestions.length > 0) {
+                              setModelSuggestionIndex(prev =>
+                                prev < modelSuggestions.length - 1 ? prev + 1 : 0
+                              );
+                            }
+                          }
+                          // Arrow up
+                          else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            if (modelSuggestions.length > 0) {
+                              setModelSuggestionIndex(prev =>
+                                prev > 0 ? prev - 1 : modelSuggestions.length - 1
+                              );
+                            }
+                          }
+                          // Enter - select highlighted or top match
+                          else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (modelSearchText.trim()) {
+                              const modelToAdd = modelSuggestionIndex >= 0 && modelSuggestions[modelSuggestionIndex]
+                                ? modelSuggestions[modelSuggestionIndex]
+                                : modelSuggestions[0] || modelSearchText.trim();
+
+                              if (!filters.models?.includes(modelToAdd)) {
+                                setFilters({...filters, models: [...(filters.models || []), modelToAdd]});
+                              }
+                              setModelSearchText('');
+                              setShowModelSuggestions(false);
+                              setModelSuggestionIndex(-1);
+                            }
+                          }
+                          // Backspace when empty - remove last badge
+                          else if (e.key === 'Backspace' && !modelSearchText && filters.models?.length > 0) {
+                            setFilters({...filters, models: filters.models.slice(0, -1)});
+                          }
+                          // Escape
+                          else if (e.key === 'Escape') {
+                            setShowModelSuggestions(false);
+                            setModelSuggestionIndex(-1);
                           }
                         }}
-                        className="button-win95"
                         style={{
-                          padding: '2px 6px',
+                          flex: 1,
+                          minWidth: '60px',
+                          border: 'none',
+                          outline: 'none',
+                          padding: '2px 0',
                           fontSize: '7pt',
-                          background: filters.models?.includes(model) ? 'var(--grey-600)' : 'var(--white)',
-                          color: filters.models?.includes(model) ? 'var(--white)' : 'var(--text)'
+                          fontFamily: '"MS Sans Serif", sans-serif',
+                          background: 'transparent'
                         }}
-                      >
-                        {model}
-                      </button>
-                    ))}
-                    {availableModels.length > 15 && (
-                      <span style={{ fontSize: '6pt', color: 'var(--text-muted)', alignSelf: 'center' }}>
-                        +{availableModels.length - 15} more
-                      </span>
+                      />
+                    </div>
+
+                    {/* Autocomplete dropdown */}
+                    {showModelSuggestions && modelSearchText.length > 0 && modelSuggestions.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '150px',
+                        overflowY: 'auto',
+                        background: 'var(--white)',
+                        border: '1px solid var(--border)',
+                        borderTop: 'none',
+                        zIndex: 100,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}>
+                        {modelSuggestions.map((model, idx) => (
+                          <div
+                            key={model}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setFilters({...filters, models: [...(filters.models || []), model]});
+                              setModelSearchText('');
+                              setShowModelSuggestions(false);
+                              setModelSuggestionIndex(-1);
+                            }}
+                            onMouseEnter={() => setModelSuggestionIndex(idx)}
+                            style={{
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontSize: '7pt',
+                              background: idx === modelSuggestionIndex ? 'var(--grey-200)' : 'var(--white)',
+                              borderBottom: '1px solid var(--grey-100)'
+                            }}
+                          >
+                            {model}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Type filter - expanded (body style) */}
               {!collapsedSections.typeFilters && (
