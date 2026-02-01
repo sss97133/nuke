@@ -94,14 +94,35 @@ function sortNewestFirst(q: string): boolean {
 }
 
 // Model names by make - used to detect when user specifies a model
+// Also used to identify vehicle-related searches vs organization searches
 const MAKE_MODELS: Record<string, string[]> = {
   porsche: [
     "911", "carrera", "gt3", "turbo", "rs", "cayman", "boxster",
     "taycan", "macan", "cayenne", "panamera", "964", "993", "997", "991", "992",
   ],
-  chevrolet: ["c10", "camaro", "corvette", "impala", "chevelle", "nova", "bel air"],
-  ford: ["mustang", "bronco", "f100", "f150", "gt", "thunderbird", "falcon"],
-  bmw: ["m3", "m5", "2002", "e30", "e36", "e46", "e90", "z3", "z4"],
+  chevrolet: ["c10", "camaro", "corvette", "impala", "chevelle", "nova", "bel air", "silverado", "blazer"],
+  chevy: ["c10", "camaro", "corvette", "impala", "chevelle", "nova", "bel air", "silverado", "blazer"],
+  ford: ["mustang", "bronco", "f100", "f150", "gt", "thunderbird", "falcon", "f250", "ranger"],
+  bmw: ["m3", "m5", "2002", "e30", "e36", "e46", "e90", "z3", "z4", "m4", "m2"],
+  mercedes: ["sl", "amg", "s-class", "g-wagon", "c-class", "e-class", "190e", "300sl"],
+  ferrari: ["testarossa", "308", "328", "348", "355", "360", "430", "458", "488", "f40", "f50"],
+  lamborghini: ["countach", "diablo", "murcielago", "gallardo", "huracan", "aventador"],
+  audi: ["r8", "rs", "quattro", "tt", "s4", "s5", "s6"],
+  toyota: ["supra", "land cruiser", "4runner", "tacoma", "celica", "mr2"],
+  nissan: ["240z", "280z", "300zx", "skyline", "gtr", "370z"],
+  dodge: ["challenger", "charger", "viper", "cuda", "demon", "hellcat"],
+  plymouth: ["cuda", "barracuda", "roadrunner", "gtx", "satellite"],
+  pontiac: ["gto", "firebird", "trans am", "tempest", "lemans"],
+  jaguar: ["e-type", "xke", "xj", "xjs", "f-type"],
+  aston: ["db5", "db9", "vantage", "vanquish"],
+  maserati: ["ghibli", "quattroporte", "granturismo"],
+  cadillac: ["eldorado", "deville", "escalade", "ct5", "cts"],
+  lincoln: ["continental", "navigator", "mkz"],
+  buick: ["riviera", "grand national", "skylark", "regal"],
+  oldsmobile: ["442", "cutlass", "toronado"],
+  datsun: ["240z", "280z", "510", "fairlady"],
+  honda: ["s2000", "nsx", "civic", "accord", "prelude"],
+  mazda: ["rx7", "rx8", "miata", "mx5"],
 };
 
 // Check if any model from a make is already in the query
@@ -549,6 +570,10 @@ serve(async (req: Request) => {
       const baseFts = usedFts ? clamp01(Number(v.relevance ?? 0) / vehiclesMaxRel) : 0;
       const makeBoost = terms.includes(String(v.make || "").toLowerCase()) ? 0.15 : 0;
       const modelBoost = vehicleOrPartsTerms.some((t) => String(v.model || "").toLowerCase().includes(t)) ? 0.1 : 0;
+      // Penalize if search terms only appear in description (not title)
+      // e.g. "mecum" should rank "Mecum Auctions" org above a car that merely "was sold at Mecum"
+      const titleScore = scoreText(terms, title);
+      const descOnlyPenalty = titleScore === 0 && baseText > 0 ? 0.6 : 1; // 40% penalty for desc-only matches
       return {
         id: String(v.id),
         type: "vehicle",
@@ -564,7 +589,7 @@ serve(async (req: Request) => {
           state: vMeta?.state ?? undefined,
           fts_relevance: usedFts ? v.relevance : undefined,
         },
-        relevance_score: clamp01((usedFts ? baseFts : baseText) + (usedFts ? 0.15 * baseText : 0) + makeBoost + modelBoost),
+        relevance_score: clamp01(((usedFts ? baseFts : baseText) + (usedFts ? 0.15 * baseText : 0) + makeBoost + modelBoost) * descOnlyPenalty),
         image_url: vehicleImageById[String(v.id)] || undefined,
         created_at: v.updated_at || v.created_at,
       };
@@ -599,6 +624,9 @@ serve(async (req: Request) => {
       const description = o.description || `${o.city ?? ""}${o.state ? `, ${o.state}` : ""}`.trim();
       const baseText = scoreText(terms, `${title} ${description}`);
       const baseFts = usedFts ? clamp01(Number(o.relevance ?? 0) / orgsMaxRel) : 0;
+      // Boost when search terms match the org name (not just description)
+      const titleScore = scoreText(terms, title);
+      const titleMatchBoost = titleScore > 0 ? 0.25 : 0;
       return {
         id: String(o.id),
         type: "organization",
@@ -611,7 +639,7 @@ serve(async (req: Request) => {
           state: o.state,
           fts_relevance: usedFts ? o.relevance : undefined,
         },
-        relevance_score: clamp01((usedFts ? baseFts : baseText) + (usedFts ? 0.15 * baseText : 0) + 0.05),
+        relevance_score: clamp01((usedFts ? baseFts : baseText) + (usedFts ? 0.15 * baseText : 0) + 0.05 + titleMatchBoost),
         image_url: o.logo_url || undefined,
         created_at: o.created_at,
       };
@@ -698,6 +726,28 @@ serve(async (req: Request) => {
       results.push(...sections.sources);
       results.push(...sections.images.slice(0, 10));
     }
+
+    // Final sort by relevance so high-scoring results appear first
+    // When scores tie, context matters:
+    // - For make/model searches (e.g. "mustang", "bmw"), prefer vehicles
+    // - For other searches (e.g. "mecum", company names), prefer organizations
+    const knownMakes = Object.keys(MAKE_MODELS);
+    const allModels = Object.values(MAKE_MODELS).flat();
+    const isVehicleSearch = terms.some(t =>
+      knownMakes.includes(t) ||
+      allModels.includes(t) ||
+      /^\d{4}$/.test(t) // Year
+    );
+
+    const typeOrderVehicleFirst: Record<string, number> = { vehicle: 0, organization: 1, user: 2, source: 3, image: 4 };
+    const typeOrderOrgFirst: Record<string, number> = { organization: 0, user: 1, source: 2, vehicle: 3, image: 4 };
+    const typeOrder = isVehicleSearch ? typeOrderVehicleFirst : typeOrderOrgFirst;
+
+    results.sort((a, b) => {
+      const scoreDiff = b.relevance_score - a.relevance_score;
+      if (Math.abs(scoreDiff) > 0.001) return scoreDiff;
+      return (typeOrder[a.type] ?? 5) - (typeOrder[b.type] ?? 5);
+    });
 
     const topCitations = results.slice(0, 6).map((r) => ({ type: r.type, id: r.id }));
 
