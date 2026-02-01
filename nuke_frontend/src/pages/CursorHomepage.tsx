@@ -2125,34 +2125,23 @@ const CursorHomepage: React.FC = () => {
       const { data: fastStats, error: fastError } = await supabase.rpc('get_portfolio_stats_fast');
 
       if (!fastError && fastStats) {
-        // Fast stats only has core counts, fill in zeros for detailed values
-        const stats = {
+        // Fast stats only has core counts - PRESERVE existing detailed values (don't reset to 0)
+        console.log('Fast stats loaded:', {
           totalVehicles: Number(fastStats.total_vehicles) || 0,
-          totalValue: 0, // Will be computed from vehicles if needed
-          salesVolume: 0,
-          salesCountToday: Number(fastStats.sales_count_today) || 0,
           forSaleCount: Number(fastStats.for_sale_count) || 0,
           activeAuctions: Number(fastStats.active_auctions) || 0,
-          totalBids: 0,
-          avgValue: 0,
-          vehiclesAddedToday: Number(fastStats.vehicles_added_today) || 0,
-          valueMarkTotal: 0,
-          valueAskTotal: 0,
-          valueRealizedTotal: 0,
-          valueCostTotal: 0,
-          valueImportedToday: 0,
-          valueImported24h: 0,
-          valueImported7d: 0,
-        };
-
-        console.log('Fast stats loaded:', {
-          totalVehicles: stats.totalVehicles,
-          forSaleCount: stats.forSaleCount,
-          activeAuctions: stats.activeAuctions,
           source: 'get_portfolio_stats_fast RPC'
         });
 
-        setDbStats(stats);
+        // Merge fast stats with existing values (preserve totalValue, salesVolume, etc.)
+        setDbStats(prev => ({
+          ...prev,
+          totalVehicles: Number(fastStats.total_vehicles) || prev.totalVehicles,
+          salesCountToday: Number(fastStats.sales_count_today) || prev.salesCountToday,
+          forSaleCount: Number(fastStats.for_sale_count) || prev.forSaleCount,
+          activeAuctions: Number(fastStats.active_auctions) || prev.activeAuctions,
+          vehiclesAddedToday: Number(fastStats.vehicles_added_today) || prev.vehiclesAddedToday,
+        }));
         setDbStatsLoading(false);
 
         // Now try to get detailed values in the background (slower query)
