@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaviconIcon } from '../common/FaviconIcon';
 import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { UserInteractionService } from '../../services/userInteractionService';
@@ -15,6 +15,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useVehicleFollow } from '../../hooks/useVehicleFollow';
 import { formatCurrencyAmount, formatCurrencyFromCents, resolveCurrencyCode } from '../../utils/currency';
+import VehicleHoverCard from './VehicleHoverCard';
 
 const parseMoneyNumber = (val: any): number | null => {
   if (val === null || val === undefined) return null;
@@ -167,6 +168,43 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }>({ loading: false, images: [], error: null });
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [computedCardSize, setComputedCardSize] = React.useState(cardSizePx || 200);
+
+  // Hover card state
+  const [hoverCard, setHoverCard] = useState<{ visible: boolean; position: { x: number; y: number } }>({ visible: false, position: { x: 0, y: 0 } });
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const navigate = useNavigate();
+
+  const handleMouseEnterCard = useCallback((e: React.MouseEvent) => {
+    // Start timer to show hover card after 400ms delay
+    const rect = e.currentTarget.getBoundingClientRect();
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoverCard({
+        visible: true,
+        position: { x: rect.right + 10, y: rect.top }
+      });
+    }, 400);
+  }, []);
+
+  const handleMouseLeaveCard = useCallback(() => {
+    // Cancel pending hover card
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    // Don't hide immediately - let the hover card handle its own close
+  }, []);
+
+  const handleHoverCardClose = useCallback(() => {
+    setHoverCard({ visible: false, position: { x: 0, y: 0 } });
+  }, []);
+
+  const handleHoverCardAction = useCallback((action: 'follow' | 'compare' | 'details') => {
+    setHoverCard({ visible: false, position: { x: 0, y: 0 } });
+    if (action === 'details') {
+      navigate(`/vehicle/${vehicle.id}`);
+    }
+    // TODO: implement follow and compare actions
+  }, [navigate, vehicle.id]);
   const listingCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
     const externalListing = v?.external_listings?.[0];
@@ -2010,9 +2048,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.opacity = '0.85';
+        handleMouseEnterCard(e);
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.opacity = '1';
+        handleMouseLeaveCard();
       }}
     >
       {/* Horizontal swipeable image grid (1:1 ratio) */}
@@ -2832,6 +2872,16 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             const v: any = vehicle as any;
             return v.sale_date || v.external_listings?.[0]?.sold_at || null;
           })()}
+        />
+      )}
+
+      {/* Hover Card - shows vehicle details on hover */}
+      {hoverCard.visible && (
+        <VehicleHoverCard
+          vehicle={vehicle as any}
+          position={hoverCard.position}
+          onClose={handleHoverCardClose}
+          onAction={handleHoverCardAction}
         />
       )}
     </Link>
