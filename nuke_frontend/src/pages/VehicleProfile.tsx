@@ -45,6 +45,7 @@ import { BATListingManager } from '../components/vehicle/BATListingManager';
 import VehicleDescriptionCard from '../components/vehicle/VehicleDescriptionCard';
 import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
 import VehicleCommunityInsights from '../components/vehicle/VehicleCommunityInsights';
+import VehicleDocumentIntelligence from '../components/vehicle/VehicleDocumentIntelligence';
 import VehicleROISummaryCard from '../components/vehicle/VehicleROISummaryCard';
 import { VehiclePricingValueCard } from '../components/vehicle/VehiclePricingValueCard';
 import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
@@ -3689,6 +3690,9 @@ const VehicleProfile: React.FC = () => {
 
               {/* Community Insights - AI-analyzed sentiment from observations */}
               <VehicleCommunityInsights vehicleId={vehicle.id} />
+
+              {/* Document Intelligence - AI-analyzed receipts and service records */}
+              <VehicleDocumentIntelligence vehicleId={vehicle.id} />
 
               {/* Comments & Bids - Sticky below header/auction bar, scrollable independently */}
               <VehicleCommentsCard
