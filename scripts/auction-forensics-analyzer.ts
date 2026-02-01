@@ -24,7 +24,7 @@
  *    - Too-fast lots (rushed through)
  *    - Unusual bid patterns (shill bidding?)
  *    - Price vs estimate discrepancies
- *    - Auctioneer behavior anomalies
+ *    - Auctioneer behavior patterns
  *
  * Hypothesis: Find evidence of cars being run through too fast / sold too low
  */
@@ -40,6 +40,104 @@ const supabase = createClient(
 );
 
 const DATA_DIR = '/tmp/auction-forensics';
+
+// ═══════════════════════════════════════════════════════════════
+// DATABASE INTEGRATION
+// ═══════════════════════════════════════════════════════════════
+
+interface VehicleEstimates {
+  vehicleId: string;
+  auctionEventId: string;
+  estimateLow: number | null;
+  estimateHigh: number | null;
+  year: number;
+  make: string;
+  model: string;
+}
+
+async function lookupVehicleEstimates(
+  lotNumber: string,
+  vehicleDesc: string,
+  auctionSource: string = 'mecum'
+): Promise<VehicleEstimates | null> {
+  // Only match by EXACT lot number - no fuzzy year/make matching
+  // Fuzzy matching creates wrong data
+
+  // Check if it looks like a real Mecum lot (S98, F89, T306, S115.1, etc.)
+  const realLotPattern = /^[STFK]\d+(\.\d+)?$/i;
+  const cleanLot = lotNumber.replace(/^Lot\s*/i, '').trim().toUpperCase();
+
+  if (!realLotPattern.test(cleanLot)) {
+    // Not a real lot number (e.g., "Lot 1" from GPT) - can't match reliably
+    console.log(`    ⚠️ Cannot match "${lotNumber}" - not a valid Mecum lot number`);
+    return null;
+  }
+
+  const { data } = await supabase
+    .from('auction_events')
+    .select('id, vehicle_id, lot_number, estimate_low, estimate_high, vehicles(year, make, model)')
+    .eq('source', auctionSource)
+    .ilike('lot_number', cleanLot)
+    .limit(1)
+    .single();
+
+  if (data?.vehicle_id) {
+    const v = data.vehicles as any;
+    console.log(`    ✓ Matched ${cleanLot} → ${v?.year} ${v?.make} ${v?.model}`);
+    return {
+      vehicleId: data.vehicle_id,
+      auctionEventId: data.id,
+      estimateLow: data.estimate_low,
+      estimateHigh: data.estimate_high,
+      year: v?.year,
+      make: v?.make,
+      model: v?.model,
+    };
+  }
+
+  console.log(`    ⚠️ No match for lot ${cleanLot} in database`);
+  return null;
+}
+
+async function saveForensicsToVehicle(
+  vehicleId: string,
+  auctionEventId: string,
+  analysis: LotAnalysis,
+  videoUrl?: string
+): Promise<void> {
+  // Update auction_event with forensics data
+  const { error } = await supabase
+    .from('auction_events')
+    .update({
+      broadcast_video_url: videoUrl || null,
+      broadcast_timestamp_start: Math.round(analysis.announcementTime),
+      broadcast_timestamp_end: Math.round(analysis.hammerTime),
+      outcome: analysis.outcome,
+      winning_bid: analysis.finalPrice > 0 ? analysis.finalPrice : null,
+      // Store forensics metadata
+      forensics_data: {
+        lotNumber: analysis.lotNumber,
+        vehicleDescription: analysis.vehicleDescription,
+        duration: analysis.totalDuration,
+        bidCount: analysis.bidCount,
+        bidsPerSecond: analysis.bidsPerSecond,
+        wordsPerMinute: analysis.wordsPerMinute,
+        alertScore: analysis.alertScore,
+        alerts: analysis.alerts,
+        flags: analysis.flags,
+        bids: analysis.bids,
+        translatedSpeech: analysis.translatedSpeech?.slice(0, 10), // Keep top 10 key phrases
+        analyzedAt: new Date().toISOString(),
+      },
+    })
+    .eq('id', auctionEventId);
+
+  if (error) {
+    console.log(`    ❌ Failed to save: ${error.message}`);
+  } else {
+    console.log(`    💾 Saved to lot ${analysis.lotNumber}`);
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 // DATA STRUCTURES
@@ -86,21 +184,26 @@ interface LotAnalysis {
   fillerRatio: number;          // % of speech that's filler
   urgencyScore: number;         // How urgently they pushed
 
+  // Auctioneer Translation (decoded speech)
+  translatedSpeech: AuctioneerPhrase[];  // Full decoded auctioneer commentary
+
   // Outcome
   outcome: 'sold' | 'no_sale';
-  estimatedValue?: number;
-  priceVsEstimate?: number;     // Ratio of final to estimate
+  estimateLow?: number;         // Low estimate from auction house
+  estimateHigh?: number;        // High estimate from auction house
+  estimatedValue?: string;      // Single estimate (from transcript if no DB data)
+  priceVsEstimate?: number;     // Ratio of final to estimate midpoint
 
   // Flags
   flags: {
     tooFast: boolean;           // Duration < threshold
     lowActivity: boolean;       // Few real bids
     unusualPattern: boolean;    // Anomaly detected
-    priceAnomaly: boolean;      // Sold way under/over estimate
+    priceAlert: boolean;      // Sold way under/over estimate
   };
 
-  anomalyScore: number;         // Overall suspicion score 0-100
-  anomalyReasons: string[];
+  alertScore: number;           // Risk/alert score 0-100 (higher = more concerning)
+  alerts: string[];             // List of specific concerns/flags
 }
 
 interface AuctioneerPhrase {
@@ -115,12 +218,150 @@ interface AuctioneerPhrase {
 // AUCTIONEER TRANSLATION
 // ═══════════════════════════════════════════════════════════════
 
+// Written number to digit conversion (Whisper transcribes numbers as words)
+const WORD_TO_NUM: Record<string, number> = {
+  'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+  'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+  'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
+  'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19,
+  'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50, 'sixty': 60,
+  'seventy': 70, 'eighty': 80, 'ninety': 90,
+  'hundred': 100, 'thousand': 1000, 'million': 1000000,
+  'grand': 1000, 'k': 1000,
+};
+
+function parseWrittenNumber(text: string): number | null {
+  // Handle digit patterns first
+  const digitMatch = text.match(/\$?([\d,]+)\s*(?:thousand|grand|k)?/i);
+  if (digitMatch) {
+    const num = parseInt(digitMatch[1].replace(/,/g, ''));
+    if (text.toLowerCase().match(/thousand|grand|k/)) return num * 1000;
+    return num;
+  }
+
+  // Handle written numbers: "ninety thousand", "six hundred forty five thousand"
+  const words = text.toLowerCase().split(/[\s-]+/);
+  let total = 0;
+  let current = 0;
+
+  for (const word of words) {
+    const val = WORD_TO_NUM[word];
+    if (val === undefined) continue;
+
+    if (val === 1000000) {
+      current = current === 0 ? 1 : current;
+      total += current * 1000000;
+      current = 0;
+    } else if (val === 1000) {
+      current = current === 0 ? 1 : current;
+      total += current * 1000;
+      current = 0;
+    } else if (val === 100) {
+      current = current === 0 ? 1 : current;
+      current *= 100;
+    } else {
+      current += val;
+    }
+  }
+
+  total += current;
+  return total > 0 ? total : null;
+}
+
+// Common engine sizes that should NOT be parsed as bid amounts
+const ENGINE_SIZES = new Set([
+  '289', '302', '305', '307', '327', '350', '351', '360', '383', '390',
+  '400', '401', '409', '426', '427', '428', '429', '430', '440', '454',
+  '455', '460', '462', '472', '500', '502', '572',
+]);
+
+/**
+ * Extract auctioneer shorthand bids from rapid-fire chant
+ * Examples:
+ *   "1 80" = $180,000 (1 hundred 80 thousand)
+ *   "1 75" = $175,000
+ *   "90" = $90,000
+ *   "65" = $65,000
+ *
+ * Filters out:
+ *   - Common engine sizes (302, 350, 427, 454, etc.)
+ *   - Numbers in technical context (horsepower, displacement)
+ */
+function extractAuctioneerShorthand(text: string, hasBidContext: boolean): number[] {
+  const amounts: number[] = [];
+
+  // Only extract shorthand if there's bid-related context nearby
+  // This prevents parsing engine specs as bids
+  if (!hasBidContext) {
+    return amounts;
+  }
+
+  // Pattern for "X YY" format (e.g., "1 80" = $180K, "2 50" = $250K)
+  // Only match where first digit is 1-3 (typical bid range $100K-$399K)
+  // Avoid 4-5 which are usually engine prefixes (4 30 = 430 engine)
+  const shorthandPattern = /\b([1-3])\s+([0-9]{2})\b/g;
+  let match;
+  while ((match = shorthandPattern.exec(text)) !== null) {
+    const hundreds = parseInt(match[1]);
+    const tens = parseInt(match[2]);
+    // "1 80" means $180,000 (100K + 80K)
+    const amount = (hundreds * 100 + tens) * 1000;
+    if (amount >= 100000 && amount <= 3990000) {
+      amounts.push(amount);
+    }
+  }
+
+  // Pattern for standalone two-digit numbers (50-99 = $50K-$99K)
+  // Only if followed/preceded by other bid numbers
+  const twoDigitPattern = /\b([5-9][0-9])\b/g;
+  while ((match = twoDigitPattern.exec(text)) !== null) {
+    const num = match[1];
+    // Skip if it looks like a year (50-99 could be 1950-1999)
+    if (text.includes('19' + num) || text.includes("'" + num)) continue;
+    const amount = parseInt(num) * 1000;
+    amounts.push(amount);
+  }
+
+  // Pattern for three-digit numbers as potential bids
+  // Filter out engine sizes
+  const threeDigitPattern = /\b([1-9][0-9]{2})\b/g;
+  while ((match = threeDigitPattern.exec(text)) !== null) {
+    const numStr = match[1];
+    const num = parseInt(numStr);
+    // Skip known engine sizes
+    if (ENGINE_SIZES.has(numStr)) continue;
+    // Skip if context suggests engine (cubic, ci, horsepower, hp)
+    const contextWindow = text.substring(
+      Math.max(0, match.index - 20),
+      Math.min(text.length, match.index + 20)
+    ).toLowerCase();
+    if (/cubic|ci\b|horse|hp\b|engine|block|displacement/i.test(contextWindow)) continue;
+    // In bid context, treat as thousands (180 = $180K)
+    if (num >= 100 && num <= 999) {
+      amounts.push(num * 1000);
+    }
+  }
+
+  return amounts;
+}
+
 const AUCTIONEER_PATTERNS = {
-  // Real bid announcements
-  bidPatterns: [
-    /(?:i['\s]?(?:ve\s)?got|now|bid|at)\s*\$?(\d{1,3}(?:,?\d{3})*)/gi,
-    /(\d{1,3}(?:,?\d{3})*)\s*(?:thousand|hundred|bid|now)/gi,
-    /\$(\d{1,3}(?:,?\d{3})*)/g,
+  // Patterns that indicate a price/bid is being stated
+  // Whisper outputs written numbers, so we match phrases and extract numbers separately
+  bidPhrasePatterns: [
+    // Direct bid statements
+    /(?:bid|bidding)\s+(?:at|is|of|now)?\s*(.+?)(?:dollars?|$)/gi,
+    /(?:the\s+)?bid\s+(?:at|is)\s*(.+?)(?:dollars?|here|$)/gi,
+    // Sale announcements
+    /sells?\s+(?:at|for)\s*(.+?)(?:dollars?|here|$)/gi,
+    /brought\s+(.+?)(?:dollars?|$)/gi,
+    /hammers?\s+(?:it\s+)?(?:at|for)\s*(.+?)(?:dollars?|$)/gi,
+    /sold\s+(?:at|for)?\s*(.+?)(?:dollars?|$)/gi,
+    // Direct amounts
+    /(\w+(?:\s+\w+)*)\s+(?:thousand|grand|k)\s*(?:dollars?)?/gi,
+    /(\w+(?:\s+\w+)*)\s+dollars/gi,
+    // Numeric patterns
+    /\$?([\d,]+)\s*(?:thousand|grand|k)?/gi,
   ],
 
   // Filler phrases (not real bids)
@@ -129,11 +370,12 @@ const AUCTIONEER_PATTERNS = {
     'last chance', 'fair warning', 'going once', 'going twice',
     'anybody else', 'any more', 'one more time', 'right here',
     'yep yep yep', 'hey hey hey', 'money money money',
+    'how about', 'can we get', 'we need', 'i need',
   ],
 
   // Outcome indicators
-  soldPhrases: ['sold', 'hammer', 'congratulations', 'you got it', 'yours'],
-  noSalePhrases: ['no sale', 'pass', 'reserve not met', 'take it back'],
+  soldPhrases: ['sold', 'hammer', 'hammers', 'congratulations', 'you got it', 'yours', 'new owner'],
+  noSalePhrases: ['no sale', 'pass', 'reserve not met', 'take it back', 'didn\'t meet'],
 
   // Bid source indicators
   phoneBid: ['phone', 'on the phone', 'internet', 'online'],
@@ -148,35 +390,69 @@ async function translateAuctioneerSpeech(
   for (const seg of segments) {
     const text = seg.text.toLowerCase();
 
-    // Check if it's filler
-    const isFiller = AUCTIONEER_PATTERNS.fillerPhrases.some(f => text.includes(f));
-
-    // Try to extract bid amount
+    // Try to extract bid amounts using multiple strategies
     let bidAmount: number | undefined;
-    for (const pattern of AUCTIONEER_PATTERNS.bidPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        const numStr = match[1]?.replace(/,/g, '') || match[0].replace(/[^\d]/g, '');
-        const num = parseInt(numStr);
-        if (num > 0 && num < 100000000) {
-          bidAmount = num;
-          // Normalize: if small number, likely in thousands
-          if (bidAmount < 1000 && text.includes('thousand')) {
-            bidAmount *= 1000;
-          }
+    let allShorthandBids: number[] = [];
+
+    // Strategy 1: Try phrase patterns that capture context around numbers
+    for (const pattern of AUCTIONEER_PATTERNS.bidPhrasePatterns) {
+      pattern.lastIndex = 0; // Reset regex state
+      const match = pattern.exec(text);
+      if (match && match[1]) {
+        const parsed = parseWrittenNumber(match[1]);
+        if (parsed && parsed >= 1000 && parsed < 100000000) {
+          bidAmount = parsed;
           break;
         }
       }
     }
 
+    // Strategy 2: If no phrase match, try parsing the whole segment for numbers
+    if (!bidAmount) {
+      const parsed = parseWrittenNumber(text);
+      if (parsed && parsed >= 1000 && parsed < 100000000) {
+        bidAmount = parsed;
+      }
+    }
+
+    // Check if segment has bid-related context
+    const hasBidContext = /bid|sell|sold|bought|hammer|goes|brings|got|need|call|money|dollar/i.test(text);
+
+    // Strategy 3: Extract auctioneer shorthand (rapid-fire chant like "1 80 1 75 1 80")
+    // This captures the actual bid-by-bid action
+    // Only run if there's bid context to avoid parsing engine specs as bids
+    allShorthandBids = extractAuctioneerShorthand(seg.text, hasBidContext);
+    if (allShorthandBids.length > 0) {
+      // Shorthand bids from rapid-fire chant OVERRIDE generic number parsing
+      // because they're more likely to be accurate in auction context
+      const shorthandMax = Math.max(...allShorthandBids);
+      if (shorthandMax > (bidAmount || 0)) {
+        bidAmount = shorthandMax;
+      }
+    }
+
+    // Determine event type - check this BEFORE marking as filler
+    const isSold = AUCTIONEER_PATTERNS.soldPhrases.some(p => text.includes(p));
+    const isNoSale = AUCTIONEER_PATTERNS.noSalePhrases.some(p => text.includes(p));
+
+    // Only mark as filler if there's no meaningful content
+    const isFiller = !bidAmount && !isSold && !isNoSale &&
+      AUCTIONEER_PATTERNS.fillerPhrases.some(f => text.includes(f));
+
     // Generate translation
     let translated = seg.text;
-    if (bidAmount && !isFiller) {
-      translated = `BID: $${bidAmount.toLocaleString()}`;
-    } else if (AUCTIONEER_PATTERNS.soldPhrases.some(p => text.includes(p))) {
-      translated = `SOLD${bidAmount ? ` at $${bidAmount.toLocaleString()}` : ''}`;
-    } else if (AUCTIONEER_PATTERNS.noSalePhrases.some(p => text.includes(p))) {
+    if (isSold && bidAmount) {
+      translated = `SOLD at $${bidAmount.toLocaleString()}`;
+    } else if (isSold) {
+      translated = 'SOLD';
+    } else if (isNoSale) {
       translated = 'NO SALE';
+    } else if (allShorthandBids.length > 1) {
+      // Multiple rapid-fire bids detected - show the sequence
+      const bidSequence = allShorthandBids.map(b => `$${(b/1000).toFixed(0)}K`).join(' → ');
+      translated = `CHANT: ${bidSequence}`;
+    } else if (bidAmount) {
+      translated = `BID: $${bidAmount.toLocaleString()}`;
     } else if (isFiller) {
       translated = `[Filler: ${seg.text.trim()}]`;
     }
@@ -202,26 +478,48 @@ function extractBidsFromPhrases(phrases: AuctioneerPhrase[]): BidEvent[] {
   let lastBidAmount = 0;
 
   for (const phrase of phrases) {
-    if (phrase.bidAmount && !phrase.isFiller && phrase.bidAmount > lastBidAmount) {
-      // Determine bid source
-      let source: BidEvent['source'] = 'unknown';
-      const text = phrase.raw.toLowerCase();
-      if (AUCTIONEER_PATTERNS.phoneBid.some(p => text.includes(p))) {
-        source = 'phone';
-      } else if (AUCTIONEER_PATTERNS.floorBid.some(p => text.includes(p))) {
-        source = 'floor';
-      }
+    if (!phrase.bidAmount || phrase.isFiller) continue;
+    if (phrase.bidAmount <= lastBidAmount) continue;
 
-      bids.push({
-        timestamp: phrase.timestamp,
-        amount: phrase.bidAmount,
-        source,
-        isReal: true,
-        confidence: 0.8,
-      });
+    // Filter out year-like numbers (1900-2099 are likely car years, not prices)
+    if (phrase.bidAmount >= 1900 && phrase.bidAmount <= 2099) continue;
 
-      lastBidAmount = phrase.bidAmount;
+    // Filter out very small amounts that are likely misparses
+    // Collector car auctions rarely have bids under $5,000
+    if (phrase.bidAmount < 5000) continue;
+
+    // Check context - is this actually announcing a bid/sale?
+    const text = phrase.raw.toLowerCase();
+    const hasBidContext = /bid|sell|sold|bought|hammer|price|thousand|grand|dollars|goes|brings/i.test(text);
+
+    // If it's a large amount, require less context
+    // If it's a smaller amount, require stronger bid context
+    const isLargeAmount = phrase.bidAmount >= 50000;
+    if (!isLargeAmount && !hasBidContext) continue;
+
+    // Determine bid source
+    let source: BidEvent['source'] = 'unknown';
+    if (AUCTIONEER_PATTERNS.phoneBid.some(p => text.includes(p))) {
+      source = 'phone';
+    } else if (AUCTIONEER_PATTERNS.floorBid.some(p => text.includes(p))) {
+      source = 'floor';
     }
+
+    // Determine confidence based on context quality
+    let confidence = 0.5;
+    if (hasBidContext) confidence = 0.7;
+    if (/sold|hammer|final|gone/i.test(text)) confidence = 0.9;
+    if (/bid at|sells for|brought/i.test(text)) confidence = 0.95;
+
+    bids.push({
+      timestamp: phrase.timestamp,
+      amount: phrase.bidAmount,
+      source,
+      isReal: true,
+      confidence,
+    });
+
+    lastBidAmount = phrase.bidAmount;
   }
 
   return bids;
@@ -293,10 +591,10 @@ const DEFAULT_THRESHOLDS: AnomalyThresholds = {
   priceDeviationThreshold: 0.5, // Within 50% of estimate
 };
 
-function detectAnomalies(
+function detectAlerts(
   lot: Partial<LotAnalysis>,
   thresholds = DEFAULT_THRESHOLDS
-): { anomalyScore: number; reasons: string[] } {
+): { alertScore: number; reasons: string[] } {
   const reasons: string[] = [];
   let score = 0;
 
@@ -341,7 +639,7 @@ function detectAnomalies(
     score += 10;
   }
 
-  return { anomalyScore: Math.min(100, score), reasons };
+  return { alertScore: Math.min(100, score), reasons };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -350,7 +648,15 @@ function detectAnomalies(
 
 async function analyzeLot(
   segments: { start: number; end: number; text: string }[],
-  lotInfo: { lotNumber: string; vehicle: string; estimate?: number }
+  lotInfo: {
+    lotNumber: string;
+    vehicle: string;
+    estimate?: number;
+    estimateLow?: number;
+    estimateHigh?: number;
+    vehicleId?: string;
+    auctionEventId?: string;
+  }
 ): Promise<LotAnalysis> {
   // Translate auctioneer speech
   const phrases = await translateAuctioneerSpeech(segments);
@@ -384,6 +690,18 @@ async function analyzeLot(
   const lastText = segments[segments.length - 1]?.text.toLowerCase() || '';
   const outcome = AUCTIONEER_PATTERNS.soldPhrases.some(p => lastText.includes(p)) ? 'sold' : 'no_sale';
 
+  // Calculate price vs estimate using high/low range if available
+  let priceVsEstimate: number | undefined;
+  const finalBidAmount = bids.length > 0 ? bids[bids.length - 1].amount : 0;
+
+  if (lotInfo.estimateLow && lotInfo.estimateHigh && finalBidAmount > 0) {
+    // Use midpoint of estimate range
+    const estimateMidpoint = (lotInfo.estimateLow + lotInfo.estimateHigh) / 2;
+    priceVsEstimate = finalBidAmount / estimateMidpoint;
+  } else if (lotInfo.estimate && finalBidAmount > 0) {
+    priceVsEstimate = finalBidAmount / lotInfo.estimate;
+  }
+
   // Build partial analysis for anomaly detection
   const partial: Partial<LotAnalysis> = {
     totalDuration,
@@ -392,13 +710,16 @@ async function analyzeLot(
     fillerRatio,
     finalRushIntensity: velocity.finalRushIntensity,
     outcome,
-    priceVsEstimate: lotInfo.estimate && bids.length > 0
-      ? bids[bids.length - 1].amount / lotInfo.estimate
-      : undefined,
+    priceVsEstimate,
   };
 
   // Detect anomalies
-  const { anomalyScore, reasons } = detectAnomalies(partial);
+  const { alertScore, reasons } = detectAlerts(partial);
+
+  // Filter to key translated phrases for output
+  const keyPhrases = phrases.filter(p =>
+    p.bidAmount || p.translated.includes('SOLD') || p.translated.includes('NO SALE')
+  );
 
   return {
     lotNumber: lotInfo.lotNumber,
@@ -429,20 +750,27 @@ async function analyzeLot(
     fillerRatio,
     urgencyScore: 0, // TODO: sentiment analysis
 
+    translatedSpeech: keyPhrases,
+
     outcome,
-    estimatedValue: lotInfo.estimate,
-    priceVsEstimate: partial.priceVsEstimate,
+    estimateLow: lotInfo.estimateLow,
+    estimateHigh: lotInfo.estimateHigh,
+    estimatedValue: lotInfo.estimate?.toString() ||
+      (lotInfo.estimateLow && lotInfo.estimateHigh
+        ? `${lotInfo.estimateLow.toLocaleString()}-${lotInfo.estimateHigh.toLocaleString()}`
+        : undefined),
+    priceVsEstimate,
 
     flags: {
       tooFast: totalDuration < DEFAULT_THRESHOLDS.minLotDuration,
       lowActivity: bids.length < DEFAULT_THRESHOLDS.minBidCount,
       unusualPattern: velocity.bidAcceleration < 0.5 || velocity.bidAcceleration > 3,
-      priceAnomaly: partial.priceVsEstimate !== undefined &&
+      priceAlert: partial.priceVsEstimate !== undefined &&
         (partial.priceVsEstimate < 0.5 || partial.priceVsEstimate > 2),
     },
 
-    anomalyScore,
-    anomalyReasons: reasons,
+    alertScore,
+    alerts: reasons,
   };
 }
 
@@ -455,7 +783,7 @@ async function processVideoForForensics(videoUrl: string) {
 
   console.log('\n═══════════════════════════════════════════════════════════════');
   console.log('  AUCTION FORENSICS ANALYZER');
-  console.log('  Maximum data extraction + anomaly detection');
+  console.log('  Maximum data extraction + pattern alerts');
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   // Get video metadata
@@ -529,20 +857,35 @@ async function processVideoForForensics(videoUrl: string) {
       );
 
       if (lotSegments.length > 0) {
+        // Look up vehicle in database for high/low estimates
+        const dbVehicle = await lookupVehicleEstimates(lot.lotNumber, lot.vehicle, 'mecum');
+
         const analysis = await analyzeLot(lotSegments, {
           lotNumber: lot.lotNumber,
           vehicle: lot.vehicle,
           estimate: lot.estimate,
+          estimateLow: dbVehicle?.estimateLow || undefined,
+          estimateHigh: dbVehicle?.estimateHigh || undefined,
+          vehicleId: dbVehicle?.vehicleId,
+          auctionEventId: dbVehicle?.auctionEventId,
         });
 
         allAnalyses.push(analysis);
 
-        // Report
-        const flag = analysis.anomalyScore > 30 ? '⚠️' : analysis.anomalyScore > 10 ? '⚡' : '✓';
+        // Save to database if we found a matching vehicle
+        if (dbVehicle?.vehicleId && dbVehicle?.auctionEventId) {
+          await saveForensicsToVehicle(dbVehicle.vehicleId, dbVehicle.auctionEventId, analysis, videoUrl);
+        }
+
+        // Report with estimate range if available
+        const flag = analysis.alertScore > 30 ? '⚠️' : analysis.alertScore > 10 ? '⚡' : '✓';
+        const estimateStr = analysis.estimateLow && analysis.estimateHigh
+          ? `Est: $${(analysis.estimateLow/1000).toFixed(0)}K-$${(analysis.estimateHigh/1000).toFixed(0)}K`
+          : analysis.estimatedValue ? `Est: $${analysis.estimatedValue}` : '';
         console.log(`  ${flag} ${analysis.lotNumber}: ${analysis.vehicleDescription}`);
-        console.log(`     Duration: ${analysis.totalDuration}s | Bids: ${analysis.bidCount} | Final: $${analysis.finalPrice.toLocaleString()}`);
-        if (analysis.anomalyReasons.length > 0) {
-          console.log(`     ⚠️ ${analysis.anomalyReasons.join('; ')}`);
+        console.log(`     Duration: ${analysis.totalDuration.toFixed(0)}s | Bids: ${analysis.bidCount} | Final: $${analysis.finalPrice.toLocaleString()} ${estimateStr}`);
+        if (analysis.alerts.length > 0) {
+          console.log(`     ⚠️ ${analysis.alerts.join('; ')}`);
         }
       }
     }
@@ -555,8 +898,8 @@ async function processVideoForForensics(videoUrl: string) {
   console.log('  FORENSICS SUMMARY');
   console.log('═══════════════════════════════════════════════════════════════\n');
 
-  const flagged = allAnalyses.filter(a => a.anomalyScore > 30);
-  const suspicious = allAnalyses.filter(a => a.anomalyScore > 10 && a.anomalyScore <= 30);
+  const flagged = allAnalyses.filter(a => a.alertScore > 30);
+  const suspicious = allAnalyses.filter(a => a.alertScore > 10 && a.alertScore <= 30);
 
   console.log(`Total lots analyzed: ${allAnalyses.length}`);
   console.log(`Flagged (score > 30): ${flagged.length}`);
@@ -567,7 +910,7 @@ async function processVideoForForensics(videoUrl: string) {
     console.log('\n🚨 FLAGGED LOTS:');
     for (const lot of flagged) {
       console.log(`  ${lot.lotNumber}: ${lot.vehicleDescription}`);
-      console.log(`    Score: ${lot.anomalyScore} | ${lot.anomalyReasons.join('; ')}`);
+      console.log(`    Score: ${lot.alertScore} | ${lot.alerts.join('; ')}`);
     }
   }
 
@@ -581,7 +924,7 @@ async function processVideoForForensics(videoUrl: string) {
 
 async function identifyLotBoundaries(
   segments: { start: number; end: number; text: string }[]
-): Promise<{ lotNumber: string; vehicle: string; estimate?: number; startTime: number; endTime: number }[]> {
+): Promise<{ lotNumber: string; vehicle: string; estimate?: number; startTime: number; endTime: number; outcome?: string; finalPrice?: number }[]> {
   const fullText = segments.map(s => `[${s.start.toFixed(1)}] ${s.text}`).join('\n');
 
   const resp = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -595,13 +938,21 @@ async function identifyLotBoundaries(
       messages: [
         {
           role: 'system',
-          content: `Identify individual auction lots from this transcript. Each timestamp in brackets is seconds.
+          content: `Identify individual auction lots from this Mecum auction transcript. Each timestamp in brackets is seconds.
+
+IMPORTANT: Mecum lot numbers follow specific formats:
+- S followed by number (e.g., S98, S115, S115.1) - main stage
+- F followed by number (e.g., F123, F89) - featured
+- T followed by number (e.g., T266) - other
+
 For each lot, extract:
-- lot_number: The lot number mentioned (e.g., "S115.1", "Lot 47")
-- vehicle: Year make model
-- estimate: Estimated value if mentioned
-- start_time: Timestamp when lot starts (first mention)
-- end_time: Timestamp when sold/no-sale
+- lot_number: The ACTUAL Mecum lot number mentioned (e.g., "S98", "F123.1"). Listen for "lot S ninety-eight" = "S98"
+- vehicle: Year make model (e.g., "1969 Chevrolet Corvette")
+- estimate: Estimated value if mentioned (number only, no $)
+- start_time: Timestamp (seconds) when lot is first announced
+- end_time: Timestamp (seconds) when hammer falls (sold or no-sale)
+- outcome: "sold" or "no_sale" - listen for "sold", "hammer", "congratulations" vs "no sale", "pass", "didn't meet reserve"
+- final_price: Hammer price if sold (number only)
 
 Return JSON: { "lots": [...] }`
         },
@@ -622,6 +973,8 @@ Return JSON: { "lots": [...] }`
     estimate: lot.estimate,
     startTime: lot.start_time || 0,
     endTime: lot.end_time || 0,
+    outcome: lot.outcome,
+    finalPrice: lot.final_price,
   }));
 }
 
