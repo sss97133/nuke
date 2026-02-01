@@ -61,6 +61,7 @@ import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import ImageGallery from '../components/images/ImageGallery';
+import VehicleVideoSection from '../components/vehicle/VehicleVideoSection';
 import { VehicleDataGapsCard } from '../components/vehicle/VehicleDataGapsCard';
 import VehicleResearchItemsCard from '../components/vehicle/VehicleResearchItemsCard';
 import { VehicleLedgerDocumentsCard } from '../components/vehicle/VehicleLedgerDocumentsCard';
@@ -74,6 +75,62 @@ const WORKSPACE_TABS = [
 ] as const;
 
 type WorkspaceTabId = typeof WORKSPACE_TABS[number]['id'];
+
+// Collapsible wrapper for ImageGallery
+const CollapsibleGalleryCard: React.FC<{
+  vehicleId: string;
+  vehicleImages: string[];
+  fallbackListingImageUrls: string[];
+  vehicle: any;
+  onImagesUpdated: () => void;
+}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, vehicle, onImagesUpdated }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const imageCount = vehicleImages.length || fallbackListingImageUrls.length || 0;
+
+  return (
+    <div className={`card ${isCollapsed ? 'is-collapsed' : ''}`}>
+      <div
+        className="card-header"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        style={{
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        <span>IMAGES {imageCount > 0 && `(${imageCount})`}</span>
+        <span style={{
+          fontSize: '10px',
+          color: 'var(--text-muted)',
+          transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s'
+        }}>
+          ▼
+        </span>
+      </div>
+      {!isCollapsed && (
+        <div className="card-body" style={{ padding: 0 }}>
+          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading gallery...</div>}>
+            <ImageGallery
+              vehicleId={vehicleId}
+              showUpload={true}
+              fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
+              fallbackLabel={vehicle?.profile_origin === 'bat_import' ? 'BaT listing' : 'Listing'}
+              fallbackSourceUrl={
+                vehicle?.discovery_url ||
+                vehicle?.bat_auction_url ||
+                vehicle?.listing_url ||
+                undefined
+              }
+              onImagesUpdated={onImagesUpdated}
+            />
+          </React.Suspense>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -3738,27 +3795,23 @@ const VehicleProfile: React.FC = () => {
               )}
             </div>
 
-            {/* Right Column: Image Gallery */}
-            <div>
-              <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading gallery...</div>}>
-                <ImageGallery
-                  vehicleId={vehicle.id}
-                  showUpload={true}
-                  fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
-                  fallbackLabel={(vehicle as any)?.profile_origin === 'bat_import' ? 'BaT listing' : 'Listing'}
-                  fallbackSourceUrl={
-                    (vehicle as any)?.discovery_url ||
-                    (vehicle as any)?.bat_auction_url ||
-                    (vehicle as any)?.listing_url ||
-                    undefined
-                  }
-                  onImagesUpdated={() => {
-                    loadVehicle();
-                    loadTimelineEvents();
-                    loadVehicleImages();
-                  }}
-                />
-              </React.Suspense>
+            {/* Right Column: Image Gallery & Videos */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Images - Collapsible */}
+              <CollapsibleGalleryCard
+                vehicleId={vehicle.id}
+                vehicleImages={vehicleImages}
+                fallbackListingImageUrls={fallbackListingImageUrls}
+                vehicle={vehicle}
+                onImagesUpdated={() => {
+                  loadVehicle();
+                  loadTimelineEvents();
+                  loadVehicleImages();
+                }}
+              />
+
+              {/* Video Moments - Collapsible */}
+              <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
             </div>
           </div>
         </section>
