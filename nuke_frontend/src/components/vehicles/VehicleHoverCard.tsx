@@ -240,7 +240,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           )}
           {vehicle.location && (
             <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-              📍 {vehicle.location.slice(0, 20)}
+              {vehicle.location.slice(0, 20)}
             </span>
           )}
         </div>
@@ -274,13 +274,13 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           marginBottom: '10px',
         }}>
           {vehicle.image_count !== undefined && vehicle.image_count > 0 && (
-            <span>📷 {vehicle.image_count} images</span>
+            <span>{vehicle.image_count} images</span>
           )}
           {vehicle.event_count !== undefined && vehicle.event_count > 0 && (
-            <span>📅 {vehicle.event_count} events</span>
+            <span>{vehicle.event_count} events</span>
           )}
           {vehicle.receipt_count !== undefined && vehicle.receipt_count > 0 && (
-            <span>🧾 {vehicle.receipt_count} receipts</span>
+            <span>{vehicle.receipt_count} receipts</span>
           )}
         </div>
       )}
@@ -315,7 +315,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             cursor: 'pointer',
           }}
         >
-          ★ Follow
+          Follow
         </button>
         <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction?.('compare'); }}
@@ -329,7 +329,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             cursor: 'pointer',
           }}
         >
-          ⚖ Compare
+          Compare
         </button>
       </div>
 
