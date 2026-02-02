@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { optimizeImageUrl, type ImageSize } from '../../lib/imageOptimizer';
 
 type ObjectFit = 'cover' | 'contain';
@@ -18,6 +18,10 @@ export interface ResilientImageProps {
   placeholderOpacity?: number;
   /** Image optimization size. Defaults to 'small' for grid display. Set to 'full' to disable optimization. */
   optimizeSize?: ImageSize;
+  /** Set to 'eager' for above-the-fold images. Default is 'lazy'. */
+  loading?: 'lazy' | 'eager';
+  /** Priority hint for fetch. Use 'high' for critical images. */
+  fetchPriority?: 'high' | 'low' | 'auto';
 }
 
 function normalizeSources(sources: Array<string | null | undefined>, size: ImageSize): string[] {
@@ -34,6 +38,17 @@ function normalizeSources(sources: Array<string | null | undefined>, size: Image
 
 const DEFAULT_PLACEHOLDER = '/n-zero.png';
 
+// Shared preload cache to avoid duplicate preloads
+const preloadedUrls = new Set<string>();
+
+// Preload an image URL (browser will cache it)
+function preloadImage(url: string): void {
+  if (!url || preloadedUrls.has(url)) return;
+  preloadedUrls.add(url);
+  const img = new Image();
+  img.src = url;
+}
+
 const ResilientImage: React.FC<ResilientImageProps> = ({
   sources,
   alt,
@@ -45,16 +60,56 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
   placeholderSrc = DEFAULT_PLACEHOLDER,
   placeholderOpacity = 0.3,
   optimizeSize = 'small', // Default to small (300px) for grid cards
+  loading = 'lazy',
+  fetchPriority = 'auto',
 }) => {
-  const sourceList = React.useMemo(() => normalizeSources(sources, optimizeSize), [sources, optimizeSize]);
-  const [idx, setIdx] = React.useState(0);
-  const [failed, setFailed] = React.useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sourceList = useMemo(() => normalizeSources(sources, optimizeSize), [sources, optimizeSize]);
+  const [idx, setIdx] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const [isNearViewport, setIsNearViewport] = useState(loading === 'eager');
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Reset when the sources change.
     setIdx(0);
     setFailed(false);
   }, [sourceList.join('|')]);
+
+  // IntersectionObserver to preload images BEFORE they enter viewport
+  // rootMargin of 1000px means we start loading when within 1000px of viewport
+  useEffect(() => {
+    if (loading === 'eager') {
+      setIsNearViewport(true);
+      return;
+    }
+
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setIsNearViewport(true);
+            // Also preload the image immediately
+            if (sourceList[0]) {
+              preloadImage(sourceList[0]);
+            }
+            observer.disconnect();
+          }
+        }
+      },
+      {
+        // Start loading when image is within 1000px of viewport
+        // This gives us a large buffer for smooth scrolling
+        rootMargin: '1000px',
+        threshold: 0,
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [sourceList, loading]);
 
   const current = !failed ? (sourceList[idx] || '') : '';
 
@@ -72,15 +127,19 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
       }
     : { objectFit };
 
-  const showPlaceholder = !current;
+  const showPlaceholder = !current || !isNearViewport;
   const finalSrc = showPlaceholder ? placeholderSrc : current;
   const finalOpacity = showPlaceholder ? placeholderOpacity : 1;
 
   return (
-    <div className={className} style={{ ...baseContainerStyle, ...style }}>
+    <div ref={containerRef} className={className} style={{ ...baseContainerStyle, ...style }}>
       <img
         src={finalSrc}
         alt={alt}
+        loading={loading}
+        decoding="async"
+        // @ts-ignore - fetchPriority is valid but not in older TS types
+        fetchpriority={fetchPriority}
         style={{ ...baseImgStyle, ...imgStyle, opacity: finalOpacity }}
         onError={() => {
           if (showPlaceholder) return;
@@ -97,5 +156,3 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
 };
 
 export default ResilientImage;
-
-

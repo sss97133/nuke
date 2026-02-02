@@ -78,6 +78,87 @@ const VIN_PATTERNS = [
   /\b(SAL[A-Z0-9]{14})\b/g,                // Land Rover
 ];
 
+// Non-vehicle listing keywords - these are parts, memorabilia, etc.
+const NON_VEHICLE_KEYWORDS = [
+  'wheels for', 'wheel for', 'rims for',
+  'seats for', 'seat for',
+  'engine for', 'motor for',
+  'transmission for', 'gearbox for',
+  'hardtop for', 'soft top for', 'tonneau',
+  'literature', 'manual for', 'brochure',
+  'memorabilia', 'sign', 'neon',
+  'tool kit', 'toolkit', 'jack',
+  'luggage', 'suitcase',
+  'helmet', 'racing suit', 'driving shoes',
+  'watch', 'chronograph',
+  'model car', 'diecast', 'sculpture',
+  'poster', 'artwork', 'painting',
+  'badge', 'emblem', 'key fob',
+  'spare parts', 'nos parts',
+];
+
+// Check if this is a vehicle listing vs parts/memorabilia
+function isVehicleListing(extracted: { title: string | null; year: number | null; make: string | null; model: string | null }): { isVehicle: boolean; reason?: string } {
+  const title = (extracted.title || '').toLowerCase();
+
+  for (const keyword of NON_VEHICLE_KEYWORDS) {
+    if (title.includes(keyword)) {
+      return { isVehicle: false, reason: `Title contains non-vehicle keyword: "${keyword}"` };
+    }
+  }
+
+  if (!extracted.year) {
+    if (!extracted.make || !extracted.model) {
+      return { isVehicle: false, reason: 'No year and missing make/model - likely not a vehicle' };
+    }
+  }
+
+  if (!extracted.make && !extracted.model) {
+    return { isVehicle: false, reason: 'No make or model extracted - likely not a vehicle' };
+  }
+
+  return { isVehicle: true };
+}
+
+// Find existing vehicle by VIN or year/make/model/url
+async function findExistingVehicle(
+  supabase: any,
+  extracted: { vin: string | null; year: number | null; make: string | null; model: string | null; url: string }
+): Promise<{ id: string; matchType: 'vin' | 'url' | 'ymm' } | null> {
+  if (extracted.vin && extracted.vin.length >= 11) {
+    const { data: vinMatch } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('vin', extracted.vin)
+      .limit(1)
+      .single();
+    if (vinMatch) return { id: vinMatch.id, matchType: 'vin' };
+  }
+
+  const { data: urlMatch } = await supabase
+    .from('vehicles')
+    .select('id')
+    .eq('bat_auction_url', extracted.url)
+    .limit(1)
+    .single();
+  if (urlMatch) return { id: urlMatch.id, matchType: 'url' };
+
+  if (extracted.year && extracted.make && extracted.model) {
+    const { data: ymmMatch } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('year', extracted.year)
+      .ilike('make', extracted.make)
+      .ilike('model', extracted.model)
+      .is('bat_auction_url', null)
+      .limit(1)
+      .single();
+    if (ymmMatch) return { id: ymmMatch.id, matchType: 'ymm' };
+  }
+
+  return null;
+}
+
 function extractVin(html: string): string | null {
   // First try modern 17-char VINs
   for (const pattern of VIN_PATTERNS) {
@@ -771,57 +852,98 @@ serve(async (req) => {
         extracted.vehicle_id = vehicle_id;
         healthLogger.setVehicleId(vehicle_id);
       } else {
-        // Insert new vehicle (not upsert - start fresh)
-        const { data, error } = await supabase
-          .from('vehicles')
-          .insert({
-            bat_auction_url: extracted.url,
-            year: extracted.year,
-            make: extracted.make,
-            model: extracted.model,
-            vin: extracted.vin,
-            bat_listing_title: extracted.title,
-            bat_seller: extracted.seller_username,
-            bat_buyer: extracted.buyer_username,
-            sale_price: extracted.sale_price,
-            high_bid: extracted.high_bid,
-            bat_bids: extracted.bid_count,
-            bat_comments: extracted.comment_count,
-            bat_views: extracted.view_count,
-            bat_watchers: extracted.watcher_count,
-            bat_lot_number: extracted.lot_number,
-            bat_location: extracted.location,
-            reserve_status: extracted.reserve_status,
-            // Specs extracted from listing
-            mileage: extracted.mileage,
-            color: extracted.exterior_color,
-            interior_color: extracted.interior_color,
-            transmission: extracted.transmission,
-            drivetrain: extracted.drivetrain,
-            engine_type: extracted.engine,
-            body_style: extracted.body_style,
-            // Standard fields
-            description: extracted.description,
-            auction_end_date: extracted.auction_end_date,
-            listing_source: 'bat_simple_extract',
-            profile_origin: 'bat_import',
-            discovery_url: extracted.url,
-            discovery_source: 'bat',
-            is_public: true,
-            sale_status: extracted.sale_price ? 'sold' : 'available',
-            status: 'active',
-          })
-          .select()
-          .single();
-        
-        if (error) {
-          console.error('DB error:', error);
-          throw new Error(`Failed to save vehicle: ${error.message}`);
+        // VALIDATION: Check if this is actually a vehicle listing
+        const vehicleCheck = isVehicleListing(extracted);
+        if (!vehicleCheck.isVehicle) {
+          console.log(`Skipping non-vehicle listing: ${vehicleCheck.reason}`);
+          return new Response(
+            JSON.stringify({ success: true, skipped: true, reason: vehicleCheck.reason, title: extracted.title, url: extracted.url }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
-        
-        console.log(`Saved vehicle: ${data.id}`);
-        extracted.vehicle_id = data.id;
-        healthLogger.setVehicleId(data.id);
+
+        // DEDUPLICATION: Check for existing vehicle before creating
+        const existingVehicle = await findExistingVehicle(supabase, extracted);
+        if (existingVehicle) {
+          console.log(`Found existing vehicle ${existingVehicle.id} via ${existingVehicle.matchType}, updating`);
+          const { error: updateError } = await supabase
+            .from('vehicles')
+            .update({
+              bat_auction_url: extracted.url,
+              bat_listing_title: extracted.title,
+              bat_seller: extracted.seller_username,
+              bat_buyer: extracted.buyer_username,
+              sale_price: extracted.sale_price,
+              high_bid: extracted.high_bid,
+              bat_bids: extracted.bid_count,
+              bat_comments: extracted.comment_count,
+              bat_views: extracted.view_count,
+              bat_watchers: extracted.watcher_count,
+              bat_lot_number: extracted.lot_number,
+              bat_location: extracted.location,
+              reserve_status: extracted.reserve_status,
+              mileage: extracted.mileage || undefined,
+              color: extracted.exterior_color || undefined,
+              interior_color: extracted.interior_color || undefined,
+              transmission: extracted.transmission || undefined,
+              drivetrain: extracted.drivetrain || undefined,
+              engine_type: extracted.engine || undefined,
+              body_style: extracted.body_style || undefined,
+              description: extracted.description || undefined,
+              auction_end_date: extracted.auction_end_date,
+              sale_status: extracted.sale_price ? 'sold' : 'available',
+              vin: extracted.vin || undefined,
+            })
+            .eq('id', existingVehicle.id);
+          if (updateError) throw new Error(`Failed to update vehicle: ${updateError.message}`);
+          extracted.vehicle_id = existingVehicle.id;
+          healthLogger.setVehicleId(existingVehicle.id);
+        } else {
+          // Insert new vehicle
+          const { data, error } = await supabase
+            .from('vehicles')
+            .insert({
+              bat_auction_url: extracted.url,
+              year: extracted.year,
+              make: extracted.make,
+              model: extracted.model,
+              vin: extracted.vin,
+              bat_listing_title: extracted.title,
+              bat_seller: extracted.seller_username,
+              bat_buyer: extracted.buyer_username,
+              sale_price: extracted.sale_price,
+              high_bid: extracted.high_bid,
+              bat_bids: extracted.bid_count,
+              bat_comments: extracted.comment_count,
+              bat_views: extracted.view_count,
+              bat_watchers: extracted.watcher_count,
+              bat_lot_number: extracted.lot_number,
+              bat_location: extracted.location,
+              reserve_status: extracted.reserve_status,
+              mileage: extracted.mileage,
+              color: extracted.exterior_color,
+              interior_color: extracted.interior_color,
+              transmission: extracted.transmission,
+              drivetrain: extracted.drivetrain,
+              engine_type: extracted.engine,
+              body_style: extracted.body_style,
+              description: extracted.description,
+              auction_end_date: extracted.auction_end_date,
+              listing_source: 'bat_simple_extract',
+              profile_origin: 'bat_import',
+              discovery_url: extracted.url,
+              discovery_source: 'bat',
+              is_public: true,
+              sale_status: extracted.sale_price ? 'sold' : 'available',
+              status: 'active',
+            })
+            .select()
+            .single();
+          if (error) throw new Error(`Failed to save vehicle: ${error.message}`);
+          console.log(`Saved vehicle: ${data.id}`);
+          extracted.vehicle_id = data.id;
+          healthLogger.setVehicleId(data.id);
+        }
       }
       
       // Save ALL images (BaT has great galleries - use them)

@@ -1,0 +1,241 @@
+{
+  "scan_time": "2026-02-01T11:43:04.198130",
+  "source_dir": "/Users/skylar/Pictures/Photos Library.photoslibrary",
+  "stats": {
+    "total_files": 0,
+    "images_found": 219881,
+    "exif_extracted": 10,
+    "classified": 0,
+    "errors": 0
+  },
+  "grouping_summary": {
+    "vehicle_groups": 0,
+    "grouped_images": 0,
+    "documents": 0,
+    "ungrouped": 10,
+    "other": 0,
+    "groups": {}
+  },
+  "images": [
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/cvt/1/17CDE4C0-E27F-412F-9CF6-BE26C8AB711C/17CDE4C0-E27F-412F-9CF6-BE26C8AB711C_cvt_t0004.jpeg",
+        "filename": "17CDE4C0-E27F-412F-9CF6-BE26C8AB711C_cvt_t0004.jpeg",
+        "file_hash": "25005124c6205a9a",
+        "file_size": 39809,
+        "created_at": "2025-12-30T22:03:00.976138",
+        "taken_at": null,
+        "camera_make": null,
+        "camera_model": null,
+        "latitude": null,
+        "longitude": null,
+        "width": 640,
+        "height": 360,
+        "phash": "9e16f4cd99334346",
+        "dhash": "66646c7871733e3c",
+        "device_fingerprint": null
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/4/4F365BA5-41AE-4B52-8A7B-40732783255D_1_105_c.jpeg",
+        "filename": "4F365BA5-41AE-4B52-8A7B-40732783255D_1_105_c.jpeg",
+        "file_hash": "01fc49a14ae270e0",
+        "file_size": 141177,
+        "created_at": "2025-11-06T11:00:25.494698",
+        "taken_at": "2019-12-28T11:32:21",
+        "camera_make": null,
+        "camera_model": null,
+        "latitude": null,
+        "longitude": null,
+        "width": 602,
+        "height": 1304,
+        "phash": "ba51851a782d7cd3",
+        "dhash": "33c02b3b1b3f47c7",
+        "device_fingerprint": null
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/9/99D83B6A-1E47-4FFE-B86F-3E4309790851_1_105_c.jpeg",
+        "filename": "99D83B6A-1E47-4FFE-B86F-3E4309790851_1_105_c.jpeg",
+        "file_hash": "61405730324abbee",
+        "file_size": 277975,
+        "created_at": "2025-07-13T08:34:16.370206",
+        "taken_at": "2022-10-22T00:32:05",
+        "camera_make": "Canon",
+        "camera_model": "Canon EOS 5DS",
+        "latitude": null,
+        "longitude": null,
+        "width": 1086,
+        "height": 724,
+        "phash": "a459a0ad85eceaf1",
+        "dhash": "37bc8c626a67a6fe",
+        "device_fingerprint": "24209317f07f6281"
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/masters/9/9039D322-F56E-4DC8-A469-8C04F0755996_4_5005_c.jpeg",
+        "filename": "9039D322-F56E-4DC8-A469-8C04F0755996_4_5005_c.jpeg",
+        "file_hash": "a13542d547536e6e",
+        "file_size": 82719,
+        "created_at": "2024-11-24T19:01:48.890884",
+        "taken_at": null,
+        "camera_make": null,
+        "camera_model": null,
+        "latitude": null,
+        "longitude": null,
+        "width": 360,
+        "height": 480,
+        "phash": "ea8bad830393175d",
+        "dhash": "cba332cbc18d9d23",
+        "device_fingerprint": null
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/4/401F9307-56DA-429F-8761-F3108A6C8DD3_1_105_c.jpeg",
+        "filename": "401F9307-56DA-429F-8761-F3108A6C8DD3_1_105_c.jpeg",
+        "file_hash": "9387cdf352832539",
+        "file_size": 349865,
+        "created_at": "2025-12-29T10:42:28.252920",
+        "taken_at": "2025-12-28T12:21:18",
+        "camera_make": "Apple",
+        "camera_model": "iPhone 15 Pro",
+        "latitude": 17.90215,
+        "longitude": -62.842431,
+        "width": 768,
+        "height": 1024,
+        "phash": "be6c26e7c1636131",
+        "dhash": "253537000c4d2e99",
+        "device_fingerprint": "46a411ac9ec1bf92"
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/masters/E/E1F95CBB-EE5C-4935-A0A3-31CD11FFF5AC_4_5005_c.jpeg",
+        "filename": "E1F95CBB-EE5C-4935-A0A3-31CD11FFF5AC_4_5005_c.jpeg",
+        "file_hash": "bb55892e6548af6f",
+        "file_size": 44202,
+        "created_at": "2024-11-25T00:09:08.926125",
+        "taken_at": null,
+        "camera_make": null,
+        "camera_model": null,
+        "latitude": null,
+        "longitude": null,
+        "width": 360,
+        "height": 480,
+        "phash": "a9f042cc1df2738b",
+        "dhash": "90e31d1673aee77a",
+        "device_fingerprint": null
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/cvt/B/BCC5B9B7-8F17-485C-BE51-BEDA131E6252/BCC5B9B7-8F17-485C-BE51-BEDA131E6252_cvt_t0003.jpeg",
+        "filename": "BCC5B9B7-8F17-485C-BE51-BEDA131E6252_cvt_t0003.jpeg",
+        "file_hash": "274e4fdbd7a9559d",
+        "file_size": 41412,
+        "created_at": "2025-12-30T20:50:19.870775",
+        "taken_at": null,
+        "camera_make": null,
+        "camera_model": null,
+        "latitude": null,
+        "longitude": null,
+        "width": 360,
+        "height": 632,
+        "phash": "969ac4c924ed3337",
+        "dhash": "70383c74dc99220c",
+        "device_fingerprint": null
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/masters/F/F431F3B3-830E-4036-9B27-6932AF9916D2_4_5005_c.jpeg",
+        "filename": "F431F3B3-830E-4036-9B27-6932AF9916D2_4_5005_c.jpeg",
+        "file_hash": "3c58987a56bcc986",
+        "file_size": 54122,
+        "created_at": "2024-11-24T19:09:52.644784",
+        "taken_at": null,
+        "camera_make": null,
+        "camera_model": null,
+        "latitude": null,
+        "longitude": null,
+        "width": 360,
+        "height": 780,
+        "phash": "efa7e47f1104b130",
+        "dhash": "1f41cef31b132171",
+        "device_fingerprint": null
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/masters/7/76BD1CEF-C864-45D5-91D3-B5DA90C1DA49_4_5005_c.jpeg",
+        "filename": "76BD1CEF-C864-45D5-91D3-B5DA90C1DA49_4_5005_c.jpeg",
+        "file_hash": "3e20786931804868",
+        "file_size": 66153,
+        "created_at": "2024-11-24T18:54:55.598485",
+        "taken_at": null,
+        "camera_make": null,
+        "camera_model": null,
+        "latitude": null,
+        "longitude": null,
+        "width": 359,
+        "height": 780,
+        "phash": "97ad643d96656c24",
+        "dhash": "965aea5c381c8c8c",
+        "device_fingerprint": null
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    },
+    {
+      "metadata": {
+        "path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/masters/0/012661D2-88E7-4014-AA5B-B15EA98E1C9A_4_5005_c.jpeg",
+        "filename": "012661D2-88E7-4014-AA5B-B15EA98E1C9A_4_5005_c.jpeg",
+        "file_hash": "37b8cd146d8db7a1",
+        "file_size": 65180,
+        "created_at": "2024-11-24T19:51:55.371309",
+        "taken_at": null,
+        "camera_make": null,
+        "camera_model": null,
+        "latitude": null,
+        "longitude": null,
+        "width": 480,
+        "height": 360,
+        "phash": "f6ffa0832d83c3a0",
+        "dhash": "4f250d72a6a88c96",
+        "device_fingerprint": null
+      },
+      "classification": null,
+      "vehicle_group": null,
+      "upload_status": "pending"
+    }
+  ]
+}

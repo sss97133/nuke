@@ -1,0 +1,6 @@
+year,make,model,vin,mileage,price,color,transmission,engine,description
+1974,Chevrolet,C10,CCY144Z123456,87000,35000,Red,Automatic,350 V8,Original paint and interior
+1987,Porsche,911,WP0AB0919HS120123,45000,75000,Black,Manual,3.2L Flat-6,Turbo with sport package
+2015,Tesla,Model S,5YJSA1E14FF123456,32000,45000,White,Automatic,Electric,Autopilot enabled
+1969,Ford,Mustang,9F02M123456,102000,55000,Blue,Manual,428 Cobra Jet,Fastback Boss 302
+1995,Toyota,Supra,JT2JA82J5S0123456,68000,85000,Red,Manual,2JZ-GTE,Twin turbo

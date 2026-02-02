@@ -70,6 +70,10 @@ const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIde
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const SocialWorkspace = React.lazy(() => import('../pages/SocialWorkspace'));
+const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
+const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
+const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
+const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
 const Search = React.lazy(() => import('../pages/Search').catch((error) => {
   console.error('Failed to load Search component:', error);
   // Return a fallback component
@@ -137,6 +141,14 @@ export const DomainRoutes = () => {
 
         {/* Social Media Workspace */}
         <Route path="/social" element={<SocialWorkspace />} />
+
+        {/* Import Data */}
+        <Route path="/import" element={<ImportDataPage />} />
+
+        {/* Settings */}
+        <Route path="/settings/api-keys" element={<ApiKeysPage />} />
+        <Route path="/settings/webhooks" element={<WebhooksPage />} />
+        <Route path="/settings/usage" element={<UsageDashboardPage />} />
 
         {/* Investment Platform */}
         <Route path="/invest" element={<Invest />} />

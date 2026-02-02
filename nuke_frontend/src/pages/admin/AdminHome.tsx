@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminNotificationService, type AdminDashboardStats } from '../../services/adminNotificationService';
 import { supabase } from '../../lib/supabase';
+import DataGrowthChart from '../../components/admin/DataGrowthChart';
 
 type Card = {
   title: string;
@@ -10,6 +11,7 @@ type Card = {
 };
 
 const cards: Card[] = [
+  { title: 'Identity Claims', description: 'Review and approve user identity claims (446K seeds)', to: '/admin/identity-claims' },
   { title: 'Reviews', description: 'Contributor onboarding, queues, and admin review tools', to: '/admin/reviews' },
   { title: 'Verifications', description: 'User verification review and status changes', to: '/admin/verifications' },
   { title: 'Ownership Verifications', description: 'Ownership documentation review dashboard', to: '/admin/ownership-verifications' },
@@ -181,6 +183,10 @@ export default function AdminHome() {
             </div>
           </div>
         )}
+      </div>
+
+      <div style={{ marginTop: 'var(--space-6)' }}>
+        <DataGrowthChart />
       </div>
 
       <div style={{

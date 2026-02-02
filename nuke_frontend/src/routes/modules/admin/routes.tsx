@@ -34,6 +34,7 @@ import MarketDataTools from '../../../pages/MarketDataTools';
 import BotTestDashboard from '../../../pages/admin/BotTestDashboard';
 import AdminRalphBrief from '../../../pages/admin/AdminRalphBrief';
 import NLQueryConsole from '../../../pages/admin/NLQueryConsole';
+import AdminIdentityClaims from '../../../pages/admin/AdminIdentityClaims';
 
 const AdminModuleRoutes = () => {
   return (
@@ -48,6 +49,7 @@ const AdminModuleRoutes = () => {
         <Route path="ownership-verifications" element={<OwnershipVerificationDashboard />} />
         <Route path="merge-proposals" element={<MergeProposalsDashboard />} />
         <Route path="pending-vehicles" element={<AdminPendingVehicles />} />
+        <Route path="identity-claims" element={<AdminIdentityClaims />} />
 
         {/* Ops */}
         <Route path="ralph" element={<AdminRalphBrief />} />

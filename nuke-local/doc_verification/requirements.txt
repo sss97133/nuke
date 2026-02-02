@@ -1,0 +1,19 @@
+# Document Verification - Local ML Stack
+# Install: pip install -r requirements.txt
+
+# Server
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+
+# ML Models
+ultralytics>=8.0.0  # YOLOv8
+easyocr>=1.7.0      # Better OCR than Tesseract for many docs
+
+# Image processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# Optional: GPU acceleration
+# torch>=2.0.0  # Uncomment if you have CUDA

@@ -1,0 +1,65 @@
+[
+  {
+    "confidence": 0.9500000000000002,
+    "year": 1974,
+    "make": "Chevrolet",
+    "model": "C10",
+    "mileage": 87000,
+    "price": 35000,
+    "color": "Red",
+    "transmission": "Automatic",
+    "engine": "350 V8",
+    "description": "Original paint and interior"
+  },
+  {
+    "confidence": 1,
+    "year": 1987,
+    "make": "Porsche",
+    "model": "911",
+    "vin": "WP0AB0919HS120123",
+    "mileage": 45000,
+    "price": 75000,
+    "color": "Black",
+    "transmission": "Manual",
+    "engine": "3.2L Flat-6",
+    "description": "Turbo with sport package"
+  },
+  {
+    "confidence": 1,
+    "year": 2015,
+    "make": "Tesla",
+    "model": "Model S",
+    "vin": "5YJSA1E14FF123456",
+    "mileage": 32000,
+    "price": 45000,
+    "color": "White",
+    "transmission": "Automatic",
+    "engine": "Electric",
+    "description": "Autopilot enabled"
+  },
+  {
+    "confidence": 0.9500000000000002,
+    "year": 1969,
+    "make": "Ford",
+    "model": "Mustang",
+    "mileage": 102000,
+    "price": 55000,
+    "color": "Blue",
+    "transmission": "Manual",
+    "engine": "428 Cobra Jet",
+    "description": "Fastback Boss 302"
+  },
+  {
+    "confidence": 1,
+    "year": 1995,
+    "make": "Toyota",
+    "model": "Supra",
+    "vin": "JT2JA82J5S0123456",
+    "mileage": 68000,
+    "price": 85000,
+    "color": "Red",
+    "transmission": "Manual",
+    "engine": "2JZ-GTE",
+    "description": "Twin turbo"
+  }
+]

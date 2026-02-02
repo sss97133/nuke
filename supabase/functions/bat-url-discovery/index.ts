@@ -22,6 +22,45 @@ const corsHeaders = {
 
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+// URL patterns that are NOT actual listings
+const BAD_URL_PATTERNS = [
+  /\/contact$/,           // Contact pages
+  /\/embed$/,             // Embed pages
+  /\.js$/,                // JavaScript files
+  /\.css$/,               // CSS files
+  /\.png$/,               // Images
+  /\.jpg$/,
+  /\.jpeg$/,
+  /\.gif$/,
+  /\.svg$/,
+  /\.webp$/,
+  /%22/,                  // URL-encoded quotes (garbage)
+  /%5C/,                  // URL-encoded backslashes
+  /&quot;/,               // HTML entities
+  /&amp;/,
+  /\\"$/,                 // Escaped quotes at end
+  /",$/,                  // Comma after quote
+];
+
+function isValidListingUrl(url: string): boolean {
+  // Must match pattern: /listing/[slug]/ or /listing/[slug]
+  // Where slug is alphanumeric with hyphens
+  const listingPattern = /^https:\/\/bringatrailer\.com\/listing\/[a-z0-9-]+\/?$/i;
+
+  if (!listingPattern.test(url)) {
+    return false;
+  }
+
+  // Check against bad patterns
+  for (const pattern of BAD_URL_PATTERNS) {
+    if (pattern.test(url)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function okJson(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body, null, 2), {
     status,
@@ -54,7 +93,11 @@ async function scrapeBatResultsPage(page: number): Promise<string[]> {
   for (const match of matches) {
     // Clean URL (remove trailing slash variations)
     let listingUrl = match[1].replace(/\/$/, "");
-    urls.add(listingUrl);
+
+    // Validate URL is an actual listing
+    if (isValidListingUrl(listingUrl)) {
+      urls.add(listingUrl);
+    }
   }
 
   return Array.from(urls);
