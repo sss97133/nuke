@@ -800,13 +800,28 @@ serve(async (req) => {
             .single();
 
           if (error) {
-            console.error('DB insert error:', error);
-            throw new Error(`Failed to save vehicle: ${error.message}`);
+            // Handle VIN duplicate race condition - another worker inserted first
+            if (error.message?.includes('vin_unique') || error.message?.includes('duplicate key')) {
+              console.log('VIN race condition detected, retrying lookup...');
+              const retryExisting = await findExistingVehicle(supabase, extracted);
+              if (retryExisting) {
+                console.log(`Found vehicle on retry: ${retryExisting.id}`);
+                extracted.vehicle_id = retryExisting.id;
+                healthLogger.setVehicleId(retryExisting.id);
+                // Don't throw - we found the vehicle, continue with auction_events
+              } else {
+                console.error('DB insert error (no retry match):', error);
+                throw new Error(`Failed to save vehicle: ${error.message}`);
+              }
+            } else {
+              console.error('DB insert error:', error);
+              throw new Error(`Failed to save vehicle: ${error.message}`);
+            }
+          } else {
+            console.log(`Created vehicle: ${data.id}`);
+            extracted.vehicle_id = data.id;
+            healthLogger.setVehicleId(data.id);
           }
-
-          console.log(`Created vehicle: ${data.id}`);
-          extracted.vehicle_id = data.id;
-          healthLogger.setVehicleId(data.id);
         }
       }
 
