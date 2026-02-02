@@ -1,0 +1,16 @@
+[
+  {
+    "confidence": 0.8999999999999999,
+    "year": 1987,
+    "make": "Porsche",
+    "model": "911",
+    "sourceFile": "/Users/skylar/nuke/tools/nuke-scanner/test-data/cars/1987 Porsche 911/service_records.pdf"
+  },
+  {
+    "confidence": 0.8999999999999999,
+    "year": 1974,
+    "make": "Chevrolet",
+    "model": "C10",
+    "sourceFile": "/Users/skylar/nuke/tools/nuke-scanner/test-data/cars/1974 Chevrolet C10/photo_front.jpg"
+  }
+]

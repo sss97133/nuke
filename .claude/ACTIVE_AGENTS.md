@@ -1,115 +1,42 @@
-# Active Claude Agents
+# Active Agents Coordination
 
-**Last updated**: 2026-01-30 07:32
+Last updated: 2026-02-01 ~5pm PST
 
-## Quick Check: Running Sessions
-```bash
-ps aux | grep "claude" | grep -v grep | awk '{print $2, $7, $10}'
-```
+## Priority Queue (Claim One)
 
-## How to Use This File
+### P0 - Unblock Extraction
+- [ ] Fix OpenAI quota (blocking coordinator + AI extractors)
+- [ ] Run `process-import-queue` batches (82k BaT pending)
 
-1. **Check running sessions** with the command above
-2. **Claim your work**: Add an entry below with what you're working on
-3. **When done**: Remove or mark your entry as complete
-4. **Conflict?**: If someone else is on the same file, pick different work
+### P1 - Dormant Extractors (have code, need discovery crawls)
+- [ ] Cars & Bids discovery crawl
+- [ ] PCarMarket discovery crawl  
+- [ ] Classic.com - process 266 pending
 
----
+### P2 - Build New Crawlers
+- [ ] Mecum crawler
+- [ ] Collecting Cars crawler
+- [ ] Barrett-Jackson crawler
+- [ ] Hemmings crawler
 
-## Currently Active Agents (7 sessions running)
+### P3 - Enrichment
+- [ ] Hagerty valuation catalog sync + vehicle matching
 
-| TTY | PID | Status | Working On |
-|-----|-----|--------|------------|
-| s000 | 68738 | paused | BaT queue - 80.8k done, 29k pending, workers stopped |
-| s001 | 68890 | active | Comment sentiment backfill (~71k remaining) |
-| s002 | 69152 | active | Multi-server inference + overnight batch |
-| s005 | 69351 | ? | (unclaimed) |
-| s006 | 69467 | active | Forum extraction overnight run (monitoring) |
-| s017 | 69886 | ? | (unclaimed) |
-| s018 | 69691 | active | Setup coordination system |
+### P4 - Resume Dealers
+- [ ] Beverly Hills Car Club, L'Art de l'Automobile, etc (400 sources)
 
-**Claim format**: Edit the "Working On" cell with your task
+## Session Log
+| Agent | Working On | Files Touched | Started |
+|-------|------------|---------------|---------|
+| Sonnet worker | Processing BaT import_queue (20 items) | import_queue table | Feb 1 ~6pm |
+| Extraction Worker 2 | Processing BaT import_queue (20 items batch 2) | import_queue table | Feb 1 ~6:01pm |
+| FB Marketplace Validator | Testing FB Marketplace extractors | extract-facebook-marketplace, report-marketplace-sale | Feb 1 ~6:05pm |
+| Scanner Validator | ✅ COMPLETE - Scanner tested & validated | tools/nuke-scanner/* (VALIDATION_REPORT.md, test-data/*) | Feb 1 ~6:10pm |
+| SDK Agent | ✅ COMPLETE - Nuke SDK review & fixes | tools/nuke-sdk/* (package.json, batch.ts, SDK_REVIEW.md) | Feb 1 ~6:10pm |
+| API v1 Deployer | ✅ COMPLETE - API v1 deployed, schema issues documented | api-v1-*, api_keys table, API_V1_DEPLOYMENT_STATUS.md | Feb 1 ~6:12pm |
+| Marketplace UI Reviewer | Reviewing marketplace components, build status OK | nuke_frontend/src/components/marketplace/* | Feb 1 ~6:15pm |
 
----
-
-## Work Queues (coordinate here)
-
-### High Priority (grab these)
-- [ ] Forum extraction pipeline
-- [ ] Comment sentiment backfill
-- [ ] Image deduplication
-
-### In Progress (claimed)
-- None currently claimed
-
-### Completed Today
-- (agents add finished work here)
-
----
-
-## File Locks
-
-If editing these files, announce it here first:
-- `database/migrations/*` - one agent at a time
-- `supabase/functions/_shared/*` - coordinate changes
-- `.env` files - never edit simultaneously
-
----
-
-## Notes Between Agents
-
-(Use this section to leave notes for other agents)
-
-
-**[s000 @ 09:32]** Running CL Archive batch upload: 379/538 complete.
-- Background process: PID 99654
-- Log: ~/nuke/data/upload-progress.log
-- Local DB: ~/nuke/data/archive-inventory.db
-
-**[s006 @ 09:37]** Forum overnight run finishing (~30 mins left)
-- Posts: 26k → 56,786 (+30k overnight)
-- Threads completed: 969
-- Background: PID 73175
-- Log: ~/nuke/logs/overnight/forum-run-20260130-0002.log
-
-**[s002 @ 09:41]** Built multi-server inference system
-- Files: `lib/inference-client.js`, `config/inference-servers.json`, `scripts/inference-servers.js`
-- Switched batch-structure-threads from OpenAI (quota hit) → local Ollama
-- Ready for friend's GPU server - just `node scripts/inference-servers.js enable friend-gpu`
-- Overnight batch running: PID 63236, ~340 vehicles created, 241 remaining
-
-**[s000 @ 09:47]** BaT queue failure retry in progress
-- Reset ~20k "Extraction failed" → pending for retry
-- 8 workers processing: `ps aux | grep bat-continuous`
-- Queue: 79.6k complete, 15k pending, 20k failed remaining
-- Failed breakdown: VIN dupes (resales), null make (non-vehicles), transient errors
-
----
-
-## FLIGHT CHECKPOINT @ 10:30
-
-**All sessions pausing. Resume when landed:**
-
-| Task | Status | Resume |
-|------|--------|--------|
-| BaT queue | 79.6k done, 15k pending, 20k failed | Queue in DB, workers restart |
-| Sentiment backfill | s001 running, 71k remaining | Check progress |
-| Forum extraction | ~56k posts, ~30 mins out | Check logs |
-| Inference batch | 241 remaining | Check PID 63236 |
-| CL Archive | 379/538 | Checkpoint in sqlite |
-
-**DB at pause:** 175k vehicles, 72.6k BaT, 843 AI analyzed
-
-
-## Session: Profile Data Fixes (skylar)
-- **Time**: $(date)
-- **Status**: Completed immediate DB fixes, pending code changes
-- **Done**:
-  - Created 5 vehicle_ownerships from approved verifications
-  - Linked skylarwilliams BaT identity
-  - Fixed gallery (removed 8856 scraped images)
-- **TODO (next session)**:
-  - Fix ContributionTimeline.tsx to show all time, not 365 days
-  - Investigate tool images (none exist)
-  - Extract remaining BaT auctions for skylarwilliams
-  - Profile tab performance optimization
+## How to Claim
+1. Pick an unclaimed task from priority queue
+2. Add yourself to Session Log table
+3. Check the task box when done

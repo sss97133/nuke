@@ -431,6 +431,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
   const isCompactCard = cardTier === 'xs' || cardTier === 'sm';
 
+  // Choose image optimization size based on card size - smaller cards get smaller images
+  const imageOptimizeSize = React.useMemo(() => {
+    if (cardTier === 'xs') return 'thumbnail' as const; // ~105px cards, use 150px images
+    if (cardTier === 'sm') return 'thumbnail' as const; // ~135px cards, use 150px images
+    if (cardTier === 'md') return 'small' as const;     // ~175px cards, use 300px images
+    return 'small' as const;                            // Large cards, use 300px images
+  }, [cardTier]);
+
   const logIdentityToken = React.useCallback((kind: string, value: string, position: number) => {
     if (!viewerUserId) return;
     if (!vehicle?.id) return;
@@ -1414,6 +1422,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             objectFit={thumbnailFit}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
+            optimizeSize="thumbnail"
           />
         </div>
         
@@ -1527,6 +1536,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             objectFit={thumbnailFit}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
+            optimizeSize="small"
           />
           {(showTopLeftBadges || showPriceBadge) && (
             <div
@@ -2092,6 +2102,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             style={{ position: 'absolute', inset: 0 }}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
+            optimizeSize={imageOptimizeSize}
           />
         )}
         {!hasValidImage && !dbImagesLoading && vehicleImages.length === 0 && (
@@ -2835,6 +2846,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                               objectFit="cover"
                               placeholderSrc="/n-zero.png"
                               placeholderOpacity={0.15}
+                              optimizeSize="thumbnail"
                             />
                           </div>
                         </button>

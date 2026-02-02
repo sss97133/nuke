@@ -1,0 +1,17 @@
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/nuke_desktop-7b7bb36224bab30a: src/main.rs /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/ca4b99503ddf30de9e81681a6080a4374e25f429112fa1e7e02f56fb64f5738f /Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/index.html /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/d277f9ef515f6b3c6c9a401348fc8c83e6525eeda6e2d8fffcfbdbef5f6e5581.html /Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/assets/index-CrR-fNb8.js /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/952d47e74e6def665f30300b90fc70c45171e425a622327cda85edf7cddf63b4.js /Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/assets/index-FyJeW2av.css /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/3613009e868db979ac602a52c5c66f99730fdb9681136abdff539068877d882d.css
+
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/nuke_desktop-7b7bb36224bab30a.d: src/main.rs /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/ca4b99503ddf30de9e81681a6080a4374e25f429112fa1e7e02f56fb64f5738f /Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/index.html /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/d277f9ef515f6b3c6c9a401348fc8c83e6525eeda6e2d8fffcfbdbef5f6e5581.html /Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/assets/index-CrR-fNb8.js /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/952d47e74e6def665f30300b90fc70c45171e425a622327cda85edf7cddf63b4.js /Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/assets/index-FyJeW2av.css /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/3613009e868db979ac602a52c5c66f99730fdb9681136abdff539068877d882d.css
+
+src/main.rs:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/ca4b99503ddf30de9e81681a6080a4374e25f429112fa1e7e02f56fb64f5738f:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/index.html:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/d277f9ef515f6b3c6c9a401348fc8c83e6525eeda6e2d8fffcfbdbef5f6e5581.html:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/assets/index-CrR-fNb8.js:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/952d47e74e6def665f30300b90fc70c45171e425a622327cda85edf7cddf63b4.js:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/../dist/assets/index-FyJeW2av.css:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out/tauri-codegen-assets/3613009e868db979ac602a52c5c66f99730fdb9681136abdff539068877d882d.css:
+
+# env-dep:CARGO_PKG_AUTHORS=Nuke
+# env-dep:CARGO_PKG_DESCRIPTION=Nuke Desktop App - Vehicle data scanner and sync
+# env-dep:CARGO_PKG_NAME=nuke-desktop
+# env-dep:OUT_DIR=/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/nuke-desktop-a772babed2ee3b26/out

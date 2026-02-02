@@ -1,0 +1,4 @@
+year,make,model,vin,mileage,price
+1850,InvalidMake,TestModel,INVALID_VIN,not_a_number,abc
+3000,FutureCar,Model,12345,100000,50000
+,,,,,

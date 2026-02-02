@@ -1,0 +1,14 @@
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/libthiserror-b3152eaa3b735c7e.rmeta: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/thiserror-89d3841aafa425ee/out/private.rs
+
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/libthiserror-b3152eaa3b735c7e.rlib: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/thiserror-89d3841aafa425ee/out/private.rs
+
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/thiserror-b3152eaa3b735c7e.d: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/thiserror-89d3841aafa425ee/out/private.rs
+
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/thiserror-89d3841aafa425ee/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/thiserror-89d3841aafa425ee/out

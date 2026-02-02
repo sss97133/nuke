@@ -1,0 +1,44 @@
+{
+  "name": "@nuke/scanner",
+  "version": "0.1.0",
+  "description": "Open source vehicle data scanner and extractor",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "nuke-scan": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "vehicle",
+    "data",
+    "scanner",
+    "extractor",
+    "automotive",
+    "csv",
+    "pdf"
+  ],
+  "author": "Nuke",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nukeplatform/nuke-scanner.git"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "csv-parse": "^5.5.2",
+    "glob": "^10.3.10",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,11 @@
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/libtauri_runtime-a192cfe0aa6ae86c.rmeta: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/dpi.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/monitor.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/webview.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/window.rs
+
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/libtauri_runtime-a192cfe0aa6ae86c.rlib: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/dpi.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/monitor.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/webview.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/window.rs
+
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/tauri_runtime-a192cfe0aa6ae86c.d: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/dpi.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/monitor.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/webview.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/window.rs
+
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/lib.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/dpi.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/monitor.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/webview.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.2/src/window.rs:

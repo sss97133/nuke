@@ -1,0 +1,980 @@
+openapi: 3.0.3
+info:
+  title: Nuke Vehicle Data API
+  description: |
+    The Nuke API provides programmatic access to vehicle data management, observations,
+    and real-time event notifications via webhooks.
+
+    ## Authentication
+
+    All API requests require authentication using either:
+
+    - **API Key**: Pass via `X-API-Key` header
+    - **Bearer Token**: Supabase JWT via `Authorization: Bearer <token>` header
+
+    Get your API key at [https://nuke.com/settings/api-keys](https://nuke.com/settings/api-keys)
+
+    ## Rate Limiting
+
+    API requests are rate limited. When you exceed your limit, you'll receive a 429 response.
+    Check the `X-RateLimit-Remaining` header to monitor your usage.
+
+    ## Webhooks
+
+    Subscribe to real-time events by creating webhook endpoints. Events are delivered with
+    HMAC-SHA256 signatures for verification.
+  version: 1.0.0
+  contact:
+    name: Nuke Support
+    url: https://nuke.com/support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://qkgaybvrernstplzjaam.supabase.co/functions/v1
+    description: Production API
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: Vehicles
+    description: Vehicle management operations
+  - name: Observations
+    description: Observation (data point) operations
+  - name: Batch
+    description: Bulk import operations
+  - name: Webhooks
+    description: Webhook endpoint management
+
+paths:
+  /api-v1-vehicles:
+    get:
+      tags: [Vehicles]
+      summary: List vehicles
+      description: Retrieve a paginated list of vehicles you own or have access to.
+      operationId: listVehicles
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: mine
+          in: query
+          description: Only return vehicles you own
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: List of vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VehicleSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Vehicles]
+      summary: Create a vehicle
+      operationId: createVehicle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleInput'
+      responses:
+        '201':
+          description: Vehicle created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Vehicle'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api-v1-vehicles/{id}:
+    get:
+      tags: [Vehicles]
+      summary: Retrieve a vehicle
+      operationId: getVehicle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vehicle details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Vehicle'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Vehicles]
+      summary: Update a vehicle
+      operationId: updateVehicle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleInput'
+      responses:
+        '200':
+          description: Vehicle updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Vehicle'
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Vehicles]
+      summary: Archive a vehicle
+      description: Soft-deletes the vehicle by setting archived_at timestamp.
+      operationId: deleteVehicle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vehicle archived
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api-v1-observations:
+    get:
+      tags: [Observations]
+      summary: List observations
+      description: Retrieve observations for a specific vehicle.
+      operationId: listObservations
+      parameters:
+        - name: vehicle_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: vin
+          in: query
+          schema:
+            type: string
+        - name: kind
+          in: query
+          description: Filter by observation kind
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: List of observations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Observation'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: vehicle_id or vin required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags: [Observations]
+      summary: Create an observation
+      description: |
+        Record a new observation (data point) for a vehicle. Observations are immutable
+        and include full provenance tracking.
+      operationId: createObservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationInput'
+      responses:
+        '201':
+          description: Observation created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Observation'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api-v1-batch:
+    post:
+      tags: [Batch]
+      summary: Batch import vehicles
+      description: |
+        Import up to 1000 vehicles in a single request. Optionally include
+        observations for each vehicle.
+      operationId: batchIngest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchRequest'
+      responses:
+        '200':
+          description: Batch import completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  result:
+                    $ref: '#/components/schemas/BatchResult'
+                  summary:
+                    type: string
+        '400':
+          description: Invalid request (e.g., batch too large)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /webhooks-manage:
+    get:
+      tags: [Webhooks]
+      summary: List webhook endpoints
+      operationId: listWebhooks
+      responses:
+        '200':
+          description: List of webhook endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookEndpoint'
+
+    post:
+      tags: [Webhooks]
+      summary: Create webhook endpoint
+      description: |
+        Register a new webhook endpoint. The response includes the signing secret
+        which will only be shown once - save it immediately.
+      operationId: createWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookInput'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/WebhookEndpoint'
+                      - type: object
+                        properties:
+                          secret:
+                            type: string
+                            description: Save this! Won't be shown again.
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /webhooks-manage/{id}:
+    get:
+      tags: [Webhooks]
+      summary: Retrieve webhook endpoint
+      operationId: getWebhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook endpoint with recent deliveries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/WebhookEndpoint'
+                      - type: object
+                        properties:
+                          recent_deliveries:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/WebhookDelivery'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Webhooks]
+      summary: Update webhook endpoint
+      operationId: updateWebhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookUpdateInput'
+      responses:
+        '200':
+          description: Webhook updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WebhookEndpoint'
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Webhooks]
+      summary: Delete webhook endpoint
+      operationId: deleteWebhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /webhooks-manage/{id}/rotate-secret:
+    post:
+      tags: [Webhooks]
+      summary: Rotate webhook secret
+      description: Generate a new signing secret. The old secret will be invalidated immediately.
+      operationId: rotateWebhookSecret
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Secret rotated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/WebhookEndpoint'
+                      - type: object
+                        properties:
+                          secret:
+                            type: string
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key from https://nuke.com/settings/api-keys
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase session JWT
+
+  schemas:
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        year:
+          type: integer
+          nullable: true
+        make:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        vin:
+          type: string
+          nullable: true
+        mileage:
+          type: integer
+          nullable: true
+        exterior_color:
+          type: string
+          nullable: true
+        interior_color:
+          type: string
+          nullable: true
+        transmission:
+          type: string
+          nullable: true
+        engine:
+          type: string
+          nullable: true
+        drivetrain:
+          type: string
+          nullable: true
+        body_style:
+          type: string
+          nullable: true
+        sale_price:
+          type: number
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        is_public:
+          type: boolean
+        owner_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    VehicleSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        year:
+          type: integer
+          nullable: true
+        make:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        vin:
+          type: string
+          nullable: true
+        mileage:
+          type: integer
+          nullable: true
+        exterior_color:
+          type: string
+          nullable: true
+        transmission:
+          type: string
+          nullable: true
+        body_style:
+          type: string
+          nullable: true
+        sale_price:
+          type: number
+          nullable: true
+        is_public:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        owner_id:
+          type: string
+          format: uuid
+
+    VehicleInput:
+      type: object
+      properties:
+        year:
+          type: integer
+          minimum: 1886
+          maximum: 2100
+        make:
+          type: string
+        model:
+          type: string
+        vin:
+          type: string
+        mileage:
+          type: integer
+          minimum: 0
+        exterior_color:
+          type: string
+        interior_color:
+          type: string
+        transmission:
+          type: string
+        engine:
+          type: string
+        drivetrain:
+          type: string
+        body_style:
+          type: string
+        sale_price:
+          type: number
+        description:
+          type: string
+        is_public:
+          type: boolean
+
+    Observation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vehicle_id:
+          type: string
+          format: uuid
+        vin:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+        observation_kind:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          additionalProperties: true
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        provenance:
+          type: object
+          properties:
+            ingested_by:
+              type: string
+            ingested_via:
+              type: string
+            url:
+              type: string
+            document_id:
+              type: string
+            extracted_by:
+              type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ObservationInput:
+      type: object
+      required:
+        - source_type
+        - observation_kind
+        - data
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+        vin:
+          type: string
+        source_type:
+          type: string
+          description: e.g., "manual", "auction", "service_record"
+        observation_kind:
+          type: string
+          description: e.g., "mileage_reading", "sale_result", "condition_report"
+        observed_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          additionalProperties: true
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.8
+        provenance:
+          type: object
+          properties:
+            url:
+              type: string
+            document_id:
+              type: string
+            extracted_by:
+              type: string
+
+    BatchRequest:
+      type: object
+      required:
+        - vehicles
+      properties:
+        vehicles:
+          type: array
+          maxItems: 1000
+          items:
+            allOf:
+              - $ref: '#/components/schemas/VehicleInput'
+              - type: object
+                properties:
+                  observations:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - source_type
+                        - observation_kind
+                        - data
+                      properties:
+                        source_type:
+                          type: string
+                        observation_kind:
+                          type: string
+                        observed_at:
+                          type: string
+                          format: date-time
+                        data:
+                          type: object
+                        confidence:
+                          type: number
+        options:
+          type: object
+          properties:
+            skip_duplicates:
+              type: boolean
+              default: true
+            match_by:
+              type: string
+              enum: [vin, year_make_model, none]
+              default: vin
+            update_existing:
+              type: boolean
+              default: false
+
+    BatchResult:
+      type: object
+      properties:
+        created:
+          type: integer
+        updated:
+          type: integer
+        skipped:
+          type: integer
+        failed:
+          type: integer
+        vehicles:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              id:
+                type: string
+                format: uuid
+              status:
+                type: string
+                enum: [created, updated, skipped, failed]
+              error:
+                type: string
+
+    WebhookEndpoint:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        description:
+          type: string
+          nullable: true
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              - '*'
+              - vehicle.created
+              - vehicle.updated
+              - vehicle.deleted
+              - observation.created
+              - document.uploaded
+              - import.completed
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        stats:
+          type: object
+          properties:
+            total_deliveries:
+              type: integer
+            failed_deliveries:
+              type: integer
+
+    WebhookDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        event_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, success, failed, retrying]
+        attempts:
+          type: integer
+        response_status:
+          type: integer
+          nullable: true
+        response_time_ms:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+
+    WebhookInput:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Must be HTTPS (HTTP allowed for localhost)
+        description:
+          type: string
+        events:
+          type: array
+          default: ['*']
+          items:
+            type: string
+            enum:
+              - '*'
+              - vehicle.created
+              - vehicle.updated
+              - vehicle.deleted
+              - observation.created
+              - document.uploaded
+              - import.completed
+
+    WebhookUpdateInput:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        description:
+          type: string
+        events:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Invalid or missing authentication
+
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Access denied
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Vehicle not found
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Rate limit exceeded
+      headers:
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        Retry-After:
+          schema:
+            type: integer

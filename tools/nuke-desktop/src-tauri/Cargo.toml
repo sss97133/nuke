@@ -1,0 +1,37 @@
+[package]
+name = "nuke-desktop"
+version = "0.1.0"
+description = "Nuke Desktop App - Vehicle data scanner and sync"
+authors = ["Nuke"]
+license = "MIT"
+repository = ""
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+walkdir = "2"
+regex = "1"
+csv = "1.3"
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+tokio = { version = "1", features = ["full"] }
+base64 = "0.21"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "z"
+strip = true

@@ -1,0 +1,14 @@
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/libserde-bc2872c8d3f74ca0.rmeta: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/serde-176365db14eef4c5/out/private.rs
+
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/libserde-bc2872c8d3f74ca0.rlib: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/serde-176365db14eef4c5/out/private.rs
+
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/deps/serde-bc2872c8d3f74ca0.d: /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/serde-176365db14eef4c5/out/private.rs
+
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/skylar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/serde-176365db14eef4c5/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/skylar/nuke/tools/nuke-desktop/src-tauri/target/release/build/serde-176365db14eef4c5/out
