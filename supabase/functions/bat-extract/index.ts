@@ -7,6 +7,9 @@
  * - Detects BaT Alumni status (previously sold on BaT)
  * - Sanitizes control characters from JSON output
  * - Tracks extractor version in database
+ *
+ * ⚠️ DEPRECATED: Use complete-bat-import instead
+ * This function is deprecated. Use complete-bat-import for all new BaT extractions.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -582,6 +585,8 @@ async function extractBatListing(url: string): Promise<BatExtracted> {
 }
 
 serve(async (req) => {
+  console.warn('⚠️ DEPRECATED: bat-extract is deprecated. Use complete-bat-import instead.');
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

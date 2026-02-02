@@ -43,13 +43,19 @@ serve(async (req) => {
         let extractorUrl = null;
 
         if (url.includes('bringatrailer.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/bat-simple-extract';
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/complete-bat-import';
         } else if (url.includes('carsandbids.com')) {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-cars-and-bids-core';
         } else if (url.includes('pcarmarket.com')) {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/import-pcarmarket-listing';
         } else if (url.includes('hagerty.com')) {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-hagerty-listing';
+        } else if (url.includes('classic.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/import-classic-auction';
+        } else if (url.includes('collectingcars.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-collecting-cars';
+        } else if (url.includes('craigslist.org')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-craigslist';
         } else {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
         }

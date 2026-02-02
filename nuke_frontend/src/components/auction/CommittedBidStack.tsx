@@ -85,12 +85,24 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
 
         {bid_count > 0 && (
           <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-400">Total Committed</span>
+            <div
+              className="p-2 rounded-md"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <span className="text-gray-400 text-xs">Total Committed</span>
               <p className="text-white font-medium">{formatCurrency(total_committed)}</p>
             </div>
-            <div>
-              <span className="text-gray-400">High Bid</span>
+            <div
+              className="p-2 rounded-md"
+              style={{
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+              }}
+            >
+              <span className="text-gray-400 text-xs">High Bid</span>
               <p className="text-green-400 font-medium">
                 {high_bid ? formatCurrency(high_bid) : '-'}
               </p>

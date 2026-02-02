@@ -43,15 +43,17 @@ const platformColors: Record<string, { bg: string; text: string; accent: string 
   hemmings: { bg: '#8b0000', text: '#ffffff', accent: '#ffd700' },
 };
 
-function formatTimeRemaining(endDate: string | null): { text: string; urgent: boolean; ended: boolean } {
-  if (!endDate) return { text: 'No end time', urgent: false, ended: false };
+type UrgencyLevel = 'ended' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClose' | 'normal';
+
+function formatTimeRemaining(endDate: string | null): { text: string; urgency: UrgencyLevel; ended: boolean } {
+  if (!endDate) return { text: 'No end time', urgency: 'normal', ended: false };
 
   const now = Date.now();
   const end = new Date(endDate).getTime();
   const diff = end - now;
 
   if (diff <= 0) {
-    return { text: 'ENDED', urgent: false, ended: true };
+    return { text: 'ENDED', urgency: 'ended', ended: true };
   }
 
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -59,18 +61,33 @@ function formatTimeRemaining(endDate: string | null): { text: string; urgent: bo
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-  const urgent = diff < 10 * 60 * 1000; // < 10 minutes
+  // Enhanced urgency levels - NO YELLOW (BaT uses yellow)
+  let urgency: UrgencyLevel = 'normal';
+  if (diff <= 60000) urgency = 'lastMinute';           // < 1 min - PULSING RED
+  else if (diff <= 300000) urgency = 'critical';       // < 5 min - RED
+  else if (diff <= 900000) urgency = 'urgent';         // < 15 min - orange
+  else if (diff <= 3600000) urgency = 'gettingClose';  // < 1 hour - coral/warm
 
   if (days > 0) {
-    return { text: `${days}d ${hours}h`, urgent: false, ended: false };
+    return { text: `${days}d ${hours}h`, urgency, ended: false };
   } else if (hours > 0) {
-    return { text: `${hours}h ${minutes}m`, urgent: false, ended: false };
+    return { text: `${hours}h ${minutes}m`, urgency, ended: false };
   } else if (minutes > 0) {
-    return { text: `${minutes}m ${seconds}s`, urgent, ended: false };
+    return { text: `${minutes}m ${seconds}s`, urgency, ended: false };
   } else {
-    return { text: `${seconds}s`, urgent: true, ended: false };
+    return { text: `${seconds}s`, urgency, ended: false };
   }
 }
+
+// Color mapping for urgency levels - NO YELLOW
+const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
+  lastMinute: { color: '#dc2626', glow: '0 0 12px rgba(220, 38, 38, 0.7)' },
+  critical: { color: '#dc2626', glow: '0 0 8px rgba(220, 38, 38, 0.5)' },
+  urgent: { color: '#ea580c', glow: '0 0 6px rgba(234, 88, 12, 0.4)' },
+  gettingClose: { color: '#e07960' },
+  normal: { color: 'inherit' },
+  ended: { color: '#9ca3af' },
+};
 
 function formatCurrency(amount: number | null, currencyCode?: string | null): string {
   return formatCurrencyAmount(amount, {
@@ -140,6 +157,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
 
   // Live countdown timer
   const [timeState, setTimeState] = useState(() => formatTimeRemaining(endDate));
+  const [pulsePhase, setPulsePhase] = useState(0);
 
   useEffect(() => {
     if (!endDate) return;
@@ -150,6 +168,22 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [endDate]);
+
+  // Pulsing effect for critical urgency
+  useEffect(() => {
+    if (timeState.urgency === 'lastMinute') {
+      const pulseInterval = setInterval(() => {
+        setPulsePhase((prev) => (prev + 1) % 2);
+      }, 300);
+      return () => clearInterval(pulseInterval);
+    } else if (timeState.urgency === 'critical') {
+      const pulseInterval = setInterval(() => {
+        setPulsePhase((prev) => (prev + 1) % 2);
+      }, 500);
+      return () => clearInterval(pulseInterval);
+    }
+    setPulsePhase(0);
+  }, [timeState.urgency]);
 
   // Track bid changes for animation
   const [bidChanged, setBidChanged] = useState(false);
@@ -200,9 +234,9 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                   width: '8px',
                   height: '8px',
                   borderRadius: '50%',
-                  background: timeState.urgent ? '#ef4444' : '#22c55e',
+                  background: ['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? '#ef4444' : '#22c55e',
                   animation: 'pulse 1.5s ease-in-out infinite',
-                  boxShadow: `0 0 8px ${timeState.urgent ? '#ef4444' : '#22c55e'}`,
+                  boxShadow: `0 0 8px ${['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? '#ef4444' : '#22c55e'}`,
                 }}
               />
               <span style={{ fontWeight: 700, fontSize: '7pt', letterSpacing: '0.5px' }}>LIVE</span>
@@ -226,14 +260,17 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
           <span style={{ opacity: 0.8, fontSize: '7pt' }}>on {platformName}</span>
         </div>
 
-        {/* Timer */}
+        {/* Timer - with urgency colors (NO YELLOW - BaT uses yellow) */}
         <div
           style={{
             fontFamily: 'monospace',
-            fontSize: timeState.urgent ? '11pt' : '9pt',
+            fontSize: ['lastMinute', 'critical'].includes(timeState.urgency) ? '11pt' : '9pt',
             fontWeight: 700,
-            color: timeState.urgent ? '#fbbf24' : colors.text,
-            textShadow: timeState.urgent ? '0 0 10px rgba(251, 191, 36, 0.5)' : 'none',
+            color: urgencyColors[timeState.urgency].color === 'inherit' ? colors.text : urgencyColors[timeState.urgency].color,
+            textShadow: urgencyColors[timeState.urgency].glow || 'none',
+            opacity: ['lastMinute', 'critical'].includes(timeState.urgency) ? (pulsePhase === 0 ? 1 : 0.6) : 1,
+            transform: timeState.urgency === 'lastMinute' && pulsePhase === 1 ? 'scale(1.05)' : 'scale(1)',
+            transition: 'opacity 0.15s, transform 0.15s',
           }}
         >
           {timeState.text}
@@ -242,8 +279,19 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
 
       {/* Stats row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-        {/* Current bid */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        {/* Current bid - with visual accent box */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            padding: '6px 10px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            borderRadius: '6px',
+            border: `1px solid ${colors.accent}40`,
+            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 3px rgba(0,0,0,0.1)`,
+          }}
+        >
           <span style={{ fontSize: '6pt', opacity: 0.7, textTransform: 'uppercase' }}>Current Bid</span>
           <span
             style={{
@@ -259,15 +307,35 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
           </span>
         </div>
 
-        {/* Bid count */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        {/* Bid count - with subtle accent */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            padding: '6px 10px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            borderRadius: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
           <span style={{ fontSize: '6pt', opacity: 0.7, textTransform: 'uppercase' }}>Bids</span>
           <span style={{ fontSize: '10pt', fontWeight: 600 }}>{bidCount ?? '--'}</span>
         </div>
 
         {/* Watchers */}
         {watcherCount !== null && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              padding: '6px 10px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+            }}
+          >
             <span style={{ fontSize: '6pt', opacity: 0.7, textTransform: 'uppercase' }}>Watching</span>
             <span style={{ fontSize: '10pt', fontWeight: 600 }}>{watcherCount.toLocaleString()}</span>
           </div>
@@ -275,7 +343,17 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
 
         {/* Comments */}
         {commentCount !== null && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              padding: '6px 10px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+            }}
+          >
             <span style={{ fontSize: '6pt', opacity: 0.7, textTransform: 'uppercase' }}>Comments</span>
             <span style={{ fontSize: '10pt', fontWeight: 600 }}>{commentCount}</span>
           </div>

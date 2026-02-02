@@ -20,6 +20,18 @@ interface AuctionListing {
   auction_start_time: string | null;
 }
 
+// Urgency level type for timer coloring (NO YELLOW - BaT uses yellow)
+type UrgencyLevel = 'ended' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClose' | 'normal';
+
+const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
+  lastMinute: { color: '#dc2626', glow: '0 0 8px rgba(220, 38, 38, 0.6)' },
+  critical: { color: '#dc2626', glow: '0 0 6px rgba(220, 38, 38, 0.4)' },
+  urgent: { color: '#ea580c' },
+  gettingClose: { color: '#e07960' },
+  normal: { color: 'var(--text-muted)' },
+  ended: { color: '#94a3b8' },
+};
+
 const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -27,6 +39,8 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
   const [loading, setLoading] = useState(true);
   const [showBidInterface, setShowBidInterface] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [urgencyLevel, setUrgencyLevel] = useState<UrgencyLevel>('normal');
+  const [pulsePhase, setPulsePhase] = useState(0);
   const [timerExtension, setTimerExtension] = useState<{ seconds: number; visible: boolean } | null>(null);
   const endRefreshTriggeredRef = useRef(false);
   const previousEndTimeRef = useRef<string | null>(null);
@@ -107,6 +121,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
 
       if (diff <= 0) {
         setTimeRemaining('Ended');
+        setUrgencyLevel('ended');
         // The UI countdown ended; re-fetch to let the backend settlement hide this banner
         // (status will flip to sold/expired via scheduler).
         if (!endRefreshTriggeredRef.current) {
@@ -117,6 +132,14 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
         }
         return;
       }
+
+      // Calculate urgency level (NO YELLOW - BaT uses yellow)
+      let newUrgency: UrgencyLevel = 'normal';
+      if (diff <= 60000) newUrgency = 'lastMinute';           // < 1 min
+      else if (diff <= 300000) newUrgency = 'critical';       // < 5 min
+      else if (diff <= 900000) newUrgency = 'urgent';         // < 15 min
+      else if (diff <= 3600000) newUrgency = 'gettingClose';  // < 1 hour
+      setUrgencyLevel(newUrgency);
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -139,6 +162,22 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
 
     return () => clearInterval(interval);
   }, [listing?.auction_end_time]);
+
+  // Pulsing effect for critical urgency
+  useEffect(() => {
+    if (urgencyLevel === 'lastMinute') {
+      const pulseInterval = setInterval(() => {
+        setPulsePhase((prev) => (prev + 1) % 2);
+      }, 300);
+      return () => clearInterval(pulseInterval);
+    } else if (urgencyLevel === 'critical') {
+      const pulseInterval = setInterval(() => {
+        setPulsePhase((prev) => (prev + 1) % 2);
+      }, 500);
+      return () => clearInterval(pulseInterval);
+    }
+    setPulsePhase(0);
+  }, [urgencyLevel]);
 
   const loadActiveListing = async () => {
     try {
@@ -261,7 +300,16 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
             />
             <span style={{ fontWeight: 600, color: 'var(--text)' }}>{isEnded ? 'Auction Ended' : 'Live Auction'}</span>
             <span style={{ color: 'var(--text-muted)' }}>•</span>
-            <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <span
+              style={{
+                fontFamily: 'monospace',
+                color: urgencyColors[urgencyLevel].color,
+                textShadow: urgencyColors[urgencyLevel].glow || 'none',
+                fontWeight: ['lastMinute', 'critical', 'urgent'].includes(urgencyLevel) ? 700 : 400,
+                opacity: ['lastMinute', 'critical'].includes(urgencyLevel) ? (pulsePhase === 0 ? 1 : 0.6) : 1,
+                transition: 'opacity 0.15s',
+              }}
+            >
               {timeRemaining || 'Loading...'}
             </span>
           </div>

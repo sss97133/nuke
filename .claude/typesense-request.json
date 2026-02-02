@@ -1,0 +1,40 @@
+{
+  "searches": [
+    {
+      "query_by": "title,productMake,vehicleMake,productYear,tags,lotType,driveSide,location,collectionId,modelId",
+      "query_by_weights": "9,8,7,6,5,4,3,2,1,0",
+      "text_match_type": "sum_score",
+      "sort_by": "rank:asc",
+      "highlight_full_fields": "*",
+      "facet_by": "lotType, regionCode, countryCode, saleFormat, noReserve, isBoosted, productMake, vendorType, driveSide, listingStage, tags",
+      "max_facet_values": 999,
+      "facet_counts": true,
+      "facet_stats": true,
+      "facet_distribution": true,
+      "facet_return_parent": true,
+      "collection": "production_cars",
+      "q": "*",
+      "filter_by": "listingStage:comingsoon || listingStage:live || listingStage:sold && listingStage:=[`live`]",
+      "page": 1,
+      "per_page": 38
+    },
+    {
+      "query_by": "title,productMake,vehicleMake,productYear,tags,lotType,driveSide,location,collectionId,modelId",
+      "query_by_weights": "9,8,7,6,5,4,3,2,1,0",
+      "text_match_type": "sum_score",
+      "sort_by": "rank:asc",
+      "highlight_full_fields": "*",
+      "facet_by": "lotType, regionCode, countryCode, saleFormat, noReserve, isBoosted, productMake, vendorType, driveSide, listingStage, tags",
+      "max_facet_values": 999,
+      "facet_counts": true,
+      "facet_stats": true,
+      "facet_distribution": true,
+      "facet_return_parent": true,
+      "collection": "production_cars",
+      "q": "*",
+      "filter_by": "listingStage:comingsoon || listingStage:live || listingStage:sold",
+      "page": 1,
+      "per_page": 0
+    }
+  ]
+}

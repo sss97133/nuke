@@ -36,7 +36,7 @@ const SITE_LISTING_PATTERNS: Record<string, RegExp[]> = {
   bringatrailer: [/bringatrailer\.com\/listing\/[a-z0-9-]+/],
   hagerty: [/hagerty\.com\/marketplace\/[a-zA-Z0-9-]+/],
   pcarmarket: [/pcarmarket\.com\/listing\/\d+/],
-  mecum: [/mecum\.com\/lots\/\d{4}\/[A-Z]+-\d+/],
+  mecum: [/mecum\.com\/lots\/[A-Z0-9]+-[A-Z0-9]+/],
   barrettjackson: [/barrett-jackson\.com\/Events\/Auction\/Details\/\d+/],
   russoandsteele: [/russoandsteele\.com\/auction-detail\/\d+/],
 };
