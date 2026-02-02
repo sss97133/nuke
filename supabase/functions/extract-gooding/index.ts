@@ -37,12 +37,15 @@ interface GoodingExtracted {
   make: string | null;
   model: string | null;
   vin: string | null;
+  chassis: string | null;       // Classic car chassis (used as VIN when no 17-char VIN)
+  coachwork: string | null;     // e.g. "Scaglietti"
 
   // Auction data
   lot_number: number | null;
   auction_name: string | null;
   auction_date: string | null;
   auction_location: string | null;
+  auction_calendar_position: string | null;  // e.g. "2025 Pebble Beach Auctions (Lot 38)"
   currency: string;
 
   // Pricing
@@ -59,6 +62,7 @@ interface GoodingExtracted {
   specifications: string[];
   description: string | null;
   vehicle_type: string | null;
+  saleroom_addendum: string | null;  // SRA note HTML or plain text
 
   // Images
   image_urls: string[];
@@ -85,6 +89,7 @@ interface GoodingPageData {
         title: string | null;
         slug: string;
         description: { raw: string } | null;
+        sraNote?: { childMarkdownRemark?: { html?: string } } | null;
         auction: {
           name: string;
           contentful_id: string;
@@ -105,6 +110,8 @@ interface GoodingPageData {
         item: {
           __typename: string;
           title: string;
+          chassis?: string | null;
+          coachwork?: string | null;
           highlights: string[] | null;
           specifications: string[] | null;
           salesForceId: string | null;
@@ -121,6 +128,9 @@ interface GoodingPageData {
           cloudinaryImages1?: Array<{ public_id: string }> | null;
           cloudinaryImages2?: Array<{ public_id: string }> | null;
           cloudinaryImages3?: Array<{ public_id: string }> | null;
+          cloudinaryImages4?: Array<{ public_id: string }> | null;
+          cloudinaryImages5?: Array<{ public_id: string }> | null;
+          cloudinaryImages6?: Array<{ public_id: string }> | null;
         } | null;
       } | null;
     };
@@ -221,6 +231,9 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
   addImages(item?.cloudinaryImages1);
   addImages(item?.cloudinaryImages2);
   addImages(item?.cloudinaryImages3);
+  addImages(item?.cloudinaryImages4);
+  addImages(item?.cloudinaryImages5);
+  addImages(item?.cloudinaryImages6);
 
   // Get auction date
   let auctionDate: string | null = null;
@@ -234,7 +247,11 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     h.replace(/<[^>]+>/g, '').trim()
   ).filter(Boolean);
 
-  // Try to extract VIN from highlights or specifications
+  // Chassis (classic car ID) and coachwork from Contentful
+  const chassis = (item?.chassis ?? '').trim() || null;
+  const coachwork = (item?.coachwork ?? '').trim() || null;
+
+  // Try to extract 17-char VIN from highlights or specifications; fall back to chassis for classics
   let vin: string | null = null;
   const textToSearch = [
     ...(item?.highlights || []),
@@ -242,6 +259,26 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     item?.note || '',
   ].join(' ');
   vin = extractVinFromText(textToSearch);
+  if (!vin && chassis) {
+    vin = chassis;
+  }
+
+  // Salesroom addendum (SRA note) – strip HTML for plain text
+  let saleroom_addendum: string | null = null;
+  const sraHtml = lot.sraNote?.childMarkdownRemark?.html;
+  if (sraHtml && sraHtml.trim()) {
+    saleroom_addendum = sraHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // Auction calendar position: "2025 Pebble Beach Auctions (Lot 38)"
+  let auction_calendar_position: string | null = null;
+  const auctionSlug = auction?.webpage__auction?.[0]?.slug;
+  const yearFromSlug = auctionSlug ? auctionSlug.match(/(\d{4})$/)?.[1] : null;
+  if (auction?.name && lot.lotNumber != null) {
+    auction_calendar_position = yearFromSlug
+      ? `${yearFromSlug} ${auction.name} (Lot ${lot.lotNumber})`
+      : `${auction.name} (Lot ${lot.lotNumber})`;
+  }
 
   return {
     url: `https://www.goodingco.com/lot/${slug}`,
@@ -254,11 +291,15 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     make: item?.make?.name || null,
     model: item?.model || null,
     vin,
+    chassis,
+    coachwork,
 
     lot_number: lot.lotNumber,
     auction_name: auction?.name || null,
     auction_date: auctionDate,
     auction_location: auction?.location?.address?.addressCountry || null,
+    auction_calendar_position,
+
     currency: auction?.currency || 'USD',
 
     estimate_low: lot.lowEstimate,
@@ -272,6 +313,7 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     specifications: item?.specifications || [],
     description: item?.note || null,
     vehicle_type: item?.type || null,
+    saleroom_addendum,
 
     image_urls: allImages,
 
@@ -364,24 +406,57 @@ async function saveToDatabase(
     .eq('listing_url_key', listingUrlKey)
     .single();
 
-  let vehicleId: string;
+  // Also find vehicle by discovery_url (exact or pattern – prior import may use different scheme/www)
+  let vehicleId: string | null = existingListing?.vehicle_id ?? null;
+  if (!vehicleId) {
+    const { data: byUrl } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('discovery_url', extracted.url)
+      .limit(1)
+      .maybeSingle();
+    vehicleId = byUrl?.id ?? null;
+  }
+  if (!vehicleId && extracted.slug) {
+    const { data: bySlugRows } = await supabase
+      .from('vehicles')
+      .select('id')
+      .ilike('discovery_url', `%goodingco.com/lot/${extracted.slug}%`)
+      .limit(1);
+    vehicleId = bySlugRows?.[0]?.id ?? null;
+  }
+
   let isNew = false;
 
-  if (existingListing?.vehicle_id) {
-    // Update existing vehicle
-    vehicleId = existingListing.vehicle_id;
+  if (vehicleId) {
+    // Update existing vehicle (vehicleId from listing, discovery_url, or slug match)
 
+    const vehicleUpdate: Record<string, unknown> = {
+      year: extracted.year,
+      make: extracted.make,
+      model: extracted.model,
+      vin: extracted.vin || undefined,
+      sale_price: extracted.sale_price,
+      sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : extracted.status),
+      updated_at: new Date().toISOString(),
+    };
+    if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
+      const { data: existingVehicle } = await supabase
+        .from('vehicles')
+        .select('origin_metadata')
+        .eq('id', vehicleId)
+        .single();
+      const existingMeta = (existingVehicle?.origin_metadata as Record<string, unknown>) || {};
+      vehicleUpdate.origin_metadata = {
+        ...existingMeta,
+        gooding_coachwork: extracted.coachwork,
+        gooding_saleroom_addendum: extracted.saleroom_addendum,
+        gooding_auction_calendar: extracted.auction_calendar_position,
+      };
+    }
     const { error: updateError } = await supabase
       .from('vehicles')
-      .update({
-        year: extracted.year,
-        make: extracted.make,
-        model: extracted.model,
-        vin: extracted.vin || undefined,
-        sale_price: extracted.sale_price,
-        sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : extracted.status),
-        updated_at: new Date().toISOString(),
-      })
+      .update(vehicleUpdate)
       .eq('id', vehicleId);
 
     if (updateError) {
@@ -390,23 +465,35 @@ async function saveToDatabase(
   } else {
     // Insert new vehicle
     isNew = true;
+    const notesParts: string[] = [];
+    if (extracted.coachwork) notesParts.push(`Coachwork by ${extracted.coachwork}`);
+    notesParts.push(...extracted.highlights.slice(0, 8));
+    if (extracted.auction_calendar_position) notesParts.push(extracted.auction_calendar_position);
+    const insertPayload: Record<string, unknown> = {
+      year: extracted.year,
+      make: extracted.make,
+      model: extracted.model,
+      vin: extracted.vin,
+      sale_price: extracted.sale_price,
+      sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : extracted.status),
+      listing_source: 'gooding_extract',
+      profile_origin: 'gooding_import',
+      discovery_url: extracted.url,
+      discovery_source: 'gooding',
+      is_public: true,
+      auction_source: 'gooding',
+      notes: notesParts.join('\n'),
+    };
+    if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
+      insertPayload.origin_metadata = {
+        gooding_coachwork: extracted.coachwork,
+        gooding_saleroom_addendum: extracted.saleroom_addendum,
+        gooding_auction_calendar: extracted.auction_calendar_position,
+      };
+    }
     const { data: newVehicle, error: insertError } = await supabase
       .from('vehicles')
-      .insert({
-        year: extracted.year,
-        make: extracted.make,
-        model: extracted.model,
-        vin: extracted.vin,
-        sale_price: extracted.sale_price,
-        sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : extracted.status),
-        listing_source: 'gooding_extract',
-        profile_origin: 'gooding_import',
-        discovery_url: extracted.url,
-        discovery_source: 'gooding',
-        is_public: true,
-        auction_source: 'gooding',
-        notes: extracted.highlights.slice(0, 5).join('\n'),
-      })
+      .insert(insertPayload)
       .select('id')
       .single();
 
@@ -438,12 +525,16 @@ async function saveToDatabase(
       metadata: {
         lot_number: extracted.lot_number,
         auction_name: extracted.auction_name,
+        auction_calendar_position: extracted.auction_calendar_position,
         currency: extracted.currency,
         estimate_low: extracted.estimate_low,
         estimate_high: extracted.estimate_high,
         has_reserve: extracted.has_reserve,
-        highlights: extracted.highlights.slice(0, 10),
-        specifications: extracted.specifications.slice(0, 20),
+        highlights: extracted.highlights,
+        specifications: extracted.specifications,
+        coachwork: extracted.coachwork,
+        chassis: extracted.chassis,
+        saleroom_addendum: extracted.saleroom_addendum,
         online_bidding: extracted.online_bidding_available,
         auction_mobility_id: extracted.auction_mobility_id,
         salesforce_id: extracted.salesforce_id,
@@ -595,10 +686,13 @@ serve(async (req) => {
       console.log(`=== GOODING EXTRACTION RESULTS ===`);
       console.log(`Title: ${extracted.title}`);
       console.log(`Year/Make/Model: ${extracted.year} ${extracted.make} ${extracted.model}`);
+      console.log(`VIN/Chassis: ${extracted.vin || 'N/A'} | Coachwork: ${extracted.coachwork || 'N/A'}`);
       console.log(`Lot: ${extracted.lot_number} | Auction: ${extracted.auction_name}`);
+      console.log(`Calendar: ${extracted.auction_calendar_position || 'N/A'}`);
       console.log(`Estimate: ${extracted.currency} ${extracted.estimate_low?.toLocaleString()} - ${extracted.estimate_high?.toLocaleString()}`);
       console.log(`Sale Price: ${extracted.sale_price ? `${extracted.currency} ${extracted.sale_price.toLocaleString()}` : 'N/A'}`);
       console.log(`Status: ${extracted.status}`);
+      console.log(`Highlights: ${extracted.highlights.length} | Specs: ${extracted.specifications.length}`);
       console.log(`Images: ${extracted.image_urls.length}`);
 
       return new Response(
@@ -610,6 +704,23 @@ serve(async (req) => {
             images_saved: dbResult.images_saved,
             is_new: dbResult.is_new,
           } : null,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Backfill: re-extract specific URLs and save (fixes missing chassis, coachwork, estimate, etc.)
+    if (action === 'backfill' && Array.isArray(body.urls) && body.urls.length > 0) {
+      const urls = body.urls as string[];
+      const limit = Math.min(urls.length, typeof body.limit === 'number' ? body.limit : 100);
+      const results = await processBatch(supabase, urls, limit);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          action: 'backfill',
+          requested: urls.length,
+          limit,
+          results,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -671,7 +782,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        error: 'Invalid request. Use { url: "..." } for single extraction, { action: "discover" } for sitemap, or { action: "batch", limit: N } for batch processing.',
+        error: 'Invalid request. Use { url: "..." } for single extraction; { action: "backfill", urls: ["..."] } to re-extract and save; { action: "discover" } for sitemap; or { action: "batch", limit: N } for batch.',
       }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

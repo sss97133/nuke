@@ -194,33 +194,46 @@ interface TypesenseDocument {
   };
 }
 
+const CC_PAGE_SIZE = 250;
+const CC_MAX_PAGES = 40; // 250 * 40 = 10k cap for scale toward 4k-10k live
+
 async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
   try {
     console.log("[sync-live-auctions] Fetching Collecting Cars live auctions from Typesense...");
 
-    const response = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        searches: [{
-          collection: "production_cars",
-          q: "*",
-          filter_by: "listingStage:live",
-          per_page: 250,
-          page: 1,
-          query_by: "title,productMake,vehicleMake,productYear",
-        }],
-      }),
-    });
+    const documents: TypesenseDocument[] = [];
+    let page = 1;
 
-    if (!response.ok) {
-      return { auctions: [], error: `Collecting Cars Typesense returned HTTP ${response.status}` };
+    while (page <= CC_MAX_PAGES) {
+      const response = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          searches: [{
+            collection: "production_cars",
+            q: "*",
+            filter_by: "listingStage:live",
+            per_page: CC_PAGE_SIZE,
+            page,
+            query_by: "title,productMake,vehicleMake,productYear",
+          }],
+        }),
+      });
+
+      if (!response.ok) {
+        return { auctions: [], error: `Collecting Cars Typesense returned HTTP ${response.status}` };
+      }
+
+      const data = await response.json();
+      const hits = data.results?.[0]?.hits ?? [];
+      const pageDocs = hits.map((hit: { document: TypesenseDocument }) => hit.document);
+      documents.push(...pageDocs);
+
+      if (pageDocs.length < CC_PAGE_SIZE) break;
+      page++;
     }
-
-    const data = await response.json();
-    const documents: TypesenseDocument[] = data.results?.[0]?.hits?.map((hit: { document: TypesenseDocument }) => hit.document) || [];
 
     console.log(`[sync-live-auctions] Collecting Cars: Found ${documents.length} live auctions`);
 
@@ -394,13 +407,14 @@ async function syncToDatabase(
     return url && !currentLiveUrls.has(url);
   }) || [];
 
-  // Mark ended auctions
+  // Mark ended auctions (clear sale_status so UI/stats no longer count as live)
   if (endedVehicles.length > 0) {
     const endedIds = endedVehicles.map(v => v.id);
     const { error } = await supabase
       .from("vehicles")
       .update({
         auction_status: "ended",
+        sale_status: null,
         updated_at: new Date().toISOString(),
       })
       .in("id", endedIds);
@@ -411,7 +425,7 @@ async function syncToDatabase(
     }
   }
 
-  // Upsert current live auctions
+  // Upsert current live auctions (sale_status = auction_live so UI/portfolio stats count them)
   for (const auction of auctions) {
     const vehicleData = {
       listing_url: auction.url,
@@ -419,7 +433,8 @@ async function syncToDatabase(
       year: auction.year,
       make: auction.make,
       model: auction.model,
-      auction_status: "active", // Use "active" to match existing data convention
+      auction_status: "active",
+      sale_status: "auction_live",
       auction_end_date: auction.auction_end_date,
       sale_price: auction.current_bid,
       platform_source: platform,
@@ -527,11 +542,13 @@ Deno.serve(async (req) => {
     const targetPlatform = body.platform || null;
 
     if (action === "status") {
-      // Get current active auction stats
+      // Get current active auction stats (auction_status and sale_status for UI parity)
       const { data: activeAuctions, count } = await supabase
         .from("vehicles")
-        .select("listing_url, bat_auction_url, auction_status, auction_end_date", { count: "exact" })
+        .select("listing_url, bat_auction_url, auction_status, sale_status, auction_end_date", { count: "exact" })
         .eq("auction_status", "active");
+
+      const saleStatusLiveCount = (activeAuctions || []).filter(v => v.sale_status === "auction_live").length;
 
       // Group by platform
       const byPlatform: Record<string, number> = {};
@@ -553,6 +570,7 @@ Deno.serve(async (req) => {
       return okJson({
         success: true,
         total_active: count || 0,
+        sale_status_live_count: saleStatusLiveCount,
         by_platform: byPlatform,
         sources: sources || [],
       });
