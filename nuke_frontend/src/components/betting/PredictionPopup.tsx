@@ -192,14 +192,14 @@ export function PredictionPopup({
         <div className="p-4 border-b border-gray-700 flex items-start justify-between">
           <div>
             {vehicleYear && vehicleMake && (
-              <div className="text-xs text-gray-500 mb-1">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                 {vehicleYear} {vehicleMake} {vehicleModel}
               </div>
             )}
             <h2 className="font-bold text-white text-lg leading-tight">{title}</h2>
-            <p className="text-sm text-gray-400 mt-1">{description}</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400 mt-1">{description}</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white p-1">
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-white p-1">
             <X size={20} />
           </button>
         </div>
@@ -223,7 +223,7 @@ export function PredictionPopup({
                   className="w-24 h-16 flex-shrink-0"
                 />
                 <div className="flex-1">
-                  <div className="text-xs text-gray-500 mb-1">Auction Footage</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Auction Footage</div>
                   <WatchMomentButton
                     videoId={broadcastVideoId}
                     timestampStart={broadcastTimestampStart}
@@ -238,7 +238,7 @@ export function PredictionPopup({
 
         {/* Chart */}
         <div className="p-4 border-b border-gray-700">
-          <div className="flex justify-between text-xs text-gray-500 mb-2">
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
             <span>24h Odds Movement</span>
             <div className="flex gap-4">
               <span className="text-green-500">● Over</span>
@@ -256,7 +256,7 @@ export function PredictionPopup({
         {/* Current Odds */}
         <div className="p-4 border-b border-gray-700">
           <div className="flex justify-between items-center mb-3">
-            <span className="text-gray-400 text-sm">Line</span>
+            <span className="text-gray-400 dark:text-gray-500 dark:text-gray-400 text-sm">Line</span>
             <span className="font-mono font-bold text-white text-xl">{formatLine(lineValue)}</span>
           </div>
 
@@ -295,9 +295,9 @@ export function PredictionPopup({
         <div className="p-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1">
-              <label className="text-xs text-gray-500 block mb-1">Amount</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Amount</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">$</span>
                 <input
                   type="number"
                   value={amount}
@@ -317,7 +317,7 @@ export function PredictionPopup({
                     "px-2 py-1 text-xs rounded transition-colors",
                     amount === v
                       ? "bg-blue-500 text-white"
-                      : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                      : "bg-gray-800 text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:bg-gray-700"
                   )}
                 >
                   ${v}
@@ -345,12 +345,12 @@ export function PredictionPopup({
           </button>
 
           {userPrediction && (
-            <div className="mt-3 text-center text-sm text-gray-500">
+            <div className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
               You predicted {userPrediction.toUpperCase()} with ${(userAmount || 0) / 100}
             </div>
           )}
 
-          <div className="mt-3 flex justify-between text-xs text-gray-500">
+          <div className="mt-3 flex justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>{totalBettors} predictors</span>
             <span>{isLive ? '🔴 LIVE' : `Locks in ${timeUntilLock()}`}</span>
           </div>

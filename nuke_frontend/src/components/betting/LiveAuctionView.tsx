@@ -143,7 +143,7 @@ export function LiveAuctionView() {
 
   if (!currentLot) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
         Loading live auction...
       </div>
     );
@@ -185,13 +185,13 @@ export function LiveAuctionView() {
                 <h2 className="text-2xl font-bold">
                   {currentLot.year} {currentLot.make} {currentLot.model}
                 </h2>
-                <div className="text-gray-400 text-sm mt-1">
+                <div className="text-gray-400 dark:text-gray-500 dark:text-gray-400 text-sm mt-1">
                   Mecum Kissimmee 2026
                 </div>
               </div>
 
               <div className="text-right">
-                <div className="text-gray-400 text-sm">Current Bid</div>
+                <div className="text-gray-400 dark:text-gray-500 dark:text-gray-400 text-sm">Current Bid</div>
                 <div className={cn(
                   "text-4xl font-mono font-bold transition-all",
                   currentLot.currentBid > currentLot.lineValue
@@ -249,7 +249,7 @@ export function LiveAuctionView() {
       <div className="grid grid-cols-3 gap-4 p-4">
         {/* Bid Feed */}
         <div className="bg-gray-900 rounded-lg p-3">
-          <h3 className="text-sm font-bold text-gray-400 mb-2">BID ACTIVITY</h3>
+          <h3 className="text-sm font-bold text-gray-400 dark:text-gray-500 dark:text-gray-400 mb-2">BID ACTIVITY</h3>
           <div ref={bidFeedRef} className="space-y-1 max-h-48 overflow-y-auto">
             {recentBids.map((bid, i) => (
               <div
@@ -259,7 +259,7 @@ export function LiveAuctionView() {
                   i === 0 && "bg-blue-900/50 animate-pulse"
                 )}
               >
-                <span className="text-gray-500">
+                <span className="text-gray-500 dark:text-gray-400">
                   {bid.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
                 <span className="font-mono font-bold text-green-400">
@@ -277,7 +277,7 @@ export function LiveAuctionView() {
 
         {/* Up Next */}
         <div className="bg-gray-900 rounded-lg p-3 col-span-2">
-          <h3 className="text-sm font-bold text-gray-400 mb-2">UP NEXT</h3>
+          <h3 className="text-sm font-bold text-gray-400 dark:text-gray-500 dark:text-gray-400 mb-2">UP NEXT</h3>
           <div className="grid grid-cols-2 gap-2">
             {upcomingLots.slice(0, 4).map((lot) => (
               <div
@@ -292,7 +292,7 @@ export function LiveAuctionView() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-gray-500">{lot.lotNumber}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">{lot.lotNumber}</div>
                   <div className="text-sm font-medium truncate">
                     {lot.year} {lot.make}
                   </div>
