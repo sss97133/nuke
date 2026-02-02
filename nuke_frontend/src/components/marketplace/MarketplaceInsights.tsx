@@ -112,7 +112,7 @@ export default function MarketplaceInsights() {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold">Private Party Market Intelligence</h2>
-        <p className="text-gray-400">
+        <p className="text-gray-400 dark:text-gray-500 dark:text-gray-400">
           Real transaction data from Facebook Marketplace
         </p>
       </div>
@@ -124,31 +124,31 @@ export default function MarketplaceInsights() {
             <div className="text-3xl font-bold text-white">
               {stats.total_listings.toLocaleString()}
             </div>
-            <div className="text-sm text-gray-400">Total Listings Tracked</div>
+            <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Total Listings Tracked</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-3xl font-bold text-green-400">
               {stats.total_sold.toLocaleString()}
             </div>
-            <div className="text-sm text-gray-400">Confirmed Sales</div>
+            <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Confirmed Sales</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-3xl font-bold text-blue-400">
               {formatCurrency(stats.total_sale_value)}
             </div>
-            <div className="text-sm text-gray-400">Total Transaction Value</div>
+            <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Total Transaction Value</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-3xl font-bold text-yellow-400">
               {stats.avg_days_to_sell.toFixed(0)}
             </div>
-            <div className="text-sm text-gray-400">Avg Days to Sell</div>
+            <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Avg Days to Sell</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-3xl font-bold text-purple-400">
               {formatPct(stats.sale_capture_rate)}
             </div>
-            <div className="text-sm text-gray-400">Price Capture Rate</div>
+            <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Price Capture Rate</div>
           </div>
         </div>
       )}
@@ -161,19 +161,19 @@ export default function MarketplaceInsights() {
         <div className="grid md:grid-cols-3 gap-4 text-sm">
           <div>
             <span className="text-blue-300 font-medium">Carfax/AutoCheck:</span>
-            <p className="text-gray-400">
+            <p className="text-gray-400 dark:text-gray-500 dark:text-gray-400">
               Service records only. No pricing data.
             </p>
           </div>
           <div>
             <span className="text-blue-300 font-medium">Hagerty/KBB:</span>
-            <p className="text-gray-400">
+            <p className="text-gray-400 dark:text-gray-500 dark:text-gray-400">
               Auction prices (10-15% higher than private party).
             </p>
           </div>
           <div>
             <span className="text-blue-300 font-medium">Nuke:</span>
-            <p className="text-gray-400">
+            <p className="text-gray-400 dark:text-gray-500 dark:text-gray-400">
               Actual private party transaction prices + time to sell.
             </p>
           </div>
@@ -205,11 +205,11 @@ export default function MarketplaceInsights() {
 
       {/* Insights Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading...</div>
+        <div className="text-center py-12 text-gray-400 dark:text-gray-500 dark:text-gray-400">Loading...</div>
       ) : insights.length === 0 ? (
         <div className="text-center py-12 bg-gray-800 rounded-lg">
-          <p className="text-gray-400 mb-2">No market data yet</p>
-          <p className="text-sm text-gray-500">
+          <p className="text-gray-400 dark:text-gray-500 dark:text-gray-400 mb-2">No market data yet</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Import listings to start building market intelligence
           </p>
         </div>
@@ -217,7 +217,7 @@ export default function MarketplaceInsights() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-gray-400 border-b border-gray-700">
+              <tr className="text-left text-gray-400 dark:text-gray-500 dark:text-gray-400 border-b border-gray-700">
                 <th className="pb-3 font-medium">Make/Model</th>
                 <th className="pb-3 font-medium text-right">Active</th>
                 <th className="pb-3 font-medium text-right">Sold</th>
@@ -235,10 +235,10 @@ export default function MarketplaceInsights() {
                       {row.year || ""} {row.make}
                     </div>
                     {row.model && (
-                      <div className="text-gray-400 text-xs">{row.model}</div>
+                      <div className="text-gray-400 dark:text-gray-500 dark:text-gray-400 text-xs">{row.model}</div>
                     )}
                     {row.state && (
-                      <span className="text-xs text-gray-500">{row.state}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{row.state}</span>
                     )}
                   </td>
                   <td className="py-3 text-right text-gray-300">
@@ -277,10 +277,10 @@ export default function MarketplaceInsights() {
         <h3 className="font-semibold text-white mb-2">
           Want this data via API?
         </h3>
-        <p className="text-gray-400 text-sm mb-4">
+        <p className="text-gray-400 dark:text-gray-500 dark:text-gray-400 text-sm mb-4">
           Private party transaction data, updated daily. Perfect for:
         </p>
-        <ul className="text-sm text-gray-400 space-y-1 mb-4">
+        <ul className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400 space-y-1 mb-4">
           <li>• Insurance valuations (actual market prices)</li>
           <li>• Dealer acquisition strategy (what to pay)</li>
           <li>• Market timing (days to sell trends)</li>

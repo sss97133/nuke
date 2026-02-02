@@ -101,22 +101,22 @@ const TimelineEventForm = () => {
 
   return (
     <div className="container mx-auto p-4 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Add Timeline Event</h1>
+      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Add Timeline Event</h1>
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
       
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-lg shadow-md p-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
+          <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
             Event Type*
           </label>
           <select
             {...register('event_type')}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
           >
             <option value="">Select event type...</option>
             <option value="purchase">Purchase</option>
@@ -137,12 +137,12 @@ const TimelineEventForm = () => {
         </div>
         
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
+          <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
             Title*
           </label>
           <input
             {...register('title')}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             type="text"
             placeholder="Event title"
           />
@@ -152,12 +152,12 @@ const TimelineEventForm = () => {
         </div>
         
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
+          <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
             Date*
           </label>
           <input
             {...register('event_date')}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             type="date"
           />
           {errors.event_date && (
@@ -166,12 +166,12 @@ const TimelineEventForm = () => {
         </div>
         
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
+          <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
             Description
           </label>
           <textarea
             {...register('description')}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             rows={4}
             placeholder="Detailed description of the event"
           />
@@ -182,12 +182,12 @@ const TimelineEventForm = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-gray-700 text-sm font-bold mb-2">
+            <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
               Location
             </label>
             <input
               {...register('location')}
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
               type="text"
               placeholder="Where this event occurred"
             />
@@ -197,12 +197,12 @@ const TimelineEventForm = () => {
           </div>
           
           <div>
-            <label className="block text-gray-700 text-sm font-bold mb-2">
+            <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
               Source
             </label>
             <input
               {...register('source')}
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
               type="text"
               placeholder="Source of information"
             />
@@ -213,7 +213,7 @@ const TimelineEventForm = () => {
         </div>
         
         <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
+          <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
             Confidence Score: {getConfidenceLabel(confidenceScore)} ({Math.round(confidenceScore * 100)}%)
           </label>
           <div className="flex items-center">
@@ -228,7 +228,7 @@ const TimelineEventForm = () => {
             />
             <span className="ml-2 text-xs">High</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+          <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5 mt-2">
             <div 
               className={`h-2.5 rounded-full ${getConfidenceColor(confidenceScore)}`}
               style={{ width: `${confidenceScore * 100}%` }}
@@ -238,16 +238,16 @@ const TimelineEventForm = () => {
         
         {/* Dynamic fields based on event type */}
         {eventType === 'purchase' && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-bold mb-2">Purchase Details</h3>
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h3 className="font-bold mb-2 text-gray-900 dark:text-white">Purchase Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
                   Purchase Price
                 </label>
                 <input
                   type="number"
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   placeholder="Purchase price"
                   onChange={(e) => {
                     const metadata = watch('metadata') || {};
@@ -259,12 +259,12 @@ const TimelineEventForm = () => {
                 />
               </div>
               <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
                   Seller Name
                 </label>
                 <input
                   type="text"
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   placeholder="Seller name"
                   onChange={(e) => {
                     const metadata = watch('metadata') || {};
@@ -280,15 +280,15 @@ const TimelineEventForm = () => {
         )}
         
         {eventType === 'service' && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-bold mb-2">Service Details</h3>
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h3 className="font-bold mb-2 text-gray-900 dark:text-white">Service Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
                   Service Type
                 </label>
                 <select
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   onChange={(e) => {
                     const metadata = watch('metadata') || {};
                     setValue('metadata', {
@@ -306,12 +306,12 @@ const TimelineEventForm = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
                   Service Cost
                 </label>
                 <input
                   type="number"
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  className="shadow appearance-none border border-gray-300 dark:border-gray-600 rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   placeholder="Service cost"
                   onChange={(e) => {
                     const metadata = watch('metadata') || {};
@@ -330,7 +330,7 @@ const TimelineEventForm = () => {
           <button
             type="button"
             onClick={() => navigate(`/vehicles/${vehicleId}`)}
-            className="mr-4 text-gray-500 hover:text-gray-700"
+            className="mr-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
             Cancel
           </button>

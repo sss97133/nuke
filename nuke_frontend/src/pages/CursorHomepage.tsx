@@ -8,6 +8,8 @@ import { getCanonicalBodyStyle } from '../services/bodyStyleTaxonomy';
 import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
 import { parseMoneyNumber } from '../lib/auctionUtils';
 import { preloadImageBatch, optimizeImageUrl } from '../lib/imageOptimizer';
+import ActiveAuctionsPanel from '../components/dashboard/ActiveAuctionsPanel';
+import { ValueTrendsPanel } from '../components/charts';
 
 interface HypeVehicle {
   id: string;
@@ -543,6 +545,7 @@ const CursorHomepage: React.FC = () => {
   const [statsPanelError, setStatsPanelError] = useState<string | null>(null);
   const [statsPanelRows, setStatsPanelRows] = useState<any[]>([]);
   const [statsPanelMeta, setStatsPanelMeta] = useState<any>(null);
+  const [showActiveAuctionsPanel, setShowActiveAuctionsPanel] = useState(false);
   const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
@@ -4328,69 +4331,81 @@ const CursorHomepage: React.FC = () => {
               ) : (
                 <>
                   {statsPanel === 'value' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px' }}>
-                      <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BEST-KNOWN VALUE</div>
-                        <div style={{ fontSize: '12pt', fontWeight: 900 }}>{formatCurrency(displayStats.totalValue)}</div>
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                          Uses priority: sale &gt; bids &gt; ask &gt; mark &gt; cost.
+                    <>
+                      {/* Current value snapshot */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginBottom: '16px' }}>
+                        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BEST-KNOWN VALUE</div>
+                          <div style={{ fontSize: '12pt', fontWeight: 900 }}>{formatCurrency(displayStats.totalValue)}</div>
+                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                            Uses priority: sale &gt; bids &gt; ask &gt; mark &gt; cost.
+                          </div>
+                          <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HEADER:</div>
+                            {([
+                              { mode: 'best_known', label: 'val' },
+                              { mode: 'mark', label: 'mark' },
+                              { mode: 'ask', label: 'ask' },
+                              { mode: 'realized', label: 'realized' },
+                              { mode: 'cost', label: 'cost' },
+                            ] as Array<{ mode: ValueMetricMode; label: string }>).map((m) => (
+                              <button
+                                key={m.mode}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setValueMetricMode(m.mode);
+                                }}
+                                style={{
+                                  padding: '2px 6px',
+                                  fontSize: '7pt',
+                                  border: '1px solid var(--border)',
+                                  background: valueMetricMode === m.mode ? 'var(--grey-600)' : 'transparent',
+                                  color: valueMetricMode === m.mode ? 'var(--white)' : 'var(--text)',
+                                  cursor: 'pointer',
+                                  borderRadius: 6,
+                                  fontFamily: 'monospace',
+                                  fontWeight: 900,
+                                }}
+                                title="Choose which value concept the header shows"
+                              >
+                                {m.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HEADER:</div>
-                          {([
-                            { mode: 'best_known', label: 'val' },
-                            { mode: 'mark', label: 'mark' },
-                            { mode: 'ask', label: 'ask' },
-                            { mode: 'realized', label: 'realized' },
-                            { mode: 'cost', label: 'cost' },
-                          ] as Array<{ mode: ValueMetricMode; label: string }>).map((m) => (
-                            <button
-                              key={m.mode}
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setValueMetricMode(m.mode);
-                              }}
-                              style={{
-                                padding: '2px 6px',
-                                fontSize: '7pt',
-                                border: '1px solid var(--border)',
-                                background: valueMetricMode === m.mode ? 'var(--grey-600)' : 'transparent',
-                                color: valueMetricMode === m.mode ? 'var(--white)' : 'var(--text)',
-                                cursor: 'pointer',
-                                borderRadius: 6,
-                                fontFamily: 'monospace',
-                                fontWeight: 900,
-                              }}
-                              title="Choose which value concept the header shows"
-                            >
-                              {m.label}
-                            </button>
-                          ))}
+                        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BREAKDOWN</div>
+                          <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
+                            <div><b>{formatCurrency(displayStats.valueMarkTotal)}</b> mark (current_value)</div>
+                            <div><b>{formatCurrency(displayStats.valueAskTotal)}</b> ask (for sale)</div>
+                            <div><b>{formatCurrency(displayStats.valueRealizedTotal)}</b> realized (sale_price)</div>
+                            <div><b>{formatCurrency(displayStats.valueCostTotal)}</b> cost (purchase_price)</div>
+                          </div>
+                        </div>
+                        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>VALUE ADDED (IMPORTS)</div>
+                          <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
+                            <div><b>{formatCurrency(displayStats.valueImportedToday)}</b> today</div>
+                            <div><b>{formatCurrency(displayStats.valueImported24h)}</b> last 24h</div>
+                            <div><b>{formatCurrency(displayStats.valueImported7d)}</b> last 7d</div>
+                          </div>
+                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '6px' }}>
+                            Note: "Sold date" can be old, but "import date" is created_at.
+                          </div>
                         </div>
                       </div>
-                      <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BREAKDOWN</div>
-                        <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
-                          <div><b>{formatCurrency(displayStats.valueMarkTotal)}</b> mark (current_value)</div>
-                          <div><b>{formatCurrency(displayStats.valueAskTotal)}</b> ask (for sale)</div>
-                          <div><b>{formatCurrency(displayStats.valueRealizedTotal)}</b> realized (sale_price)</div>
-                          <div><b>{formatCurrency(displayStats.valueCostTotal)}</b> cost (purchase_price)</div>
-                        </div>
+
+                      {/* Value trends charts */}
+                      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                        <div style={{ fontSize: '8pt', fontWeight: 900, marginBottom: '12px' }}>VALUE TRENDS</div>
+                        <ValueTrendsPanel
+                          chartWidth={260}
+                          chartHeight={70}
+                        />
                       </div>
-                      <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>VALUE ADDED (IMPORTS)</div>
-                        <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
-                          <div><b>{formatCurrency(displayStats.valueImportedToday)}</b> today</div>
-                          <div><b>{formatCurrency(displayStats.valueImported24h)}</b> last 24h</div>
-                          <div><b>{formatCurrency(displayStats.valueImported7d)}</b> last 7d</div>
-                        </div>
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '6px' }}>
-                          Note: “Sold date” can be old, but “import date” is created_at.
-                        </div>
-                      </div>
-                    </div>
+                    </>
                   )}
 
                   {statsPanel === 'vehicles' && (
@@ -4644,9 +4659,28 @@ const CursorHomepage: React.FC = () => {
               {displayStats.activeAuctions > 0 && (
                 <>
                   <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
-                  <div style={{ color: 'var(--text-muted)' }}>
-                    {displayStats.activeAuctions} auctions
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowActiveAuctionsPanel(true);
+                    }}
+                    title="Live auctions with countdown timers, bid counts, and market analytics"
+                    style={{
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      padding: '1px 6px',
+                      margin: 0,
+                      cursor: 'pointer',
+                      fontFamily: '"MS Sans Serif", sans-serif',
+                      fontSize: '7pt',
+                      color: 'white',
+                      borderRadius: '999px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    LIVE {displayStats.activeAuctions}
+                  </button>
                 </>
               )}
               {salesByPeriod.count > 0 && (
@@ -5102,21 +5136,24 @@ const CursorHomepage: React.FC = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      openStatsPanel('auctions');
+                      setShowActiveAuctionsPanel(true);
                     }}
-                    title="Live auctions (prefers external listings with end_date in the future). Click to preview."
+                    title="Live auctions with countdown timers, bid counts, and market analytics. Click to open."
                     style={{
                       border: 'none',
-                      background: 'transparent',
-                      padding: 0,
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      padding: '2px 8px',
                       margin: 0,
                       cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '7pt',
-                      color: 'var(--text)'
+                      color: 'white',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                      animation: 'pulse 2s infinite',
                     }}
                   >
-                    <b>{displayStats.activeAuctions}</b> auct
+                    LIVE {displayStats.activeAuctions}
                   </button>
                 </>
               )}
@@ -7173,6 +7210,16 @@ const CursorHomepage: React.FC = () => {
         >
           ↑
         </button>
+      )}
+
+      {/* Active Auctions Panel - Enhanced with countdown timers, bid counts, and market analytics */}
+      {showActiveAuctionsPanel && (
+        <ActiveAuctionsPanel
+          onClose={() => setShowActiveAuctionsPanel(false)}
+          onNavigateToVehicle={(vehicleId) => {
+            navigate(`/vehicle/${vehicleId}`);
+          }}
+        />
       )}
 
     </div>

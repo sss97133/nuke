@@ -166,7 +166,7 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
   }
 
   if (!workSummary) {
-    return <div className="text-center p-8 text-gray-500">No work data found</div>;
+    return <div className="text-center p-8 text-gray-500 dark:text-gray-400 dark:text-gray-500">No work data found</div>;
   }
 
   return (
@@ -268,7 +268,7 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
                           </div>
                           <div className="text-right">
                             <div className="text-sm font-medium">{formatDuration(session.duration_minutes)}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">
                               {Math.round(session.confidence_score * 100)}% confidence
                             </div>
                           </div>
@@ -310,14 +310,14 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
                               {new Date(session.end_time).toLocaleTimeString()}
                             </div>
                             {session.work_description && (
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500 mt-1">
                                 {session.work_description}
                               </div>
                             )}
                           </div>
                           <div className="text-right">
                             <div className="text-sm font-medium">{formatDuration(session.duration_minutes)}</div>
-                            <div className="text-xs text-gray-400">
+                            <div className="text-xs text-gray-400 dark:text-gray-500">
                               {Math.round(session.confidence_score * 100)}%
                             </div>
                           </div>

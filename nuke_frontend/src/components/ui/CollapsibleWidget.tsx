@@ -29,7 +29,7 @@ export function CollapsibleWidget({
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
 
   return (
-    <div className={cn("rounded-lg border bg-white", className)}>
+    <div className={cn("rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700", className)}>
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className={cn(
@@ -38,7 +38,7 @@ export function CollapsibleWidget({
         )}
       >
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium uppercase tracking-wide text-gray-500">
+          <h3 className="text-sm font-medium uppercase tracking-wide text-gray-600 dark:text-gray-400">
             {title}
           </h3>
           {badge}
@@ -49,14 +49,14 @@ export function CollapsibleWidget({
           )}
           <ChevronDown
             className={cn(
-              "h-4 w-4 text-gray-400 transition-transform",
+              "h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform",
               isCollapsed && "-rotate-90"
             )}
           />
         </div>
       </button>
       {!isCollapsed && (
-        <div className={cn("border-t p-4", contentClassName)}>
+        <div className={cn("border-t border-gray-200 dark:border-gray-700 p-4", contentClassName)}>
           {children}
         </div>
       )}

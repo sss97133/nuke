@@ -53,9 +53,9 @@ Auto-updated log of autonomous agent activity.
 ### Metrics
 
 - **Vehicles fixed this session**: 1,161 (data corruption) + 265 (inconsistencies) = **1,426 total**
-- **Vehicles extracted this session**: 63 (BaT) + 237 (Collecting Cars) = **300 new vehicles**
+- **Vehicles extracted this session**: 63 (BaT) + 446 (Collecting Cars) + 4,082 (Craigslist already done) = **509 new + 4k existing**
 - **New listings discovered**: 121 (Collecting Cars)
-- **Extractors deployed**: 2 (Craigslist, Mecum fix)
+- **Extractors deployed**: 5 (Craigslist, Collecting Cars, Playwright fallback, Ollama fallback, eBay Motors)
 - **Blocked resources**: OpenAI quota, Firecrawl credits
 - **Agents spawned**: 15+
 - **Follow-up iterations**: 4 (discoveries led to new agent spawns)
@@ -73,6 +73,12 @@ Auto-updated log of autonomous agent activity.
 2. **Craigslist**: Simple extractor uses JSON-LD structured data, no AI needed
 3. **BaT**: Native extractor (extract-bat-core) works without AI
 
+### Source Registry (NEW)
+- `source_registry` table created with 13 sources
+- Helper views: `v_active_sources`, `v_sources_needing_attention`, `v_ugly_sources`
+- Quality filters configured for eBay Motors and Copart
+- Automatic health tracking (success rates, extraction times)
+
 ### Extraction Fallback Hierarchy (NEVER ZERO)
 
 ```
@@ -85,8 +91,8 @@ Priority 2: API Bypasses (fast, free)
 Priority 3: Firecrawl (medium speed, paid)
   └─ When credits available
 
-Priority 4: Playwright (slow, free) ← BUILDING
-  └─ extract-with-playwright - universal fallback
+Priority 4: Playwright (slow, free) ← DONE
+  └─ extract-with-playwright - universal fallback deployed
 
 Priority 5: Ollama Local (slow, free) ← DONE
   └─ extract-vehicle-data-ollama + ollama-extraction-worker.ts
