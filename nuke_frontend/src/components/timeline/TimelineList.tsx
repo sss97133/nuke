@@ -53,8 +53,8 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
 
   if (events.length === 0) {
     return (
-      <div className="text-center p-8 bg-gray-50 rounded-lg">
-        <p className="mb-4">No timeline events found for this vehicle.</p>
+      <div className="text-center p-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <p className="mb-4 text-gray-700 dark:text-gray-300">No timeline events found for this vehicle.</p>
         <button
           onClick={() => setShowAddEventForm(true)}
           className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
@@ -102,10 +102,10 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
   const sortedYears = Object.keys(groupedEvents).sort((a, b) => parseInt(b) - parseInt(a));
 
   return (
-    <div className="bg-gray-50 rounded-lg p-6">
+    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
       {/* Add Event Button - Always visible */}
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-medium text-gray-900">Timeline Events</h3>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">Timeline Events</h3>
         <button
           onClick={() => setShowAddEventForm(true)}
           className="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors"
@@ -116,11 +116,11 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
 
       <div className="relative">
         {/* Vertical timeline line */}
-        <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-300"></div>
+        <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-300 dark:bg-gray-600"></div>
         
         {sortedYears.map(year => (
           <div key={year} className="mb-8">
-            <h3 className="text-xl font-bold mb-4">{year}</h3>
+            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">{year}</h3>
             
             {groupedEvents[year].map(event => (
               <div key={event.id} className="relative mb-6 ml-10">
@@ -134,9 +134,9 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
                 </div>
                 
                 {/* Event card */}
-                <div className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
+                <div className="bg-white dark:bg-gray-700 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="text-lg font-bold">{event.title}</h4>
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white">{event.title}</h4>
                     
                     <div className="flex items-center">
                       {/* Event type badge */}
@@ -153,25 +153,25 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
                     </div>
                   </div>
                   
-                  <p className="text-sm text-gray-500 mb-3">
-                    {new Date(event.event_date).toLocaleDateString()} | 
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                    {new Date(event.event_date).toLocaleDateString()} |
                     {event.location && ` ${event.location} | `}
                     {event.source && ` Source: ${event.source}`}
                   </p>
                   
                   {event.description && (
-                    <p className="mb-4">{event.description}</p>
+                    <p className="mb-4 text-gray-700 dark:text-gray-300">{event.description}</p>
                   )}
                   
                   {/* Confidence score indicator */}
                   <div className="flex items-center mt-2">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5 mr-2">
                       <div 
                         className={`h-2.5 rounded-full ${getConfidenceColor(event.confidence_score)}`}
                         style={{ width: `${event.confidence_score * 100}%` }}
                       ></div>
                     </div>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       Confidence: {Math.round(event.confidence_score * 100)}%
                     </span>
                   </div>
@@ -275,24 +275,24 @@ const getEventTypeBgColor = (eventType: string): string => {
   switch (eventType) {
     case 'purchase':
     case 'sale':
-      return 'bg-green-100 text-green-800';
+      return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
     case 'service':
     case 'repair':
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300';
     case 'restoration':
-      return 'bg-purple-100 text-purple-800';
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300';
     case 'inspection':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
     case 'modification':
-      return 'bg-indigo-100 text-indigo-800';
+      return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300';
     case 'registration':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     case 'accident':
-      return 'bg-red-100 text-red-800';
+      return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300';
     case 'milestone':
-      return 'bg-teal-100 text-teal-800';
+      return 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
   }
 };
 

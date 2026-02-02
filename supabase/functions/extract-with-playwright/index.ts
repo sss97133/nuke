@@ -18,7 +18,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const EXTRACTOR_VERSION = "extract-with-playwright:1.1.0";
+const EXTRACTOR_VERSION = "extract-with-playwright:1.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -147,14 +147,29 @@ async function fetchWithFirecrawl(url: string): Promise<{ html: string; markdown
 
   console.log(`[extract-with-playwright] Firecrawl response status: ${response.status}`);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[extract-with-playwright] Firecrawl error: ${errorText.slice(0, 500)}`);
-    throw new Error(`Firecrawl failed: ${response.status} - ${errorText.slice(0, 200)}`);
+  const responseText = await response.text();
+  let data: any;
+
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    console.error(`[extract-with-playwright] Firecrawl response not JSON: ${responseText.slice(0, 200)}`);
+    throw new Error(`Firecrawl returned invalid JSON`);
   }
 
-  const data = await response.json();
-  console.log(`[extract-with-playwright] Firecrawl success: ${data.success}`);
+  console.log(`[extract-with-playwright] Firecrawl response success: ${data.success}`);
+
+  if (!response.ok || !data.success) {
+    const errorMsg = data.error || `HTTP ${response.status}`;
+    console.error(`[extract-with-playwright] Firecrawl error: ${errorMsg}`);
+
+    // Check for specific errors
+    if (errorMsg.includes("Insufficient credits")) {
+      console.warn(`[extract-with-playwright] Firecrawl credits exhausted - falling back to direct fetch`);
+    }
+
+    throw new Error(`Firecrawl failed: ${errorMsg.slice(0, 200)}`);
+  }
 
   if (!data.success) {
     console.error(`[extract-with-playwright] Firecrawl returned success=false: ${JSON.stringify(data).slice(0, 300)}`);
@@ -174,25 +189,51 @@ async function fetchWithFirecrawl(url: string): Promise<{ html: string; markdown
 }
 
 /**
- * Fallback: Direct fetch for simple pages
+ * Fallback: Direct fetch for simple pages with enhanced browser simulation
  */
 async function fetchDirect(url: string): Promise<{ html: string; markdown: string }> {
   console.log(`[extract-with-playwright] Fallback direct fetch: ${url}`);
 
+  // Rotate user agents
+  const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+  ];
+  const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+
+  // Enhanced headers to simulate real browser
   const response = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "User-Agent": userAgent,
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Cache-Control": "no-cache",
+      "Pragma": "no-cache",
+      "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+      "Sec-Ch-Ua-Mobile": "?0",
+      "Sec-Ch-Ua-Platform": '"macOS"',
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1",
     },
     signal: AbortSignal.timeout(30000),
+    redirect: "follow",
   });
+
+  console.log(`[extract-with-playwright] Direct fetch response: ${response.status} ${response.statusText}`);
 
   if (!response.ok) {
     throw new Error(`Direct fetch failed: ${response.status}`);
   }
 
   const html = await response.text();
+  console.log(`[extract-with-playwright] Fetched HTML length: ${html.length}`);
+
   return { html, markdown: "" };
 }
 
@@ -200,23 +241,65 @@ async function fetchDirect(url: string): Promise<{ html: string; markdown: strin
  * Extract title from HTML
  */
 function extractTitle(html: string, markdown: string): string | null {
-  // Try OG title first
+  // Try OG title first (usually most specific)
   const ogMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-  if (ogMatch?.[1]) return cleanText(ogMatch[1]);
+  if (ogMatch?.[1]) {
+    const title = cleanText(ogMatch[1]);
+    // Skip generic site titles
+    if (!isGenericTitle(title)) return title;
+  }
 
-  // Try regular title tag
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  if (titleMatch?.[1]) return cleanText(titleMatch[1]);
+  // Try Twitter card title
+  const twitterMatch = html.match(/<meta[^>]*name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i);
+  if (twitterMatch?.[1]) {
+    const title = cleanText(twitterMatch[1]);
+    if (!isGenericTitle(title)) return title;
+  }
 
-  // Try H1
+  // Try H1 (often the listing title)
   const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-  if (h1Match?.[1]) return cleanText(h1Match[1]);
+  if (h1Match?.[1]) {
+    const title = cleanText(h1Match[1]);
+    if (!isGenericTitle(title) && title.length >= 10) return title;
+  }
+
+  // Try regular title tag (clean up common suffixes)
+  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleMatch?.[1]) {
+    let title = cleanText(titleMatch[1]);
+    // Remove common site name suffixes
+    title = title
+      .replace(/\s*\|.*$/i, "")
+      .replace(/\s*-\s*(Bring a Trailer|BaT|Cars & Bids|Hagerty|eBay|Craigslist|AutoTrader|CarGurus|Cars\.com).*$/i, "")
+      .trim();
+    if (!isGenericTitle(title) && title.length >= 10) return title;
+  }
 
   // Try first heading from markdown
   const mdHeading = markdown.match(/^#\s+(.+)$/m);
-  if (mdHeading?.[1]) return cleanText(mdHeading[1]);
+  if (mdHeading?.[1]) {
+    const title = cleanText(mdHeading[1]);
+    if (!isGenericTitle(title)) return title;
+  }
 
   return null;
+}
+
+/**
+ * Check if title is too generic to be useful
+ */
+function isGenericTitle(title: string): boolean {
+  const genericPatterns = [
+    /^the\s+best\s+(vintage|classic)/i,
+    /^buy\s+and\s+sell/i,
+    /^cars?\s+for\s+sale/i,
+    /^(used|new)\s+cars?/i,
+    /^(search|browse|find)\s+(used|new|all)/i,
+    /^(welcome|home)\s*(to|page)?/i,
+    /^auction\s*(results|listings)?$/i,
+  ];
+
+  return genericPatterns.some(p => p.test(title));
 }
 
 /**

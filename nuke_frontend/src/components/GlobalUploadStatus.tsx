@@ -87,11 +87,11 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
   const isUploading = uploadingFiles > 0;
 
   return (
-    <div className={`fixed top-0 left-0 right-0 z-50 bg-white border-b shadow-sm global-upload-status ${className}`}>
+    <div className={`fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm global-upload-status ${className}`}>
       {/* Compact Progress Bar */}
       <div 
         className={`px-4 py-2 cursor-pointer transition-all ${
-          isUploading ? 'bg-blue-50' : completedFiles > 0 ? 'bg-green-50' : 'bg-red-50'
+          isUploading ? 'bg-blue-50 dark:bg-blue-900/30' : completedFiles > 0 ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
         }`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -101,7 +101,7 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
             )}
             <span className={`text-sm font-medium ${
-              isUploading ? 'text-blue-700' : completedFiles > 0 ? 'text-green-700' : 'text-red-700'
+              isUploading ? 'text-blue-700 dark:text-blue-300' : completedFiles > 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
             }`}>
               {isUploading ? (
                 `Uploading ${completedFiles}/${totalFiles} images...`
@@ -112,7 +112,7 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
               )}
             </span>
             <span className={`text-xs ${
-              isUploading ? 'text-blue-600' : completedFiles > 0 ? 'text-green-600' : 'text-red-600'
+              isUploading ? 'text-blue-600 dark:text-blue-400' : completedFiles > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
             }`}>
               {overallProgress}%
             </span>
@@ -120,12 +120,12 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
           
           <div className="flex items-center gap-2">
             {/* Vehicle count indicator */}
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
               {allUploads.size} vehicle{allUploads.size !== 1 ? 's' : ''}
             </span>
-            
+
             {/* Expand/collapse button */}
-            <button className="text-gray-400 hover:text-gray-600">
+            <button className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
               <svg 
                 className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
                 fill="none" 
@@ -151,14 +151,14 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
 
       {/* Expanded Details */}
       {isExpanded && (
-        <div className="border-t bg-gray-50 max-h-64 overflow-y-auto">
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 max-h-64 overflow-y-auto">
           {Array.from(allUploads.entries()).map(([vehicleId, files]) => {
             const vehicleCompleted = files.filter(f => f.status === 'success').length;
             const vehicleUploading = files.filter(f => f.status === 'uploading' || f.status === 'pending').length;
             const vehicleProgress = files.length > 0 ? Math.round((vehicleCompleted / files.length) * 100) : 0;
 
             return (
-              <div key={vehicleId} className="px-4 py-3 border-b border-gray-200 last:border-b-0">
+              <div key={vehicleId} className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
                 <div className="flex items-center justify-between mb-2">
                   <button
                     onClick={() => navigate(`/vehicle/${vehicleId}`)}
@@ -166,13 +166,13 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
                   >
                     Vehicle {vehicleId.slice(0, 8)}...
                   </button>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     {vehicleCompleted}/{files.length} completed ({vehicleProgress}%)
                   </span>
                 </div>
                 
                 {/* Vehicle progress bar */}
-                <div className="w-full bg-gray-200 rounded-full h-1 mb-2">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mb-2">
                   <div 
                     className={`h-1 rounded-full transition-all duration-300 ${
                       vehicleUploading > 0 ? 'bg-blue-600' : vehicleCompleted > 0 ? 'bg-green-600' : 'bg-red-600'
@@ -185,12 +185,12 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
                 <div className="space-y-1">
                   {files.slice(0, 3).map(file => (
                     <div key={file.id} className="flex items-center justify-between text-xs">
-                      <span className="truncate flex-1 mr-2 text-gray-600">
+                      <span className="truncate flex-1 mr-2 text-gray-600 dark:text-gray-300">
                         {file.file.name}
                       </span>
                       <div className="flex items-center gap-1">
                         {file.status === 'pending' && (
-                          <span className="text-gray-500">Waiting...</span>
+                          <span className="text-gray-500 dark:text-gray-400">Waiting...</span>
                         )}
                         {file.status === 'uploading' && (
                           <span className="text-blue-600">Uploading {file.progress}%</span>
@@ -205,7 +205,7 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
                     </div>
                   ))}
                   {files.length > 3 && (
-                    <div className="text-xs text-gray-500 text-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
                       ... and {files.length - 3} more files
                     </div>
                   )}
@@ -215,7 +215,7 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
           })}
           
           {/* Action buttons */}
-          <div className="px-4 py-3 bg-gray-100 flex gap-2">
+          <div className="px-4 py-3 bg-gray-100 dark:bg-gray-900 flex gap-2">
             {failedFiles > 0 && (
               <button
                 onClick={() => {

@@ -1,5 +1,6 @@
 // High-quality Bonhams auction extractor
 // Handles lot pages, catalogs, and department pages with full gallery support
+// V2: Added catalog extraction via JSON-LD (no Firecrawl needed) and batch processing
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -57,8 +58,29 @@ interface BonhamsExtracted {
 
   // Metadata
   vehicle_id?: string;
-  scrape_source: 'firecrawl';
+  scrape_source: 'firecrawl' | 'json-ld' | 'native';
   scrape_cost_cents: number;
+}
+
+interface CatalogLot {
+  name: string;
+  url: string;
+  price: number | null;
+  priceCurrency: string | null;
+  lotNumber: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  vin: string | null;
+  availability: string | null;
+}
+
+interface CatalogResult {
+  auctionId: string;
+  auctionName: string;
+  auctionDate: string | null;
+  auctionLocation: string | null;
+  lots: CatalogLot[];
 }
 
 // VIN patterns (17-character modern + chassis numbers for classics)
@@ -82,13 +104,13 @@ const CHASSIS_PATTERNS = [
   /frame\s*(?:number|no\.?|#)?\s*:?\s*([A-Z0-9\-\/]+)/i,
 ];
 
-function extractVinOrChassis(html: string): { vin: string | null; chassis: string | null } {
+function extractVinOrChassis(text: string): { vin: string | null; chassis: string | null } {
   let vin: string | null = null;
   let chassis: string | null = null;
 
   // Try VIN first (modern vehicles)
   for (const pattern of VIN_PATTERNS) {
-    const matches = html.match(pattern);
+    const matches = text.match(pattern);
     if (matches && matches.length > 0) {
       vin = matches[0];
       break;
@@ -97,7 +119,7 @@ function extractVinOrChassis(html: string): { vin: string | null; chassis: strin
 
   // Try chassis number (classic vehicles)
   for (const pattern of CHASSIS_PATTERNS) {
-    const match = html.match(pattern);
+    const match = text.match(pattern);
     if (match && match[1]) {
       const candidate = match[1].trim();
       // Validate: 5-20 chars, alphanumeric with hyphens/slashes
@@ -142,6 +164,60 @@ function extractTitle(html: string): { title: string | null; year: number | null
   }
 
   return { title, year: null, make: null, model: null };
+}
+
+// Parse vehicle info from JSON-LD offer name
+// Format: "2022 Bugatti Chiron Super Sport 300+ Coupe VIN: VF9SW3V37NM795006"
+function parseOfferName(name: string): { year: number | null; make: string | null; model: string | null; vin: string | null } {
+  let year: number | null = null;
+  let make: string | null = null;
+  let model: string | null = null;
+  let vin: string | null = null;
+
+  // Extract VIN from end
+  const vinMatch = name.match(/VIN:\s*([A-HJ-NPR-Z0-9]{17})/i);
+  if (vinMatch) {
+    vin = vinMatch[1].toUpperCase();
+  }
+
+  // Remove VIN part and clean
+  const cleanName = name.replace(/VIN:\s*[A-HJ-NPR-Z0-9]+/i, '').trim();
+
+  // Extract year
+  const yearMatch = cleanName.match(/^(\d{4})\s+/);
+  if (yearMatch) {
+    year = parseInt(yearMatch[1]);
+    const afterYear = cleanName.slice(yearMatch[0].length);
+
+    // Common makes
+    const knownMakes = [
+      'Alfa Romeo', 'Aston Martin', 'Mercedes-Benz', 'Rolls-Royce', 'Land Rover',
+      'Porsche', 'Ferrari', 'Lamborghini', 'Bugatti', 'McLaren', 'Maserati',
+      'Bentley', 'Jaguar', 'BMW', 'Audi', 'Ford', 'Chevrolet', 'Dodge',
+      'Plymouth', 'Pontiac', 'Cadillac', 'Lincoln', 'Chrysler', 'Shelby',
+      'AC', 'Austin-Healey', 'De Tomaso', 'Lancia', 'Iso', 'Bizzarrini',
+      'Facel Vega', 'Delahaye', 'Delage', 'Hispano-Suiza', 'Duesenberg',
+      'Packard', 'Pierce-Arrow', 'Stutz', 'Cord', 'Auburn', 'Tucker',
+      'Harley-Davidson', 'Indian', 'Vincent', 'Brough Superior', 'Norton'
+    ];
+
+    for (const knownMake of knownMakes) {
+      if (afterYear.toLowerCase().startsWith(knownMake.toLowerCase())) {
+        make = knownMake;
+        model = afterYear.slice(knownMake.length).trim();
+        break;
+      }
+    }
+
+    // If no known make found, take first word
+    if (!make) {
+      const parts = afterYear.split(/\s+/);
+      make = parts[0];
+      model = parts.slice(1).join(' ');
+    }
+  }
+
+  return { year, make, model, vin };
 }
 
 // Parse Bonhams money format: "£25,000 - 35,000", "$50,000-70,000", "€100,000"
@@ -491,26 +567,268 @@ function extractImages(html: string): string[] {
   return [...new Set(images)];
 }
 
-async function extractBonhamsListing(url: string): Promise<BonhamsExtracted> {
+// Process pre-scraped catalog JSON data
+function processCatalogJson(jsonLd: any, auctionId: string): CatalogResult | null {
+  try {
+    const auctionName = jsonLd.name || jsonLd.description || 'Unknown Auction';
+
+    let auctionDate: string | null = null;
+    if (jsonLd.startDate) {
+      try {
+        auctionDate = new Date(jsonLd.startDate).toISOString().split('T')[0];
+      } catch {}
+    }
+
+    const auctionLocation = jsonLd.location?.name || jsonLd.location?.address?.addressLocality || null;
+
+    // Extract lots from offers
+    const offers = jsonLd.offers?.offers || jsonLd.offers || [];
+    const lots: CatalogLot[] = [];
+
+    for (const offer of (Array.isArray(offers) ? offers : [])) {
+      if (offer['@type'] !== 'Offer') continue;
+
+      const name = offer.name || '';
+      const url = offer.url || '';
+      const price = typeof offer.price === 'number' ? offer.price : null;
+      const priceCurrency = offer.priceCurrency || null;
+      const availability = offer.availability || null;
+
+      // Extract lot number from URL
+      const lotMatch = url.match(/\/lot\/(\d+)\//);
+      const lotNumber = lotMatch?.[1] || null;
+
+      // Parse vehicle info from name
+      const parsed = parseOfferName(name);
+
+      // Skip non-vehicle lots (automobilia, etc.)
+      // Vehicles typically have a year in their name
+      if (!parsed.year && !name.match(/\d{4}/)) {
+        continue;
+      }
+
+      lots.push({
+        name,
+        url,
+        price,
+        priceCurrency,
+        lotNumber,
+        year: parsed.year,
+        make: parsed.make,
+        model: parsed.model,
+        vin: parsed.vin,
+        availability,
+      });
+    }
+
+    console.log(`[Bonhams] Processed ${lots.length} vehicle lots from JSON`);
+
+    return {
+      auctionId,
+      auctionName,
+      auctionDate,
+      auctionLocation,
+      lots,
+    };
+  } catch (error: any) {
+    console.error(`[Bonhams] processCatalogJson error: ${error.message}`);
+    return null;
+  }
+}
+
+// Extract auction catalog from JSON-LD (no Firecrawl needed!)
+async function extractCatalogFromJsonLd(auctionUrl: string): Promise<CatalogResult | null> {
+  console.log(`[Bonhams] Fetching catalog via JSON-LD: ${auctionUrl}`);
+
+  try {
+    const response = await fetch(auctionUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`[Bonhams] Catalog fetch failed: ${response.status} - ${response.statusText}`);
+      // Try to get error body
+      const errorBody = await response.text().catch(() => 'No body');
+      console.error(`[Bonhams] Response body (first 500 chars):`, errorBody.slice(0, 500));
+      return null;
+    }
+
+    const html = await response.text();
+    console.log(`[Bonhams] Fetched ${html.length} bytes from catalog page`);
+
+    // Extract JSON-LD script - Bonhams uses data-next-head attribute
+    // Pattern: <script type="application/ld+json" data-next-head="">{"@context":...}</script>
+    let jsonLdContent: string | null = null;
+
+    // Try multiple patterns
+    const patterns = [
+      /<script[^>]*type="application\/ld\+json"[^>]*>(\{[\s\S]*?\})<\/script>/i,
+      /type="application\/ld\+json"[^>]*>(\{[^<]+)<\/script>/i,
+      /type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        jsonLdContent = match[1].trim();
+        console.log(`[Bonhams] Found JSON-LD with pattern, first 200 chars:`, jsonLdContent.slice(0, 200));
+        break;
+      }
+    }
+
+    if (!jsonLdContent) {
+      // Last resort: find the JSON directly after the script tag
+      const idx = html.indexOf('type="application/ld+json"');
+      if (idx > -1) {
+        const startIdx = html.indexOf('>', idx) + 1;
+        const endIdx = html.indexOf('</script>', startIdx);
+        if (startIdx > 0 && endIdx > startIdx) {
+          jsonLdContent = html.slice(startIdx, endIdx).trim();
+          console.log(`[Bonhams] Found JSON-LD via indexOf, first 200 chars:`, jsonLdContent.slice(0, 200));
+        }
+      }
+    }
+
+    if (!jsonLdContent) {
+      console.log('[Bonhams] No JSON-LD found in catalog page');
+      return null;
+    }
+
+    console.log(`[Bonhams] Parsing JSON-LD, ${jsonLdContent.length} chars`);
+    const jsonLd = JSON.parse(jsonLdContent);
+
+    // Extract auction info
+    const auctionIdMatch = auctionUrl.match(/\/auction\/(\d+)\//);
+    const auctionId = auctionIdMatch?.[1] || 'unknown';
+
+    const auctionName = jsonLd.name || jsonLd.description || 'Unknown Auction';
+
+    let auctionDate: string | null = null;
+    if (jsonLd.startDate) {
+      try {
+        auctionDate = new Date(jsonLd.startDate).toISOString().split('T')[0];
+      } catch {}
+    }
+
+    const auctionLocation = jsonLd.location?.name || jsonLd.location?.address?.addressLocality || null;
+
+    // Extract lots from offers
+    const offers = jsonLd.offers?.offers || jsonLd.offers || [];
+    const lots: CatalogLot[] = [];
+
+    for (const offer of offers) {
+      if (offer['@type'] !== 'Offer') continue;
+
+      const name = offer.name || '';
+      const url = offer.url || '';
+      const price = typeof offer.price === 'number' ? offer.price : null;
+      const priceCurrency = offer.priceCurrency || null;
+      const availability = offer.availability || null;
+
+      // Extract lot number from URL
+      const lotMatch = url.match(/\/lot\/(\d+)\//);
+      const lotNumber = lotMatch?.[1] || null;
+
+      // Parse vehicle info from name
+      const parsed = parseOfferName(name);
+
+      // Skip non-vehicle lots (automobilia, etc.)
+      // Vehicles typically have a year in their name
+      if (!parsed.year && !name.match(/\d{4}/)) {
+        continue;
+      }
+
+      lots.push({
+        name,
+        url,
+        price,
+        priceCurrency,
+        lotNumber,
+        year: parsed.year,
+        make: parsed.make,
+        model: parsed.model,
+        vin: parsed.vin,
+        availability,
+      });
+    }
+
+    console.log(`[Bonhams] Extracted ${lots.length} vehicle lots from catalog`);
+
+    return {
+      auctionId,
+      auctionName,
+      auctionDate,
+      auctionLocation,
+      lots,
+    };
+  } catch (error: any) {
+    console.error(`[Bonhams] Catalog extraction error: ${error.message}`);
+    return null;
+  }
+}
+
+async function extractBonhamsListing(url: string, useFirecrawl: boolean = true): Promise<BonhamsExtracted> {
   console.log(`[Bonhams] Fetching: ${url}`);
 
-  // Use Firecrawl for JS rendering (Bonhams requires it)
-  const result = await firecrawlScrape({
-    url,
-    formats: ['html', 'markdown'],
-    waitFor: 5000,  // Wait for JS to load images
-    onlyMainContent: false,
-  });
+  let html = '';
+  let markdown = '';
+  let costCents = 0;
+  let scrapeSource: 'firecrawl' | 'native' | 'json-ld' = 'native';
 
-  if (!result.success || !result.data.html) {
-    throw new Error(`Firecrawl failed: ${result.error || 'No HTML returned'}`);
+  if (useFirecrawl) {
+    // Use Firecrawl for JS rendering (Bonhams requires it for full lot details)
+    try {
+      const result = await firecrawlScrape({
+        url,
+        formats: ['html', 'markdown'],
+        waitFor: 5000,  // Wait for JS to load images
+        onlyMainContent: false,
+      });
+
+      if (result.success && result.data.html) {
+        html = result.data.html;
+        markdown = result.data.markdown || '';
+        costCents = 1;
+        scrapeSource = 'firecrawl';
+        console.log(`[Bonhams] Firecrawl returned ${html.length} bytes HTML, ${markdown.length} bytes markdown`);
+      } else {
+        throw new Error(result.error || 'No HTML returned');
+      }
+    } catch (fcError: any) {
+      console.log(`[Bonhams] Firecrawl failed, trying native fetch: ${fcError.message}`);
+      // Fall back to native fetch
+    }
   }
 
-  const html = result.data.html;
-  const markdown = result.data.markdown || '';
-  const costCents = 1; // Standard Firecrawl cost
+  // Native fetch fallback
+  if (!html) {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
 
-  console.log(`[Bonhams] Firecrawl returned ${html.length} bytes HTML, ${markdown.length} bytes markdown`);
+    if (!response.ok) {
+      throw new Error(`Fetch failed: ${response.status}`);
+    }
+
+    html = await response.text();
+    scrapeSource = 'native';
+    console.log(`[Bonhams] Native fetch returned ${html.length} bytes`);
+  }
 
   // Try markdown extraction first for cleaner data (cars.bonhams.com returns good markdown)
   let titleData = { title: null as string | null, year: null as number | null, make: null as string | null, model: null as string | null };
@@ -576,6 +894,22 @@ async function extractBonhamsListing(url: string): Promise<BonhamsExtracted> {
     auctionData.lot_number = mdLotMatch[1];
   }
 
+  // Extract lot number from URL if not in markdown
+  if (!auctionData.lot_number) {
+    const urlLotMatch = url.match(/\/lot\/(\d+)\//);
+    if (urlLotMatch) {
+      auctionData.lot_number = urlLotMatch[1];
+    }
+  }
+
+  // Extract sale ID from URL
+  if (!auctionData.sale_id) {
+    const urlSaleMatch = url.match(/\/auction\/(\d+)\//);
+    if (urlSaleMatch) {
+      auctionData.sale_id = urlSaleMatch[1];
+    }
+  }
+
   const specs = extractSpecs(html);
   const content = extractContent(html);
 
@@ -609,7 +943,7 @@ async function extractBonhamsListing(url: string): Promise<BonhamsExtracted> {
     ...specs,
     ...content,
     image_urls: images,
-    scrape_source: 'firecrawl',
+    scrape_source: scrapeSource,
     scrape_cost_cents: costCents,
   };
 }
@@ -620,240 +954,490 @@ serve(async (req) => {
   }
 
   try {
-    const { url, save_to_db, vehicle_id } = await req.json();
-
-    if (!url || !url.includes('bonhams.com')) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid Bonhams URL' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const body = await req.json();
+    const { url, save_to_db, vehicle_id, catalog_url, batch_size = 0, use_firecrawl = true } = body;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    console.log(`[Bonhams] Extracting: ${url}`);
-    const extracted = await extractBonhamsListing(url);
+    // Mode 0: Accept pre-scraped JSON-LD data directly
+    // This is useful when the caller has already scraped the page (e.g., via browser)
+    if (body.catalog_json) {
+      console.log(`[Bonhams] Processing pre-scraped catalog JSON`);
+      const catalog = processCatalogJson(body.catalog_json, body.auction_id || 'unknown');
 
-    // Log Firecrawl cost
-    await supabase.from('api_usage_logs').insert({
-      user_id: null,
-      provider: 'firecrawl',
-      function_name: 'extract-bonhams',
-      cost_cents: extracted.scrape_cost_cents,
-      success: true,
-      metadata: {
-        url,
-        lot_number: extracted.lot_number,
-        image_count: extracted.image_urls.length,
-      },
-    });
-
-    // Optionally save to database
-    if (save_to_db || vehicle_id) {
-      let targetVehicleId = vehicle_id;
-
-      // Upsert vehicle (by VIN or discovery_url)
-      if (!targetVehicleId && extracted.vin) {
-        const { data: existing } = await supabase
-          .from('vehicles')
-          .select('id')
-          .eq('vin', extracted.vin.toUpperCase())
-          .maybeSingle();
-        if (existing) targetVehicleId = existing.id;
+      if (!catalog) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to parse catalog JSON' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
-      if (!targetVehicleId) {
-        const { data: existing } = await supabase
-          .from('vehicles')
-          .select('id')
-          .eq('discovery_url', extracted.url)
-          .maybeSingle();
-        if (existing) targetVehicleId = existing.id;
-      }
+      // If save_to_db, create vehicles from catalog lots
+      const results: any[] = [];
+      let created = 0;
+      let updated = 0;
 
-      const vehicleData = {
-        year: extracted.year,
-        make: extracted.make?.toLowerCase(),
-        model: extracted.model?.toLowerCase(),
-        // Store chassis number in VIN field for vintage vehicles if no modern VIN
-        vin: extracted.vin ? extracted.vin.toUpperCase() : (extracted.chassis_number ? extracted.chassis_number.toUpperCase() : null),
-        mileage: extracted.mileage,
-        color: extracted.exterior_color, // vehicles table uses 'color' not 'exterior_color'
-        interior_color: extracted.interior_color,
-        transmission: extracted.transmission,
-        engine_type: extracted.engine,
-        body_style: extracted.body_style,
-        description: extracted.description,
-        sale_price: extracted.total_price,
-        sale_date: extracted.sale_date,
-        sale_status: extracted.auction_status === 'sold' ? 'sold' : 'available',
-        auction_end_date: extracted.sale_date,
-        auction_outcome: extracted.auction_status === 'sold' ? 'sold' : extracted.auction_status === 'unsold' ? 'reserve_not_met' : null,
-        listing_url: extracted.url,
-        discovery_url: extracted.url,
-        discovery_source: 'bonhams',
-        profile_origin: 'bonhams_import',
-        is_public: true,
-        selling_organization_id: '174f863a-1ec0-4e0d-820a-0624473796b3', // Bonhams org
-        origin_metadata: {
-          source: 'bonhams_import',
-          lot_number: extracted.lot_number,
-          sale_id: extracted.sale_id,
-          sale_name: extracted.sale_name,
-          sale_location: extracted.sale_location,
-          chassis_number: extracted.chassis_number,
-          estimate_low: extracted.estimate_low,
-          estimate_high: extracted.estimate_high,
-          estimate_currency: extracted.estimate_currency,
-          hammer_price: extracted.hammer_price,
-          buyers_premium: extracted.buyers_premium,
-          condition_report: extracted.condition_report,
-          provenance: extracted.provenance,
-          history: extracted.history,
-          literature: extracted.literature,
-          imported_at: new Date().toISOString(),
-        },
-      };
+      if (save_to_db) {
+        for (const lot of catalog.lots) {
+          // Check if vehicle already exists
+          const listingUrlKey = normalizeListingUrlKey(lot.url);
+          const { data: existing } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('discovery_url', lot.url)
+            .maybeSingle();
 
-      if (targetVehicleId) {
-        await supabase
-          .from('vehicles')
-          .update(vehicleData)
-          .eq('id', targetVehicleId);
-        console.log(`[Bonhams] Updated vehicle: ${targetVehicleId}`);
-      } else {
-        const { data: newVehicle, error: vehicleError } = await supabase
-          .from('vehicles')
-          .insert(vehicleData)
-          .select()
-          .single();
-
-        if (vehicleError) {
-          throw new Error(`Failed to save vehicle: ${vehicleError.message}`);
-        }
-
-        targetVehicleId = newVehicle.id;
-        console.log(`[Bonhams] Created vehicle: ${targetVehicleId}`);
-      }
-
-      extracted.vehicle_id = targetVehicleId;
-
-      // Save images
-      if (extracted.image_urls.length > 0 && targetVehicleId) {
-        const imageRecords = extracted.image_urls.map((img_url, i) => ({
-          vehicle_id: targetVehicleId,
-          image_url: img_url,
-          position: i,
-          source: 'bonhams_import',
-          is_external: true,
-        }));
-
-        const { error: imgError } = await supabase
-          .from('vehicle_images')
-          .upsert(imageRecords, {
-            onConflict: 'vehicle_id,image_url',
-            ignoreDuplicates: false,
-          });
-
-        if (imgError) {
-          console.error('[Bonhams] Image save error:', imgError);
-        } else {
-          console.log(`[Bonhams] Saved ${imageRecords.length} images`);
-        }
-      }
-
-      // Create external_listings record
-      if (targetVehicleId) {
-        const listingUrlKey = normalizeListingUrlKey(extracted.url);
-        const { error: listingError } = await supabase
-          .from('external_listings')
-          .upsert({
-            vehicle_id: targetVehicleId,
-            platform: 'bonhams',
-            listing_url: extracted.url,
-            listing_url_key: listingUrlKey,
-            listing_id: extracted.lot_number || extracted.sale_id || listingUrlKey,
-            listing_status: extracted.auction_status === 'sold' ? 'sold' : extracted.auction_status === 'upcoming' ? 'active' : 'ended',
-            end_date: extracted.sale_date,
-            final_price: extracted.total_price,
-            sold_at: extracted.auction_status === 'sold' ? extracted.sale_date : null,
-            metadata: {
-              lot_number: extracted.lot_number,
-              sale_id: extracted.sale_id,
-              sale_name: extracted.sale_name,
-              sale_location: extracted.sale_location,
-              estimate_low: extracted.estimate_low,
-              estimate_high: extracted.estimate_high,
-              estimate_currency: extracted.estimate_currency,
-              hammer_price: extracted.hammer_price,
-              buyers_premium: extracted.buyers_premium,
-              chassis_number: extracted.chassis_number,
+          const vehicleData = {
+            year: lot.year,
+            make: lot.make?.toLowerCase(),
+            model: lot.model?.toLowerCase(),
+            vin: lot.vin?.toUpperCase(),
+            sale_price: lot.price,
+            listing_url: lot.url,
+            discovery_url: lot.url,
+            discovery_source: 'bonhams',
+            profile_origin: 'bonhams_catalog_import',
+            is_public: true,
+            sale_status: lot.availability?.includes('OutOfStock') ? 'sold' : 'available',
+            auction_outcome: lot.availability?.includes('OutOfStock') ? 'sold' : null,
+            auction_end_date: catalog.auctionDate,
+            origin_metadata: {
+              source: 'bonhams_catalog_import',
+              lot_number: lot.lotNumber,
+              sale_id: catalog.auctionId,
+              sale_name: catalog.auctionName,
+              sale_location: catalog.auctionLocation,
+              price_currency: lot.priceCurrency,
+              imported_at: new Date().toISOString(),
             },
-          }, {
-            onConflict: 'platform,listing_url_key',
-          });
+          };
 
-        if (listingError) {
-          console.error('[Bonhams] External listing save error:', listingError);
-        } else {
-          console.log('[Bonhams] Created/updated external_listings record');
+          if (existing) {
+            await supabase
+              .from('vehicles')
+              .update(vehicleData)
+              .eq('id', existing.id);
+            updated++;
+            results.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: existing.id, action: 'updated' });
+          } else {
+            const { data: newVehicle, error: insertError } = await supabase
+              .from('vehicles')
+              .insert(vehicleData)
+              .select('id')
+              .single();
+
+            if (insertError) {
+              results.push({ lot: lot.lotNumber, url: lot.url, error: insertError.message });
+            } else {
+              created++;
+              results.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: newVehicle.id, action: 'created' });
+
+              // Create external_listings record
+              await supabase
+                .from('external_listings')
+                .upsert({
+                  vehicle_id: newVehicle.id,
+                  platform: 'bonhams',
+                  listing_url: lot.url,
+                  listing_url_key: listingUrlKey,
+                  listing_id: lot.lotNumber || catalog.auctionId,
+                  listing_status: lot.availability?.includes('OutOfStock') ? 'sold' : 'active',
+                  end_date: catalog.auctionDate,
+                  final_price: lot.price,
+                  sold_at: lot.availability?.includes('OutOfStock') ? catalog.auctionDate : null,
+                  metadata: {
+                    lot_number: lot.lotNumber,
+                    sale_id: catalog.auctionId,
+                    sale_name: catalog.auctionName,
+                    price_currency: lot.priceCurrency,
+                  },
+                }, {
+                  onConflict: 'platform,listing_url_key',
+                });
+            }
+          }
         }
       }
 
-      // Create auction_events for timeline
-      if (targetVehicleId && extracted.sale_date) {
-        const events = [];
-
-        if (extracted.auction_status === 'sold' && extracted.total_price) {
-          events.push({
-            vehicle_id: targetVehicleId,
-            event_type: 'auction_sold',
-            event_date: extracted.sale_date,
-            title: `Sold at ${extracted.sale_name || 'Bonhams'} (Lot ${extracted.lot_number || 'N/A'})`,
-            description: `Hammer price: ${extracted.price_currency}${extracted.hammer_price?.toLocaleString()} + premium: ${extracted.buyers_premium?.toLocaleString()} = total: ${extracted.total_price.toLocaleString()}. ${extracted.sale_location || ''}`,
-            source: 'bonhams_import',
-            metadata: {
-              lot_number: extracted.lot_number,
-              sale_id: extracted.sale_id,
-              sale_name: extracted.sale_name,
-              hammer_price: extracted.hammer_price,
-              buyers_premium: extracted.buyers_premium,
-              total_price: extracted.total_price,
-            },
-          });
-        } else if (extracted.auction_status === 'upcoming') {
-          events.push({
-            vehicle_id: targetVehicleId,
-            event_type: 'auction_listed',
-            event_date: extracted.sale_date,
-            title: `Listed at ${extracted.sale_name || 'Bonhams'} (Lot ${extracted.lot_number || 'N/A'})`,
-            description: `Estimate: ${extracted.estimate_currency}${extracted.estimate_low?.toLocaleString()} - ${extracted.estimate_high?.toLocaleString()}. ${extracted.sale_location || ''}`,
-            source: 'bonhams_import',
-            metadata: {
-              lot_number: extracted.lot_number,
-              sale_id: extracted.sale_id,
-              estimate_low: extracted.estimate_low,
-              estimate_high: extracted.estimate_high,
-            },
-          });
-        }
-
-        if (events.length > 0) {
-          await supabase.from('timeline_events').insert(events);
-          console.log(`[Bonhams] Created ${events.length} timeline events`);
-        }
-      }
+      return new Response(
+        JSON.stringify({
+          success: true,
+          catalog: {
+            auction_id: catalog.auctionId,
+            auction_name: catalog.auctionName,
+            auction_date: catalog.auctionDate,
+            auction_location: catalog.auctionLocation,
+            total_lots: catalog.lots.length,
+          },
+          lots: save_to_db ? results : catalog.lots,
+          summary: save_to_db ? { created, updated, total: catalog.lots.length } : undefined,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
+    // Mode 1: Extract catalog from auction page (requires no bot protection)
+    if (catalog_url) {
+      const catalog = await extractCatalogFromJsonLd(catalog_url);
+
+      if (!catalog) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to extract catalog from JSON-LD' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // If save_to_db, create vehicles from catalog lots
+      const results: any[] = [];
+      let created = 0;
+      let updated = 0;
+
+      if (save_to_db) {
+        for (const lot of catalog.lots) {
+          // Check if vehicle already exists
+          const listingUrlKey = normalizeListingUrlKey(lot.url);
+          const { data: existing } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('discovery_url', lot.url)
+            .maybeSingle();
+
+          const vehicleData = {
+            year: lot.year,
+            make: lot.make?.toLowerCase(),
+            model: lot.model?.toLowerCase(),
+            vin: lot.vin?.toUpperCase(),
+            sale_price: lot.price,
+            listing_url: lot.url,
+            discovery_url: lot.url,
+            discovery_source: 'bonhams',
+            profile_origin: 'bonhams_catalog_import',
+            is_public: true,
+            sale_status: lot.availability?.includes('OutOfStock') ? 'sold' : 'available',
+            auction_outcome: lot.availability?.includes('OutOfStock') ? 'sold' : null,
+            auction_end_date: catalog.auctionDate,
+            origin_metadata: {
+              source: 'bonhams_catalog_import',
+              lot_number: lot.lotNumber,
+              sale_id: catalog.auctionId,
+              sale_name: catalog.auctionName,
+              sale_location: catalog.auctionLocation,
+              price_currency: lot.priceCurrency,
+              imported_at: new Date().toISOString(),
+            },
+          };
+
+          if (existing) {
+            await supabase
+              .from('vehicles')
+              .update(vehicleData)
+              .eq('id', existing.id);
+            updated++;
+            results.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: existing.id, action: 'updated' });
+          } else {
+            const { data: newVehicle, error: insertError } = await supabase
+              .from('vehicles')
+              .insert(vehicleData)
+              .select('id')
+              .single();
+
+            if (insertError) {
+              results.push({ lot: lot.lotNumber, url: lot.url, error: insertError.message });
+            } else {
+              created++;
+              results.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: newVehicle.id, action: 'created' });
+
+              // Create external_listings record
+              await supabase
+                .from('external_listings')
+                .upsert({
+                  vehicle_id: newVehicle.id,
+                  platform: 'bonhams',
+                  listing_url: lot.url,
+                  listing_url_key: listingUrlKey,
+                  listing_id: lot.lotNumber || catalog.auctionId,
+                  listing_status: lot.availability?.includes('OutOfStock') ? 'sold' : 'active',
+                  end_date: catalog.auctionDate,
+                  final_price: lot.price,
+                  sold_at: lot.availability?.includes('OutOfStock') ? catalog.auctionDate : null,
+                  metadata: {
+                    lot_number: lot.lotNumber,
+                    sale_id: catalog.auctionId,
+                    sale_name: catalog.auctionName,
+                    price_currency: lot.priceCurrency,
+                  },
+                }, {
+                  onConflict: 'platform,listing_url_key',
+                });
+            }
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          catalog: {
+            auction_id: catalog.auctionId,
+            auction_name: catalog.auctionName,
+            auction_date: catalog.auctionDate,
+            auction_location: catalog.auctionLocation,
+            total_lots: catalog.lots.length,
+          },
+          lots: save_to_db ? results : catalog.lots,
+          summary: save_to_db ? { created, updated, total: catalog.lots.length } : undefined,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Mode 2: Single URL extraction
+    if (url) {
+      if (!url.includes('bonhams.com')) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid Bonhams URL' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[Bonhams] Extracting: ${url}`);
+      const extracted = await extractBonhamsListing(url, use_firecrawl);
+
+      // Log API cost if Firecrawl was used
+      if (extracted.scrape_source === 'firecrawl') {
+        await supabase.from('api_usage_logs').insert({
+          user_id: null,
+          provider: 'firecrawl',
+          function_name: 'extract-bonhams',
+          cost_cents: extracted.scrape_cost_cents,
+          success: true,
+          metadata: {
+            url,
+            lot_number: extracted.lot_number,
+            image_count: extracted.image_urls.length,
+          },
+        });
+      }
+
+      // Optionally save to database
+      if (save_to_db || vehicle_id) {
+        let targetVehicleId = vehicle_id;
+
+        // Upsert vehicle (by VIN or discovery_url)
+        if (!targetVehicleId && extracted.vin) {
+          const { data: existing } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('vin', extracted.vin.toUpperCase())
+            .maybeSingle();
+          if (existing) targetVehicleId = existing.id;
+        }
+
+        if (!targetVehicleId) {
+          const { data: existing } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('discovery_url', extracted.url)
+            .maybeSingle();
+          if (existing) targetVehicleId = existing.id;
+        }
+
+        const vehicleData = {
+          year: extracted.year,
+          make: extracted.make?.toLowerCase(),
+          model: extracted.model?.toLowerCase(),
+          // Store chassis number in VIN field for vintage vehicles if no modern VIN
+          vin: extracted.vin ? extracted.vin.toUpperCase() : (extracted.chassis_number ? extracted.chassis_number.toUpperCase() : null),
+          mileage: extracted.mileage,
+          color: extracted.exterior_color, // vehicles table uses 'color' not 'exterior_color'
+          interior_color: extracted.interior_color,
+          transmission: extracted.transmission,
+          engine_type: extracted.engine,
+          body_style: extracted.body_style,
+          description: extracted.description,
+          sale_price: extracted.total_price,
+          sale_date: extracted.sale_date,
+          sale_status: extracted.auction_status === 'sold' ? 'sold' : 'available',
+          auction_end_date: extracted.sale_date,
+          auction_outcome: extracted.auction_status === 'sold' ? 'sold' : extracted.auction_status === 'unsold' ? 'reserve_not_met' : null,
+          listing_url: extracted.url,
+          discovery_url: extracted.url,
+          discovery_source: 'bonhams',
+          profile_origin: 'bonhams_import',
+          is_public: true,
+          origin_metadata: {
+            source: 'bonhams_import',
+            lot_number: extracted.lot_number,
+            sale_id: extracted.sale_id,
+            sale_name: extracted.sale_name,
+            sale_location: extracted.sale_location,
+            chassis_number: extracted.chassis_number,
+            estimate_low: extracted.estimate_low,
+            estimate_high: extracted.estimate_high,
+            estimate_currency: extracted.estimate_currency,
+            hammer_price: extracted.hammer_price,
+            buyers_premium: extracted.buyers_premium,
+            condition_report: extracted.condition_report,
+            provenance: extracted.provenance,
+            history: extracted.history,
+            literature: extracted.literature,
+            imported_at: new Date().toISOString(),
+          },
+        };
+
+        if (targetVehicleId) {
+          await supabase
+            .from('vehicles')
+            .update(vehicleData)
+            .eq('id', targetVehicleId);
+          console.log(`[Bonhams] Updated vehicle: ${targetVehicleId}`);
+        } else {
+          const { data: newVehicle, error: vehicleError } = await supabase
+            .from('vehicles')
+            .insert(vehicleData)
+            .select()
+            .single();
+
+          if (vehicleError) {
+            throw new Error(`Failed to save vehicle: ${vehicleError.message}`);
+          }
+
+          targetVehicleId = newVehicle.id;
+          console.log(`[Bonhams] Created vehicle: ${targetVehicleId}`);
+        }
+
+        extracted.vehicle_id = targetVehicleId;
+
+        // Save images
+        if (extracted.image_urls.length > 0 && targetVehicleId) {
+          const imageRecords = extracted.image_urls.map((img_url, i) => ({
+            vehicle_id: targetVehicleId,
+            image_url: img_url,
+            position: i,
+            source: 'bonhams_import',
+            is_external: true,
+          }));
+
+          const { error: imgError } = await supabase
+            .from('vehicle_images')
+            .upsert(imageRecords, {
+              onConflict: 'vehicle_id,image_url',
+              ignoreDuplicates: false,
+            });
+
+          if (imgError) {
+            console.error('[Bonhams] Image save error:', imgError);
+          } else {
+            console.log(`[Bonhams] Saved ${imageRecords.length} images`);
+          }
+        }
+
+        // Create external_listings record
+        if (targetVehicleId) {
+          const listingUrlKey = normalizeListingUrlKey(extracted.url);
+          const { error: listingError } = await supabase
+            .from('external_listings')
+            .upsert({
+              vehicle_id: targetVehicleId,
+              platform: 'bonhams',
+              listing_url: extracted.url,
+              listing_url_key: listingUrlKey,
+              listing_id: extracted.lot_number || extracted.sale_id || listingUrlKey,
+              listing_status: extracted.auction_status === 'sold' ? 'sold' : extracted.auction_status === 'upcoming' ? 'active' : 'ended',
+              end_date: extracted.sale_date,
+              final_price: extracted.total_price,
+              sold_at: extracted.auction_status === 'sold' ? extracted.sale_date : null,
+              metadata: {
+                lot_number: extracted.lot_number,
+                sale_id: extracted.sale_id,
+                sale_name: extracted.sale_name,
+                sale_location: extracted.sale_location,
+                estimate_low: extracted.estimate_low,
+                estimate_high: extracted.estimate_high,
+                estimate_currency: extracted.estimate_currency,
+                hammer_price: extracted.hammer_price,
+                buyers_premium: extracted.buyers_premium,
+                chassis_number: extracted.chassis_number,
+              },
+            }, {
+              onConflict: 'platform,listing_url_key',
+            });
+
+          if (listingError) {
+            console.error('[Bonhams] External listing save error:', listingError);
+          } else {
+            console.log('[Bonhams] Created/updated external_listings record');
+          }
+        }
+
+        // Create timeline_events for timeline
+        if (targetVehicleId && extracted.sale_date) {
+          const events = [];
+
+          if (extracted.auction_status === 'sold' && extracted.total_price) {
+            events.push({
+              vehicle_id: targetVehicleId,
+              event_type: 'auction_sold',
+              event_date: extracted.sale_date,
+              title: `Sold at ${extracted.sale_name || 'Bonhams'} (Lot ${extracted.lot_number || 'N/A'})`,
+              description: `Hammer price: ${extracted.price_currency}${extracted.hammer_price?.toLocaleString()} + premium: ${extracted.buyers_premium?.toLocaleString()} = total: ${extracted.total_price.toLocaleString()}. ${extracted.sale_location || ''}`,
+              source: 'bonhams_import',
+              metadata: {
+                lot_number: extracted.lot_number,
+                sale_id: extracted.sale_id,
+                sale_name: extracted.sale_name,
+                hammer_price: extracted.hammer_price,
+                buyers_premium: extracted.buyers_premium,
+                total_price: extracted.total_price,
+              },
+            });
+          } else if (extracted.auction_status === 'upcoming') {
+            events.push({
+              vehicle_id: targetVehicleId,
+              event_type: 'auction_listed',
+              event_date: extracted.sale_date,
+              title: `Listed at ${extracted.sale_name || 'Bonhams'} (Lot ${extracted.lot_number || 'N/A'})`,
+              description: `Estimate: ${extracted.estimate_currency}${extracted.estimate_low?.toLocaleString()} - ${extracted.estimate_high?.toLocaleString()}. ${extracted.sale_location || ''}`,
+              source: 'bonhams_import',
+              metadata: {
+                lot_number: extracted.lot_number,
+                sale_id: extracted.sale_id,
+                estimate_low: extracted.estimate_low,
+                estimate_high: extracted.estimate_high,
+              },
+            });
+          }
+
+          if (events.length > 0) {
+            await supabase.from('timeline_events').insert(events);
+            console.log(`[Bonhams] Created ${events.length} timeline events`);
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          extracted,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // No valid input
     return new Response(
       JSON.stringify({
-        success: true,
-        extracted,
+        error: 'Provide url (lot page) or catalog_url (auction page)',
+        usage: {
+          single_lot: { url: 'https://cars.bonhams.com/auction/30560/lot/117/...', save_to_db: true },
+          catalog: { catalog_url: 'https://cars.bonhams.com/auction/30560/the-audrain-auction/', save_to_db: true },
+          catalog_preview: { catalog_url: 'https://cars.bonhams.com/auction/30560/the-audrain-auction/' },
+        },
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {

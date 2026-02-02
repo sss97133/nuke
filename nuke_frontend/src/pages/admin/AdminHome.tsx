@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AdminNotificationService, type AdminDashboardStats } from '../../services/adminNotificationService';
 import { supabase } from '../../lib/supabase';
 import DataGrowthChart from '../../components/admin/DataGrowthChart';
+import AuctionTrendsDashboard from '../../components/admin/AuctionTrendsDashboard';
 
 type Card = {
   title: string;
@@ -185,8 +186,14 @@ export default function AdminHome() {
         )}
       </div>
 
-      <div style={{ marginTop: 'var(--space-6)' }}>
+      <div style={{
+        marginTop: 'var(--space-6)',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+        gap: 'var(--space-4)',
+      }}>
         <DataGrowthChart />
+        <AuctionTrendsDashboard />
       </div>
 
       <div style={{

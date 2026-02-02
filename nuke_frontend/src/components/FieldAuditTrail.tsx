@@ -55,14 +55,14 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Data Source Audit: {fieldName}
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
             ✕
           </button>
@@ -71,10 +71,10 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading audit trail...</p>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">Loading audit trail...</p>
           </div>
         ) : auditTrail.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             No audit trail found for this field
           </div>
         ) : (
@@ -82,12 +82,12 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
             {auditTrail.map((entry, index) => (
               <div
                 key={index}
-                className="border rounded-lg p-4 bg-gray-50"
+                className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
                     <span className="text-xl">{getSourceTypeIcon(entry.source_type)}</span>
-                    <span className="font-medium capitalize">
+                    <span className="font-medium capitalize text-gray-900 dark:text-white">
                       {entry.source_type.replace('_', ' ')}
                     </span>
                     {entry.verification_status && (
@@ -103,7 +103,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                     >
                       {Math.round(entry.confidence * 100)}% confidence
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       {new Date(entry.created_at).toLocaleDateString()}
                     </span>
                   </div>
@@ -112,7 +112,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                 {/* Source URL */}
                 {entry.source_url && (
                   <div className="mb-2">
-                    <span className="text-sm font-medium text-gray-700">Source URL:</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Source URL:</span>
                     <a
                       href={entry.source_url}
                       target="_blank"
@@ -127,7 +127,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                 {/* Source Image */}
                 {entry.source_image_url && (
                   <div className="mb-2">
-                    <span className="text-sm font-medium text-gray-700">Source Image:</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Source Image:</span>
                     <div className="mt-1">
                       <img
                         src={entry.source_image_url}
@@ -141,8 +141,8 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                 {/* Extraction Method */}
                 {entry.extraction_method && (
                   <div className="mb-2">
-                    <span className="text-sm font-medium text-gray-700">Method:</span>
-                    <span className="text-sm ml-2 capitalize">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Method:</span>
+                    <span className="text-sm ml-2 capitalize text-gray-900 dark:text-gray-200">
                       {entry.extraction_method.replace('_', ' ')}
                     </span>
                   </div>
@@ -151,8 +151,8 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                 {/* Raw Text */}
                 {entry.raw_text && (
                   <div className="mb-2">
-                    <span className="text-sm font-medium text-gray-700">Raw Extracted Text:</span>
-                    <div className="mt-1 p-2 bg-gray-100 rounded text-sm font-mono">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Raw Extracted Text:</span>
+                    <div className="mt-1 p-2 bg-gray-100 dark:bg-gray-600 rounded text-sm font-mono text-gray-900 dark:text-gray-200">
                       {entry.raw_text}
                     </div>
                   </div>
@@ -161,8 +161,8 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                 {/* AI Reasoning */}
                 {entry.ai_reasoning && (
                   <div className="mb-2">
-                    <span className="text-sm font-medium text-gray-700">AI Analysis:</span>
-                    <div className="mt-1 p-2 bg-blue-50 rounded text-sm">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Analysis:</span>
+                    <div className="mt-1 p-2 bg-blue-50 dark:bg-blue-900/30 rounded text-sm text-gray-900 dark:text-gray-200">
                       {entry.ai_reasoning}
                     </div>
                   </div>
@@ -172,8 +172,8 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
           </div>
         )}
 
-        <div className="mt-6 pt-4 border-t">
-          <p className="text-xs text-gray-600">
+        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
             This audit trail shows all sources and methods used to determine this field's value.
             Human verification indicates the data has been manually confirmed as accurate.
           </p>

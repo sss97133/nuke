@@ -204,7 +204,7 @@ export function UploadProgressNotifications({
         <div
           key={notification.id}
           className={`
-            bg-white border-2 rounded-lg shadow-lg p-4
+            bg-white dark:bg-gray-800 border-2 rounded-lg shadow-lg p-4
             transform transition-all duration-300 ease-out
             ${notification.type === 'success' ? 'border-green-500' : ''}
             ${notification.type === 'warning' ? 'border-yellow-500' : ''}
@@ -227,15 +227,15 @@ export function UploadProgressNotifications({
                 {notification.type === 'info' && (
                   <span className="text-2xl">🔒</span>
                 )}
-                <h3 className="font-bold text-lg">{notification.title}</h3>
+                <h3 className="font-bold text-lg text-gray-900 dark:text-white">{notification.title}</h3>
               </div>
               
-              <p className="mt-2 text-sm text-gray-700">
+              <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
                 {notification.message}
               </p>
 
               {notification.extractedData && (
-                <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200 text-xs font-mono">
+                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-xs font-mono text-gray-800 dark:text-gray-200">
                   <div className="font-bold mb-1">Extracted Fields:</div>
                   {notification.extractedData.vin && (
                     <div>VIN: {notification.extractedData.vin}</div>
@@ -249,7 +249,7 @@ export function UploadProgressNotifications({
                   {notification.extractedData.state && (
                     <div>State: {notification.extractedData.state}</div>
                   )}
-                  <div className="mt-1 text-gray-500">
+                  <div className="mt-1 text-gray-500 dark:text-gray-400">
                     Confidence: {Math.round((notification.extractedData.extraction_confidence || 0) * 100)}%
                   </div>
                 </div>
@@ -264,14 +264,14 @@ export function UploadProgressNotifications({
                 </button>
               )}
 
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 {notification.timestamp.toLocaleTimeString()}
               </div>
             </div>
 
             <button
               onClick={() => dismissNotification(notification.id)}
-              className="ml-4 text-gray-400 hover:text-gray-600 text-xl leading-none"
+              className="ml-4 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-xl leading-none"
             >
               ×
             </button>
@@ -280,7 +280,7 @@ export function UploadProgressNotifications({
       ))}
 
       {isListening && (
-        <div className="text-xs text-gray-500 text-center">
+        <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
           Listening for image processing updates...
         </div>
       )}

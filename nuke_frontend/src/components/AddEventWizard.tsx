@@ -448,10 +448,10 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="text-4xl text-gray-400">+</div>
+                  <div className="text-4xl text-gray-400 dark:text-gray-500 dark:text-gray-400">+</div>
                   <div>
                     <p className="text-lg font-medium text-gray-700">Drop images here or click to browse</p>
-                    <p className="text-sm text-gray-500">Up to 10 images, max 10MB each</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Up to 10 images, max 10MB each</p>
                   </div>
                   <input
                     type="file"
@@ -544,7 +544,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div>
                       <div className="font-semibold">{new Date(g.date).toLocaleDateString()}</div>
-                      <div className="text-gray-500">{g.files.length} photos</div>
+                      <div className="text-gray-500 dark:text-gray-400">{g.files.length} photos</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -565,7 +565,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                         title="Gap (minutes)"
                       />
                       {typeof splitResultInfo[i] !== 'undefined' && (
-                        <span className="text-xs text-gray-500">→ {splitResultInfo[i]} group{(splitResultInfo[i]||0) > 1 ? 's' : ''}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">→ {splitResultInfo[i]} group{(splitResultInfo[i]||0) > 1 ? 's' : ''}</span>
                       )}
                       <label className="text-gray-600">Stage:</label>
                       <select
@@ -713,11 +713,11 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
               {imageMetadata.some(m => m.camera) ? (
                 <div className="text-green-600">✅ Camera: {imageMetadata.find(m => m.camera)?.camera?.make} {imageMetadata.find(m => m.camera)?.camera?.model}</div>
               ) : (
-                <div className="text-gray-500">ℹ️ No camera information found</div>
+                <div className="text-gray-500 dark:text-gray-400">ℹ️ No camera information found</div>
               )}
               
               <div className="mt-2 pt-2 border-t border-gray-200">
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
                   📊 Processed {imageMetadata.length} image{imageMetadata.length !== 1 ? 's' : ''}
                   {!imageMetadata.some(m => m.dateTaken || m.location) && (
                     <div className="mt-1 text-orange-600">
@@ -760,7 +760,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                       )}
                     </div>
                     
-                    <div className="flex-shrink-0 text-xs text-gray-500">
+                    <div className="flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
                       {status === 'pending' && 'Waiting...'}
                       {status === 'uploading' && `${Math.round(progress)}%`}
                       {status === 'completed' && 'Done'}
