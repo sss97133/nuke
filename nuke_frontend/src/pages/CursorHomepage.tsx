@@ -2124,9 +2124,9 @@ const CursorHomepage: React.FC = () => {
       return Number.isFinite(t) && t >= todayStartMs && t < tomorrowStartMs;
     }).length;
 
-    return { 
-      totalVehicles, 
-      totalValue, 
+    return {
+      totalVehicles,
+      totalValue,
       salesVolume,
       salesCountToday,
       forSaleCount,
@@ -2141,6 +2141,9 @@ const CursorHomepage: React.FC = () => {
       valueImportedToday,
       valueImported24h,
       valueImported7d,
+      // Market interest not computed locally - only available from global cache
+      marketInterestValue: 0,
+      rnmVehicleCount: 0,
     };
   }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredStatsFromDb]);
 
@@ -2162,6 +2165,9 @@ const CursorHomepage: React.FC = () => {
     valueImportedToday: 0,
     valueImported24h: 0,
     valueImported7d: 0,
+    // Market interest from reserve-not-met auctions
+    marketInterestValue: 0,
+    rnmVehicleCount: 0,
   });
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
 
@@ -2197,6 +2203,9 @@ const CursorHomepage: React.FC = () => {
           avgValue: cachedStats.total_vehicles > 0
             ? Number(cachedStats.total_value) / Number(cachedStats.total_vehicles)
             : prev.avgValue,
+          // Market interest from reserve-not-met auctions
+          marketInterestValue: Number(cachedStats.market_interest_value) || prev.marketInterestValue,
+          rnmVehicleCount: Number(cachedStats.rnm_vehicle_count) || prev.rnmVehicleCount,
         }));
         setDbStatsLoading(false);
         return; // Done - cache is authoritative
@@ -4573,8 +4582,35 @@ const CursorHomepage: React.FC = () => {
                 </>
               )}
               <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
-              <div style={{ color: 'var(--text-muted)' }}>
-                {formatCurrency(headerValueMetric.value)} {headerValueMetric.label}
+              {/* Value display with market interest breakdown */}
+              <div
+                style={{
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: '4px',
+                  position: 'relative',
+                }}
+                title={displayStats.marketInterestValue > 0
+                  ? `Realized: ${formatCurrency(displayStats.totalValue)}\nMarket Interest: ${formatCurrency(displayStats.marketInterestValue)} (${displayStats.rnmVehicleCount} reserve-not-met auctions)\n\nMarket interest = highest bids on auctions where reserve wasn't met. Shows real buyer demand even though sale didn't complete.`
+                  : `Total portfolio value: ${formatCurrency(displayStats.totalValue)}`
+                }
+              >
+                <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                  {formatCurrency(displayStats.totalValue)}
+                </span>
+                {displayStats.marketInterestValue > 0 && (
+                  <span
+                    style={{
+                      color: '#f59e0b',
+                      fontSize: '6.5pt',
+                      fontWeight: 500,
+                      cursor: 'help',
+                    }}
+                  >
+                    +{formatCurrency(displayStats.marketInterestValue)} interest
+                  </span>
+                )}
               </div>
               {displayStats.forSaleCount > 0 && (
                 <>
@@ -4973,7 +5009,10 @@ const CursorHomepage: React.FC = () => {
                   e.stopPropagation();
                   openStatsPanel('value');
                 }}
-                title="Portfolio value (best-known per vehicle). Click for breakdown + recent value added."
+                title={displayStats.marketInterestValue > 0
+                  ? `Realized: ${formatCurrency(displayStats.totalValue)}\nMarket Interest: ${formatCurrency(displayStats.marketInterestValue)} (${displayStats.rnmVehicleCount} reserve-not-met)\n\nMarket interest = highest bids on auctions where reserve wasn't met.`
+                  : 'Portfolio value (best-known per vehicle). Click for breakdown.'
+                }
                 style={{
                   border: 'none',
                   background: 'transparent',
@@ -4982,10 +5021,18 @@ const CursorHomepage: React.FC = () => {
                   cursor: 'pointer',
                   fontFamily: 'monospace',
                   fontSize: '7pt',
-                  color: 'var(--text)'
+                  color: 'var(--text)',
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: '3px',
                 }}
               >
-                <b>{formatCurrency(headerValueMetric.value)}</b> {headerValueMetric.label}
+                <b>{formatCurrency(displayStats.totalValue)}</b>
+                {displayStats.marketInterestValue > 0 && (
+                  <span style={{ color: '#f59e0b', fontSize: '6pt', fontWeight: 500 }}>
+                    +{formatCurrency(displayStats.marketInterestValue)}
+                  </span>
+                )}
               </button>
               {displayStats.forSaleCount > 0 && (
                 <>
