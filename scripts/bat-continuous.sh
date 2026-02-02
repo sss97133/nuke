@@ -59,21 +59,26 @@ while true; do
     # Extract vehicle_id with grep (handles control chars)
     VID=$(echo "$RESULT" | grep -o '"vehicle_id":"[^"]*"' | head -1 | sed 's/"vehicle_id":"//;s/"$//')
     if [ -n "$VID" ]; then
-      dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
-        -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
-        -H \"Content-Type: application/json\" -d '{\"status\":\"complete\",\"vehicle_id\":\"$VID\"}'" > /dev/null 2>&1
-      ok=$((ok + 1))
+      export PATCH_JSON="{\"status\":\"complete\",\"vehicle_id\":\"$VID\",\"extractor_version\":\"bat-extract:2.0.0\"}"
     else
-      # Success but no vehicle_id (rare edge case)
-      dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
-        -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
-        -H \"Content-Type: application/json\" -d '{\"status\":\"complete\"}'" > /dev/null 2>&1
-      ok=$((ok + 1))
+      export PATCH_JSON="{\"status\":\"complete\",\"extractor_version\":\"bat-extract:2.0.0\"}"
     fi
+    dotenvx run --quiet -- bash -c 'curl -s -X PATCH "$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.'"$ID"'" \
+      -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+      -H "Content-Type: application/json" -d "$PATCH_JSON"' > /dev/null 2>&1
+    ok=$((ok + 1))
   else
-    dotenvx run --quiet -- bash -c "curl -s -X PATCH \"\$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.$ID\" \
-      -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
-      -H \"Content-Type: application/json\" -d '{\"status\":\"failed\"}'" > /dev/null 2>&1
+    # Extract error message for debugging
+    ERR_MSG=$(echo "$RESULT" | grep -o '"error":"[^"]*"' | head -1 | sed 's/"error":"//;s/"$//' | head -c 200)
+    if [ -z "$ERR_MSG" ]; then
+      ERR_MSG="Unknown extraction error"
+    fi
+    # Escape for JSON
+    ERR_MSG=$(echo "$ERR_MSG" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    export PATCH_JSON="{\"status\":\"failed\",\"error_message\":\"$ERR_MSG\",\"extractor_version\":\"bat-extract:2.0.0\"}"
+    dotenvx run --quiet -- bash -c 'curl -s -X PATCH "$VITE_SUPABASE_URL/rest/v1/import_queue?id=eq.'"$ID"'" \
+      -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+      -H "Content-Type: application/json" -d "$PATCH_JSON"' > /dev/null 2>&1
     fail=$((fail + 1))
   fi
   

@@ -204,7 +204,13 @@ function extractVin(html: string): string | null {
       for (const m of matches) {
         counts[m] = (counts[m] || 0) + 1;
       }
-      return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      const vin = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      // VIN column is varchar(17) - ensure we don't exceed
+      if (vin.length <= 17) {
+        return vin;
+      }
+      // If longer, it's probably a malformed match - skip
+      console.warn(`VIN too long (${vin.length} chars), skipping: ${vin}`);
     }
   }
 
@@ -216,7 +222,8 @@ function extractVin(html: string): string | null {
                        html.match(/Serial(?:\s*Number)?:\s*([A-Z0-9*-]+)/i);
   if (chassisMatch) {
     const chassis = chassisMatch[1].trim();
-    if (chassis.length >= 6 && /^[A-Z0-9*-]+$/i.test(chassis)) {
+    // Must be 6-17 chars to fit in VIN column
+    if (chassis.length >= 6 && chassis.length <= 17 && /^[A-Z0-9*-]+$/i.test(chassis)) {
       return chassis;
     }
   }
