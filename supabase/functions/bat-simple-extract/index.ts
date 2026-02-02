@@ -1,5 +1,8 @@
 // ONE function to extract EVERYTHING from a BaT listing
 // BaT is a simple WordPress site - every listing has the same structure
+//
+// ⚠️ DEPRECATED: Use complete-bat-import instead
+// This function is deprecated. Use complete-bat-import for all new BaT extractions.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -713,6 +716,8 @@ async function extractBatListing(url: string): Promise<BatExtracted> {
 }
 
 serve(async (req) => {
+  console.warn('⚠️ DEPRECATED: bat-simple-extract is deprecated. Use complete-bat-import instead.');
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

@@ -1,6 +1,7 @@
 /**
  * extract-bat-core
  *
+ * Version: 3.0.0
  * Free-mode BaT core extractor:
  * - Fetch HTML directly (no Firecrawl)
  * - Save HTML evidence to listing_page_snapshots
@@ -15,6 +16,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
+
+// Extractor versioning - update on each significant change
+const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -327,7 +331,9 @@ function extractEssentials(html: string): {
 
   // Seller (from essentials)
   const essentialsIdx = h.indexOf('<div class="essentials"');
-  const win = essentialsIdx >= 0 ? h.slice(essentialsIdx, essentialsIdx + 300000) : h;
+  // CRITICAL: Limit the essentials slice to 50KB to prevent comment pollution.
+  // Comments section typically starts after ~20-30KB of essentials + description.
+  const win = essentialsIdx >= 0 ? h.slice(essentialsIdx, essentialsIdx + 50000) : h;
   const winText = stripTags(win).replace(/\s+/g, " ").trim();
   const fullText = stripTags(h).replace(/\s+/g, " ").trim();
   // NOTE: Some outcome/price strings (e.g. "Sold for $X") can live outside the essentials block.
@@ -489,8 +495,12 @@ function extractEssentials(html: string): {
   let high_bid: number | null = null;
 
   // Highest-signal: the Auction Result table.
-  if (soldPriceFromStats) {
+  // CRITICAL: If stats show "Reserve Not Met", there is NO sale price - only a high bid.
+  if (soldPriceFromStats && !statsHasReserveNotMet) {
     sale_price = soldPriceFromStats;
+    high_bid = soldPriceFromStats;
+  } else if (soldPriceFromStats && statsHasReserveNotMet) {
+    // RNM: the "sold" value is actually just the high bid
     high_bid = soldPriceFromStats;
   } else if (bidFromStats) {
     high_bid = bidFromStats;
@@ -503,10 +513,11 @@ function extractEssentials(html: string): {
   }
 
   // SOLD signals (prefer title for low-noise extraction).
+  // CRITICAL: Do NOT extract sold prices if stats table shows RNM.
   const titleSoldMatch = titleText
     ? titleText.match(/\bsold\s+(?:for|to)\s+\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i)
     : null;
-  if (!sale_price && titleSoldMatch?.[1]) {
+  if (!sale_price && !statsHasReserveNotMet && titleSoldMatch?.[1]) {
     const n = parseMoney(titleSoldMatch[1]);
     if (Number.isFinite(n) && n > 0) {
       sale_price = n;
@@ -514,15 +525,22 @@ function extractEssentials(html: string): {
     }
   }
 
-  if (!sale_price) {
+  // CRITICAL: Do NOT search for "sold" text patterns if the stats table explicitly shows RNM.
+  // The stats table is the highest-signal source; text searches can be polluted by user comments
+  // referencing OTHER vehicles' sale prices.
+  if (!sale_price && !statsHasReserveNotMet) {
     const soldPatterns = [
       /Sold\s+(?:for|to)\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i,
       // "Sold on 2/3/22 for $76,500 to ..."
       /Sold\s+on\b[\s\S]{0,120}?\bfor\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i,
       /Sold\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)\s+(?:on|for)/i,
     ];
+    // CRITICAL: Only search essentials + title for sold price, NOT full page text (which includes
+    // user comments that may reference other vehicles' sale prices). Comments like "Another 300F
+    // sold for $437,250 at Robson auction" will pollute the extraction.
+    const soldSearchScope = `${winText} ${titleText || ""}`;
     for (const p of soldPatterns) {
-      const m = text.match(p);
+      const m = soldSearchScope.match(p);
       if (m?.[1]) {
         const n = parseMoney(m[1]);
         if (Number.isFinite(n) && n > 0) {
@@ -534,13 +552,26 @@ function extractEssentials(html: string): {
     }
   }
 
-  // If we have a sold price, this listing cannot be RNM.
-  // Prefer explicit "No Reserve" when present; otherwise treat as reserve met.
-  if (sale_price && reserve_status === "reserve_not_met") {
+  // CRITICAL SAFETY CHECK: If the stats table explicitly shows "Reserve Not Met",
+  // the listing did NOT sell, regardless of any "sold for $X" text we found elsewhere.
+  // This prevents comment pollution (e.g., users mentioning other vehicles' sale prices).
+  if (statsHasReserveNotMet) {
+    sale_price = null; // Force clear any polluted sale price
+    reserve_status = "reserve_not_met"; // Force correct status
+  }
+
+  // If we have a GENUINE sold price (from stats table or essentials), the listing cannot be RNM.
+  // However, if we parsed sale_price from general text (which may include comment pollution),
+  // don't override an explicit "Reserve Not Met" marker from the auction result table.
+  // Only override reserve_status if we have HIGH-CONFIDENCE sale data (soldPriceFromStats).
+  const hasHighConfidenceSale = Boolean(soldPriceFromStats);
+
+  if (sale_price && hasHighConfidenceSale && reserve_status === "reserve_not_met") {
+    // Stats table says sold + price, but we detected RNM - trust the sold signal
     const hasNoReserve = reserveScope.includes("no-reserve") || /\bNo Reserve\b/i.test(reserveScope);
     reserve_status = hasNoReserve ? "no_reserve" : "reserve_met";
   }
-  if (sale_price && !reserve_status) {
+  if (sale_price && hasHighConfidenceSale && !reserve_status) {
     const hasNoReserve = reserveScope.includes("no-reserve") || /\bNo Reserve\b/i.test(reserveScope);
     reserve_status = hasNoReserve ? "no_reserve" : "reserve_met";
   }
@@ -1186,6 +1217,7 @@ serve(async (req) => {
         drivetrain: essentials.drivetrain || null,
         engine_size: essentials.engine || null,
         body_style: bestBodyStyle || null,
+        extractor_version: EXTRACTOR_VERSION,
       };
 
       const { data: inserted, error } = await supabase.from("vehicles").insert(insertPayload).select("id").single();
@@ -1211,6 +1243,7 @@ serve(async (req) => {
         // Prefer to only mark non-vehicle, never downgrade.
         ...(listingKind === "non_vehicle_item" ? { listing_kind: "non_vehicle_item" } : {}),
         updated_at: new Date().toISOString(),
+        extractor_version: EXTRACTOR_VERSION,
       };
 
       const makeLower = String(existing?.make || "").toLowerCase();
@@ -1452,17 +1485,21 @@ serve(async (req) => {
           // Older RNM/bid-to states should not overwrite the vehicle-level cache.
         } else {
         // UNSOLD: ensure we don't keep a polluted sale_price that actually represents "bid to".
+        // This includes cases where comments mentioned another vehicle's sale price (e.g. "$437,250").
         const looksLikePollutedSale =
           typeof existingSalePrice === "number" &&
           existingSalePrice > 0 &&
           ((typeof existingHighBid === "number" && existingHighBid > 0 && existingSalePrice === existingHighBid) ||
-            existingSalePrice === extractedHighBid);
+            existingSalePrice === extractedHighBid ||
+            // If we have reserve_not_met but an existing sale_price, it's likely polluted
+            existingSalePrice !== extractedSalePrice);
 
         const alreadySold =
           existingSaleStatus === "sold" ||
           existingOutcome === "sold";
 
-        if (!alreadySold && looksLikePollutedSale) {
+        // CRITICAL: Clear any sale_price when we have explicit RNM status and no genuine sale data
+        if (!alreadySold && (looksLikePollutedSale || existingSalePrice > 0)) {
           updatePayload.sale_price = null;
         }
 
@@ -1474,6 +1511,18 @@ serve(async (req) => {
         // Keep auction_outcome consistent (best-effort; depends on schema).
         if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
         if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+        }
+      } else if (!hasExtractedBid && (extractedReserve === "reserve_not_met" || extractedReserve === "no_sale")) {
+        // CRITICAL: Reserve Not Met with no bid data extracted (extraction may have failed).
+        // Still need to clear any polluted sale_price and set correct reserve status.
+        if (listingIsLatestOrEqual) {
+          const alreadySold = existingSaleStatus === "sold" || existingOutcome === "sold";
+          if (!alreadySold && existingSalePrice && existingSalePrice > 0) {
+            updatePayload.sale_price = null;
+            updatePayload.high_bid = null;
+          }
+          if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
+          if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
         }
       } else {
         if (listingIsLatestOrEqual) {
@@ -1874,7 +1923,7 @@ serve(async (req) => {
         fieldValue: String(descriptionRaw),
         sourceUrl: listingUrlCanonical,
         extractionMethod: "extract-bat-core",
-        scraperVersion: "v4",
+        scraperVersion: EXTRACTOR_VERSION,
         confidenceScore: 0.9,
         validationStatus: "unvalidated",
         rawExtractionData: {
@@ -1895,7 +1944,7 @@ serve(async (req) => {
           fieldValue: String(Math.round(essentials.mileage)),
           sourceUrl: listingUrlCanonical,
           extractionMethod: "extract-bat-core",
-          scraperVersion: "v4",
+          scraperVersion: EXTRACTOR_VERSION,
           confidenceScore: 0.95,
           validationStatus: "valid",
           rawExtractionData: {
@@ -1913,7 +1962,7 @@ serve(async (req) => {
           fieldValue: String(essentials.drivetrain),
           sourceUrl: listingUrlCanonical,
           extractionMethod: "extract-bat-core",
-          scraperVersion: "v4",
+          scraperVersion: EXTRACTOR_VERSION,
           confidenceScore: 0.9,
           validationStatus: "valid",
           rawExtractionData: {

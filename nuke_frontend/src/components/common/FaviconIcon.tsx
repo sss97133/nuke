@@ -26,6 +26,16 @@ interface FaviconIconProps {
    * Defaults to 2x the computed icon size.
    */
   maxWidth?: number;
+  /**
+   * Render favicon inside a circular badge container.
+   * The favicon is centered within the circle.
+   */
+  circleBadge?: boolean;
+  /**
+   * Background color for the circle badge.
+   * Defaults to semi-transparent dark.
+   */
+  circleBadgeBg?: string;
 }
 
 export const FaviconIcon: React.FC<FaviconIconProps> = ({
@@ -36,7 +46,9 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
   matchTextSize = false,
   textSize = 8,
   preserveAspectRatio = false,
-  maxWidth
+  maxWidth,
+  circleBadge = false,
+  circleBadgeBg = 'rgba(0,0,0,0.75)'
 }) => {
   // If matching text size, calculate icon size from font size
   const iconSize = matchTextSize ? Math.round(textSize * 1.2) : size; // Slightly larger than text for visibility
@@ -86,12 +98,17 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
       }
     }
 
-    return (
+    const imgElement = (
       <img
         src={faviconUrl}
         alt=""
-        className={className}
-        style={{
+        className={circleBadge ? '' : className}
+        style={circleBadge ? {
+          width: `${Math.round(iconSize * 0.7)}px`,
+          height: `${Math.round(iconSize * 0.7)}px`,
+          objectFit: 'contain',
+          display: 'block',
+        } : {
           width: preserveAspectRatio ? 'auto' : `${iconSize}px`,
           height: `${iconSize}px`,
           maxWidth: preserveAspectRatio ? `${effectiveMaxWidth}px` : undefined,
@@ -106,5 +123,30 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
         }}
       />
     );
+
+    if (circleBadge) {
+      // Circle badge: favicon is centered inside a circle
+      const badgeSize = iconSize * 1.6; // Badge is larger than favicon to provide padding
+      return (
+        <div
+          className={className}
+          style={{
+            width: `${badgeSize}px`,
+            height: `${badgeSize}px`,
+            borderRadius: '50%',
+            background: circleBadgeBg,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            ...style
+          }}
+        >
+          {imgElement}
+        </div>
+      );
+    }
+
+    return imgElement;
 };
 

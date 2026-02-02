@@ -2,6 +2,18 @@ import { useState, useEffect } from 'react';
 import { Auction, FlexibleAuctionService } from '../../services/flexibleAuctionService';
 import '../../design-system.css';
 
+// Urgency level type for timer coloring (NO YELLOW - BaT uses yellow)
+type UrgencyLevel = 'ended' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClose' | 'normal';
+
+const urgencyTimerColors: Record<UrgencyLevel, string> = {
+  lastMinute: '#dc2626',    // Bright red - pulsing
+  critical: '#dc2626',      // Red
+  urgent: '#ea580c',        // Orange (not yellow!)
+  gettingClose: '#e07960',  // Coral/salmon - warmer
+  normal: '#6b7280',        // Gray
+  ended: '#9ca3af',         // Light gray
+};
+
 interface AuctionCardProps {
   auction: Auction;
   onBidClick?: (auction: Auction) => void;
@@ -12,20 +24,31 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
   const [timeRemaining, setTimeRemaining] = useState<string>('--:--');
   const [timePercentage, setTimePercentage] = useState<number>(100);
   const [isEnding, setIsEnding] = useState<boolean>(false);
+  const [urgencyLevel, setUrgencyLevel] = useState<UrgencyLevel>('normal');
+  const [pulsePhase, setPulsePhase] = useState(0);
 
   useEffect(() => {
     const updateTimer = () => {
       const time = FlexibleAuctionService.getTimeRemaining(auction);
       setTimeRemaining(time.formatted);
-      
+
       // Calculate percentage of time remaining
       const totalSeconds = auction.config.initial_duration_seconds;
       const remainingSeconds = time.seconds;
       const percentage = Math.max(0, (remainingSeconds / totalSeconds) * 100);
       setTimePercentage(percentage);
-      
+
       // Show warning if < 60 seconds
       setIsEnding(remainingSeconds < 60 && remainingSeconds > 0);
+
+      // Calculate urgency level (NO YELLOW - BaT uses yellow)
+      let newUrgency: UrgencyLevel = 'normal';
+      if (remainingSeconds <= 0) newUrgency = 'ended';
+      else if (remainingSeconds <= 60) newUrgency = 'lastMinute';           // < 1 min
+      else if (remainingSeconds <= 300) newUrgency = 'critical';            // < 5 min
+      else if (remainingSeconds <= 900) newUrgency = 'urgent';              // < 15 min
+      else if (remainingSeconds <= 3600) newUrgency = 'gettingClose';       // < 1 hour
+      setUrgencyLevel(newUrgency);
     };
 
     updateTimer();
@@ -33,6 +56,22 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
 
     return () => clearInterval(interval);
   }, [auction]);
+
+  // Pulsing effect for critical urgency
+  useEffect(() => {
+    if (urgencyLevel === 'lastMinute') {
+      const pulseInterval = setInterval(() => {
+        setPulsePhase((prev) => (prev + 1) % 2);
+      }, 300);
+      return () => clearInterval(pulseInterval);
+    } else if (urgencyLevel === 'critical') {
+      const pulseInterval = setInterval(() => {
+        setPulsePhase((prev) => (prev + 1) % 2);
+      }, 500);
+      return () => clearInterval(pulseInterval);
+    }
+    setPulsePhase(0);
+  }, [urgencyLevel]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -148,8 +187,10 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
             fontSize: '8pt'
           }}>
             <span style={{
-              color: getStateColor(),
-              fontWeight: 'bold'
+              color: urgencyTimerColors[urgencyLevel],
+              fontWeight: 'bold',
+              opacity: ['lastMinute', 'critical'].includes(urgencyLevel) ? (pulsePhase === 0 ? 1 : 0.6) : 1,
+              transition: 'opacity 0.15s',
             }}>
               {timeRemaining}
             </span>
@@ -217,21 +258,24 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
           {getStateLabel()}
         </div>
 
-        {/* Timer badge */}
+        {/* Timer badge with urgency coloring */}
         <div
           style={{
             position: 'absolute',
             top: '8px',
             right: '8px',
             background: 'rgba(0, 0, 0, 0.7)',
-            color: getStateColor(),
+            color: urgencyTimerColors[urgencyLevel],
             padding: '4px 8px',
             fontSize: '9pt',
             fontWeight: 'bold',
-            borderRadius: '2px'
+            borderRadius: '2px',
+            opacity: ['lastMinute', 'critical'].includes(urgencyLevel) ? (pulsePhase === 0 ? 1 : 0.7) : 1,
+            boxShadow: urgencyLevel === 'lastMinute' ? `0 0 8px ${urgencyTimerColors[urgencyLevel]}` : 'none',
+            transition: 'opacity 0.15s, box-shadow 0.15s',
           }}
         >
-          ⏱️ {timeRemaining}
+          {timeRemaining}
         </div>
 
         {/* Extension indicator */}
@@ -283,12 +327,14 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
           </div>
         )}
 
-        {/* Current Bid Section */}
+        {/* Current Bid Section - with visual accent */}
         <div style={{
-          background: 'var(--bg)',
-          padding: '8px',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.03) 100%)',
+          padding: '10px',
           marginBottom: '8px',
-          borderRadius: '2px'
+          borderRadius: '4px',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5)',
         }}>
           <div style={{ fontSize: '8pt', color: '#6b7280', marginBottom: '2px' }}>
             Current Bid:
