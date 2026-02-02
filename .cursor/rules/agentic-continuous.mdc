@@ -1,0 +1,42 @@
+---
+description: Be agentic and proactive in nuke; don't wait to be told—suggest and do.
+alwaysApply: true
+---
+
+# Agentic / continuous behavior in nuke
+
+When working in this project, act like an ongoing agent. The user should not have to repeat "check status," "run extraction," or "inspect theme" every time.
+
+## Proactive defaults
+
+1. **When the user asks for "status" or anything open-ended**  
+   - Check running extractors (terminals, processes: autonomous-profile-repair, backfill-cab-vins, extract-loop, bat-process-queue, marketplace monitor).  
+   - Mention extraction queues (import_queue: BaT ~77k, Craigslist, Classic.com) and whether the main pipeline is running.  
+   - Suggest a concrete next action if something is idle (e.g. "Main queue is idle. Run `./scripts/run-major-extraction.sh` to process BaT/CL.")
+
+2. **When the user mentions extraction, queues, or "finish up"**  
+   - Reference RUN_MAJOR_EXTRACTION.md and runbook targets.  
+   - Propose or run the right script (run-major-extraction.sh, extract-loop.sh, bat-process-queue) with sensible batch size / limits unless the user says otherwise.
+
+3. **When editing frontend (theme, UI, CSS)**  
+   - Apply theme-inspection rules: no forcing data-theme/colorScheme outside ThemeContext; use design tokens or dark: variants.  
+   - If changing light/dark behavior, run or suggest `./scripts/inspect-theme.sh` and fix issues found.
+
+4. **When the user mentions Facebook or marketplace**  
+   - Recall: config is set to vehicles older than 1991 (maxYear=1991, title filter).  
+   - Suggest starting the monitor if they want to pull listings: `cd scripts/marketplace-monitor && npx tsx monitor.ts`.
+
+5. **After doing a discrete task**  
+   - Briefly state what was done and one optional next step (e.g. "Done. Want me to start the extraction loop or check queue counts?").
+
+## What "continuous" means here
+
+- **In conversation:** Every time the user talks to you in this project, default to this proactive behavior. Don't wait for explicit "check status" or "run X" every time.
+- **Not background cron:** You only run when the user has a session open. You cannot wake on a schedule. For true 24/7 extraction, the user runs scripts (e.g. extract-loop.sh) in a terminal or via cron themselves.
+
+## Where to look
+
+- Extraction runbook: `scripts/RUN_MAJOR_EXTRACTION.md`
+- Queue/process check: terminals folder, `ps`/`pgrep` for extract-loop, bat-process-queue, marketplace monitor
+- Theme: `.cursor/rules/theme-inspection.mdc`, `.cursor/agents/theme-inspection-agent.md`, `scripts/inspect-theme.sh`
+- Sources/targets: `.claude/EXTRACTION_SOURCES_INVENTORY.md`, `data/sources/master_sources.yaml`

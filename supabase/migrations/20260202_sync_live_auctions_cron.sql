@@ -17,8 +17,9 @@ SELECT cron.unschedule('sync-live-auctions')
 WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'sync-live-auctions');
 
 -- Schedule sync job: Every 15 minutes
--- Syncs BaT and Collecting Cars live auctions
--- (Cars & Bids requires Firecrawl credits and may fail)
+-- Syncs BaT, Collecting Cars (paginated to 10k), and Cars & Bids live auctions.
+-- Vehicles get auction_status='active' and sale_status='auction_live' for UI/stats parity.
+-- If app.settings.service_role_key or app.service_role_key is set, auth is sent; else function must allow anon (no-verify-jwt).
 SELECT cron.schedule(
   'sync-live-auctions',
   '*/15 * * * *', -- Every 15 minutes
@@ -30,13 +31,14 @@ SELECT cron.schedule(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || COALESCE(
           current_setting('app.settings.service_role_key', true),
-          current_setting('app.service_role_key', true)
+          current_setting('app.service_role_key', true),
+          ''
         )
       ),
       body := jsonb_build_object(
         'action', 'sync'
       ),
-      timeout_milliseconds := 180000 -- 3 minute timeout (BaT takes ~60s)
+      timeout_milliseconds := 300000
     ) AS request_id;
   $$
 );

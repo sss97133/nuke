@@ -67,13 +67,61 @@ async function scrapeDetailPage(page, url) {
       const intColorMatch = bodyText.match(/(?:Interior\s*Color|Int\.?\s*Color)[:\s]+([^\n]+)/i);
       const drivetrainMatch = bodyText.match(/Drivetrain[:\s]+([^\n]+)/i);
 
-      // Price
-      const priceMatch = bodyText.match(/\$([0-9,]+)/) || bodyText.match(/Price[:\s]+\$?([0-9,]+)/i);
+      // Price - sophisticated attribution to avoid irrelevant prices
+      let askingPrice = null;
+      let soldPrice = null;
+      let estimateLow = null;
+      let estimateHigh = null;
+      
+      // Asking/Listing price (current for sale)
+      const askingMatch = bodyText.match(/(?:Asking|Listed?|Price|For Sale)[:\s]*\$?([\d,]+)/i) ||
+                          bodyText.match(/\$([\d,]+)\s*(?:asking|listed?|for sale)/i);
+      
+      // Sold price (final sale price)
+      const soldMatch = bodyText.match(/Sold[:\s]*\$?([\d,]+)/i) ||
+                        bodyText.match(/Hammer[:\s]*\$?([\d,]+)/i) ||
+                        bodyText.match(/Final[:\s]*\$?([\d,]+)/i);
+      
+      // Estimate ranges
+      const estimateMatch = bodyText.match(/Estimate[:\s]*\$?([\d,]+)\s*[-–]\s*\$?([\d,]+)/i) ||
+                           bodyText.match(/Est(?:\.|imate)?[:\s]*\$?([\d,]+)\s*[-–]\s*\$?([\d,]+)/i);
+      
+      // Current bid (for active auctions)
+      const currentBidMatch = bodyText.match(/(?:Current|Winning|High)\s*Bid[:\s]*\$?([\d,]+)/i);
+      
+      // Convert to numbers, filtering out unrealistic values
+      const parsePrice = (match) => match ? parseInt(match.replace(/,/g, '')) : null;
+      const isValidPrice = (price) => price && price > 100 && price < 10000000; // Filter out $1 or $10M+
+      
+      askingPrice = parsePrice(askingMatch?.[1]);
+      soldPrice = parsePrice(soldMatch?.[1]);
+      estimateLow = parsePrice(estimateMatch?.[1]);
+      estimateHigh = parsePrice(estimateMatch?.[2]);
+      const currentBid = parsePrice(currentBidMatch?.[1]);
+      
+      // Validate prices
+      askingPrice = isValidPrice(askingPrice) ? askingPrice : null;
+      soldPrice = isValidPrice(soldPrice) ? soldPrice : null;
+      estimateLow = isValidPrice(estimateLow) ? estimateLow : null;
+      estimateHigh = isValidPrice(estimateHigh) ? estimateHigh : null;
+      
+      // For Hemmings (marketplace), prioritize asking price
+      const price = askingPrice || currentBid;
 
       // Stock/Dealer info
       const stockMatch = bodyText.match(/Stock\s*#?[:\s]+([^\n]+)/i);
       const dealerMatch = bodyText.match(/(?:Seller|Dealer|Offered By)[:\s]+([^\n]+)/i);
       const locationMatch = bodyText.match(/(?:Location|Located)[:\s]+([^\n]+)/i);
+      
+      // Chassis number - critical for classic/collector cars
+      const chassisMatch = bodyText.match(/(?:Chassis|Frame|Chassis\s*#?)[:\s]+([A-HJ-NPR-Z0-9\-]+)/i) || 
+                            bodyText.match(/chassis\s+([A-HJ-NPR-Z0-9\-]+)/i) ||
+                            bodyText.match(/frame\s+([A-HJ-NPR-Z0-9\-]+)/i);
+
+      // Auction/Event Date - critical for auction houses
+      const auctionDateMatch = bodyText.match(/(?:Auction|Sale|Event)\s*(?:Date|:)?\s*([A-Za-z]+\s+\d{1,2},?\s*\d{4})/i) ||
+                               bodyText.match(/(?:\d{1,2}[\s\/-])?[A-Za-z]+[\s\/-]\d{4}/i) ||
+                               bodyText.match(/(\d{4})\s*(?:Auction|Sale|Event)/i);
 
       // Description
       const descEl = document.querySelector('[class*="description"], [class*="about"], .listing-description, #description');
@@ -97,6 +145,8 @@ async function scrapeDetailPage(page, url) {
 
       return {
         vin: vinMatch?.[1],
+        chassis_number: chassisMatch?.[1],
+        auction_date: auctionDateMatch?.[1],
         title,
         mileage: mileageMatch ? parseInt(mileageMatch[1].replace(/,/g, '')) : null,
         engine: engineMatch?.[1]?.trim(),
@@ -104,7 +154,11 @@ async function scrapeDetailPage(page, url) {
         drivetrain: drivetrainMatch?.[1]?.trim(),
         exterior_color: extColorMatch?.[1]?.trim(),
         interior_color: intColorMatch?.[1]?.trim(),
-        price: priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : null,
+        price: price,
+        sold_price: soldPrice,
+        estimate_low: estimateLow,
+        estimate_high: estimateHigh,
+        current_bid: currentBidMatch ? parseInt(currentBidMatch[1].replace(/,/g, '')) : null,
         stock_number: stockMatch?.[1]?.trim(),
         dealer: dealerMatch?.[1]?.trim(),
         location: locationMatch?.[1]?.trim(),
@@ -126,6 +180,8 @@ async function upsertVehicle(vehicleId, data) {
 
   const updateData = {
     vin: data.vin,
+    chassis_number: data.chassis_number,
+    auction_date: data.auction_date,
     engine_size: data.engine,
     transmission: data.transmission,
     drivetrain: data.drivetrain,
@@ -136,6 +192,11 @@ async function upsertVehicle(vehicleId, data) {
     highlights: data.features,
     primary_image_url: data.images?.[0],
     image_url: data.images?.[0],
+    asking_price: data.asking_price,
+    sold_price: data.sold_price,
+    estimate_low: data.estimate_low,
+    estimate_high: data.estimate_high,
+    current_bid: data.current_bid,
     status: data.vin ? 'active' : 'pending'
   };
 
@@ -169,9 +230,14 @@ async function createAuctionEvent(vehicleId, sourceUrl, data) {
       source: 'hemmings',
       source_url: sourceUrl,
       outcome: data.outcome,
-      asking_price: data.price,
+      asking_price: data.asking_price,
+      sold_price: data.sold_price,
+      estimate_low: data.estimate_low,
+      estimate_high: data.estimate_high,
+      current_bid: data.current_bid,
       seller_name: data.dealer,
       seller_location: data.location,
+      auction_date: data.auction_date,
       raw_data: { extractor: 'hemmings-proper-extract', stock_number: data.stock_number }
     })
   });

@@ -1,0 +1,42 @@
+---
+description: Inspect and fix light/dark mode; prevent light color schemes in dark mode
+globs: nuke_frontend/**/*.{tsx,ts,css,scss}
+alwaysApply: false
+---
+
+# Theme inspection (light / dark mode)
+
+When editing the Nuke frontend, respect the design system and avoid introducing **light color schemes in dark mode**.
+
+## Single source of theme
+
+- **ThemeProvider** (`src/contexts/ThemeContext.tsx`) is the only place that sets `data-theme` and `document.documentElement.style.colorScheme`.
+- **Do not** set `data-theme` or `colorScheme` in pages or components (e.g. do not "force light" to "prevent dark mode issues" — that causes dark mode to show light schemes).
+- **Do not** read/write `data-theme` for UI logic; use `useTheme()` and the context value.
+
+## Styling rules
+
+1. **Prefer design tokens**  
+   Use CSS variables: `var(--bg)`, `var(--surface)`, `var(--text)`, `var(--text-secondary)`, `var(--border)`, `var(--surface-hover)`.  
+   Defined in `src/styles/unified-design-system.css` under `:root[data-theme="light"]` and `:root[data-theme="dark"]`.
+
+2. **Tailwind + dark**  
+   If using Tailwind, pair light utilities with dark equivalents so dark mode is correct, e.g.  
+   `bg-white dark:bg-gray-800`, `text-gray-900 dark:text-white`, `text-gray-500 dark:text-gray-400`.  
+   `index.css` already remaps common light utilities when `data-theme="dark"`; prefer tokens or explicit `dark:` where possible.
+
+3. **No hardcoded light-only styles in global CSS**  
+   Avoid rules that only target `[data-theme="light"]` and leave dark mode unstyled (e.g. no `color-scheme: light` on `:root` or a parent when theme is dark).  
+   If adding `color-scheme`, it must match the effective theme (ThemeContext sets it on `document.documentElement`).
+
+4. **Modals / overlays**  
+   Ensure dialogs and overlays use `var(--surface)` / `var(--bg)` and `var(--border)` so they are not white in dark mode.
+
+## Inspection checklist (for agents / manual review)
+
+When asked to "inspect theme" or "fix dark mode":
+
+- [ ] Search for `setAttribute('data-theme'` or `data-theme` being set in TS/TSX (except ThemeContext); remove or replace with context.
+- [ ] Search for `colorScheme` or `color-scheme` in CSS/TS; ensure they follow the effective theme, never force `light` when user chose dark.
+- [ ] Check new or edited components for `bg-white`, `text-gray-900`, etc. without `dark:` or token equivalents; add dark overrides or switch to tokens.
+- [ ] Confirm modals and full-page wrappers use theme variables so they are not light-only.

@@ -49,8 +49,11 @@ async function scrapeDetailPage(page, url) {
     return await page.evaluate(() => {
       const bodyText = document.body.innerText;
       
-      // VIN
+      // VIN and Chassis - critical for classic/collector cars
       const vinMatch = bodyText.match(/VIN[:\s#]+([A-HJ-NPR-Z0-9]{17})/i);
+      const chassisMatch = bodyText.match(/(?:Chassis|Frame|Chassis\s*#?)[:\s]+([A-HJ-NPR-Z0-9\-]+)/i) || 
+                            bodyText.match(/chassis\s+([A-HJ-NPR-Z0-9\-]+)/i) ||
+                            bodyText.match(/frame\s+([A-HJ-NPR-Z0-9\-]+)/i);
 
       // Title and year/make/model parsing
       const rawTitle = document.querySelector('h1')?.innerText?.trim();
@@ -93,9 +96,50 @@ async function scrapeDetailPage(page, url) {
       const extColorMatch = bodyText.match(/(?:Exterior|Color)[:\s]+([^\n,]+)/i);
       const intColorMatch = bodyText.match(/Interior[:\s]+([^\n,]+)/i);
       
+      // Price - sophisticated attribution to avoid irrelevant prices
+      let askingPrice = null;
+      let soldPrice = null;
+      let estimateLow = null;
+      let estimateHigh = null;
+      
+      // Asking/Listing price (current for sale)
+      const askingMatch = bodyText.match(/(?:Asking|Listed?|Price|For Sale)[:\s]*\$?([\d,]+)/i) ||
+                          bodyText.match(/\$([\d,]+)\s*(?:asking|listed?|for sale)/i);
+      
+      // Sold price (final sale price)
+      const soldMatch = bodyText.match(/Sold[:\s]*\$?([\d,]+)/i) ||
+                        bodyText.match(/Hammer[:\s]*\$?([\d,]+)/i) ||
+                        bodyText.match(/Final[:\s]*\$?([\d,]+)/i);
+      
+      // Estimate ranges
+      const estimateMatch = bodyText.match(/Estimate[:\s]*\$?([\d,]+)\s*[-–]\s*\$?([\d,]+)/i) ||
+                           bodyText.match(/Est(?:\.|imate)?[:\s]*\$?([\d,]+)\s*[-–]\s*\$?([\d,]+)/i);
+      
+      // Current bid (for active auctions)
+      const currentBidMatch = bodyText.match(/(?:Current|Winning|High)\s*Bid[:\s]*\$?([\d,]+)/i);
+      
+      // Convert to numbers, filtering out unrealistic values
+      const parsePrice = (match) => match ? parseInt(match.replace(/,/g, '')) : null;
+      const isValidPrice = (price) => price && price > 100 && price < 10000000; // Filter out $1 or $10M+
+      
+      askingPrice = parsePrice(askingMatch?.[1]);
+      soldPrice = parsePrice(soldMatch?.[1]);
+      estimateLow = parsePrice(estimateMatch?.[1]);
+      estimateHigh = parsePrice(estimateMatch?.[2]);
+      const currentBid = parsePrice(currentBidMatch?.[1]);
+      
+      // Validate prices
+      askingPrice = isValidPrice(askingPrice) ? askingPrice : null;
+      soldPrice = isValidPrice(soldPrice) ? soldPrice : null;
+      estimateLow = isValidPrice(estimateLow) ? estimateLow : null;
+      estimateHigh = isValidPrice(estimateHigh) ? estimateHigh : null;
+      
+      // For PCA Market (auction platform), prioritize current bid or sold price
+      const price = currentBid || soldPrice || askingPrice;
+
       // Sale info - PCarMarket shows current bid and time left
-      const soldMatch = bodyText.match(/Sold\s*(?:for)?\s*\$?([\d,]+)/i);
-      const currentBidMatch = bodyText.match(/(?:Current|Winning)\s*Bid[:\s]*\$?([\d,]+)/i);
+      const soldMatch2 = bodyText.match(/Sold\s*(?:for)?\s*\$?([\d,]+)/i);
+      const currentBidMatch2 = bodyText.match(/(?:Current|Winning)\s*Bid[:\s]*\$?([\d,]+)/i);
       const reserveMatch = bodyText.match(/Reserve\s*(Met|Not Met)/i);
       
       // Seller info

@@ -1,6 +1,6 @@
 # Active Agents Coordination
 
-Last updated: 2026-02-01 ~9:15pm PST
+Last updated: 2026-02-02 ~12:00pm PST
 
 ## MEGA SHIP FLEET - 19 Agents Running
 
@@ -25,6 +25,7 @@ Last updated: 2026-02-01 ~9:15pm PST
 | ac0f985 | AutoTrader scout | Running |
 | a22228d | CarGurus scout | Running |
 | a348b81 | DuPont Registry scout | Running |
+| a987cde | Specialty builder extractors + self-healing | Running |
 
 ## Principle: NEVER ZERO
 
@@ -58,12 +59,17 @@ Extraction must always trend upward. Fallback hierarchy:
 - [ ] Mecum (Cloudflare)
 - [ ] Barrett-Jackson (Cloudflare)
 
+## Live Auctions (4k–10k target)
+
+- **2026-02-02:** sync-live-auctions now sets `sale_status = 'auction_live'` so UI/portfolio counts match. CC paginated (up to 10k). See [LIVE_AUCTIONS_STABILITY.md](./LIVE_AUCTIONS_STABILITY.md).
+- Deploy: run migration `20260202_vehicles_sale_status_auction_live.sql`, then `supabase functions deploy sync-live-auctions --no-verify-jwt`.
+
 ## Session Stats
 
 | Metric | Value |
 |--------|-------|
 | Vehicles | 219,610 |
-| Live BaT Auctions | 126 |
+| Live Auctions (target 4k–10k) | sync sets sale_status=auction_live; CC paginated |
 | Pending Queue | 71,489 |
 | Active Sources | 5 (BaT, CC, CL, Hagerty, PCarMarket) |
 | Blocked Sources | 4 (C&B, Classic.com, Mecum, BJ) |

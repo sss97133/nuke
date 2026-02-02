@@ -514,16 +514,7 @@ export default function OrganizationProfile() {
     setPrimaryHeroSrcIndex(0);
   }, [heroKey]);
 
-  // Ensure light theme is applied (prevent dark mode issues)
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const root = document.documentElement;
-      // Force light theme if not explicitly set
-      if (!root.getAttribute('data-theme')) {
-        root.setAttribute('data-theme', 'light');
-      }
-    }
-  }, []);
+  // Theme is controlled by ThemeProvider only; do not set data-theme here (would override dark mode).
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

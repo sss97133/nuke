@@ -52,8 +52,12 @@ async function scrapeDetailPage(page, url) {
     return await page.evaluate(() => {
       const bodyText = document.body.innerText;
 
-      // VIN - C&B shows VIN in specs
-      const vinMatch = bodyText.match(/VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i);
+      // VIN and Chassis - critical for classic/collector cars
+      const vinMatch = bodyText.match(/VIN[:\s#]+([A-HJ-NPR-Z0-9]{17})/i);
+      const chassisMatch = bodyText.match(/(?:Chassis|Frame|Chassis\s*#?)[:\s]+([A-HJ-NPR-Z0-9\-]+)/i) || 
+                            bodyText.match(/chassis\s+([A-HJ-NPR-Z0-9\-]+)/i) ||
+                            bodyText.match(/frame\s+([A-HJ-NPR-Z0-9\-]+)/i) ||
+                            bodyText.match(/chassis\s+([A-HJ-NPR-Z0-9\-]+)\s+with/i);
 
       // Title
       const title = document.querySelector('h1')?.innerText?.trim();
@@ -88,9 +92,52 @@ async function scrapeDetailPage(page, url) {
       const sellerMatch = bodyText.match(/Seller[:\s]+([^\n]+)/i);
       const locationMatch = bodyText.match(/Location[:\s]+([^\n]+)/i);
 
-      // Sale info
-      const soldMatch = bodyText.match(/Sold\s*(?:for|:)?\s*\$?([\d,]+)/i);
+      // Price - sophisticated attribution to avoid irrelevant prices
+      let askingPrice = null;
+      let soldPrice = null;
+      let estimateLow = null;
+      let estimateHigh = null;
+      
+      // Asking/Listing price (current for sale)
+      const askingMatch = bodyText.match(/(?:Asking|Listed?|Price|For Sale)[:\s]*\$?([\d,]+)/i) ||
+                          bodyText.match(/\$([\d,]+)\s*(?:asking|listed?|for sale)/i);
+      
+      // Sold price (final sale price)
+      const soldMatch = bodyText.match(/Sold\s*(?:for|:)?\s*\$?([\d,]+)/i) ||
+                        bodyText.match(/Hammer[:\s]*\$?([\d,]+)/i) ||
+                        bodyText.match(/Final[:\s]*\$?([\d,]+)/i);
+      
+      // Estimate ranges
+      const estimateMatch = bodyText.match(/Estimate[:\s]*\$?([\d,]+)\s*[-–]\s*\$?([\d,]+)/i) ||
+                           bodyText.match(/Est(?:\.|imate)?[:\s]*\$?([\d,]+)\s*[-–]\s*\$?([\d,]+)/i);
+      
+      // Current bid (for active auctions)
       const currentBidMatch = bodyText.match(/(?:Current|Winning|High)\s*Bid[:\s]*\$?([\d,]+)/i);
+      
+      // Buy It Now price
+      const buyNowMatch = bodyText.match(/Buy\s*(?:It\s*)?Now[:\s]*\$?([\d,]+)/i);
+      
+      // Convert to numbers, filtering out unrealistic values
+      const parsePrice = (match) => match ? parseInt(match.replace(/,/g, '')) : null;
+      const isValidPrice = (price) => price && price > 100 && price < 10000000; // Filter out $1 or $10M+
+      
+      askingPrice = parsePrice(askingMatch?.[1]);
+      soldPrice = parsePrice(soldMatch?.[1]);
+      estimateLow = parsePrice(estimateMatch?.[1]);
+      estimateHigh = parsePrice(estimateMatch?.[2]);
+      const currentBid = parsePrice(currentBidMatch?.[1]);
+      const buyNowPrice = parsePrice(buyNowMatch?.[1]);
+      
+      // Validate prices
+      askingPrice = isValidPrice(askingPrice) ? askingPrice : null;
+      soldPrice = isValidPrice(soldPrice) ? soldPrice : null;
+      estimateLow = isValidPrice(estimateLow) ? estimateLow : null;
+      estimateHigh = isValidPrice(estimateHigh) ? estimateHigh : null;
+      
+      // For Cars & Bids (auction platform), prioritize current bid or sold price
+      const price = currentBid || soldPrice || askingPrice || buyNowPrice;
+
+      // Bid count
       const bidCountMatch = bodyText.match(/(\d+)\s*(?:bids?)/i);
 
       // Reserve status
@@ -129,6 +176,7 @@ async function scrapeDetailPage(page, url) {
 
       return {
         vin: vinMatch?.[1],
+        chassis_number: chassisMatch?.[1],
         title,
         mileage: mileageNum,
         engine,
@@ -140,8 +188,12 @@ async function scrapeDetailPage(page, url) {
         title_status: titleStatus,
         seller: sellerMatch?.[1]?.trim(),
         location: locationMatch?.[1]?.trim(),
-        sold_price: soldMatch ? parseInt(soldMatch[1].replace(/,/g, '')) : null,
-        current_bid: currentBidMatch ? parseInt(currentBidMatch[1].replace(/,/g, '')) : null,
+        sold_price: soldPrice,
+        asking_price: askingPrice,
+        estimate_low: estimateLow,
+        estimate_high: estimateHigh,
+        current_bid: currentBid,
+        buy_now_price: buyNowPrice,
         bid_count: bidCountMatch ? parseInt(bidCountMatch[1]) : null,
         reserve_met: reserveMatch?.[1]?.toLowerCase() === 'met',
         no_reserve: noReserve,
@@ -163,6 +215,7 @@ async function upsertVehicle(vehicleId, data) {
 
   const updateData = {
     vin: data.vin,
+    chassis_number: data.chassis_number,
     engine_size: data.engine,
     transmission: data.transmission,
     drivetrain: data.drivetrain,
@@ -174,6 +227,12 @@ async function upsertVehicle(vehicleId, data) {
     highlights: data.highlights,
     primary_image_url: data.images?.[0],
     image_url: data.images?.[0],
+    asking_price: data.asking_price,
+    sold_price: data.sold_price,
+    estimate_low: data.estimate_low,
+    estimate_high: data.estimate_high,
+    current_bid: data.current_bid,
+    buy_now_price: data.buy_now_price,
     status: data.vin ? 'active' : 'pending'
   };
 
