@@ -459,7 +459,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
               type="button"
               onClick={() => setShowAllMakeButtons((v) => !v)}
               disabled={disabled || loadingMakes}
-              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 dark:text-gray-500 dark:text-gray-400"
               title={showAllMakeButtons ? 'Collapse' : 'Show all makes'}
             >
               {showAllMakeButtons ? '–' : '+'}
@@ -485,7 +485,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                     isSelected
                       ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                       : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
-                  } disabled:bg-gray-100 disabled:text-gray-400`}
+                  } disabled:bg-gray-100 disabled:text-gray-400 dark:text-gray-500 dark:text-gray-400`}
                 >
                   {m.logo_url ? (
                     <img
@@ -508,7 +508,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
             })}
 
             {makeButtons.length === 0 && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 {loadingMakes ? 'Loading makes…' : 'No makes found.'}
               </div>
             )}
@@ -541,7 +541,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
               type="button"
               onClick={() => setShowAllModelButtons((v) => !v)}
               disabled={disabled || loadingModels || !selectedMake}
-              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 dark:text-gray-500 dark:text-gray-400"
               title={!selectedMake ? 'Select make first' : showAllModelButtons ? 'Collapse' : 'Show all models'}
             >
               {showAllModelButtons ? '–' : '+'}
@@ -549,7 +549,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
           </div>
 
           {!selectedMake ? (
-            <div className="text-xs text-gray-500">Model buttons unlock once a make is selected.</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">Model buttons unlock once a make is selected.</div>
           ) : (
             <div className={`flex flex-wrap gap-2 ${showAllModelButtons ? 'max-h-56 overflow-auto pr-1' : ''}`}>
               {modelButtons.map((m) => {
@@ -571,7 +571,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                       isSelected
                         ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                         : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
-                    } disabled:bg-gray-100 disabled:text-gray-400`}
+                    } disabled:bg-gray-100 disabled:text-gray-400 dark:text-gray-500 dark:text-gray-400`}
                   >
                     <span className="max-w-[12rem] truncate">{m.model_name}</span>
 
@@ -584,7 +584,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
               })}
 
               {modelButtons.length === 0 && (
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
                   {loadingModels ? 'Loading models…' : 'No models found for this make.'}
                 </div>
               )}
@@ -671,7 +671,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                     )}
                     <div className="min-w-0">
                       <div className="font-medium text-gray-900 truncate">{make.make_name}</div>
-                      <div className="text-xs text-gray-500 truncate">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                         {make.model_count != null ? `${make.model_count.toLocaleString()} models` : 'Models: —'}
                         {make.car_count != null ? ` • ${make.car_count.toLocaleString()} cars` : ''}
                       </div>
@@ -683,7 +683,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
           )}
 
           {showMakeSuggestions && makeSuggestions.length === 0 && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-xs text-gray-500">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-xs text-gray-500 dark:text-gray-400">
               {loadingMakes ? 'Loading makes…' : 'No makes found.'}
             </div>
           )}
@@ -712,7 +712,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
             disabled={disabled || !makeQuery.trim()}
             required={required}
             placeholder={selectedMake ? "e.g., Suburban, Corvette, F-150" : "Select make (or type one) first"}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500"
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500 dark:text-gray-400"
           />
           
           {/* Model Suggestions Dropdown */}
@@ -742,7 +742,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                     <div className="min-w-0">
                       <div className="font-medium text-gray-900 truncate">{model.model_name}</div>
                       {model.variants_count != null && (
-                        <div className="text-xs text-gray-500 truncate">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {model.variants_count.toLocaleString()} variant{model.variants_count === 1 ? '' : 's'}
                         </div>
                       )}
@@ -754,7 +754,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
           )}
 
           {showModelSuggestions && modelSuggestions.length === 0 && selectedMake && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-xs text-gray-500">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-xs text-gray-500 dark:text-gray-400">
               {loadingModels ? 'Loading models…' : 'No models found for this make.'}
             </div>
           )}

@@ -66,7 +66,7 @@ interface VaultPortfolioProps {
 
 const FACILITY_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   climate_controlled: { label: 'Climate Controlled', color: 'text-blue-400' },
-  covered: { label: 'Covered', color: 'text-gray-400' },
+  covered: { label: 'Covered', color: 'text-gray-400 dark:text-gray-500 dark:text-gray-400' },
   outdoor: { label: 'Outdoor', color: 'text-yellow-400' },
   high_security: { label: 'High Security', color: 'text-red-400' },
   museum_grade: { label: 'Museum Grade', color: 'text-purple-400' },
@@ -77,7 +77,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   active: { label: 'Active', color: 'bg-green-900/50 text-green-400' },
   suspended: { label: 'Suspended', color: 'bg-red-900/50 text-red-400' },
   pending_release: { label: 'Pending Release', color: 'bg-blue-900/50 text-blue-400' },
-  released: { label: 'Released', color: 'bg-gray-700 text-gray-400' },
+  released: { label: 'Released', color: 'bg-gray-700 text-gray-400 dark:text-gray-500 dark:text-gray-400' },
 };
 
 export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
@@ -233,17 +233,17 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-900 rounded-lg p-4">
-            <p className="text-xs text-gray-400 uppercase">Vehicles Stored</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 uppercase">Vehicles Stored</p>
             <p className="text-2xl font-bold text-white">{summary.total_vehicles}</p>
           </div>
           <div className="bg-gray-900 rounded-lg p-4">
-            <p className="text-xs text-gray-400 uppercase">Monthly Fees</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 uppercase">Monthly Fees</p>
             <p className="text-2xl font-bold text-white">
               {formatCurrency(summary.total_monthly_fees)}
             </p>
           </div>
           <div className="bg-gray-900 rounded-lg p-4">
-            <p className="text-xs text-gray-400 uppercase">Outstanding</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 uppercase">Outstanding</p>
             <p
               className={`text-2xl font-bold ${
                 summary.outstanding_balance > 0 ? 'text-red-400' : 'text-green-400'
@@ -253,7 +253,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
             </p>
           </div>
           <div className="bg-gray-900 rounded-lg p-4">
-            <p className="text-xs text-gray-400 uppercase">Vaults Used</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 uppercase">Vaults Used</p>
             <p className="text-2xl font-bold text-white">{summary.vaults_used}</p>
           </div>
         </div>
@@ -282,7 +282,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
 
         {storageRecords.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-gray-400">No vehicles in storage</p>
+            <p className="text-gray-400 dark:text-gray-500 dark:text-gray-400">No vehicles in storage</p>
             {onAllocateVehicle && (
               <button
                 onClick={onAllocateVehicle}
@@ -323,7 +323,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                       </div>
 
                       {vehicle?.vin && (
-                        <p className="text-xs text-gray-500 font-mono mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">
                           VIN: {vehicle.vin}
                         </p>
                       )}
@@ -331,7 +331,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                       {vault && (
                         <div className="mt-2 flex items-center gap-4 text-sm">
                           <span className="text-gray-300">{vault.name}</span>
-                          <span className="text-gray-500">
+                          <span className="text-gray-500 dark:text-gray-400">
                             {vault.city}, {vault.state}
                           </span>
                           {facilityInfo && (
@@ -340,13 +340,13 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                             </span>
                           )}
                           <div className="flex items-center gap-1">
-                            <span className="text-gray-500 text-xs">Security:</span>
+                            <span className="text-gray-500 dark:text-gray-400 text-xs">Security:</span>
                             {renderSecurityLevel(vault.security_level)}
                           </div>
                         </div>
                       )}
 
-                      <div className="mt-2 flex items-center gap-4 text-xs text-gray-400">
+                      <div className="mt-2 flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400">
                         <span>Since {formatDate(record.start_date)}</span>
                         <span className="capitalize">{record.storage_type}</span>
                         {record.bay_number && <span>Bay {record.bay_number}</span>}
@@ -357,7 +357,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                     <div className="text-right">
                       <p className="text-lg font-medium text-white">
                         {formatCurrency(record.monthly_rate_cents)}
-                        <span className="text-xs text-gray-400">/mo</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400">/mo</span>
                       </p>
 
                       {outstanding > 0 && (
@@ -369,7 +369,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                       {record.status === 'active' && (
                         <button
                           onClick={() => handleReleaseRequest(record.id)}
-                          className="mt-2 text-xs text-gray-400 hover:text-white transition-colors"
+                          className="mt-2 text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:text-white transition-colors"
                         >
                           Request Release
                         </button>
@@ -387,7 +387,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
       <div className="bg-gray-950 rounded-xl overflow-hidden">
         <div className="bg-gray-900 px-6 py-4 border-b border-gray-800">
           <h2 className="text-lg font-semibold text-white">Available Vaults</h2>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400 mt-1">
             Storage facilities accepting new vehicles
           </p>
         </div>
@@ -414,7 +414,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-white font-medium">{vault.name}</h3>
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">
                       {vault.city}, {vault.state}
                     </p>
                   </div>
@@ -422,7 +422,7 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                     <p className="text-lg font-medium text-white">
                       {formatCurrency(vault.base_monthly_rate_cents)}
                     </p>
-                    <p className="text-xs text-gray-400">/month</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400">/month</p>
                   </div>
                 </div>
 
@@ -431,14 +431,14 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                     {facilityInfo.label}
                   </span>
                   <div className="flex items-center gap-1">
-                    <span className="text-gray-500 text-xs">Security:</span>
+                    <span className="text-gray-500 dark:text-gray-400 text-xs">Security:</span>
                     {renderSecurityLevel(vault.security_level)}
                   </div>
                 </div>
 
                 {/* Capacity Bar */}
                 <div className="mt-3">
-                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 mb-1">
                     <span>Capacity</span>
                     <span>
                       {vault.current_occupancy}/{vault.capacity_vehicles} ({occupancyPct}%)
@@ -464,13 +464,13 @@ export const VaultPortfolio: React.FC<VaultPortfolioProps> = ({
                     {(vault.features as string[]).slice(0, 4).map((feature, i) => (
                       <span
                         key={i}
-                        className="px-2 py-0.5 bg-gray-800 text-gray-400 text-xs rounded"
+                        className="px-2 py-0.5 bg-gray-800 text-gray-400 dark:text-gray-500 dark:text-gray-400 text-xs rounded"
                       >
                         {feature}
                       </span>
                     ))}
                     {vault.features.length > 4 && (
-                      <span className="px-2 py-0.5 text-gray-500 text-xs">
+                      <span className="px-2 py-0.5 text-gray-500 dark:text-gray-400 text-xs">
                         +{vault.features.length - 4} more
                       </span>
                     )}

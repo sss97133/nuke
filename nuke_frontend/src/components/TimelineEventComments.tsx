@@ -148,7 +148,7 @@ const TimelineEventComments: React.FC<TimelineEventCommentsProps> = ({
                         {commentAccess.canEdit && !isEditing && (
                           <button
                             onClick={() => startEdit(comment)}
-                            className="text-gray-400 hover:text-gray-600 ml-1"
+                            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 ml-1"
                             title="Edit comment"
                           >
                             Edit
@@ -157,7 +157,7 @@ const TimelineEventComments: React.FC<TimelineEventCommentsProps> = ({
                         {commentAccess.canDelete && (
                           <button
                             onClick={() => handleDeleteComment(comment.id)}
-                            className="text-gray-400 hover:text-red-600 ml-1"
+                            className="text-gray-400 dark:text-gray-500 hover:text-red-600 ml-1"
                             title="Delete comment"
                           >
                             ×
@@ -198,7 +198,7 @@ const TimelineEventComments: React.FC<TimelineEventCommentsProps> = ({
                     )}
 
                     {comment.updated_at !== comment.created_at && !isEditing && (
-                      <div className="text-gray-400 text-xs mt-1">
+                      <div className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                         (edited {new Date(comment.updated_at).toLocaleDateString()})
                       </div>
                     )}

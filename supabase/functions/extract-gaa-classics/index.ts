@@ -445,12 +445,27 @@ async function upsertVehicle(
   extracted: ExtractedVehicle,
   orgId: string | null
 ): Promise<{ vehicleId: string | null; created: boolean; error: string | null }> {
-  // Check if vehicle already exists by listing_url
-  const { data: existing } = await supabase
+  // Check if vehicle already exists by listing_url OR VIN
+  let existing = null;
+
+  const { data: byUrl } = await supabase
     .from("vehicles")
     .select("id")
     .eq("listing_url", extracted.url)
     .maybeSingle();
+
+  if (byUrl) {
+    existing = byUrl;
+  } else if (extracted.vin) {
+    const { data: byVin } = await supabase
+      .from("vehicles")
+      .select("id")
+      .eq("vin", extracted.vin.toUpperCase())
+      .maybeSingle();
+    if (byVin) {
+      existing = byVin;
+    }
+  }
 
   const vehicleData = {
     year: extracted.year,
@@ -524,23 +539,31 @@ async function saveImages(
     vehicle_id: vehicleId,
     image_url: url,
     position: i,
-    source: "gaa_import",
+    source: "external_import",  // Must be in vehicle_images_attribution_check list
     is_external: true,
+    image_type: "general",
+    category: "general",
   }));
 
-  const { error } = await supabase
-    .from("vehicle_images")
-    .upsert(imageRecords, {
-      onConflict: "vehicle_id,image_url",
-      ignoreDuplicates: true,
-    });
+  // Insert images one at a time to handle conflicts
+  let saved = 0;
+  for (const record of imageRecords) {
+    const { error } = await supabase
+      .from("vehicle_images")
+      .insert(record)
+      .single();
 
-  if (error) {
-    console.error("[GAA] Image save error:", error);
-    return 0;
+    if (error) {
+      // Likely duplicate, skip silently
+      if (!error.message?.includes("duplicate")) {
+        console.error("[GAA] Image save error:", error);
+      }
+    } else {
+      saved++;
+    }
   }
 
-  return imageRecords.length;
+  return saved;
 }
 
 /**
@@ -556,12 +579,27 @@ async function upsertVehiclesFromGrid(
   let failed = 0;
 
   for (const item of items) {
-    // Check if vehicle already exists by listing_url
-    const { data: existing } = await supabase
+    // Check if vehicle already exists by listing_url OR VIN
+    let existing = null;
+
+    const { data: byUrl } = await supabase
       .from("vehicles")
       .select("id")
       .eq("listing_url", item.url)
       .maybeSingle();
+
+    if (byUrl) {
+      existing = byUrl;
+    } else if (item.vin) {
+      const { data: byVin } = await supabase
+        .from("vehicles")
+        .select("id")
+        .eq("vin", item.vin.toUpperCase())
+        .maybeSingle();
+      if (byVin) {
+        existing = byVin;
+      }
+    }
 
     const vehicleData = {
       year: item.year,

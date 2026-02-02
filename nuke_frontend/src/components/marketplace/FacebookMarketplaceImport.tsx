@@ -122,14 +122,14 @@ export default function FacebookMarketplaceImport() {
         Import from Facebook Marketplace
       </h2>
 
-      <p className="text-gray-400 text-sm mb-4">
+      <p className="text-gray-400 dark:text-gray-500 text-sm mb-4">
         Track private party listings and capture actual sale prices.
       </p>
 
       {/* URL Input */}
       <div className="space-y-4">
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
+          <label className="block text-sm text-gray-400 dark:text-gray-500 mb-1">
             Facebook Marketplace URL
           </label>
           <input
@@ -151,7 +151,7 @@ export default function FacebookMarketplaceImport() {
           />
           <div>
             <span className="text-white">This is my listing</span>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-400 dark:text-gray-500">
               You'll earn more points and can report the final sale price
             </p>
           </div>
@@ -195,31 +195,31 @@ export default function FacebookMarketplaceImport() {
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   {result.extracted.year && (
                     <div>
-                      <span className="text-gray-400">Year:</span>{" "}
+                      <span className="text-gray-400 dark:text-gray-500">Year:</span>{" "}
                       <span className="text-white">{result.extracted.year}</span>
                     </div>
                   )}
                   {result.extracted.make && (
                     <div>
-                      <span className="text-gray-400">Make:</span>{" "}
+                      <span className="text-gray-400 dark:text-gray-500">Make:</span>{" "}
                       <span className="text-white">{result.extracted.make}</span>
                     </div>
                   )}
                   {result.extracted.model && (
                     <div>
-                      <span className="text-gray-400">Model:</span>{" "}
+                      <span className="text-gray-400 dark:text-gray-500">Model:</span>{" "}
                       <span className="text-white">{result.extracted.model}</span>
                     </div>
                   )}
                   {result.extracted.price && (
                     <div>
-                      <span className="text-gray-400">Price:</span>{" "}
+                      <span className="text-gray-400 dark:text-gray-500">Price:</span>{" "}
                       <span className="text-white">${result.extracted.price.toLocaleString()}</span>
                     </div>
                   )}
                   {result.extracted.location && (
                     <div className="col-span-2">
-                      <span className="text-gray-400">Location:</span>{" "}
+                      <span className="text-gray-400 dark:text-gray-500">Location:</span>{" "}
                       <span className="text-white">{result.extracted.location}</span>
                     </div>
                   )}
@@ -245,7 +245,7 @@ export default function FacebookMarketplaceImport() {
                   <h3 className="font-medium text-white">Report Sale</h3>
 
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">
+                    <label className="block text-sm text-gray-400 dark:text-gray-500 mb-1">
                       Final Sale Price
                     </label>
                     <input
@@ -258,7 +258,7 @@ export default function FacebookMarketplaceImport() {
                   </div>
 
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">
+                    <label className="block text-sm text-gray-400 dark:text-gray-500 mb-1">
                       Sale Date
                     </label>
                     <input
@@ -270,7 +270,7 @@ export default function FacebookMarketplaceImport() {
                   </div>
 
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">
+                    <label className="block text-sm text-gray-400 dark:text-gray-500 mb-1">
                       Sold To
                     </label>
                     <select
@@ -300,7 +300,7 @@ export default function FacebookMarketplaceImport() {
                     </button>
                   </div>
 
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
                     This data helps build accurate market pricing. Thank you!
                   </p>
                 </div>
@@ -322,7 +322,7 @@ export default function FacebookMarketplaceImport() {
         <h3 className="text-sm font-medium text-gray-300 mb-2">
           Why import from Facebook Marketplace?
         </h3>
-        <ul className="text-xs text-gray-400 space-y-1">
+        <ul className="text-xs text-gray-400 dark:text-gray-500 space-y-1">
           <li>• Track your listing's price history</li>
           <li>• Get notified of similar vehicles</li>
           <li>• Build your vehicle's verified history</li>
