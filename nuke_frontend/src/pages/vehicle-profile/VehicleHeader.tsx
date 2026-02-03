@@ -121,6 +121,23 @@ const formatAuctionHouseLabel = (platform?: string | null, host?: string | null,
   return toTitleCase(normalized.replace(/[_-]+/g, ' '));
 };
 
+// Classified platforms are not auctions - they have sellers, not consigners
+const isClassifiedPlatform = (platform?: string | null) => {
+  const normalized = String(platform || '').trim().toLowerCase().replace(/[_\s-]+/g, '');
+  const classifiedPlatforms = [
+    'facebookmarketplace', 'facebook',
+    'craigslist',
+    'autotrader',
+    'carscom', 'cars',
+    'carfax',
+    'carsdirect',
+    'truecar',
+    'ksl',
+    'offerup',
+  ];
+  return classifiedPlatforms.some(p => normalized.includes(p));
+};
+
 const normalizeBusinessType = (value?: string | null) => {
   const normalized = String(value || '').trim().toLowerCase();
   return normalized || null;
@@ -2679,19 +2696,121 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </span>
                 </div>
               )}
-              {headerAuctionHouse?.label && (
-                <div className="badge-priority-3">
-                  {headerAuctionHouse.url ? (
-                    <a
-                      href={headerAuctionHouse.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ textDecoration: 'none', color: 'inherit' }}
-                      title={`Auction house: ${headerAuctionHouse.label}`}
-                    >
+              {headerAuctionHouse?.label && (() => {
+                const platformSource = String(
+                  (auctionPulse as any)?.platform ||
+                  (vehicle as any)?.profile_origin ||
+                  (vehicle as any)?.discovery_source ||
+                  ''
+                ).trim();
+                const isClassified = isClassifiedPlatform(platformSource);
+                const classifiedSellerName = String(
+                  (vehicle as any)?.origin_metadata?.seller_name ||
+                  (vehicle as any)?.origin_metadata?.seller ||
+                  ''
+                ).trim() || null;
+
+                if (isClassified) {
+                  // For classifieds: show favicon badge + seller name (if available)
+                  const platformUrl = headerAuctionHouse.url || (vehicle as any)?.discovery_url || 'https://facebook.com';
+                  return (
+                    <>
+                      {/* Platform favicon badge */}
+                      <div className="badge-priority-3">
+                        <a
+                          href={headerAuctionHouse.url || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!headerAuctionHouse.url) e.preventDefault();
+                          }}
+                          title={headerAuctionHouse.label}
+                          style={{ textDecoration: 'none', color: 'inherit' }}
+                        >
+                          <span
+                            className="badge"
+                            style={{
+                              fontSize: '8px',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              color: baseTextColor,
+                              lineHeight: 1,
+                            }}
+                          >
+                            <FaviconIcon url={platformUrl} size={12} style={{ margin: 0 }} />
+                          </span>
+                        </a>
+                      </div>
+                      {/* Seller name badge (if available) */}
+                      {classifiedSellerName && (
+                        <div className="badge-priority-3">
+                          <span
+                            className="badge"
+                            title={`Seller: ${classifiedSellerName}`}
+                            style={{
+                              fontSize: '8px',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              color: baseTextColor,
+                              lineHeight: 1,
+                            }}
+                          >
+                            {classifiedSellerName}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                }
+
+                // For auctions: show "Auction: X" format
+                return (
+                  <div className="badge-priority-3">
+                    {headerAuctionHouse.url ? (
+                      <a
+                        href={headerAuctionHouse.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                        title={`Auction house: ${headerAuctionHouse.label}`}
+                      >
+                        <span
+                          className="badge"
+                          style={{
+                            fontSize: '8px',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            background: 'var(--surface)',
+                            border: '1px solid var(--border)',
+                            color: baseTextColor,
+                            lineHeight: 1,
+                          }}
+                        >
+                          Auction: {headerAuctionHouse.label}
+                        </span>
+                      </a>
+                    ) : (
                       <span
                         className="badge"
+                        title={`Auction house: ${headerAuctionHouse.label}`}
                         style={{
                           fontSize: '8px',
                           fontWeight: 700,
@@ -2708,30 +2827,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       >
                         Auction: {headerAuctionHouse.label}
                       </span>
-                    </a>
-                  ) : (
-                    <span
-                      className="badge"
-                      title={`Auction house: ${headerAuctionHouse.label}`}
-                      style={{
-                        fontSize: '8px',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        background: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        color: baseTextColor,
-                        lineHeight: 1,
-                      }}
-                    >
-                      Auction: {headerAuctionHouse.label}
-                    </span>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                );
+              })()}
               {headerBuyer && (
                 <div className="badge-priority-3">
                   {headerBuyer.href ? (
