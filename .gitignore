@@ -120,3 +120,11 @@ venv/
 # Reports and generated data
 reports/
 *.csv
+
+# Agent state and logs
+.extraction-agent/
+agent/
+extraction-agent
+
+# Playwright reports (generated)
+playwright-report/

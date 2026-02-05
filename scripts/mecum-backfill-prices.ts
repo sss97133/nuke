@@ -25,14 +25,14 @@ async function getVehiclesWithoutPrices(limit: number, auctionSlug?: string) {
   return res.json();
 }
 
-async function extractPriceFromPage(browser: Browser, url: string): Promise<{
+async function extractPriceFromPage(context: any, url: string): Promise<{
   sold: number | null;
   highBid: number | null;
   status: 'sold' | 'no_sale' | 'pending';
   lot: string | null;
   auction: string | null;
 }> {
-  const page = await browser.newPage();
+  const page = await context.newPage();
 
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
@@ -129,7 +129,17 @@ async function main() {
     return;
   }
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--disable-blink-features=AutomationControlled'],
+  });
+
+  // Create a context with realistic settings
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 800 },
+    locale: 'en-US',
+  });
 
   let processed = 0;
   let updated = 0;
@@ -141,7 +151,7 @@ async function main() {
     process.stdout.write(`[${processed}/${vehicles.length}] ${v.year} ${v.make} ${v.model?.slice(0, 15).padEnd(15)} `);
 
     try {
-      const data = await extractPriceFromPage(browser, v.discovery_url);
+      const data = await extractPriceFromPage(context, v.discovery_url);
 
       if (data.sold || data.highBid) {
         const success = await updateVehicle(v.id, data);
@@ -170,6 +180,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 500));
   }
 
+  await context.close();
   await browser.close();
 
   console.log('\n═══════════════════════════════════════════════');

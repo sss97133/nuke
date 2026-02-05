@@ -13,7 +13,7 @@ interface VehicleData {
 
 interface VehicleImage {
   id: string;
-  url: string;
+  image_url: string;
   is_primary?: boolean;
 }
 
@@ -68,7 +68,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
           .single(),
         supabase
           .from('vehicle_images')
-          .select('id, url, is_primary')
+          .select('id, image_url, is_primary')
           .eq('vehicle_id', vehicleId)
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: true })
@@ -352,7 +352,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 <button
                   key={img.id}
                   type="button"
-                  onClick={() => openLightbox(img.url, idx)}
+                  onClick={() => openLightbox(img.image_url, idx)}
                   style={{
                     flexShrink: 0,
                     width: '80px',
@@ -366,7 +366,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                   }}
                 >
                   <img
-                    src={img.url}
+                    src={img.image_url}
                     alt={`Vehicle ${idx + 1}`}
                     style={{
                       width: '100%',
