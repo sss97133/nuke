@@ -1,0 +1,46 @@
+# YONO Classifier Training Config
+
+# Task: what to classify
+# Options: make_model, make, year, angle, category
+task: make
+
+# Data
+data:
+  train_dir: /Users/skylar/nuke/training-data/images
+  cache_dir: /Users/skylar/nuke/yono/.image_cache
+  batch_size: 32
+  num_workers: 4
+  train_split: 0.9
+
+# Model
+model:
+  # Options: resnet50, efficientnet_b0, convnext_tiny, vit_base_patch16_224
+  architecture: efficientnet_b0
+  pretrained: true
+  dropout: 0.2
+
+# Training
+training:
+  epochs: 50
+  learning_rate: 0.001
+  weight_decay: 0.01
+  warmup_epochs: 5
+  scheduler: cosine  # cosine, step, plateau
+
+# Hardware
+hardware:
+  device: auto  # auto, cuda, mps, cpu
+  mixed_precision: true
+
+# Logging
+logging:
+  project: yono-classifier
+  log_every: 100
+  save_every: 5
+  output_dir: /Users/skylar/nuke/yono/outputs
+
+# Checkpointing
+checkpoint:
+  save_best: true
+  save_last: true
+  metric: val_accuracy

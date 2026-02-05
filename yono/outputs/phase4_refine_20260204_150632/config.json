@@ -1,0 +1,7 @@
+{
+  "name": "phase4_refine",
+  "target_images": 75000,
+  "epochs": 25,
+  "batch_size": 48,
+  "lr": 1e-05
+}

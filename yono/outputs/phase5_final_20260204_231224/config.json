@@ -1,0 +1,7 @@
+{
+  "name": "phase5_final",
+  "target_images": 100000,
+  "epochs": 30,
+  "batch_size": 64,
+  "lr": 5e-06
+}

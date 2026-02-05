@@ -1,0 +1,7 @@
+{
+  "name": "phase3_full",
+  "target_images": 50000,
+  "epochs": 20,
+  "batch_size": 48,
+  "lr": 3e-05
+}
