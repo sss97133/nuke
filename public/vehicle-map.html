@@ -8,15 +8,16 @@
   <script src="https://d3js.org/topojson.v3.min.js"></script>
   <style>
     :root {
-      --bg: #1e1e1e;
-      --surface: #252526;
-      --border: #3e3e42;
-      --text: #cccccc;
-      --text-secondary: #858585;
+      --bg: #0d0d0d;
+      --surface: #1a1a1a;
+      --border: #333;
+      --text: #e0e0e0;
+      --text-secondary: #888;
+      --accent: #7fff00;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'SF Mono', Monaco, monospace;
       background: var(--bg);
       color: var(--text);
       height: 100vh;
@@ -28,122 +29,177 @@
       display: flex;
       flex-direction: column;
       padding: 12px;
+      min-height: 0;
     }
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding-bottom: 8px;
-      border-bottom: 2px solid var(--border);
+      border-bottom: 1px solid var(--border);
       margin-bottom: 8px;
     }
-    .title {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .controls {
-      display: flex;
-      gap: 4px;
-    }
+    .title { font-size: 14px; font-weight: 600; }
+    .controls { display: flex; gap: 6px; }
     .btn {
-      border: 2px solid var(--border);
-      background: var(--surface);
-      color: var(--text);
-      padding: 4px 8px;
-      font-size: 9px;
-      font-weight: 600;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      font-size: 10px;
+      font-family: inherit;
       cursor: pointer;
-      border-radius: 4px;
+      transition: all 0.15s;
     }
-    .btn:hover { border-color: var(--text); }
-    .btn.active { background: var(--text); color: var(--surface); }
+    .btn:hover { color: var(--text); border-color: #555; }
+    .btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
     .stats {
       display: flex;
-      gap: 24px;
+      gap: 30px;
       margin-bottom: 8px;
-      font-size: 9px;
+      font-size: 11px;
       color: var(--text-secondary);
     }
-    .stat-value {
-      color: var(--text);
-      font-weight: 700;
-      font-family: 'SF Mono', Monaco, monospace;
-    }
+    .stat-value { color: var(--accent); font-weight: 600; }
     #map-container {
       flex: 1;
       position: relative;
-      border: 2px solid var(--border);
-      border-radius: 4px;
+      border: 1px solid var(--border);
       overflow: hidden;
-      background: var(--surface);
+      background: #0a0a0a;
+      min-height: 0;
     }
-    #map {
-      width: 100%;
-      height: 100%;
+    #map { width: 100%; height: 100%; }
+    .county {
+      stroke: #1a1a1a;
+      stroke-width: 0.25px;
+      transition: opacity 0.1s;
     }
-    .state {
-      stroke: var(--border);
-      stroke-width: 0.5px;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .state:hover {
-      opacity: 0.8;
-      stroke: var(--text);
+    .county:hover {
+      opacity: 0.7;
+      stroke: #fff;
       stroke-width: 1px;
+    }
+    .state-border {
+      fill: none;
+      stroke: #333;
+      stroke-width: 0.5px;
+      pointer-events: none;
     }
     .tooltip {
       position: fixed;
-      background: var(--surface);
-      border: 2px solid var(--border);
-      border-radius: 4px;
-      padding: 8px 12px;
+      background: #000;
+      border: 1px solid var(--border);
+      padding: 10px 14px;
       pointer-events: none;
       opacity: 0;
       z-index: 1000;
-      font-size: 9px;
+      font-size: 10px;
+      min-width: 160px;
     }
     .tooltip.visible { opacity: 1; }
-    .tooltip-title { font-weight: 700; margin-bottom: 4px; }
-    .tooltip-value { font-size: 16px; font-weight: 700; color: #4ecdc4; margin-bottom: 6px; }
-    .tooltip-row { display: flex; justify-content: space-between; gap: 20px; color: var(--text-secondary); }
+    .tooltip-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .tooltip-subtitle { font-size: 9px; color: var(--text-secondary); margin-bottom: 6px; }
+    .tooltip-value { font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+    .tooltip-row { display: flex; justify-content: space-between; gap: 20px; color: var(--text-secondary); margin-bottom: 2px; }
     .tooltip-row .val { color: var(--text); }
     .legend {
       position: absolute;
-      bottom: 20px;
-      right: 20px;
-      background: var(--surface);
+      bottom: 60px;
+      right: 15px;
+      background: rgba(0,0,0,0.85);
       border: 1px solid var(--border);
-      padding: 8px;
-      border-radius: 4px;
-      font-size: 8px;
+      padding: 10px;
+      font-size: 9px;
     }
-    .legend-title { font-weight: 600; margin-bottom: 4px; }
-    .legend-scale {
+    .legend-title { font-weight: 600; margin-bottom: 6px; color: var(--text-secondary); }
+    .legend-scale { display: flex; height: 8px; width: 140px; margin-bottom: 4px; }
+    .legend-labels { display: flex; justify-content: space-between; color: var(--text-secondary); }
+    .level-toggle {
+      position: absolute;
+      top: 15px;
+      left: 15px;
       display: flex;
-      height: 10px;
-      width: 120px;
-      margin-bottom: 4px;
+      gap: 4px;
     }
-    .legend-labels {
-      display: flex;
-      justify-content: space-between;
+    .level-btn {
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.7);
       color: var(--text-secondary);
+      padding: 4px 10px;
+      font-size: 9px;
+      font-family: inherit;
+      cursor: pointer;
     }
+    .level-btn:hover { color: var(--text); }
+    .level-btn.active { background: var(--text); color: var(--bg); }
     .loading {
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       color: var(--text-secondary);
     }
+    /* Timeline */
+    .timeline {
+      position: absolute;
+      bottom: 15px;
+      left: 15px;
+      right: 15px;
+      background: rgba(0,0,0,0.85);
+      border: 1px solid var(--border);
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .timeline-label {
+      font-size: 9px;
+      color: var(--text-secondary);
+      min-width: 80px;
+    }
+    .timeline-date {
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+      min-width: 100px;
+    }
+    .timeline-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      background: var(--border);
+      height: 4px;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .timeline-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .timeline-controls {
+      display: flex;
+      gap: 4px;
+    }
+    .timeline-btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 2px 8px;
+      font-size: 10px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .timeline-btn:hover { color: var(--text); }
+    .timeline-btn.playing { color: var(--accent); border-color: var(--accent); }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <div class="title">Vehicle Distribution Map</div>
+      <div class="title">Vehicle Distribution by County</div>
       <div class="controls">
         <button class="btn active" data-metric="value">Value</button>
         <button class="btn" data-metric="count">Volume</button>
@@ -151,33 +207,50 @@
       </div>
     </div>
     <div class="stats">
-      <div>States: <span class="stat-value" id="state-count">—</span></div>
-      <div>Total: <span class="stat-value" id="total-value">—</span></div>
+      <div>Counties: <span class="stat-value" id="county-count">—</span></div>
       <div>Vehicles: <span class="stat-value" id="total-count">—</span></div>
+      <div>Total: <span class="stat-value" id="total-value">—</span></div>
     </div>
     <div id="map-container">
       <svg id="map"></svg>
-      <div class="legend" id="legend">
-        <div class="legend-title">Value</div>
+      <div class="level-toggle">
+        <button class="level-btn" data-level="state">States</button>
+        <button class="level-btn active" data-level="county">Counties</button>
+      </div>
+      <div class="legend">
+        <div class="legend-title" id="legend-title">Total Value</div>
         <div class="legend-scale" id="legend-scale"></div>
         <div class="legend-labels">
           <span id="legend-min">$0</span>
           <span id="legend-max">$0</span>
         </div>
       </div>
-      <div class="loading" id="loading">Loading...</div>
+      <div class="timeline">
+        <span class="timeline-label">Timeline:</span>
+        <span class="timeline-date" id="timeline-date">All Time</span>
+        <input type="range" class="timeline-slider" id="timeline-slider" min="0" max="100" value="100">
+        <div class="timeline-controls">
+          <button class="timeline-btn" id="play-btn">▶</button>
+          <button class="timeline-btn" id="reset-btn">⟲</button>
+        </div>
+      </div>
+      <div class="loading" id="loading">Loading map data...</div>
     </div>
   </div>
   <div class="tooltip" id="tooltip">
     <div class="tooltip-title"></div>
+    <div class="tooltip-subtitle"></div>
     <div class="tooltip-value"></div>
     <div class="tooltip-stats"></div>
   </div>
 
   <script>
-    const API = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/map-vehicles';
-    const US_TOPO = 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json';
+    // RPC endpoint
+    const API_BASE = 'https://qkgaybvrernstplzjaam.supabase.co/rest/v1/rpc/get_vehicle_map_data';
+    const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjg3MzI4NTMsImV4cCI6MjA0NDMwODg1M30.bLde5PSt05Yqj7N_J2p7q88xeWG8j6AULI8cOcRLsXM';
+    const COUNTIES_TOPO = 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json';
 
+    let countyNames = {};
     const stateNames = {
       'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
       'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
@@ -191,8 +264,6 @@
       'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
       'DC': 'District of Columbia'
     };
-
-    // FIPS to state code
     const fipsToState = {
       '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT',
       '10': 'DE', '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL',
@@ -204,35 +275,90 @@
       '55': 'WI', '56': 'WY'
     };
 
-    let data = null, metric = 'value', usGeo = null;
+    let data = null, metric = 'value', level = 'county', usGeo = null;
+    let countyData = {}, stateData = {};
+    let isPlaying = false, playInterval = null;
 
-    const fmtMoney = n => n >= 1e9 ? '$'+(n/1e9).toFixed(2)+'B' : n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'K' : '$'+n;
+    const fmtMoney = n => n >= 1e9 ? '$'+(n/1e9).toFixed(2)+'B' : n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'K' : '$'+n.toLocaleString();
     const fmtNum = n => n.toLocaleString();
-
-    // Color scale - teal to blue gradient
-    const colorScale = d3.scaleSequential(d3.interpolateBlues);
+    const colorScale = d3.scaleSequential(d3.interpolateYlOrRd);
 
     async function loadData() {
-      const [dataRes, geoRes] = await Promise.all([
-        fetch(API).then(r => r.json()),
-        fetch(US_TOPO).then(r => r.json())
-      ]);
-      data = dataRes;
-      usGeo = geoRes;
-      document.getElementById('loading').style.display = 'none';
-      updateStats();
-      render();
+      const loadingEl = document.getElementById('loading');
+      try {
+        loadingEl.textContent = 'Loading map data...';
+        console.log('Fetching data...');
+
+        const headers = {
+          'apikey': API_KEY,
+          'Content-Type': 'application/json'
+        };
+
+        const [countyRes, stateRes, geoRes] = await Promise.all([
+          fetch(API_BASE, { method: 'POST', headers, body: JSON.stringify({ p_level: 'county' }) }).then(r => {
+            console.log('County response status:', r.status);
+            return r.json();
+          }),
+          fetch(API_BASE, { method: 'POST', headers, body: JSON.stringify({ p_level: 'state' }) }).then(r => {
+            console.log('State response status:', r.status);
+            return r.json();
+          }),
+          fetch(COUNTIES_TOPO).then(r => r.json())
+        ]);
+
+        console.log('County data:', countyRes);
+        console.log('State data:', stateRes);
+
+        if (countyRes.error || countyRes.code) {
+          throw new Error(countyRes.message || countyRes.error || 'API error');
+        }
+
+        // Index county data by FIPS
+        countyData = {};
+        (countyRes.counties || []).forEach(c => {
+          countyData[c.fips] = c;
+        });
+        console.log('Indexed counties:', Object.keys(countyData).length);
+
+        // Index state data by code
+        stateData = {};
+        (stateRes.states || []).forEach(s => {
+          stateData[s.code] = s;
+        });
+        console.log('Indexed states:', Object.keys(stateData).length);
+
+        // Extract county names from TopoJSON
+        const counties = topojson.feature(geoRes, geoRes.objects.counties).features;
+        counties.forEach(c => {
+          countyNames[c.id] = c.properties.name;
+        });
+
+        data = { county: countyRes, state: stateRes };
+        usGeo = geoRes;
+
+        loadingEl.style.display = 'none';
+        updateStats();
+        render();
+      } catch (err) {
+        console.error('Load error:', err);
+        loadingEl.textContent = 'Error: ' + err.message;
+      }
     }
 
     function updateStats() {
-      if (!data?.stats) return;
-      document.getElementById('state-count').textContent = data.states?.length || 0;
-      document.getElementById('total-value').textContent = fmtMoney(data.stats.totalValue);
-      document.getElementById('total-count').textContent = fmtNum(data.stats.totalCount);
+      if (!data) return;
+      const d = level === 'county' ? data.county : data.state;
+      document.getElementById('county-count').textContent = level === 'county' ? (d.stats?.countyCount || 0) : (d.states?.length || 0);
+      document.getElementById('total-count').textContent = fmtNum(d.stats?.totalCount || 0);
+      document.getElementById('total-value').textContent = fmtMoney(d.stats?.totalValue || 0);
+    }
+
+    function getCountyData(fips) {
+      return countyData[fips] || { count: 0, value: 0, avg: 0 };
     }
 
     function getStateData(code) {
-      return data?.states?.find(s => s.code === code) || { count: 0, value: 0, avg: 0 };
+      return stateData[code] || { count: 0, value: 0, avg: 0 };
     }
 
     function render() {
@@ -241,7 +367,7 @@
       const container = document.getElementById('map-container');
       const rect = container.getBoundingClientRect();
       const width = rect.width;
-      const height = rect.height;
+      const height = rect.height - 50; // Account for timeline
 
       const svg = d3.select('#map')
         .attr('viewBox', `0 0 ${width} ${height}`)
@@ -249,93 +375,200 @@
 
       svg.selectAll('*').remove();
 
-      // Create projection
       const projection = d3.geoAlbersUsa()
-        .fitSize([width - 40, height - 40], topojson.feature(usGeo, usGeo.objects.states));
+        .fitSize([width - 20, height - 20], topojson.feature(usGeo, usGeo.objects.nation));
 
       const path = d3.geoPath().projection(projection);
 
       // Calculate color scale domain
-      const values = data.states.map(s => {
-        if (metric === 'count') return s.count;
-        if (metric === 'avg') return s.avg;
-        return s.value;
-      });
-      const maxVal = d3.max(values) || 1;
+      let values, maxVal;
+      if (level === 'county') {
+        values = Object.values(countyData).map(c => {
+          if (metric === 'count') return c.count;
+          if (metric === 'avg') return c.avg;
+          return c.value;
+        });
+      } else {
+        values = Object.values(stateData).map(s => {
+          if (metric === 'count') return s.count;
+          if (metric === 'avg') return s.avg;
+          return s.value;
+        });
+      }
+      maxVal = d3.max(values) || 1;
       colorScale.domain([0, maxVal]);
-
-      // Update legend
       updateLegend(maxVal);
 
-      // Draw states
-      const states = topojson.feature(usGeo, usGeo.objects.states).features;
+      if (level === 'county') {
+        const counties = topojson.feature(usGeo, usGeo.objects.counties).features;
+        svg.selectAll('.county')
+          .data(counties)
+          .join('path')
+          .attr('class', 'county')
+          .attr('d', path)
+          .attr('fill', d => {
+            const fips = d.id.toString().padStart(5, '0');
+            const c = getCountyData(fips);
+            let val = metric === 'count' ? c.count : metric === 'avg' ? c.avg : c.value;
+            return val > 0 ? colorScale(val) : '#1a1a1a';
+          })
+          .on('mouseover', showCountyTooltip)
+          .on('mousemove', moveTooltip)
+          .on('mouseout', hideTooltip);
 
-      svg.selectAll('path')
-        .data(states)
-        .join('path')
-        .attr('class', 'state')
-        .attr('d', path)
-        .attr('fill', d => {
-          const fips = d.id.toString().padStart(2, '0');
-          const code = fipsToState[fips];
-          const st = getStateData(code);
-          let val = metric === 'count' ? st.count : metric === 'avg' ? st.avg : st.value;
-          return val > 0 ? colorScale(val) : '#2a2a2a';
-        })
-        .on('mouseover', showTooltip)
-        .on('mousemove', moveTooltip)
-        .on('mouseout', hideTooltip);
+        svg.append('path')
+          .datum(topojson.mesh(usGeo, usGeo.objects.states, (a, b) => a !== b))
+          .attr('class', 'state-border')
+          .attr('d', path);
+      } else {
+        const states = topojson.feature(usGeo, usGeo.objects.states).features;
+        svg.selectAll('.county')
+          .data(states)
+          .join('path')
+          .attr('class', 'county')
+          .attr('d', path)
+          .attr('fill', d => {
+            const fips = d.id.toString().padStart(2, '0');
+            const code = fipsToState[fips];
+            const s = getStateData(code);
+            let val = metric === 'count' ? s.count : metric === 'avg' ? s.avg : s.value;
+            return val > 0 ? colorScale(val) : '#1a1a1a';
+          })
+          .on('mouseover', showStateTooltip)
+          .on('mousemove', moveTooltip)
+          .on('mouseout', hideTooltip);
+      }
     }
 
     function updateLegend(max) {
       const scale = document.getElementById('legend-scale');
       scale.innerHTML = '';
-      const steps = 10;
-      for (let i = 0; i < steps; i++) {
+      for (let i = 0; i < 12; i++) {
         const div = document.createElement('div');
         div.style.flex = '1';
-        div.style.background = colorScale(max * i / steps);
+        div.style.background = colorScale(max * i / 12);
         scale.appendChild(div);
       }
-
-      document.querySelector('.legend-title').textContent =
-        metric === 'count' ? 'Vehicles' : metric === 'avg' ? 'Avg Price' : 'Total Value';
+      const titles = { value: 'Total Value', count: 'Vehicles', avg: 'Avg Price' };
+      document.getElementById('legend-title').textContent = titles[metric];
       document.getElementById('legend-min').textContent = metric === 'count' ? '0' : '$0';
       document.getElementById('legend-max').textContent = metric === 'count' ? fmtNum(max) : fmtMoney(max);
     }
 
-    function showTooltip(e, d) {
+    function showCountyTooltip(e, d) {
+      const fips = d.id.toString().padStart(5, '0');
+      const stateFips = fips.slice(0, 2);
+      const stateCode = fipsToState[stateFips];
+      const c = getCountyData(fips);
+      const countyName = countyNames[d.id] || 'Unknown County';
+
+      let val;
+      if (metric === 'count') val = fmtNum(c.count) + ' vehicles';
+      else if (metric === 'avg') val = fmtMoney(c.avg);
+      else val = fmtMoney(c.value);
+
+      const tt = document.getElementById('tooltip');
+      tt.querySelector('.tooltip-title').textContent = countyName;
+      tt.querySelector('.tooltip-subtitle').textContent = stateNames[stateCode] || stateCode;
+      tt.querySelector('.tooltip-value').textContent = c.count > 0 ? val : 'No data';
+      tt.querySelector('.tooltip-stats').innerHTML = c.count > 0 ? `
+        <div class="tooltip-row"><span>Vehicles</span><span class="val">${fmtNum(c.count)}</span></div>
+        <div class="tooltip-row"><span>Total Value</span><span class="val">${fmtMoney(c.value)}</span></div>
+        <div class="tooltip-row"><span>Avg Price</span><span class="val">${fmtMoney(c.avg)}</span></div>
+      ` : '';
+      tt.classList.add('visible');
+    }
+
+    function showStateTooltip(e, d) {
       const fips = d.id.toString().padStart(2, '0');
       const code = fipsToState[fips];
-      const st = getStateData(code);
+      const s = getStateData(code);
       const name = stateNames[code] || code;
 
       let val;
-      if (metric === 'count') val = fmtNum(st.count) + ' vehicles';
-      else if (metric === 'avg') val = fmtMoney(st.avg);
-      else val = fmtMoney(st.value);
+      if (metric === 'count') val = fmtNum(s.count) + ' vehicles';
+      else if (metric === 'avg') val = fmtMoney(s.avg);
+      else val = fmtMoney(s.value);
 
       const tt = document.getElementById('tooltip');
       tt.querySelector('.tooltip-title').textContent = name;
-      tt.querySelector('.tooltip-value').textContent = val;
-      tt.querySelector('.tooltip-stats').innerHTML = `
-        <div class="tooltip-row"><span>Vehicles</span><span class="val">${fmtNum(st.count)}</span></div>
-        <div class="tooltip-row"><span>Total Value</span><span class="val">${fmtMoney(st.value)}</span></div>
-        <div class="tooltip-row"><span>Avg Price</span><span class="val">${fmtMoney(st.avg)}</span></div>
-      `;
+      tt.querySelector('.tooltip-subtitle').textContent = '';
+      tt.querySelector('.tooltip-value').textContent = s.count > 0 ? val : 'No data';
+      tt.querySelector('.tooltip-stats').innerHTML = s.count > 0 ? `
+        <div class="tooltip-row"><span>Vehicles</span><span class="val">${fmtNum(s.count)}</span></div>
+        <div class="tooltip-row"><span>Total Value</span><span class="val">${fmtMoney(s.value)}</span></div>
+        <div class="tooltip-row"><span>Avg Price</span><span class="val">${fmtMoney(s.avg)}</span></div>
+      ` : '';
       tt.classList.add('visible');
     }
 
     function moveTooltip(e) {
       const tt = document.getElementById('tooltip');
       const r = tt.getBoundingClientRect();
-      tt.style.left = Math.min(e.clientX + 10, window.innerWidth - r.width - 10) + 'px';
-      tt.style.top = Math.min(e.clientY + 10, window.innerHeight - r.height - 10) + 'px';
+      tt.style.left = Math.min(e.clientX + 12, window.innerWidth - r.width - 12) + 'px';
+      tt.style.top = Math.min(e.clientY + 12, window.innerHeight - r.height - 12) + 'px';
     }
 
     function hideTooltip() {
       document.getElementById('tooltip').classList.remove('visible');
     }
+
+    // Timeline controls (placeholder - needs backend support for time filtering)
+    const slider = document.getElementById('timeline-slider');
+    const dateLabel = document.getElementById('timeline-date');
+    const playBtn = document.getElementById('play-btn');
+    const resetBtn = document.getElementById('reset-btn');
+
+    slider.addEventListener('input', () => {
+      const val = parseInt(slider.value);
+      if (val === 100) {
+        dateLabel.textContent = 'All Time';
+      } else {
+        // Map 0-99 to date range (placeholder)
+        const months = Math.floor(val * 24 / 100); // 0-24 months back
+        const date = new Date();
+        date.setMonth(date.getMonth() - (24 - months));
+        dateLabel.textContent = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      }
+      // TODO: Fetch filtered data based on date
+    });
+
+    playBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        clearInterval(playInterval);
+        isPlaying = false;
+        playBtn.textContent = '▶';
+        playBtn.classList.remove('playing');
+      } else {
+        isPlaying = true;
+        playBtn.textContent = '⏸';
+        playBtn.classList.add('playing');
+        slider.value = 0;
+        playInterval = setInterval(() => {
+          const val = parseInt(slider.value);
+          if (val >= 100) {
+            clearInterval(playInterval);
+            isPlaying = false;
+            playBtn.textContent = '▶';
+            playBtn.classList.remove('playing');
+          } else {
+            slider.value = val + 2;
+            slider.dispatchEvent(new Event('input'));
+          }
+        }, 200);
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      slider.value = 100;
+      dateLabel.textContent = 'All Time';
+      if (isPlaying) {
+        clearInterval(playInterval);
+        isPlaying = false;
+        playBtn.textContent = '▶';
+        playBtn.classList.remove('playing');
+      }
+    });
 
     // Metric buttons
     document.querySelectorAll('.btn[data-metric]').forEach(btn => {
@@ -343,6 +576,17 @@
         document.querySelectorAll('.btn[data-metric]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         metric = btn.dataset.metric;
+        render();
+      });
+    });
+
+    // Level buttons
+    document.querySelectorAll('.level-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.level-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        level = btn.dataset.level;
+        updateStats();
         render();
       });
     });
