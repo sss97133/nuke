@@ -77,3 +77,21 @@ browser/node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Fra
 .env*.local
 .auth-state.json
 nuke_frontend/src/components/parts/*.tsx
+
+# Browser sessions and auth data
+fb-session/
+*.session
+*.session-journal
+
+# Private keys and credentials
+*.pem
+*.key
+private_key*
+
+# Sensitive env files (keep only templates/examples)
+.env.vercel
+.env.x
+.env.remote-backup
+
+# Bot state
+.bot_state.json
