@@ -40,7 +40,7 @@ BEGIN
       'event_count', 0,
       'image_count', (SELECT COUNT(*)::int FROM vehicle_images vi WHERE vi.vehicle_id = v.id),
       'primary_image_url', (
-        SELECT vi.url FROM vehicle_images vi
+        SELECT vi.image_url FROM vehicle_images vi
         WHERE vi.vehicle_id = v.id
         ORDER BY vi.is_primary DESC NULLS LAST, vi.created_at ASC
         LIMIT 1
@@ -84,7 +84,7 @@ BEGIN
             ),
             'interaction_score', 0,
             'primary_image_url', (
-              SELECT vi.url FROM vehicle_images vi
+              SELECT vi.image_url FROM vehicle_images vi
               WHERE vi.vehicle_id = v.id
               ORDER BY vi.is_primary DESC NULLS LAST, vi.created_at ASC
               LIMIT 1
