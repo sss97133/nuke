@@ -647,6 +647,35 @@ serve(async (req) => {
 
     // WORK SUBMISSION: Has media
     if (numMedia > 0) {
+      // For batch submissions (2+ photos), use the batch processor
+      if (numMedia >= 2) {
+        try {
+          const batchResponse = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/work-intake-batch`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({
+                techLinkId: techLink.id,
+                mediaUrls,
+                messageBody,
+                source: "sms",
+              }),
+            }
+          );
+          const batchResult = await batchResponse.json();
+          if (batchResult.success) {
+            return twimlResponse(batchResult.message);
+          }
+        } catch (e) {
+          console.error("Batch processing failed, falling back:", e);
+        }
+      }
+
+      // Single photo or batch fallback - original flow
       // Create submission record
       const { data: submission } = await supabase
         .from("sms_work_submissions")

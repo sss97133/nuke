@@ -36,6 +36,18 @@ XAI_API_KEY = os.getenv("XAI_API_KEY")
 
 CHANNEL_ID = 3813097515  # Nukegpt channel
 
+# Discussion intent patterns - when user wants to TALK about images, not just save them
+DISCUSSION_PATTERNS = [
+    'what do i need', 'what needs', 'whats wrong', "what's wrong", 'what should i',
+    'how much', 'cost', 'budget', 'price', 'estimate', 'quote',
+    'priority', 'prioritize', 'urgent', 'critical', 'first',
+    'parts list', 'shopping list', 'order', 'buy',
+    'fix', 'repair', 'replace', 'broken', 'worn', 'damaged',
+    'inspect', 'check', 'look at', 'thoughts', 'opinion', 'advice',
+    'plan', 'next steps', 'todo', 'to do', 'work on',
+    '?'  # Any question mark indicates discussion intent
+]
+
 
 class ConversationState:
     """Track conversation context."""
@@ -43,9 +55,11 @@ class ConversationState:
         self.current_vehicle = None
         self.vehicle_title = None
         self.pending_images = []
+        self.discussion_images = []  # Images being discussed (not saved yet)
         self.last_search_results = []
         self.awaiting = None
         self.last_message_id = 0
+        self.conversation_history = []  # For multi-turn discussions
         self.load()
 
     def load(self):
@@ -57,7 +71,9 @@ class ConversationState:
                     self.vehicle_title = data.get("vehicle_title")
                     self.last_message_id = data.get("last_message_id", 0)
                     self.pending_images = data.get("pending_images", [])
+                    self.discussion_images = data.get("discussion_images", [])
                     self.awaiting = data.get("awaiting")
+                    self.conversation_history = data.get("conversation_history", [])
             except:
                 pass
 
@@ -68,8 +84,25 @@ class ConversationState:
                 "vehicle_title": self.vehicle_title,
                 "last_message_id": self.last_message_id,
                 "pending_images": self.pending_images,
-                "awaiting": self.awaiting
+                "discussion_images": self.discussion_images,
+                "awaiting": self.awaiting,
+                "conversation_history": self.conversation_history[-10:]  # Keep last 10 turns
             }, f)
+
+    def add_to_conversation(self, role: str, content: str):
+        """Add a message to conversation history."""
+        self.conversation_history.append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        self.save()
+
+    def clear_discussion(self):
+        """Clear discussion state after it's resolved."""
+        self.discussion_images = []
+        self.conversation_history = []
+        self.save()
 
 
 def extract_exif(filepath: Path) -> Dict[str, Any]:
@@ -180,6 +213,154 @@ def _convert_to_degrees(value):
     return d + (m / 60.0) + (s / 3600.0)
 
 
+def has_discussion_intent(text: str) -> bool:
+    """Check if the message indicates the user wants to discuss/analyze, not just save."""
+    if not text:
+        return False
+    lower = text.lower()
+    return any(pattern in lower for pattern in DISCUSSION_PATTERNS)
+
+
+async def call_vehicle_expert(
+    vehicle_id: str,
+    question: str,
+    image_urls: List[str] = None,
+    conversation_history: List[Dict] = None
+) -> Dict[str, Any]:
+    """Call the vehicle-expert-agent for intelligent discussion."""
+    try:
+        url = f"{SUPABASE_URL}/functions/v1/vehicle-expert-agent"
+
+        payload = {
+            "vehicleId": vehicle_id,
+            "question": question,
+            "conversation_history": conversation_history or []
+        }
+
+        # If we have image URLs, include them in the question context
+        if image_urls:
+            image_context = f"\n\n[User shared {len(image_urls)} images for discussion]"
+            payload["question"] = question + image_context
+
+        data = json.dumps(payload).encode()
+
+        req = urllib.request.Request(url, data=data, method='POST')
+        req.add_header('Authorization', f'Bearer {SUPABASE_KEY}')
+        req.add_header('Content-Type', 'application/json')
+
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read().decode())
+            return result
+
+    except Exception as e:
+        print(f"  Expert agent error: {e}")
+        return {"error": str(e), "response": "I couldn't process that right now. Try again?"}
+
+
+async def analyze_images_for_parts(
+    vehicle_id: str,
+    image_ids: List[str] = None
+) -> Dict[str, Any]:
+    """Call recommend-parts-for-vehicle for direct parts analysis."""
+    try:
+        # Use the archived function (we'll un-archive it or call directly)
+        url = f"{SUPABASE_URL}/functions/v1/recommend-parts-for-vehicle"
+
+        payload = {
+            "vehicle_id": vehicle_id,
+            "image_ids": image_ids
+        }
+
+        data = json.dumps(payload).encode()
+
+        req = urllib.request.Request(url, data=data, method='POST')
+        req.add_header('Authorization', f'Bearer {SUPABASE_KEY}')
+        req.add_header('Content-Type', 'application/json')
+
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode())
+            return result
+
+    except Exception as e:
+        print(f"  Parts analysis error: {e}")
+        return {"error": str(e)}
+
+
+def format_parts_response(result: Dict) -> str:
+    """Format parts recommendations for Telegram."""
+    if result.get("error"):
+        return f"Couldn't analyze: {result['error']}"
+
+    if not result.get("recommendations"):
+        return "No parts issues identified in these images."
+
+    lines = [f"**{result.get('vehicle', 'Vehicle')} - Parts Assessment**\n"]
+
+    # Group by priority
+    by_priority = {}
+    for rec in result.get("recommendations", []):
+        priority = rec.get("priority", "medium")
+        if priority not in by_priority:
+            by_priority[priority] = []
+        by_priority[priority].append(rec)
+
+    priority_emoji = {
+        "critical": "🔴",
+        "high": "🟠",
+        "medium": "🟡",
+        "low": "🟢",
+        "cosmetic": "⚪"
+    }
+
+    for priority in ["critical", "high", "medium", "low", "cosmetic"]:
+        if priority in by_priority:
+            lines.append(f"\n{priority_emoji.get(priority, '•')} **{priority.upper()}**")
+            for rec in by_priority[priority]:
+                cost = f" ~${rec['estimated_cost']}" if rec.get('estimated_cost') else ""
+                lines.append(f"  • {rec['part_name']}{cost}")
+                if rec.get('issue'):
+                    lines.append(f"    _{rec['issue'][:60]}_")
+
+    total = result.get("total_estimated_cost", 0)
+    if total > 0:
+        lines.append(f"\n**Estimated Total:** ${total:,.0f}")
+
+    return "\n".join(lines)
+
+
+def format_expert_response(result: Dict) -> str:
+    """Format vehicle expert response for Telegram."""
+    if result.get("error"):
+        return result.get("response", "Something went wrong.")
+
+    # Get the main response text
+    response = result.get("response", "")
+
+    # If there's structured UI data, extract key info
+    ui = result.get("ui")
+    if ui and isinstance(ui, dict):
+        # Add estimate if present
+        for card in ui.get("cards", []):
+            if card.get("type") == "estimate":
+                totals = card.get("totals", {})
+                if totals.get("total_low") or totals.get("total_high"):
+                    low = totals.get("total_low", 0)
+                    high = totals.get("total_high", 0)
+                    response += f"\n\n💰 **Estimate:** ${low:,.0f} - ${high:,.0f}"
+                    if card.get("confidence"):
+                        response += f" ({card['confidence']} confidence)"
+
+            # Add parts options if present
+            if card.get("type") == "parts_options":
+                items = card.get("items", [])
+                if items:
+                    response += "\n\n**Parts needed:**"
+                    for item in items[:5]:  # Limit to 5
+                        response += f"\n• {item.get('name', 'Part')}"
+
+    return response[:4000]  # Telegram limit
+
+
 class NukeBot:
     def __init__(self):
         self.client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
@@ -247,18 +428,21 @@ class NukeBot:
         text = msg.text or ""
         has_media = bool(msg.media and isinstance(msg.media, (MessageMediaPhoto, MessageMediaDocument)))
 
-        # Handle images
+        # Handle images (with or without text)
         if has_media:
-            await self.handle_image(msg)
+            await self.handle_image(msg, text)
             return
 
-        # Handle text
+        # Handle text-only messages
         lower = text.lower().strip()
         import re
 
+        # Check if this is a discussion/question about previously sent images
+        if has_discussion_intent(text) and (self.state.discussion_images or self.state.pending_images):
+            await self.handle_discussion(text)
+            return
+
         # Flexible image grabbing - detect intent, not exact commands
-        # Matches things like: "grab images", "get the pics", "save those photos",
-        # "upload my images", "get last 5", "grab 10 pics", etc.
         image_words = ('image', 'images', 'photo', 'photos', 'pic', 'pics', 'picture', 'pictures')
         action_words = ('grab', 'get', 'save', 'upload', 'fetch', 'pull', 'catchup', 'catch up')
 
@@ -300,6 +484,11 @@ class NukeBot:
                     await self.reply(f"✓ Working on: **{vehicle['title']}**\n\nImages will auto-save.")
                 return
 
+        # If user has an active discussion, continue it
+        if self.state.conversation_history and self.state.current_vehicle:
+            await self.handle_discussion(text)
+            return
+
         # Try to interpret as vehicle reference
         if text and not text.startswith('/'):
             results = await self.search_vehicles(text)
@@ -322,11 +511,61 @@ class NukeBot:
             else:
                 await self.reply(f"No vehicles found for '{text}'. Try year/make/model.")
 
-    async def handle_image(self, msg):
-        """Handle image upload - auto-saves if vehicle is set."""
+    async def handle_discussion(self, question: str):
+        """Handle a discussion/question about images or vehicle."""
+        if not self.state.current_vehicle:
+            await self.reply("Which vehicle are we discussing? Tell me the year/make/model.")
+            return
+
+        print(f"  💬 Discussion mode: {question[:50]}...")
+        await self.reply("🤔 Analyzing...")
+
+        # Add user message to history
+        self.state.add_to_conversation("user", question)
+
+        lower = question.lower()
+
+        # Check if this is a parts-related question - use the parts analyzer
+        parts_keywords = ['part', 'parts', 'cost', 'budget', 'price', 'buy', 'need', 'replace', 'fix', 'repair', 'estimate', 'quote']
+        is_parts_question = any(kw in lower for kw in parts_keywords)
+
+        if is_parts_question:
+            # Use recommend-parts-for-vehicle (works with Anthropic)
+            print(f"  🔧 Parts question detected - using parts analyzer...")
+            result = await analyze_images_for_parts(
+                vehicle_id=self.state.current_vehicle
+            )
+            response = format_parts_response(result)
+        else:
+            # Use vehicle expert agent for other questions
+            image_urls = [img.get("url") for img in self.state.discussion_images if img.get("url")]
+            result = await call_vehicle_expert(
+                vehicle_id=self.state.current_vehicle,
+                question=question,
+                image_urls=image_urls,
+                conversation_history=[
+                    {"role": h["role"], "content": h["content"]}
+                    for h in self.state.conversation_history[-6:]
+                ]
+            )
+            response = format_expert_response(result)
+
+        # Add assistant response to history
+        self.state.add_to_conversation("assistant", response)
+
+        await self.reply(response)
+
+        # Log the interaction
+        self.log_discussion(question, response, result)
+
+    async def handle_image(self, msg, accompanying_text: str = ""):
+        """Handle image upload - auto-saves if vehicle is set, or starts discussion if question."""
         # Detect if sent as document (file) vs photo
         is_document = isinstance(msg.media, MessageMediaDocument)
         is_photo = isinstance(msg.media, MessageMediaPhoto)
+
+        # Check if user wants to discuss these images (not just save)
+        wants_discussion = has_discussion_intent(accompanying_text)
 
         # Download image
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -384,7 +623,32 @@ class NukeBot:
         else:
             print(f"  EXIF: None (stripped by Telegram)")
 
-        # If vehicle is set, upload immediately (no confirmation needed)
+        # DISCUSSION MODE: User wants to talk about this image, not just save it
+        if wants_discussion:
+            # Queue image for discussion (don't save to vehicle yet)
+            self.state.discussion_images.append({
+                "path": str(filepath),
+                "filename": filename,
+                "timestamp": ts,
+                "exif": exif,
+                "dimensions": dimensions
+            })
+            self.state.save()
+
+            if not self.state.current_vehicle:
+                # Need to know which vehicle we're discussing
+                await self.reply(
+                    f"📷 Got the image for discussion! ({file_size_mb:.1f}MB, {dimensions})\n\n"
+                    f"Which vehicle is this? Tell me year/make/model, then ask your question."
+                )
+                self.state.awaiting = "vehicle_select"
+            else:
+                # Vehicle is set - start the discussion immediately
+                print(f"  💬 Starting discussion about image...")
+                await self.handle_discussion(accompanying_text)
+            return
+
+        # SAVE MODE: If vehicle is set, upload immediately (no confirmation needed)
         if self.state.current_vehicle:
             url = await self.upload_to_supabase(filepath, self.state.current_vehicle, exif)
             if url:
@@ -691,6 +955,67 @@ class NukeBot:
             urllib.request.urlopen(req, timeout=10)
         except Exception as e:
             print(f"  Link error: {e}")
+
+    def log_discussion(self, question: str, response: str, result: Dict):
+        """Log discussion to file and optionally to database."""
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "vehicle_id": self.state.current_vehicle,
+            "vehicle_title": self.state.vehicle_title,
+            "question": question,
+            "response": response[:500],  # Truncate for log
+            "images_discussed": len(self.state.discussion_images),
+            "has_estimate": bool(result.get("ui", {}).get("cards")),
+        }
+
+        # Log to file
+        log_file = AGENT_DIR / "discussion_log.jsonl"
+        try:
+            with open(log_file, "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
+        except Exception as e:
+            print(f"  Log write error: {e}")
+
+        # Also log as observation to database (async, best-effort)
+        try:
+            self._log_observation_to_db(log_entry, result)
+        except Exception as e:
+            print(f"  DB log error: {e}")
+
+    def _log_observation_to_db(self, log_entry: Dict, result: Dict):
+        """Log the discussion as a vehicle observation."""
+        if not self.state.current_vehicle:
+            return
+
+        try:
+            # Create observation record
+            observation = {
+                "vehicle_id": self.state.current_vehicle,
+                "kind": "work_record",
+                "observed_at": log_entry["timestamp"],
+                "structured_data": {
+                    "source": "telegram_discussion",
+                    "question": log_entry["question"],
+                    "ai_response": log_entry["response"],
+                    "images_count": log_entry["images_discussed"],
+                    "ui_data": result.get("ui")
+                },
+                "confidence_score": 0.7
+            }
+
+            url = f"{SUPABASE_URL}/rest/v1/vehicle_observations"
+            data = json.dumps(observation).encode()
+
+            req = urllib.request.Request(url, data=data, method='POST')
+            req.add_header('Authorization', f'Bearer {SUPABASE_KEY}')
+            req.add_header('Content-Type', 'application/json')
+            req.add_header('apikey', SUPABASE_KEY)
+            req.add_header('Prefer', 'return=minimal')
+
+            urllib.request.urlopen(req, timeout=10)
+            print(f"  📝 Logged observation to DB")
+        except Exception as e:
+            print(f"  Observation log error: {e}")
 
 
 async def main():

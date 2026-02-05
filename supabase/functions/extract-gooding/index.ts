@@ -19,6 +19,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 
 // ============================================================================
 // TYPES
@@ -396,35 +397,17 @@ async function saveToDatabase(
   supabase: any,
   extracted: GoodingExtracted
 ): Promise<{ vehicle_id: string; images_saved: number; is_new: boolean }> {
-  // Check if we already have this lot
   const listingUrlKey = normalizeListingUrlKey(extracted.url);
 
-  const { data: existingListing } = await supabase
-    .from('external_listings')
-    .select('vehicle_id')
-    .eq('platform', 'gooding')
-    .eq('listing_url_key', listingUrlKey)
-    .single();
-
-  // Also find vehicle by discovery_url (exact or pattern – prior import may use different scheme/www)
-  let vehicleId: string | null = existingListing?.vehicle_id ?? null;
-  if (!vehicleId) {
-    const { data: byUrl } = await supabase
-      .from('vehicles')
-      .select('id')
-      .eq('discovery_url', extracted.url)
-      .limit(1)
-      .maybeSingle();
-    vehicleId = byUrl?.id ?? null;
-  }
-  if (!vehicleId && extracted.slug) {
-    const { data: bySlugRows } = await supabase
-      .from('vehicles')
-      .select('id')
-      .ilike('discovery_url', `%goodingco.com/lot/${extracted.slug}%`)
-      .limit(1);
-    vehicleId = bySlugRows?.[0]?.id ?? null;
-  }
+  // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
+  const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+    url: extracted.url,
+    platform: 'gooding',
+    discoveryUrlIlikePattern: extracted.slug
+      ? `%goodingco.com/lot/${extracted.slug}%`
+      : discoveryUrlIlikePattern(extracted.url),
+  });
+  let vehicleId: string | null = resolvedId;
 
   let isNew = false;
 
@@ -438,6 +421,7 @@ async function saveToDatabase(
       vin: extracted.vin || undefined,
       sale_price: extracted.sale_price,
       sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : extracted.status),
+      status: 'active', // so feed shows vehicle (feed filters out status = 'pending')
       updated_at: new Date().toISOString(),
     };
     if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
@@ -476,6 +460,7 @@ async function saveToDatabase(
       vin: extracted.vin,
       sale_price: extracted.sale_price,
       sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : extracted.status),
+      status: 'active', // so feed shows vehicle (feed filters out status = 'pending')
       listing_source: 'gooding_extract',
       profile_origin: 'gooding_import',
       discovery_url: extracted.url,

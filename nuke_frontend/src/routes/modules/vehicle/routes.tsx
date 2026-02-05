@@ -4,7 +4,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Lazy load VehicleProfile to defer module initialization and avoid TDZ
 const VehicleProfile = React.lazy(() => import('../../../pages/VehicleProfile'));
-const Vehicles = React.lazy(() => import('../../../pages/Vehicles'));
+const VehiclesDashboard = React.lazy(() => import('../../../pages/VehiclesDashboard'));
+const VehiclesLegacy = React.lazy(() => import('../../../pages/Vehicles'));
 const AddVehicle = React.lazy(() => import('../../../pages/add-vehicle/AddVehicle'));
 const EditVehicle = React.lazy(() => import('../../../pages/EditVehicle'));
 const VehicleMailbox = React.lazy(() => import('../../../components/VehicleMailbox/VehicleMailbox'));
@@ -15,8 +16,9 @@ const VehicleModuleRoutes = () => {
   return (
     <Suspense fallback={<div style={{ padding: '20px' }}>Loading...</div>}>
       <Routes>
-        <Route path="/" element={<Vehicles />} />
-        <Route path="/list" element={<Vehicles />} />
+        <Route path="/" element={<VehiclesDashboard />} />
+        <Route path="/list" element={<VehiclesDashboard />} />
+        <Route path="/list/legacy" element={<VehiclesLegacy />} />
         <Route path="/add" element={<AddVehicle />} />
         <Route path="/:vehicleId" element={<VehicleProfile />} />
         <Route path="/:vehicleId/edit" element={<EditVehicle />} />

@@ -291,23 +291,24 @@ const PlatformBreakdownChart: React.FC<PlatformBreakdownChartProps> = ({ stats }
   };
 
   return (
-    <div style={{ marginTop: '12px' }}>
-      <div style={{ fontSize: '8px', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>
+    <div style={{ marginTop: 'var(--space-3)' }}>
+      <div style={{ fontSize: 'var(--fs-8)', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text-secondary)' }}>
         AUCTIONS BY PLATFORM
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         {stats.slice(0, 6).map((s) => (
-          <div key={s.platform} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '40px', fontSize: '8px', fontWeight: 600, color: 'var(--text)' }}>
+          <div key={s.platform} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div style={{ width: 40, fontSize: 'var(--fs-8)', fontWeight: 600, color: 'var(--text)' }}>
               {platformLabels[s.platform] || s.platform.substring(0, 4).toUpperCase()}
             </div>
             <div
               style={{
                 flex: 1,
-                height: '12px',
-                background: 'var(--grey-200)',
-                borderRadius: '2px',
+                height: 12,
+                background: 'var(--surface-hover)',
+                borderRadius: 'var(--radius)',
                 overflow: 'hidden',
+                border: '1px solid var(--border)',
               }}
             >
               <div
@@ -315,12 +316,12 @@ const PlatformBreakdownChart: React.FC<PlatformBreakdownChartProps> = ({ stats }
                   width: `${(s.count / maxCount) * 100}%`,
                   height: '100%',
                   background: platformColors[s.platform] || platformColors.default,
-                  borderRadius: '2px',
+                  borderRadius: 'var(--radius)',
                   transition: 'width 0.3s ease',
                 }}
               />
             </div>
-            <div style={{ width: '30px', fontSize: '8px', fontWeight: 700, textAlign: 'right' }}>{s.count}</div>
+            <div style={{ width: 30, fontSize: 'var(--fs-8)', fontWeight: 700, textAlign: 'right', color: 'var(--text)' }}>{s.count}</div>
           </div>
         ))}
       </div>
@@ -373,16 +374,17 @@ const MarketHeatIndicator: React.FC<MarketHeatIndicatorProps> = ({ totalBids, to
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '8px 12px',
+        gap: 'var(--space-2)',
+        padding: 'var(--space-2) var(--space-3)',
         background: heatBg,
-        borderRadius: '6px',
-        marginTop: '12px',
+        border: '2px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        marginTop: 'var(--space-3)',
       }}
     >
       <div
         style={{
-          fontSize: '12px',
+          fontSize: 'var(--fs-12)',
           fontWeight: 900,
           color: heatColor,
           textTransform: 'uppercase',
@@ -390,10 +392,10 @@ const MarketHeatIndicator: React.FC<MarketHeatIndicatorProps> = ({ totalBids, to
       >
         {heat === 'fire' ? 'FIRE' : heat === 'hot' ? 'HOT' : heat === 'warm' ? 'WARM' : heat === 'soft' ? 'SOFT' : 'COLD'}
       </div>
-      <div style={{ fontSize: '9px', color: 'var(--text-muted)', flex: 1 }}>
+      <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', flex: 1 }}>
         {bidsPerAuction.toFixed(1)} bids/auction avg
       </div>
-      <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text)' }}>
+      <div style={{ fontSize: 'var(--fs-10)', fontWeight: 700, color: 'var(--text)' }}>
         ${(avgBid / 1000).toFixed(0)}K avg
       </div>
     </div>
@@ -451,9 +453,9 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
       style={{
         flex: '0 0 auto',
         width: 180,
-        border: '1px solid var(--border)',
+        border: '2px solid var(--border)',
         background: 'var(--surface)',
-        borderRadius: 8,
+        borderRadius: 'var(--radius)',
         overflow: 'hidden',
         cursor: 'pointer',
         transition: 'transform 0.2s, box-shadow 0.2s',
@@ -469,7 +471,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
       }}
     >
       {/* Image with tier badge overlay */}
-      <div style={{ width: '100%', paddingBottom: '66%', background: 'var(--grey-200)', position: 'relative' }}>
+      <div style={{ width: '100%', paddingBottom: '66%', background: 'var(--surface-hover)', position: 'relative' }}>
         <img
           src={img}
           alt=""
@@ -574,22 +576,22 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
         </div>
 
         {/* Engagement stats */}
-        <div style={{ display: 'flex', gap: 8, fontSize: '8px', color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>
           {listing.watcher_count > 0 && <span title="Watchers">{listing.watcher_count} watching</span>}
           {listing.view_count > 0 && <span title="Views">{listing.view_count.toLocaleString()} views</span>}
         </div>
 
-        {/* CTA Button */}
+        {/* CTA Button - design system framing */}
         <button
           style={{
             width: '100%',
-            marginTop: 8,
-            padding: '6px 10px',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 4,
-            fontSize: '9px',
+            marginTop: 'var(--space-2)',
+            padding: 'var(--space-2) var(--space-2)',
+            background: 'var(--surface)',
+            color: 'var(--text)',
+            border: '2px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: 'var(--fs-9)',
             fontWeight: 700,
             cursor: 'pointer',
             textTransform: 'uppercase',
@@ -613,82 +615,147 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
 // MAIN COMPONENT
 // =============================================================================
 
+const PAGE_SIZE = 50;
+
 const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNavigateToVehicle }) => {
   const [listings, setListings] = useState<AuctionListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<'ending_soon' | 'most_bids' | 'highest_bid'>('ending_soon');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  // Fetch active auctions
+  const nowIso = useMemo(() => new Date().toISOString(), []);
+
+  const fetchPage = React.useCallback(async (pageIndex: number, append: boolean) => {
+    const from = pageIndex * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data: extListings, error: extErr } = await supabase
+      .from('external_listings')
+      .select(`
+        id,
+        vehicle_id,
+        platform,
+        listing_url,
+        listing_status,
+        current_bid,
+        bid_count,
+        watcher_count,
+        view_count,
+        end_date,
+        start_date,
+        updated_at
+      `)
+      .eq('listing_status', 'active')
+      .gt('end_date', nowIso)
+      .order('end_date', { ascending: true })
+      .range(from, to);
+
+    if (extErr) throw extErr;
+
+    if (!extListings || extListings.length === 0) {
+      return [];
+    }
+
+    const vehicleIds = [...new Set(extListings.map((l) => l.vehicle_id))];
+    const { data: vehicles } = await supabase
+      .from('vehicles')
+      .select('id, year, make, model, primary_image_url, image_url')
+      .in('id', vehicleIds);
+
+    const vehicleMap = new Map((vehicles || []).map((v) => [v.id, v]));
+
+    return extListings.map((l) => ({
+      ...l,
+      vehicle: vehicleMap.get(l.vehicle_id) || undefined,
+    }));
+  }, [nowIso]);
+
+  // Initial load + refresh: fetch first page, order by ending soonest
   useEffect(() => {
-    const fetchListings = async () => {
+    let cancelled = false;
+
+    const load = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const nowIso = new Date().toISOString();
+        const [merged, countRes] = await Promise.all([
+          fetchPage(0, false),
+          supabase
+            .from('external_listings')
+            .select('id', { count: 'exact', head: true })
+            .eq('listing_status', 'active')
+            .gt('end_date', nowIso),
+        ]);
 
-        // Get external listings with end_date in future
-        const { data: extListings, error: extErr } = await supabase
-          .from('external_listings')
-          .select(`
-            id,
-            vehicle_id,
-            platform,
-            listing_url,
-            listing_status,
-            current_bid,
-            bid_count,
-            watcher_count,
-            view_count,
-            end_date,
-            start_date,
-            updated_at
-          `)
-          .eq('listing_status', 'active')
-          .gt('end_date', nowIso)
-          .order('end_date', { ascending: true })
-          .limit(100);
-
-        if (extErr) throw extErr;
-
-        if (!extListings || extListings.length === 0) {
-          setListings([]);
-          return;
-        }
-
-        // Get vehicle data
-        const vehicleIds = [...new Set(extListings.map((l) => l.vehicle_id))];
-        const { data: vehicles } = await supabase
-          .from('vehicles')
-          .select('id, year, make, model, primary_image_url, image_url')
-          .in('id', vehicleIds);
-
-        const vehicleMap = new Map((vehicles || []).map((v) => [v.id, v]));
-
-        // Merge data
-        const merged = extListings.map((l) => ({
-          ...l,
-          vehicle: vehicleMap.get(l.vehicle_id) || undefined,
-        }));
+        if (cancelled) return;
 
         setListings(merged);
+        setPage(1);
+        setHasMore(merged.length === PAGE_SIZE);
+        setTotalCount(countRes.count ?? null);
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : 'Failed to load auctions';
-        setError(message);
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load auctions');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchListings();
+    load();
 
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchListings, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    const interval = setInterval(() => {
+      fetchPage(0, false).then((merged) => {
+        if (cancelled) return;
+        setListings((prev) => (prev.length <= PAGE_SIZE ? merged : prev));
+      }).catch(() => {});
+    }, 60000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [fetchPage, nowIso]);
+
+  const loadMore = React.useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    try {
+      setLoadingMore(true);
+      const next = await fetchPage(page, true);
+      setListings((prev) => [...prev, ...next]);
+      setPage((p) => p + 1);
+      setHasMore(next.length === PAGE_SIZE);
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [fetchPage, loadingMore, hasMore, page]);
+
+  // Infinite scroll: when sentinel is visible, load more
+  useEffect(() => {
+    if (!hasMore || loadingMore || loading) return;
+
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { root: scrollContainerRef.current, rootMargin: '200px', threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, loadMore]);
 
   // Calculate platform stats
   const platformStats = useMemo((): PlatformStats[] => {
@@ -742,19 +809,19 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
     }
   }, [listings, sortBy]);
 
-  const displayListings = expanded ? sortedListings : sortedListings.slice(0, 10);
+  const displayListings = sortedListings;
 
   return (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.5)',
+        background: 'rgba(0,0,0,0.4)',
         zIndex: 20000,
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '16px',
+        padding: 'var(--space-4)',
         overflowY: 'auto',
       }}
       onClick={onClose}
@@ -762,75 +829,62 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
       <div
         style={{
           width: '100%',
-          maxWidth: expanded ? '1200px' : '900px',
+          maxWidth: '1200px',
           background: 'var(--surface)',
-          borderRadius: 12,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-          marginTop: '40px',
-          marginBottom: '40px',
+          border: '2px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          marginTop: 'var(--space-6)',
+          marginBottom: 'var(--space-6)',
           overflow: 'hidden',
           transition: 'max-width 0.3s ease',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header - matches .card-header framing */}
         <div
           style={{
-            padding: '16px 20px',
-            borderBottom: '1px solid var(--border)',
+            padding: 'var(--space-3) var(--space-4)',
+            borderBottom: '2px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)',
-            color: 'white',
+            background: 'var(--surface)',
+            color: 'var(--text)',
           }}
         >
           <div>
-            <div style={{ fontSize: '16px', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 'var(--fs-12)', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <span style={{ animation: 'pulse 2s infinite' }}>LIVE</span>
               Active Auctions
               <span
                 style={{
-                  fontSize: '12px',
+                  fontSize: 'var(--fs-10)',
                   fontWeight: 700,
-                  background: 'rgba(255,255,255,0.2)',
-                  padding: '2px 8px',
-                  borderRadius: 12,
+                  background: 'var(--surface-hover)',
+                  padding: '2px var(--space-2)',
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
                 }}
               >
-                {listings.length}
+                {totalCount != null ? `${listings.length}${totalCount > listings.length ? ` / ${totalCount}` : ''}` : listings.length}
               </span>
             </div>
-            <div style={{ fontSize: '10px', opacity: 0.8, marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--fs-10)', color: 'var(--text-secondary)', marginTop: 2 }}>
               Real-time auction data from BaT, C&B, PCM, and more
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              onClick={() => setExpanded(!expanded)}
-              style={{
-                padding: '6px 12px',
-                background: 'rgba(255,255,255,0.15)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: 6,
-                color: 'white',
-                fontSize: '10px',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              {expanded ? 'COLLAPSE' : 'EXPAND'}
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <button
               onClick={onClose}
               style={{
                 width: 28,
                 height: 28,
-                background: 'rgba(255,255,255,0.15)',
-                border: 'none',
-                borderRadius: 6,
-                color: 'white',
-                fontSize: '16px',
+                background: 'var(--surface)',
+                border: '2px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                color: 'var(--text)',
+                fontSize: 'var(--fs-12)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -842,20 +896,28 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
           </div>
         </div>
 
-        {/* Content */}
-        <div style={{ padding: '16px 20px' }}>
+        {/* Content - matches .card-body framing */}
+        <div style={{ padding: 'var(--space-4) var(--space-5)' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading auctions...</div>
+            <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-secondary)' }}>Loading auctions...</div>
           ) : error ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>{error}</div>
+            <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--error)' }}>{error}</div>
           ) : listings.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No active auctions found</div>
+            <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-secondary)' }}>No active auctions found</div>
           ) : (
             <>
-              {/* Market Overview */}
-              <div style={{ display: 'flex', gap: 20, marginBottom: 16 }}>
+              {/* Market Overview - framed sections */}
+              <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
                 {/* Platform breakdown */}
-                <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    border: '2px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--surface)',
+                    padding: 'var(--space-3)',
+                  }}
+                >
                   <PlatformBreakdownChart stats={platformStats} />
                 </div>
                 {/* Market heat */}
@@ -870,43 +932,67 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                     style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: 8,
-                      marginTop: 12,
+                      gap: 'var(--space-2)',
+                      marginTop: 'var(--space-3)',
                     }}
                   >
-                    <div style={{ textAlign: 'center', padding: 8, background: 'var(--grey-50)', borderRadius: 6 }}>
-                      <div style={{ fontSize: '16px', fontWeight: 900 }}>{overallStats.totalAuctions}</div>
-                      <div style={{ fontSize: '8px', color: 'var(--text-muted)' }}>AUCTIONS</div>
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: 'var(--space-2)',
+                        background: 'var(--surface)',
+                        border: '2px solid var(--border)',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    >
+                      <div style={{ fontSize: 'var(--fs-12)', fontWeight: 900, color: 'var(--text)' }}>{overallStats.totalAuctions}</div>
+                      <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>AUCTIONS</div>
                     </div>
-                    <div style={{ textAlign: 'center', padding: 8, background: 'var(--grey-50)', borderRadius: 6 }}>
-                      <div style={{ fontSize: '16px', fontWeight: 900 }}>{overallStats.totalBids.toLocaleString()}</div>
-                      <div style={{ fontSize: '8px', color: 'var(--text-muted)' }}>TOTAL BIDS</div>
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: 'var(--space-2)',
+                        background: 'var(--surface)',
+                        border: '2px solid var(--border)',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    >
+                      <div style={{ fontSize: 'var(--fs-12)', fontWeight: 900, color: 'var(--text)' }}>{overallStats.totalBids.toLocaleString()}</div>
+                      <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>TOTAL BIDS</div>
                     </div>
-                    <div style={{ textAlign: 'center', padding: 8, background: 'var(--grey-50)', borderRadius: 6 }}>
-                      <div style={{ fontSize: '16px', fontWeight: 900 }}>
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: 'var(--space-2)',
+                        background: 'var(--surface)',
+                        border: '2px solid var(--border)',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    >
+                      <div style={{ fontSize: 'var(--fs-12)', fontWeight: 900, color: 'var(--text)' }}>
                         ${(overallStats.avgBid / 1000).toFixed(0)}K
                       </div>
-                      <div style={{ fontSize: '8px', color: 'var(--text-muted)' }}>AVG BID</div>
+                      <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>AVG BID</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Sort controls */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)' }}>SORT:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                <span style={{ fontSize: 'var(--fs-9)', fontWeight: 600, color: 'var(--text-secondary)' }}>SORT:</span>
                 {(['ending_soon', 'most_bids', 'highest_bid'] as const).map((option) => (
                   <button
                     key={option}
                     onClick={() => setSortBy(option)}
                     style={{
-                      padding: '4px 10px',
-                      fontSize: '9px',
+                      padding: 'var(--space-1) var(--space-2)',
+                      fontSize: 'var(--fs-9)',
                       fontWeight: 600,
-                      border: sortBy === option ? '1px solid var(--primary)' : '1px solid var(--border)',
-                      background: sortBy === option ? 'var(--primary-bg)' : 'transparent',
-                      color: sortBy === option ? 'var(--primary)' : 'var(--text-muted)',
-                      borderRadius: 4,
+                      border: `2px solid ${sortBy === option ? 'var(--accent)' : 'var(--border)'}`,
+                      background: sortBy === option ? 'var(--accent-dim)' : 'var(--surface)',
+                      color: sortBy === option ? 'var(--accent)' : 'var(--text-secondary)',
+                      borderRadius: 'var(--radius)',
                       cursor: 'pointer',
                     }}
                   >
@@ -915,17 +1001,17 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                 ))}
               </div>
 
-              {/* Auction cards grid */}
+              {/* Auction cards grid - scrollable, ordered by ending soonest; lazy load more on scroll */}
               <div
                 ref={scrollContainerRef}
                 style={{
                   display: 'flex',
-                  flexWrap: expanded ? 'wrap' : 'nowrap',
-                  gap: 12,
-                  overflowX: expanded ? 'visible' : 'auto',
-                  paddingBottom: 8,
-                  maxHeight: expanded ? '600px' : 'auto',
-                  overflowY: expanded ? 'auto' : 'visible',
+                  flexWrap: 'wrap',
+                  gap: 'var(--space-3)',
+                  paddingBottom: 'var(--space-2)',
+                  maxHeight: 'min(65vh, 600px)',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
                 }}
               >
                 {displayListings.map((listing) => (
@@ -940,48 +1026,57 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                     }}
                   />
                 ))}
+                {/* Sentinel for infinite scroll */}
+                <div ref={loadMoreRef} style={{ width: '100%', height: 1, minHeight: 1 }} aria-hidden />
               </div>
 
-              {/* Show more / less */}
-              {sortedListings.length > 10 && (
-                <div style={{ textAlign: 'center', marginTop: 12 }}>
+              {/* Load more button (fallback if IntersectionObserver doesn't fire) */}
+              {hasMore && !loading && !loadingMore && displayListings.length > 0 && (
+                <div style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
                   <button
-                    onClick={() => setExpanded(!expanded)}
+                    type="button"
+                    onClick={loadMore}
+                    disabled={loadingMore}
                     style={{
-                      padding: '8px 24px',
-                      background: 'var(--grey-100)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      fontSize: '10px',
+                      padding: 'var(--space-2) var(--space-6)',
+                      background: 'var(--surface)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: 'var(--fs-10)',
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      cursor: loadingMore ? 'wait' : 'pointer',
                       color: 'var(--text)',
                     }}
                   >
-                    {expanded ? 'SHOW LESS' : `SHOW ALL ${sortedListings.length} AUCTIONS`}
+                    {loadingMore ? 'Loading…' : `Load more (${totalCount != null && totalCount > listings.length ? `${listings.length} of ${totalCount}` : 'more'})`}
                   </button>
+                </div>
+              )}
+              {loadingMore && (
+                <div style={{ textAlign: 'center', padding: 'var(--space-2)', fontSize: 'var(--fs-9)', color: 'var(--text-secondary)' }}>
+                  Loading more…
                 </div>
               )}
             </>
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer - matches design system framing */}
         <div
           style={{
-            padding: '12px 20px',
-            borderTop: '1px solid var(--border)',
-            background: 'var(--grey-50)',
+            padding: 'var(--space-3) var(--space-4)',
+            borderTop: '2px solid var(--border)',
+            background: 'var(--surface-hover)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            fontSize: '9px',
-            color: 'var(--text-muted)',
+            fontSize: 'var(--fs-9)',
+            color: 'var(--text-secondary)',
           }}
         >
           <div>Updated every 60 seconds. Prices and bid counts from source platforms.</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 6, height: 6, background: '#10b981', borderRadius: '50%' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            <span style={{ width: 6, height: 6, background: 'var(--success)', borderRadius: '50%' }} />
             <span>Live</span>
           </div>
         </div>

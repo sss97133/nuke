@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuke Vehicle Value Distribution</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #222;
+    }
+    .title { font-size: 20px; font-weight: 600; }
+    .title span { text-decoration: underline; text-underline-offset: 3px; }
+    .controls { display: flex; gap: 8px; }
+    .btn {
+      background: transparent;
+      border: 1px solid #333;
+      color: #888;
+      padding: 5px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: #1a1a1a; color: #e0e0e0; }
+    .btn.active { background: #1a1a1a; border-color: #444; color: #e0e0e0; }
+    .stats-row {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #666;
+    }
+    .stat-value { color: #7fff00; font-weight: 600; font-size: 14px; }
+    .breadcrumb {
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .breadcrumb a {
+      color: #888;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .breadcrumb a:hover { color: #e0e0e0; }
+    .breadcrumb .sep { color: #444; }
+    .breadcrumb .current { color: #e0e0e0; }
+    .back-btn {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #888;
+      padding: 3px 8px;
+      cursor: pointer;
+      font-size: 11px;
+      margin-right: 10px;
+    }
+    .back-btn:hover { color: #e0e0e0; border-color: #555; }
+    #treemap {
+      width: 100%;
+      height: 550px;
+      border: 1px solid #222;
+      background: #0d0d0d;
+    }
+    .node {
+      stroke: #0a0a0a;
+      stroke-width: 1.5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .node:hover { stroke: #444; stroke-width: 2px; }
+    .node-label {
+      font-size: 11px;
+      fill: #fff;
+      pointer-events: none;
+      font-weight: 500;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+    .node-value {
+      font-size: 10px;
+      fill: #ccc;
+      pointer-events: none;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+    .tooltip {
+      position: fixed;
+      background: #000;
+      border: 1px solid #333;
+      padding: 12px 16px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+      z-index: 1000;
+      min-width: 180px;
+      font-size: 11px;
+    }
+    .tooltip.visible { opacity: 1; }
+    .tooltip-title { font-size: 13px; margin-bottom: 6px; color: #e0e0e0; }
+    .tooltip-value { font-size: 24px; font-weight: 600; color: #7fff00; margin-bottom: 8px; }
+    .tooltip-row { display: flex; justify-content: space-between; margin-bottom: 3px; color: #666; }
+    .tooltip-row .val { color: #e0e0e0; }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #666;
+      font-size: 14px;
+    }
+    #treemap-container { position: relative; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title">Nuke <span>Vehicle Value Distribution</span></div>
+      <div class="controls">
+        <button class="btn active" data-metric="value">Total Value</button>
+        <button class="btn" data-metric="count">Volume</button>
+        <button class="btn" data-metric="avg">Avg Price</button>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div>Total Value: <span class="stat-value" id="total-value">-</span></div>
+      <div>Vehicles: <span class="stat-value" id="total-count">-</span></div>
+      <div>Avg Price: <span class="stat-value" id="avg-price">-</span></div>
+    </div>
+
+    <div class="breadcrumb" id="breadcrumb">
+      <span class="current">All Sources</span>
+    </div>
+
+    <div id="treemap-container">
+      <svg id="treemap"></svg>
+      <div class="loading" id="loading">Loading...</div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-title"></div>
+    <div class="tooltip-value"></div>
+    <div class="tooltip-stats"></div>
+  </div>
+
+  <script>
+    const API_URL = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/treemap-vehicles';
+
+    // Color scale based on value
+    const colorScale = d3.scaleSequential(d3.interpolateViridis).domain([0, 1]);
+
+    // Normalize source names
+    function normalizeSource(name) {
+      const map = {
+        'bat': 'Bring a Trailer',
+        'Bring a Trailer': 'Bring a Trailer',
+        'gooding': 'Gooding & Co',
+        'Gooding': 'Gooding & Co',
+        'RM Sothebys': 'RM Sotheby\'s',
+        'rm-sothebys': 'RM Sotheby\'s',
+        'Cars & Bids': 'Cars & Bids',
+        'cars-and-bids': 'Cars & Bids',
+      };
+      return map[name] || name;
+    }
+
+    // Merge duplicate sources
+    function mergeChildren(children) {
+      const merged = {};
+      children.forEach(child => {
+        const name = normalizeSource(child.name);
+        if (!merged[name]) {
+          merged[name] = { ...child, name };
+        } else {
+          merged[name].value += child.value;
+          merged[name].count += child.count;
+          // Merge nested children if they exist
+          if (child.children && merged[name].children) {
+            merged[name].children = mergeChildren([...merged[name].children, ...child.children]);
+          }
+        }
+      });
+      return Object.values(merged).sort((a, b) => b.value - a.value);
+    }
+
+    function formatMoney(n) {
+      if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+      if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
+      return '$' + n.toFixed(0);
+    }
+
+    function formatNum(n) {
+      return n.toLocaleString();
+    }
+
+    let currentData = null;
+    let currentFilters = {};
+    let currentMetric = 'value';
+    let navigationStack = [];
+
+    async function fetchData(filters = {}) {
+      document.getElementById('loading').style.display = 'block';
+
+      const params = new URLSearchParams();
+      if (filters.source) params.set('source', filters.source);
+      if (filters.make) params.set('make', filters.make);
+      if (filters.model) params.set('model', filters.model);
+
+      try {
+        const res = await fetch(`${API_URL}?${params}`);
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error);
+
+        // Merge duplicate sources
+        if (data.hierarchy?.children) {
+          data.hierarchy.children = mergeChildren(data.hierarchy.children);
+        }
+
+        currentData = data;
+        currentFilters = filters;
+        render();
+      } catch (err) {
+        console.error('Fetch error:', err);
+        document.getElementById('loading').textContent = 'Error loading data';
+      }
+    }
+
+    function updateStats() {
+      if (!currentData?.stats) return;
+
+      const { totalValue, totalCount } = currentData.stats;
+      const avgPrice = totalCount > 0 ? totalValue / totalCount : 0;
+
+      document.getElementById('total-value').textContent = formatMoney(totalValue);
+      document.getElementById('total-count').textContent = formatNum(totalCount);
+      document.getElementById('avg-price').textContent = formatMoney(avgPrice);
+    }
+
+    function updateBreadcrumb() {
+      const bc = document.getElementById('breadcrumb');
+      const parts = [];
+
+      parts.push('<a onclick="navigateTo({})">All Sources</a>');
+
+      if (currentFilters.source) {
+        if (currentFilters.make) {
+          parts.push(`<a onclick="navigateTo({source: '${currentFilters.source}'})">${normalizeSource(currentFilters.source)}</a>`);
+        } else {
+          parts.push(`<span class="current">${normalizeSource(currentFilters.source)}</span>`);
+        }
+      }
+
+      if (currentFilters.make) {
+        if (currentFilters.model) {
+          parts.push(`<a onclick="navigateTo({source: '${currentFilters.source}', make: '${currentFilters.make}'})">${currentFilters.make}</a>`);
+        } else {
+          parts.push(`<span class="current">${currentFilters.make}</span>`);
+        }
+      }
+
+      if (currentFilters.model) {
+        parts.push(`<span class="current">${currentFilters.model}</span>`);
+      }
+
+      // Add back button if not at root
+      let html = '';
+      if (navigationStack.length > 0) {
+        html += '<button class="back-btn" onclick="goBack()">← Back</button>';
+      }
+      html += parts.join('<span class="sep">›</span>');
+      bc.innerHTML = html;
+    }
+
+    function navigateTo(filters) {
+      navigationStack.push({ ...currentFilters });
+      fetchData(filters);
+    }
+
+    function goBack() {
+      if (navigationStack.length > 0) {
+        const prev = navigationStack.pop();
+        fetchData(prev);
+      }
+    }
+
+    function render() {
+      document.getElementById('loading').style.display = 'none';
+      updateStats();
+      updateBreadcrumb();
+
+      if (!currentData?.hierarchy) return;
+
+      const container = document.getElementById('treemap');
+      const width = container.clientWidth || 1200;
+      const height = 550;
+
+      container.innerHTML = '';
+
+      const svg = d3.select('#treemap').attr('width', width).attr('height', height);
+
+      // Prepare data for treemap
+      const root = d3.hierarchy(currentData.hierarchy)
+        .sum(d => {
+          if (currentMetric === 'count') return d.count || 0;
+          if (currentMetric === 'avg') return d.count > 0 ? (d.value || 0) / d.count : 0;
+          return d.value || 0;
+        })
+        .sort((a, b) => b.value - a.value);
+
+      d3.treemap()
+        .size([width, height])
+        .padding(2)
+        .round(true)(root);
+
+      const maxValue = d3.max(root.leaves(), d => d.value) || 1;
+
+      const nodes = svg.selectAll('g')
+        .data(root.leaves())
+        .join('g')
+        .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+      // Rectangles with color based on value
+      nodes.append('rect')
+        .attr('class', 'node')
+        .attr('width', d => Math.max(0, d.x1 - d.x0))
+        .attr('height', d => Math.max(0, d.y1 - d.y0))
+        .attr('fill', d => {
+          const intensity = Math.sqrt(d.value / maxValue); // sqrt for better spread
+          return d3.interpolateViridis(0.2 + intensity * 0.6);
+        })
+        .on('mouseover', showTooltip)
+        .on('mousemove', moveTooltip)
+        .on('mouseout', hideTooltip)
+        .on('click', handleClick);
+
+      // Labels
+      nodes.filter(d => (d.x1 - d.x0) > 50 && (d.y1 - d.y0) > 25)
+        .append('text')
+        .attr('class', 'node-label')
+        .attr('x', 5)
+        .attr('y', 14)
+        .text(d => {
+          const name = normalizeSource(d.data.name);
+          const max = Math.floor((d.x1 - d.x0 - 10) / 6);
+          return name.length > max ? name.slice(0, max) + '…' : name;
+        });
+
+      // Values
+      nodes.filter(d => (d.x1 - d.x0) > 45 && (d.y1 - d.y0) > 40)
+        .append('text')
+        .attr('class', 'node-value')
+        .attr('x', 5)
+        .attr('y', 26)
+        .text(d => {
+          if (currentMetric === 'count') return formatNum(d.data.count);
+          if (currentMetric === 'avg') return formatMoney(d.data.count > 0 ? d.data.value / d.data.count : 0);
+          return formatMoney(d.data.value);
+        });
+    }
+
+    function handleClick(event, d) {
+      const data = d.data;
+      const level = currentData?.stats?.level;
+
+      // Determine next drill-down level
+      if (level === 'sources') {
+        navigateTo({ source: data.name });
+      } else if (level === 'makes') {
+        navigateTo({ ...currentFilters, make: data.name });
+      } else if (level === 'models') {
+        navigateTo({ ...currentFilters, model: data.name });
+      }
+      // At years level, no further drill-down
+    }
+
+    function showTooltip(event, d) {
+      const tt = document.getElementById('tooltip');
+      const total = currentData?.stats?.totalValue || 1;
+      const pct = ((d.data.value / total) * 100).toFixed(1);
+      const avgPrice = d.data.count > 0 ? d.data.value / d.data.count : 0;
+
+      let valueDisplay;
+      if (currentMetric === 'count') valueDisplay = formatNum(d.data.count) + ' vehicles';
+      else if (currentMetric === 'avg') valueDisplay = formatMoney(avgPrice);
+      else valueDisplay = formatMoney(d.data.value);
+
+      tt.querySelector('.tooltip-title').textContent = normalizeSource(d.data.name);
+      tt.querySelector('.tooltip-value').textContent = valueDisplay;
+      tt.querySelector('.tooltip-stats').innerHTML = `
+        <div class="tooltip-row"><span>${pct}%</span><span class="val">of Total</span></div>
+        <div class="tooltip-row"><span>${formatNum(d.data.count)}</span><span class="val">Vehicles</span></div>
+        <div class="tooltip-row"><span>${formatMoney(d.data.value)}</span><span class="val">Total Value</span></div>
+        <div class="tooltip-row"><span>${formatMoney(avgPrice)}</span><span class="val">Avg Price</span></div>
+      `;
+      tt.classList.add('visible');
+    }
+
+    function moveTooltip(event) {
+      const tt = document.getElementById('tooltip');
+      const rect = tt.getBoundingClientRect();
+      tt.style.left = Math.min(event.clientX + 12, window.innerWidth - rect.width - 15) + 'px';
+      tt.style.top = Math.min(event.clientY + 12, window.innerHeight - rect.height - 15) + 'px';
+    }
+
+    function hideTooltip() {
+      document.getElementById('tooltip').classList.remove('visible');
+    }
+
+    // Metric toggle
+    document.querySelectorAll('.btn[data-metric]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn[data-metric]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMetric = btn.dataset.metric;
+        render();
+      });
+    });
+
+    window.addEventListener('resize', render);
+
+    // Initial load
+    fetchData();
+  </script>
+</body>
+</html>

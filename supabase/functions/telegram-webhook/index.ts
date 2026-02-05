@@ -18,6 +18,9 @@ const supabase = createClient(
 // Use Nuke bot for verification (separate from L'Officiel concierge bot)
 const BOT_TOKEN = Deno.env.get("NUKE_TELEGRAM_BOT_TOKEN") || Deno.env.get("TELEGRAM_BOT_TOKEN");
 
+// User mode tracking (work vs verification)
+const userModes: Map<number, "work" | "verify"> = new Map();
+
 interface TelegramUpdate {
   update_id: number;
   message?: {
@@ -682,12 +685,15 @@ serve(async (req) => {
     if (text === "/start") {
       await sendMessage(
         chatId,
-        `👋 *Nuke Document Verification Bot*\n\n` +
-          `Send me:\n` +
-          `📸 Photo of your vehicle *title* - I'll extract the VIN and verify\n` +
-          `🪪 Photo of your *ID* - For identity verification\n\n` +
-          `All processing happens locally on our servers first (free, private), ` +
-          `with AI backup when needed.`
+        `👋 *Nuke Bot*\n\n` +
+          `Two modes:\n\n` +
+          `🔧 */work* - Log work photos\n` +
+          `   Send pics, vehicles claim their photos\n` +
+          `   Grouped by vehicle + shop\n\n` +
+          `📋 */verify* - Document verification\n` +
+          `   Titles, IDs, registrations\n\n` +
+          `First time? Text your phone number to link accounts.\n` +
+          `Example: +17025551234`
       );
       return new Response("OK", { status: 200 });
     }
@@ -701,6 +707,36 @@ serve(async (req) => {
           `/help - This message\n` +
           `/status - Check verification server status\n\n` +
           `Or just send a photo to analyze!`
+      );
+      return new Response("OK", { status: 200 });
+    }
+
+    // Handle /work command - switch to work intake mode
+    if (text === "/work") {
+      userModes.set(userId, "work");
+      await sendMessage(
+        chatId,
+        `🔧 *Work Mode*\n\n` +
+          `Send me photos of your work. I'll:\n` +
+          `• Group them by vehicle\n` +
+          `• Log to the right shop (Nuke, Viva, etc.)\n` +
+          `• Each vehicle will claim its photos\n\n` +
+          `Send 1 or more photos now!`
+      );
+      return new Response("OK", { status: 200 });
+    }
+
+    // Handle /verify command - switch to verification mode
+    if (text === "/verify") {
+      userModes.set(userId, "verify");
+      await sendMessage(
+        chatId,
+        `📋 *Verification Mode*\n\n` +
+          `Send me document photos:\n` +
+          `• Vehicle title\n` +
+          `• Registration\n` +
+          `• Driver's license\n\n` +
+          `I'll extract and verify the data.`
       );
       return new Response("OK", { status: 200 });
     }
@@ -747,8 +783,6 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      await sendMessage(chatId, "📷 Analyzing document...");
-
       // Get the highest resolution photo
       const photo = message.photo[message.photo.length - 1];
       const fileUrl = await getFileUrl(photo.file_id);
@@ -758,9 +792,136 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
+      // Check user mode - work or verification
+      const userMode = userModes.get(userId) || "verify";
+
+      if (userMode === "work") {
+        await sendMessage(chatId, "🔧 Processing work photo...");
+
+        // Look up technician by telegram user ID
+        const { data: techLink } = await supabase
+          .from("technician_phone_links")
+          .select("id, display_name, user_id")
+          .or(`metadata->telegram_id.eq.${userId},phone_number.eq.telegram:${userId}`)
+          .single();
+
+        // If no tech link found, try to find by user_id matching telegram
+        let finalTechLink = techLink;
+        if (!techLink) {
+          // Check if there's a user with this telegram ID linked
+          const { data: techByPhone } = await supabase
+            .from("technician_phone_links")
+            .select("id, display_name, user_id")
+            .not("user_id", "is", null)
+            .limit(10);
+
+          // For now, check if any tech has sent from telegram before
+          const { data: prevSubmission } = await supabase
+            .from("sms_work_submissions")
+            .select("technician_phone_link_id")
+            .eq("from_phone", `telegram:${userId}`)
+            .limit(1)
+            .single();
+
+          if (prevSubmission) {
+            const { data: linkedTech } = await supabase
+              .from("technician_phone_links")
+              .select("id, display_name, user_id")
+              .eq("id", prevSubmission.technician_phone_link_id)
+              .single();
+            finalTechLink = linkedTech;
+          }
+        }
+
+        if (!finalTechLink) {
+          await sendMessage(
+            chatId,
+            `👋 I don't have your account linked yet.\n\n` +
+              `Text your phone number so I can connect your Telegram to your tech profile.\n\n` +
+              `Example: +17025551234`
+          );
+          return new Response("OK", { status: 200 });
+        }
+
+        // Call batch intake
+        try {
+          const batchResponse = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/work-intake-batch`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({
+                techLinkId: finalTechLink.id,
+                mediaUrls: [fileUrl],
+                messageBody: message.caption || "",
+                source: "telegram",
+              }),
+            }
+          );
+
+          const batchResult = await batchResponse.json();
+          if (batchResult.success) {
+            await sendMessage(chatId, batchResult.message);
+          } else {
+            await sendMessage(chatId, `⚠️ ${batchResult.error || "Processing failed"}`);
+          }
+        } catch (e) {
+          console.error("Work intake failed:", e);
+          await sendMessage(chatId, "❌ Failed to process work photo. Try again?");
+        }
+
+        return new Response("OK", { status: 200 });
+      }
+
+      // Default: verification mode
+      await sendMessage(chatId, "📷 Analyzing document...");
       const result = await processPhoto(fileUrl, chatId, userId, message.caption);
       await sendMessage(chatId, result);
 
+      return new Response("OK", { status: 200 });
+    }
+
+    // Check for phone number to link accounts
+    const phoneMatch = text.match(/^\+?1?(\d{10})$/);
+    if (phoneMatch) {
+      const normalizedPhone = phoneMatch[1].length === 10 ? `1${phoneMatch[1]}` : phoneMatch[1];
+
+      // Find technician by phone
+      const { data: techLink } = await supabase
+        .from("technician_phone_links")
+        .select("id, display_name, phone_number")
+        .eq("phone_number", normalizedPhone)
+        .single();
+
+      if (techLink) {
+        // Link telegram ID to this tech
+        await supabase
+          .from("technician_phone_links")
+          .update({
+            metadata: {
+              telegram_id: userId,
+              telegram_chat_id: chatId,
+              telegram_linked_at: new Date().toISOString(),
+            },
+          })
+          .eq("id", techLink.id);
+
+        await sendMessage(
+          chatId,
+          `✅ Linked! Hey ${techLink.display_name || "there"}!\n\n` +
+            `Your Telegram is now connected to your tech profile.\n\n` +
+            `Use /work to start logging photos.`
+        );
+      } else {
+        await sendMessage(
+          chatId,
+          `❓ Couldn't find a tech profile for that number.\n\n` +
+            `Text the Twilio number first to create your profile, then come back here.`
+        );
+      }
       return new Response("OK", { status: 200 });
     }
 
@@ -768,8 +929,10 @@ serve(async (req) => {
     if (text && !text.startsWith("/")) {
       await sendMessage(
         chatId,
-        `Send me a *photo* of a document to analyze!\n\n` +
-          `Or use /help for commands.`
+        `Commands:\n` +
+          `/work - Log work photos\n` +
+          `/verify - Document verification\n\n` +
+          `Or text your phone number to link accounts.`
       );
     }
 

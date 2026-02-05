@@ -6,6 +6,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1001,6 +1002,7 @@ serve(async (req) => {
             discovery_source: 'bonhams',
             profile_origin: 'bonhams_catalog_import',
             is_public: true,
+            status: 'active',
             sale_status: lot.availability?.includes('OutOfStock') ? 'sold' : 'available',
             auction_outcome: lot.availability?.includes('OutOfStock') ? 'sold' : null,
             auction_end_date: catalog.auctionDate,
@@ -1116,6 +1118,7 @@ serve(async (req) => {
             discovery_source: 'bonhams',
             profile_origin: 'bonhams_catalog_import',
             is_public: true,
+            status: 'active',
             sale_status: lot.availability?.includes('OutOfStock') ? 'sold' : 'available',
             auction_outcome: lot.availability?.includes('OutOfStock') ? 'sold' : null,
             auction_end_date: catalog.auctionDate,
@@ -1226,21 +1229,20 @@ serve(async (req) => {
       if (save_to_db || vehicle_id) {
         let targetVehicleId = vehicle_id;
 
-        // Upsert vehicle (by VIN or discovery_url)
+        // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
+        if (!targetVehicleId) {
+          const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+            url: extracted.url,
+            platform: 'bonhams',
+            discoveryUrlIlikePattern: discoveryUrlIlikePattern(extracted.url),
+          });
+          if (resolvedId) targetVehicleId = resolvedId;
+        }
         if (!targetVehicleId && extracted.vin) {
           const { data: existing } = await supabase
             .from('vehicles')
             .select('id')
             .eq('vin', extracted.vin.toUpperCase())
-            .maybeSingle();
-          if (existing) targetVehicleId = existing.id;
-        }
-
-        if (!targetVehicleId) {
-          const { data: existing } = await supabase
-            .from('vehicles')
-            .select('id')
-            .eq('discovery_url', extracted.url)
             .maybeSingle();
           if (existing) targetVehicleId = existing.id;
         }
@@ -1268,6 +1270,7 @@ serve(async (req) => {
           discovery_source: 'bonhams',
           profile_origin: 'bonhams_import',
           is_public: true,
+          status: 'active',
           origin_metadata: {
             source: 'bonhams_import',
             lot_number: extracted.lot_number,

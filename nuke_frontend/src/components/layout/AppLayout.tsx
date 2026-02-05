@@ -25,6 +25,15 @@ interface AppLayoutProps {
   }>;
 }
 
+type QuickVehicle = {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  title?: string;
+  thumbnail?: string | null;
+};
+
 const AppLayoutInner: React.FC<AppLayoutProps> = ({
   children,
   title,
@@ -39,6 +48,12 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   const [nZeroMenuOpen, setNZeroMenuOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Quick vehicle nav state
+  const [vehiclesSubMenuOpen, setVehiclesSubMenuOpen] = useState(false);
+  const [quickVehicles, setQuickVehicles] = useState<QuickVehicle[]>([]);
+  const [quickVehiclesLoading, setQuickVehiclesLoading] = useState(false);
+  const [vehicleSearch, setVehicleSearch] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
   const { vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab } = useAppLayoutContext();
@@ -185,12 +200,22 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       const target = e.target as HTMLElement;
       if (!target.closest('[data-n-zero-menu]')) {
         setNZeroMenuOpen(false);
+        setVehiclesSubMenuOpen(false);
+        setVehicleSearch('');
       }
     };
 
     if (nZeroMenuOpen) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [nZeroMenuOpen]);
+
+  // Reset vehicle submenu when main menu closes
+  useEffect(() => {
+    if (!nZeroMenuOpen) {
+      setVehiclesSubMenuOpen(false);
+      setVehicleSearch('');
     }
   }, [nZeroMenuOpen]);
 
@@ -273,6 +298,65 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
     }
   };
 
+  const loadQuickVehicles = async (userId: string) => {
+    if (quickVehiclesLoading) return;
+    setQuickVehiclesLoading(true);
+    try {
+      // Fetch vehicles user is involved with (owned, uploaded, has permissions)
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_user_vehicle_relationships', { p_user_id: userId });
+
+      if (rpcError) throw rpcError;
+
+      // Combine all vehicle relationships into a deduplicated list
+      const vehicleMap = new Map<string, QuickVehicle>();
+
+      const addVehicles = (vehicles: any[]) => {
+        vehicles?.forEach((v: any) => {
+          if (v?.id && !vehicleMap.has(v.id)) {
+            vehicleMap.set(v.id, {
+              id: v.id,
+              year: v.year,
+              make: v.make,
+              model: v.model,
+              title: [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle',
+              thumbnail: v.primary_image_url || v.primaryImageUrl || null
+            });
+          }
+        });
+      };
+
+      if (rpcData) {
+        addVehicles(rpcData.user_added_vehicles || []);
+        addVehicles(rpcData.verified_ownerships || []);
+        addVehicles(rpcData.permission_ownerships || []);
+        addVehicles(rpcData.discovered_vehicles || []);
+      }
+
+      // Sort by year descending (newest first), then by make/model
+      const sorted = Array.from(vehicleMap.values()).sort((a, b) => {
+        if (a.year && b.year) return b.year - a.year;
+        if (a.year) return -1;
+        if (b.year) return 1;
+        return (a.title || '').localeCompare(b.title || '');
+      });
+
+      setQuickVehicles(sorted);
+    } catch (error) {
+      console.error('Error loading quick vehicles:', error);
+      setQuickVehicles([]);
+    } finally {
+      setQuickVehiclesLoading(false);
+    }
+  };
+
+  // Preload vehicles immediately when user is authenticated (not on menu open)
+  useEffect(() => {
+    if (session?.user?.id && quickVehicles.length === 0 && !quickVehiclesLoading) {
+      loadQuickVehicles(session.user.id);
+    }
+  }, [session?.user?.id]);
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate('/');
@@ -329,120 +413,185 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       position: 'absolute',
                       top: '100%',
                       left: 0,
-                      background: 'var(--surface)',
-                      border: '2px solid var(--border)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      display: 'flex',
                       zIndex: 2000,
-                      minWidth: '160px',
                       marginTop: '2px'
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Link
-                      to="/vehicles"
-                      className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
+                  {/* Main nav panel - always visible */}
+                  <div
+                    style={{
+                      background: 'var(--surface)',
+                      border: '2px solid var(--border)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      minWidth: '160px'
+                    }}
+                  >
+                    {/* Vehicles button - expands to right */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setVehiclesSubMenuOpen(!vehiclesSubMenuOpen);
+                        if (!vehiclesSubMenuOpen && session?.user?.id) {
+                          loadQuickVehicles(session.user.id);
+                        }
+                      }}
+                      className={`nav-link ${isActivePage('/vehicle') ? 'active' : ''}`}
                       style={{
-                        display: 'block',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
                         padding: '8px 12px',
-                        textDecoration: 'none',
+                        border: 'none',
+                        background: vehiclesSubMenuOpen ? 'var(--surface-hover)' : 'transparent',
+                        cursor: 'pointer',
+                        textAlign: 'left',
                         borderBottom: '1px solid var(--border)'
                       }}
-                      onClick={() => setNZeroMenuOpen(false)}
                     >
-                      Vehicles
-                    </Link>
-                    <Link
-                      to="/search"
-                      className={`nav-link ${isActivePage('/search') ? 'active' : ''}`}
+                      <span>Vehicles</span>
+                      <span style={{ fontSize: '7pt', marginLeft: '8px' }}>▶</span>
+                    </button>
+                    <Link to="/search" className={`nav-link ${isActivePage('/search') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Search</Link>
+                    <Link to="/auctions" className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Auctions</Link>
+                    <Link to={orgNavPath} className={`nav-link ${isActivePage('/org') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Organizations</Link>
+                    <Link to="/invoices" className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Invoices</Link>
+                    <Link to="/market" className={`nav-link ${isActivePage('/market') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Market</Link>
+                    <Link to="/market/contracts" className={`nav-link ${isActivePage('/market/contracts') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Contract Station</Link>
+                    <a href="https://n-zero.dev/" target="_blank" rel="noopener noreferrer" className="nav-link" style={{ display: 'block', padding: '8px 12px', textDecoration: 'none' }} onClick={() => setNZeroMenuOpen(false)}>n-zero</a>
+                  </div>
+
+                  {/* Vehicles panel - pops out to the RIGHT */}
+                  {vehiclesSubMenuOpen && (
+                    <div
                       style={{
-                        display: 'block',
-                        padding: '8px 12px',
-                        textDecoration: 'none',
-                        borderBottom: '1px solid var(--border)'
+                        background: 'var(--surface)',
+                        border: '2px solid var(--border)',
+                        borderLeft: 'none',
+                        boxShadow: '4px 4px 12px rgba(0,0,0,0.15)',
+                        minWidth: '220px',
+                        maxHeight: '350px',
+                        display: 'flex',
+                        flexDirection: 'column'
                       }}
-                      onClick={() => setNZeroMenuOpen(false)}
                     >
-                      Search
-                    </Link>
-                    <Link
-                      to="/auctions"
-                      className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
-                      style={{
-                        display: 'block',
-                        padding: '8px 12px',
-                        textDecoration: 'none',
-                        borderBottom: '1px solid var(--border)'
-                      }}
-                      onClick={() => setNZeroMenuOpen(false)}
-                    >
-                      Auctions
-                    </Link>
-                    <Link
-                      to={orgNavPath}
-                      className={`nav-link ${isActivePage('/org') ? 'active' : ''}`}
-                      style={{
-                        display: 'block',
-                        padding: '8px 12px',
-                        textDecoration: 'none',
-                        borderBottom: '1px solid var(--border)'
-                      }}
-                      onClick={() => setNZeroMenuOpen(false)}
-                    >
-                      Organizations
-                    </Link>
-                    <Link
-                      to="/invoices"
-                      className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`}
-                      style={{
-                        display: 'block',
-                        padding: '8px 12px',
-                        textDecoration: 'none',
-                        borderBottom: '1px solid var(--border)'
-                      }}
-                      onClick={() => setNZeroMenuOpen(false)}
-                    >
-                      Invoices
-                    </Link>
-                    <Link
-                      to="/market"
-                      className={`nav-link ${isActivePage('/market') ? 'active' : ''}`}
-                      style={{
-                        display: 'block',
-                        padding: '8px 12px',
-                        textDecoration: 'none',
-                        borderBottom: '1px solid var(--border)'
-                      }}
-                      onClick={() => setNZeroMenuOpen(false)}
-                    >
-                      Market
-                    </Link>
-                    <Link
-                      to="/market/contracts"
-                      className={`nav-link ${isActivePage('/market/contracts') ? 'active' : ''}`}
-                      style={{
-                        display: 'block',
-                        padding: '8px 12px',
-                        textDecoration: 'none',
-                        borderBottom: '1px solid var(--border)'
-                      }}
-                      onClick={() => setNZeroMenuOpen(false)}
-                    >
-                      Contract Station
-                    </Link>
-                    <a
-                      href="https://n-zero.dev/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="nav-link"
-                      style={{
-                        display: 'block',
-                        padding: '8px 12px',
-                        textDecoration: 'none'
-                      }}
-                      onClick={() => setNZeroMenuOpen(false)}
-                    >
-                      n-zero
-                    </a>
+                      {/* Search input */}
+                      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>
+                        <input
+                          type="text"
+                          placeholder="Search by year, make..."
+                          value={vehicleSearch}
+                          onChange={(e) => setVehicleSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            width: '100%',
+                            padding: '4px 8px',
+                            fontSize: '9pt',
+                            border: '1px solid var(--border)',
+                            background: 'var(--white)',
+                            outline: 'none'
+                          }}
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Vehicle list - scrollable */}
+                      <div style={{
+                        flex: 1,
+                        overflowY: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        scrollbarWidth: 'thin'
+                      }}>
+                        {quickVehiclesLoading ? (
+                          <div style={{ padding: '12px', textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                            Loading...
+                          </div>
+                        ) : quickVehicles.length === 0 ? (
+                          <div style={{ padding: '12px', textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                            No vehicles yet
+                          </div>
+                        ) : (
+                          quickVehicles
+                            .filter((v) => {
+                              if (!vehicleSearch.trim()) return true;
+                              const search = vehicleSearch.toLowerCase();
+                              return (
+                                (v.title || '').toLowerCase().includes(search) ||
+                                String(v.year || '').includes(search) ||
+                                (v.make || '').toLowerCase().includes(search) ||
+                                (v.model || '').toLowerCase().includes(search)
+                              );
+                            })
+                            .slice(0, 10)
+                            .map((v) => (
+                              <button
+                                key={v.id}
+                                onClick={() => {
+                                  setNZeroMenuOpen(false);
+                                  setVehiclesSubMenuOpen(false);
+                                  setVehicleSearch('');
+                                  navigate(`/vehicle/${v.id}`, { state: { vehicleTitle: v.title } });
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  width: '100%',
+                                  padding: '6px 10px',
+                                  border: 'none',
+                                  borderBottom: '1px solid var(--border)',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  fontSize: '9pt'
+                                }}
+                                className="nav-link"
+                                title={v.title}
+                              >
+                                <div style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '3px',
+                                  background: v.thumbnail ? `url(${v.thumbnail}) center/cover` : 'var(--grey-300)',
+                                  flexShrink: 0
+                                }} />
+                                <span style={{
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {v.title}
+                                </span>
+                              </button>
+                            ))
+                        )}
+                      </div>
+
+                      {/* View all link */}
+                      <Link
+                        to="/vehicles"
+                        onClick={() => {
+                          setNZeroMenuOpen(false);
+                          setVehiclesSubMenuOpen(false);
+                          setVehicleSearch('');
+                        }}
+                        style={{
+                          display: 'block',
+                          padding: '8px 12px',
+                          textDecoration: 'none',
+                          fontSize: '9pt',
+                          fontWeight: 600,
+                          borderTop: '1px solid var(--border)',
+                          background: 'var(--surface)'
+                        }}
+                        className="nav-link"
+                      >
+                        View All Vehicles →
+                      </Link>
+                    </div>
+                  )}
                   </div>
                 )}
               </div>

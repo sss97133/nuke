@@ -1,5 +1,5 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.27.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,21 +7,15 @@ const corsHeaders = {
 }
 
 interface ReceiptProcessingRequest {
-  receipt_id: string;
-  file_url: string;
+  receipt_id?: string;
+  file_url?: string;
+  image_url?: string;
+  image_base64?: string;
+  user_id?: string;
+  vehicle_id?: string;
 }
 
-interface TextractResponse {
-  BlockMap: Record<string, any>;
-  Blocks: Array<{
-    BlockType: string;
-    Text?: string;
-    Confidence?: number;
-    Geometry?: any;
-  }>;
-}
-
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -32,49 +26,90 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { receipt_id, file_url }: ReceiptProcessingRequest = await req.json()
+    const body: ReceiptProcessingRequest = await req.json()
+    const { receipt_id, file_url, image_url, image_base64, user_id, vehicle_id } = body
+    const imageSource = file_url || image_url
 
-    console.log('Processing receipt:', receipt_id, file_url)
+    console.log('Processing receipt:', receipt_id || 'new', imageSource?.slice(0, 50))
 
-    // Update receipt status to processing
-    await supabaseClient
-      .from('receipts')
-      .update({ processing_status: 'processing' })
-      .eq('id', receipt_id)
+    // Update receipt status if we have an ID
+    if (receipt_id) {
+      await supabaseClient
+        .from('receipts')
+        .update({ processing_status: 'processing' })
+        .eq('id', receipt_id)
+    }
 
-    // For demo purposes, we'll simulate OCR processing
-    // In production, you'd integrate with AWS Textract, Google Vision API, etc.
-    const mockOCRResult = await simulateOCRProcessing(file_url)
+    // Use Claude Vision to extract receipt data
+    const extractedData = await extractWithClaude(imageSource, image_base64)
 
-    // Extract receipt data
-    const extractedData = parseReceiptText(mockOCRResult.text)
+    // Update user's preferred retailers (learn from purchases)
+    if (user_id && extractedData.vendor_name) {
+      await updateUserRetailer(supabaseClient, user_id, extractedData)
+    }
 
-    // Update receipt with extracted data
-    const { error: updateError } = await supabaseClient
-      .from('receipts')
-      .update({
-        processing_status: 'processed',
-        vendor_name: extractedData.vendor_name,
-        transaction_date: extractedData.transaction_date,
-        total_amount: extractedData.total_amount,
-        tax_amount: extractedData.tax_amount,
-        raw_extraction: extractedData.raw_data,
-        confidence_score: extractedData.confidence_score
-      })
-      .eq('id', receipt_id)
+    // Create or update receipt record
+    let finalReceiptId = receipt_id
+    if (!receipt_id) {
+      // Create new receipt
+      const { data: newReceipt, error: insertError } = await supabaseClient
+        .from('receipts')
+        .insert({
+          user_id,
+          vehicle_id,
+          vendor_name: extractedData.vendor_name,
+          receipt_date: extractedData.transaction_date,
+          subtotal: extractedData.subtotal,
+          tax: extractedData.tax_amount,
+          total: extractedData.total_amount,
+          status: 'imported',
+          processing_status: 'processed',
+          metadata: {
+            store_id: extractedData.store_id,
+            store_name: extractedData.store_name,
+            store_address: extractedData.store_address,
+            source: 'receipt_scan',
+          },
+        })
+        .select('id')
+        .single()
 
-    if (updateError) {
-      throw new Error(`Failed to update receipt: ${updateError.message}`)
+      if (newReceipt) {
+        finalReceiptId = newReceipt.id
+      }
+    } else {
+      // Update existing receipt
+      await supabaseClient
+        .from('receipts')
+        .update({
+          processing_status: 'processed',
+          vendor_name: extractedData.vendor_name,
+          receipt_date: extractedData.transaction_date,
+          subtotal: extractedData.subtotal,
+          tax: extractedData.tax_amount,
+          total: extractedData.total_amount,
+          metadata: {
+            store_id: extractedData.store_id,
+            store_name: extractedData.store_name,
+            store_address: extractedData.store_address,
+          },
+        })
+        .eq('id', receipt_id)
     }
 
     // Insert extracted items
-    if (extractedData.items && extractedData.items.length > 0) {
+    if (finalReceiptId && extractedData.items && extractedData.items.length > 0) {
       const { error: itemsError } = await supabaseClient
         .from('receipt_items')
         .insert(
           extractedData.items.map((item: any) => ({
-            receipt_id,
-            ...item
+            receipt_id: finalReceiptId,
+            description: item.description,
+            part_number: item.part_number,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            line_total: item.line_total,
+            category: item.category
           }))
         )
 
@@ -86,9 +121,11 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        receipt_id,
-        extracted_items: extractedData.items?.length || 0,
-        confidence_score: extractedData.confidence_score
+        receipt_id: finalReceiptId,
+        data: extractedData,
+        items_count: extractedData.items?.length || 0,
+        retailer: extractedData.vendor_name,
+        retailer_learned: !!user_id,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -98,24 +135,6 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Receipt processing error:', error)
-
-    // Update receipt status to failed if we have receipt_id
-    try {
-      const { receipt_id } = await req.json()
-      if (receipt_id) {
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
-
-        await supabaseClient
-          .from('receipts')
-          .update({ processing_status: 'failed' })
-          .eq('id', receipt_id)
-      }
-    } catch (e) {
-      console.error('Failed to update receipt status:', e)
-    }
 
     return new Response(
       JSON.stringify({
@@ -130,41 +149,146 @@ serve(async (req) => {
   }
 })
 
-// Simulate OCR processing (replace with actual OCR service)
-async function simulateOCRProcessing(fileUrl: string) {
-  // In production, integrate with:
-  // - AWS Textract for receipt analysis
-  // - Google Vision API for document text detection
-  // - Azure Cognitive Services for form recognizer
+// Extract receipt data using Claude Vision
+async function extractWithClaude(imageUrl?: string, imageBase64?: string) {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
 
-  console.log('Simulating OCR for:', fileUrl)
+  // Fallback to regex parsing if no API key
+  if (!apiKey) {
+    console.log('No ANTHROPIC_API_KEY, using fallback parser')
+    return fallbackExtract()
+  }
 
-  // Mock OCR result with common automotive receipt patterns
-  const mockText = `
-AUTO PARTS WAREHOUSE
-123 Main Street
-Anytown, ST 12345
-(555) 123-4567
+  const anthropic = new Anthropic({ apiKey })
 
-Date: 03/15/2024
-Receipt #: APW-789456
+  // Prepare image content
+  let imageContent: any
+  if (imageBase64) {
+    imageContent = {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: 'image/jpeg',
+        data: imageBase64,
+      },
+    }
+  } else if (imageUrl) {
+    // Fetch and convert to base64
+    const response = await fetch(imageUrl)
+    const buffer = await response.arrayBuffer()
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    imageContent = {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: 'image/jpeg',
+        data: base64,
+      },
+    }
+  } else {
+    return fallbackExtract()
+  }
 
-Engine Oil Filter     OEM-123456    1    $12.99    $12.99
-5W-30 Motor Oil      MOB1-5W30     2    $14.99    $29.98
-Spark Plugs Set      NGK-456789    1    $45.99    $45.99
-Air Filter           AC-789012     1    $24.99    $24.99
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2000,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          imageContent,
+          {
+            type: 'text',
+            text: `Extract ALL data from this auto parts receipt. Return JSON only, no markdown:
 
-                     Subtotal:             $113.95
-                     Tax (8.25%):           $9.40
-                     Total:               $123.35
+{
+  "vendor_name": "AutoZone|OReilly|RockAuto|NAPA|etc (normalize name)",
+  "store_id": "store number if visible",
+  "store_name": "full store name with location",
+  "store_address": "street address",
+  "transaction_date": "YYYY-MM-DD",
+  "subtotal": 0.00,
+  "tax_amount": 0.00,
+  "total_amount": 0.00,
+  "items": [
+    {
+      "description": "part name as shown",
+      "part_number": "ABC123 or null",
+      "quantity": 1,
+      "unit_price": 0.00,
+      "line_total": 0.00,
+      "category": "oil|filter|brake|electrical|steering|suspension|gasket|hardware|paint|tools|other"
+    }
+  ]
+}
 
-Payment Method: VISA ****1234
-Thank you for your business!
-  `.trim()
+Extract EVERY line item. Include all part numbers visible. Normalize retailer names.`,
+          },
+        ],
+      },
+    ],
+  })
 
+  const responseText = response.content[0].type === 'text' ? response.content[0].text : ''
+
+  try {
+    const jsonStr = responseText.replace(/```json\n?|\n?```/g, '').trim()
+    return JSON.parse(jsonStr)
+  } catch (e) {
+    console.error('Failed to parse Claude response:', responseText.slice(0, 200))
+    return fallbackExtract()
+  }
+}
+
+// Update user's preferred retailers
+async function updateUserRetailer(supabase: any, userId: string, data: any) {
+  const retailer = data.vendor_name?.toLowerCase()
+  if (!retailer) return
+
+  const { data: existing } = await supabase
+    .from('user_preferred_retailers')
+    .select('id, purchase_count')
+    .eq('user_id', userId)
+    .eq('retailer', retailer)
+    .eq('store_id', data.store_id || '')
+    .maybeSingle()
+
+  if (existing) {
+    await supabase
+      .from('user_preferred_retailers')
+      .update({
+        purchase_count: existing.purchase_count + 1,
+        last_purchase_at: new Date().toISOString(),
+        store_name: data.store_name,
+        store_address: data.store_address,
+      })
+      .eq('id', existing.id)
+  } else {
+    await supabase.from('user_preferred_retailers').insert({
+      user_id: userId,
+      retailer,
+      store_id: data.store_id,
+      store_name: data.store_name,
+      store_address: data.store_address,
+      purchase_count: 1,
+      last_purchase_at: new Date().toISOString(),
+    })
+  }
+}
+
+// Fallback extraction without Claude
+function fallbackExtract() {
   return {
-    text: mockText,
-    confidence: 0.92
+    vendor_name: 'Unknown',
+    store_id: null,
+    store_name: null,
+    store_address: null,
+    transaction_date: new Date().toISOString().split('T')[0],
+    subtotal: null,
+    tax_amount: null,
+    total_amount: 0,
+    items: [],
+    confidence_score: 0.5
   }
 }
 

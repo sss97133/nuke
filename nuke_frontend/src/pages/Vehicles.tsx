@@ -2048,7 +2048,7 @@ const VehiclesInner: React.FC = () => {
             )}
           </aside>
 
-          <main className="vehicle-library-main">
+          <div className="vehicle-library-main" role="region" aria-label="Vehicle list">
             <div className="vehicle-library-toolbar">
               <div className="vehicle-library-toolbar-left">
                 <div style={{ fontSize: '8pt', fontWeight: 700 }}>
@@ -2369,7 +2369,7 @@ const VehiclesInner: React.FC = () => {
                 </>
               )}
             </div>
-          </main>
+          </div>
         </div>
       )}
       {/* Quick Fix Modal */}

@@ -95,3 +95,28 @@ private_key*
 
 # Bot state
 .bot_state.json
+
+# Large data directories
+yono/.image_cache/
+yono/.venv/
+training-data/
+
+# Desktop app binaries
+tools/nuke-desktop/
+tools/nuke-scanner/
+tools/nuke-sdk/
+tools/blender/
+tools/make_logo_index/
+
+# Additional browser session folders
+fb-session-*/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Reports and generated data
+reports/
+*.csv

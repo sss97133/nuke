@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { QuotePartsList } from '../parts';
 
 interface WorkOrderViewerProps {
   event: any; // business_timeline_event
@@ -969,147 +970,13 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
             </div>
           )}
 
-          {/* PARTS TAB */}
+          {/* PARTS TAB - Interactive Quote with Alternatives */}
           {activeTab === 'parts' && (
             <div>
-              {parts.length > 0 ? (
-                <div>
-                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '16px', color: 'var(--text)' }}>
-                    Parts & Materials Used
-                    <span style={{ float: 'right', color: 'var(--accent)' }}>
-                      Total: ${partsTotal.toLocaleString()}
-                    </span>
-                  </div>
-                  
-                  {parts.map(part => (
-                    <div
-                      key={part.id}
-                      style={{
-                        padding: '16px',
-                        marginBottom: '12px',
-                        border: '2px solid var(--border)',
-                        borderRadius: '6px',
-                        background: part.is_ai_detected ? '#f0fdf4' : 'var(--white)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', gap: '12px' }}>
-                        {part.image_url && (
-                          <img
-                            src={part.image_url}
-                            alt={part.part_name || part.tag_name}
-                            style={{
-                              width: '80px',
-                              height: '80px',
-                              objectFit: 'cover',
-                              borderRadius: '4px',
-                              border: '1px solid var(--border)'
-                            }}
-                          />
-                        )}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
-                            {part.part_name || part.tag_name}
-                            {part.is_ai_detected && (
-                              <span style={{ 
-                                fontSize: '7pt', 
-                                background: '#10b981', 
-                                color: 'white', 
-                                padding: '2px 6px', 
-                                borderRadius: '3px',
-                                marginLeft: '8px'
-                              }}>
-                                AI DETECTED
-                              </span>
-                            )}
-                            {part.quantity > 1 && (
-                              <span style={{ fontSize: '8pt', color: 'var(--text-muted)', marginLeft: '8px' }}>
-                                × {part.quantity}
-                              </span>
-                            )}
-                            {part.confidence && (
-                              <span style={{ fontSize: '7pt', color: 'var(--text-muted)', marginLeft: '8px' }}>
-                                {part.confidence}% confidence
-                              </span>
-                            )}
-                          </div>
-                          {part.brand && (
-                            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                              Brand: {part.brand}
-                            </div>
-                          )}
-                          {part.part_number && (
-                            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                              Part #: {part.part_number}
-                            </div>
-                          )}
-                          {part.oem_part_number && (
-                            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                              OEM #: {part.oem_part_number}
-                            </div>
-                          )}
-                          <div style={{ fontSize: '11pt', fontWeight: 700, color: 'var(--accent)' }}>
-                            ${parseFloat(part.total_price || part.lowest_price_cents / 100 || 0).toLocaleString()}
-                          </div>
-                          {(part.buy_url || part.buy_link) && (
-                            <a
-                              href={part.buy_url || part.buy_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="button button-small button-primary"
-                              style={{
-                                marginTop: '8px',
-                                fontSize: '8pt',
-                                display: 'inline-block',
-                                textDecoration: 'none'
-                              }}
-                            >
-                              BUY ON AMAZON
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : partsIdentified.length > 0 ? (
-                <div>
-                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '16px', color: 'var(--text)' }}>
-                    Parts & Materials (AI Identified)
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {partsIdentified.map((part, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          fontSize: '8pt',
-                          padding: '8px 12px',
-                          background: 'var(--bg)',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '4px',
-                          color: '#374151'
-                        }}
-                      >
-                        {part}
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{
-                    marginTop: '20px',
-                    padding: '16px',
-                    background: '#fff3cd',
-                    borderRadius: '6px',
-                    border: '1px solid #ffeaa7',
-                    fontSize: '8pt',
-                    color: '#856404'
-                  }}>
-                    These parts were identified by AI from work photos. Shop owners can add exact part numbers and buy links.
-                  </div>
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
-                  <div>No parts information available yet.</div>
-                </div>
-              )}
+              <QuotePartsList
+                timelineEventId={event.id}
+                onTotalChange={(total) => console.log('Quote total:', total)}
+              />
             </div>
           )}
 

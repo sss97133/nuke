@@ -10,7 +10,21 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, SUPABASE_URL } from '../../lib/supabase';
-import MiniLineChart, { DataSeries, DataPoint } from './MiniLineChart';
+import MiniLineChart from './MiniLineChart';
+
+// Inlined to avoid Vite import issues
+interface DataPoint {
+  date: string;
+  value: number;
+}
+
+interface DataSeries {
+  id: string;
+  label: string;
+  data: DataPoint[];
+  color: string;
+  showArea?: boolean;
+}
 
 type TrendPeriod = '30d' | '90d' | '1y';
 

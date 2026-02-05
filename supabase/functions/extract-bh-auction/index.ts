@@ -20,6 +20,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 
 // Direct fetch - BH Auction has no Cloudflare/bot protection
 async function fetchPage(url: string): Promise<{ html: string; success: boolean; error?: string }> {
@@ -637,6 +638,7 @@ serve(async (req) => {
           discovery_source: 'bh_auction',
           profile_origin: 'bh_auction_import',
           is_public: true,
+          status: 'active',
           origin_metadata: {
             source: 'bh_auction',
             lot_number: extracted.lot_number,
@@ -652,23 +654,19 @@ serve(async (req) => {
           },
         };
 
-        // Check for existing vehicle by URL or VIN
+        // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
         let vehicleId: string | null = null;
-
-        if (extracted.vin || extracted.chassis_number) {
+        const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+          url: extracted.url,
+          platform: 'bh_auction',
+          discoveryUrlIlikePattern: discoveryUrlIlikePattern(extracted.url),
+        });
+        if (resolvedId) vehicleId = resolvedId;
+        if (!vehicleId && (extracted.vin || extracted.chassis_number)) {
           const { data: existing } = await supabase
             .from('vehicles')
             .select('id')
             .eq('vin', (extracted.vin || extracted.chassis_number)!.toUpperCase())
-            .maybeSingle();
-          if (existing) vehicleId = existing.id;
-        }
-
-        if (!vehicleId) {
-          const { data: existing } = await supabase
-            .from('vehicles')
-            .select('id')
-            .eq('discovery_url', extracted.url)
             .maybeSingle();
           if (existing) vehicleId = existing.id;
         }
@@ -799,6 +797,7 @@ serve(async (req) => {
               discovery_source: 'bh_auction',
               profile_origin: 'bh_auction_import',
               is_public: true,
+              status: 'active',
               origin_metadata: {
                 source: 'bh_auction',
                 lot_number: extracted.lot_number,
@@ -808,17 +807,17 @@ serve(async (req) => {
               },
             };
 
-            // Check for existing
+            // Resolve existing vehicle to avoid duplicate discovery_url
             let vehicleId: string | null = null;
-            const { data: existing } = await supabase
-              .from('vehicles')
-              .select('id')
-              .eq('discovery_url', extracted.url)
-              .maybeSingle();
+            const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+              url: extracted.url,
+              platform: 'bh_auction',
+              discoveryUrlIlikePattern: discoveryUrlIlikePattern(extracted.url),
+            });
+            if (resolvedId) vehicleId = resolvedId;
 
-            if (existing) {
-              await supabase.from('vehicles').update(vehicleData).eq('id', existing.id);
-              vehicleId = existing.id;
+            if (vehicleId) {
+              await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
             } else {
               const { data: newVehicle } = await supabase
                 .from('vehicles')

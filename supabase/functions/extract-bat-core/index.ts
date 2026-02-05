@@ -232,7 +232,9 @@ async function fetchHtmlDirect(url: string): Promise<{ html: string; status: num
   const delayMs = Math.random() * 500 + 200;
   await new Promise((r) => setTimeout(r, delayMs));
 
+  // Use manual redirect to detect rate limiting/auth redirects
   const resp = await fetch(url, {
+    redirect: "manual",
     headers: {
       "User-Agent": userAgent,
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -245,9 +247,33 @@ async function fetchHtmlDirect(url: string): Promise<{ html: string; status: num
     signal: AbortSignal.timeout(30000),
   });
 
+  // Detect redirects - usually means rate limit or auth required
+  if (resp.status === 301 || resp.status === 302 || resp.status === 303 || resp.status === 307 || resp.status === 308) {
+    const location = resp.headers.get("location") || "";
+    if (location.includes("/account/login") || location.includes("/login")) {
+      throw new Error(`RATE_LIMITED: Redirected to login (${resp.status})`);
+    }
+    if (location.includes("cloudflare") || location.includes("challenge")) {
+      throw new Error(`BLOCKED: Cloudflare challenge (${resp.status})`);
+    }
+    throw new Error(`REDIRECT: ${resp.status} to ${location.slice(0, 100)}`);
+  }
+
   if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
   const html = await resp.text();
   if (!html || html.length < 1000) throw new Error(`Insufficient HTML (${html?.length || 0} chars)`);
+
+  // Detect if we got a login/error page instead of listing
+  if (html.includes('id="login-form"') || html.includes('action="/account/login"')) {
+    throw new Error(`RATE_LIMITED: Got login page instead of listing`);
+  }
+  if (html.includes("Access Denied") || html.includes("403 Forbidden")) {
+    throw new Error(`BLOCKED: Access denied in response`);
+  }
+  if (!html.includes("bringatrailer.com/listing/") && !html.includes("listing-essentials")) {
+    throw new Error(`INVALID_PAGE: Response doesn't appear to be a BaT listing`);
+  }
+
   return { html, status: resp.status, userAgent };
 }
 
@@ -364,14 +390,21 @@ function extractEssentials(html: string): {
   const parseMoney = (raw: string | null): number | null => {
     const s = String(raw || "").trim().toLowerCase();
     if (!s) return null;
+    // CRITICAL: Strip trailing k/m ONLY if preceded by a small number (like "48k" not "48000m").
+    // HTML noise like "$48,000 markup" was being parsed as "48000m" -> 48 billion.
     const normalized = s.replace(/,/g, "").replace(/\s+/g, "");
     const m = normalized.match(/^([0-9]+(?:\.[0-9]+)?)([km])?$/i);
     if (!m?.[1]) return null;
     const n = parseFloat(m[1]);
     if (!Number.isFinite(n) || n <= 0) return null;
     const suffix = m[2]?.toLowerCase();
-    const multiplier = suffix === "k" ? 1000 : suffix === "m" ? 1_000_000 : 1;
-    return Math.round(n * multiplier);
+    // Only apply k/m multiplier if the base number is small (real shorthand like "48k" or "1.2m")
+    // If base number > 1000, the "m" or "k" is likely HTML noise, not a multiplier
+    const multiplier = suffix === "k" && n < 1000 ? 1000 : suffix === "m" && n < 100 ? 1_000_000 : 1;
+    const result = Math.round(n * multiplier);
+    // Sanity check: no vehicle auction has exceeded $100M; reject absurd values
+    if (result > 100_000_000) return null;
+    return result;
   };
 
   const parseMoneyFromRow = (rowHtml: string | null): number | null => {

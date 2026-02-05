@@ -7,7 +7,8 @@ ALTER TABLE vehicles DROP CONSTRAINT IF EXISTS vehicles_sale_status_check1;
 ALTER TABLE vehicles ADD CONSTRAINT vehicles_sale_status_check CHECK (
   sale_status IS NULL OR sale_status IN (
     'not_for_sale', 'for_sale', 'sold', 'pending',
-    'auction_live', 'ended', 'available', 'discovered'
+    'auction_live', 'ended', 'available', 'discovered',
+    'not_sold', 'unsold', 'upcoming'
   )
 );
 
