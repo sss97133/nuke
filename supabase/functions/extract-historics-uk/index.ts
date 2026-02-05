@@ -633,18 +633,13 @@ async function saveToDatabase(
   supabase: any,
   extracted: HistoricsExtracted
 ): Promise<string> {
-  // Try to find existing vehicle by URL
-  let vehicleId: string | null = null;
-
-  const { data: existing } = await supabase
-    .from('vehicles')
-    .select('id')
-    .eq('discovery_url', extracted.url)
-    .maybeSingle();
-
-  if (existing) {
-    vehicleId = existing.id;
-  }
+  // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
+  const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+    url: extracted.url,
+    platform: 'historics',
+    discoveryUrlIlikePattern: discoveryUrlIlikePattern(extracted.url),
+  });
+  let vehicleId: string | null = resolvedId;
 
   const vehicleData = {
     year: extracted.year,
@@ -664,6 +659,7 @@ async function saveToDatabase(
     discovery_source: 'historics',
     profile_origin: 'historics_import',
     is_public: true,
+    status: 'active',
     origin_metadata: {
       source: 'historics_import',
       lot_number: extracted.lot_number,

@@ -33,11 +33,13 @@ interface ExtractedListing {
   location_city: string | null;
   location_state: string | null;
   seller_name: string | null;
+  seller_profile_url: string | null;
   extracted_year: number | null;
   extracted_make: string | null;
   extracted_model: string | null;
   extracted_vin: string | null;
   extracted_mileage: number | null;
+  listed_days_ago: number | null;
   image_urls: string[];
   raw_scrape_data: any;
 }
@@ -59,7 +61,91 @@ function normalizeUrl(url: string): string {
   return `https://www.facebook.com/marketplace/item/${itemId}/`;
 }
 
-// Extract year from title/description
+/**
+ * Parse year, make, model from FB Marketplace title
+ * Handles corrupted titles like "$4,5001972 Chevrolet C10"
+ */
+function parseTitle(title: string): { year: number | null; make: string | null; model: string | null; cleanPrice: number | null } {
+  // Extract price - look for year at END of price string (e.g., "$1,9502021" -> price=$1,950, year=2021)
+  let cleanPrice: number | null = null;
+  const priceMatch = title.match(/^\$?([\d,]+)/);
+  if (priceMatch) {
+    const priceStr = priceMatch[1].replace(/,/g, '');
+    // Look for 4-digit year at the END of the price string
+    const yearAtEnd = priceStr.match(/((?:19[2-9]\d|20[0-3]\d))$/);
+    if (yearAtEnd && priceStr.length > 4) {
+      // Year is at end - extract price from beginning
+      const priceDigits = priceStr.slice(0, -4);
+      cleanPrice = priceDigits.length > 0 ? parseInt(priceDigits, 10) : null;
+    } else if (priceStr.length <= 7 && !priceStr.match(/^(19|20)\d{2}$/)) {
+      // No year embedded, reasonable price length, not just a year
+      cleanPrice = parseInt(priceStr, 10);
+    }
+  }
+
+  // Clean up title - remove price prefixes like "$4,500" but keep year
+  const cleaned = title.replace(/^\$[\d,]+(?=\d{4})/g, '').replace(/^\$[\d,]+\s*/g, '').trim();
+
+  // Match year (1920-2030)
+  const yearMatch = cleaned.match(/\b(19[2-9]\d|20[0-3]\d)\b/);
+  const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
+
+  if (!year) return { year: null, make: null, model: null, cleanPrice };
+
+  // Get text after year
+  const afterYear = cleaned.split(String(year))[1]?.trim() || '';
+  const words = afterYear.split(/\s+/).filter(w => w.length > 0);
+
+  if (words.length === 0) return { year, make: null, model: null, cleanPrice };
+
+  // Make normalization map
+  const makeMap: Record<string, string> = {
+    'chevy': 'Chevrolet', 'chevrolet': 'Chevrolet',
+    'ford': 'Ford', 'dodge': 'Dodge', 'gmc': 'GMC',
+    'toyota': 'Toyota', 'honda': 'Honda', 'nissan': 'Nissan',
+    'mazda': 'Mazda', 'subaru': 'Subaru', 'mitsubishi': 'Mitsubishi',
+    'jeep': 'Jeep', 'ram': 'Ram', 'chrysler': 'Chrysler',
+    'plymouth': 'Plymouth', 'pontiac': 'Pontiac', 'buick': 'Buick',
+    'oldsmobile': 'Oldsmobile', 'cadillac': 'Cadillac', 'lincoln': 'Lincoln',
+    'mercury': 'Mercury', 'amc': 'AMC', 'studebaker': 'Studebaker',
+    'packard': 'Packard', 'hudson': 'Hudson', 'nash': 'Nash',
+    'international': 'International', 'willys': 'Willys', 'kaiser': 'Kaiser',
+    'datsun': 'Datsun', 'volkswagen': 'Volkswagen', 'vw': 'Volkswagen',
+    'porsche': 'Porsche', 'mercedes': 'Mercedes-Benz', 'mercedes-benz': 'Mercedes-Benz',
+    'bmw': 'BMW', 'audi': 'Audi', 'volvo': 'Volvo', 'saab': 'Saab',
+    'jaguar': 'Jaguar', 'triumph': 'Triumph', 'mg': 'MG', 'austin': 'Austin',
+    'austin-healey': 'Austin-Healey', 'lotus': 'Lotus', 'tvr': 'TVR',
+    'alfa': 'Alfa Romeo', 'alfa romeo': 'Alfa Romeo', 'fiat': 'Fiat',
+    'ferrari': 'Ferrari', 'maserati': 'Maserati', 'lamborghini': 'Lamborghini',
+    'lancia': 'Lancia', 'delorean': 'DeLorean', 'de tomaso': 'De Tomaso',
+    'shelby': 'Shelby', 'ac': 'AC', 'cobra': 'AC Cobra',
+  };
+
+  const rawMake = words[0].toLowerCase();
+  const make = makeMap[rawMake] || words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase();
+
+  // Model: next 1-3 words, excluding common suffixes
+  const stopWords = ['pickup', 'truck', 'sedan', 'coupe', 'wagon', 'van', 'suv',
+    'convertible', 'hatchback', 'cab', 'door', 'bed', 'ton', 'series',
+    'runs', 'drives', 'project', 'restored', 'original', 'clean', 'rare'];
+  const modelParts: string[] = [];
+
+  for (let i = 1; i < Math.min(words.length, 5); i++) {
+    const word = words[i];
+    const lower = word.toLowerCase();
+    // Stop at common suffixes or location markers
+    if (stopWords.includes(lower)) break;
+    // Stop at city/state pattern
+    if (/^[A-Z][a-z]+,$/.test(word)) break;
+    modelParts.push(word);
+    if (modelParts.length >= 2) break;
+  }
+
+  const model = modelParts.length > 0 ? modelParts.join(' ') : null;
+  return { year, make, model, cleanPrice };
+}
+
+// Extract year from title/description (fallback)
 function extractYear(text: string): number | null {
   // Look for 4-digit year between 1900-2030
   const match = text.match(/\b(19[0-9]{2}|20[0-2][0-9])\b/);
@@ -133,18 +219,81 @@ function extractMileage(text: string): number | null {
   return null;
 }
 
-// Extract price from text
+// Extract price from text - avoid grabbing years
 function extractPrice(text: string): number | null {
-  // Patterns: "$15,000", "$15000", "15,000", "asking 15000"
-  const match = text.match(/\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/);
-  if (match) {
-    const price = parseFloat(match[1].replace(/,/g, ""));
-    // Sanity check: vehicles typically $500 - $10M
-    if (price >= 500 && price <= 10000000) {
-      return price;
+  // Explicit price patterns with $ or keywords
+  const patterns = [
+    /\$\s*([\d,]+)/,                          // $15,000
+    /asking\s*\$?\s*([\d,]+)/i,               // asking $15,000 or asking 15000
+    /price[:\s]+\$?\s*([\d,]+)/i,             // price: 15000
+    /obo\s*\$?\s*([\d,]+)/i,                  // OBO $5000
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const price = parseFloat(match[1].replace(/,/g, ""));
+      // Sanity check: vehicles typically $500 - $500k for FB marketplace
+      if (price >= 500 && price <= 500000) {
+        return price;
+      }
     }
   }
   return null;
+}
+
+// Extract days since listed from FB "Listed X days ago" text
+function extractListedDaysAgo(text: string): number | null {
+  const patterns = [
+    /listed\s+(\d+)\s+days?\s+ago/i,           // Listed 3 days ago
+    /listed\s+(\d+)\s+weeks?\s+ago/i,          // Listed 2 weeks ago -> convert
+    /listed\s+yesterday/i,                      // Listed yesterday
+    /listed\s+today/i,                          // Listed today
+    /(\d+)\s+days?\s+ago/i,                    // 3 days ago (fallback)
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      if (pattern.source.includes('yesterday')) return 1;
+      if (pattern.source.includes('today')) return 0;
+      if (pattern.source.includes('weeks?')) {
+        return parseInt(match[1], 10) * 7;
+      }
+      return parseInt(match[1], 10);
+    }
+  }
+  return null;
+}
+
+// Extract seller name from FB page content
+function extractSellerName(text: string, html: string): { name: string | null; profileUrl: string | null } {
+  // Look for seller patterns in text
+  const namePatterns = [
+    /(?:sold by|seller|listed by)[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+    /seller[:\s]+([A-Z][a-z]+\s+[A-Z]\.?)/i,
+  ];
+
+  let name: string | null = null;
+  for (const pattern of namePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      name = match[1].trim();
+      break;
+    }
+  }
+
+  // Extract profile URL from HTML
+  let profileUrl: string | null = null;
+  const profileMatch = html.match(/href="(\/marketplace\/profile\/\d+[^"]*)"/) ||
+                       html.match(/href="(https:\/\/www\.facebook\.com\/marketplace\/profile\/\d+[^"]*)"/);
+  if (profileMatch) {
+    profileUrl = profileMatch[1].startsWith('/')
+      ? `https://www.facebook.com${profileMatch[1]}`
+      : profileMatch[1];
+  }
+
+  return { name, profileUrl };
 }
 
 // Extract location (City, State pattern)
@@ -170,6 +319,46 @@ function extractLocation(text: string): { city: string | null; state: string | n
   }
 
   return { city: null, state: null };
+}
+
+// Filter vehicle images - exclude profile pics, UI elements, icons
+function filterVehicleImages(images: string[]): string[] {
+  const dominated: string[] = [];
+
+  for (const url of images) {
+    // Must be FB content CDN
+    if (!url.includes('scontent') && !url.includes('fbcdn')) continue;
+
+    // Exclude profile pictures (common patterns)
+    if (url.includes('/v/') && url.includes('_n.')) continue;  // Profile pic pattern
+    if (url.match(/\/p\d+x\d+\//)) continue;                   // Small profile format
+    if (url.includes('profile')) continue;                      // Explicit profile
+
+    // Exclude tiny images (icons, emojis, thumbnails)
+    if (url.includes('_s.') || url.includes('_t.') || url.includes('_q.')) continue;
+    if (url.includes('emoji')) continue;
+    if (url.includes('static')) continue;
+    if (url.includes('rsrc.php')) continue;                    // FB static resources
+
+    // Exclude messenger/UI elements
+    if (url.includes('messenger')) continue;
+    if (url.includes('badge')) continue;
+    if (url.includes('icon')) continue;
+
+    // Prefer larger images
+    const sizeMatch = url.match(/_(\d+)_(\d+)_/);
+    if (sizeMatch) {
+      const width = parseInt(sizeMatch[1], 10);
+      const height = parseInt(sizeMatch[2], 10);
+      // Skip tiny images (less than 200px on any side)
+      if (width < 200 || height < 200) continue;
+    }
+
+    dominated.push(url);
+  }
+
+  // Deduplicate
+  return [...new Set(dominated)];
 }
 
 // Scrape using Firecrawl
@@ -207,42 +396,82 @@ function parseScrapedData(url: string, scrapeResult: any): ExtractedListing {
   const html = data.html || "";
   const metadata = data.metadata || {};
 
-  // Combine all text sources
+  // Get raw title for structured parsing
+  const rawTitle = metadata["og:title"] || metadata.title || "";
+
+  // Use structured title parser FIRST (handles corrupted FB titles)
+  const parsed = parseTitle(rawTitle);
+
+  // Combine text for supplementary extraction (not for Y/M/M/price)
   const allText = [
-    metadata.title || "",
     metadata.description || "",
-    metadata["og:title"] || "",
     metadata["og:description"] || "",
     markdown,
   ].join(" ");
 
-  // Extract og:image or find images in content
+  // Extract images from multiple sources
   const imageUrls: string[] = [];
   if (metadata["og:image"]) {
     imageUrls.push(metadata["og:image"]);
   }
-  // Could parse more images from HTML here
+  // Parse img tags from HTML
+  const imgMatches = html.matchAll(/<img[^>]+src="([^"]+scontent[^"]+)"/gi);
+  for (const match of imgMatches) {
+    imageUrls.push(match[1]);
+  }
+  // Also check markdown for image URLs
+  const mdImgMatches = markdown.matchAll(/!\[[^\]]*\]\(([^)]+scontent[^)]+)\)/g);
+  for (const match of mdImgMatches) {
+    imageUrls.push(match[1]);
+  }
+
+  // Filter to vehicle images only
+  const filteredImages = filterVehicleImages(imageUrls);
 
   const location = extractLocation(allText);
+  const seller = extractSellerName(allText + " " + markdown, html);
+
+  // Build full description from multiple sources
+  let description = metadata["og:description"] || "";
+  // Try to get more from markdown (after "See more" content if present)
+  const descMatch = markdown.match(/(?:Description|About this item)[:\s]*([^#]+)/i);
+  if (descMatch && descMatch[1].length > description.length) {
+    description = descMatch[1].trim();
+  }
+  // Fallback: use markdown content if longer
+  if (markdown.length > description.length && markdown.length < 5000) {
+    // Clean up markdown - remove nav elements
+    const cleanMd = markdown
+      .replace(/\[.*?\]\(.*?\)/g, '')  // Remove links
+      .replace(/#{1,6}\s+/g, '')       // Remove headers
+      .trim();
+    if (cleanMd.length > description.length) {
+      description = cleanMd.substring(0, 2000);
+    }
+  }
 
   return {
     external_id: extractFacebookItemId(url)!,
     url: normalizeUrl(url),
-    title: metadata["og:title"] || metadata.title || null,
-    asking_price: extractPrice(allText),
-    description: metadata["og:description"] || null,
+    title: rawTitle || null,
+    // Use parsed price first, fallback to text extraction
+    asking_price: parsed.cleanPrice || extractPrice(rawTitle + " " + allText),
+    description: description || null,
     location_city: location.city,
     location_state: location.state,
-    seller_name: null, // Would need to parse from page structure
-    extracted_year: extractYear(allText),
-    extracted_make: extractMake(allText),
-    extracted_model: null, // Hard to extract reliably without AI
+    seller_name: seller.name,
+    seller_profile_url: seller.profileUrl,
+    // Use structured parser for Y/M/M
+    extracted_year: parsed.year || extractYear(allText),
+    extracted_make: parsed.make || extractMake(allText),
+    extracted_model: parsed.model,
     extracted_vin: extractVin(allText),
     extracted_mileage: extractMileage(allText),
-    image_urls: imageUrls,
+    listed_days_ago: extractListedDaysAgo(allText + " " + markdown),
+    image_urls: filteredImages.length > 0 ? filteredImages : imageUrls.slice(0, 10),
     raw_scrape_data: {
       metadata,
-      markdown_preview: markdown.substring(0, 1000),
+      markdown_preview: markdown.substring(0, 2000),
       scraped_at: new Date().toISOString(),
     },
   };

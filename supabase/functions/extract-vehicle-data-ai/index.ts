@@ -8,6 +8,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
+import { getLLMConfig, callLLM, type LLMProvider } from '../_shared/llmProvider.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,12 +37,6 @@ serve(async (req) => {
       )
     }
 
-    // Get OpenAI API key
-    const openaiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openaiKey) {
-      throw new Error('OPENAI_API_KEY not configured')
-    }
-
     // Prepare text content for AI analysis
     const contentToAnalyze = textContent || extractTextFromHTML(html || '')
     const contentPreview = contentToAnalyze.substring(0, 30000) // Limit to 30k chars
@@ -49,16 +44,25 @@ serve(async (req) => {
     // Build AI prompt for extraction
     const prompt = buildExtractionPrompt(url, contentPreview, source)
 
-    // Call OpenAI
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
+    // Initialize Supabase for LLM config
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    // Get LLM config with automatic fallback (Anthropic → Google → OpenAI)
+    // Anthropic first since OpenAI quota is exhausted
+    let llmConfig;
+    let llmResponse;
+    const providers: LLMProvider[] = ['anthropic', 'google', 'openai'];
+    let lastError: Error | null = null;
+
+    for (const provider of providers) {
+      try {
+        llmConfig = await getLLMConfig(supabase, null, provider, undefined, 'tier2');
+        console.log(`[extract-vehicle-data-ai] Trying provider: ${llmConfig.provider}/${llmConfig.model}`);
+
+        llmResponse = await callLLM(llmConfig, [
           {
             role: 'system',
             content: `You are an expert vehicle data extraction specialist. Extract structured vehicle information from listing pages with maximum accuracy. Always return valid JSON.`
@@ -67,30 +71,53 @@ serve(async (req) => {
             role: 'user',
             content: prompt
           }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1, // Low temperature for consistent extraction
-        max_tokens: 2000
-      })
-    })
+        ], {
+          temperature: 0.1,
+          maxTokens: 2000
+        });
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text()
-      throw new Error(`OpenAI API error: ${errorText}`)
+        // Success - break out of retry loop
+        console.log(`[extract-vehicle-data-ai] ✅ Success with ${llmConfig.provider}`);
+        break;
+      } catch (error: any) {
+        lastError = error;
+        console.log(`[extract-vehicle-data-ai] ❌ ${provider} failed: ${error.message}`);
+
+        // If it's a quota error, try next provider
+        if (error.message?.includes('quota') ||
+            error.message?.includes('insufficient') ||
+            error.message?.includes('rate_limit') ||
+            error.message?.includes('429')) {
+          continue;
+        }
+
+        // For other errors, still try next provider
+        continue;
+      }
     }
 
-    const aiData = await openaiResponse.json()
-    const extractedJson = JSON.parse(aiData.choices[0].message.content)
+    if (!llmResponse) {
+      throw lastError || new Error('All LLM providers failed');
+    }
+
+    // Parse response - handle both JSON and text responses
+    let extractedJson;
+    try {
+      extractedJson = JSON.parse(llmResponse.content);
+    } catch {
+      // Try to extract JSON from response text
+      const jsonMatch = llmResponse.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        extractedJson = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('Failed to parse LLM response as JSON');
+      }
+    }
 
     // Validate and normalize extracted data
     const normalized = normalizeExtractedData(extractedJson, url)
 
     // === FIELD-LEVEL EXTRACTION HEALTH LOGGING ===
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
-
     const overallConfidence = extractedJson.confidence || 0.8
     const healthLogger = new ExtractionLogger(supabase, {
       source: source || 'unknown',

@@ -1,0 +1,24 @@
+---
+description: When editing listing/auction extractors, apply the shared quality checklist and resolver.
+globs: supabase/functions/extract-*/**/*.ts, supabase/functions/import-*auction*/**/*.ts
+alwaysApply: false
+---
+
+# Extractor quality (listing/auction)
+
+When you create or modify any edge function that writes to `vehicles` and `external_listings` from a listing URL:
+
+1. **Use the shared resolver before insert**  
+   Import and call `resolveExistingVehicleId` from `_shared/resolveVehicleForListing.ts` so existing vehicles are found by (1) `external_listings` (platform + `listing_url_key`), (2) `vehicles.discovery_url` exact, (3) `vehicles.discovery_url` ILIKE pattern. Only insert when `vehicleId` is null. This avoids `vehicles_discovery_url_unique` violations.
+
+2. **Apply the checklist**  
+   See `supabase/functions/_shared/EXTRACTOR_QUALITY_CHECKLIST.md` for:
+   - Classic car VIN/chassis (use chassis as `vin` when no 17-char VIN)
+   - Estimate, auction calendar position, coachwork, saleroom addendum
+   - Full highlights/specs in metadata (no arbitrary truncation)
+   - `normalizeListingUrlKey(url)` for `external_listings.listing_url_key`
+
+3. **Never overwrite `vehicleId` with `existingListing.vehicle_id`** when the vehicle was resolved via discovery_url or URL pattern—`existingListing` may be null in that path.
+
+4. **Align with reference**  
+   `extract-gooding` is the reference: chassis/coachwork, estimate, calendar position, SRA note, full highlights/specs, duplicate-URL resolution (listing → discovery_url exact → slug ILIKE).

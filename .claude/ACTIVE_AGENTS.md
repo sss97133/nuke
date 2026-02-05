@@ -1,80 +1,136 @@
-# Active Agents Coordination
+# ACTIVE AGENTS - Updated 2026-02-05 01:35
 
-Last updated: 2026-02-02 ~12:00pm PST
+## TELEGRAM SYSTEM V2 - CONFIRMED WORKING ✅
 
-## MEGA SHIP FLEET - 19 Agents Running
+### System Status (verified 2026-02-05)
+- ✅ Button approvals working (A9VBTWUA, YGMCFDZ5, etc. all processed)
+- ✅ Text approvals working (`REQUESTID yes/no/message`)
+- ✅ 10-minute timeout (increased from 5 min)
+- ✅ Confirmation messages sent when approval recorded
+- ✅ Hook script integrated with Claude Code
 
-| Agent | Task | Status |
-|-------|------|--------|
-| a66a703 | BaT pending queue processing | Running |
-| a6af507 | Collecting Cars queue (Typesense API) | Running |
-| a789f98 | C&B Playwright Cloudflare bypass | Running |
-| a8ce971 | Hemmings queue processing | Running |
-| a81e762 | Craigslist backlog | Running |
-| acc92b2 | Failed queue retry (8,752 items) | Running |
-| a5443bb | PCarMarket extraction | Running |
-| a00a224 | Hagerty extraction | Running |
-| a089453 | eBay parts catalog expansion | Running |
-| ad4cf66 | Live auction sync monitor | Running |
-| afa5610 | Regional auction discovery | Running |
-| ae7ec4a | BaT live listings discovery | Running |
-| a915222 | Ollama fallback activation | Running |
-| a635bf7 | Forum discovery (30 sources) | Running |
-| a9a35f1 | Queue health monitor setup | Running |
-| a2855f5 | International auction discovery | Running |
-| ac0f985 | AutoTrader scout | Running |
-| a22228d | CarGurus scout | Running |
-| a348b81 | DuPont Registry scout | Running |
-| a987cde | Specialty builder extractors + self-healing | Running |
+### What Was Built
+Complete bi-directional Telegram system for:
+1. **Claude Code approvals via text** - Reply to permission requests from anywhere
+2. **Intelligent query handling** - Natural language queries processed by Claude API
+3. **Task queueing** - Complex requests queued and processed async
 
-## Principle: NEVER ZERO
+### New Database Tables
+- `claude_approval_requests` - Pending permissions with 10-min expiry
+- `telegram_tasks` - Task queue for complex queries
+- `telegram_conversations` - Multi-turn chat state
+- `telegram_message_log` - Full message history
 
-Extraction must always trend upward. Fallback hierarchy:
-1. Native Extractors (fast, free)
-2. API Bypasses (Typesense, etc.)
-3. Firecrawl (when credits available)
-4. Playwright (slow, free)
-5. Ollama Local (slow, free)
+### New Edge Functions Deployed
+- `nuke-telegram-bot` - Unified entry point (webhook target)
+- `telegram-task-worker` - Claude API task processor
+- `telegram-approval-callback` - Button callback handler
 
-## Priority Queue
+### Local Files Created
+- `~/.claude/hooks/telegram-approval.py` - Permission request hook
+- `/Users/skylar/nuke/agent/nuke_telegram_agent.py` - Local bot (backup)
+- `/Users/skylar/nuke/agent/intelligent_worker.py` - Local task processor
+- `/Users/skylar/nuke/agent/TELEGRAM_SYSTEM.md` - Full documentation
 
-### P0 - Critical
-- [ ] **OpenAI quota exhausted** - blocks AI extractors (Ollama fallback available)
-- [ ] **Cars & Bids Cloudflare** - needs Playwright bypass solution
+### How to Use
+- **Quick commands**: `status`, `approvals`, `help`
+- **Approve Claude**: `ABC12345 yes` or tap inline button
+- **Deny Claude**: `ABC12345 no`
+- **Approve with message**: `ABC12345 go ahead and do it`
 
-### P1 - Process Queues
-- [ ] Process BaT pending extractions
-- [ ] Process Collecting Cars queue items
-- [ ] Process Hemmings queue (30 items)
-- [ ] Process Craigslist backlog
+### Files Modified
+- `~/.claude/settings.local.json` - Added PermissionRequest hook
 
-### P2 - Source Expansion
-- [ ] eBay Motors extractor (ugly source - needs filters)
-- [ ] Copart extractor (salvage - needs filters)
-- [ ] Regional auction house discovery
+### DO NOT TOUCH
+- `~/.claude/hooks/telegram-approval.py` - Active hook
+- `telegram_tasks` table - Active queue
 
-### P3 - Blocked Sources
-- [ ] Cars & Bids (Cloudflare)
-- [ ] Classic.com (Cloudflare)
-- [ ] Mecum (Cloudflare)
-- [ ] Barrett-Jackson (Cloudflare)
+---
 
-## Live Auctions (4k–10k target)
+## EXTRACTION FLEET STATUS
 
-- **2026-02-02:** sync-live-auctions now sets `sale_status = 'auction_live'` so UI/portfolio counts match. CC paginated (up to 10k). See [LIVE_AUCTIONS_STABILITY.md](./LIVE_AUCTIONS_STABILITY.md).
-- Deploy: run migration `20260202_vehicles_sale_status_auction_live.sql`, then `supabase functions deploy sync-live-auctions --no-verify-jwt`.
+### Running Processes
+- **BaT Workers**: ~20+ autonomous workers processing 46K pending BaT listings
+- **Playwright Multi-Source**: Extracting C&B, Hagerty, PCarMarket (bypassing Firecrawl)
+- **C&B VIN Backfill**: Playwright-based VIN extraction for Cars & Bids
+- **Gooding Batch**: Processing 9K+ auction lots
+- **RM Sotheby's**: Processing multiple auctions (PA26, AZ26, AZ25, MT25)
 
-## Session Stats
+### Queue Status (as of extraction start)
+- **Pending**: ~46K (mostly BaT)
+- **Complete**: ~138K
+- **Processing Rate**: ~3K/hour
 
-| Metric | Value |
-|--------|-------|
-| Vehicles | 219,610 |
-| Live Auctions (target 4k–10k) | sync sets sale_status=auction_live; CC paginated |
-| Pending Queue | 71,489 |
-| Active Sources | 5 (BaT, CC, CL, Hagerty, PCarMarket) |
-| Blocked Sources | 4 (C&B, Classic.com, Mecum, BJ) |
+### BLOCKERS - DO NOT RETRY THESE
+1. **OpenAI**: Quota exceeded - affects coordinator only
+2. **Firecrawl**: Credits exhausted - use Playwright fallback instead
 
-## How to Claim
-1. Pick an unclaimed task from priority queue
-2. Add yourself to Running table
-3. Check the task box when done
+---
+
+## PHOTO PIPELINE (skylar session - active)
+
+### What I'm Building
+- **Telegram intake** → Cloud storage → photo_inbox queue
+- **YONO** - Custom YOLOv8 classifier for vehicle ID
+- **SMS review** - Low confidence photos trigger tech notification
+
+### New Tables Created
+- `photo_inbox` - Fast intake queue (no triggers)
+- `photo_training_data` - Corrections for YONO training
+
+### New Functions Deployed
+- `telegram-intake` - Simplified, direct to storage
+- `sms-review` - SMS-based photo assignment
+
+### Files Modified
+- `/Users/skylar/nuke/supabase/functions/telegram-intake/index.ts`
+- `/Users/skylar/nuke/yono/` - YONO training pipeline
+
+### Storage
+- Bucket: `vehicle-photos` (public)
+
+### DO NOT TOUCH
+- `photo_inbox` table
+- `telegram-intake` function
+- `vehicle-photos` bucket
+
+---
+
+## What's Working
+- BaT direct HTML extraction (no API needed)
+- Gooding (Gatsby/Contentful API)
+- RM Sotheby's (direct API)
+- Playwright-based extraction (local browser)
+- **Telegram photo upload** (just deployed)
+
+### Extractors by Source
+| Source | Extractor | Status |
+|--------|-----------|--------|
+| BaT | extract-bat-core | ✅ Running |
+| Cars & Bids | playwright-multi | ✅ Running |
+| Gooding | extract-gooding | ✅ Running |
+| RM Sotheby's | extract-rmsothebys | ✅ Running |
+| PCarMarket | playwright-multi | ✅ Running |
+| Hagerty | playwright-multi | ✅ Running |
+| Mecum | needs Playwright setup | ⚠️ Pending |
+| Collecting Cars | extract-collecting-cars-simple | ⚠️ Not queued |
+
+---
+
+## Scripts to Monitor
+```bash
+# Check queue status
+PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "SELECT status, COUNT(*) FROM import_queue GROUP BY status;"
+
+# Check photo inbox
+psql ... -c "SELECT source, COUNT(*), COUNT(*) FILTER (WHERE processed) as done FROM photo_inbox GROUP BY source;"
+
+# Check active workers
+ps aux | grep -E "(autonomous-bat|playwright|extract-)" | grep -v grep | wc -l
+```
+
+### Next Steps for Other Agents
+1. Continue BaT processing (auto-running)
+2. Monitor Playwright extraction progress
+3. Don't restart Firecrawl-dependent extractors - use Playwright
+4. **Don't modify photo pipeline tables/functions** - active development

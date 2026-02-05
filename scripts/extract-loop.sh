@@ -1,35 +1,59 @@
 #!/bin/bash
-# Simple extraction loop - runs continuously
+# Continuous BaT extraction loop
+# Usage: ./scripts/extract-loop.sh [batch_size] [batches]
+
 cd /Users/skylar/nuke
-source .env 2>/dev/null || true
+BATCH_SIZE=${1:-50}
+BATCHES=${2:-20}
 
-LOG="logs/extract-loop-$(date +%Y%m%d-%H%M%S).log"
-echo "Starting extraction loop at $(date)" | tee "$LOG"
-echo "Log: $LOG"
+echo "Starting extraction loop: $BATCHES batches of $BATCH_SIZE"
 
-BATCH=50
-WORKERS=3
+total_success=0
+total_fail=0
 
-while true; do
-  # Check pending count
-  PENDING=$(PGPASSWORD='RbzKq32A0uhqvJMQ' psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT COUNT(*) FROM import_queue WHERE status = 'pending'" 2>/dev/null | tr -d ' ')
-
-  if [[ "$PENDING" -eq 0 ]]; then
-    echo "[$(date +%H:%M:%S)] No pending items. Sleeping 5min..." | tee -a "$LOG"
-    sleep 300
-    continue
+for batch in $(seq 1 $BATCHES); do
+  urls=$(dotenvx run -- bash -c '
+    PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
+    SELECT listing_url FROM import_queue 
+    WHERE status = '\''pending'\'' 
+    AND listing_url LIKE '\''%bringatrailer%'\''
+    AND attempts < 3
+    ORDER BY RANDOM()
+    LIMIT '"$BATCH_SIZE"';
+    "' 2>/dev/null | grep "http" | tr -d " ")
+  
+  if [ -z "$urls" ]; then
+    echo "No more pending items"
+    break
   fi
-
-  echo "[$(date +%H:%M:%S)] $PENDING pending. Running $WORKERS workers..." | tee -a "$LOG"
-
-  # Run workers in parallel
-  for i in $(seq 1 $WORKERS); do
-    curl -s -X POST "$VITE_SUPABASE_URL/functions/v1/process-import-queue" \
-      -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-      -H "Content-Type: application/json" \
-      -d "{\"batch_size\": $BATCH}" >> "$LOG" 2>&1 &
+  
+  success=0
+  fail=0
+  
+  for url in $urls; do
+    result=$(dotenvx run -- bash -c "curl -s -X POST \"\$VITE_SUPABASE_URL/functions/v1/complete-bat-import\" \
+      -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" \
+      -H \"Content-Type: application/json\" \
+      -d '{\"url\": \"$url\"}' --max-time 45" 2>/dev/null)
+    
+    if echo "$result" | grep -q '"success":true'; then
+      success=$((success + 1))
+      dotenvx run -- bash -c "PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET status='complete', processed_at=NOW() WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
+    else
+      fail=$((fail + 1))
+      dotenvx run -- bash -c "PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET attempts=attempts+1 WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
+    fi
   done
-
-  wait
-  sleep 10
+  
+  total_success=$((total_success + success))
+  total_fail=$((total_fail + fail))
+  pct=$((success * 100 / (success + fail)))
+  
+  echo "[Batch $batch/$BATCHES] +$success vehicles ($pct%) | Total: $total_success success, $total_fail failed"
 done
+
+echo ""
+echo "=== EXTRACTION LOOP COMPLETE ==="
+echo "Total Success: $total_success"
+echo "Total Failed: $total_fail"
+echo "Success Rate: $((total_success * 100 / (total_success + total_fail)))%"

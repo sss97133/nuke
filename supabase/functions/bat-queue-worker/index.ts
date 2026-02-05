@@ -103,15 +103,45 @@ serve(async (req) => {
       processed: 0,
       succeeded: 0,
       failed: 0,
+      rate_limited: 0,
       vehicle_ids: [] as string[],
+      circuit_breaker_triggered: false,
     };
+
+    // Circuit breaker: stop if we hit too many rate limits
+    const RATE_LIMIT_THRESHOLD = 3;
+    let consecutiveRateLimits = 0;
 
     // Process each URL
     for (const item of batItems) {
+      // Circuit breaker check
+      if (consecutiveRateLimits >= RATE_LIMIT_THRESHOLD) {
+        results.circuit_breaker_triggered = true;
+        // Release remaining items back to queue with delay
+        const remainingIds = batItems
+          .slice(batItems.indexOf(item))
+          .map((i: any) => i.id);
+        if (remainingIds.length > 0) {
+          const retryAfter = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
+          await supabase.from("import_queue")
+            .update({
+              status: "pending",
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: retryAfter,
+              error_message: "CIRCUIT_BREAKER: Rate limited, backing off 10 min",
+            })
+            .in("id", remainingIds);
+        }
+        break;
+      }
+
       const url = item.listing_url;
 
-      // Stealth delay (2-5 seconds)
-      await randomDelay(2000, 5000);
+      // Adaptive delay: longer if we've seen rate limits
+      const baseDelay = consecutiveRateLimits > 0 ? 5000 : 2000;
+      const maxDelay = consecutiveRateLimits > 0 ? 10000 : 5000;
+      await randomDelay(baseDelay, maxDelay);
 
       try {
         // Call extract-bat-core
@@ -130,6 +160,7 @@ serve(async (req) => {
         const extractResult = await extractResponse.json();
 
         if (extractResult.success) {
+          consecutiveRateLimits = 0; // Reset on success
           const vehicleId = extractResult.created_vehicle_ids?.[0] ||
                            extractResult.updated_vehicle_ids?.[0];
 
@@ -140,6 +171,7 @@ serve(async (req) => {
             processed_at: new Date().toISOString(),
             locked_at: null,
             locked_by: null,
+            error_message: null,
           }).eq("id", item.id);
 
           results.succeeded++;
@@ -166,14 +198,46 @@ serve(async (req) => {
           throw new Error(extractResult.error || "Extraction failed");
         }
       } catch (e: any) {
-        // Mark failed or back to pending
-        await supabase.from("import_queue").update({
-          status: item.attempts >= 3 ? "failed" : "pending",
-          error_message: e.message,
-          processed_at: new Date().toISOString(),
-          locked_at: null,
-          locked_by: null,
-        }).eq("id", item.id);
+        const errorMsg = e.message || String(e);
+        const isRateLimit = errorMsg.includes("RATE_LIMITED") ||
+                           errorMsg.includes("BLOCKED") ||
+                           errorMsg.includes("429") ||
+                           errorMsg.includes("login");
+        const isGone = errorMsg.includes("410") || errorMsg.includes("Gone") || errorMsg.includes("404");
+
+        if (isRateLimit) {
+          consecutiveRateLimits++;
+          results.rate_limited++;
+          // Don't count against attempts for rate limits - not our fault
+          const retryAfter = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+          await supabase.from("import_queue").update({
+            status: "pending",
+            error_message: errorMsg,
+            next_attempt_at: retryAfter,
+            locked_at: null,
+            locked_by: null,
+          }).eq("id", item.id);
+        } else if (isGone) {
+          // Page doesn't exist - mark as skipped, don't retry
+          await supabase.from("import_queue").update({
+            status: "skipped",
+            error_message: errorMsg,
+            processed_at: new Date().toISOString(),
+            locked_at: null,
+            locked_by: null,
+          }).eq("id", item.id);
+          consecutiveRateLimits = 0;
+        } else {
+          // Regular failure - count attempts
+          consecutiveRateLimits = 0;
+          await supabase.from("import_queue").update({
+            status: item.attempts >= 3 ? "failed" : "pending",
+            error_message: errorMsg,
+            processed_at: new Date().toISOString(),
+            locked_at: null,
+            locked_by: null,
+          }).eq("id", item.id);
+        }
 
         results.failed++;
       }

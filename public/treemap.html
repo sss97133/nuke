@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuke Source Distribution</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #333;
+    }
+
+    .title {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    .title span {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #e0e0e0;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: #333;
+    }
+
+    .btn.active {
+      background: #333;
+      border-color: #666;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #888;
+    }
+
+    .stat-value {
+      color: #e0e0e0;
+      font-weight: 600;
+    }
+
+    .breadcrumb {
+      margin-bottom: 15px;
+      font-size: 14px;
+      color: #888;
+    }
+
+    .breadcrumb a {
+      color: #888;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .breadcrumb a:hover {
+      color: #e0e0e0;
+    }
+
+    .breadcrumb .separator {
+      margin: 0 8px;
+    }
+
+    .breadcrumb .current {
+      color: #e0e0e0;
+    }
+
+    #treemap {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #333;
+      background: #111;
+    }
+
+    .node {
+      stroke: #1a1a1a;
+      stroke-width: 1px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .node:hover {
+      opacity: 0.85;
+    }
+
+    .node-label {
+      font-size: 12px;
+      fill: #1a1a1a;
+      pointer-events: none;
+      font-weight: 500;
+    }
+
+    .node-value {
+      font-size: 10px;
+      fill: #1a1a1a;
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    .tooltip {
+      position: fixed;
+      background: #000;
+      border: 1px solid #333;
+      padding: 15px 20px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 1000;
+      min-width: 200px;
+    }
+
+    .tooltip.visible {
+      opacity: 1;
+    }
+
+    .tooltip-title {
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #e0e0e0;
+    }
+
+    .tooltip-value {
+      font-size: 28px;
+      font-weight: 600;
+      color: #7fff00;
+      margin-bottom: 12px;
+    }
+
+    .tooltip-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: #888;
+    }
+
+    .tooltip-row .value {
+      color: #e0e0e0;
+    }
+
+    .legend {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #888;
+    }
+
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title">Nuke <span>Source Distribution</span></div>
+      <div class="controls">
+        <button class="btn active" data-metric="universe">Universe Size</button>
+        <button class="btn" data-metric="extracted">Extracted</button>
+        <button class="btn" data-metric="quality">Quality Score</button>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div>Total Sources: <span class="stat-value" id="total-sources">0</span></div>
+      <div>Total Universe: <span class="stat-value" id="total-universe">0</span></div>
+      <div>Total Extracted: <span class="stat-value" id="total-extracted">0</span></div>
+    </div>
+
+    <div class="breadcrumb" id="breadcrumb">
+      <span class="current">All Sources</span>
+    </div>
+
+    <svg id="treemap"></svg>
+
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-title"></div>
+    <div class="tooltip-value"></div>
+    <div class="tooltip-stats"></div>
+  </div>
+
+  <script>
+    // Data from Nuke database
+    const sourceRegistry = [
+      // Auctions - Active
+      { slug: "bringatrailer", name: "Bring a Trailer", category: "auction", status: "active", universe: 95000, extracted: 0, quality: 0.95 },
+      { slug: "pcarmarket", name: "PCarMarket", category: "auction", status: "active", universe: 8000, extracted: 1311, quality: 0.90 },
+      { slug: "collecting-cars", name: "Collecting Cars", category: "auction", status: "active", universe: 5000, extracted: 0, quality: 0.90 },
+      { slug: "hagerty", name: "Hagerty Marketplace", category: "auction", status: "active", universe: 3000, extracted: 80, quality: 0.90 },
+
+      // Auctions - Blocked
+      { slug: "mecum", name: "Mecum Auctions", category: "auction", status: "blocked", universe: 150000, extracted: 0, quality: 0.90 },
+      { slug: "cars-and-bids", name: "Cars & Bids", category: "auction", status: "blocked", universe: 12000, extracted: 0, quality: 0.95 },
+      { slug: "barrett-jackson", name: "Barrett-Jackson", category: "auction", status: "blocked", universe: 75000, extracted: 0, quality: 0.90 },
+      { slug: "classic-com", name: "Classic.com", category: "auction", status: "blocked", universe: 50000, extracted: 0, quality: 0.85 },
+      { slug: "broad-arrow", name: "Broad Arrow", category: "auction", status: "blocked", universe: 2000, extracted: 0, quality: 0.90 },
+      { slug: "shannons", name: "Shannons (AU)", category: "auction", status: "blocked", universe: 8000, extracted: 0, quality: 0.80 },
+
+      // Auctions - Pending
+      { slug: "rm-sothebys", name: "RM Sotheby's", category: "auction", status: "pending", universe: 25000, extracted: 0, quality: 0.95 },
+      { slug: "gooding", name: "Gooding & Co", category: "auction", status: "pending", universe: 8000, extracted: 0, quality: 0.90 },
+      { slug: "bonhams", name: "Bonhams", category: "auction", status: "pending", universe: 15000, extracted: 0, quality: 0.90 },
+      { slug: "russo-steele", name: "Russo & Steele", category: "auction", status: "pending", universe: 5000, extracted: 0, quality: 0.85 },
+      { slug: "worldwide", name: "Worldwide", category: "auction", status: "pending", universe: 3000, extracted: 0, quality: 0.85 },
+      { slug: "leake", name: "Leake Auctions", category: "auction", status: "pending", universe: 4000, extracted: 0, quality: 0.75 },
+      { slug: "carlisle", name: "Carlisle", category: "auction", status: "pending", universe: 3000, extracted: 0, quality: 0.75 },
+      { slug: "gaa", name: "GAA Classic Cars", category: "auction", status: "pending", universe: 5000, extracted: 0, quality: 0.80 },
+      { slug: "bh-auction", name: "BH Auction (JP)", category: "auction", status: "pending", universe: 2000, extracted: 0, quality: 0.80 },
+      { slug: "uss-auto", name: "USS Auto (JP)", category: "auction", status: "pending", universe: 50000, extracted: 0, quality: 0.75 },
+      { slug: "historics", name: "Historics (UK)", category: "auction", status: "pending", universe: 3000, extracted: 0, quality: 0.80 },
+      { slug: "iconic", name: "Iconic Auctioneers", category: "auction", status: "pending", universe: 2500, extracted: 0, quality: 0.80 },
+      { slug: "hh-classics", name: "H&H Classics", category: "auction", status: "pending", universe: 3000, extracted: 0, quality: 0.80 },
+
+      // Marketplaces - Active
+      { slug: "craigslist", name: "Craigslist", category: "marketplace", status: "active", universe: 500000, extracted: 0, quality: 0.60 },
+      { slug: "cargurus", name: "CarGurus", category: "marketplace", status: "active", universe: 2000000, extracted: 0, quality: 0.70 },
+      { slug: "cars-com", name: "Cars.com", category: "marketplace", status: "active", universe: 1500000, extracted: 0, quality: 0.70 },
+      { slug: "autotrader", name: "AutoTrader", category: "marketplace", status: "active", universe: 1000000, extracted: 0, quality: 0.70 },
+      { slug: "carfax", name: "Carfax", category: "marketplace", status: "active", universe: 500000, extracted: 0, quality: 0.75 },
+      { slug: "truecar", name: "TrueCar", category: "marketplace", status: "active", universe: 300000, extracted: 0, quality: 0.70 },
+      { slug: "edmunds", name: "Edmunds", category: "marketplace", status: "active", universe: 400000, extracted: 0, quality: 0.70 },
+      { slug: "kbb", name: "Kelley Blue Book", category: "marketplace", status: "active", universe: 300000, extracted: 0, quality: 0.75 },
+
+      // Marketplaces - Other
+      { slug: "hemmings", name: "Hemmings", category: "marketplace", status: "degraded", universe: 25000, extracted: 60, quality: 0.85 },
+      { slug: "dupont", name: "duPont Registry", category: "marketplace", status: "pending", universe: 15000, extracted: 0, quality: 0.90 },
+      { slug: "ebay-motors", name: "eBay Motors", category: "marketplace", status: "not_started", universe: 500000, extracted: 0, quality: 0.40 },
+      { slug: "copart", name: "Copart", category: "marketplace", status: "not_started", universe: 200000, extracted: 0, quality: 0.30 },
+      { slug: "facebook", name: "FB Marketplace", category: "marketplace", status: "pending", universe: 1000000, extracted: 0, quality: 0.60 },
+
+      // EU Marketplaces
+      { slug: "mobile-de", name: "Mobile.de (DE)", category: "marketplace", status: "pending", universe: 800000, extracted: 0, quality: 0.75 },
+      { slug: "autoscout24", name: "AutoScout24 (EU)", category: "marketplace", status: "pending", universe: 600000, extracted: 0, quality: 0.75 },
+      { slug: "leboncoin", name: "Leboncoin (FR)", category: "marketplace", status: "pending", universe: 400000, extracted: 0, quality: 0.70 },
+      { slug: "blocket", name: "Blocket (SE)", category: "marketplace", status: "pending", universe: 100000, extracted: 0, quality: 0.70 },
+      { slug: "autotrader-uk", name: "AutoTrader UK", category: "marketplace", status: "pending", universe: 300000, extracted: 0, quality: 0.75 },
+      { slug: "classic-driver", name: "Classic Driver", category: "marketplace", status: "pending", universe: 10000, extracted: 0, quality: 0.85 },
+
+      // Forums - Porsche
+      { slug: "rennlist", name: "Rennlist", category: "forum", status: "not_started", universe: 50000, extracted: 0, quality: 0.60 },
+      { slug: "pelican-porsche", name: "Pelican Porsche", category: "forum", status: "not_started", universe: 30000, extracted: 0, quality: 0.60 },
+      { slug: "6speedonline", name: "6SpeedOnline", category: "forum", status: "not_started", universe: 25000, extracted: 0, quality: 0.60 },
+
+      // Forums - BMW
+      { slug: "bimmerfest", name: "BimmerFest", category: "forum", status: "not_started", universe: 40000, extracted: 0, quality: 0.55 },
+      { slug: "e30zone", name: "E30 Zone", category: "forum", status: "not_started", universe: 15000, extracted: 0, quality: 0.55 },
+      { slug: "r3vlimited", name: "R3VLimited", category: "forum", status: "not_started", universe: 20000, extracted: 0, quality: 0.60 },
+
+      // Forums - American
+      { slug: "corvetteforum", name: "Corvette Forum", category: "forum", status: "not_started", universe: 60000, extracted: 0, quality: 0.55 },
+      { slug: "mustangforums", name: "Mustang Forums", category: "forum", status: "not_started", universe: 50000, extracted: 0, quality: 0.55 },
+      { slug: "camaros", name: "Camaros.net", category: "forum", status: "not_started", universe: 25000, extracted: 0, quality: 0.50 },
+
+      // Forums - Japanese
+      { slug: "zcar", name: "ZCar Forum", category: "forum", status: "not_started", universe: 20000, extracted: 0, quality: 0.55 },
+      { slug: "miatanet", name: "Miata.net", category: "forum", status: "not_started", universe: 35000, extracted: 0, quality: 0.55 },
+      { slug: "nasioc", name: "NASIOC Subaru", category: "forum", status: "not_started", universe: 40000, extracted: 0, quality: 0.55 },
+
+      // Forums - Other
+      { slug: "ferrarichat", name: "FerrariChat", category: "forum", status: "not_started", universe: 15000, extracted: 0, quality: 0.65 },
+      { slug: "thesamba", name: "TheSamba VW", category: "forum", status: "not_started", universe: 80000, extracted: 0, quality: 0.70 },
+      { slug: "benzworld", name: "BenzWorld", category: "forum", status: "not_started", universe: 30000, extracted: 0, quality: 0.55 },
+      { slug: "defendersource", name: "Defender Source", category: "forum", status: "not_started", universe: 20000, extracted: 0, quality: 0.60 },
+
+      // Registries
+      { slug: "hagerty-val", name: "Hagerty Valuation", category: "registry", status: "active", universe: 100000, extracted: 0, quality: 0.85 },
+      { slug: "ferrari-classiche", name: "Ferrari Classiche", category: "registry", status: "pending", universe: 15000, extracted: 0, quality: 0.98 },
+      { slug: "porsche-coa", name: "Porsche CoA", category: "registry", status: "pending", universe: 50000, extracted: 0, quality: 0.98 },
+      { slug: "lamborghini-polo", name: "Lambo Polo Storico", category: "registry", status: "pending", universe: 5000, extracted: 0, quality: 0.98 },
+      { slug: "bmw-classic", name: "BMW Classic", category: "registry", status: "pending", universe: 20000, extracted: 0, quality: 0.95 },
+      { slug: "mercedes-classic", name: "MB Classic", category: "registry", status: "pending", universe: 30000, extracted: 0, quality: 0.95 },
+      { slug: "yenko-registry", name: "Yenko Registry", category: "registry", status: "active", universe: 3000, extracted: 0, quality: 0.97 },
+      { slug: "hemi-registry", name: "426 Hemi Registry", category: "registry", status: "active", universe: 5000, extracted: 0, quality: 0.90 },
+
+      // Dealers
+      { slug: "manheim", name: "Manheim", category: "dealer", status: "not_started", universe: 500000, extracted: 0, quality: 0.65 },
+    ];
+
+    // Category colors (muted, professional)
+    const categoryColors = {
+      auction: '#4a7c59',      // Forest green
+      marketplace: '#5c6b73',  // Steel gray
+      forum: '#7a6c5d',        // Taupe
+      registry: '#5d6d7e',     // Slate blue
+      dealer: '#6b5b4f',       // Brown
+      social_media: '#6c5b7b', // Purple
+    };
+
+    const statusColors = {
+      active: '#7fff00',
+      blocked: '#ff6b6b',
+      pending: '#ffd93d',
+      degraded: '#ff9f43',
+      not_started: '#a0a0a0'
+    };
+
+    // Build hierarchical data
+    function buildHierarchy(data, metric = 'universe') {
+      const categories = {};
+
+      data.forEach(source => {
+        if (!categories[source.category]) {
+          categories[source.category] = {
+            name: source.category.charAt(0).toUpperCase() + source.category.slice(1).replace('_', ' '),
+            category: source.category,
+            children: []
+          };
+        }
+
+        let value;
+        switch(metric) {
+          case 'extracted':
+            value = Math.max(source.extracted, 1);
+            break;
+          case 'quality':
+            value = (source.quality || 0.5) * 100;
+            break;
+          default:
+            value = source.universe || 1000;
+        }
+
+        categories[source.category].children.push({
+          name: source.name,
+          slug: source.slug,
+          category: source.category,
+          status: source.status,
+          universe: source.universe,
+          extracted: source.extracted,
+          quality: source.quality,
+          value: value
+        });
+      });
+
+      return {
+        name: "All Sources",
+        children: Object.values(categories)
+      };
+    }
+
+    // Format numbers
+    function formatNumber(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
+      return n.toString();
+    }
+
+    // Calculate totals
+    function updateStats() {
+      const totalSources = sourceRegistry.length;
+      const totalUniverse = sourceRegistry.reduce((sum, s) => sum + (s.universe || 0), 0);
+      const totalExtracted = sourceRegistry.reduce((sum, s) => sum + (s.extracted || 0), 0);
+
+      document.getElementById('total-sources').textContent = totalSources;
+      document.getElementById('total-universe').textContent = formatNumber(totalUniverse);
+      document.getElementById('total-extracted').textContent = formatNumber(totalExtracted);
+    }
+
+    // Main visualization
+    let currentMetric = 'universe';
+    let currentRoot = null;
+    let rootData = null;
+
+    function render(data, parent = null) {
+      const container = document.getElementById('treemap');
+      const width = container.clientWidth || 1200;
+      const height = 600;
+
+      container.innerHTML = '';
+
+      const svg = d3.select('#treemap')
+        .attr('width', width)
+        .attr('height', height);
+
+      const hierarchy = d3.hierarchy(data)
+        .sum(d => d.value || 0)
+        .sort((a, b) => b.value - a.value);
+
+      const treemap = d3.treemap()
+        .size([width, height])
+        .padding(2)
+        .round(true);
+
+      treemap(hierarchy);
+
+      currentRoot = hierarchy;
+
+      // Update breadcrumb
+      updateBreadcrumb(parent);
+
+      const nodes = svg.selectAll('g')
+        .data(hierarchy.leaves())
+        .join('g')
+        .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+      // Rectangles
+      nodes.append('rect')
+        .attr('class', 'node')
+        .attr('width', d => Math.max(0, d.x1 - d.x0))
+        .attr('height', d => Math.max(0, d.y1 - d.y0))
+        .attr('fill', d => {
+          const baseColor = categoryColors[d.data.category] || '#666';
+          // Adjust brightness based on status
+          if (d.data.status === 'blocked') return d3.color(baseColor).darker(0.5);
+          if (d.data.status === 'not_started') return d3.color(baseColor).darker(0.8);
+          if (d.data.status === 'pending') return d3.color(baseColor).darker(0.3);
+          return baseColor;
+        })
+        .on('mouseover', showTooltip)
+        .on('mousemove', moveTooltip)
+        .on('mouseout', hideTooltip)
+        .on('click', (event, d) => {
+          if (d.parent && d.parent.data.children) {
+            // Drill into category
+            const categoryData = {
+              name: d.parent.data.name,
+              children: d.parent.data.children
+            };
+            render(categoryData, d.parent.data);
+          }
+        });
+
+      // Labels
+      nodes.filter(d => (d.x1 - d.x0) > 60 && (d.y1 - d.y0) > 30)
+        .append('text')
+        .attr('class', 'node-label')
+        .attr('x', 6)
+        .attr('y', 16)
+        .text(d => {
+          const maxLen = Math.floor((d.x1 - d.x0 - 12) / 7);
+          return d.data.name.length > maxLen ? d.data.name.slice(0, maxLen) + '…' : d.data.name;
+        });
+
+      // Values
+      nodes.filter(d => (d.x1 - d.x0) > 50 && (d.y1 - d.y0) > 45)
+        .append('text')
+        .attr('class', 'node-value')
+        .attr('x', 6)
+        .attr('y', 30)
+        .text(d => {
+          if (currentMetric === 'quality') return (d.data.quality * 100).toFixed(0) + '%';
+          if (currentMetric === 'extracted') return formatNumber(d.data.extracted);
+          return formatNumber(d.data.universe);
+        });
+    }
+
+    function updateBreadcrumb(parent) {
+      const bc = document.getElementById('breadcrumb');
+      if (!parent) {
+        bc.innerHTML = '<span class="current">All Sources</span>';
+      } else {
+        bc.innerHTML = `
+          <a onclick="renderRoot()">All Sources</a>
+          <span class="separator">›</span>
+          <span class="current">${parent.name}</span>
+        `;
+      }
+    }
+
+    function renderRoot() {
+      rootData = buildHierarchy(sourceRegistry, currentMetric);
+      render(rootData);
+    }
+
+    function showTooltip(event, d) {
+      const tooltip = document.getElementById('tooltip');
+      const total = currentRoot.value;
+      const parentValue = d.parent ? d.parent.value : total;
+
+      let valueDisplay;
+      if (currentMetric === 'quality') {
+        valueDisplay = (d.data.quality * 100).toFixed(0) + '%';
+      } else if (currentMetric === 'extracted') {
+        valueDisplay = formatNumber(d.data.extracted);
+      } else {
+        valueDisplay = formatNumber(d.data.universe);
+      }
+
+      tooltip.querySelector('.tooltip-title').textContent = d.data.name;
+      tooltip.querySelector('.tooltip-value').textContent = valueDisplay;
+      tooltip.querySelector('.tooltip-stats').innerHTML = `
+        <div class="tooltip-row">
+          <span>${((d.value / total) * 100).toFixed(1)}%</span>
+          <span class="value">of Total</span>
+        </div>
+        <div class="tooltip-row">
+          <span>${((d.value / parentValue) * 100).toFixed(1)}%</span>
+          <span class="value">of ${d.parent?.data?.name || 'Category'}</span>
+        </div>
+        <div class="tooltip-row" style="margin-top: 8px; border-top: 1px solid #333; padding-top: 8px;">
+          <span>Status</span>
+          <span class="value" style="color: ${statusColors[d.data.status]}">${d.data.status}</span>
+        </div>
+        <div class="tooltip-row">
+          <span>Universe</span>
+          <span class="value">${formatNumber(d.data.universe)}</span>
+        </div>
+        <div class="tooltip-row">
+          <span>Extracted</span>
+          <span class="value">${formatNumber(d.data.extracted)}</span>
+        </div>
+        <div class="tooltip-row">
+          <span>Quality</span>
+          <span class="value">${d.data.quality ? (d.data.quality * 100).toFixed(0) + '%' : 'N/A'}</span>
+        </div>
+      `;
+
+      tooltip.classList.add('visible');
+    }
+
+    function moveTooltip(event) {
+      const tooltip = document.getElementById('tooltip');
+      const x = event.clientX + 15;
+      const y = event.clientY + 15;
+
+      // Keep tooltip on screen
+      const rect = tooltip.getBoundingClientRect();
+      const maxX = window.innerWidth - rect.width - 20;
+      const maxY = window.innerHeight - rect.height - 20;
+
+      tooltip.style.left = Math.min(x, maxX) + 'px';
+      tooltip.style.top = Math.min(y, maxY) + 'px';
+    }
+
+    function hideTooltip() {
+      document.getElementById('tooltip').classList.remove('visible');
+    }
+
+    // Build legend
+    function buildLegend() {
+      const legend = document.getElementById('legend');
+      legend.innerHTML = '';
+
+      Object.entries(categoryColors).forEach(([cat, color]) => {
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `
+          <div class="legend-color" style="background: ${color}"></div>
+          <span>${cat.charAt(0).toUpperCase() + cat.slice(1).replace('_', ' ')}</span>
+        `;
+        legend.appendChild(item);
+      });
+
+      // Status legend
+      const statusLegend = document.createElement('div');
+      statusLegend.style.marginLeft = '30px';
+      statusLegend.style.display = 'flex';
+      statusLegend.style.gap = '15px';
+      statusLegend.innerHTML = Object.entries(statusColors).map(([status, color]) => `
+        <span style="color: ${color}; font-size: 11px;">● ${status}</span>
+      `).join('');
+      legend.appendChild(statusLegend);
+    }
+
+    // Control buttons
+    document.querySelectorAll('.btn[data-metric]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn[data-metric]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMetric = btn.dataset.metric;
+        renderRoot();
+      });
+    });
+
+    // Init
+    updateStats();
+    buildLegend();
+    renderRoot();
+
+    // Handle resize
+    window.addEventListener('resize', () => renderRoot());
+  </script>
+</body>
+</html>

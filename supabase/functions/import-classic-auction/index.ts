@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -237,15 +238,13 @@ serve(async (req) => {
       parseIsoDateFromJsonLd(html, ['endDate', 'validThrough']) ||
       null;
 
-    // Upsert vehicle: we keep it private by default (VIN public safety can block is_public=true)
-    let vehicleId: string | null = null;
-    const { data: existingVehicle } = await supabase
-      .from('vehicles')
-      .select('id')
-      .or(`listing_url.eq.${url},discovery_url.eq.${url}`)
-      .limit(1)
-      .maybeSingle();
-    if (existingVehicle?.id) vehicleId = existingVehicle.id;
+    // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
+    const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+      url,
+      platform: 'classic_com',
+      discoveryUrlIlikePattern: discoveryUrlIlikePattern(url),
+    });
+    let vehicleId: string | null = resolvedId;
 
     if (!vehicleId) {
       const { data: newVehicle, error: vehicleErr } = await supabase

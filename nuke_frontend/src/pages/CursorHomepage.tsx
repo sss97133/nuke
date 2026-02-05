@@ -9,7 +9,8 @@ import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
 import { parseMoneyNumber } from '../lib/auctionUtils';
 import { preloadImageBatch, optimizeImageUrl } from '../lib/imageOptimizer';
 import ActiveAuctionsPanel from '../components/dashboard/ActiveAuctionsPanel';
-import { ValueTrendsPanel } from '../components/charts';
+import FBMarketplacePanel from '../components/dashboard/FBMarketplacePanel';
+// import { ValueTrendsPanel } from '../components/charts'; // Temporarily disabled - import bug
 
 interface HypeVehicle {
   id: string;
@@ -546,6 +547,7 @@ const CursorHomepage: React.FC = () => {
   const [statsPanelRows, setStatsPanelRows] = useState<any[]>([]);
   const [statsPanelMeta, setStatsPanelMeta] = useState<any>(null);
   const [showActiveAuctionsPanel, setShowActiveAuctionsPanel] = useState(false);
+  const [showFBMarketplacePanel, setShowFBMarketplacePanel] = useState(false);
   const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
@@ -1148,6 +1150,31 @@ const CursorHomepage: React.FC = () => {
     }
   }, [session]);
 
+  // Refetch feed when source filter changes so first page reflects selected sources (server-side filter)
+  const sourceFilterKey = [
+    filters.hideBat,
+    filters.hideCraigslist,
+    filters.hideDealerListings,
+    filters.hideDealerSites,
+    filters.hideKsl,
+    filters.hideClassic,
+    (filters.hiddenSources || []).join(','),
+  ].join('\n');
+  const prevSourceFilterKeyRef = useRef<string>(sourceFilterKey);
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      prevSourceFilterKeyRef.current = sourceFilterKey;
+      return;
+    }
+    if (prevSourceFilterKeyRef.current === sourceFilterKey) return;
+    prevSourceFilterKeyRef.current = sourceFilterKey;
+    setPage(0);
+    setHasMore(true);
+    loadHypeFeed(0, false);
+  }, [sourceFilterKey]);
+
   // Load active sources from database
   const [activeSources, setActiveSources] = useState<Array<{
     id: string;
@@ -1182,6 +1209,15 @@ const CursorHomepage: React.FC = () => {
     
     // Initialize all known source types (not just activeSources)
     // This ensures we handle all possible source classifications
+    const hasSourceSelections =
+      filters.hideDealerListings ||
+      filters.hideCraigslist ||
+      filters.hideDealerSites ||
+      filters.hideKsl ||
+      filters.hideBat ||
+      filters.hideClassic ||
+      (filters.hiddenSources && filters.hiddenSources.length > 0);
+
     const knownSourceTypes = ['craigslist', 'ksl', 'dealer_site', 'bat', 'classic', 'user', 'unknown'];
     
     knownSourceTypes.forEach(key => {
@@ -1196,8 +1232,8 @@ const CursorHomepage: React.FC = () => {
       } else if (key === 'classic') {
         base[key] = !filters.hideClassic;
       } else {
-        // user, unknown: check if they're in hiddenSources set
-        base[key] = !hiddenSourcesSet.has(key);
+        // user, unknown: when any source filter is active, exclude by default so "only BaT" doesn't show user/unknown
+        base[key] = !hiddenSourcesSet.has(key) && !hasSourceSelections;
       }
     });
     
@@ -2173,6 +2209,7 @@ const CursorHomepage: React.FC = () => {
     rnmVehicleCount: 0,
   });
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
+  const hasLoggedCachedStatsRef = useRef(false);
 
   // Load database-wide stats - try cached table first (instant), then RPCs as fallback
   const loadDatabaseStats = async () => {
@@ -2187,11 +2224,15 @@ const CursorHomepage: React.FC = () => {
         .single();
 
       if (!cacheError && cachedStats) {
-        console.log('Cached stats loaded instantly:', {
-          totalVehicles: cachedStats.total_vehicles,
-          totalValue: cachedStats.total_value,
-          source: 'portfolio_stats_cache table'
-        });
+        // Only log on first cache hit so the 30s refresh doesn't spam "instantly" after 30 sec
+        if (!hasLoggedCachedStatsRef.current) {
+          hasLoggedCachedStatsRef.current = true;
+          console.log('Cached stats loaded:', {
+            totalVehicles: cachedStats.total_vehicles,
+            totalValue: cachedStats.total_value,
+            source: 'portfolio_stats_cache table'
+          });
+        }
 
         setDbStats(prev => ({
           ...prev,
@@ -2794,6 +2835,38 @@ const CursorHomepage: React.FC = () => {
 
       const offset = pageNum * PAGE_SIZE;
 
+      // When source filter is active, only fetch vehicles from included sources (so filter works and pagination is correct)
+      const hasSourceSelectionsForFeed =
+        filters.hideDealerListings ||
+        filters.hideCraigslist ||
+        filters.hideDealerSites ||
+        filters.hideKsl ||
+        filters.hideBat ||
+        filters.hideClassic ||
+        (filters.hiddenSources && filters.hiddenSources.length > 0);
+      const includedKeysForFeed = hasSourceSelectionsForFeed
+        ? (Object.entries(includedSources).filter(([, v]) => v === true) as [string, boolean][]).map(([k]) => k)
+        : [];
+      let sourceOrFilter: string | null = null;
+      if (includedKeysForFeed.length > 0) {
+        const clauses: string[] = [];
+        const keyToPatterns: Record<string, string[]> = {
+          bat: ['discovery_url.ilike.%bringatrailer.com%', 'profile_origin.eq.bat_import'],
+          craigslist: ['discovery_url.ilike.%craigslist.org%'],
+          ksl: ['discovery_url.ilike.%ksl.com%'],
+          classic: ['discovery_url.ilike.%classic.com%'],
+        };
+        for (const key of includedKeysForFeed) {
+          if (keyToPatterns[key]) {
+            clauses.push(...keyToPatterns[key]);
+          } else {
+            const domain = activeSources.find((s: { domain: string }) => domainToFilterKey(s.domain) === key)?.domain;
+            if (domain) clauses.push(`discovery_url.ilike.%${domain}%`);
+          }
+        }
+        if (clauses.length > 0) sourceOrFilter = clauses.join(',');
+      }
+
       // Get vehicles for feed (keep payload small; avoid heavy origin_metadata + bulk image joins here).
       // NOTE: Do NOT select `listing_start_date` here. It is not a real column in the DB and will cause
       // PostgREST 400 errors if included in the `select()` list.
@@ -2863,6 +2936,9 @@ const CursorHomepage: React.FC = () => {
             .neq('status', 'pending');
           if (listingKindSupportedRef.current) {
             q = q.eq('listing_kind', 'vehicle');
+          }
+          if (sourceOrFilter) {
+            q = q.or(sourceOrFilter);
           }
           return await q
             .order('created_at', { ascending: false })
@@ -4250,12 +4326,12 @@ const CursorHomepage: React.FC = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.35)',
+            background: 'rgba(0,0,0,0.4)',
             zIndex: 20000,
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
-            padding: '16px',
+            padding: 'var(--space-4)',
           }}
           onClick={(e) => {
             e.preventDefault();
@@ -4275,12 +4351,12 @@ const CursorHomepage: React.FC = () => {
               maxHeight: 'min(82vh, 860px)',
               overflow: 'auto',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              boxShadow: '2px 2px 14px rgba(0,0,0,0.25)',
-              borderRadius: 8,
+              border: '2px solid var(--border)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+              borderRadius: 'var(--radius)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', borderBottom: '2px solid var(--border)' }}>
               <div style={{ fontSize: '9pt', fontWeight: 900 }}>
                 {statsPanel === 'vehicles'
                   ? 'Vehicles'
@@ -4323,18 +4399,18 @@ const CursorHomepage: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ padding: '12px' }}>
+            <div style={{ padding: 'var(--space-4)' }}>
               {statsPanelLoading ? (
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Loading…</div>
+                <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)' }}>Loading…</div>
               ) : statsPanelError ? (
-                <div style={{ fontSize: '9pt', color: '#b91c1c' }}>{statsPanelError}</div>
+                <div style={{ fontSize: 'var(--fs-9)', color: 'var(--error)' }}>{statsPanelError}</div>
               ) : (
                 <>
                   {statsPanel === 'value' && (
                     <>
                       {/* Current value snapshot */}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginBottom: '16px' }}>
-                        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                        <div style={{ border: '2px solid var(--border)', background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
                           <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BEST-KNOWN VALUE</div>
                           <div style={{ fontSize: '12pt', fontWeight: 900 }}>{formatCurrency(displayStats.totalValue)}</div>
                           <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
@@ -4375,7 +4451,7 @@ const CursorHomepage: React.FC = () => {
                             ))}
                           </div>
                         </div>
-                        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                        <div style={{ border: '2px solid var(--border)', background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
                           <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BREAKDOWN</div>
                           <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
                             <div><b>{formatCurrency(displayStats.valueMarkTotal)}</b> mark (current_value)</div>
@@ -4384,7 +4460,7 @@ const CursorHomepage: React.FC = () => {
                             <div><b>{formatCurrency(displayStats.valueCostTotal)}</b> cost (purchase_price)</div>
                           </div>
                         </div>
-                        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                        <div style={{ border: '2px solid var(--border)', background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
                           <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>VALUE ADDED (IMPORTS)</div>
                           <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
                             <div><b>{formatCurrency(displayStats.valueImportedToday)}</b> today</div>
@@ -4397,7 +4473,7 @@ const CursorHomepage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Value trends charts */}
+                      {/* Value trends charts - temporarily disabled
                       <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
                         <div style={{ fontSize: '8pt', fontWeight: 900, marginBottom: '12px' }}>VALUE TRENDS</div>
                         <ValueTrendsPanel
@@ -4405,6 +4481,7 @@ const CursorHomepage: React.FC = () => {
                           chartHeight={70}
                         />
                       </div>
+                      */}
                     </>
                   )}
 
@@ -4683,6 +4760,32 @@ const CursorHomepage: React.FC = () => {
                   </button>
                 </>
               )}
+              {/* FB Marketplace button - always show */}
+              <>
+                <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFBMarketplacePanel(true);
+                  }}
+                  title="Facebook Marketplace classic cars - live monitor feed"
+                  style={{
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    padding: '1px 6px',
+                    margin: 0,
+                    cursor: 'pointer',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    fontSize: '7pt',
+                    color: 'white',
+                    borderRadius: '999px',
+                    fontWeight: 700,
+                  }}
+                >
+                  FB CARS
+                </button>
+              </>
               {salesByPeriod.count > 0 && (
                 <>
                   <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
@@ -7219,6 +7322,13 @@ const CursorHomepage: React.FC = () => {
           onNavigateToVehicle={(vehicleId) => {
             navigate(`/vehicle/${vehicleId}`);
           }}
+        />
+      )}
+
+      {/* FB Marketplace Panel - Live feed of classic cars from Facebook */}
+      {showFBMarketplacePanel && (
+        <FBMarketplacePanel
+          onClose={() => setShowFBMarketplacePanel(false)}
         />
       )}
 

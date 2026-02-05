@@ -20,6 +20,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -247,51 +248,26 @@ async function saveVehicle(
   supabase: any,
   vehicle: ExtractedVehicle
 ): Promise<{ vehicleId: string; isNew: boolean }> {
-  // Check for existing vehicle by URL
   const listingUrlKey = normalizeListingUrlKey(vehicle.url);
 
-  const { data: existingByUrl } = await supabase
-    .from('vehicles')
-    .select('id')
-    .eq('discovery_url', vehicle.url)
-    .limit(1)
-    .maybeSingle();
+  // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
+  const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+    url: vehicle.url,
+    platform: 'rmsothebys',
+    discoveryUrlIlikePattern: discoveryUrlIlikePattern(vehicle.url),
+  });
 
-  if (existingByUrl?.id) {
-    // Update existing
+  if (resolvedId) {
     await supabase
       .from('vehicles')
       .update({
         sale_price: vehicle.sold_price,
         sale_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'available' : 'ended'),
+        status: 'active',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', existingByUrl.id);
-
-    return { vehicleId: existingByUrl.id, isNew: false };
-  }
-
-  // Check by external_listings
-  const { data: existingByListing } = await supabase
-    .from('external_listings')
-    .select('vehicle_id')
-    .eq('platform', 'rmsothebys')
-    .eq('listing_url_key', listingUrlKey)
-    .limit(1)
-    .maybeSingle();
-
-  if (existingByListing?.vehicle_id) {
-    // Update existing vehicle
-    await supabase
-      .from('vehicles')
-      .update({
-        sale_price: vehicle.sold_price,
-        sale_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'available' : 'ended'),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', existingByListing.vehicle_id);
-
-    return { vehicleId: existingByListing.vehicle_id, isNew: false };
+      .eq('id', resolvedId);
+    return { vehicleId: resolvedId, isNew: false };
   }
 
   // Create new vehicle
@@ -308,6 +284,7 @@ async function saveVehicle(
       discovery_source: 'rmsothebys',
       profile_origin: 'rmsothebys_import',
       is_public: true,
+      status: 'active',
       origin_metadata: {
         source: 'rmsothebys',
         auction_house: RM_SOTHEBYS_NAME,

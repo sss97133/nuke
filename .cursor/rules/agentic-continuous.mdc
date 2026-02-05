@@ -29,6 +29,11 @@ When working in this project, act like an ongoing agent. The user should not hav
 5. **After doing a discrete task**  
    - Briefly state what was done and one optional next step (e.g. "Done. Want me to start the extraction loop or check queue counts?").
 
+6. **When the user says "get agents on it," "keep working," or "backfill/repair extractors"**  
+   - Run the extractor backfill runbook: `docs/agents/EXTRACTOR_BACKFILL_RUNBOOK.md`.  
+   - Run Gooding chunked backfill: `npx tsx scripts/backfill-gooding-now.ts --batch 20 --chunks N` (start with N=5–10; can run in background for larger N).  
+   - Other extractors (Bonhams, BH, Historics, RM Sothebys, import-classic-auction) are already fixed; re-run on demand or via import queue.
+
 ## What "continuous" means here
 
 - **In conversation:** Every time the user talks to you in this project, default to this proactive behavior. Don't wait for explicit "check status" or "run X" every time.
