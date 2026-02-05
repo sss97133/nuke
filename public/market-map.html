@@ -42,6 +42,10 @@
       }
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
     body {
       font-family: var(--font-family);
       font-size: var(--fs-10);
@@ -50,16 +54,22 @@
       line-height: 1.3;
       -webkit-font-smoothing: antialiased;
     }
-    .container { max-width: 1400px; margin: 0 auto; padding: 12px; }
+    .container {
+      padding: 12px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
 
     /* Header */
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 8px;
+      padding-bottom: 6px;
       border-bottom: 2px solid var(--border);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+      flex-shrink: 0;
     }
     .title {
       font-size: var(--fs-11);
@@ -95,28 +105,79 @@
       border-color: var(--text);
     }
 
-    /* Stats */
+    /* Stats - clickable */
     .stats {
       display: flex;
       gap: 24px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       font-size: var(--fs-9);
       color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    .stat-item {
+      cursor: pointer;
+      padding: 4px 8px;
+      margin: -4px -8px;
+      border-radius: var(--radius);
+      transition: var(--transition);
+    }
+    .stat-item:hover {
+      background: var(--accent-dim);
+    }
+    .stat-item.active {
+      background: var(--accent-dim);
+      border: 1px solid var(--border);
     }
     .stat-value {
       color: var(--text);
       font-weight: 700;
       font-family: var(--font-mono);
     }
+    .stat-label {
+      font-size: var(--fs-8);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    /* View selector dropdown */
+    .view-selector {
+      position: relative;
+      display: inline-block;
+    }
+    .view-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      min-width: 140px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .view-dropdown.open { display: block; }
+    .view-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: var(--fs-9);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .view-option:hover { background: var(--surface-hover); }
+    .view-option.active { font-weight: 700; }
+    .view-option .check { color: var(--success); }
 
     /* Breadcrumb */
     .breadcrumb {
       display: flex;
       align-items: center;
       gap: 4px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       font-size: var(--fs-9);
       color: var(--text-secondary);
+      flex-shrink: 0;
     }
     .breadcrumb a {
       color: var(--text-secondary);
@@ -145,11 +206,13 @@
       border-radius: var(--radius);
       overflow: hidden;
       background: var(--surface);
+      flex: 1;
+      min-height: 0;
     }
     #treemap {
       display: block;
-      width: 100%;
-      height: 500px;
+      width: 100% !important;
+      height: 100% !important;
     }
     .node {
       cursor: pointer;
@@ -218,7 +281,7 @@
     }
     .tooltip-row .val { color: var(--text); font-family: var(--font-mono); }
 
-    /* Color scale - muted greens matching design system */
+    /* Color scale */
     .color-0 { fill: #e8e8e8; }
     .color-1 { fill: #c8e6c9; }
     .color-2 { fill: #a5d6a7; }
@@ -243,9 +306,32 @@
     </div>
 
     <div class="stats">
-      <div>Total <span class="stat-value" id="total-value">—</span></div>
-      <div>Vehicles <span class="stat-value" id="total-count">—</span></div>
-      <div>Avg <span class="stat-value" id="avg-price">—</span></div>
+      <div class="stat-item view-selector" id="view-selector">
+        <span class="stat-label">View by</span>
+        <span class="stat-value" id="view-label">Source ▾</span>
+        <div class="view-dropdown" id="view-dropdown">
+          <div class="view-option active" data-view="source">
+            <span>By Source</span>
+            <span class="check">✓</span>
+          </div>
+          <div class="view-option" data-view="brand">
+            <span>By Brand</span>
+            <span class="check"></span>
+          </div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Total</span>
+        <span class="stat-value" id="total-value">—</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Vehicles</span>
+        <span class="stat-value" id="total-count">—</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Avg</span>
+        <span class="stat-value" id="avg-price">—</span>
+      </div>
     </div>
 
     <div class="breadcrumb" id="breadcrumb">
@@ -267,27 +353,29 @@
   <script>
     const API = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/treemap-vehicles';
 
-    // Server now handles normalization - passthrough
-    const normalize = n => n;
-
     // Format helpers
     const fmtMoney = n => n >= 1e9 ? '$'+(n/1e9).toFixed(2)+'B' : n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'K' : '$'+n;
     const fmtNum = n => n.toLocaleString();
 
     // State
-    let data = null, metric = 'value', filters = {}, history = [];
+    let data = null, metric = 'value', view = 'source', filters = {}, history = [];
 
-    // Color scale (quantile)
+    // View labels
+    const viewLabels = { source: 'Source', brand: 'Brand' };
+    const viewRootLabels = { source: 'All Sources', brand: 'All Brands' };
+
+    // Color scale
     function getColor(val, max) {
       const t = Math.sqrt(val / (max || 1));
       const i = Math.min(9, Math.floor(t * 10));
       return `color-${i}`;
     }
 
-    // Fetch
+    // Fetch data
     async function load(f = {}) {
       document.getElementById('loading').style.display = 'block';
       const p = new URLSearchParams();
+      p.set('view', view);
       if (f.source) p.set('source', f.source);
       if (f.make) p.set('make', f.make);
       if (f.model) p.set('model', f.model);
@@ -299,7 +387,8 @@
         if (d.error) throw new Error(d.error);
         data = d;
         filters = f;
-        render();
+        // Delay render to ensure container has final dimensions
+        requestAnimationFrame(() => requestAnimationFrame(render));
       } catch(e) {
         console.error(e);
         document.getElementById('loading').textContent = 'Error';
@@ -315,7 +404,25 @@
       if (history.length) load(history.pop());
     }
 
-    // Update UI
+    // Switch view mode
+    function setView(v) {
+      if (v === view) return;
+      view = v;
+      history = [];
+      filters = {};
+
+      // Update dropdown UI
+      document.querySelectorAll('.view-option').forEach(opt => {
+        const isActive = opt.dataset.view === v;
+        opt.classList.toggle('active', isActive);
+        opt.querySelector('.check').textContent = isActive ? '✓' : '';
+      });
+      document.getElementById('view-label').textContent = viewLabels[v] + ' ▾';
+
+      load({});
+    }
+
+    // Update stats
     function updateStats() {
       if (!data?.stats) return;
       const {totalValue, totalCount} = data.stats;
@@ -324,72 +431,109 @@
       document.getElementById('avg-price').textContent = fmtMoney(totalCount > 0 ? totalValue/totalCount : 0);
     }
 
+    // Update breadcrumb based on view mode
     function updateBreadcrumb() {
       const bc = document.getElementById('breadcrumb');
       let html = history.length ? '<button class="back-btn" onclick="back()">←</button>' : '';
-      const parts = ['<a onclick="load({})">All</a>'];
-      if (filters.source) {
-        if (filters.make) parts.push(`<a onclick="nav({source:'${filters.source}'})">${normalize(filters.source)}</a>`);
-        else parts.push(`<span class="current">${normalize(filters.source)}</span>`);
+      const parts = [`<a onclick="load({})">${viewRootLabels[view]}</a>`];
+
+      if (view === 'source') {
+        if (filters.source) {
+          if (filters.make) parts.push(`<a onclick="nav({source:'${filters.source}'})">${filters.source}</a>`);
+          else parts.push(`<span class="current">${filters.source}</span>`);
+        }
+        if (filters.make) {
+          if (filters.model) parts.push(`<a onclick="nav({source:'${filters.source}',make:'${filters.make}'})">${filters.make}</a>`);
+          else parts.push(`<span class="current">${filters.make}</span>`);
+        }
+        if (filters.model) {
+          if (filters.year) parts.push(`<a onclick="nav({source:'${filters.source}',make:'${filters.make}',model:'${filters.model}'})">${filters.model}</a>`);
+          else parts.push(`<span class="current">${filters.model}</span>`);
+        }
+        if (filters.year) parts.push(`<span class="current">${filters.year}</span>`);
+      } else if (view === 'brand') {
+        if (filters.make) {
+          if (filters.model) parts.push(`<a onclick="nav({make:'${filters.make}'})">${filters.make}</a>`);
+          else parts.push(`<span class="current">${filters.make}</span>`);
+        }
+        if (filters.model) {
+          if (filters.year) parts.push(`<a onclick="nav({make:'${filters.make}',model:'${filters.model}'})">${filters.model}</a>`);
+          else parts.push(`<span class="current">${filters.model}</span>`);
+        }
+        if (filters.year) parts.push(`<span class="current">${filters.year}</span>`);
       }
-      if (filters.make) {
-        if (filters.model) parts.push(`<a onclick="nav({source:'${filters.source}',make:'${filters.make}'})">${filters.make}</a>`);
-        else parts.push(`<span class="current">${filters.make}</span>`);
-      }
-      if (filters.model) {
-        if (filters.year) parts.push(`<a onclick="nav({source:'${filters.source}',make:'${filters.make}',model:'${filters.model}'})">${filters.model}</a>`);
-        else parts.push(`<span class="current">${filters.model}</span>`);
-      }
-      if (filters.year) parts.push(`<span class="current">${filters.year}</span>`);
+
       bc.innerHTML = html + parts.join('<span class="sep">›</span>');
     }
 
-    // Render treemap with zoom transition
+    // Render treemap
     function render() {
       document.getElementById('loading').style.display = 'none';
       updateStats();
       updateBreadcrumb();
       if (!data?.hierarchy) return;
 
-      const container = document.getElementById('treemap');
-      const width = container.clientWidth || 1200;
-      const height = 500;
+      const wrapper = document.getElementById('treemap-container');
+      let rect = wrapper.getBoundingClientRect();
 
-      // Clear and setup SVG
-      d3.select('#treemap').selectAll('*').remove();
-      const svg = d3.select('#treemap').attr('width', width).attr('height', height);
+      // If container has no height yet, wait and retry
+      if (rect.height < 100) {
+        setTimeout(render, 50);
+        return;
+      }
 
-      // Build hierarchy
-      const root = d3.hierarchy(data.hierarchy)
+      const width = Math.floor(rect.width - 4); // -4 for border
+      const height = Math.floor(rect.height - 4); // -4 for border
+
+      const treemapEl = document.getElementById('treemap');
+      treemapEl.innerHTML = '';
+      const svg = d3.select('#treemap')
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .attr('preserveAspectRatio', 'none');
+
+      // Filter out items with no value for current metric
+      const filteredData = {
+        ...data.hierarchy,
+        children: (data.hierarchy.children || []).filter(c => {
+          if (metric === 'count') return (c.count || 0) > 0;
+          if (metric === 'avg') return (c.count || 0) > 0;
+          return (c.value || 0) > 0;
+        })
+      };
+
+      const root = d3.hierarchy(filteredData)
         .sum(d => {
-          if (metric === 'count') return d.count || 0;
+          // Use sqrt transform to reduce extreme skew for value/count
+          if (metric === 'count') return Math.sqrt(d.count || 0);
           if (metric === 'avg') return d.count > 0 ? (d.value||0)/d.count : 0;
-          return d.value || 0;
+          return Math.sqrt(d.value || 0);
         })
         .sort((a,b) => b.value - a.value);
 
       d3.treemap()
+        .tile(d3.treemapSquarify.ratio(1))
         .size([width, height])
-        .paddingOuter(2)
+        .paddingOuter(0)
         .paddingInner(1)
-        .round(true)(root);
+        .round(false)(root);
 
-      const maxVal = d3.max(root.leaves(), d => d.value) || 1;
+      // Debug: Check if treemap fills the space
+      const leaves = root.leaves();
+      const maxX = Math.max(...leaves.map(d => d.x1));
+      const maxY = Math.max(...leaves.map(d => d.y1));
+      console.log(`Container: ${width}x${height}, Treemap fills: ${maxX}x${maxY}`);
 
-      // Create nodes with transition
+      const maxVal = d3.max(leaves, d => d.value) || 1;
+
       const nodes = svg.selectAll('g')
-        .data(root.leaves())
+        .data(leaves)
         .join('g')
         .attr('class', 'node')
         .attr('transform', d => `translate(${d.x0},${d.y0})`)
         .style('opacity', 0);
 
-      // Animate in
-      nodes.transition()
-        .duration(300)
-        .style('opacity', 1);
+      nodes.transition().duration(300).style('opacity', 1);
 
-      // Rectangles
       nodes.append('rect')
         .attr('class', d => `node-rect ${getColor(d.value, maxVal)}`)
         .attr('width', d => Math.max(0, d.x1 - d.x0))
@@ -400,19 +544,17 @@
         .on('mouseout', hideTip)
         .on('click', click);
 
-      // Labels
       nodes.filter(d => (d.x1-d.x0) > 40 && (d.y1-d.y0) > 20)
         .append('text')
         .attr('class', 'node-label')
         .attr('x', 4)
         .attr('y', 12)
         .text(d => {
-          const n = normalize(d.data.name);
+          const n = d.data.name;
           const max = Math.floor((d.x1-d.x0-8)/5.5);
           return n.length > max ? n.slice(0,max)+'…' : n;
         });
 
-      // Values
       nodes.filter(d => (d.x1-d.x0) > 35 && (d.y1-d.y0) > 32)
         .append('text')
         .attr('class', 'node-value')
@@ -425,18 +567,24 @@
         });
     }
 
-    // Click handler
+    // Click handler - adapted for view mode
     function click(e, d) {
       const lvl = data?.stats?.level;
       if (d.data.isVehicle) {
-        // Vehicle clicked - could open detail view
         window.open(`/vehicle/${d.data.id}`, '_blank');
         return;
       }
-      if (lvl === 'sources') nav({source: d.data.name});
-      else if (lvl === 'makes') nav({...filters, make: d.data.name});
-      else if (lvl === 'models') nav({...filters, model: d.data.name});
-      else if (lvl === 'years') nav({...filters, year: d.data.name});
+
+      if (view === 'source') {
+        if (lvl === 'sources') nav({source: d.data.name});
+        else if (lvl === 'makes') nav({...filters, make: d.data.name});
+        else if (lvl === 'models') nav({...filters, model: d.data.name});
+        else if (lvl === 'years') nav({...filters, year: d.data.name});
+      } else if (view === 'brand') {
+        if (lvl === 'brands') nav({make: d.data.name});
+        else if (lvl === 'models') nav({...filters, model: d.data.name});
+        else if (lvl === 'years') nav({...filters, year: d.data.name});
+      }
     }
 
     // Tooltip
@@ -451,7 +599,7 @@
       else if (metric === 'avg') val = fmtMoney(avg);
       else val = fmtMoney(d.data.value);
 
-      tt.querySelector('.tooltip-title').textContent = normalize(d.data.name);
+      tt.querySelector('.tooltip-title').textContent = d.data.name;
       tt.querySelector('.tooltip-value').textContent = val;
       tt.querySelector('.tooltip-stats').innerHTML = `
         <div class="tooltip-row"><span>${pct}%</span><span class="val">of total</span></div>
@@ -471,7 +619,26 @@
       document.getElementById('tooltip').classList.remove('visible');
     }
 
-    // Controls
+    // View dropdown toggle
+    document.getElementById('view-selector').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('view-dropdown').classList.toggle('open');
+    });
+
+    document.querySelectorAll('.view-option').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setView(opt.dataset.view);
+        document.getElementById('view-dropdown').classList.remove('open');
+      });
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+      document.getElementById('view-dropdown').classList.remove('open');
+    });
+
+    // Metric controls
     document.querySelectorAll('.btn[data-metric]').forEach(b => {
       b.addEventListener('click', () => {
         document.querySelectorAll('.btn[data-metric]').forEach(x => x.classList.remove('active'));
@@ -481,7 +648,14 @@
       });
     });
 
-    window.addEventListener('resize', render);
+    window.addEventListener('resize', () => requestAnimationFrame(render));
+
+    // Use ResizeObserver for accurate container sizing
+    const resizeObserver = new ResizeObserver(() => {
+      if (data) requestAnimationFrame(render);
+    });
+    resizeObserver.observe(document.getElementById('treemap-container'));
+
     load();
   </script>
 </body>

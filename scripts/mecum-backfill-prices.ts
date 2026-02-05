@@ -35,8 +35,9 @@ async function extractPriceFromPage(context: any, url: string): Promise<{
   const page = await context.newPage();
 
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    await page.waitForTimeout(3000);
+    await page.goto(url, { waitUntil: 'load', timeout: 90000 });
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(5000);
 
     const data = await page.evaluate(() => {
       const text = document.body.innerText;
@@ -131,7 +132,6 @@ async function main() {
 
   const browser = await chromium.launch({
     headless: true,
-    args: ['--disable-blink-features=AutomationControlled'],
   });
 
   // Create a context with realistic settings

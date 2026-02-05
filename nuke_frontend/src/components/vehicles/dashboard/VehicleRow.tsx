@@ -40,7 +40,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
   const vehicleTitle = [year, make, model].filter(Boolean).join(' ') || 'Unknown Vehicle';
 
   const handleClick = () => {
-    navigate(`/vehicles/${vehicleId}`);
+    navigate(`/vehicle/${vehicleId}`);
   };
 
   const handleLogWork = (e: React.MouseEvent) => {

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vehicle Map — Nuke</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://d3js.org/topojson.v3.min.js"></script>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --surface: #252526;
+      --border: #3e3e42;
+      --text: #cccccc;
+      --text-secondary: #858585;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 8px;
+    }
+    .title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .controls {
+      display: flex;
+      gap: 4px;
+    }
+    .btn {
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 4px 8px;
+      font-size: 9px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .btn:hover { border-color: var(--text); }
+    .btn.active { background: var(--text); color: var(--surface); }
+    .stats {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 8px;
+      font-size: 9px;
+      color: var(--text-secondary);
+    }
+    .stat-value {
+      color: var(--text);
+      font-weight: 700;
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+    #map-container {
+      flex: 1;
+      position: relative;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    .state {
+      stroke: var(--border);
+      stroke-width: 0.5px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .state:hover {
+      opacity: 0.8;
+      stroke: var(--text);
+      stroke-width: 1px;
+    }
+    .tooltip {
+      position: fixed;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 1000;
+      font-size: 9px;
+    }
+    .tooltip.visible { opacity: 1; }
+    .tooltip-title { font-weight: 700; margin-bottom: 4px; }
+    .tooltip-value { font-size: 16px; font-weight: 700; color: #4ecdc4; margin-bottom: 6px; }
+    .tooltip-row { display: flex; justify-content: space-between; gap: 20px; color: var(--text-secondary); }
+    .tooltip-row .val { color: var(--text); }
+    .legend {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 8px;
+    }
+    .legend-title { font-weight: 600; margin-bottom: 4px; }
+    .legend-scale {
+      display: flex;
+      height: 10px;
+      width: 120px;
+      margin-bottom: 4px;
+    }
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-secondary);
+    }
+    .loading {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title">Vehicle Distribution Map</div>
+      <div class="controls">
+        <button class="btn active" data-metric="value">Value</button>
+        <button class="btn" data-metric="count">Volume</button>
+        <button class="btn" data-metric="avg">Avg Price</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div>States: <span class="stat-value" id="state-count">—</span></div>
+      <div>Total: <span class="stat-value" id="total-value">—</span></div>
+      <div>Vehicles: <span class="stat-value" id="total-count">—</span></div>
+    </div>
+    <div id="map-container">
+      <svg id="map"></svg>
+      <div class="legend" id="legend">
+        <div class="legend-title">Value</div>
+        <div class="legend-scale" id="legend-scale"></div>
+        <div class="legend-labels">
+          <span id="legend-min">$0</span>
+          <span id="legend-max">$0</span>
+        </div>
+      </div>
+      <div class="loading" id="loading">Loading...</div>
+    </div>
+  </div>
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-title"></div>
+    <div class="tooltip-value"></div>
+    <div class="tooltip-stats"></div>
+  </div>
+
+  <script>
+    const API = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/map-vehicles';
+    const US_TOPO = 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json';
+
+    const stateNames = {
+      'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
+      'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+      'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+      'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+      'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri',
+      'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+      'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+      'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+      'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+      'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+      'DC': 'District of Columbia'
+    };
+
+    // FIPS to state code
+    const fipsToState = {
+      '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT',
+      '10': 'DE', '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL',
+      '18': 'IN', '19': 'IA', '20': 'KS', '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD',
+      '25': 'MA', '26': 'MI', '27': 'MN', '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE',
+      '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM', '36': 'NY', '37': 'NC', '38': 'ND',
+      '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI', '45': 'SC', '46': 'SD',
+      '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV',
+      '55': 'WI', '56': 'WY'
+    };
+
+    let data = null, metric = 'value', usGeo = null;
+
+    const fmtMoney = n => n >= 1e9 ? '$'+(n/1e9).toFixed(2)+'B' : n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(0)+'K' : '$'+n;
+    const fmtNum = n => n.toLocaleString();
+
+    // Color scale - teal to blue gradient
+    const colorScale = d3.scaleSequential(d3.interpolateBlues);
+
+    async function loadData() {
+      const [dataRes, geoRes] = await Promise.all([
+        fetch(API).then(r => r.json()),
+        fetch(US_TOPO).then(r => r.json())
+      ]);
+      data = dataRes;
+      usGeo = geoRes;
+      document.getElementById('loading').style.display = 'none';
+      updateStats();
+      render();
+    }
+
+    function updateStats() {
+      if (!data?.stats) return;
+      document.getElementById('state-count').textContent = data.states?.length || 0;
+      document.getElementById('total-value').textContent = fmtMoney(data.stats.totalValue);
+      document.getElementById('total-count').textContent = fmtNum(data.stats.totalCount);
+    }
+
+    function getStateData(code) {
+      return data?.states?.find(s => s.code === code) || { count: 0, value: 0, avg: 0 };
+    }
+
+    function render() {
+      if (!data || !usGeo) return;
+
+      const container = document.getElementById('map-container');
+      const rect = container.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+
+      const svg = d3.select('#map')
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet');
+
+      svg.selectAll('*').remove();
+
+      // Create projection
+      const projection = d3.geoAlbersUsa()
+        .fitSize([width - 40, height - 40], topojson.feature(usGeo, usGeo.objects.states));
+
+      const path = d3.geoPath().projection(projection);
+
+      // Calculate color scale domain
+      const values = data.states.map(s => {
+        if (metric === 'count') return s.count;
+        if (metric === 'avg') return s.avg;
+        return s.value;
+      });
+      const maxVal = d3.max(values) || 1;
+      colorScale.domain([0, maxVal]);
+
+      // Update legend
+      updateLegend(maxVal);
+
+      // Draw states
+      const states = topojson.feature(usGeo, usGeo.objects.states).features;
+
+      svg.selectAll('path')
+        .data(states)
+        .join('path')
+        .attr('class', 'state')
+        .attr('d', path)
+        .attr('fill', d => {
+          const fips = d.id.toString().padStart(2, '0');
+          const code = fipsToState[fips];
+          const st = getStateData(code);
+          let val = metric === 'count' ? st.count : metric === 'avg' ? st.avg : st.value;
+          return val > 0 ? colorScale(val) : '#2a2a2a';
+        })
+        .on('mouseover', showTooltip)
+        .on('mousemove', moveTooltip)
+        .on('mouseout', hideTooltip);
+    }
+
+    function updateLegend(max) {
+      const scale = document.getElementById('legend-scale');
+      scale.innerHTML = '';
+      const steps = 10;
+      for (let i = 0; i < steps; i++) {
+        const div = document.createElement('div');
+        div.style.flex = '1';
+        div.style.background = colorScale(max * i / steps);
+        scale.appendChild(div);
+      }
+
+      document.querySelector('.legend-title').textContent =
+        metric === 'count' ? 'Vehicles' : metric === 'avg' ? 'Avg Price' : 'Total Value';
+      document.getElementById('legend-min').textContent = metric === 'count' ? '0' : '$0';
+      document.getElementById('legend-max').textContent = metric === 'count' ? fmtNum(max) : fmtMoney(max);
+    }
+
+    function showTooltip(e, d) {
+      const fips = d.id.toString().padStart(2, '0');
+      const code = fipsToState[fips];
+      const st = getStateData(code);
+      const name = stateNames[code] || code;
+
+      let val;
+      if (metric === 'count') val = fmtNum(st.count) + ' vehicles';
+      else if (metric === 'avg') val = fmtMoney(st.avg);
+      else val = fmtMoney(st.value);
+
+      const tt = document.getElementById('tooltip');
+      tt.querySelector('.tooltip-title').textContent = name;
+      tt.querySelector('.tooltip-value').textContent = val;
+      tt.querySelector('.tooltip-stats').innerHTML = `
+        <div class="tooltip-row"><span>Vehicles</span><span class="val">${fmtNum(st.count)}</span></div>
+        <div class="tooltip-row"><span>Total Value</span><span class="val">${fmtMoney(st.value)}</span></div>
+        <div class="tooltip-row"><span>Avg Price</span><span class="val">${fmtMoney(st.avg)}</span></div>
+      `;
+      tt.classList.add('visible');
+    }
+
+    function moveTooltip(e) {
+      const tt = document.getElementById('tooltip');
+      const r = tt.getBoundingClientRect();
+      tt.style.left = Math.min(e.clientX + 10, window.innerWidth - r.width - 10) + 'px';
+      tt.style.top = Math.min(e.clientY + 10, window.innerHeight - r.height - 10) + 'px';
+    }
+
+    function hideTooltip() {
+      document.getElementById('tooltip').classList.remove('visible');
+    }
+
+    // Metric buttons
+    document.querySelectorAll('.btn[data-metric]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn[data-metric]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        metric = btn.dataset.metric;
+        render();
+      });
+    });
+
+    window.addEventListener('resize', render);
+    loadData();
+  </script>
+</body>
+</html>
