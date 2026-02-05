@@ -8,7 +8,7 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 | Metric | Value |
 |--------|-------|
 | Total Vehicles | 284,349 |
-| Map Vehicles | 48,498 |
+| Map Vehicles | 48,532 |
 | Total Value | $3.59B |
 | BaT Listings | 127,666 |
 | Observations | 626,761 |
@@ -18,7 +18,7 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| Complete | 241,674 | 91% |
+| Complete | 242,278 | 91% |
 | Skipped | 16,799 | 6% |
 | Duplicate | 7,919 | 3% |
 | Failed | 6,087 | 2% |
@@ -149,6 +149,9 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 2. `597f0080` - Add comprehensive system status report
 3. `778c782b` - Update static vehicle map with refreshed data
 4. `571fb61d` - Update vehicle map: 48,498 vehicles ($3.59B)
+5. `332aaeb4` - Update system status report with cleanup progress
+6. `0bc96a2c` - Add migration for make case normalization
+7. `5b266f4a` - Update vehicle map: 48,532 vehicles
 
 ## System Architecture
 
