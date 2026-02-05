@@ -18,14 +18,14 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| Complete | 242,278 | 91% |
-| Skipped | 16,799 | 6% |
-| Duplicate | 7,919 | 3% |
-| Failed | 6,087 | 2% |
-| Pending | 1,272 | <1% |
-| Processing | 330 | <1% |
+| Complete | 242,485 | 88.3% |
+| Skipped | 16,802 | 6.1% |
+| Duplicate | 7,919 | 2.9% |
+| Failed | 6,530 | 2.4% |
+| Pending | 842 | 0.3% |
+| Processing | 18 | <0.1% |
 
-**Queue improved from 89% to 91% complete today.**
+**Pending items reduced from 6,131 to 842 today (86% reduction).**
 
 ## Today's Data Cleanup
 
@@ -65,7 +65,7 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 | Source | Pending | Notes |
 |--------|---------|-------|
 | Cars & Bids | 724 | May need auth |
-| BaT | 395 | Retry possible |
+| BaT | 1 | Most require auth (303 marked) |
 | PCarMarket | 91 | React SPA - needs JS rendering |
 | Mecum | 58 | Retry possible |
 | Other | 29 | Various |
