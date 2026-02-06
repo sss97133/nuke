@@ -38,16 +38,15 @@ interface SourceConfig {
 }
 
 const SOURCES: SourceConfig[] = [
-  // ─── Tier 1: Big auction sites with dedicated extractors ───
-  {
-    name: 'BaT',
-    urlPattern: '%bringatrailer.com%',
-    extractorFunction: 'extract-bat-core',
-    discoveryFunction: 'bat-url-discovery',
-    discoveryArgs: { action: 'discover', pages: 50 },
-    concurrency: 3,  // BaT is slow (10-30s per item), keep concurrency moderate
-    delayMs: 3000,
-  },
+  // ─── Tier 1: Big auction sites ───
+  // NOTE: BaT runs separately via `dotenvx run -- npx tsx scripts/bat-process-queue.ts`
+  // because the edge function takes 10-35s per item and times out when called from another edge function.
+  // {
+  //   name: 'BaT',
+  //   urlPattern: '%bringatrailer.com%',
+  //   extractorFunction: 'extract-bat-core',
+  //   ...
+  // },
   {
     name: 'Cars & Bids',
     urlPattern: '%carsandbids.com%',
