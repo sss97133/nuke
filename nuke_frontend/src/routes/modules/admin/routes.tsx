@@ -35,6 +35,7 @@ import BotTestDashboard from '../../../pages/admin/BotTestDashboard';
 import AdminRalphBrief from '../../../pages/admin/AdminRalphBrief';
 import NLQueryConsole from '../../../pages/admin/NLQueryConsole';
 import AdminIdentityClaims from '../../../pages/admin/AdminIdentityClaims';
+import InventoryAnalytics from '../../../pages/admin/InventoryAnalytics';
 
 const AdminModuleRoutes = () => {
   return (
@@ -63,6 +64,8 @@ const AdminModuleRoutes = () => {
         <Route path="status" element={<SystemStatus />} />
 
         {/* Tools */}
+        <Route path="inventory-analytics" element={<InventoryAnalytics />} />
+        <Route path="analytics" element={<InventoryAnalytics />} />
         <Route path="business-intelligence" element={<BusinessIntelligence />} />
         <Route path="bi" element={<BusinessIntelligence />} />
         <Route path="price-editor" element={<BulkPriceEditor />} />

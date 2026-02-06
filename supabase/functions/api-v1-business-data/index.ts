@@ -211,7 +211,7 @@ async function getVehicles(
       notes,
       created_at,
       vehicles:vehicle_id (
-        id, year, make, model, vin, exterior_color
+        id, year, make, model, vin, color
       )
     `,
       { count: "exact" }
