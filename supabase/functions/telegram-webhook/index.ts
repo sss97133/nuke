@@ -15,8 +15,8 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-// Use Nuke bot for verification (separate from L'Officiel concierge bot)
-const BOT_TOKEN = Deno.env.get("NUKE_TELEGRAM_BOT_TOKEN") || Deno.env.get("TELEGRAM_BOT_TOKEN");
+// Nukeproof bot - public bot for technicians (verification, work photos)
+const BOT_TOKEN = Deno.env.get("NUKEPROOF_BOT_TOKEN") || Deno.env.get("NUKE_TELEGRAM_BOT_TOKEN") || Deno.env.get("TELEGRAM_BOT_TOKEN");
 
 // User mode tracking (work vs verification)
 const userModes: Map<number, "work" | "verify"> = new Map();

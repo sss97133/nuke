@@ -395,7 +395,7 @@ export default function ApiKeysPage() {
         </pre>
         <div style={{ marginTop: '12px' }}>
           <a
-            href="/docs/api"
+            href="/developers"
             style={{ fontSize: '12px', color: 'var(--accent)' }}
           >
             View API Documentation →

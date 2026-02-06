@@ -7,7 +7,9 @@ vi.mock('../../lib/supabase', () => {
       eq: vi.fn(() => ({
         eq: vi.fn(() => ({
           eq: vi.fn(() => ({
-            order: vi.fn(async () => ({ data: [], error: null })),
+            eq: vi.fn(() => ({
+              order: vi.fn(async () => ({ data: [], error: null })),
+            })),
           })),
         })),
       })),
@@ -33,7 +35,8 @@ describe('CashflowDealsService', () => {
   it('lists public deals for a user with correct filters', async () => {
     // Arrange: override the chained builder to capture calls
     const order = vi.fn(async () => ({ data: [{ id: 'd1' }], error: null }));
-    const eq3 = vi.fn(() => ({ order }));
+    const eq4 = vi.fn(() => ({ order }));
+    const eq3 = vi.fn(() => ({ eq: eq4 }));
     const eq2 = vi.fn(() => ({ eq: eq3 }));
     const eq1 = vi.fn(() => ({ eq: eq2 }));
     const select = vi.fn(() => ({ eq: eq1 }));
@@ -51,6 +54,7 @@ describe('CashflowDealsService', () => {
     expect(eq1).toHaveBeenCalledWith('subject_type', 'user');
     expect(eq2).toHaveBeenCalledWith('subject_user_id', 'user-123');
     expect(eq3).toHaveBeenCalledWith('status', 'active');
+    expect(eq4).toHaveBeenCalledWith('is_public', true);
     expect(order).toHaveBeenCalledWith('created_at', { ascending: false });
     expect(rows).toEqual([{ id: 'd1' }]);
   });

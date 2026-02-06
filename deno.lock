@@ -37,6 +37,7 @@
         "npm:openai@^6.10.0",
         "npm:pdf-parse@^2.4.5",
         "npm:pdfjs-dist@^5.4.449",
+        "npm:pg@^8.18.0",
         "npm:playwright@^1.58.1",
         "npm:plist@^3.1.0",
         "npm:stripe@^20.3.0",

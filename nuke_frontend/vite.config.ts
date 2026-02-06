@@ -41,6 +41,13 @@ export default defineConfig({
       transformMixedEsModules: true,
     },
   },
+  test: {
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/_archived/**',
+    ],
+  },
   server: {
     port: 5174,
     host: '0.0.0.0', // Allow access from any IP on the network

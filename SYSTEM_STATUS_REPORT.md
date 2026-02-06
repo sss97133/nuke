@@ -7,25 +7,29 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 
 | Metric | Value |
 |--------|-------|
-| Total Vehicles | 284,349 |
-| Map Vehicles | 48,532 |
-| Total Value | $3.59B |
-| BaT Listings | 127,666 |
+| Total Vehicles | 285,103 |
+| Vehicle Images | 25,094,730 |
+| Total Value | $11.36B |
+| BaT Listings | 128,001 |
 | Observations | 626,761 |
-| External Identities | 485,764 |
+| External Identities | 486,368 |
 
 ## Import Queue Status (Live)
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| Complete | 242,485 | 88.3% |
-| Skipped | 16,802 | 6.1% |
-| Duplicate | 7,919 | 2.9% |
-| Failed | 6,530 | 2.4% |
-| Pending | 842 | 0.3% |
-| Processing | 18 | <0.1% |
+| Complete | 117,733 | 52.9% |
+| Pending | 88,604 | 39.8% |
+| Skipped | 16,870 | 7.6% |
+| Duplicate | 6,989 | 3.1% |
+| Failed | ~1,000 | 0.4% |
 
-**Pending items reduced from 6,131 to 842 today (86% reduction).**
+**Major discovery: Found 91,336 BaT URLs marked complete but never extracted. Reset to pending for re-extraction.**
+
+**BaT Extraction Progress:**
+- 128,383 bat_listings (target: ~230,000)
+- 83,335 new URLs discovered via year crawling
+- 12+ parallel extraction agents running
 
 ## Today's Data Cleanup
 
@@ -64,11 +68,12 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 
 | Source | Pending | Notes |
 |--------|---------|-------|
-| Cars & Bids | 724 | May need auth |
-| BaT | 1 | Most require auth (303 marked) |
-| PCarMarket | 91 | React SPA - needs JS rendering |
-| Mecum | 58 | Retry possible |
-| Other | 29 | Various |
+| Cars & Bids | 44 | React SPA - needs Firecrawl |
+| Collecting Cars | 20 | Empty raw_data - needs re-fetch |
+| PCarMarket | 19 | React SPA - needs Firecrawl |
+| BaT | 0 | All processed or marked |
+
+**All remaining items require Firecrawl (blocked - see Known Issues)**
 
 ## Edge Function Status
 
@@ -115,13 +120,14 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 
 ### Blocking Issues
 1. **OpenAI quota exhausted** - All AI-powered functions return 429 errors
+2. **Firecrawl API credits exhausted** - Current API key has -140 credits (overdrawn). User has second plan with credits but needs to find/configure alternate API key. Blocks extraction for Cars & Bids, PCarMarket, and Collecting Cars.
 
 ### Data Quality Issues
 | Issue | Count | Status |
 |-------|-------|--------|
-| Vehicles without year | 13,138 | 10.9k have no source |
-| Vehicles without make | 7,195 | Needs investigation |
-| Case-inconsistent makes | ~45k | DB timeout on bulk update |
+| Vehicles without year | 12,269 | 95.7% have year |
+| Vehicles without make | 6,296 | 97.8% have make |
+| Case-inconsistent makes | ~95k | Migration ready, run via Supabase dashboard |
 
 ### Technical Debt
 - PCarMarket extractor needs Playwright for JS rendering
@@ -131,8 +137,11 @@ The Nuke vehicle data platform is operational with strong data coverage. Key met
 ## Recommendations
 
 ### High Priority
-1. **Replenish OpenAI API quota** - Required for AI-based extraction
-2. **Fix make case normalization** - Use database migration instead of live UPDATE
+1. **Configure Firecrawl API key for second plan** - User has two Firecrawl plans. Current key `fc-12e25...` is overdrawn (-140 credits). Need to get API key from second plan ($99 paid Feb 5) and update:
+   - `/Users/skylar/.claude.json` → `projects./Users/skylar/nuke.mcpServers.firecrawl.env.FIRECRAWL_API_KEY`
+   - `/Users/skylar/nuke/.env` → `FIRECRAWL_API_KEY`
+2. **Replenish OpenAI API quota** - Required for AI-based extraction
+3. **Run make case normalization** - Function `normalize_all_makes_batch()` is ready, run via Supabase SQL Editor
 
 ### Medium Priority
 3. **Add Playwright to PCarMarket extractor** - 91 pending items need JS rendering

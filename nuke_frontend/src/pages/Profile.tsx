@@ -51,6 +51,7 @@ import { AdminNotificationService } from '../services/adminNotificationService';
 import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
 import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
 import ShopFinancials from './ShopFinancials';
+import TechInbox from '../components/profile/TechInbox';
 import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
 import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
 import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
@@ -82,6 +83,7 @@ const Profile: React.FC = () => {
     'photos' |
     'financials' |
     'duplicates' |
+    'inbox' |
     'settings'
   >('overview');
   const [comprehensiveData, setComprehensiveData] = useState<any>(null);
@@ -229,7 +231,7 @@ const Profile: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
-    const validTabs = ['overview', 'collection', 'gallery', 'professional', 'organizations', 'auctions', 'listings', 'bids', 'comments', 'stories', 'photos', 'financials', 'duplicates', 'settings'];
+    const validTabs = ['overview', 'collection', 'gallery', 'professional', 'organizations', 'auctions', 'listings', 'bids', 'comments', 'stories', 'photos', 'financials', 'duplicates', 'inbox', 'settings'];
     if (tabParam && validTabs.includes(tabParam)) {
       setActiveTab(tabParam as any);
     }
@@ -607,6 +609,7 @@ const Profile: React.FC = () => {
             { key: 'bids', label: 'Bids', public: true },
             { key: 'comments', label: 'Comments', public: true },
             { key: 'stories', label: 'Success Stories', public: true },
+            { key: 'inbox', label: 'Tech Inbox' },
             { key: 'settings', label: 'Settings' }
           ].filter(tab => tab.key === 'settings' ? isOwnProfile : (tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations' || tab.key === 'auctions' || tab.key === 'listings' || tab.key === 'bids' || tab.key === 'comments' || tab.key === 'stories')).map((tab) => (
             <button
@@ -780,14 +783,20 @@ const Profile: React.FC = () => {
                     Duplicate Vehicle Detection
                   </div>
                   <div className="card-body" style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                    When potential duplicate vehicles are detected in your profile, they'll appear below for review. 
+                    When potential duplicate vehicles are detected in your profile, they'll appear below for review.
                     You can merge duplicates to consolidate all images, events, and data into a single vehicle profile.
                   </div>
                 </div>
                 <VehicleMergeInterface userId={profile.id} />
               </div>
             )}
-            
+
+            {activeTab === 'inbox' && isOwnProfile && (
+              <div>
+                <TechInbox />
+              </div>
+            )}
+
             {activeTab === 'settings' && isOwnProfile && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                 <div className="card">

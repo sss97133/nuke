@@ -56,6 +56,10 @@ const VaultScanPage = React.lazy(() => import('../pages/VaultScanPage'));
 // Business management
 const BusinessSettings = React.lazy(() => import('../pages/BusinessSettings'));
 const QuickBooksCallback = React.lazy(() => import('../pages/QuickBooksCallback'));
+const RestorationIntake = React.lazy(() => import('../pages/RestorationIntake'));
+
+// Collections Map
+const CollectionsMap = React.lazy(() => import('../pages/CollectionsMap'));
 
 // Legacy pages (still used by navigation components)
 const Profile = React.lazy(() => import('../pages/Profile'));
@@ -71,9 +75,11 @@ const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const SocialWorkspace = React.lazy(() => import('../pages/SocialWorkspace'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
+const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
 const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
+const DevelopersPage = React.lazy(() => import('../pages/developers'));
 const Search = React.lazy(() => import('../pages/Search').catch((error) => {
   console.error('Failed to load Search component:', error);
   // Return a fallback component
@@ -120,6 +126,7 @@ export const DomainRoutes = () => {
 
         {/* Legacy user pages (used by header nav / profile capsule) */}
         <Route path="/capture" element={<Capture />} />
+        <Route path="/debrief" element={<DailyDebrief />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/:userId" element={<Profile />} />
         <Route path="/profile/external/:externalIdentityId" element={<Profile />} />
@@ -150,6 +157,10 @@ export const DomainRoutes = () => {
         <Route path="/settings/webhooks" element={<WebhooksPage />} />
         <Route path="/settings/usage" element={<UsageDashboardPage />} />
 
+        {/* Developers */}
+        <Route path="/developers" element={<DevelopersPage />} />
+        <Route path="/docs/api" element={<DevelopersPage />} />
+
         {/* Investment Platform */}
         <Route path="/invest" element={<Invest />} />
         <Route path="/invest/offering/:offeringId" element={<OfferingDetail />} />
@@ -174,6 +185,10 @@ export const DomainRoutes = () => {
         <Route path="/business/settings" element={<BusinessSettings />} />
         <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
 
+        {/* Restoration Intake - Telegram photo intake for shops */}
+        <Route path="/restoration" element={<RestorationIntake />} />
+        <Route path="/intake" element={<RestorationIntake />} />
+
         {/* ASCII samples (preview shape / identity / pulse) */}
         <Route path="/ascii-samples" element={<LivingAsciiSamplesPage />} />
 
@@ -182,6 +197,10 @@ export const DomainRoutes = () => {
         <Route path="/curation/queue" element={<Navigate to="/curation-queue" replace />} />
         <Route path="/review/ai-detections" element={<Navigate to="/curation-queue" replace />} />
         <Route path="/receipts/unlinked" element={<UnlinkedReceipts />} />
+
+        {/* Collections Map */}
+        <Route path="/collections-map" element={<CollectionsMap />} />
+        <Route path="/collections/map" element={<Navigate to="/collections-map" replace />} />
 
         {/* Portfolio legacy routes */}
         <Route path="/portfolio" element={<Portfolio />} />

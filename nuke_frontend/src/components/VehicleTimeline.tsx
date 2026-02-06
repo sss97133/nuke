@@ -10,6 +10,7 @@ import { TimelineEventService } from '../services/timelineEventService';
 import { ComprehensiveWorkOrderReceipt } from './ComprehensiveWorkOrderReceipt';
 import { ParticipantBadge } from './auction/AuctionBadges';
 import { generateDaySummary, generateEventSummary } from '../utils/timelineSummary';
+import WorkSessionEventCard from './timeline/WorkSessionEventCard';
 
 // Types
 // Note: DB supports auction_* event types via timeline_events constraint migration.
@@ -1651,6 +1652,24 @@ const VehicleTimeline: React.FC<{
                   );
                   return uniqueEvents;
                 })().map((ev) => {
+                  // Special rendering for work session events (full provenance breakdown)
+                  if (ev.source === 'work_session' && ev.metadata?.work_session_id) {
+                    return (
+                      <WorkSessionEventCard
+                        key={ev.id}
+                        event={{
+                          id: ev.id,
+                          title: ev.title || 'Work Session',
+                          description: ev.description,
+                          event_date: ev.event_date,
+                          cost_amount: ev.cost_amount,
+                          duration_hours: ev.duration_hours,
+                          metadata: ev.metadata
+                        }}
+                      />
+                    );
+                  }
+
                   // If event has no images but it's a photo event, try to get image from metadata
                   let urls: string[] = Array.isArray(ev.image_urls) ? ev.image_urls : [];
                   
