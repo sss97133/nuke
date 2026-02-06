@@ -1483,6 +1483,12 @@ body {
   padding: 0 5px; /* slight side padding */
 }
 
+/* Break out of content-container for fullscreen pages (maps, dashboards) */
+.content-container:has(.fullscreen-content) {
+  max-width: none;
+  padding: 0;
+}
+
 /* Vehicle price header breaks out of container padding */
 .vehicle-price-header {
   margin-left: calc(-1 * 5px) !important;

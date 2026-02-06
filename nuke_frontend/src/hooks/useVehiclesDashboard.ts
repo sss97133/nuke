@@ -58,6 +58,7 @@ export interface DashboardSummary {
 
 export interface DashboardData {
   my_vehicles: MyVehicle[];
+  public_vehicles?: MyVehicle[];
   client_vehicles: ClientVehicle[];
   business_fleets: BusinessFleet[];
   summary: DashboardSummary;
@@ -85,7 +86,13 @@ export function useVehiclesDashboard(userId: string | undefined) {
         throw new Error(rpcError.message);
       }
 
-      setData(result as DashboardData);
+      const raw = result as DashboardData;
+      // Merge public_vehicles into my_vehicles if user has no owned vehicles
+      if (raw.public_vehicles?.length && raw.my_vehicles.length === 0) {
+        raw.my_vehicles = raw.public_vehicles;
+        raw.summary.total_my_vehicles = raw.public_vehicles.length;
+      }
+      setData(raw);
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       setError(err instanceof Error ? err : new Error('Failed to load dashboard'));
