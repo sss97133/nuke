@@ -39,10 +39,10 @@ const sourceFilter = args.includes("--source")
   : null;
 const batchSize = args.includes("--batch")
   ? parseInt(args[args.indexOf("--batch") + 1])
-  : 10;
+  : 100; // Default: all feeds every cycle
 const force = args.includes("--force");
 const loop = args.includes("--loop");
-const LOOP_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const LOOP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 // ─── Feed Parsing ──────────────────────────────────────────────────
 
@@ -250,6 +250,73 @@ function decodeEntities(str: string): string {
 }
 
 /**
+ * Parse eBay Motors search results HTML.
+ * eBay renders via JS but embeds item URLs in the initial HTML.
+ */
+function parseEbayHTML(html: string): FeedItem[] {
+  const items: FeedItem[] = [];
+  const seen = new Set<string>();
+
+  // Extract listing URLs: https://www.ebay.com/itm/NUMBERS
+  const urlRegex = /https:\/\/www\.ebay\.com\/itm\/(\d+)/g;
+  let m;
+  while ((m = urlRegex.exec(html)) !== null) {
+    const url = m[0];
+    if (!seen.has(url)) {
+      seen.add(url);
+      items.push({
+        title: "", // Will be filled by extraction pipeline
+        link: url,
+        published: null,
+        description: null,
+        price: null,
+        imageUrl: null,
+        location: null,
+      });
+    }
+  }
+
+  return items;
+}
+
+/**
+ * Generic HTML parser - extract any URLs that look like vehicle listings.
+ */
+function parseGenericHTML(html: string): FeedItem[] {
+  const items: FeedItem[] = [];
+  const seen = new Set<string>();
+
+  const patterns = [
+    /https?:\/\/[^\s"'<>]+(?:listing|vehicle|auction|item|detail|classified)[^\s"'<>]*/gi,
+    /https?:\/\/[^\s"'<>]+(?:\/cars\/|\/auto\/|\/motors\/|\/for-sale\/)[^\s"'<>]*/gi,
+  ];
+
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    let m;
+    while ((m = pattern.exec(html)) !== null) {
+      let url = m[0].replace(/[)"'>\]]+$/, "").replace(/&amp;/g, "&");
+      // Skip junk
+      if (/unsubscribe|\.png|\.jpg|\.css|\.js|tracking|pixel|fonts\./i.test(url)) continue;
+      if (!seen.has(url)) {
+        seen.add(url);
+        items.push({
+          title: "",
+          link: url,
+          published: null,
+          description: null,
+          price: null,
+          imageUrl: null,
+          location: null,
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
+/**
  * Decide how to parse the response based on feed source.
  */
 function parseFeedResponse(
@@ -260,7 +327,13 @@ function parseFeedResponse(
   if (sourceSlug === "craigslist") {
     return parseCraigslistHTML(body, feedUrl);
   }
-  return parseRSS(body);
+  if (sourceSlug === "ebay") {
+    return parseEbayHTML(body);
+  }
+  // Try RSS first, fall back to generic HTML
+  const rssItems = parseRSS(body);
+  if (rssItems.length > 0) return rssItems;
+  return parseGenericHTML(body);
 }
 
 // ─── Vehicle Parsing ───────────────────────────────────────────────
@@ -322,8 +395,9 @@ async function pollFeeds() {
   }
 
   if (!force) {
+    // Re-poll feeds that haven't been checked in 4+ minutes
     query = query.or(
-      `last_polled_at.is.null,last_polled_at.lt.${new Date(Date.now() - 10 * 60 * 1000).toISOString()}`
+      `last_polled_at.is.null,last_polled_at.lt.${new Date(Date.now() - 4 * 60 * 1000).toISOString()}`
     );
   }
 
@@ -464,8 +538,8 @@ async function pollFeeds() {
       }
     }
 
-    // Be polite between fetches
-    await new Promise((r) => setTimeout(r, 800));
+    // Brief pause between fetches
+    await new Promise((r) => setTimeout(r, 300));
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
