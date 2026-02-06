@@ -18,6 +18,7 @@ const primary: AdminNavItem[] = [
 ];
 
 const operations: AdminNavItem[] = [
+  { label: 'Inventory Analytics', to: '/admin/analytics', description: 'Full inventory visualization & data quality' },
   { label: 'Ralph Brief', to: '/admin/ralph', description: 'What’s broken + what to do next' },
   { label: 'Mission Control', to: '/admin/mission-control' },
   { label: 'System Status', to: '/admin/status' },

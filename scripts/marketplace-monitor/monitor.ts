@@ -606,6 +606,137 @@ class MarketplaceMonitor {
 
       await supabase.from('marketplace_listings').upsert(data, { onConflict: 'facebook_id' });
       this.seenListings.add(listing.id);
+
+      // ─── ALSO create/update vehicle record directly ───────────────
+      // This ensures the vehicle table has complete data from the start,
+      // without needing a separate import-fb-marketplace pass.
+      if (year && (listing.parsedMake || listing.parsedModel)) {
+        const make = listing.parsedMake || '';
+        const model = listing.parsedModel || '';
+        const fbUrl = listing.url;
+        const price = listing.cleanPrice || listing.price;
+
+        // Check if vehicle already exists for this FB URL
+        const { data: existing } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('discovery_url', fbUrl)
+          .maybeSingle();
+
+        const vehiclePayload: Record<string, any> = {
+          year,
+          make,
+          model,
+          asking_price: price || null,
+          discovery_url: fbUrl,
+          listing_url: fbUrl,
+          discovery_source: 'facebook_marketplace',
+          platform_source: 'facebook_marketplace',
+          is_public: true,
+          listing_kind: 'vehicle',
+          // All the detail fields from the listing page
+          description: listing.description || null,
+          listing_location: listing.location || null,
+          mileage: listing.mileage || null,
+          transmission: listing.transmission || null,
+          color: listing.exteriorColor || null,
+          interior_color: listing.interiorColor || null,
+          fuel_type: listing.fuelType || null,
+          primary_image_url: listing.imageUrl || null,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (existing) {
+          // Update existing vehicle - only fill null fields
+          const updates: Record<string, any> = {};
+          for (const [key, val] of Object.entries(vehiclePayload)) {
+            if (val != null && key !== 'discovery_url' && key !== 'discovery_source') {
+              updates[key] = val;
+            }
+          }
+          await supabase.from('vehicles').update(updates).eq('id', existing.id);
+
+          // Insert images if we have them and vehicle has few
+          if (listing.allImages && listing.allImages.length > 0) {
+            const { count } = await supabase
+              .from('vehicle_images')
+              .select('id', { count: 'exact', head: true })
+              .eq('vehicle_id', existing.id);
+
+            if (!count || count < 2) {
+              const imgRecords = listing.allImages.slice(0, 20).map((url: string, i: number) => ({
+                vehicle_id: existing.id,
+                image_url: url,
+                source: 'facebook_marketplace',
+                is_primary: i === 0,
+                position: i,
+                display_order: i,
+              }));
+              await supabase.from('vehicle_images').insert(imgRecords).catch(() => {});
+            }
+          }
+        } else {
+          // Create new vehicle
+          vehiclePayload.profile_origin = 'facebook_marketplace';
+          vehiclePayload.origin_metadata = {
+            facebook_id: listing.id,
+            seller_name: listing.sellerName || null,
+            location: listing.location || null,
+            scraped_at: listing.scrapedAt,
+          };
+
+          const { data: newVehicle } = await supabase
+            .from('vehicles')
+            .insert(vehiclePayload)
+            .select('id')
+            .single();
+
+          if (newVehicle) {
+            // Link marketplace listing to vehicle
+            await supabase.from('marketplace_listings')
+              .update({ vehicle_id: newVehicle.id })
+              .eq('facebook_id', listing.id);
+
+            // Insert images
+            if (listing.allImages && listing.allImages.length > 0) {
+              const imgRecords = listing.allImages.slice(0, 20).map((url: string, i: number) => ({
+                vehicle_id: newVehicle.id,
+                image_url: url,
+                source: 'facebook_marketplace',
+                is_primary: i === 0,
+                position: i,
+                display_order: i,
+              }));
+              await supabase.from('vehicle_images').insert(imgRecords).catch(() => {});
+            }
+
+            // Create timeline event
+            const listingDate = listing.listedDaysAgo != null
+              ? new Date(Date.now() - listing.listedDaysAgo * 86400000).toISOString().split('T')[0]
+              : new Date().toISOString().split('T')[0];
+
+            await supabase.from('auction_events').insert({
+              vehicle_id: newVehicle.id,
+              source: 'facebook_marketplace',
+              source_url: fbUrl,
+              outcome: 'live',
+              auction_start_date: listingDate,
+              starting_bid: price || null,
+              seller_location: listing.location || null,
+              seller_name: listing.sellerName || null,
+              raw_data: {
+                mileage: listing.mileage,
+                transmission: listing.transmission,
+                exterior_color: listing.exteriorColor,
+                interior_color: listing.interiorColor,
+                fuel_type: listing.fuelType,
+                image_count: listing.allImages?.length || 0,
+              },
+            }).catch(() => {});
+          }
+        }
+      }
+
       return true;
     } catch (e) {
       console.error('Error saving:', e);

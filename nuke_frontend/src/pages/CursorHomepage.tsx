@@ -946,6 +946,7 @@ const CursorHomepage: React.FC = () => {
   }, [filters]);
 
   // Load available models when makes are selected
+  // Uses case-insensitive make matching and normalizes model names to base models
   useEffect(() => {
     const loadModelsForMakes = async () => {
       if (!filters.makes || filters.makes.length === 0) {
@@ -953,27 +954,84 @@ const CursorHomepage: React.FC = () => {
         return;
       }
       try {
-        // Query models for selected makes
+        // Build case-insensitive OR filter for makes (handles "Chevrolet" vs "chevrolet")
+        const makeClauses = filters.makes.map(m => `make.ilike.${m}`).join(',');
+        
+        // Query distinct models with counts using RPC-style approach
+        // Fetch more rows (2000) to get better coverage of model variants
         const { data: modelData } = await supabase
           .from('vehicles')
           .select('model')
           .eq('is_public', true)
-          .in('make', filters.makes)
+          .neq('status', 'pending')
+          .eq('listing_kind', 'vehicle')
+          .or(makeClauses)
           .not('model', 'is', null)
-          .limit(500);
+          .order('model', { ascending: true })
+          .limit(2000);
 
         if (modelData && Array.isArray(modelData)) {
-          const modelCounts = new Map<string, number>();
+          // Normalize models to base names:
+          // "C10 Pickup" -> "C10"
+          // "c10 custom pickup" -> "C10"
+          // "911 Carrera S" -> "911"
+          // Keep the most common full form for display
+          const baseModelMap = new Map<string, { display: string; count: number; variants: Set<string> }>();
+          
+          const extractBaseModel = (model: string): string => {
+            const trimmed = model.trim();
+            if (!trimmed) return '';
+            
+            // Split on spaces, take the first meaningful part as the base model
+            // Handle alphanumeric model names: "C10", "911", "Camaro", "F-150"
+            const parts = trimmed.split(/\s+/);
+            let base = parts[0];
+            
+            // If the first part is very short and next part looks like a model continuation, combine
+            // e.g. "GS 455" -> "GS", "GT 350" -> "GT"  
+            // But "Land Cruiser" -> "Land Cruiser", "Grand Cherokee" -> "Grand Cherokee"
+            if (parts.length > 1) {
+              const second = parts[1];
+              // Check if second part is a known sub-model qualifier (keep both parts)
+              const multiWordModels = ['cruiser', 'cherokee', 'wrangler', 'bronco', 'blazer', 'suburban',
+                'camaro', 'corvette', 'mustang', 'challenger', 'charger', 'firebird', 'barracuda',
+                'romeo', 'martin', 'rover'];
+              if (multiWordModels.some(mw => second.toLowerCase() === mw)) {
+                base = `${parts[0]} ${parts[1]}`;
+              }
+            }
+            
+            // Title case the base
+            return base.charAt(0).toUpperCase() + base.slice(1);
+          };
+          
           for (const row of modelData as any[]) {
-            const model = String(row?.model || '').trim();
-            if (model && model.length > 0 && model.length < 100) {
-              modelCounts.set(model, (modelCounts.get(model) || 0) + 1);
+            const rawModel = String(row?.model || '').trim();
+            if (!rawModel || rawModel.length < 1 || rawModel.length > 100) continue;
+            if (rawModel === 'Unknown') continue;
+            
+            const baseModel = extractBaseModel(rawModel);
+            if (!baseModel || baseModel.length < 1) continue;
+            
+            const key = baseModel.toLowerCase();
+            const existing = baseModelMap.get(key);
+            if (existing) {
+              existing.count++;
+              existing.variants.add(rawModel);
+              // Keep the most "canonical" looking display name (shortest, title case)
+              if (rawModel.length <= existing.display.length && rawModel === rawModel.charAt(0).toUpperCase() + rawModel.slice(1)) {
+                existing.display = rawModel.length < existing.display.length ? baseModel : existing.display;
+              }
+            } else {
+              baseModelMap.set(key, { display: baseModel, count: 1, variants: new Set([rawModel]) });
             }
           }
-          // Sort by frequency, then alphabetically
-          const sortedModels = Array.from(modelCounts.entries())
-            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-            .map(([model]) => model);
+          
+          // Sort by frequency (highest first), then alphabetically
+          const sortedModels = Array.from(baseModelMap.entries())
+            .sort((a, b) => b[1].count - a[1].count || a[1].display.localeCompare(b[1].display))
+            .map(([, v]) => v.display);
+          
           setAvailableModels(sortedModels);
         }
       } catch (err) {
