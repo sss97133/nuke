@@ -2964,10 +2964,11 @@ const CursorHomepage: React.FC = () => {
 
       const runVehicleQuery = async (selectFields: string) => {
         try {
-          // Include count: 'exact' for accurate filtered vehicle counts in the stats bar
+          // Only request exact count on first page (page 0) to avoid expensive COUNT on every scroll
+          const countMode = (pageNum === 0) ? 'exact' as const : undefined;
           let q = supabase
             .from('vehicles')
-            .select(selectFields, { count: 'exact' })
+            .select(selectFields, countMode ? { count: countMode } : undefined)
             .eq('is_public', true);
           
           // Status filter: show pending only if explicitly requested
