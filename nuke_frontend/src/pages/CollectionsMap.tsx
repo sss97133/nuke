@@ -242,7 +242,7 @@ export default function CollectionsMap() {
     .sort((a, b) => b[1] - a[1]);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
+    <div className="fullscreen-content h-screen flex flex-col bg-gray-900">
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">

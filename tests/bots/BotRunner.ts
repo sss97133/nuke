@@ -5,6 +5,7 @@
 
 import { chromium, firefox, webkit, Browser, Page, BrowserContext } from 'playwright';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createHmac } from 'crypto';
 import type {
   BotPersona,
   BotTestRun,
@@ -69,7 +70,7 @@ export class BotRunner {
   async start(): Promise<void> {
     console.log(`🤖 Starting bot: ${this.persona.name}`);
     console.log(`   Goals: ${this.persona.goals.join(', ')}`);
-    
+
     // Create test run record
     const { data: run, error } = await this.supabase
       .from('bot_test_runs')
@@ -92,9 +93,102 @@ export class BotRunner {
 
     // Launch browser
     await this.launchBrowser();
-    
+
+    // Authenticate if possible
+    await this.authenticate();
+
     // Setup event listeners
     await this.setupListeners();
+  }
+
+  /**
+   * Create a HS256 JWT using Node.js crypto (no external deps).
+   */
+  private signJwt(payload: Record<string, unknown>, secret: string): string {
+    const header = { alg: 'HS256', typ: 'JWT' };
+    const b64 = (obj: unknown) =>
+      Buffer.from(JSON.stringify(obj)).toString('base64url');
+    const headerB64 = b64(header);
+    const payloadB64 = b64(payload);
+    const sig = createHmac('sha256', secret)
+      .update(`${headerB64}.${payloadB64}`)
+      .digest('base64url');
+    return `${headerB64}.${payloadB64}.${sig}`;
+  }
+
+  /**
+   * Authenticate the bot by injecting a JWT into the browser's localStorage.
+   * Uses the pre-created bot-tester user (created via direct SQL) and signs
+   * a JWT with the project's JWT secret to bypass GoTrue API issues.
+   */
+  private async authenticate(): Promise<void> {
+    if (!this.page) return;
+
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+    if (!jwtSecret) {
+      this.log('auth', 'warning', 'No SUPABASE_JWT_SECRET — running unauthenticated');
+      return;
+    }
+
+    // Use pre-created bot user (created via SQL migration)
+    const botUserId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0001';
+    const botEmail = 'bot-tester@nuke-test.local';
+
+    try {
+      // Navigate to base URL first so localStorage is on the right origin
+      await this.page.goto(this.config.baseUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
+
+      const now = Math.floor(Date.now() / 1000);
+      const accessToken = this.signJwt(
+        {
+          sub: botUserId,
+          aud: 'authenticated',
+          role: 'authenticated',
+          email: botEmail,
+          email_confirmed_at: new Date().toISOString(),
+          iat: now,
+          exp: now + 3600,
+          app_metadata: { provider: 'email', providers: ['email'] },
+          user_metadata: { preferred_username: 'bot_tester', full_name: 'Bot Test User' },
+        },
+        jwtSecret,
+      );
+
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+      const projectRef = supabaseUrl.match(/https:\/\/([^.]+)/)?.[1] || '';
+      const storageKey = `sb-${projectRef}-auth-token`;
+
+      await this.page.evaluate(
+        ({ key, token }) => {
+          localStorage.setItem(key, JSON.stringify(token));
+        },
+        {
+          key: storageKey,
+          token: {
+            access_token: accessToken,
+            refresh_token: 'bot-test-refresh-token',
+            expires_at: now + 3600,
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: {
+              id: botUserId,
+              email: botEmail,
+              aud: 'authenticated',
+              role: 'authenticated',
+              email_confirmed_at: new Date().toISOString(),
+              app_metadata: { provider: 'email', providers: ['email'] },
+              user_metadata: { preferred_username: 'bot_tester', full_name: 'Bot Test User' },
+              created_at: new Date().toISOString(),
+            },
+          },
+        },
+      );
+
+      this.log('auth', 'success', `Authenticated as ${botEmail} (JWT)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'auth error';
+      this.log('auth', 'warning', `Auth failed: ${msg} — running unauthenticated`);
+    }
   }
 
   /**
