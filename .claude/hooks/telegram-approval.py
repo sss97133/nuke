@@ -35,15 +35,15 @@ if env_file.exists():
         key, _, val = line.partition("=")
         os.environ.setdefault(key.strip(), val.strip('"').strip("'"))
 
-# Configuration
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# Configuration - Use dedicated approval bot
+BOT_TOKEN = os.getenv("TELEGRAM_APPROVAL_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "7587296683")
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # Timeouts
 POLL_INTERVAL = 1  # seconds
-MAX_WAIT_TIME = 600  # 10 minutes
+MAX_WAIT_TIME = 86400  # 10 minutes
 TELEGRAM_TIMEOUT = 10
 
 def log(msg: str):
@@ -221,7 +221,7 @@ def create_approval_request(session_id: str, tool_name: str, tool_input: dict,
         "p_description": description,
         "p_context": context,
         "p_chat_id": int(CHAT_ID),
-        "p_expires_minutes": 10
+        "p_expires_minutes": 1440
     })
 
     if isinstance(result, list) and len(result) > 0:
@@ -274,6 +274,19 @@ def output_decision(behavior: str, message: str = None, updated_input: dict = No
     print(json.dumps(output))
     sys.exit(0)
 
+def check_session_allowed(session_id: str) -> bool:
+    """Check if this session has Allow All enabled."""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/claude_allowed_sessions?session_id=eq.{session_id}&select=id"
+        req = urllib.request.Request(url)
+        req.add_header('Authorization', f'Bearer {SUPABASE_KEY}')
+        req.add_header('apikey', SUPABASE_KEY)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            return len(data) > 0
+    except:
+        return False
+
 def main():
     # Check configuration
     if not all([BOT_TOKEN, CHAT_ID, SUPABASE_URL, SUPABASE_KEY]):
@@ -296,6 +309,11 @@ def main():
 
     # Skip if already in bypass mode
     if permission_mode == "bypassPermissions":
+        output_decision("allow")
+
+    # Check if this session has "Allow All" enabled
+    if check_session_allowed(session_id):
+        log(f"Session {session_id[:8]} has Allow All - auto-approving")
         output_decision("allow")
 
     # Create human-readable description
@@ -328,29 +346,18 @@ def main():
     }
     emoji = emoji_map.get(tool_name, "🔧")
 
-    # Get project context from cwd
-    project = "nuke" if "nuke" in cwd else cwd.split("/")[-1][:20]
-
     # Format working directory nicely
     cwd_display = cwd.replace("/Users/skylar/nuke/", "~/nuke/")
     if len(cwd_display) > 40:
         cwd_display = "..." + cwd_display[-37:]
 
-    message = f"""{emoji} *Claude Permission Request*
+    # Clean first line for notification preview
+    message = f"""{emoji} {tool_name}: {request_id}
 
 {description}
 
-━━━━━━━━━━━━━━━━━━
 📁 `{cwd_display}`
-🆔 `{request_id}`
-━━━━━━━━━━━━━━━━━━
-
-*Quick Reply:*
-`{request_id} yes` ✅ Approve
-`{request_id} no` ❌ Deny
-`{request_id} <message>` 💬 Approve with instructions
-
-⏰ _Expires in 10 minutes_"""
+"""
 
     # Inline keyboard for quick actions
     keyboard = {

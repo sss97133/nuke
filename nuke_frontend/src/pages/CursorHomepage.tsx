@@ -10,6 +10,7 @@ import { parseMoneyNumber } from '../lib/auctionUtils';
 import { preloadImageBatch, optimizeImageUrl } from '../lib/imageOptimizer';
 import ActiveAuctionsPanel from '../components/dashboard/ActiveAuctionsPanel';
 import FBMarketplacePanel from '../components/dashboard/FBMarketplacePanel';
+import RecentlyAddedPanel from '../components/dashboard/RecentlyAddedPanel';
 // import { ValueTrendsPanel } from '../components/charts'; // Temporarily disabled - import bug
 
 interface HypeVehicle {
@@ -548,7 +549,8 @@ const CursorHomepage: React.FC = () => {
   const [statsPanelMeta, setStatsPanelMeta] = useState<any>(null);
   const [showActiveAuctionsPanel, setShowActiveAuctionsPanel] = useState(false);
   const [showFBMarketplacePanel, setShowFBMarketplacePanel] = useState(false);
-  const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, string>>({});
+  const [showRecentlyAddedPanel, setShowRecentlyAddedPanel] = useState(false);
+  const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, { website: string; business_name: string; business_type: string | null; logo_url: string | null; city: string | null; state: string | null }>>({});
   const navigate = useNavigate();
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
   const lastScrollYRef = useRef<number>(0);
@@ -3445,13 +3447,20 @@ const CursorHomepage: React.FC = () => {
         if (orgIds.length > 0) {
           const { data: orgs, error: orgErr } = await supabase
             .from('businesses')
-            .select('id, website')
+            .select('id, website, business_name, business_type, logo_url, city, state')
             .in('id', orgIds);
           if (!orgErr && Array.isArray(orgs)) {
-            const next: Record<string, string> = {};
+            const next: Record<string, { website: string; business_name: string; business_type: string | null; logo_url: string | null; city: string | null; state: string | null }> = {};
             for (const o of orgs as any[]) {
               if (o?.id && typeof o?.website === 'string' && o.website.trim()) {
-                next[o.id] = o.website.trim();
+                next[o.id] = {
+                  website: o.website.trim(),
+                  business_name: o.business_name || o.website.trim(),
+                  business_type: o.business_type || null,
+                  logo_url: o.logo_url || null,
+                  city: o.city || null,
+                  state: o.state || null,
+                };
               }
             }
             setOrgWebsitesById(next);
@@ -4640,13 +4649,9 @@ const CursorHomepage: React.FC = () => {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleAddedTodayOnly();
+                      setShowRecentlyAddedPanel(true);
                     }}
-                    title={
-                      filters.addedTodayOnly
-                        ? 'Showing vehicles added today (click to clear)'
-                        : 'Show vehicles added today'
-                    }
+                    title="View recently added vehicles analytics"
                     style={{
                       padding: '1px 6px',
                       borderRadius: '999px',
@@ -5115,13 +5120,9 @@ const CursorHomepage: React.FC = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      toggleAddedTodayOnly();
+                      setShowRecentlyAddedPanel(true);
                     }}
-                    title={
-                      filters.addedTodayOnly
-                        ? 'Showing vehicles added today (click to clear)'
-                        : 'Show vehicles added today'
-                    }
+                    title="View recently added vehicles analytics"
                     style={{
                       border: 'none',
                       background: 'transparent',
@@ -7145,7 +7146,7 @@ const CursorHomepage: React.FC = () => {
                   showFollowButton={!!session?.user?.id}
                   thermalPricing={false} // ARCHIVED: Always disabled
                   sourceStampUrl={
-                    ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined) ||
+                    ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)]?.website : undefined) ||
                     (vehicle as any)?.discovery_url
                   }
                 />
@@ -7173,7 +7174,7 @@ const CursorHomepage: React.FC = () => {
                 thermalPricing={thermalPricing}
                 thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
                 sourceStampUrl={
-                  ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined) ||
+                  ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)]?.website : undefined) ||
                   (vehicle as any)?.discovery_url
                 }
               />
@@ -7329,6 +7330,17 @@ const CursorHomepage: React.FC = () => {
       {showFBMarketplacePanel && (
         <FBMarketplacePanel
           onClose={() => setShowFBMarketplacePanel(false)}
+        />
+      )}
+
+      {/* Recently Added Panel - Analytics for newly imported vehicles */}
+      {showRecentlyAddedPanel && (
+        <RecentlyAddedPanel
+          onClose={() => setShowRecentlyAddedPanel(false)}
+          vehicles={feedVehicles}
+          orgInfoById={orgWebsitesById}
+          onNavigateToVehicle={(id) => navigate(`/vehicle/${id}`)}
+          onFilterMainView={() => { toggleAddedTodayOnly(); setShowRecentlyAddedPanel(false); }}
         />
       )}
 

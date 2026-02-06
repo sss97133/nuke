@@ -1,3 +1,112 @@
+# ACTIVE AGENTS - Updated 2026-02-05 (Opus Session)
+
+## CURRENT SESSION - MAJOR BAT EXTRACTION (aa587a72)
+
+### MAJOR DISCOVERY
+Found 91,336 BaT URLs falsely marked "complete" but never extracted to bat_listings!
+Reset them to pending - now being extracted.
+
+### Current Status (Live)
+- **91,556 BaT pending** being extracted
+- **12+ parallel agents** running extraction and discovery
+- **Scripts running**: `/tmp/aggressive-bat.log`, `/tmp/bat-extraction.log`
+
+### Progress (13:34 PST)
+- **185,829 URLs discovered** (up 47k from start!)
+- **128,727 bat_listings**
+- **44,331 pending** (down from 91,556 - over 50% reduction!)
+- **34,960 processing** (high parallelism)
+- **Extraction rate**: ~2,500/min
+- **ETA**: ~18 min for current pending
+
+### Live Auction Discovery - TARGET REACHED! ✅
+- **800 total monitored** (target: 800) - **100% COMPLETE!**
+- Sources: Collecting Cars (505), BaT (211), PCarMarket (37), SBX Cars (30), C&B (10+)
+- Discovery agents found auctions from all major platforms
+
+### Year Discovery (Finding Missing URLs)
+Crawling years 2014-2021 for undiscovered listings:
+- 2015-2018: Only 24 pages crawled, ~1750 pages exist each
+- Finding ~200 new URLs per page
+
+### Background Processes
+- `aggressive-bat-extraction.sh` (PID 76942)
+- `continuous-bat-extraction.sh` (PID 58967)
+- 10+ subagent workers
+
+### Files Created
+- `/Users/skylar/nuke/scripts/aggressive-bat-extraction.sh`
+- `/Users/skylar/nuke/scripts/continuous-bat-extraction.sh`
+
+### STILL BLOCKED
+- **Firecrawl**: API key `fc-12e25...` has -140 credits
+- Other sites (C&B, PCarMarket, Collecting Cars) need Firecrawl
+
+---
+
+## RESTORATION COMPANY TELEGRAM INTAKE - COMPLETE ✅
+
+### What Was Built
+Telegram-based photo intake system for restoration companies:
+- Boss generates invite code for their business
+- Technicians join via `/start INVITE_CODE`
+- Techs set active vehicle via `/vehicle VIN`
+- Techs send photos → auto-routed to business → vehicle
+- Business pulls structured data via REST API
+
+### Database Changes (APPLIED)
+- `telegram_work_submissions` - New table for photo submissions
+- `telegram_technicians.business_id` - Links techs to businesses
+- `business_invite_codes` - Invite code system for onboarding
+- `generate_invite_code()` - SQL function to create codes
+- `use_invite_code()` - SQL function for tech onboarding
+- `business_telegram_submissions` - View for easy querying
+
+### Edge Functions (NEEDS DEPLOY)
+Supabase deployment was timing out. Code is complete:
+- `telegram-restoration-bot/index.ts` - Bot handling onboarding + photos
+- `api-v1-business-data/index.ts` - REST API for businesses
+
+**To deploy when Supabase is working:**
+```bash
+supabase functions deploy telegram-restoration-bot --no-verify-jwt
+supabase functions deploy api-v1-business-data --no-verify-jwt
+```
+
+### Files Created
+- `/Users/skylar/nuke/database/migrations/20260205_telegram_restoration_intake.sql`
+- `/Users/skylar/nuke/supabase/functions/telegram-restoration-bot/index.ts`
+- `/Users/skylar/nuke/supabase/functions/api-v1-business-data/index.ts`
+
+### How To Use (After Deploy)
+
+**For the Boss:**
+```sql
+-- Generate invite code for your business
+SELECT generate_invite_code('YOUR_BUSINESS_ID');
+-- Returns: ABC12345
+```
+
+**For Technicians (Telegram):**
+1. `/start ABC12345` - Join the business
+2. `/vehicle WBA3A5C51CF123456` - Set active vehicle
+3. Send photos
+4. `/done` when finished
+
+**For Businesses (API):**
+```bash
+curl -H "X-API-Key: nk_live_xxx" \
+  https://xxx.supabase.co/functions/v1/api-v1-business-data/submissions
+```
+
+### API Endpoints
+- `GET /summary` - Dashboard stats
+- `GET /submissions` - Photo submissions (filterable)
+- `GET /vehicles` - Vehicles in service
+- `GET /technicians` - Connected technicians
+
+---
+
 # ACTIVE AGENTS - Updated 2026-02-05 01:35
 
 ## TELEGRAM SYSTEM V2 - CONFIRMED WORKING ✅

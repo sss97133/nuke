@@ -1,0 +1,5243 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "thermal-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/thermal-ferrari-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Thermal, CA",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.1392,
+          33.6403
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "porsche-classic-collection",
+        "url": "https://exclusivecarregistry.com/collection/porsche-classic-collection",
+        "instagram": "porsche.museum",
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-sytner-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-sytner-collection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Leicester",
+        "source": "Sytner Group HQ"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -1.1398,
+          52.6369
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "heppenheim-collection",
+        "url": "https://exclusivecarregistry.com/collection/heppenheim-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Heppenheim",
+        "source": "German city"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.6361,
+          49.6417
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ferrarios",
+        "url": "https://exclusivecarregistry.com/collection/ferrarios",
+        "instagram": "ferrarios1979",
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "turbophile888",
+        "url": "https://exclusivecarregistry.com/collection/turbophile888",
+        "instagram": null,
+        "country": "USA",
+        "city": "Greenwich, CT",
+        "source": "Miller Motorcars delivery"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.6282,
+          41.0262
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "sk",
+        "url": "https://exclusivecarregistry.com/collection/sk",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Stans",
+        "source": "German entrepreneur Gemballa owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.366,
+          46.9572
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "yoojean-kim-collection",
+        "url": "https://exclusivecarregistry.com/collection/yoojean-kim-collection",
+        "instagram": null,
+        "country": "South Korea",
+        "city": "Seoul",
+        "source": "Korean collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          126.978,
+          37.5665
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "lamborghini-ranch",
+        "url": "https://exclusivecarregistry.com/collection/lamborghini-ranch",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Bologna",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.3426,
+          44.4949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-lake-house-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-lake-house-collection",
+        "instagram": "lakehouse_collection",
+        "country": "USA",
+        "city": "Lake Tahoe, CA",
+        "source": "Lake house reference"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.0324,
+          39.0968
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "la-collection-bleu",
+        "url": "https://exclusivecarregistry.com/collection/la-collection-bleu",
+        "instagram": null,
+        "country": "France",
+        "city": "Nice",
+        "source": "Blue collection France"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.262,
+          43.7102
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-hickling-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-hickling-collection",
+        "instagram": "mlhickling",
+        "country": "UK",
+        "city": "Norfolk",
+        "source": "Hickling, Norfolk"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1.5689,
+          52.7494
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "boom_laferrari",
+        "url": "https://exclusivecarregistry.com/collection/boom_laferrari",
+        "instagram": "boom_laferrari",
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "craig-liebermans-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/craig-liebermans-car-collection",
+        "instagram": "httpswww.instagram.comcraiglieberman_42",
+        "country": "USA",
+        "city": "Los Angeles, CA",
+        "source": "Fast & Furious technical advisor"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.2437,
+          34.0522
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "scuderia-gg",
+        "url": "https://exclusivecarregistry.com/collection/scuderia-gg",
+        "instagram": "Scuderia.GG",
+        "country": "Italy",
+        "city": "Milan",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.19,
+          45.4642
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-perfetti-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-perfetti-collection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Milan",
+        "source": "Italian collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.19,
+          45.4642
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "hotcave-by-eh0601",
+        "url": "https://exclusivecarregistry.com/collection/hotcave-by-eh0601",
+        "instagram": "httpswww.instagram.comeh0601igshMW45Z3dma25nZ2VrcQ",
+        "country": "Belgium",
+        "city": "Brussels",
+        "source": "Emmanuel Belgian entrepreneur"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          4.3488,
+          50.8505
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "lorne-leibels-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/lorne-leibels-car-collection",
+        "instagram": null,
+        "country": "Canada",
+        "city": "Toronto",
+        "source": "Canadian Motorsport HOF"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.3832,
+          43.6532
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "nac-racing",
+        "url": "https://exclusivecarregistry.com/collection/nac-racing",
+        "instagram": "nac__racing",
+        "country": "France",
+        "city": "Le Mans",
+        "source": "Racing team"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0.2077,
+          47.9567
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "mclarentwins",
+        "url": "https://exclusivecarregistry.com/collection/mclarentwins",
+        "instagram": "mclarentwins",
+        "country": "UK",
+        "city": "Woking",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.56,
+          51.3148
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jzaibs-garage",
+        "url": "https://exclusivecarregistry.com/collection/jzaibs-garage",
+        "instagram": "httpswww.instagram.comjzaibsgarage",
+        "country": "USA",
+        "city": "Pompano Beach, FL",
+        "source": "Jahanzaib Majid Florida"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.1248,
+          26.2379
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "rosso-barchetta",
+        "url": "https://exclusivecarregistry.com/collection/rosso-barchetta",
+        "instagram": "rossobarchetta",
+        "country": "Italy",
+        "city": "Milan",
+        "source": "Italian name"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.19,
+          45.4642
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jayvj",
+        "url": "https://exclusivecarregistry.com/collection/jayvj",
+        "instagram": "jayvj",
+        "country": "UK",
+        "city": "Barnet",
+        "source": "440K followers Pagani owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1997,
+          51.6444
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "0008-collection",
+        "url": "https://exclusivecarregistry.com/collection/0008-collection",
+        "instagram": "dineshdthakkar",
+        "country": "India",
+        "city": "Mumbai",
+        "source": "Dinesh Thakkar Angel One CEO"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          72.8777,
+          19.076
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "rammjaeger",
+        "url": "https://exclusivecarregistry.com/collection/rammjaeger",
+        "instagram": "rammjaeger",
+        "country": "USA",
+        "city": "Roswell, GA",
+        "source": "John Gibson"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.3616,
+          34.0232
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "chickendiarrhea",
+        "url": "https://exclusivecarregistry.com/collection/chickendiarrhea",
+        "instagram": "chickendiarrhea",
+        "country": "Japan",
+        "city": "Ebisu",
+        "source": "Formula Drift Japan"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          140.4317,
+          37.6422
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "liam-howletts-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/liam-howletts-car-collection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Essex",
+        "source": "The Prodigy member"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0.4691,
+          51.7343
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "pga-cars-collection",
+        "url": "https://exclusivecarregistry.com/collection/pga-cars-collection",
+        "instagram": "pgacars_",
+        "country": "USA",
+        "city": "Ponte Vedra, FL",
+        "source": "PGA Tour HQ area"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.3857,
+          30.2396
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-sidhom-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-sidhom-collection",
+        "instagram": "csid830",
+        "country": "USA",
+        "city": "Glen Cove, NY",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.6315,
+          40.8623
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "germansupercarowner",
+        "url": "https://exclusivecarregistry.com/collection/germansupercarowner",
+        "instagram": "germansupercarowner",
+        "country": "Germany",
+        "city": "Munich",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.582,
+          48.1351
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "oceanking_seven",
+        "url": "https://exclusivecarregistry.com/collection/oceanking_seven",
+        "instagram": "oceanking_seven",
+        "country": "Singapore",
+        "city": "Singapore",
+        "source": "ECR page Albert Oon"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          103.9056,
+          1.3021
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jas_aulakh",
+        "url": "https://exclusivecarregistry.com/collection/jas_aulakh",
+        "instagram": "jas_aulakh",
+        "country": "USA",
+        "city": "Newport Beach, CA",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.9289,
+          33.6189
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "lakeside-collection",
+        "url": "https://exclusivecarregistry.com/collection/lakeside-collection",
+        "instagram": "lakeside.collection",
+        "country": "Switzerland",
+        "city": "Zug",
+        "source": "Swiss lakeside"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.5177,
+          47.1724
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-strnad-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-strnad-collection",
+        "instagram": null,
+        "country": "Czechia",
+        "city": "Kopřivnice",
+        "source": "Jaroslav Strnad TATRA museum"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18.1448,
+          49.5993
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "south-texas-king",
+        "url": "https://exclusivecarregistry.com/collection/south-texas-king",
+        "instagram": null,
+        "country": "USA",
+        "city": "Houston",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -95.3698,
+          29.7604
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "parisian-private-car-collector",
+        "url": "https://exclusivecarregistry.com/collection/parisian-private-car-collector",
+        "instagram": null,
+        "country": "France",
+        "city": "Paris",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.3522,
+          48.8566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "monegasque-am-collection",
+        "url": "https://exclusivecarregistry.com/collection/monegasque-am-collection",
+        "instagram": null,
+        "country": "Monaco",
+        "city": "Monaco",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.4246,
+          43.7384
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-shields-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-shields-collection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Belfast",
+        "source": "Northern Ireland"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -5.9301,
+          54.5973
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "dct-racing",
+        "url": "https://exclusivecarregistry.com/collection/dct-racing",
+        "instagram": "dctracing_official",
+        "country": "South Korea",
+        "city": "Yongin-si",
+        "source": "Korean racing team"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.1776,
+          37.2411
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "talcos-garage",
+        "url": "https://exclusivecarregistry.com/collection/talcos-garage",
+        "instagram": "talcosgarage",
+        "country": "USA",
+        "city": "Boston, MA",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.0589,
+          42.3601
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-versluys-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-versluys-collection",
+        "instagram": null,
+        "country": "Belgium",
+        "city": "Ostend",
+        "source": "Belgian collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.9286,
+          51.2154
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "george-harrisons-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/george-harrisons-car-collection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Henley-on-Thames",
+        "source": "Friar Park estate"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.9014,
+          51.5354
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "wroclaw-hypercar-collection",
+        "url": "https://exclusivecarregistry.com/collection/wroclaw-hypercar-collection",
+        "instagram": null,
+        "country": "Poland",
+        "city": "Wroclaw",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.0385,
+          51.1079
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-speedy-gonzales-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-speedy-gonzales-collection",
+        "instagram": null,
+        "country": "UAE",
+        "city": "Dubai",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          55.2708,
+          25.2048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "auto-world-vintage-museum-collection",
+        "url": "https://exclusivecarregistry.com/collection/auto-world-vintage-museum-collection",
+        "instagram": "httpswww.instagram.comdastanautoworldofficialigshaW1hdWp4YjJ4bWhw",
+        "country": "USA",
+        "city": "Fulton, MO",
+        "source": "Museum"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -91.9479,
+          38.8469
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "rags_2richz",
+        "url": "https://exclusivecarregistry.com/collection/rags_2richz",
+        "instagram": "rags_2richz",
+        "country": "USA",
+        "city": "Miami, FL",
+        "source": "Steven Weinstock Porsche collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.1918,
+          25.7617
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-comer-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-comer-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Milwaukee, WI",
+        "source": "Colin Comer classic auto"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -87.9065,
+          43.0389
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-cohen-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-cohen-collection",
+        "instagram": "ferrariking_max.",
+        "country": "USA",
+        "city": "Avon, CT",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.8301,
+          41.8098
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "nomorelots",
+        "url": "https://exclusivecarregistry.com/collection/nomorelots",
+        "instagram": "nomorelots",
+        "country": "Singapore",
+        "city": "Singapore",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          103.82,
+          1.305
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-neubauer-family-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-neubauer-family-collection",
+        "instagram": null,
+        "country": "Austria",
+        "city": "Vienna",
+        "source": "German surname"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.3738,
+          48.2082
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jc-para-collection",
+        "url": "https://exclusivecarregistry.com/collection/jc-para-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Westhampton, NY",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.6662,
+          40.8237
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "challengetheroad",
+        "url": "https://exclusivecarregistry.com/collection/challengetheroad",
+        "instagram": "challengetheroad",
+        "country": "UK",
+        "city": "West Sussex",
+        "source": "ECR page Richard Groves"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.45,
+          50.92
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "7777j8888",
+        "url": "https://exclusivecarregistry.com/collection/7777j8888",
+        "instagram": "7777j8888",
+        "country": "South Korea",
+        "city": "Seoul",
+        "source": "Gangnam-gu"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0473,
+          37.5172
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-piazza-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-piazza-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Bryn Mawr, PA",
+        "source": "Former Algar Ferrari dealership"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.3163,
+          40.0218
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "hubbard-collection",
+        "url": "https://exclusivecarregistry.com/collection/hubbard-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Scottsdale, AZ",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -111.9261,
+          33.4942
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-kristiansen-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-kristiansen-collection",
+        "instagram": null,
+        "country": "Norway",
+        "city": "Oslo",
+        "source": "Norwegian name"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.7522,
+          59.9139
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "rungsted-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/rungsted-ferrari-collection",
+        "instagram": null,
+        "country": "Denmark",
+        "city": "Rungsted",
+        "source": "Denmark"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12.5417,
+          55.875
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ahmed_n_alnahyan",
+        "url": "https://exclusivecarregistry.com/collection/ahmed_n_alnahyan",
+        "instagram": "ahmed_n_alnahyan",
+        "country": "UAE",
+        "city": "Abu Dhabi",
+        "source": "UAE royal family"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          54.3773,
+          24.4539
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jorg-kintzels-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/jorg-kintzels-car-collection",
+        "instagram": "joergkintzel",
+        "country": "Germany",
+        "city": "Munich",
+        "source": "Valuniq AG board"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.582,
+          48.1351
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-bluhm-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-bluhm-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Cologne",
+        "source": "Eckhard Bluhm Ferrari collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.9603,
+          50.9375
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "turbo832",
+        "url": "https://exclusivecarregistry.com/collection/turbo832",
+        "instagram": "httpswww.instagram.comturbo8833",
+        "country": "South Korea",
+        "city": "Seoul",
+        "source": "ECR page Yongsan-gu"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          126.99,
+          37.5326
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "stevinson-collection",
+        "url": "https://exclusivecarregistry.com/collection/stevinson-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Denver, CO",
+        "source": "Stevinson Automotive"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.9903,
+          39.7392
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "car777watches",
+        "url": "https://exclusivecarregistry.com/collection/car777watches",
+        "instagram": null,
+        "country": "UAE",
+        "city": "Dubai",
+        "source": "Greek-Turkish Bugatti collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          55.2708,
+          25.2048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-weng-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-weng-collection",
+        "instagram": null,
+        "country": "Taiwan",
+        "city": "Taoyuan",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.301,
+          24.9936
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-carrera-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-carrera-collection",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Zurich",
+        "source": "Swiss collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.5417,
+          47.3769
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-pray-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-pray-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Bedford, NY",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.644,
+          41.2048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-sufliarsky-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-sufliarsky-collection",
+        "instagram": "mariansufliarsky",
+        "country": "Slovakia",
+        "city": "Lučenec",
+        "source": "Marian Sufliarsky Ferrari collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.6673,
+          48.3327
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "grossman-racing",
+        "url": "https://exclusivecarregistry.com/collection/grossman-racing",
+        "instagram": null,
+        "country": "USA",
+        "city": "Connecticut",
+        "source": "Racing team"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.0877,
+          41.6032
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jabrbinhamad",
+        "url": "https://exclusivecarregistry.com/collection/jabrbinhamad",
+        "instagram": "jabrbinhamad",
+        "country": "Bahrain",
+        "city": "Manama",
+        "source": "Bahrain royal"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          50.586,
+          26.2285
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "bodyfriend-collection",
+        "url": "https://exclusivecarregistry.com/collection/bodyfriend-collection",
+        "instagram": null,
+        "country": "South Korea",
+        "city": "Seoul",
+        "source": "Gangnam-gu"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0473,
+          37.5172
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "monterrey-classic-collection",
+        "url": "https://exclusivecarregistry.com/collection/monterrey-classic-collection",
+        "instagram": null,
+        "country": "Mexico",
+        "city": "Monterrey",
+        "source": "Mexico"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -100.3161,
+          25.6866
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "nasser-al-thanis-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/nasser-al-thanis-car-collection",
+        "instagram": "nasseraalthani",
+        "country": "Qatar",
+        "city": "Doha",
+        "source": "Qatari royal"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          51.531,
+          25.2854
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "fbf-collezione",
+        "url": "https://exclusivecarregistry.com/collection/fbf-collezione",
+        "instagram": "fbf.collezione",
+        "country": "Italy",
+        "city": "Rome",
+        "source": "Italian collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12.4964,
+          41.9028
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "carl-moons-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/carl-moons-car-collection",
+        "instagram": "carlmoon",
+        "country": "UAE",
+        "city": "Dubai",
+        "source": "Crypto investor"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          55.2708,
+          25.2048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "vasek-polaks-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/vasek-polaks-private-collection",
+        "instagram": "vasekpolakcollection",
+        "country": "USA",
+        "city": "Torrance, CA",
+        "source": "Porsche legend"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.3406,
+          33.8358
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "batyr-collection",
+        "url": "https://exclusivecarregistry.com/collection/batyr-collection",
+        "instagram": null,
+        "country": "Kazakhstan",
+        "city": "Astana",
+        "source": "Madiyar Batyr"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          71.4704,
+          51.1605
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "chemicalmethod",
+        "url": "https://exclusivecarregistry.com/collection/chemicalmethod",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Zurich",
+        "source": "Relocated from Los Angeles"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.5417,
+          47.3769
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "saudi-private-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/saudi-private-car-collection",
+        "instagram": null,
+        "country": "Saudi Arabia",
+        "city": "Riyadh",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          46.6753,
+          24.7136
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "eduardo-costabals-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/eduardo-costabals-private-collection",
+        "instagram": "chelsea1979cars",
+        "country": "Chile",
+        "city": "Santiago",
+        "source": "Chilean collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.6693,
+          -33.4489
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-hiramatsu-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-hiramatsu-collection",
+        "instagram": null,
+        "country": "Japan",
+        "city": "Tokyo",
+        "source": "Japanese collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          139.6503,
+          35.6762
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "max-engines",
+        "url": "https://exclusivecarregistry.com/collection/max-engines",
+        "instagram": "cz_supercars",
+        "country": "Czechia",
+        "city": "Prague",
+        "source": "Czech Republic"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.4378,
+          50.0755
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "valais-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/valais-ferrari-collection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "french--english-collection",
+        "url": "https://exclusivecarregistry.com/collection/french--english-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Paris",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.3522,
+          48.8566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-oldtimer-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-oldtimer-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Munich",
+        "source": "Classic cars Germany"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.582,
+          48.1351
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-rothschild-family-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-rothschild-family-collection",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Geneva",
+        "source": "Banking family"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.1432,
+          46.2044
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-samara-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-samara-collection",
+        "instagram": null,
+        "country": "Russia",
+        "city": "Samara",
+        "source": "Russian collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          50.1001,
+          53.1959
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "borusan-otomotiv-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/borusan-otomotiv-private-collection",
+        "instagram": null,
+        "country": "Turkey",
+        "city": "Istanbul",
+        "source": "BMW distributor Turkey"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.9784,
+          41.0082
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "kiawah-island-collection",
+        "url": "https://exclusivecarregistry.com/collection/kiawah-island-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Kiawah Island, SC",
+        "source": "South Carolina coast"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.0848,
+          32.6082
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "eclectic-parisian-collector",
+        "url": "https://exclusivecarregistry.com/collection/eclectic-parisian-collector",
+        "instagram": null,
+        "country": "France",
+        "city": "Paris",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.3522,
+          48.8566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "luckyssupercars",
+        "url": "https://exclusivecarregistry.com/collection/luckyssupercars",
+        "instagram": "luckyssupercars",
+        "country": "UK",
+        "city": "Exeter",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -3.5339,
+          50.7184
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "grant-bakers-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/grant-bakers-car-collection",
+        "instagram": "httpswww.instagram.comgrantkbaker",
+        "country": "New Zealand",
+        "city": "Auckland",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          174.7645,
+          -36.8509
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "wistar-motors-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/wistar-motors-private-collection",
+        "instagram": "wistarmotors",
+        "country": "USA",
+        "city": "Philadelphia, PA",
+        "source": "Pennsylvania dealer"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.1652,
+          39.9526
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "principekarim",
+        "url": "https://exclusivecarregistry.com/collection/principekarim",
+        "instagram": "principekarim",
+        "country": "Dominican Republic",
+        "city": "Santo Domingo",
+        "source": "El Principe not royal"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9312,
+          18.4861
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "akram-juniors-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/akram-juniors-car-collection",
+        "instagram": "akramjunior",
+        "country": "Pakistan",
+        "city": "Lahore",
+        "source": "Pakistani collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          74.3587,
+          31.5204
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-amalfitano-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-amalfitano-collection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Naples",
+        "source": "Italian collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.2681,
+          40.8518
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-yadegar-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-yadegar-collection",
+        "instagram": null,
+        "country": "Iran",
+        "city": "Tehran",
+        "source": "Iranian collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          51.389,
+          35.6892
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "santa-laura-collection",
+        "url": "https://exclusivecarregistry.com/collection/santa-laura-collection",
+        "instagram": "Santa_Laura",
+        "country": "Chile",
+        "city": "Iquique",
+        "source": "Chile"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1524,
+          -20.2141
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "kenki_mitsui",
+        "url": "https://exclusivecarregistry.com/collection/kenki_mitsui",
+        "instagram": null,
+        "country": "Japan",
+        "city": "Tokyo",
+        "source": "CEO Eiff, Ikebukuro"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          139.6503,
+          35.6762
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-don-davis-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-don-davis-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Fort Worth, TX",
+        "source": "Texas collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -97.3308,
+          32.7555
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "kwaks-collection",
+        "url": "https://exclusivecarregistry.com/collection/kwaks-collection",
+        "instagram": null,
+        "country": "South Korea",
+        "city": "Seoul",
+        "source": "HANMI Semiconductor CEO"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          126.9791,
+          37.5334
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-jcdecaux-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-jcdecaux-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Neuilly-sur-Seine",
+        "source": "Advertising company heir"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.2693,
+          48.8846
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "josh-sweats-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/josh-sweats-car-collection",
+        "instagram": "Sweatyj",
+        "country": "USA",
+        "city": "Phoenix, AZ",
+        "source": "NFL player"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -112.074,
+          33.4484
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-shraga-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-shraga-collection",
+        "instagram": null,
+        "country": "Israel",
+        "city": "Tel Aviv",
+        "source": "Elad Shraga OSCA collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          34.7818,
+          32.0853
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "haeundae__pikachu",
+        "url": "https://exclusivecarregistry.com/collection/haeundae__pikachu",
+        "instagram": null,
+        "country": "South Korea",
+        "city": "Busan",
+        "source": "Haeundae district"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          129.1636,
+          35.1631
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "brittany-collection",
+        "url": "https://exclusivecarregistry.com/collection/brittany-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Brittany",
+        "source": "Brittany region"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -2.9326,
+          48.202
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "q-motorsports",
+        "url": "https://exclusivecarregistry.com/collection/q-motorsports",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Trebur",
+        "source": "Sven Quandt Audi team"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.406,
+          49.927
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ferrari-drive-collection",
+        "url": "https://exclusivecarregistry.com/collection/ferrari-drive-collection",
+        "instagram": "ferraridrive",
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-weinberger-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-weinberger-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Naperville, IL",
+        "source": "John F. Weinberger"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -88.1535,
+          41.7508
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-wegman-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-wegman-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Rochester, NY",
+        "source": "Danny Wegman Wegmans CEO"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -77.6088,
+          43.1566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "barrett-jackson-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/barrett-jackson-private-collection",
+        "instagram": "craig_jackson427",
+        "country": "USA",
+        "city": "Scottsdale, AZ",
+        "source": "Auction company"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -111.9261,
+          33.4942
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-hsu-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-hsu-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "New York, NY",
+        "source": "Aaron Hsu 250 GTO owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.006,
+          40.7128
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "porsche-lebanon-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/porsche-lebanon-private-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "markwang_cargarage",
+        "url": "https://exclusivecarregistry.com/collection/markwang_cargarage",
+        "instagram": null,
+        "country": "USA",
+        "city": "Seattle, WA",
+        "source": "Instagram posts"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.3321,
+          47.6062
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-schaevitz-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-schaevitz-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Bedford Corners, NY",
+        "source": "Gary Schaevitz McLaren F1s"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.6929,
+          41.2101
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "swizz-beatzs-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/swizz-beatzs-car-collection",
+        "instagram": "therealswizz",
+        "country": "USA",
+        "city": "La Jolla, CA",
+        "source": "Razor House"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.2713,
+          32.8328
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "southern-hypercar-collection",
+        "url": "https://exclusivecarregistry.com/collection/southern-hypercar-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Atlanta, GA",
+        "source": "Southern USA"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.388,
+          33.749
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "toyota-gazoo-racing",
+        "url": "https://exclusivecarregistry.com/collection/toyota-gazoo-racing",
+        "instagram": "httpswww.instagram.comtgreurope",
+        "country": "Germany",
+        "city": "Cologne",
+        "source": "Racing team"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.9603,
+          50.9375
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "bykolles-collection",
+        "url": "https://exclusivecarregistry.com/collection/bykolles-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Greding",
+        "source": "Racing team HQ"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.357,
+          49.047
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "pacific-sports-car-club-collection",
+        "url": "https://exclusivecarregistry.com/collection/pacific-sports-car-club-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Seattle, WA",
+        "source": "Car club"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.3321,
+          47.6062
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-kaminskey-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-kaminskey-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Long Island, NY",
+        "source": "Brian Kaminskey Ferrari Challenge"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.135,
+          40.7891
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-haddawy-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-haddawy-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Los Angeles, CA",
+        "source": "Mark Haddawy Resurrection Vintage"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.2437,
+          34.0522
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-porsport-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-porsport-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Islip, NY",
+        "source": "Long Island"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2104,
+          40.7298
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "lititz-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/lititz-ferrari-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Lititz, PA",
+        "source": "Pennsylvania"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -76.3072,
+          40.1576
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-aec-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-aec-collection",
+        "instagram": "theaeccollection",
+        "country": "Canada",
+        "city": "Aurora, ON",
+        "source": "Automobile Museo"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.4504,
+          44.0065
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ak-prestige-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/ak-prestige-private-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Paris",
+        "source": "Ak Prestige Ferrari"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.3522,
+          48.8566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "hans-georg-plaut",
+        "url": "https://exclusivecarregistry.com/collection/hans-georg-plaut",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Hannover",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.7332,
+          52.3705
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "fernando-alonsos-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/fernando-alonsos-car-collection",
+        "instagram": null,
+        "country": "Monaco",
+        "city": "Monaco",
+        "source": "F1 driver residence"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.4246,
+          43.7384
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "bruno-sennas-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/bruno-sennas-car-collection",
+        "instagram": null,
+        "country": "Monaco",
+        "city": "Monaco",
+        "source": "F1 driver residence"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.4246,
+          43.7384
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "arto-team-thailand",
+        "url": "https://exclusivecarregistry.com/collection/arto-team-thailand",
+        "instagram": null,
+        "country": "Thailand",
+        "city": "Bangkok",
+        "source": "Toyota Gazoo Racing Thailand president"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          100.5018,
+          13.7563
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "myperformantis",
+        "url": "https://exclusivecarregistry.com/collection/myperformantis",
+        "instagram": null,
+        "country": "Lebanon",
+        "city": "Beirut",
+        "source": "Eliccio Kheir Allah"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          35.5016,
+          33.8933
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "kamonegi_aniki",
+        "url": "https://exclusivecarregistry.com/collection/kamonegi_aniki",
+        "instagram": "kamonegi_aniki",
+        "country": "Japan",
+        "city": "Kyoto",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          135.7539,
+          35.0211
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "william-loughran-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/william-loughran-private-collection",
+        "instagram": "williamloughran",
+        "country": "UK",
+        "city": "Preston",
+        "source": "50+ years dealer"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -2.7045,
+          53.7628
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "m-ferrao-collection",
+        "url": "https://exclusivecarregistry.com/collection/m-ferrao-collection",
+        "instagram": null,
+        "country": "Portugal",
+        "city": "Sintra",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9.3783,
+          38.801
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ford-performance-collection",
+        "url": "https://exclusivecarregistry.com/collection/ford-performance-collection",
+        "instagram": "fordperformance",
+        "country": "USA",
+        "city": "Dearborn, MI",
+        "source": "Ford HQ"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -83.1763,
+          42.3223
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "pce-collection",
+        "url": "https://exclusivecarregistry.com/collection/pce-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Paris",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.3522,
+          48.8566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "pierre-noblets-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/pierre-noblets-car-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Roubaix",
+        "source": "Racing driver 1921-2014"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.1746,
+          50.6942
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "turbo-troy",
+        "url": "https://exclusivecarregistry.com/collection/turbo-troy",
+        "instagram": "turbo.troy",
+        "country": "Canada",
+        "city": "West Vancouver, BC",
+        "source": "Bugatti Veyron owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -123.1665,
+          49.3667
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-ogliastro-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-ogliastro-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Monflanquin",
+        "source": "Herve Ogliastro Vuitton family"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0.7662,
+          44.5309
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "1999-collection",
+        "url": "https://exclusivecarregistry.com/collection/1999-collection",
+        "instagram": null,
+        "country": "Taiwan",
+        "city": "Taipei",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.5319,
+          25.0478
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-shadow-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-shadow-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Key West, FL",
+        "source": "James Bartel Shadow racing"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.7816,
+          24.5552
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ahg-mex-collection",
+        "url": "https://exclusivecarregistry.com/collection/ahg-mex-collection",
+        "instagram": null,
+        "country": "Mexico",
+        "city": "Mexico City",
+        "source": "Classic supercars"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -99.1332,
+          19.4326
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-wettach-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-wettach-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Atlanta, GA",
+        "source": "Ed Wettach Ferrari of Atlanta"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.388,
+          33.749
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "changhua-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/changhua-ferrari-collection",
+        "instagram": null,
+        "country": "Taiwan",
+        "city": "Changhua",
+        "source": "Taiwan"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120.5134,
+          24.0734
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "bluscorpio-collection",
+        "url": "https://exclusivecarregistry.com/collection/bluscorpio-collection",
+        "instagram": null,
+        "country": "Taiwan",
+        "city": "Taipei",
+        "source": "TransAsia Airways chairman"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.5319,
+          25.0478
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "purist-collector",
+        "url": "https://exclusivecarregistry.com/collection/purist-collector",
+        "instagram": "puristcollector88",
+        "country": "Poland",
+        "city": "Mosina",
+        "source": "Near Poznan"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.8471,
+          52.2454
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "budd-and-lauries-garage",
+        "url": "https://exclusivecarregistry.com/collection/budd-and-lauries-garage",
+        "instagram": null,
+        "country": "USA",
+        "city": "Scottsdale, AZ",
+        "source": "28 American classics"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -111.899,
+          33.5092
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "villa-del-mar-collection",
+        "url": "https://exclusivecarregistry.com/collection/villa-del-mar-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Miami, FL",
+        "source": "Not Chile - Miami based"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.1918,
+          25.7617
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "tomini-classics-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/tomini-classics-private-collection",
+        "instagram": "tomini.classics",
+        "country": "UAE",
+        "city": "Dubai",
+        "source": "First postwar classic in Middle East"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          55.195,
+          25.111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-suydam-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-suydam-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Seattle, WA",
+        "source": "Kevin Suydam Corvettes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.3321,
+          47.6062
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "peregrine-motorsports-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/peregrine-motorsports-private-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Bryn Mawr, PA",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.315,
+          40.02
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "nico2015",
+        "url": "https://exclusivecarregistry.com/collection/nico2015",
+        "instagram": null,
+        "country": "USA",
+        "city": "Langhorne, PA",
+        "source": "Mercedes specialist BaT"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.9227,
+          40.1746
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-summer-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-summer-collection",
+        "instagram": null,
+        "country": "China",
+        "city": "Beijing",
+        "source": "Yi Bin"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          116.3972,
+          39.9075
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "mr-6841-collection",
+        "url": "https://exclusivecarregistry.com/collection/mr-6841-collection",
+        "instagram": null,
+        "country": "Malaysia",
+        "city": "Ipoh",
+        "source": "Carrera GT CLK DTM owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          101.0901,
+          4.5975
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "legado-collection",
+        "url": "https://exclusivecarregistry.com/collection/legado-collection",
+        "instagram": "legadocollection",
+        "country": "Mexico",
+        "city": "Mexico City",
+        "source": "Split with LA"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -99.1332,
+          19.4326
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "fxalexg",
+        "url": "https://exclusivecarregistry.com/collection/fxalexg",
+        "instagram": "fxalexg",
+        "country": "USA",
+        "city": "Miami, FL",
+        "source": "Forex trader Bugatti owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.1918,
+          25.7617
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-off-brothers-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-off-brothers-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Richland, MI",
+        "source": "Ice rink collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -85.4561,
+          42.3736
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "93_cf",
+        "url": "https://exclusivecarregistry.com/collection/93_cf",
+        "instagram": "93_cf",
+        "country": "UK",
+        "city": "London",
+        "source": "Ferrari Challenge racer"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1181,
+          51.5099
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "toms-garage",
+        "url": "https://exclusivecarregistry.com/collection/toms-garage",
+        "instagram": null,
+        "country": "USA",
+        "city": "Cave Creek, AZ",
+        "source": "Carrera GT Ford GT"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -111.9506,
+          33.8317
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "redzon_ssn-collection",
+        "url": "https://exclusivecarregistry.com/collection/redzon_ssn-collection",
+        "instagram": "redzone_ssn",
+        "country": "South Korea",
+        "city": "Seoul",
+        "source": "Gangnam-gu"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0473,
+          37.5172
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "alex-chois-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/alex-chois-car-collection",
+        "instagram": "alexchoi",
+        "country": "USA",
+        "city": "Los Angeles, CA",
+        "source": "YouTuber Korean-American"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.2437,
+          34.0522
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "car-3219-collection",
+        "url": "https://exclusivecarregistry.com/collection/car-3219-collection",
+        "instagram": null,
+        "country": "Japan",
+        "city": "Ageo",
+        "source": "Saitama dealership Centenario"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          139.5932,
+          35.9775
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jo-sifferts-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/jo-sifferts-car-collection",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Fribourg",
+        "source": "Swiss F1 driver memorial"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.151,
+          46.802
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "zakttroy",
+        "url": "https://exclusivecarregistry.com/collection/zakttroy",
+        "instagram": "zakttroy",
+        "country": "UK",
+        "city": "London",
+        "source": "Modern supercar collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1278,
+          51.5074
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-gentlemans-garage",
+        "url": "https://exclusivecarregistry.com/collection/the-gentlemans-garage",
+        "instagram": "thegentlemansgarage_",
+        "country": "USA",
+        "city": "Houston, TX",
+        "source": "Louis Flory Ferrari Challenge"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -95.3698,
+          29.7604
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-schneider-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-schneider-collection",
+        "instagram": "haydnschneider",
+        "country": "USA",
+        "city": "Dallas, TX",
+        "source": "Haydn Schneider Alani Nu founder"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -96.797,
+          32.7767
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "specmysenna",
+        "url": "https://exclusivecarregistry.com/collection/specmysenna",
+        "instagram": "spec.my.senna",
+        "country": "USA",
+        "city": "San Francisco, CA",
+        "source": "McLaren Senna GTR owner deceased 2025"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.4194,
+          37.7749
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-soleymani-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-soleymani-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Saint Johns, FL",
+        "source": "Dr Saman Soleymani Pagani owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.3975,
+          30.0812
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "mr-w16",
+        "url": "https://exclusivecarregistry.com/collection/mr-w16",
+        "instagram": null,
+        "country": "India",
+        "city": "Hyderabad",
+        "source": "Dissolved 2012 legal issues"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          78.4867,
+          17.385
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "mr-sup",
+        "url": "https://exclusivecarregistry.com/collection/mr-sup",
+        "instagram": null,
+        "country": "USA",
+        "city": "Los Angeles, CA",
+        "source": "Los Angeles county"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.2437,
+          34.0522
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "lafestada-collection",
+        "url": "https://exclusivecarregistry.com/collection/lafestada-collection",
+        "instagram": null,
+        "country": "South Korea",
+        "city": "Seoul",
+        "source": "Lamborghini Sian owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0473,
+          37.5172
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "buckblu",
+        "url": "https://exclusivecarregistry.com/collection/buckblu",
+        "instagram": "buckblu",
+        "country": "USA",
+        "city": "Atherton, CA",
+        "source": "Silicon Valley Ferrari collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.1975,
+          37.4613
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "solothurn-collection",
+        "url": "https://exclusivecarregistry.com/collection/solothurn-collection",
+        "instagram": "handschin_lucien",
+        "country": "Switzerland",
+        "city": "Solothurn",
+        "source": "Lucien Handschin"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.5323,
+          47.2088
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-bortz-auto-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-bortz-auto-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Highland Park, IL",
+        "source": "Joe Bortz concept cars"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -87.8003,
+          42.1817
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-terence-e-adderley-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-terence-e-adderley-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Bloomfield Hills, MI",
+        "source": "Kelly Services president 150 cars"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -83.2455,
+          42.5837
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "zzzz-collection",
+        "url": "https://exclusivecarregistry.com/collection/zzzz-collection",
+        "instagram": null,
+        "country": "China",
+        "city": "Shenzhen",
+        "source": "Pagani specialist"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.0579,
+          22.5431
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "nicolas-cages-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/nicolas-cages-car-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Las Vegas, NV",
+        "source": "Las Vegas mansion"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -115.1398,
+          36.1699
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "mat-armstrongs-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/mat-armstrongs-car-collection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Ibstock",
+        "source": "Leicestershire workshop"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -1.3976,
+          52.6876
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "sd-bugatti-collection",
+        "url": "https://exclusivecarregistry.com/collection/sd-bugatti-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Molsheim",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.4933,
+          48.5422
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-tailored-for-speed-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-tailored-for-speed-collection",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Zurich",
+        "source": "Iron Lynx/Iron Dames"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.5417,
+          47.3769
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "clark-gables-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/clark-gables-car-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Encino, CA",
+        "source": "Historic ranch"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.5214,
+          34.1517
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-gurdev-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-gurdev-collection",
+        "instagram": "the.gurdev.collection",
+        "country": "UK",
+        "city": "London",
+        "source": "Gurdev Singh Bugatti collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1278,
+          51.5074
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "moto_carandracing",
+        "url": "https://exclusivecarregistry.com/collection/moto_carandracing",
+        "instagram": "moto_carandracing",
+        "country": "Japan",
+        "city": "Tokyo",
+        "source": "ECR page Tokyo/Monaco"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          139.6503,
+          35.6762
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ghibli-collection",
+        "url": "https://exclusivecarregistry.com/collection/ghibli-collection",
+        "instagram": null,
+        "country": "Japan",
+        "city": "Nagoya",
+        "source": "Blu Ghibli Cup Ferraris"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          136.9066,
+          35.1815
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "contempo-concept-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/contempo-concept-private-collection",
+        "instagram": "contempo_concept",
+        "country": "Hong Kong",
+        "city": "Kowloon Tong",
+        "source": "Kevin Tse JDM collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.18,
+          22.333
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "72stagpower",
+        "url": "https://exclusivecarregistry.com/collection/72stagpower",
+        "instagram": "72stagpower",
+        "country": "Germany",
+        "city": "Wolfenbüttel",
+        "source": "Jägermeister Racing heritage"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.5369,
+          52.1622
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "my-aspen-collection",
+        "url": "https://exclusivecarregistry.com/collection/my-aspen-collection",
+        "instagram": "jorge_jorgefuentes",
+        "country": "USA",
+        "city": "Aspen, CO",
+        "source": "Jorge Fuentes"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -106.8175,
+          39.1911
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-finn-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-finn-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Danbury, CT",
+        "source": "Joel E. Finn memorial"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.454,
+          41.3948
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "mecum-private-collection",
+        "url": "https://exclusivecarregistry.com/collection/mecum-private-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Lake Geneva, WI",
+        "source": "Dana Mecum personal"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -88.433,
+          42.592
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "tyler-the-creators-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/tyler-the-creators-car-collection",
+        "instagram": "feliciathegoat",
+        "country": "USA",
+        "city": "Los Angeles, CA",
+        "source": "Ladera Heights area"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.3754,
+          33.9942
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "steven-harris-collection",
+        "url": "https://exclusivecarregistry.com/collection/steven-harris-collection",
+        "instagram": "stevenharris7344",
+        "country": "USA",
+        "city": "Rancho Mirage, CA",
+        "source": "Porsche architect collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -116.4131,
+          33.7397
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "rauh-vipers-collection",
+        "url": "https://exclusivecarregistry.com/collection/rauh-vipers-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Arp, TX",
+        "source": "World largest Viper collection 80+"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -95.053,
+          32.222
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "mcgrath-collection",
+        "url": "https://exclusivecarregistry.com/collection/mcgrath-collection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Kimpton",
+        "source": "Bill McGrath Maserati specialist"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.2967,
+          51.8833
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "p24",
+        "url": "https://exclusivecarregistry.com/collection/p24",
+        "instagram": "p24",
+        "country": "UK",
+        "city": "Richmond",
+        "source": "Parhham Donyai LA Muscle"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.3037,
+          51.4613
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "skier33",
+        "url": "https://exclusivecarregistry.com/collection/skier33",
+        "instagram": "Skier33",
+        "country": "UK",
+        "city": "London",
+        "source": "Alexander West racing driver"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1278,
+          51.5074
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "hawaiian-hypercar-collection",
+        "url": "https://exclusivecarregistry.com/collection/hawaiian-hypercar-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Honolulu, HI",
+        "source": "Hawaii collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -157.8583,
+          21.3069
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "francois-picards-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/francois-picards-car-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Nice",
+        "source": "Racing driver 1921-1996"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.262,
+          43.7102
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "alegra-motorsports-collection",
+        "url": "https://exclusivecarregistry.com/collection/alegra-motorsports-collection",
+        "instagram": "alegramotorsports",
+        "country": "USA",
+        "city": "Tampa, FL",
+        "source": "8408 Benjamin Road"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -82.453,
+          27.964
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "torontocarnut",
+        "url": "https://exclusivecarregistry.com/collection/torontocarnut",
+        "instagram": "torontocarnut",
+        "country": "Canada",
+        "city": "Toronto",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.3832,
+          43.6532
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "dhiaa070",
+        "url": "https://exclusivecarregistry.com/collection/dhiaa070",
+        "instagram": "dhiaa070",
+        "country": "Saudi Arabia",
+        "city": "Riyadh",
+        "source": "Valkyrie owner track user"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          46.7386,
+          24.7743
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jchwa",
+        "url": "https://exclusivecarregistry.com/collection/jchwa",
+        "instagram": "jchwa",
+        "country": "USA",
+        "city": "Irvine, CA",
+        "source": "Justin Choi tech entrepreneur"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.8231,
+          33.6695
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "fondation-renaud",
+        "url": "https://exclusivecarregistry.com/collection/fondation-renaud",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Cortaillod",
+        "source": "Charles Renaud museum"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.8439,
+          46.9442
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "max-verstappens-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/max-verstappens-car-collection",
+        "instagram": null,
+        "country": "Monaco",
+        "city": "Fontvieille",
+        "source": "F1 champion residence"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.4177,
+          43.7269
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "david-lettermans-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/david-lettermans-car-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Danbury, CT",
+        "source": "37,000 sq ft warehouse"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.482,
+          41.3717
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ferrari_love-_ken",
+        "url": "https://exclusivecarregistry.com/collection/ferrari_love-_ken",
+        "instagram": "ferrari_love_japan",
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "fastcarscollection-monaco",
+        "url": "https://exclusivecarregistry.com/collection/fastcarscollection-monaco",
+        "instagram": null,
+        "country": "Monaco",
+        "city": "Monaco",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.4246,
+          43.7384
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "collection-charbonneaux",
+        "url": "https://exclusivecarregistry.com/collection/collection-charbonneaux",
+        "instagram": null,
+        "country": "France",
+        "city": "Reims",
+        "source": "Philippe Charbonneaux museum dispersed"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          4.0317,
+          49.2583
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "drendel-family-porsche-collection",
+        "url": "https://exclusivecarregistry.com/collection/drendel-family-porsche-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "tim-demores-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/tim-demores-ferrari-collection",
+        "instagram": "timothydemore",
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "efese-collection",
+        "url": "https://exclusivecarregistry.com/collection/efese-collection",
+        "instagram": null,
+        "country": "Chile",
+        "city": "Santiago",
+        "source": "Ferrari 812 Competizione"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.6693,
+          -33.4489
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-curitiba-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-curitiba-collection",
+        "instagram": null,
+        "country": "Brazil",
+        "city": "Curitiba",
+        "source": "Largest Brazil supercar collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -49.2671,
+          -25.429
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "second-city-exotics",
+        "url": "https://exclusivecarregistry.com/collection/second-city-exotics",
+        "instagram": "second.city.exotics",
+        "country": "USA",
+        "city": "Barrington, IL",
+        "source": "Chicago area"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -88.1365,
+          42.1542
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "fernand-tavanos-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/fernand-tavanos-car-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Le Mans",
+        "source": "Ferrari 250 GTO privateer"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0.1909,
+          47.9956
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jean-sages-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/jean-sages-car-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Annecy",
+        "source": "Renault F1 director"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.1294,
+          45.8992
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "hiepletran",
+        "url": "https://exclusivecarregistry.com/collection/hiepletran",
+        "instagram": "hiepletran",
+        "country": "USA",
+        "city": "Newport Beach, CA",
+        "source": "Holy Trinity Cars owner"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.9279,
+          33.6283
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jacky-liu-collection",
+        "url": "https://exclusivecarregistry.com/collection/jacky-liu-collection",
+        "instagram": null,
+        "country": "China",
+        "city": "Shenzhen",
+        "source": "Shanghai Bohao shareholder"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.063,
+          22.5429
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "sebastian-vettels-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/sebastian-vettels-car-collection",
+        "instagram": "httpswww.instagram.comsebastianvettel",
+        "country": "Switzerland",
+        "city": "Ellighausen",
+        "source": "Neumuhli farmhouse"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1356,
+          47.6139
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-mittler-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-mittler-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Three Rivers, MI",
+        "source": "Tom Mittler boats & cars"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -85.6325,
+          41.9439
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "j-a-campos-costa",
+        "url": "https://exclusivecarregistry.com/collection/j-a-campos-costa",
+        "instagram": null,
+        "country": "Portugal",
+        "city": "Vila Nova de Famalicão",
+        "source": "Maserati Mercedes collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -8.52,
+          41.409
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-aco-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-aco-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Le Mans",
+        "source": "24 Hours organizer museum"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0.1909,
+          47.9956
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-ruben-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-ruben-collection",
+        "instagram": "rzbenc",
+        "country": "UK",
+        "city": "Windsor",
+        "source": "Porsche focused"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.6044,
+          51.4816
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-dieteren-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-dieteren-collection",
+        "instagram": null,
+        "country": "Belgium",
+        "city": "Brussels",
+        "source": "D'Ieteren Gallery 250+ cars"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          4.3488,
+          50.8505
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "collezione-ferrari-da-brescia",
+        "url": "https://exclusivecarregistry.com/collection/collezione-ferrari-da-brescia",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-boch-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-boch-collection",
+        "instagram": "bochcollection",
+        "country": "USA",
+        "city": "Norwood, MA",
+        "source": "Ernie Boch Jr Ferrari of New England"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.1995,
+          42.1945
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "drakes-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/drakes-car-collection",
+        "instagram": "champagnepapi",
+        "country": "Canada",
+        "city": "Toronto",
+        "source": "The Embassy mansion"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.368,
+          43.733
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-halusa-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-halusa-collection",
+        "instagram": null,
+        "country": "Austria",
+        "city": "Vienna",
+        "source": "Martin Halusa Apax F1 collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          16.3738,
+          48.2082
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "palmer-motorama",
+        "url": "https://exclusivecarregistry.com/collection/palmer-motorama",
+        "instagram": null,
+        "country": "Australia",
+        "city": "Lowood",
+        "source": "Clive Palmer 1000+ car museum"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          152.583,
+          -27.467
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-bensoussan-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-bensoussan-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Paris",
+        "source": "Edgar Bensoussan WWII pilot"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.3522,
+          48.8566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-beaumartin-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-beaumartin-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Bordeaux",
+        "source": "Xavier Beaumartin winemaker"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.5792,
+          44.8378
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "toro-racing",
+        "url": "https://exclusivecarregistry.com/collection/toro-racing",
+        "instagram": null,
+        "country": "China",
+        "city": "Guiyang",
+        "source": "Eric Zang Kan"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          106.63,
+          26.647
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-quadrifoglio-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-quadrifoglio-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Gowanda, NY",
+        "source": "Alfa Romeo racing"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -78.9356,
+          42.4617
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-zent-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-zent-collection",
+        "instagram": null,
+        "country": "Japan",
+        "city": "Nagoya",
+        "source": "Yoshio Tsuzuki 31 hypercars"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          136.9066,
+          35.1815
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ed-bolians-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/ed-bolians-car-collection",
+        "instagram": "edbolian",
+        "country": "USA",
+        "city": "Alpharetta, GA",
+        "source": "VINwiki founder"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -84.2941,
+          34.0754
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "iraqi-rolls-royce-collection",
+        "url": "https://exclusivecarregistry.com/collection/iraqi-rolls-royce-collection",
+        "instagram": null,
+        "country": "UAE",
+        "city": "Dubai",
+        "source": "Stored in Dubai/UK"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          55.2708,
+          25.2048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "mansour-ojjehs-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/mansour-ojjehs-car-collection",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Collonge-Bellerive",
+        "source": "McLaren TAG chairman"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.1962,
+          46.2416
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "dn-porsche-collection",
+        "url": "https://exclusivecarregistry.com/collection/dn-porsche-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-bailey-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-bailey-collection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Hambleton",
+        "source": "Paul Bailey Holy Trinity first UK"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -1.1464,
+          53.7862
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "surrey-lamborghini-collection",
+        "url": "https://exclusivecarregistry.com/collection/surrey-lamborghini-collection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Bologna",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.3426,
+          44.4949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-taylor-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-taylor-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Gloversville, NY",
+        "source": "Jim Taylor 130+ cars auctioned"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.3437,
+          43.0526
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "abbas_saj",
+        "url": "https://exclusivecarregistry.com/collection/abbas_saj",
+        "instagram": "Abbas_saj",
+        "country": "UAE",
+        "city": "Dubai",
+        "source": "Abbas Sajwani DAMAC heir"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          55.2708,
+          25.2048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "h0",
+        "url": "https://exclusivecarregistry.com/collection/h0",
+        "instagram": "h0",
+        "country": "UK",
+        "city": "London",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1278,
+          51.5074
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "vancouver-lamborghini-collection",
+        "url": "https://exclusivecarregistry.com/collection/vancouver-lamborghini-collection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Bologna",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.3426,
+          44.4949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "minnesota-nevada-porsche-collection",
+        "url": "https://exclusivecarregistry.com/collection/minnesota-nevada-porsche-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "renault-uk-heritage-collection",
+        "url": "https://exclusivecarregistry.com/collection/renault-uk-heritage-collection",
+        "instagram": null,
+        "country": "France",
+        "city": "Paris",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.3522,
+          48.8566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "kimi-raikkonens-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/kimi-raikkonens-car-collection",
+        "instagram": null,
+        "country": "Switzerland",
+        "city": "Baar",
+        "source": "F1 champion"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.5294,
+          47.1962
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-stuttgart-legends-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-stuttgart-legends-collection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "rfx_collection",
+        "url": "https://exclusivecarregistry.com/collection/rfx_collection",
+        "instagram": "rfx_collection",
+        "country": "Germany",
+        "city": "Herford",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.6733,
+          52.1145
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "salomondrin",
+        "url": "https://exclusivecarregistry.com/collection/salomondrin",
+        "instagram": "salomondrin",
+        "country": "USA",
+        "city": "Los Angeles, CA",
+        "source": "YouTube car collector"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.2437,
+          34.0522
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "torettomonaco",
+        "url": "https://exclusivecarregistry.com/collection/torettomonaco",
+        "instagram": "torettomonaco",
+        "country": "Monaco",
+        "city": "Monaco",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.4246,
+          43.7384
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-ross-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-ross-ferrari-collection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "warsaw-porsche-911-collection",
+        "url": "https://exclusivecarregistry.com/collection/warsaw-porsche-911-collection",
+        "instagram": null,
+        "country": "Poland",
+        "city": "Warsaw",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.0122,
+          52.2297
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jay-lenos-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/jay-lenos-car-collection",
+        "instagram": "jaylenosgarage",
+        "country": "USA",
+        "city": "Burbank, CA",
+        "source": "Jay Leno's Garage"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -118.309,
+          34.1808
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "bayareanady",
+        "url": "https://exclusivecarregistry.com/collection/bayareanady",
+        "instagram": "bayareanady",
+        "country": "USA",
+        "city": "San Francisco",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.4194,
+          37.7749
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "astonlimited",
+        "url": "https://exclusivecarregistry.com/collection/astonlimited",
+        "instagram": "astonlimited",
+        "country": "UK",
+        "city": "Gaydon",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -1.487,
+          52.1901
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "french-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/french-ferrari-collection",
+        "instagram": "beljeanclaude",
+        "country": "France",
+        "city": "Paris",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.3522,
+          48.8566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "forzaferrari1977",
+        "url": "https://exclusivecarregistry.com/collection/forzaferrari1977",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "swizzcars",
+        "url": "https://exclusivecarregistry.com/collection/swizzcars",
+        "instagram": "swizzcars",
+        "country": "Switzerland",
+        "city": "Neuchâtel",
+        "source": "Ferrari collection"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.9311,
+          46.992
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "the-ml-collection",
+        "url": "https://exclusivecarregistry.com/collection/the-ml-collection",
+        "instagram": null,
+        "country": "Denmark",
+        "city": "North Denmark",
+        "source": "Felipe Massa's LaFerrari"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.9217,
+          57.0488
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "kuwait-porsche-collector",
+        "url": "https://exclusivecarregistry.com/collection/kuwait-porsche-collector",
+        "instagram": "porsche_collector",
+        "country": "Kuwait",
+        "city": "Kuwait City",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.9774,
+          29.3759
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "rowan-atkinsons-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/rowan-atkinsons-car-collection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Oxfordshire",
+        "source": "Mr. Bean actor"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -1.2577,
+          51.752
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "south-carolina-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/south-carolina-ferrari-collection",
+        "instagram": null,
+        "country": "USA",
+        "city": "North, SC",
+        "source": "ECR page"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -81.0979,
+          33.6124
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "jimmy-lins-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/jimmy-lins-car-collection",
+        "instagram": null,
+        "country": "Taiwan",
+        "city": "Taipei",
+        "source": "Taiwanese actor"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.5654,
+          25.033
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "marbella-pagani-collection",
+        "url": "https://exclusivecarregistry.com/collection/marbella-pagani-collection",
+        "instagram": null,
+        "country": "Spain",
+        "city": "Marbella",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -4.8824,
+          36.5101
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "koenigsegg-automotive-ab",
+        "url": "https://exclusivecarregistry.com/collection/koenigsegg-automotive-ab",
+        "instagram": null,
+        "country": "Sweden",
+        "city": "Angelholm",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12.8623,
+          56.2425
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "roman-abramovichs-car-collection",
+        "url": "https://exclusivecarregistry.com/collection/roman-abramovichs-car-collection",
+        "instagram": null,
+        "country": "Oman",
+        "city": "Muscat",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          58.3829,
+          23.588
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "vendome-ferrari-collection",
+        "url": "https://exclusivecarregistry.com/collection/vendome-ferrari-collection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "aston-martin-lagonda-ltd",
+        "url": "https://exclusivecarregistry.com/collection/aston-martin-lagonda-ltd",
+        "instagram": "astonmartinlagonda",
+        "country": "UK",
+        "city": "Gaydon",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -1.487,
+          52.1901
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "pagani-automobili",
+        "url": "https://exclusivecarregistry.com/collection/pagani-automobili",
+        "instagram": "paganiautomobili",
+        "country": "Italy",
+        "city": "Modena",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.9252,
+          44.6471
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "collezioneveneto",
+        "url": "https://exclusivecarregistry.com/collection/collezioneveneto",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Venice",
+        "source": "Veneto region"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12.3155,
+          45.4408
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "katowiceferraricollection",
+        "url": "https://exclusivecarregistry.com/collection/katowiceferraricollection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ferraridentist",
+        "url": "https://exclusivecarregistry.com/collection/ferraridentist",
+        "instagram": "ferraridentist",
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "collezionerossomonza",
+        "url": "https://exclusivecarregistry.com/collection/collezionerossomonza",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Monza",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.2744,
+          45.5845
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "hendersonporschecollection",
+        "url": "https://exclusivecarregistry.com/collection/hendersonporschecollection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "floridahistoricferraricollection",
+        "url": "https://exclusivecarregistry.com/collection/floridahistoricferraricollection",
+        "instagram": null,
+        "country": "USA",
+        "city": "Miami",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.1918,
+          25.7617
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "automobililamborghini",
+        "url": "https://exclusivecarregistry.com/collection/automobililamborghini",
+        "instagram": "lamborghini",
+        "country": "Italy",
+        "city": "Bologna",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.3426,
+          44.4949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "scotlandlamborghinicollection",
+        "url": "https://exclusivecarregistry.com/collection/scotlandlamborghinicollection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Bologna",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.3426,
+          44.4949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "whatsappporschecollection",
+        "url": "https://exclusivecarregistry.com/collection/whatsappporschecollection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "hongkonglamborghinicollection",
+        "url": "https://exclusivecarregistry.com/collection/hongkonglamborghinicollection",
+        "instagram": "tmppxx",
+        "country": "Italy",
+        "city": "Bologna",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.3426,
+          44.4949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "thailandlamborghinicollection",
+        "url": "https://exclusivecarregistry.com/collection/thailandlamborghinicollection",
+        "instagram": "kimphornprapha",
+        "country": "Italy",
+        "city": "Bologna",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.3426,
+          44.4949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "oldtimeraustralia",
+        "url": "https://exclusivecarregistry.com/collection/oldtimeraustralia",
+        "instagram": "oldtimeraustralia",
+        "country": "Australia",
+        "city": "Sydney",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          151.2093,
+          -33.8688
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "hongkongmclarencollection",
+        "url": "https://exclusivecarregistry.com/collection/hongkongmclarencollection",
+        "instagram": "mclarencollection",
+        "country": "UK",
+        "city": "Woking",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.56,
+          51.3148
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ferrariracing45",
+        "url": "https://exclusivecarregistry.com/collection/ferrariracing45",
+        "instagram": "Ferrariracing45",
+        "country": "Italy",
+        "city": "Maranello",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10.8656,
+          44.5294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "belgianmclarencollection",
+        "url": "https://exclusivecarregistry.com/collection/belgianmclarencollection",
+        "instagram": null,
+        "country": "UK",
+        "city": "Woking",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.56,
+          51.3148
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "gibraltarcollection",
+        "url": "https://exclusivecarregistry.com/collection/gibraltarcollection",
+        "instagram": null,
+        "country": "Gibraltar",
+        "city": "Gibraltar",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -5.3536,
+          36.1408
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "bugattiautomobiles",
+        "url": "https://exclusivecarregistry.com/collection/bugattiautomobiles",
+        "instagram": "bugatti",
+        "country": "France",
+        "city": "Molsheim",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.4933,
+          48.5422
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "turkeylamborghinicollection",
+        "url": "https://exclusivecarregistry.com/collection/turkeylamborghinicollection",
+        "instagram": null,
+        "country": "Turkey",
+        "city": "Istanbul",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.9784,
+          41.0082
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "lamborghinilongislandprivatecollection",
+        "url": "https://exclusivecarregistry.com/collection/lamborghinilongislandprivatecollection",
+        "instagram": null,
+        "country": "Italy",
+        "city": "Bologna",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.3426,
+          44.4949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "somegreyporscheswithiowaplatescollection",
+        "url": "https://exclusivecarregistry.com/collection/somegreyporscheswithiowaplatescollection",
+        "instagram": null,
+        "country": "Germany",
+        "city": "Stuttgart",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1829,
+          48.7758
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "gosfordclassiccars",
+        "url": "https://exclusivecarregistry.com/collection/gosfordclassiccars",
+        "instagram": null,
+        "country": "Australia",
+        "city": "Gosford",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          151.3418,
+          -33.4245
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "astonmartinantwerpcollection",
+        "url": "https://exclusivecarregistry.com/collection/astonmartinantwerpcollection",
+        "instagram": null,
+        "country": "Belgium",
+        "city": "Antwerp",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          4.4025,
+          51.2194
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "ferraricollectoraustralia",
+        "url": "https://exclusivecarregistry.com/collection/ferraricollectoraustralia",
+        "instagram": "ferraricollectoraus",
+        "country": "Australia",
+        "city": "Sydney",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          151.2093,
+          -33.8688
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "dutchferraricollector",
+        "url": "https://exclusivecarregistry.com/collection/dutchferraricollector",
+        "instagram": "dutch.ferrari.collector",
+        "country": "Netherlands",
+        "city": "Amsterdam",
+        "source": "pattern"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          4.9041,
+          52.3676
+        ]
+      }
+    }
+  ]
+}
