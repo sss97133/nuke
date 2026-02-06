@@ -414,6 +414,7 @@ const CursorHomepage: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [serverFilteredCount, setServerFilteredCount] = useState<number | null>(null); // Exact count from DB when filters active
   const [session, setSession] = useState<any>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('ALL'); // Default to ALL - no time filtering
   const [salesPeriod, setSalesPeriod] = useState<SalesTimePeriod>('today'); // For "sold" stats display
@@ -1152,8 +1153,10 @@ const CursorHomepage: React.FC = () => {
     }
   }, [session]);
 
-  // Refetch feed when source filter changes so first page reflects selected sources (server-side filter)
-  const sourceFilterKey = [
+  // Refetch feed when ANY server-pushable filter changes (year, make, price, source, status, forSale, etc.)
+  // This is the KEY fix: filters must go to the database, not just filter 200 client-side records.
+  const serverFilterKey = [
+    // Source filters
     filters.hideBat,
     filters.hideCraigslist,
     filters.hideDealerListings,
@@ -1161,21 +1164,50 @@ const CursorHomepage: React.FC = () => {
     filters.hideKsl,
     filters.hideClassic,
     (filters.hiddenSources || []).join(','),
+    // Year filters
+    filters.yearMin ?? '',
+    filters.yearMax ?? '',
+    // Make filters
+    (filters.makes || []).join(','),
+    // Model filters
+    (filters.models || []).join(','),
+    // Price filters
+    filters.priceMin ?? '',
+    filters.priceMax ?? '',
+    // Status filters
+    filters.forSale,
+    filters.hideSold,
+    filters.showSoldOnly,
+    filters.showPending,
+    // Sort (affects DB query order)
+    sortBy,
+    sortDirection,
   ].join('\n');
-  const prevSourceFilterKeyRef = useRef<string>(sourceFilterKey);
+  const prevServerFilterKeyRef = useRef<string>(serverFilterKey);
   const didMountRef = useRef(false);
+  // Debounce filter reloads to avoid hammering DB on rapid changes (e.g., typing year)
+  const filterReloadTimerRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
-      prevSourceFilterKeyRef.current = sourceFilterKey;
+      prevServerFilterKeyRef.current = serverFilterKey;
       return;
     }
-    if (prevSourceFilterKeyRef.current === sourceFilterKey) return;
-    prevSourceFilterKeyRef.current = sourceFilterKey;
-    setPage(0);
-    setHasMore(true);
-    loadHypeFeed(0, false);
-  }, [sourceFilterKey]);
+    if (prevServerFilterKeyRef.current === serverFilterKey) return;
+    prevServerFilterKeyRef.current = serverFilterKey;
+    
+    // Debounce: wait 300ms before reloading (handles rapid typing in year/price inputs)
+    if (filterReloadTimerRef.current) clearTimeout(filterReloadTimerRef.current);
+    filterReloadTimerRef.current = setTimeout(() => {
+      setPage(0);
+      setHasMore(true);
+      loadHypeFeed(0, false);
+    }, 300);
+    
+    return () => {
+      if (filterReloadTimerRef.current) clearTimeout(filterReloadTimerRef.current);
+    };
+  }, [serverFilterKey]);
 
   // Load active sources from database
   const [activeSources, setActiveSources] = useState<Array<{
@@ -2060,7 +2092,8 @@ const CursorHomepage: React.FC = () => {
     }
 
     // Otherwise compute from filteredVehicles (used while DB stats are loading, or as fallback)
-    const totalVehicles = filteredVehicles.length;
+    // Use the exact count from the database if available (accurate when filters are pushed server-side)
+    const totalVehicles = (hasActiveFilters && serverFilteredCount !== null) ? serverFilteredCount : filteredVehicles.length;
     let totalValue = 0;
     let vehiclesWithValue = 0;
     let forSaleCount = 0;
@@ -2186,7 +2219,7 @@ const CursorHomepage: React.FC = () => {
       marketInterestValue: 0,
       rnmVehicleCount: 0,
     };
-  }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredStatsFromDb]);
+  }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredStatsFromDb, serverFilteredCount]);
 
   // Add state for database-wide stats (around line 370, after existing stats state)
   const [dbStats, setDbStats] = useState({
@@ -2931,19 +2964,116 @@ const CursorHomepage: React.FC = () => {
 
       const runVehicleQuery = async (selectFields: string) => {
         try {
+          // Include count: 'exact' for accurate filtered vehicle counts in the stats bar
           let q = supabase
             .from('vehicles')
-            .select(selectFields)
-            .eq('is_public', true)
-            .neq('status', 'pending');
+            .select(selectFields, { count: 'exact' })
+            .eq('is_public', true);
+          
+          // Status filter: show pending only if explicitly requested
+          if (filters.showPending) {
+            // No status filter - show everything including pending
+          } else {
+            q = q.neq('status', 'pending');
+          }
+          
           if (listingKindSupportedRef.current) {
             q = q.eq('listing_kind', 'vehicle');
           }
           if (sourceOrFilter) {
             q = q.or(sourceOrFilter);
           }
+          
+          // === SERVER-SIDE FILTERS (the critical fix) ===
+          // Year filters
+          if (filters.yearMin) {
+            q = q.gte('year', filters.yearMin);
+          }
+          if (filters.yearMax) {
+            q = q.lte('year', filters.yearMax);
+          }
+          // Make filter (case-insensitive)
+          if (filters.makes && filters.makes.length > 0) {
+            if (filters.makes.length === 1) {
+              q = q.ilike('make', `%${filters.makes[0]}%`);
+            } else {
+              // Multiple makes: use OR
+              const makeClauses = filters.makes.map(m => `make.ilike.%${m}%`).join(',');
+              q = q.or(makeClauses);
+            }
+          }
+          // Model filter
+          if (filters.models && filters.models.length > 0) {
+            if (filters.models.length === 1) {
+              q = q.ilike('model', `%${filters.models[0]}%`);
+            } else {
+              const modelClauses = filters.models.map(m => `model.ilike.%${m}%`).join(',');
+              q = q.or(modelClauses);
+            }
+          }
+          // Price filters (use sale_price as primary)
+          if (filters.priceMin) {
+            q = q.gte('sale_price', filters.priceMin);
+          }
+          if (filters.priceMax) {
+            q = q.lte('sale_price', filters.priceMax);
+          }
+          // For sale filter
+          if (filters.forSale) {
+            q = q.eq('is_for_sale', true);
+          }
+          // Hide sold
+          if (filters.hideSold) {
+            q = q.or('sale_price.is.null,sale_date.is.null');
+          }
+          // Show sold only
+          if (filters.showSoldOnly) {
+            q = q.not('sale_price', 'is', null).gte('sale_price', 500);
+          }
+          
+          // === SORTING ===
+          let orderColumn = 'created_at';
+          let orderAscending = false;
+          switch (sortBy) {
+            case 'year':
+              orderColumn = 'year';
+              orderAscending = sortDirection === 'asc';
+              break;
+            case 'make':
+              orderColumn = 'make';
+              orderAscending = sortDirection === 'asc';
+              break;
+            case 'model':
+              orderColumn = 'model';
+              orderAscending = sortDirection === 'asc';
+              break;
+            case 'mileage':
+              orderColumn = 'mileage';
+              orderAscending = sortDirection === 'asc';
+              break;
+            case 'newest':
+              orderColumn = 'created_at';
+              orderAscending = false;
+              break;
+            case 'oldest':
+              orderColumn = 'created_at';
+              orderAscending = true;
+              break;
+            case 'price_high':
+              orderColumn = 'sale_price';
+              orderAscending = false;
+              break;
+            case 'price_low':
+              orderColumn = 'sale_price';
+              orderAscending = true;
+              break;
+            default:
+              orderColumn = 'created_at';
+              orderAscending = false;
+          }
+          
           return await q
-            .order('created_at', { ascending: false })
+            .order(orderColumn, { ascending: orderAscending })
             .range(offset, offset + PAGE_SIZE - 1);
         } catch (e) {
           return { data: null, error: e };
@@ -2952,9 +3082,13 @@ const CursorHomepage: React.FC = () => {
 
       let vehicles: any[] | null = null;
       let error: any = null;
-      const applyResult = (result: { data: any[] | null; error: any }) => {
+      let totalFilteredCount: number | null = null;
+      const applyResult = (result: { data: any[] | null; error: any; count?: number | null }) => {
         vehicles = result.data as any[] | null;
         error = result.error;
+        if (typeof result.count === 'number') {
+          totalFilteredCount = result.count;
+        }
       };
 
       let result = await runVehicleQuery(selectV2);
@@ -3411,8 +3545,26 @@ const CursorHomepage: React.FC = () => {
 
       const dedupedSorted = dedupeVehicles(sorted);
       
+      // Boost live auctions to the top of the feed (only on initial load, page 0, default sort)
+      // This ensures active/buyable vehicles appear first without breaking user-chosen sort order
+      if (!append && pageNum === 0 && sortBy === 'newest') {
+        dedupedSorted.sort((a: any, b: any) => {
+          const aHasLiveAuction = externalListingsByVehicleId.has(String(a?.id || ''));
+          const bHasLiveAuction = externalListingsByVehicleId.has(String(b?.id || ''));
+          // Live auctions first, then by existing order (created_at DESC from DB)
+          if (aHasLiveAuction && !bHasLiveAuction) return -1;
+          if (!aHasLiveAuction && bHasLiveAuction) return 1;
+          return 0; // Preserve DB order within each group
+        });
+      }
+      
       setHasMore((vehicles || []).length >= PAGE_SIZE);
       setPage(pageNum);
+
+      // Store the exact filtered count from the database (only on first page load, not appends)
+      if (!append && totalFilteredCount !== null) {
+        setServerFilteredCount(totalFilteredCount);
+      }
 
       if (append) {
         // Append to bottom - preserve existing order, add new vehicles at end
@@ -5091,27 +5243,16 @@ const CursorHomepage: React.FC = () => {
               fontSize: '7pt',
               flexWrap: 'wrap'
             }}>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  openStatsPanel('vehicles');
-                }}
-                title="Total visible public vehicles in the feed (excludes pending + non-vehicle items). Click for breakdown."
+              <span
+                title="Total visible public vehicles in the feed (excludes pending + non-vehicle items)"
                 style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: 0,
-                  margin: 0,
-                  cursor: 'pointer',
                   fontFamily: 'monospace',
                   fontSize: '7pt',
                   color: 'var(--text)'
                 }}
               >
                 <b>{displayStats.totalVehicles.toLocaleString()}</b> veh
-              </button>
+              </span>
               {displayStats.vehiclesAddedToday > 0 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
@@ -5140,27 +5281,16 @@ const CursorHomepage: React.FC = () => {
                 </>
               )}
               <span style={{ opacity: 0.3 }}>|</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  openStatsPanel('value');
-                }}
+              <span
                 title={displayStats.marketInterestValue > 0
-                  ? `Realized: ${formatCurrency(displayStats.totalValue)}\nMarket Interest: ${formatCurrency(displayStats.marketInterestValue)} (${displayStats.rnmVehicleCount} reserve-not-met)\n\nMarket interest = highest bids on auctions where reserve wasn't met.`
-                  : 'Portfolio value (best-known per vehicle). Click for breakdown.'
+                  ? `Realized: ${formatCurrency(displayStats.totalValue)}\nMarket Interest: ${formatCurrency(displayStats.marketInterestValue)} (${displayStats.rnmVehicleCount} reserve-not-met)`
+                  : 'Total portfolio value (best-known per vehicle)'
                 }
                 style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: 0,
-                  margin: 0,
-                  cursor: 'pointer',
                   fontFamily: 'monospace',
                   fontSize: '7pt',
                   color: 'var(--text)',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'baseline',
                   gap: '3px',
                 }}
@@ -5171,7 +5301,7 @@ const CursorHomepage: React.FC = () => {
                     +{formatCurrency(displayStats.marketInterestValue)}
                   </span>
                 )}
-              </button>
+              </span>
               {displayStats.forSaleCount > 0 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
@@ -5264,27 +5394,16 @@ const CursorHomepage: React.FC = () => {
               {(hasActiveFilters || debouncedSearchText) && displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      openStatsPanel('value');
-                    }}
-                    title="Average value is only meaningful when you’ve filtered the set. Click for breakdown."
+                  <span
+                    title="Average value across current filtered set"
                     style={{
-                      border: 'none',
-                      background: 'transparent',
-                      padding: 0,
-                      margin: 0,
-                      cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '7pt',
                       color: 'var(--text-muted)'
                     }}
                   >
                     <b>{formatCurrency(displayStats.avgValue)}</b> avg
-                  </button>
+                  </span>
                 </>
               )}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>

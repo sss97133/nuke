@@ -89,7 +89,7 @@ async function main() {
         totalSuccess++;
         await supabase
           .from('import_queue')
-          .update({ status: 'completed', processed_at: new Date().toISOString() })
+          .update({ status: 'complete', processed_at: new Date().toISOString() })
           .eq('id', item.id);
         console.log(`  ✓ ${item.listing_url.split('/listing/')[1]?.split('/')[0] || item.listing_url}`);
       } else {
