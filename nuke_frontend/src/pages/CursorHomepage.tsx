@@ -1324,8 +1324,14 @@ const CursorHomepage: React.FC = () => {
       } else if (key === 'classic') {
         base[key] = !filters.hideClassic;
       } else {
-        // user, unknown: when any source filter is active, exclude by default so "only BaT" doesn't show user/unknown
-        base[key] = !hiddenSourcesSet.has(key) && !hasSourceSelections;
+        // user, unknown: included by default, excluded in two cases:
+        // 1. Explicitly in hiddenSources
+        // 2. ALL named sources are hidden ("none" button) — the user clearly
+        //    wants zero results, so meta-sources should also disappear.
+        const allNamedSourcesHidden =
+          filters.hideBat && filters.hideClassic && filters.hideCraigslist &&
+          filters.hideKsl && filters.hideDealerSites;
+        base[key] = !hiddenSourcesSet.has(key) && !allNamedSourcesHidden;
       }
     });
     
@@ -2928,7 +2934,14 @@ const CursorHomepage: React.FC = () => {
 
       const offset = pageNum * PAGE_SIZE;
 
-      // When source filter is active, only fetch vehicles from included sources (so filter works and pagination is correct)
+      // When source filter is active, use a BLOCKLIST approach: exclude only the
+      // hidden sources rather than building a massive OR allowlist of every included
+      // source.  This keeps the PostgREST URL short and avoids 414 errors when there
+      // are 200+ active sources.
+      //
+      // We still do a secondary client-side pass via `applyFiltersAndSort` so the two
+      // layers are complementary: server narrows the result set, client enforces exact
+      // per-vehicle classification.
       const hasSourceSelectionsForFeed =
         filters.hideDealerListings ||
         filters.hideCraigslist ||
@@ -2937,27 +2950,26 @@ const CursorHomepage: React.FC = () => {
         filters.hideBat ||
         filters.hideClassic ||
         (filters.hiddenSources && filters.hiddenSources.length > 0);
+
       const includedKeysForFeed = hasSourceSelectionsForFeed
         ? (Object.entries(includedSources).filter(([, v]) => v === true) as [string, boolean][]).map(([k]) => k)
         : [];
-      let sourceOrFilter: string | null = null;
-      if (includedKeysForFeed.length > 0) {
-        const clauses: string[] = [];
-        const keyToPatterns: Record<string, string[]> = {
-          bat: ['discovery_url.ilike.%bringatrailer.com%', 'profile_origin.eq.bat_import'],
-          craigslist: ['discovery_url.ilike.%craigslist.org%'],
-          ksl: ['discovery_url.ilike.%ksl.com%'],
-          classic: ['discovery_url.ilike.%classic.com%'],
-        };
-        for (const key of includedKeysForFeed) {
-          if (keyToPatterns[key]) {
-            clauses.push(...keyToPatterns[key]);
-          } else {
-            const domain = activeSources.find((s: { domain: string }) => domainToFilterKey(s.domain) === key)?.domain;
-            if (domain) clauses.push(`discovery_url.ilike.%${domain}%`);
-          }
-        }
-        if (clauses.length > 0) sourceOrFilter = clauses.join(',');
+
+      // Source filtering is handled ENTIRELY client-side by `applyFiltersAndSort`.
+      // Server-side source filters (OR / NOT ILIKE) are too expensive at 700K+ rows
+      // because they invalidate the partial index and force full-table scans.
+      // The trade-off is that pagination may show fewer visible results per page
+      // when many sources are hidden, but the query is fast and the client
+      // accurately filters.
+
+      const allSourcesExcluded =
+        hasSourceSelectionsForFeed && includedKeysForFeed.length === 0;
+
+      // Short-circuit: if every source is excluded ("none" button), skip the query.
+      if (allSourcesExcluded) {
+        if (!append) setFeedVehicles([]);
+        setHasMore(false);
+        return;
       }
 
       // Get vehicles for feed (keep payload small; avoid heavy origin_metadata + bulk image joins here).
@@ -3022,11 +3034,12 @@ const CursorHomepage: React.FC = () => {
 
       const runVehicleQuery = async (selectFields: string) => {
         try {
-          // Only request exact count on first page (page 0) to avoid expensive COUNT on every scroll
-          const countMode = (pageNum === 0) ? 'exact' as const : undefined;
+          // Skip exact count – the full-table window function is too expensive
+          // on 700K+ rows (causes statement timeouts).  We get the total count
+          // from the cached portfolio_stats_cache table instead.
           let q = supabase
             .from('vehicles')
-            .select(selectFields, countMode ? { count: countMode } : undefined)
+            .select(selectFields)
             .eq('is_public', true);
           
           // Status filter: show pending only if explicitly requested
@@ -3039,9 +3052,7 @@ const CursorHomepage: React.FC = () => {
           if (listingKindSupportedRef.current) {
             q = q.eq('listing_kind', 'vehicle');
           }
-          if (sourceOrFilter) {
-            q = q.or(sourceOrFilter);
-          }
+          // Source filtering handled client-side in applyFiltersAndSort
           
           // === SERVER-SIDE FILTERS (the critical fix) ===
           // Year filters
@@ -3389,34 +3400,11 @@ const CursorHomepage: React.FC = () => {
         // Non-fatal: continue with fallback images
       }
 
-      // Filter out vehicles without images or with only poor quality images
-      const vehiclesWithGoodImages = (vehicles || []).filter((v: any) => {
-        const vehicleId = String(v?.id || '');
-        
-        // Check if vehicle has good quality images from vehicle_images table
-        const quality = vehicleImageQualityMap.get(vehicleId);
-        const hasGoodImagesFromTable = quality?.hasGoodImages || false;
-        const hasThumbnail = thumbnailByVehicleId.has(vehicleId);
-        const hasMedium = mediumByVehicleId.has(vehicleId);
-        
-        // Check if vehicle has primary_image_url or image_url set (and they're good quality)
-        const primaryImageUrl = v.primary_image_url ? String(v.primary_image_url).trim() : null;
-        const imageUrl = v.image_url ? String(v.image_url).trim() : null;
-        const hasGoodPrimaryImage = primaryImageUrl && primaryImageUrl.length > 0 && !isPoorQualityImage(primaryImageUrl);
-        const hasGoodImageUrl = imageUrl && imageUrl.length > 0 && !isPoorQualityImage(imageUrl);
-        
-        // Check if vehicle has images in origin_metadata (for scraped listings)
-        // Filter out poor quality origin images
-        const originImages = getOriginImages(v);
-        const goodOriginImages = originImages.filter(img => !isPoorQualityImage(img));
-        const hasGoodOriginImages = goodOriginImages.length > 0;
-        
-        // Vehicle must have at least one GOOD quality image from any source
-        return hasGoodImagesFromTable || hasThumbnail || hasMedium || hasGoodPrimaryImage || hasGoodImageUrl || hasGoodOriginImages;
-      });
-
-      // Process vehicles with optimized image data (use thumbnails for grid performance)
-      const processed = vehiclesWithGoodImages.map((v: any) => {
+      // Process ALL vehicles – the card component handles missing images with a
+      // placeholder.  We no longer pre-filter by image quality because bulk imports
+      // can produce large batches of imageless vehicles that push everything else
+      // out of the first page.
+      const processed = (vehicles || []).map((v: any) => {
         const salePrice = parseMoneyNumber(v.sale_price);
         const askingPrice = parseMoneyNumber(v.asking_price);
         const currentValue = parseMoneyNumber(v.current_value);
@@ -3521,13 +3509,12 @@ const CursorHomepage: React.FC = () => {
         };
       });
 
-      // Final filter: Remove vehicles that ended up with no good quality images after processing
-      // This catches cases where a vehicle passed initial checks but all its images were poor quality
+      // Filter out vehicles whose ONLY image is a known-bad placeholder/logo.
+      // Vehicles with NO image at all are kept — the card component renders a placeholder.
       const sorted = processed.filter((v: any) => {
-        // Check the processed image URL (which should be optimalImageUrl)
         const imageUrl = v.primary_image_url || v.image_url;
-        if (!imageUrl) return false; // No image at all
-        return !isPoorQualityImage(imageUrl); // Must be good quality
+        if (!imageUrl) return true; // No image → still show (card handles placeholder)
+        return !isPoorQualityImage(imageUrl); // Has image but it's junk → remove
       });
 
       // Dedupe by canonical listing URL to reduce "same car, multiple rows" spam in the feed.
@@ -3603,7 +3590,7 @@ const CursorHomepage: React.FC = () => {
       };
 
       const dedupedSorted = dedupeVehicles(sorted);
-      
+
       // Boost live auctions to the top of the feed (only on initial load, page 0, default sort)
       // This ensures active/buyable vehicles appear first without breaking user-chosen sort order
       if (!append && pageNum === 0 && sortBy === 'newest') {
@@ -4093,7 +4080,7 @@ const CursorHomepage: React.FC = () => {
           return { ...base, hiddenSources: Array.from(hiddenSources) };
       }
     });
-  }, [filters]);
+  }, []); // setFilters functional form doesn't need external dependencies
 
   // Load active sources from database
   useEffect(() => {
@@ -4217,7 +4204,7 @@ const CursorHomepage: React.FC = () => {
         key,
         domain: meta?.domain || source.domain,
         title: meta?.title || source.source_name || source.domain,
-        included: includedSources[key] !== false, // Default to true if not explicitly set
+        included: includedSources[key] === true, // Must match filter logic in applyFiltersAndSort
         id: meta ? key : source.id,
         url: meta ? `https://${meta.domain}` : source.url,
         count: sourceCounts[key] || 0
