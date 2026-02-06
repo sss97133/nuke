@@ -4,7 +4,10 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { QuotePartsList } from '../parts';
+// TODO: QuotePartsList component was removed; stub until reimplemented
+const QuotePartsList: React.FC<{ timelineEventId: string; onTotalChange?: (total: number) => void }> = ({ timelineEventId }) => (
+  <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '9pt' }}>Parts list not available</div>
+);
 
 interface WorkOrderViewerProps {
   event: any; // business_timeline_event
