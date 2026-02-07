@@ -429,9 +429,8 @@ async function analyze(supabase: any, body: any) {
       WHERE bl.vehicle_id IS NOT NULL
         AND bl.comment_count >= ${minComments}
         AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = bl.vehicle_id)
-      ORDER BY bl.comment_count DESC
+      ORDER BY random()
       LIMIT ${batchSize}
-      OFFSET ${offset}
     `,
   });
 
@@ -536,45 +535,39 @@ async function analyzeVehicle(supabase: any, vehicle: any): Promise<any> {
     meta_analysis: metaAnalysis,
   };
 
-  // Use raw SQL for upsert — PostgREST has issues with JSONB containing special chars
-  const cleanJson = JSON.stringify(raw_extraction).replace(/'/g, "''");
-  const salePrice = vehicle.sale_price != null ? Math.round(Number(vehicle.sale_price)) : null;
-  const missingFlags = metaAnalysis.missing_data.length > 0
-    ? `ARRAY[${metaAnalysis.missing_data.map((s: string) => `'${s.replace(/'/g, "''")}'`).join(",")}]::text[]`
-    : "ARRAY[]::text[]";
+  // Deep-clean all strings in raw_extraction to remove JSONB-breaking chars
+  const deepClean = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === "string") return obj.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+    if (Array.isArray(obj)) return obj.map(deepClean);
+    if (typeof obj === "object") {
+      const cleaned: any = {};
+      for (const [k, v] of Object.entries(obj)) cleaned[k] = deepClean(v);
+      return cleaned;
+    }
+    return obj;
+  };
+  const cleanExtraction = deepClean(raw_extraction);
 
-  const { error: insertError } = await supabase.rpc("execute_sql", {
-    query: `
-      INSERT INTO comment_discoveries (vehicle_id, discovered_at, raw_extraction, comment_count, total_fields, sale_price, overall_sentiment, sentiment_score, data_quality_score, missing_data_flags, recommended_sources, model_used)
-      VALUES (
-        '${vehicle.vehicle_id}',
-        now(),
-        '${cleanJson}'::jsonb,
-        ${comments.length},
-        ${countFields(raw_extraction)},
-        ${salePrice},
-        '${sentiment.overall}',
-        ${sentiment.score},
-        ${metaAnalysis.data_quality_score},
-        ${missingFlags},
-        ARRAY[]::text[],
-        'programmatic-v1'
-      )
-      ON CONFLICT (vehicle_id) DO UPDATE SET
-        discovered_at = EXCLUDED.discovered_at,
-        raw_extraction = EXCLUDED.raw_extraction,
-        comment_count = EXCLUDED.comment_count,
-        total_fields = EXCLUDED.total_fields,
-        sale_price = EXCLUDED.sale_price,
-        overall_sentiment = EXCLUDED.overall_sentiment,
-        sentiment_score = EXCLUDED.sentiment_score,
-        data_quality_score = EXCLUDED.data_quality_score,
-        missing_data_flags = EXCLUDED.missing_data_flags,
-        model_used = EXCLUDED.model_used
-    `,
-  });
+  // Upsert via Supabase client
+  const { error: insertError } = await supabase
+    .from("comment_discoveries")
+    .upsert({
+      vehicle_id: vehicle.vehicle_id,
+      discovered_at: new Date().toISOString(),
+      raw_extraction: cleanExtraction,
+      comment_count: comments.length,
+      total_fields: countFields(raw_extraction),
+      sale_price: vehicle.sale_price != null ? Math.round(Number(vehicle.sale_price)) : null,
+      overall_sentiment: sentiment.overall,
+      sentiment_score: sentiment.score,
+      data_quality_score: metaAnalysis.data_quality_score,
+      missing_data_flags: metaAnalysis.missing_data,
+      recommended_sources: [],
+      model_used: "programmatic-v1",
+    }, { onConflict: "vehicle_id" });
 
-  if (insertError) throw new Error(`Insert: ${JSON.stringify(insertError)}`);
+  if (insertError) throw new Error(`Insert: ${insertError.message}`);
 
   return raw_extraction;
 }
