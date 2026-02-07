@@ -19,8 +19,13 @@ const supabase = createClient(
 const NUKEPROOF_TOKEN = Deno.env.get("NUKEPROOF_BOT_TOKEN") || Deno.env.get("NUKE_TELEGRAM_BOT_TOKEN") || Deno.env.get("TELEGRAM_BOT_TOKEN");
 const NUKURL_TOKEN = Deno.env.get("NUKURL_BOT_TOKEN");
 
-// Default to Nukeproof bot for backwards compatibility
+// Active token for current request (set per-request in serve handler)
 let BOT_TOKEN = NUKEPROOF_TOKEN;
+
+function getToken(bot?: string | null): string | undefined {
+  if (bot === "nukurl" && NUKURL_TOKEN) return NUKURL_TOKEN;
+  return NUKEPROOF_TOKEN;
+}
 
 // User mode tracking (work vs verification)
 const userModes: Map<number, "work" | "verify"> = new Map();
@@ -575,11 +580,8 @@ serve(async (req) => {
 
   // Select bot token based on ?bot= query param (set during webhook registration)
   const botParam = url.searchParams.get("bot");
-  if (botParam === "nukurl" && NUKURL_TOKEN) {
-    BOT_TOKEN = NUKURL_TOKEN;
-  } else {
-    BOT_TOKEN = NUKEPROOF_TOKEN;
-  }
+  BOT_TOKEN = getToken(botParam);
+  console.log(`[Telegram] Bot: ${botParam || "default"}, token: ${BOT_TOKEN ? BOT_TOKEN.slice(0, 10) + "..." : "NONE"}`);
 
   // Delete message endpoint
   const deleteMessageId = url.searchParams.get("delete");
@@ -676,6 +678,16 @@ serve(async (req) => {
     return new Response("Telegram webhook active", { status: 200 });
   }
 
+  // Version check endpoint
+  if (url.searchParams.get("version") === "true") {
+    return new Response(JSON.stringify({ version: "v2-nukurl", nukurl_token: !!NUKURL_TOKEN, nukeproof_token: !!NUKEPROOF_TOKEN, bot: botParam }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // Debug mode - return errors instead of swallowing them
+  const debugMode = url.searchParams.get("_debug") === "1";
+
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
@@ -683,6 +695,13 @@ serve(async (req) => {
   try {
     const update: TelegramUpdate = await req.json();
     console.log("[Telegram] Received update:", JSON.stringify(update, null, 2));
+
+    // Store every incoming webhook payload for audit trail
+    const { error: rawErr } = await supabase.from("telegram_raw_webhooks").insert({
+      payload: { ...update, _bot: botParam, _token_prefix: BOT_TOKEN?.slice(0, 10) },
+      processed: false,
+    });
+    if (rawErr) console.error("[Telegram] Raw webhook store error:", rawErr);
 
     if (!update.message) {
       return new Response("OK", { status: 200 });
@@ -915,8 +934,9 @@ serve(async (req) => {
     }
 
     // Check for URLs in text messages - route to process-url-drop
-    const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+    const urlRegex = /https?:\/\/[^\s]+/gi;
     const foundUrls = text.match(urlRegex);
+    console.log(`[Telegram] URL check: text="${text.slice(0, 100)}", foundUrls=${JSON.stringify(foundUrls)}, BOT_TOKEN=${BOT_TOKEN ? BOT_TOKEN.slice(0, 10) : "NONE"}`);
     if (foundUrls && foundUrls.length > 0) {
       console.log("[Telegram] Found URLs:", foundUrls);
       await sendMessage(chatId, `🔗 Processing ${foundUrls.length} URL${foundUrls.length > 1 ? "s" : ""}...`);
@@ -925,13 +945,14 @@ serve(async (req) => {
       for (const droppedUrl of foundUrls) {
         try {
           // Store in url_inbox for persistent tracking + audit trail
-          await supabase.from("url_inbox").insert({
+          const { error: inboxErr } = await supabase.from("url_inbox").insert({
             url: droppedUrl,
             source: "telegram",
             source_user_id: `telegram:${userId}`,
             note: text.replace(droppedUrl, "").trim() || null,
             status: "processing", // We're processing inline, skip trigger
-          }).catch(() => {}); // Non-critical
+          });
+          if (inboxErr) console.error("[Telegram] url_inbox insert error:", inboxErr);
 
           // Call process-url-drop
           const dropResponse = await fetch(
@@ -955,12 +976,12 @@ serve(async (req) => {
 
           if (dropResult.success) {
             // Mark url_inbox as completed
-            await supabase
+            const { error: updateErr } = await supabase
               .from("url_inbox")
               .update({ status: "completed", result: dropResult, processed_at: new Date().toISOString() })
               .eq("url", droppedUrl)
-              .eq("status", "processing")
-              .catch(() => {});
+              .eq("status", "processing");
+            if (updateErr) console.error("[Telegram] url_inbox update error:", updateErr);
 
             const emoji = dropResult.action === "extracted" ? "✅"
               : dropResult.action === "discovered" ? "🆕"
@@ -1038,7 +1059,13 @@ serve(async (req) => {
 
     return new Response("OK", { status: 200 });
   } catch (error) {
-    console.error("[Telegram] Error:", error);
-    return new Response("Error", { status: 500 });
+    console.error("[Telegram] Error:", error, error?.stack);
+    if (debugMode) {
+      return new Response(JSON.stringify({ error: error?.message, stack: error?.stack }), {
+        status: 500, headers: { "Content-Type": "application/json" }
+      });
+    }
+    // Always return 200 to Telegram so it doesn't retry failed webhooks
+    return new Response("OK", { status: 200 });
   }
 });
