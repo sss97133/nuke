@@ -142,7 +142,8 @@ const VIN_PATTERNS = [
 
 // Japanese chassis number patterns (Nissan, Toyota, etc.)
 const CHASSIS_PATTERNS = [
-  // Explicit VIN label in BH Auction pages
+  // BH table: "VIN | F102AB 18437 |" — capture until pipe or "Engine" (next row)
+  /VIN\s+[\|\s]*([A-Z0-9\s\-]+?)(?:\s*\|\s*|\s+Engine\s)/i,
   /VIN\s+([A-Z0-9\-]{6,17})/i,
   // Nissan Skyline patterns: BNR32, BNR34, KPGC10, etc.
   /\b(BNR3[24]-\d{6})\b/gi,
@@ -172,27 +173,34 @@ function parseJPY(raw: string | null): number | null {
   return Number.isFinite(num) && num > 0 ? num : null;
 }
 
+function normalizeVin(s: string): string {
+  return s.replace(/\s+/g, '').toUpperCase();
+}
+
 function extractVinOrChassis(text: string): { vin: string | null; chassis: string | null } {
   let vin: string | null = null;
   let chassis: string | null = null;
 
-  // Try VIN first (17-char modern VINs)
-  for (const pattern of VIN_PATTERNS) {
-    const matches = text.match(pattern);
-    if (matches && matches.length > 0) {
-      vin = matches[0].toUpperCase();
-      break;
-    }
-  }
-
-  // Try chassis number (Japanese format)
+  // Try chassis/VIN from BH table first (handles "VIN | F102AB 18437" — stop before "Engine" row)
   for (const pattern of CHASSIS_PATTERNS) {
     const match = text.match(pattern);
     if (match && match[1]) {
-      const candidate = match[1].trim().toUpperCase();
-      // Validate: reasonable length, alphanumeric with hyphens
-      if (candidate.length >= 6 && candidate.length <= 20 && /^[A-Z0-9\-\/]+$/i.test(candidate)) {
-        chassis = candidate;
+      const candidate = match[1].trim().replace(/\s+/g, ' ').slice(0, 25);
+      const normalized = normalizeVin(candidate);
+      if (normalized.length >= 6 && normalized.length <= 20 && /^[A-Z0-9\-]+$/.test(normalized) && !normalized.includes('ENGINE')) {
+        chassis = normalized;
+        if (!vin) vin = normalized;
+        break;
+      }
+    }
+  }
+
+  // Try 17-char VIN if not found
+  if (!vin) {
+    for (const pattern of VIN_PATTERNS) {
+      const matches = text.match(pattern);
+      if (matches && matches.length > 0) {
+        vin = matches[0].toUpperCase();
         break;
       }
     }
@@ -251,7 +259,40 @@ function extractTitle(text: string): { title: string | null; year: number | null
     return { title, year, make, model };
   }
 
+  // Fallback: page heading "# 1975 Ferrari 365 GT4 BB" — stop before bullet text (Formerly, Comes, One of, etc.)
+  const headingMatch = text.match(/(?:^|\s)#\s*((19|20)\d{2})\s+([A-Za-z][A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-\[\]()]+)*?)(?=\s+VIEW|\s*\||\s*$|\s+Formerly|\s+Comes|\s+One\s+of|\s+Fully|\s+In\s+the)/i) ||
+    text.match(/(?:^|\s)((19|20)\d{2})\s+([A-Za-z][A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-\[\]()]+)*?)\s+LOT\s+NUMBER/i);
+  if (headingMatch) {
+    const year = parseInt(headingMatch[1]);
+    const fullName = headingMatch[3].trim();
+    const parts = fullName.split(/\s+/);
+    let make = parts[0];
+    const normalized = MAKE_ALIASES[make.toLowerCase()];
+    if (normalized) make = normalized;
+    const model = parts.slice(1).join(' ') || null;
+    const title = `${year} ${make} ${model || ''}`.trim();
+    return { title, year, make, model };
+  }
+
   return { title: null, year: null, make: null, model: null };
+}
+
+/** Parse year, make, model from lot URL slug e.g. /lots/1975-ferrari-365-gt4-bb -> 1975, Ferrari, 365 GT4 BB */
+function extractTitleFromUrl(url: string): { year: number | null; make: string | null; model: string | null; title: string | null } {
+  const match = url.match(/\/lots\/([^\/]+)(?:\/|$)/i);
+  if (!match || !match[1]) return { year: null, make: null, model: null, title: null };
+  const slug = match[1].trim();
+  const parts = slug.split('-').filter(Boolean);
+  if (parts.length < 2) return { year: null, make: null, model: null, title: null };
+  const first = parts[0];
+  const year = /^(19|20)\d{2}$/.test(first) ? parseInt(first, 10) : null;
+  const makePart = year != null ? parts[1] : parts[0];
+  const makeNorm = MAKE_ALIASES[makePart.toLowerCase()];
+  const make = makeNorm || makePart.replace(/\b\w/g, (c) => c.toUpperCase());
+  const modelStart = year != null ? 2 : 1;
+  const model = parts.slice(modelStart).map((p) => p.replace(/\b\w/g, (c) => c.toUpperCase())).join(' ') || null;
+  const title = year && make ? `${year} ${make}${model ? ' ' + model : ''}`.trim() : null;
+  return { year, make, model, title };
 }
 
 function extractPrice(text: string): {
@@ -266,13 +307,26 @@ function extractPrice(text: string): {
   let estimate_high_jpy: number | null = null;
   let auction_status: 'sold' | 'unsold' | 'upcoming' | null = null;
 
-  // Look for sold price: "¥98,346,000" or "Sold for ¥..."
-  const soldMatch = text.match(/(?:sold\s*(?:for)?|hammer\s*price|final\s*price)[:\s]*[¥￥]?\s*([\d,]+)/i) ||
-                    text.match(/[¥￥]\s*([\d,]+(?:,\d{3})*)\s*(?:\(|$|\n)/);
-
-  if (soldMatch) {
-    price_jpy = parseJPY(soldMatch[1]);
-    if (price_jpy) auction_status = 'sold';
+  // Prefer "SOLD FOR" block then first ¥ amount (avoids "12" from "12 million" in description)
+  const soldForBlock = text.match(/SOLD\s+FOR\s*:?\s*[\s\S]*?[¥￥]\s*([\d,]+)/i);
+  if (soldForBlock) {
+    const raw = parseJPY(soldForBlock[1]);
+    if (raw && raw >= 1000) {
+      price_jpy = raw;
+      auction_status = 'sold';
+    }
+  }
+  if (!price_jpy) {
+    const soldMatch = text.match(/(?:sold\s*(?:for)?|hammer\s*price|final\s*price)\s*:?\s*[\s\n]*[¥￥]?\s*([\d,]+)/i) ||
+                      text.match(/(?:sold\s*(?:for)?|hammer\s*price|final\s*price)[:\s]*[¥￥]?\s*([\d,]+)/i) ||
+                      text.match(/[¥￥]\s*([\d,]+(?:,\d{3})*)\s*(?:\(|$|\n)/);
+    if (soldMatch) {
+      const raw = parseJPY(soldMatch[1]);
+      if (raw && (raw >= 100000 || soldMatch[1].includes(','))) {
+        price_jpy = raw;
+        auction_status = 'sold';
+      }
+    }
   }
 
   // Look for estimate range: "¥180,000,000 - ¥220,000,000" or "Estimate: ¥180,000,000–¥220,000,000"
@@ -344,14 +398,12 @@ function extractSpecs(text: string): {
   let interior_color: string | null = null;
   let body_style: string | null = null;
 
-  // Mileage: "Mileage 69,715 km" or "69,715 km" pattern
-  // Look for explicit Mileage label first
-  const mileageLabelMatch = text.match(/Mileage\s+(\d{1,3}(?:,\d{3})*)\s*(km|miles?|kms?)/i);
+  // Mileage: "Mileage 69,715 km" or "Mileage | 14,101 miles" (table) or "14,101 miles"
+  const mileageLabelMatch = text.match(/Mileage\s+[\|\s]*(\d{1,3}(?:,\d{3})*)\s*(km|miles?|kms?)/i);
   if (mileageLabelMatch) {
     mileage = parseInt(mileageLabelMatch[1].replace(/,/g, ''), 10);
     mileage_unit = mileageLabelMatch[2].toLowerCase().startsWith('km') ? 'km' : 'miles';
   } else {
-    // Fallback: larger number + km (to avoid matching small numbers)
     const mileageMatch = text.match(/(\d{2,3}(?:,\d{3})+)\s*(km|miles?|kms?)/i);
     if (mileageMatch) {
       mileage = parseInt(mileageMatch[1].replace(/,/g, ''), 10);
@@ -359,7 +411,12 @@ function extractSpecs(text: string): {
     }
   }
 
-  // Engine: JDM engines are often specific codes
+  // Engine: explicit "Engine No." (Ferrari, etc.) — stop at pipe or "Mileage" (next row)
+  const engineNoMatch = text.match(/Engine\s+No\.?\s*[\|\s]*([A-Z0-9][A-Z0-9\.\-\s]{2,25}?)(?:\s*\|\s*|\s+Mileage\s)/i);
+  if (engineNoMatch && engineNoMatch[1]) {
+    engine = engineNoMatch[1].replace(/\s+/g, ' ').trim().slice(0, 80);
+  }
+  if (!engine) {
   const enginePatterns = [
     /\b(RB26(?:DETT)?)\b/i,
     /\b(2JZ(?:-GTE|-GE)?)\b/i,
@@ -382,6 +439,7 @@ function extractSpecs(text: string): {
       engine = engine.trim().slice(0, 100);
       break;
     }
+  }
   }
 
   // Transmission - look for speed + manual/auto
@@ -426,16 +484,20 @@ function extractDescription(text: string): string | null {
   // Extract main description - find the main content block
   // Look for description-like content after the title info
 
-  // Try to find content starting with "Debuting" "This" "Owned" "Maintained" etc.
+  // BH lot pages often start with "In the late 1960s..." or "Debuting" / "This particular..."
   const descPatterns = [
+    /(In\s+the\s+(?:late|early)\s+\d{4}s[^.]+\.(?:[^.]+\.){2,30})/i,
     /(?:Debuting|This\s+(?:particular|example|car)|Owned\s+by|Maintained\s+by)[^.]+\.(?:[^.]+\.){1,10}/i,
     /(?:produced|manufactured|built)\s+(?:by|in|at)[^.]+\.[^.]+\./i,
   ];
 
   for (const pattern of descPatterns) {
     const match = text.match(pattern);
+    if (match && match[1] && match[1].length > 100) {
+      return match[1].trim().slice(0, 5000);
+    }
     if (match && match[0].length > 100) {
-      return match[0].trim().slice(0, 3000);
+      return match[0].trim().slice(0, 5000);
     }
   }
 
@@ -451,18 +513,18 @@ function extractDescription(text: string): string | null {
       if (sentence.match(/^(VIN|Engine|Mileage|LOT)\s/i)) continue;
 
       // Start capturing after we find descriptive content
-      if (!foundStart && sentence.match(/(?:Debuting|This|Owned|Maintained|produced|One of)/i)) {
+      if (!foundStart && sentence.match(/(?:In the|Debuting|This|Owned|Maintained|produced|One of)/i)) {
         foundStart = true;
       }
 
       if (foundStart) {
         descLines.push(sentence.trim() + '.');
-        if (descLines.length > 10) break;
+        if (descLines.length > 15) break;
       }
     }
 
     if (descLines.length > 0) {
-      return descLines.join(' ').slice(0, 3000);
+      return descLines.join(' ').slice(0, 5000);
     }
   }
 
@@ -525,7 +587,19 @@ async function extractBHAuctionListing(url: string): Promise<BHAuctionExtracted>
 
   console.log(`[BH Auction] Got ${html.length} bytes HTML`);
 
-  const titleData = extractTitle(text);
+  let titleData = extractTitle(text);
+  if (!titleData.year || !titleData.make) {
+    const fromUrl = extractTitleFromUrl(url);
+    if (fromUrl.year || fromUrl.make) {
+      titleData = {
+        title: fromUrl.title || titleData.title,
+        year: titleData.year ?? fromUrl.year,
+        make: titleData.make ?? fromUrl.make,
+        model: titleData.model ?? fromUrl.model,
+      };
+      console.log(`[BH Auction] Title fallback from URL: ${titleData.year} ${titleData.make} ${titleData.model}`);
+    }
+  }
   const { vin, chassis } = extractVinOrChassis(text);
   const priceData = extractPrice(text);
   const auctionData = extractAuctionName(text, url);

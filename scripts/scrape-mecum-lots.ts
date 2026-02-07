@@ -41,7 +41,7 @@ interface MecumLotData {
   lotNumber: string | null;
   auctionEvent: string | null;
   saleResult: string | null;
-  mileage: string | null;
+  mileage: number | null;
   images: string[];
 }
 
@@ -101,6 +101,15 @@ function parseMecumPage(html: string): MecumLotData | null {
     }
 
     const hammerPrice = post.hammerPrice ? parseInt(post.hammerPrice) : null;
+    // Odometer can be string or number; normalize to integer for DB
+    const rawOdo = post.odometer;
+    const mileage =
+      rawOdo != null && rawOdo !== ""
+        ? typeof rawOdo === "number"
+          ? (isNaN(rawOdo) ? null : Math.round(rawOdo))
+          : parseInt(String(rawOdo).replace(/,/g, ""), 10)
+        : null;
+    const mileageNum = mileage != null && !isNaN(mileage) ? mileage : null;
 
     return {
       title: post.title || "",
@@ -116,7 +125,7 @@ function parseMecumPage(html: string): MecumLotData | null {
       lotNumber: post.lotNumber || null,
       auctionEvent,
       saleResult,
-      mileage: post.odometer || null,
+      mileage: mileageNum,
       images: imageList,
     };
   } catch (e) {
@@ -180,8 +189,22 @@ async function processBatch(): Promise<{ processed: number; errors: number }> {
         lot.lotNumber ? `Lot: ${lot.lotNumber}` : null,
         lot.engine ? `Engine: ${lot.engine}` : null,
         lot.interior ? `Interior: ${lot.interior}` : null,
-        lot.mileage ? `Miles: ${lot.mileage}` : null,
+        lot.mileage != null ? `Miles: ${lot.mileage}` : null,
       ].filter(Boolean).join(" | ");
+
+      const payload = {
+        year: lot.year,
+        make: lot.make,
+        model: lot.model,
+        vin: lot.vin || undefined,
+        sale_price: lot.hammerPrice,
+        color: lot.color || undefined,
+        transmission: lot.transmission || undefined,
+        mileage: lot.mileage != null ? lot.mileage : undefined,
+        engine_size: lot.engine || undefined,
+        source: "mecum",
+        notes: notesStr,
+      };
 
       // Check if vehicle already exists by listing_url
       const { data: existing } = await supabase
@@ -194,35 +217,12 @@ async function processBatch(): Promise<{ processed: number; errors: number }> {
       let vehicleId: string | null = null;
 
       if (existing) {
-        // Update existing with real data
-        await supabase.from("vehicles").update({
-          year: lot.year,
-          make: lot.make,
-          model: lot.model,
-          vin: lot.vin || undefined,
-          sale_price: lot.hammerPrice,
-          color: lot.color || undefined,
-          transmission: lot.transmission || undefined,
-          source: "mecum",
-          notes: notesStr,
-        }).eq("id", existing.id);
+        await supabase.from("vehicles").update({ ...payload }).eq("id", existing.id);
         vehicleId = existing.id;
       } else {
-        // Insert new
         const { data: vehicle, error: vErr } = await supabase
           .from("vehicles")
-          .insert({
-            year: lot.year,
-            make: lot.make,
-            model: lot.model,
-            vin: lot.vin || undefined,
-            sale_price: lot.hammerPrice,
-            color: lot.color || undefined,
-            transmission: lot.transmission || undefined,
-            listing_url: item.listing_url,
-            source: "mecum",
-            notes: notesStr,
-          })
+          .insert({ ...payload, listing_url: item.listing_url })
           .select("id")
           .single();
         vehicleId = vehicle?.id || null;
