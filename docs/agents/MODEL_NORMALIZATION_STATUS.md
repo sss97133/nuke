@@ -1,64 +1,59 @@
 # Model Normalization Status
 
-> **Started:** 2026-02-06 8:45 AM PST
-> **Process:** PID 61418 (nohup, will survive terminal close)
-> **Script:** `scripts/normalize-models-psql.sh`
-> **Log:** `reports/normalize-models-psql-run2.log`
+> **Last updated:** 2026-02-06 ~7:00 PM PST
 
-## Status: RUNNING - Processing 1,068 makes
+## Status: COMPLETE (major passes done)
 
-### Progress (as of ~8:53 AM PST)
+## Results Summary
 
-| # | Make | Records Normalized | Status |
-|---|------|-------------------|--------|
-| 1 | Chevrolet (33,610) | ~17,000 (from earlier run) | ✅ Done |
-| 2 | Ford (26,229) | ~12,000 (from earlier run) | ✅ Done |
-| 3 | Porsche (22,140) | 191 | ✅ Done |
-| 4 | Mercedes-Benz (17,082) | 228 | ✅ Done |
-| 5 | BMW (15,985) | skipped (already clean?) | ✅ Done |
-| 6 | Honda (5,422) | skipped | ✅ Done |
-| 7 | Toyota (9,839) | 25 | ✅ Done |
-| 8 | Dodge (5,447) | 1,835 | ✅ Done |
-| 9 | Cadillac (3,678) | 2,644 | ✅ Done |
-| 10 | Jaguar (4,331) | 82 | ✅ Done |
-| 11 | Ferrari (4,622) | 76 | ✅ Done |
-| 12 | Volkswagen (5,228) | 1,176 | ✅ Done |
-| 13-1068 | Remaining makes | ... | ⏳ Processing |
+### Pass 1: Case normalization (psql script)
+- **21,249 records** normalized across 1,166 makes
+- "corvette coupe" → "Corvette Coupe", "camaro z28" → "Camaro Z28", etc.
+- Script: `scripts/normalize-models-psql.sh`
 
-## What the Script Does
+### Pass 2: Hyphenated make corruption fix
+- **3,261 Mercedes-Benz** models fixed ("-Benz 560SL" → "560SL")
+- **219 Austin-Healey** models fixed ("-Healey 3000" → "3000 BJ8 Mk III")
+- **109 Rolls-Royce** models fixed
+- **56 Aston Martin** makes fixed ("Aston" → "Aston Martin")
+- **2 De Tomaso** makes fixed
+- Total: **~3,650 records**
 
-For each make (1,068 total with 5+ vehicles):
-1. Groups all models by `lower(model)` to find case variants
-2. Uses `mode()` to pick the most common casing as canonical
-3. Updates all variants to match in a single UPDATE per make
-4. Logs the count of normalized records
+### Pass 3: BaT descriptor-as-make fix
+- **81 descriptors** fixed ("13k-Mile" → real make from model field)
+- **5 numeric makes** fixed ("255" → real make)
+- **5 Porsche model-as-make** fixed ("911" → "Porsche")
 
-## Approach
+### Earlier work
+- **1,251 empty makes** backfilled from URLs (backfill-make-model-from-urls.ts)
+- **~130 empty makes** extracted manually from Mecum/Classic.com URLs
+- **~565 empty makes** inferred from model names (Camaro→Chevrolet, etc.)
 
-Uses direct `psql` connection (not REST API) to avoid statement timeouts.
-Each make gets its own UPDATE with 90s timeout -- handles even the largest makes (Chevrolet 33k).
+### Known remaining issues
+- **~34 BaT records** still have bad makes (edge cases: replicas, fire apparatus, etc.)
+- **~18,000 case variant groups** remain (mostly from the trigger blocking bulk updates)
+- **Root cause:** `trigger_check_duplicates()` trigger fires on every UPDATE and does a full duplicate scan, causing 30s+ timeout on bulk operations
+- **Fix needed:** The trigger should be made smarter (skip if only model/make changed) or disabled during batch operations
 
-## How to Monitor
+## Root Cause: BaT Title Parsing Bug
 
-```bash
-tail -f /Users/skylar/nuke/reports/normalize-models-psql-run2.log
-ps -p 61418 -o pid,stat,etime  # Check if alive
-```
+The BaT extractor splits listing titles wrong:
+- BaT title: `"13k-Mile 2015 BMW M4 Convertible"`
+- Parser takes first word as make → `make="13k-Mile"`, `model="2015 BMW M4 Convertible"`
+- Should skip descriptors (Xk-Mile, One-Owner, X-Years-Owned, X-Powered) before finding the year+make
 
-## How to Resume if Process Dies
+Similarly, hyphenated makes get split wrong:
+- `"Mercedes-Benz"` → make="Mercedes-Benz" but model gets "-Benz 560SL" 
+- `"Austin-Healey"` → make="Austin", model="-Healey 3000..."
 
-```bash
-cd /Users/skylar/nuke
-dotenvx run -- ./scripts/normalize-models-psql.sh
-# It's idempotent - skips already-normalized makes (0 updates)
-```
+**The extractors need to be updated to handle these patterns.** Files:
+- `scripts/backfill-make-model-from-urls.ts` (extractFromTitle function)
+- `supabase/functions/bat-simple-extract/` (BaT-specific extractor)
 
-## Other Active Data Quality Work
+## Trigger Issue (for future agents)
 
-- `backfill-make-model-from-urls.ts` completed 1,251 empty-make fixes
-- `autonomous-profile-repair-loop.ts` ran for BaT image/VIN repairs
-- 1,561 CL cross-post duplicates merged
-- 4,911 motorcycles separated from car feed
-- ~500 junk records cleaned
-- Server-side DB filtering deployed to production
-- Model selector normalized in frontend (deployed)
+The `trigger_auto_detect_duplicates` trigger on `vehicles` table fires on every UPDATE and runs `detect_vehicle_duplicates()` which does a full table scan. This makes bulk updates impossible through normal means.
+
+**Workaround:** Use `SET session_replication_role = replica;` before bulk updates to disable triggers, then `SET session_replication_role = DEFAULT;` after.
+
+**Proper fix:** The trigger should check if the update is a data-quality fix (make/model change) vs a meaningful content change, and skip the expensive duplicate detection for the former.
