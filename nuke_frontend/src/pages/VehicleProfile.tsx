@@ -3822,6 +3822,17 @@ const VehicleProfile: React.FC = () => {
   // Render vehicle profile (responsive for mobile and desktop)
   return (
       <div>
+        {/* Back navigation */}
+        <div style={{ padding: '6px 8px', fontSize: '9pt' }}>
+          <button
+            className="button button-secondary"
+            onClick={() => navigate('/vehicle/list')}
+            style={{ fontSize: '8pt', padding: '2px 8px' }}
+          >
+            &larr; Back to Vehicles
+          </button>
+        </div>
+
         {/* Vehicle Header with Price */}
         <div ref={vehicleHeaderRef}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
