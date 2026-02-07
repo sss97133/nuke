@@ -141,6 +141,18 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
         // @ts-ignore - fetchPriority is valid but not in older TS types
         fetchpriority={fetchPriority}
         style={{ ...baseImgStyle, ...imgStyle, opacity: finalOpacity }}
+        onLoad={(e) => {
+          // Some broken URLs fire onLoad with a 0×0 image; treat as error
+          const img = e.currentTarget;
+          if (img.naturalWidth === 0) {
+            const next = idx + 1;
+            if (next < sourceList.length) {
+              setIdx(next);
+            } else {
+              setFailed(true);
+            }
+          }
+        }}
         onError={() => {
           if (showPlaceholder) return;
           const next = idx + 1;

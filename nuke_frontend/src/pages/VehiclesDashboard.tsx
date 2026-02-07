@@ -13,6 +13,9 @@ import '../design-system.css';
 
 const DashboardSkeleton: React.FC = () => (
   <div style={{ padding: '16px' }}>
+    <h1 style={{ fontSize: '12pt', fontWeight: 700, margin: '0 0 16px 0' }}>
+      Vehicles Dashboard
+    </h1>
     <div style={{
       height: '80px',
       background: 'var(--surface)',
@@ -46,6 +49,9 @@ const EmptyDashboard: React.FC = () => (
     padding: '48px 16px',
     textAlign: 'center'
   }}>
+    <h1 style={{ fontSize: '12pt', fontWeight: 700, margin: '0 0 24px 0' }}>
+      Vehicles Dashboard
+    </h1>
     <div style={{
       fontSize: '11pt',
       fontWeight: 600,
@@ -138,6 +144,9 @@ const VehiclesDashboard: React.FC = () => {
   if (error) {
     return (
       <div style={{ padding: '16px' }}>
+        <h1 style={{ fontSize: '12pt', fontWeight: 700, margin: '0 0 16px 0' }}>
+          Vehicles Dashboard
+        </h1>
         <div style={{
           padding: '24px',
           background: '#fef2f2',

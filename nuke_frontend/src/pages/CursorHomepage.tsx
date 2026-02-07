@@ -3048,6 +3048,7 @@ const CursorHomepage: React.FC = () => {
           } else {
             q = q.neq('status', 'pending');
           }
+          q = q.neq('status', 'deleted');
           
           if (listingKindSupportedRef.current) {
             q = q.eq('listing_kind', 'vehicle');
@@ -3276,6 +3277,8 @@ const CursorHomepage: React.FC = () => {
       // Helper function to check if an image URL indicates poor quality or wrong image
       const isPoorQualityImage = (url: string | null, fileSize: number | null = null): boolean => {
         if (!url) return true;
+        // Reject URLs that aren't valid HTTP(S)
+        if (!url.startsWith('http://') && !url.startsWith('https://')) return true;
         const urlLower = String(url).toLowerCase();
         
         // Check for dealer logos and placeholder images
