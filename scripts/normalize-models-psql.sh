@@ -26,7 +26,7 @@ MAKES=$(run_sql "
     SELECT make, COUNT(*) as cnt 
     FROM vehicles 
     WHERE status = 'active' AND listing_kind = 'vehicle' AND make IS NOT NULL AND make != ''
-    GROUP BY make HAVING COUNT(*) >= 5
+    GROUP BY make HAVING COUNT(*) >= 2
     ORDER BY cnt DESC
   ) sub;
 ")
@@ -45,34 +45,42 @@ for MAKE in $MAKES; do
   # Escape single quotes in make name
   ESCAPED_MAKE=$(echo "$MAKE" | sed "s/'/''/g")
   
-  # Use a DO block that returns the count via RAISE NOTICE
-  RESULT=$(psql -h "$PSQL_HOST" -p 6543 -U "$PSQL_USER" -d postgres -t -A -c "
-    SET statement_timeout = '90s';
-    WITH model_groups AS (
-      SELECT 
-        lower(model) as model_lower,
-        mode() WITHIN GROUP (ORDER BY model) as most_common,
-        COUNT(*) as total
-      FROM vehicles
-      WHERE make = '$ESCAPED_MAKE' AND status = 'active' AND listing_kind = 'vehicle' AND model IS NOT NULL
-      GROUP BY lower(model)
-      HAVING COUNT(DISTINCT model) > 1
-    ),
-    updated AS (
-      UPDATE vehicles v
-      SET model = mg.most_common
-      FROM model_groups mg
-      WHERE v.make = '$ESCAPED_MAKE' 
-        AND v.status = 'active' 
-        AND v.listing_kind = 'vehicle'
-        AND lower(v.model) = mg.model_lower
-        AND v.model != mg.most_common
-      RETURNING v.id
-    )
-    SELECT COUNT(*) FROM updated;
-  " 2>/dev/null || echo "0")
+  # Normalize in small batches per model group to work within trigger overhead
+  # First: get the model groups that need normalizing
+  GROUPS=$(psql -h "$PSQL_HOST" -p 6543 -U "$PSQL_USER" -d postgres -t -A -F'|' -c "
+    SET statement_timeout = '30s';
+    SELECT lower(model) as lm, mode() WITHIN GROUP (ORDER BY model) as canonical, COUNT(*) - COUNT(*) FILTER (WHERE model = mode() WITHIN GROUP (ORDER BY model)) as to_fix
+    FROM vehicles
+    WHERE make = '$ESCAPED_MAKE' AND status = 'active' AND listing_kind = 'vehicle' AND model IS NOT NULL
+    GROUP BY lower(model)
+    HAVING COUNT(DISTINCT model) > 1
+    ORDER BY to_fix DESC
+    LIMIT 200;
+  " 2>/dev/null || echo "")
   
-  UPDATED=$(echo "$RESULT" | tr -d ' ' | head -1)
+  UPDATED=0
+  if [ -n "$GROUPS" ]; then
+    while IFS='|' read -r lm canonical to_fix; do
+      [ -z "$lm" ] && continue
+      # Escape for SQL
+      escaped_lm=$(echo "$lm" | sed "s/'/''/g")
+      escaped_canonical=$(echo "$canonical" | sed "s/'/''/g")
+      
+      result=$(psql -h "$PSQL_HOST" -p 6543 -U "$PSQL_USER" -d postgres -t -A -c "
+        SET statement_timeout = '30s';
+        WITH updated AS (
+          UPDATE vehicles SET model = '$escaped_canonical'
+          WHERE make = '$ESCAPED_MAKE' AND status = 'active' AND listing_kind = 'vehicle'
+            AND lower(model) = '$escaped_lm' AND model != '$escaped_canonical'
+          RETURNING id
+        ) SELECT COUNT(*) FROM updated;
+      " 2>/dev/null || echo "0")
+      
+      n=$(echo "$result" | tr -d ' ' | grep -E '^[0-9]+$' | head -1)
+      n=${n:-0}
+      UPDATED=$((UPDATED + n))
+    done <<< "$GROUPS"
+  fi
   
   if [ "$UPDATED" != "0" ] && [ -n "$UPDATED" ]; then
     echo "[$MAKE_NUM/$TOTAL_MAKES] $MAKE: $UPDATED records normalized" | tee -a "$LOGFILE"

@@ -222,19 +222,25 @@ function extractMileage(text: string): number | null {
 // Extract price from text - avoid grabbing years
 function extractPrice(text: string): number | null {
   // Explicit price patterns with $ or keywords
+  // Use comma-formatted regex (\d{1,3}(?:,\d{3})*) to avoid grabbing
+  // concatenated year digits (e.g. "$4,5001986" → match "$4,500" only)
   const patterns = [
-    /\$\s*([\d,]+)/,                          // $15,000
-    /asking\s*\$?\s*([\d,]+)/i,               // asking $15,000 or asking 15000
-    /price[:\s]+\$?\s*([\d,]+)/i,             // price: 15000
-    /obo\s*\$?\s*([\d,]+)/i,                  // OBO $5000
+    /\$\s*(\d{1,3}(?:,\d{3})*)/,               // $15,000 (comma-formatted)
+    /\$\s*(\d+)(?!\d)/,                          // $15000 (unformatted, word boundary)
+    /asking\s*\$?\s*(\d{1,3}(?:,\d{3})*)/i,     // asking $15,000
+    /asking\s*\$?\s*(\d+)(?!\d)/i,               // asking 15000
+    /price[:\s]+\$?\s*(\d{1,3}(?:,\d{3})*)/i,   // price: 15,000
+    /price[:\s]+\$?\s*(\d+)(?!\d)/i,             // price: 15000
+    /obo\s*\$?\s*(\d{1,3}(?:,\d{3})*)/i,        // OBO $5,000
+    /obo\s*\$?\s*(\d+)(?!\d)/i,                  // OBO 5000
   ];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
-      const price = parseFloat(match[1].replace(/,/g, ""));
-      // Sanity check: vehicles typically $500 - $500k for FB marketplace
-      if (price >= 500 && price <= 500000) {
+      const price = parseInt(match[1].replace(/,/g, ""), 10);
+      // Sanity check: vehicles typically $100 - $500k for FB marketplace
+      if (price >= 100 && price <= 500000) {
         return price;
       }
     }

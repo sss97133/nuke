@@ -15,8 +15,12 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-// Nukeproof bot - public bot for technicians (verification, work photos)
-const BOT_TOKEN = Deno.env.get("NUKEPROOF_BOT_TOKEN") || Deno.env.get("NUKE_TELEGRAM_BOT_TOKEN") || Deno.env.get("TELEGRAM_BOT_TOKEN");
+// Bot tokens - multiple bots share this webhook via ?bot= query param
+const NUKEPROOF_TOKEN = Deno.env.get("NUKEPROOF_BOT_TOKEN") || Deno.env.get("NUKE_TELEGRAM_BOT_TOKEN") || Deno.env.get("TELEGRAM_BOT_TOKEN");
+const NUKURL_TOKEN = Deno.env.get("NUKURL_BOT_TOKEN");
+
+// Default to Nukeproof bot for backwards compatibility
+let BOT_TOKEN = NUKEPROOF_TOKEN;
 
 // User mode tracking (work vs verification)
 const userModes: Map<number, "work" | "verify"> = new Map();
@@ -569,6 +573,14 @@ Return ONLY valid JSON:
 serve(async (req) => {
   const url = new URL(req.url);
 
+  // Select bot token based on ?bot= query param (set during webhook registration)
+  const botParam = url.searchParams.get("bot");
+  if (botParam === "nukurl" && NUKURL_TOKEN) {
+    BOT_TOKEN = NUKURL_TOKEN;
+  } else {
+    BOT_TOKEN = NUKEPROOF_TOKEN;
+  }
+
   // Delete message endpoint
   const deleteMessageId = url.searchParams.get("delete");
   if (deleteMessageId && BOT_TOKEN) {
@@ -683,18 +695,34 @@ serve(async (req) => {
 
     // Handle /start command
     if (text === "/start") {
-      await sendMessage(
-        chatId,
-        `👋 *Nuke Bot*\n\n` +
-          `Two modes:\n\n` +
-          `🔧 */work* - Log work photos\n` +
-          `   Send pics, vehicles claim their photos\n` +
-          `   Grouped by vehicle + shop\n\n` +
-          `📋 */verify* - Document verification\n` +
-          `   Titles, IDs, registrations\n\n` +
-          `First time? Text your phone number to link accounts.\n` +
-          `Example: +17025551234`
-      );
+      if (botParam === "nukurl") {
+        await sendMessage(
+          chatId,
+          `🔗 *NUKURL Bot*\n\n` +
+            `Drop any URL and I'll extract vehicle data.\n\n` +
+            `Supported:\n` +
+            `• Facebook Marketplace\n` +
+            `• Bring a Trailer\n` +
+            `• Cars & Bids\n` +
+            `• Instagram, YouTube, TikTok\n` +
+            `• eBay, Craigslist\n` +
+            `• Any auction house or dealer site\n\n` +
+            `Just paste a link!`
+        );
+      } else {
+        await sendMessage(
+          chatId,
+          `👋 *Nuke Bot*\n\n` +
+            `Two modes:\n\n` +
+            `🔧 */work* - Log work photos\n` +
+            `   Send pics, vehicles claim their photos\n` +
+            `   Grouped by vehicle + shop\n\n` +
+            `📋 */verify* - Document verification\n` +
+            `   Titles, IDs, registrations\n\n` +
+            `First time? Text your phone number to link accounts.\n` +
+            `Example: +17025551234`
+        );
+      }
       return new Response("OK", { status: 200 });
     }
 
@@ -706,7 +734,9 @@ serve(async (req) => {
           `/start - Introduction\n` +
           `/help - This message\n` +
           `/status - Check verification server status\n\n` +
-          `Or just send a photo to analyze!`
+          `Or:\n` +
+          `• Send a *photo* to analyze\n` +
+          `• Send a *URL* to extract vehicle data`
       );
       return new Response("OK", { status: 200 });
     }
@@ -884,6 +914,74 @@ serve(async (req) => {
       return new Response("OK", { status: 200 });
     }
 
+    // Check for URLs in text messages - route to process-url-drop
+    const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+    const foundUrls = text.match(urlRegex);
+    if (foundUrls && foundUrls.length > 0) {
+      console.log("[Telegram] Found URLs:", foundUrls);
+      await sendMessage(chatId, `🔗 Processing ${foundUrls.length} URL${foundUrls.length > 1 ? "s" : ""}...`);
+
+      const results: string[] = [];
+      for (const droppedUrl of foundUrls) {
+        try {
+          // Store in url_inbox for persistent tracking + audit trail
+          await supabase.from("url_inbox").insert({
+            url: droppedUrl,
+            source: "telegram",
+            source_user_id: `telegram:${userId}`,
+            note: text.replace(droppedUrl, "").trim() || null,
+            status: "processing", // We're processing inline, skip trigger
+          }).catch(() => {}); // Non-critical
+
+          // Call process-url-drop
+          const dropResponse = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/process-url-drop`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({
+                url: droppedUrl,
+                userId: undefined, // Telegram user, no auth.users id
+                opinion: text.replace(droppedUrl, "").trim() || undefined,
+              }),
+            }
+          );
+
+          const dropResult = await dropResponse.json();
+          console.log("[Telegram] URL drop result:", JSON.stringify(dropResult));
+
+          if (dropResult.success) {
+            // Mark url_inbox as completed
+            await supabase
+              .from("url_inbox")
+              .update({ status: "completed", result: dropResult, processed_at: new Date().toISOString() })
+              .eq("url", droppedUrl)
+              .eq("status", "processing")
+              .catch(() => {});
+
+            const emoji = dropResult.action === "extracted" ? "✅"
+              : dropResult.action === "discovered" ? "🆕"
+              : dropResult.action === "existing" ? "📋"
+              : dropResult.action === "already_queued" ? "⏳"
+              : "🔄";
+
+            results.push(`${emoji} ${droppedUrl.split("/").slice(2, 4).join("/")}\n   ${dropResult.message || dropResult.action}`);
+          } else {
+            results.push(`⚠️ ${droppedUrl.split("/").slice(2, 4).join("/")}\n   ${dropResult.error || "Processing failed"}`);
+          }
+        } catch (e) {
+          console.error("[Telegram] URL processing error:", e);
+          results.push(`❌ ${droppedUrl.split("/").slice(2, 4).join("/")}\n   Error: ${e.message}`);
+        }
+      }
+
+      await sendMessage(chatId, `*URL Processing Results:*\n\n${results.join("\n\n")}`);
+      return new Response("OK", { status: 200 });
+    }
+
     // Check for phone number to link accounts
     const phoneMatch = text.match(/^\+?1?(\d{10})$/);
     if (phoneMatch) {
@@ -932,7 +1030,9 @@ serve(async (req) => {
         `Commands:\n` +
           `/work - Log work photos\n` +
           `/verify - Document verification\n\n` +
-          `Or text your phone number to link accounts.`
+          `Or:\n` +
+          `• Send a URL to extract vehicle data\n` +
+          `• Text your phone number to link accounts`
       );
     }
 

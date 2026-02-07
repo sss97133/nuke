@@ -201,15 +201,30 @@ async function setActiveVehicle(
 ): Promise<{ success: boolean; message: string; vehicle?: any }> {
   const normalized = vinOrQuery.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "");
 
-  // Try to find vehicle by VIN
+  // Validate VIN length to prevent expensive queries
+  if (normalized.length < 6) {
+    return {
+      success: false,
+      message: `VIN too short (${normalized.length} characters). Please enter at least 6 characters.`,
+    };
+  }
+
+  if (normalized.length > 17) {
+    return {
+      success: false,
+      message: `VIN too long (${normalized.length} characters). VINs are max 17 characters.`,
+    };
+  }
+
+  // Try to find vehicle by exact VIN match first
   let { data: vehicle } = await supabase
     .from("vehicles")
     .select("id, year, make, model, vin")
     .eq("vin", normalized)
     .single();
 
-  // If not found by exact VIN, try partial match
-  if (!vehicle && normalized.length >= 6) {
+  // If not found by exact VIN and length is between 6-16, try partial match
+  if (!vehicle && normalized.length >= 6 && normalized.length < 17) {
     const { data: vehicles } = await supabase
       .from("vehicles")
       .select("id, year, make, model, vin")
@@ -221,7 +236,7 @@ async function setActiveVehicle(
     }
   }
 
-  // If still not found, try to decode VIN and create vehicle
+  // Only try NHTSA decode for exactly 17 character VINs
   if (!vehicle && normalized.length === 17) {
     try {
       const nhtsaResponse = await fetch(
@@ -259,9 +274,12 @@ async function setActiveVehicle(
   }
 
   if (!vehicle) {
+    const hint = normalized.length < 17
+      ? " Try entering the full 17-character VIN."
+      : "";
     return {
       success: false,
-      message: `Couldn't find vehicle with VIN "${vinOrQuery}". Check the VIN and try again.`,
+      message: `Couldn't find vehicle with VIN "${vinOrQuery}".${hint}`,
     };
   }
 
@@ -782,9 +800,12 @@ Send /vehicle VIN to set a new one.`
     }
 
     // === TEXT MESSAGE (potential VIN) ===
-    // Check if it looks like a VIN (17 chars, alphanumeric minus I, O, Q)
+    // Check if it looks like a VIN (exactly 17 chars, alphanumeric minus I, O, Q)
+    // Only auto-detect for exactly 17 characters to avoid false positives
     const potentialVin = text.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "");
-    if (potentialVin.length === 17) {
+    // Strict check: exactly 17 chars, and original text was mostly the VIN (not embedded in other text)
+    const originalClean = text.replace(/[\s\-]/g, "");
+    if (potentialVin.length === 17 && originalClean.length <= 20) {
       const result = await setActiveVehicle(tech.id, potentialVin);
       await sendMessage(chatId, result.message);
       return new Response("OK", { status: 200 });

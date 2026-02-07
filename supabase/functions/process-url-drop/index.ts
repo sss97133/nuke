@@ -24,6 +24,8 @@ interface URLDropRequest {
   userId?: string;
   opinion?: string;
   rating?: number;
+  _inbox_id?: string;  // If called from url_inbox trigger
+  _source?: string;    // Source channel (telegram, web_app, etc.)
 }
 
 // Known platforms and their types
@@ -76,8 +78,12 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let _inbox_id: string | undefined;
+
   try {
-    const { url, userId, opinion, rating }: URLDropRequest = await req.json();
+    const body: URLDropRequest = await req.json();
+    const { url, userId, opinion, rating, _source } = body;
+    _inbox_id = body._inbox_id;
 
     if (!url) {
       return new Response(
@@ -281,25 +287,57 @@ serve(async (req) => {
       }).catch(() => {}); // Non-critical
     }
 
+    const responsePayload = {
+      success: true,
+      action,
+      entityType,
+      entityId,
+      detection,
+      contributorRank: userId ? contributorRank : null,
+      isOriginalDiscoverer: userId ? isOriginalDiscoverer : null,
+      pointsAwarded: userId ? pointsAwarded : null,
+      message: message || (isOriginalDiscoverer
+        ? `Discovered new ${entityType}! ${pointsAwarded ? `+${pointsAwarded} points` : ''}`
+        : `Contributed to ${entityType} ${pointsAwarded ? `+${pointsAwarded} points` : ''}`)
+    };
+
+    // Write result back to url_inbox if triggered from there
+    if (_inbox_id) {
+      await supabase
+        .from('url_inbox')
+        .update({
+          status: 'completed',
+          result: responsePayload,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', _inbox_id);
+    }
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        action,
-        entityType,
-        entityId,
-        detection,
-        contributorRank: userId ? contributorRank : null,
-        isOriginalDiscoverer: userId ? isOriginalDiscoverer : null,
-        pointsAwarded: userId ? pointsAwarded : null,
-        message: message || (isOriginalDiscoverer
-          ? `Discovered new ${entityType}! ${pointsAwarded ? `+${pointsAwarded} points` : ''}`
-          : `Contributed to ${entityType} ${pointsAwarded ? `+${pointsAwarded} points` : ''}`)
-      }),
+      JSON.stringify(responsePayload),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Process URL drop error:', error);
+
+    // Write error back to url_inbox if triggered from there
+    if (_inbox_id) {
+      const sb = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      await sb
+        .from('url_inbox')
+        .update({
+          status: 'failed',
+          error_message: error.message,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', _inbox_id)
+        .catch(() => {});
+    }
+
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -1,11 +1,14 @@
 /**
  * CALCULATE MARKET INDEXES
  *
- * Calculates daily market index values based on vehicle pricing data.
+ * Calculates daily market index values based on clean_vehicle_prices.
+ * Uses canonical makes (post-normalization) instead of hardcoded variants.
  * Called daily via cron or manually via POST request.
  *
  * Implements:
  * - SQBDY-50: Top 50 squarebody trucks by recent pricing
+ * - SQBDY-7380, SQBDY-8187, SQBDY-8891: Year-range sub-indexes
+ * - K5-BLZR, C10-TRK, SUBRBN: Model-specific indexes
  * - CLSC-100: Top 100 classic vehicles by value
  * - PROJ-ACT: Project activity momentum
  * - MKTV-USD: Overall market velocity
@@ -14,12 +17,6 @@
  * Body: {
  *   index_code?: string,  // Optional: calculate specific index
  *   date?: string         // Optional: calculate for specific date (YYYY-MM-DD)
- * }
- *
- * Returns: {
- *   success: boolean,
- *   indexes_calculated: number,
- *   results: Array<{index_code, value, count}>
  * }
  */
 
@@ -50,8 +47,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Parse request body
-    const body = req.method === "POST" ? await req.json() : {};
+    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const targetIndexCode = body.index_code || null;
     const targetDate = body.date || new Date().toISOString().split('T')[0];
 
@@ -82,7 +78,6 @@ serve(async (req) => {
 
     const results: IndexCalculationResult[] = [];
 
-    // Calculate each index
     for (const index of indexes) {
       console.log(`Calculating ${index.index_code} - ${index.index_name}`);
 
@@ -90,8 +85,6 @@ serve(async (req) => {
 
       if (calculation) {
         results.push(calculation);
-
-        // Store the calculated value
         await storeIndexValue(supabase, index.id, targetDate, calculation);
       }
     }
@@ -117,53 +110,38 @@ serve(async (req) => {
   }
 });
 
-/**
- * Calculate a single index value based on its configuration
- */
 async function calculateIndex(
   supabase: any,
   index: any,
   date: string
 ): Promise<IndexCalculationResult | null> {
-  const method = index.calculation_method || {};
-
   switch (index.index_code) {
     case 'SQBDY-50':
       return await calculateSquarebody50(supabase, index, date);
-
     case 'SQBDY-7380':
       return await calculateSquarebodyYearRange(supabase, index, date, 1973, 1980,
         '(c10|c20|c30|k10|k20|k30|blazer|jimmy|suburban|sierra|silverado|scottsdale|cheyenne|pickup)');
-
     case 'SQBDY-8187':
       return await calculateSquarebodyYearRange(supabase, index, date, 1981, 1987,
         '(c10|c20|c30|k10|k20|k30|blazer|jimmy|suburban|sierra|silverado|scottsdale|cheyenne|pickup)');
-
     case 'SQBDY-8891':
       return await calculateSquarebodyYearRange(supabase, index, date, 1988, 1991,
         '(r1500|r2500|r3500|v1500|v2500|v3500|blazer|jimmy|suburban|crew cab)');
-
     case 'K5-BLZR':
       return await calculateSquarebodyYearRange(supabase, index, date, 1973, 1991,
         '(k5|blazer|jimmy)');
-
     case 'C10-TRK':
       return await calculateSquarebodyYearRange(supabase, index, date, 1973, 1991,
         '(c10|c1500|c-10|sierra 1500|silverado 1500)');
-
     case 'SUBRBN':
       return await calculateSquarebodyYearRange(supabase, index, date, 1973, 1991,
         '(suburban)');
-
     case 'CLSC-100':
       return await calculateClassic100(supabase, index, date);
-
     case 'PROJ-ACT':
       return await calculateProjectActivity(supabase, index, date);
-
     case 'MKTV-USD':
       return await calculateMarketVelocity(supabase, index, date);
-
     default:
       console.warn(`Unknown index type: ${index.index_code}`);
       return null;
@@ -171,7 +149,7 @@ async function calculateIndex(
 }
 
 /**
- * Generic squarebody calculation for year-range and model-specific indexes
+ * Squarebody year-range indexes — uses clean_vehicle_prices + canonical makes
  */
 async function calculateSquarebodyYearRange(
   supabase: any,
@@ -181,66 +159,42 @@ async function calculateSquarebodyYearRange(
   yearMax: number,
   modelRegex: string
 ): Promise<IndexCalculationResult> {
-  // Use RPC for efficient querying
-  const { data, error } = await supabase.rpc('get_squarebody_index_stats', {
-    year_min: yearMin,
-    year_max: yearMax,
-    model_pattern: modelRegex
+  const { data, error } = await supabase.rpc('execute_sql', {
+    query: `
+      SELECT
+        count(*) AS count,
+        ROUND(avg(best_price)::numeric, 0) AS avg_price,
+        ROUND(percentile_cont(0.50) WITHIN GROUP (ORDER BY best_price)::numeric, 0) AS median_price,
+        ROUND(min(best_price)::numeric, 0) AS min_price,
+        ROUND(max(best_price)::numeric, 0) AS max_price,
+        ROUND(stddev_pop(best_price)::numeric, 0) AS std_dev
+      FROM clean_vehicle_prices
+      WHERE UPPER(make) IN ('CHEVROLET', 'GMC')
+        AND year BETWEEN ${yearMin} AND ${yearMax}
+        AND model ~* '${modelRegex}'
+    `
   });
 
-  // Fallback to direct query if RPC doesn't exist
-  if (error || !data) {
-    const { data: vehicles, error: vError } = await supabase
-      .from('vehicles')
-      .select('id, year, make, model, sale_price, asking_price')
-      .gte('year', yearMin)
-      .lte('year', yearMax)
-      .in('make', ['Chevrolet', 'GMC', 'Chevy', 'chevrolet', 'gmc', 'chevy', 'Gmc'])
-      .limit(500);
+  if (error) throw error;
 
-    if (vError) throw vError;
+  const stats = data?.[0] ?? {};
+  const medianPrice = Number(stats.median_price || stats.avg_price || 0);
 
-    // Filter by model regex client-side
-    const regex = new RegExp(modelRegex, 'i');
-    const filtered = (vehicles || []).filter((v: any) => regex.test(v.model || ''));
-
-    const prices = filtered
-      .map((v: any) => v.sale_price || v.asking_price || 0)
-      .filter((p: number) => p > 0);
-
-    const avgPrice = prices.length > 0
-      ? prices.reduce((sum: number, p: number) => sum + p, 0) / prices.length
-      : 0;
-
-    return {
-      index_code: index.index_code,
-      index_name: index.index_name,
-      value: Math.round(avgPrice),
-      count: filtered.length,
-      metadata: {
-        avg_price: Math.round(avgPrice),
-        min_price: prices.length > 0 ? Math.min(...prices) : 0,
-        max_price: prices.length > 0 ? Math.max(...prices) : 0,
-        sample_size: filtered.length,
-        year_range: `${yearMin}-${yearMax}`,
-        calculation_date: date
-      }
-    };
-  }
-
-  // Use RPC result
-  const stats = Array.isArray(data) && data.length > 0 ? data[0] : data;
   return {
     index_code: index.index_code,
     index_name: index.index_name,
-    value: Math.round(Number(stats?.avg_price || 0)),
-    count: Number(stats?.count || 0),
+    value: Math.round(medianPrice),
+    count: Number(stats.count || 0),
     metadata: {
-      avg_price: Math.round(Number(stats?.avg_price || 0)),
-      min_price: Number(stats?.min_price || 0),
-      max_price: Number(stats?.max_price || 0),
-      sample_size: Number(stats?.count || 0),
+      median_price: medianPrice,
+      avg_price: Number(stats.avg_price || 0),
+      min_price: Number(stats.min_price || 0),
+      max_price: Number(stats.max_price || 0),
+      std_dev: Number(stats.std_dev || 0),
+      sample_size: Number(stats.count || 0),
       year_range: `${yearMin}-${yearMax}`,
+      model_filter: modelRegex,
+      source: 'clean_vehicle_prices',
       calculation_date: date
     }
   };
@@ -254,100 +208,94 @@ async function calculateSquarebody50(
   index: any,
   date: string
 ): Promise<IndexCalculationResult> {
-  // Get top 50 squarebody trucks with recent prices
-  // Years: 1973-1991, Makes: Chevrolet/GMC, Models: C10/C20/K10/K20 etc.
-
-  const { data: vehicles, error } = await supabase
-    .from('vehicles')
-    .select('id, year, make, model, sale_price, asking_price, created_at')
-    .gte('year', 1973)
-    .lte('year', 1991)
-    .in('make', ['Chevrolet', 'GMC'])
-    .not('sale_price', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(200); // Get more to filter and rank
+  const { data, error } = await supabase.rpc('execute_sql', {
+    query: `
+      WITH ranked AS (
+        SELECT best_price
+        FROM clean_vehicle_prices
+        WHERE UPPER(make) IN ('CHEVROLET', 'GMC')
+          AND year BETWEEN 1973 AND 1991
+          AND model ~* '(c10|c20|c30|k10|k20|k30|blazer|suburban|jimmy|sierra|silverado|scottsdale|cheyenne|pickup)'
+          AND is_sold = true
+        ORDER BY updated_at DESC
+        LIMIT 50
+      )
+      SELECT
+        count(*) AS count,
+        ROUND(avg(best_price)::numeric, 0) AS avg_price,
+        ROUND(percentile_cont(0.50) WITHIN GROUP (ORDER BY best_price)::numeric, 0) AS median_price,
+        ROUND(min(best_price)::numeric, 0) AS min_price,
+        ROUND(max(best_price)::numeric, 0) AS max_price
+      FROM ranked
+    `
+  });
 
   if (error) throw error;
 
-  // Filter to C/K models and sort by price
-  const squarebodies = (vehicles || [])
-    .filter((v: any) => {
-      const model = (v.model || '').toUpperCase();
-      return model.includes('C10') || model.includes('C20') || model.includes('C30') ||
-             model.includes('K10') || model.includes('K20') || model.includes('K30') ||
-             model.includes('BLAZER') || model.includes('SUBURBAN');
-    })
-    .slice(0, 50);
-
-  // Calculate average price as index value
-  const prices = squarebodies
-    .map((v: any) => v.sale_price || v.asking_price || 0)
-    .filter((p: number) => p > 0);
-
-  const avgPrice = prices.length > 0
-    ? prices.reduce((sum: number, p: number) => sum + p, 0) / prices.length
-    : 0;
-
-  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-  const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+  const stats = data?.[0] ?? {};
+  const medianPrice = Number(stats.median_price || stats.avg_price || 0);
 
   return {
     index_code: index.index_code,
     index_name: index.index_name,
-    value: Math.round(avgPrice),
-    count: squarebodies.length,
+    value: Math.round(medianPrice),
+    count: Number(stats.count || 0),
     metadata: {
-      avg_price: Math.round(avgPrice),
-      min_price: minPrice,
-      max_price: maxPrice,
-      sample_size: squarebodies.length,
-      price_range: maxPrice - minPrice,
+      median_price: medianPrice,
+      avg_price: Number(stats.avg_price || 0),
+      min_price: Number(stats.min_price || 0),
+      max_price: Number(stats.max_price || 0),
+      sample_size: Number(stats.count || 0),
+      source: 'clean_vehicle_prices (top 50 recent sold)',
       calculation_date: date
     }
   };
 }
 
 /**
- * CLSC-100: Top 100 classic vehicles by value
+ * CLSC-100: Top 100 classic vehicles by value — uses clean_vehicle_prices
  */
 async function calculateClassic100(
   supabase: any,
   index: any,
   date: string
 ): Promise<IndexCalculationResult> {
-  // Get top 100 highest-value classic vehicles (pre-1996)
-
-  const { data: vehicles, error } = await supabase
-    .from('vehicles')
-    .select('id, year, make, model, sale_price, asking_price')
-    .lte('year', 1995)
-    .not('sale_price', 'is', null)
-    .order('sale_price', { ascending: false })
-    .limit(100);
+  const { data, error } = await supabase.rpc('execute_sql', {
+    query: `
+      WITH top100 AS (
+        SELECT best_price
+        FROM clean_vehicle_prices
+        WHERE year <= 1995
+          AND is_sold = true
+        ORDER BY best_price DESC
+        LIMIT 100
+      )
+      SELECT
+        count(*) AS count,
+        ROUND(avg(best_price)::numeric, 0) AS avg_price,
+        ROUND(percentile_cont(0.50) WITHIN GROUP (ORDER BY best_price)::numeric, 0) AS median_price,
+        ROUND(min(best_price)::numeric, 0) AS min_price,
+        ROUND(max(best_price)::numeric, 0) AS max_price
+      FROM top100
+    `
+  });
 
   if (error) throw error;
 
-  const prices = (vehicles || [])
-    .map((v: any) => v.sale_price || v.asking_price || 0)
-    .filter((p: number) => p > 0);
-
-  const avgPrice = prices.length > 0
-    ? prices.reduce((sum: number, p: number) => sum + p, 0) / prices.length
-    : 0;
-
-  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-  const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+  const stats = data?.[0] ?? {};
 
   return {
     index_code: index.index_code,
     index_name: index.index_name,
-    value: Math.round(avgPrice),
-    count: vehicles?.length || 0,
+    value: Math.round(Number(stats.avg_price || 0)),
+    count: Number(stats.count || 0),
     metadata: {
-      avg_price: Math.round(avgPrice),
-      min_price: minPrice,
-      max_price: maxPrice,
-      sample_size: vehicles?.length || 0,
+      avg_price: Number(stats.avg_price || 0),
+      median_price: Number(stats.median_price || 0),
+      min_price: Number(stats.min_price || 0),
+      max_price: Number(stats.max_price || 0),
+      sample_size: Number(stats.count || 0),
+      source: 'clean_vehicle_prices (top 100 sold classics)',
       calculation_date: date
     }
   };
@@ -361,23 +309,13 @@ async function calculateProjectActivity(
   index: any,
   date: string
 ): Promise<IndexCalculationResult> {
-  // Count recent listings with project/build keywords
-
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const { data: recentProjects, error } = await supabase
-    .from('vehicles')
-    .select('id, title, description, created_at')
-    .gte('created_at', thirtyDaysAgo.toISOString())
-    .or('title.ilike.%project%,title.ilike.%restore%,title.ilike.%build%,title.ilike.%custom%,description.ilike.%project%,description.ilike.%restore%');
+  const { data, error } = await supabase.rpc('execute_sql', {
+    query: `SELECT count(*) AS count FROM vehicles WHERE deleted_at IS NULL AND created_at >= NOW() - INTERVAL '30 days' AND (title ILIKE '%project%' OR title ILIKE '%restore%' OR title ILIKE '%build%' OR title ILIKE '%custom%')`
+  });
 
   if (error) throw error;
 
-  const count = recentProjects?.length || 0;
-
-  // Activity score: normalized count (higher = more activity)
-  // Scale: 0-100, where 50 = baseline activity
+  const count = Number(data?.[0]?.count || 0);
   const activityScore = Math.min(100, (count / 10) * 100);
 
   return {
@@ -402,39 +340,26 @@ async function calculateMarketVelocity(
   index: any,
   date: string
 ): Promise<IndexCalculationResult> {
-  // Calculate overall market velocity based on recent activity
+  const { data, error } = await supabase.rpc('execute_sql', {
+    query: `
+      SELECT
+        count(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS recent_count,
+        count(*) FILTER (WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days') AS previous_count
+      FROM vehicles
+      WHERE deleted_at IS NULL
+        AND created_at >= NOW() - INTERVAL '14 days'
+    `
+  });
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  if (error) throw error;
 
-  const fourteenDaysAgo = new Date();
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const recentCount = Number(data?.[0]?.recent_count || 0);
+  const previousCount = Number(data?.[0]?.previous_count || 0);
 
-  // Get listings from last 7 days
-  const { data: recentListings, error: recentError } = await supabase
-    .from('vehicles')
-    .select('id, sale_price, asking_price, created_at')
-    .gte('created_at', sevenDaysAgo.toISOString());
-
-  // Get listings from 7-14 days ago
-  const { data: previousListings, error: prevError } = await supabase
-    .from('vehicles')
-    .select('id, sale_price, asking_price, created_at')
-    .gte('created_at', fourteenDaysAgo.toISOString())
-    .lt('created_at', sevenDaysAgo.toISOString());
-
-  if (recentError) throw recentError;
-  if (prevError) throw prevError;
-
-  const recentCount = recentListings?.length || 0;
-  const previousCount = previousListings?.length || 0;
-
-  // Calculate velocity as percentage change in activity
   const velocity = previousCount > 0
     ? ((recentCount - previousCount) / previousCount) * 100
     : 0;
 
-  // Normalize to 0-100 scale (50 = no change, >50 = increasing, <50 = decreasing)
   const velocityScore = Math.max(0, Math.min(100, 50 + velocity));
 
   return {
@@ -468,7 +393,7 @@ async function storeIndexValue(
       index_id: indexId,
       value_date: date,
       close_value: calculation.value,
-      open_value: calculation.value, // For now, same as close
+      open_value: calculation.value,
       high_value: calculation.value,
       low_value: calculation.value,
       volume: calculation.count,
