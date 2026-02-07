@@ -3049,12 +3049,19 @@ const CursorHomepage: React.FC = () => {
             q = q.neq('status', 'pending');
           }
           q = q.neq('status', 'deleted');
-          
+
+          // Only show vehicles with images by default (hides ~550k incomplete records)
+          q = q.not('primary_image_url', 'is', null);
+
+          // Only show vehicles with valid year/make/model
+          q = q.not('year', 'is', null);
+          q = q.not('make', 'is', null);
+
           if (listingKindSupportedRef.current) {
             q = q.eq('listing_kind', 'vehicle');
           }
           // Source filtering handled client-side in applyFiltersAndSort
-          
+
           // === SERVER-SIDE FILTERS (the critical fix) ===
           // Year filters
           if (filters.yearMin) {
