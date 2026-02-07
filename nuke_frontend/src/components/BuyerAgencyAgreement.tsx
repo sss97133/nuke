@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import {
   COMMISSION_TIERS,
-  CommissionTier,
+  type CommissionTier,
   formatCommissionRate,
   formatCurrencyFromCents,
   getCommissionRate,
