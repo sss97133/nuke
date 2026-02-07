@@ -225,8 +225,10 @@ class MarketplaceMonitor {
           if (this.seenListings.has(id)) continue;
 
           const textContent = await link.textContent() || '';
-          const priceMatch = textContent.match(/\$[\d,]+/);
-          const price = priceMatch ? parseInt(priceMatch[0].replace(/[$,]/g, '')) : null;
+          // Use comma-formatted regex to avoid grabbing year digits
+          // e.g. "$4,5001986 Ford" → match "$4,500" not "$4,5001986"
+          const priceMatch = textContent.match(/\$(\d{1,3}(?:,\d{3})*)/);
+          const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, ''), 10) : null;
 
           const imgElement = await link.$('img');
           const imageUrl = imgElement ? await imgElement.getAttribute('src') : null;
@@ -575,10 +577,20 @@ class MarketplaceMonitor {
     const year = listing.parsedYear || parseYearFromTitle(listing.title);
 
     try {
+      // Use cleanPrice (from enhanced parser) over raw price, with sanity bounds
+      let finalPrice = listing.cleanPrice || listing.price;
+      if (finalPrice !== null && finalPrice !== undefined) {
+        // Sanity check: FB marketplace vehicles $50 - $500k
+        if (finalPrice < 50 || finalPrice > 500000) {
+          console.log(`   ⚠️ Suspicious price $${finalPrice} for "${listing.title?.slice(0, 50)}" - nullifying`);
+          finalPrice = null;
+        }
+      }
+
       const data: any = {
         facebook_id: listing.id,
         title: listing.title,
-        price: listing.cleanPrice || listing.price,
+        price: finalPrice,
         location: listing.location,
         url: listing.url,
         image_url: listing.imageUrl,
@@ -614,7 +626,7 @@ class MarketplaceMonitor {
         const make = listing.parsedMake || '';
         const model = listing.parsedModel || '';
         const fbUrl = listing.url;
-        const price = listing.cleanPrice || listing.price;
+        const price = finalPrice;
 
         // Check if vehicle already exists for this FB URL
         const { data: existing } = await supabase
@@ -778,8 +790,10 @@ class MarketplaceMonitor {
           if (this.seenListings.has(id)) continue;
 
           const textContent = await link.textContent() || '';
-          const priceMatch = textContent.match(/\$[\d,]+/);
-          const price = priceMatch ? parseInt(priceMatch[0].replace(/[$,]/g, '')) : null;
+          // Use comma-formatted regex to avoid grabbing year digits
+          // e.g. "$4,5001986 Ford" → match "$4,500" not "$4,5001986"
+          const priceMatch = textContent.match(/\$(\d{1,3}(?:,\d{3})*)/);
+          const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, ''), 10) : null;
 
           const imgElement = await link.$('img');
           const imageUrl = imgElement ? await imgElement.getAttribute('src') : null;
@@ -832,11 +846,17 @@ class MarketplaceMonitor {
     for (const query of config.SEARCH_QUERIES) {
       const listings = await this.searchMarketplace(query);
       for (const listing of listings) {
-        const saved = await this.saveListing(listing);
+        // DEEP EXTRACT: Visit listing page and grab seller, description, all images
+        const fullListing = await this.extractFullDetails(listing);
+
+        const saved = await this.saveListing(fullListing);
         if (saved) {
-          await this.sendAlert(listing);
+          await this.sendAlert(fullListing);
           totalNew++;
         }
+
+        // Delay between listing extractions
+        await this.sleep(1500 + Math.random() * 1500);
       }
       await this.sleep(2000 + Math.random() * 3000);
     }

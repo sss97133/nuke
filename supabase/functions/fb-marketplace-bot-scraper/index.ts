@@ -283,46 +283,47 @@ async function fetchWithBot(url: string): Promise<string> {
 
 /**
  * Extract listings from HTML response
+ * Uses context-aware matching: for each title, finds the nearest ID and price
+ * in the surrounding HTML to avoid positional misalignment.
  */
 function extractListings(html: string): ExtractedListing[] {
   const listings: ExtractedListing[] = [];
   const seenIds = new Set<string>();
 
-  // Strategy: Find blocks containing listing data
-  // Pattern: "id":"123456789"..."marketplace_listing_title":"Title"..."amount_with_offset_in_currency":"12345"
-
-  // Extract all titles with context
   const titleRegex = /"marketplace_listing_title":"([^"]+)"/g;
-  const priceRegex = /"amount_with_offset_in_currency":"(\d+)"/g;
-  const idRegex = /"id":"(\d{10,})"/g;
-
-  // Collect all matches
-  const titles: string[] = [];
-  const prices: number[] = [];
-  const ids: string[] = [];
-
   let match;
+
   while ((match = titleRegex.exec(html)) !== null) {
-    titles.push(match[1]);
-  }
-  while ((match = priceRegex.exec(html)) !== null) {
-    prices.push(parseInt(match[1]) / 100); // Convert cents to dollars
-  }
-  while ((match = idRegex.exec(html)) !== null) {
-    ids.push(match[1]);
-  }
+    const rawTitle = match[1];
+    const titlePos = match.index;
 
-  console.log(`Raw: ${titles.length} titles, ${prices.length} prices, ${ids.length} IDs`);
+    // Search for ID and price within a reasonable window around the title
+    // FB JSON blocks keep these fields within ~2000 chars of each other
+    const windowStart = Math.max(0, titlePos - 2000);
+    const windowEnd = Math.min(html.length, titlePos + 2000);
+    const contextBlock = html.substring(windowStart, windowEnd);
 
-  // Match titles with prices (they appear in order in the HTML)
-  for (let i = 0; i < titles.length; i++) {
-    const title = decodeUnicodeEscapes(titles[i]);
-    const price = prices[i] || null;
-    const id = ids[i] || `unknown-${i}`;
+    // Find the nearest listing ID (10+ digit number) in context
+    const idMatch = contextBlock.match(/"id":"(\d{10,})"/);
+    const id = idMatch ? idMatch[1] : `unknown-${listings.length}`;
 
     if (seenIds.has(id)) continue;
     seenIds.add(id);
 
+    // Find the nearest price in context
+    const priceMatch = contextBlock.match(/"amount_with_offset_in_currency":"(\d+)"/);
+    // Read the offset from FB's JSON (defaults to 100 for USD = cents)
+    const offsetMatch = contextBlock.match(/"offset":(\d+)/);
+    const offset = offsetMatch ? parseInt(offsetMatch[1], 10) : 100;
+    let price = priceMatch ? parseInt(priceMatch[1], 10) / offset : null;
+
+    // Price sanity check: skip clearly invalid prices
+    if (price !== null && (price < 1 || price > 1000000)) {
+      console.warn(`Suspicious price $${price} for "${rawTitle}" - nullifying`);
+      price = null;
+    }
+
+    const title = decodeUnicodeEscapes(rawTitle);
     const parsed = parseVehicleTitle(title);
 
     listings.push({
@@ -339,6 +340,7 @@ function extractListings(html: string): ExtractedListing[] {
     });
   }
 
+  console.log(`Extracted ${listings.length} listings from HTML`);
   return listings;
 }
 

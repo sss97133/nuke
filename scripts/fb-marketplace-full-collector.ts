@@ -318,36 +318,52 @@ async function discoverListings(locationName: string): Promise<FoundListing[]> {
         return []; // No listings found
       }
 
-      // Parse listings
-      const titleMatches = html.match(/"marketplace_listing_title":"([^"]+)"/g) || [];
-      const priceMatches = html.match(/"amount_with_offset_in_currency":"(\d+)"/g) || [];
-      const idMatches = html.match(/"id":"(\d{10,})"/g) || [];
-
+      // Parse listings using context-aware matching
+      // Find each title and search nearby for its ID and price to avoid positional misalignment
       const listings: FoundListing[] = [];
       const seenIds = new Set<string>();
 
-      for (let i = 0; i < titleMatches.length; i++) {
-        const titleMatch = titleMatches[i].match(/"marketplace_listing_title":"([^"]+)"/);
-        const priceMatch = priceMatches[i]?.match(/"amount_with_offset_in_currency":"(\d+)"/);
-        const idMatch = idMatches[i]?.match(/"id":"(\d+)"/);
+      const titleRegex = /"marketplace_listing_title":"([^"]+)"/g;
+      let titleMatchResult;
 
-        if (titleMatch && idMatch && !seenIds.has(idMatch[1])) {
-          seenIds.add(idMatch[1]);
-          const title = decodeUnicode(titleMatch[1]);
-          const price = priceMatch ? parseInt(priceMatch[1]) / 100 : null;
-          const parsed = parseTitle(title);
+      while ((titleMatchResult = titleRegex.exec(html)) !== null) {
+        const title = decodeUnicode(titleMatchResult[1]);
+        const titlePos = titleMatchResult.index;
 
-          if (parsed.year && parsed.year >= CONFIG.YEAR_MIN && parsed.year <= CONFIG.YEAR_MAX) {
-            listings.push({
-              facebook_id: idMatch[1],
-              title,
-              price,
-              year: parsed.year,
-              make: parsed.make,
-              model: parsed.model,
-              url: `https://www.facebook.com/marketplace/item/${idMatch[1]}/`,
-            });
-          }
+        // Search for ID and price within a reasonable window around the title
+        const windowStart = Math.max(0, titlePos - 2000);
+        const windowEnd = Math.min(html.length, titlePos + 2000);
+        const contextBlock = html.substring(windowStart, windowEnd);
+
+        // Find the nearest listing ID (10+ digit number) in context
+        const idMatch = contextBlock.match(/"id":"(\d{10,})"/);
+        if (!idMatch || seenIds.has(idMatch[1])) continue;
+
+        // Find the nearest price in context
+        const priceMatch = contextBlock.match(/"amount_with_offset_in_currency":"(\d+)"/);
+        // Also check for offset field to handle non-USD currencies
+        const offsetMatch = contextBlock.match(/"offset":(\d+)/);
+        const offset = offsetMatch ? parseInt(offsetMatch[1], 10) : 100;
+        const price = priceMatch ? parseInt(priceMatch[1], 10) / offset : null;
+
+        // Price sanity check
+        if (price !== null && (price < 1 || price > 1000000)) {
+          console.warn(`  ⚠️ Suspicious price $${price} for "${title}" - skipping price`);
+        }
+
+        seenIds.add(idMatch[1]);
+        const parsed = parseTitle(title);
+
+        if (parsed.year && parsed.year >= CONFIG.YEAR_MIN && parsed.year <= CONFIG.YEAR_MAX) {
+          listings.push({
+            facebook_id: idMatch[1],
+            title,
+            price: (price !== null && price >= 1 && price <= 1000000) ? price : null,
+            year: parsed.year,
+            make: parsed.make,
+            model: parsed.model,
+            url: `https://www.facebook.com/marketplace/item/${idMatch[1]}/`,
+          });
         }
       }
 

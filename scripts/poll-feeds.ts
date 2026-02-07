@@ -317,6 +317,45 @@ function parseGenericHTML(html: string): FeedItem[] {
 }
 
 /**
+ * Parse KSL Cars search results HTML.
+ * Listings use aria-label for title and href for URL.
+ */
+function parseKSLHTML(html: string): FeedItem[] {
+  const items: FeedItem[] = [];
+  const seen = new Set<string>();
+
+  // Pattern: aria-label="TITLE" href="https://cars.ksl.com/listing/ID"
+  const regex = /aria-label="([^"]+)"\s+href="(https:\/\/cars\.ksl\.com\/listing\/\d+)"/gi;
+  let m;
+  while ((m = regex.exec(html)) !== null) {
+    const title = m[1];
+    const url = m[2];
+    if (seen.has(url)) continue;
+    seen.add(url);
+
+    // Parse price from nearby text
+    const afterIdx = m.index + m[0].length;
+    const afterText = html.slice(afterIdx, afterIdx + 500);
+    const priceMatch = afterText.match(/\$\s*([\d,]+)/);
+    const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, "")) : null;
+
+    const hints = parseVehicleFromTitle(title);
+
+    items.push({
+      title,
+      link: url,
+      published: null,
+      description: null,
+      price: price && price > 0 && price < 100_000_000 ? price : null,
+      imageUrl: null,
+      location: null,
+    });
+  }
+
+  return items;
+}
+
+/**
  * Decide how to parse the response based on feed source.
  */
 function parseFeedResponse(
@@ -329,6 +368,9 @@ function parseFeedResponse(
   }
   if (sourceSlug === "ebay") {
     return parseEbayHTML(body);
+  }
+  if (sourceSlug === "ksl") {
+    return parseKSLHTML(body);
   }
   // Try RSS first, fall back to generic HTML
   const rssItems = parseRSS(body);

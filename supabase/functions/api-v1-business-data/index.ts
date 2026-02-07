@@ -63,11 +63,11 @@ async function authenticateRequest(req: Request): Promise<{
 
     // Get user's business
     const { data: businessRole } = await supabase
-      .from("business_user_roles")
-      .select("business_id")
+      .from("organization_contributors")
+      .select("organization_id")
       .eq("user_id", keyData.user_id)
       .eq("status", "active")
-      .in("role_type", ["owner", "manager"])
+      .in("role", ["owner", "manager"])
       .single();
 
     // Update last used
@@ -78,7 +78,7 @@ async function authenticateRequest(req: Request): Promise<{
 
     return {
       userId: keyData.user_id,
-      businessId: businessRole?.business_id || null,
+      businessId: businessRole?.organization_id || null,
       error: null,
     };
   }
@@ -98,16 +98,16 @@ async function authenticateRequest(req: Request): Promise<{
 
     // Get user's business
     const { data: businessRole } = await supabase
-      .from("business_user_roles")
-      .select("business_id")
+      .from("organization_contributors")
+      .select("organization_id")
       .eq("user_id", user.id)
       .eq("status", "active")
-      .in("role_type", ["owner", "manager"])
+      .in("role", ["owner", "manager"])
       .single();
 
     return {
       userId: user.id,
-      businessId: businessRole?.business_id || null,
+      businessId: businessRole?.organization_id || null,
       error: null,
     };
   }
