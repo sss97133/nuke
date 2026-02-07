@@ -220,6 +220,236 @@ async function discoverUrls(
 }
 
 // ─── Phase 2: Extract structured data from each listing ──────────────────────
+/**
+ * Parse structured vehicle data from Broad Arrow listing markdown.
+ * 
+ * Consistent structure:
+ * - Title:  `# 2002 Ferrari 360 Spider`
+ * - Lot:    `Lot 161 \|`
+ * - Event:  next line after lot
+ * - Price:  `Sold Price:$2,205,000` or `Sold Price:€88.000` or `Not Sold` or `Estimate:...`
+ * - Images: `cdn.dealeraccelerate.com/bagauction/.../1920x1440/...`
+ * - Highlights: bullet points (lines starting with `- `)
+ * - Specialist: name + phone + email near bottom
+ */
+function parseMarkdown(markdown: string, url: string): ExtractedVehicle {
+  // ── Title ──
+  const titleMatch = markdown.match(/^#\s+(.+)$/m);
+  const rawTitle = titleMatch?.[1]?.trim() || null;
+
+  // ── Year / Make / Model from title ──
+  let year: number | null = null;
+  let make: string | null = null;
+  let model: string | null = null;
+  if (rawTitle) {
+    const ymm = rawTitle.match(/^(\d{4})\s+(\S+(?:\s+\S+)?)\s+(.+)$/);
+    if (ymm) {
+      year = parseInt(ymm[1], 10);
+      // Common multi-word makes
+      const multiWordMakes = [
+        "Alfa Romeo", "Aston Martin", "Austin Healey", "Austin-Healey",
+        "De La Chapelle", "Diamond T", "Dual-Ghia", "Frazer Nash",
+        "Graham-Paige", "Harley-Davidson", "Hispano Suiza", "Hispano-Suiza",
+        "Iso Grifo", "Isotta Fraschini", "Land Rover", "Mercedes-Benz",
+        "Mercedes-AMG", "Mercedes-Maybach", "Meyers Manx", "Nash-Healey",
+        "NSU Prinz", "Panhard et Levassor", "Pierce-Arrow", "Porsche-Diesel",
+        "Porsche-Kremer", "Rolls-Royce", "S.S. Cars Ltd.", "Talbot-Lago",
+        "De Tomaso", "DeTomaso",
+      ];
+      const rest = rawTitle.slice(5); // after "YYYY "
+      const foundMake = multiWordMakes.find((m) =>
+        rest.toLowerCase().startsWith(m.toLowerCase())
+      );
+      if (foundMake) {
+        make = foundMake;
+        model = rest.slice(foundMake.length).trim() || null;
+      } else {
+        const parts = rest.split(/\s+/);
+        make = parts[0] || null;
+        model = parts.slice(1).join(" ") || null;
+      }
+    } else {
+      const simpleYear = rawTitle.match(/^(\d{4})\s/);
+      if (simpleYear) year = parseInt(simpleYear[1], 10);
+    }
+  }
+
+  // ── Lot number ──
+  const lotMatch = markdown.match(/Lot\s+(\d+[A-Za-z]?)\s*\\?\|/);
+  const lotNumber = lotMatch?.[1] || null;
+
+  // ── Auction event ──
+  // Usually the line right after "Lot NNN |"
+  const eventMatch = markdown.match(/Lot\s+\d+[A-Za-z]?\s*\\?\|\s*\n+(.+)/);
+  const auctionEvent = eventMatch?.[1]?.trim().replace(/^\\n/, "").trim() || null;
+
+  // ── Sale price ──
+  // Formats: "Sold Price:$2,205,000" or "Sold Price:€88.000" or "Sold for $X"
+  let salePrice: number | null = null;
+  let sold = false;
+
+  // USD price
+  const usdMatch = markdown.match(/Sold\s*Price:\s*\$([0-9,]+)/);
+  if (usdMatch) {
+    salePrice = parseInt(usdMatch[1].replace(/,/g, ""), 10);
+    sold = true;
+  }
+
+  // EUR price (€88.000 format where . is thousands separator)
+  if (!salePrice) {
+    const eurMatch = markdown.match(/Sold\s*Price:\s*€([0-9.]+)/);
+    if (eurMatch) {
+      salePrice = parseInt(eurMatch[1].replace(/\./g, ""), 10);
+      sold = true;
+    }
+  }
+
+  // GBP price
+  if (!salePrice) {
+    const gbpMatch = markdown.match(/Sold\s*Price:\s*£([0-9,]+)/);
+    if (gbpMatch) {
+      salePrice = parseInt(gbpMatch[1].replace(/,/g, ""), 10);
+      sold = true;
+    }
+  }
+
+  // CHF price
+  if (!salePrice) {
+    const chfMatch = markdown.match(/Sold\s*Price:\s*CHF\s*([0-9',]+)/);
+    if (chfMatch) {
+      salePrice = parseInt(chfMatch[1].replace(/[',]/g, ""), 10);
+      sold = true;
+    }
+  }
+
+  // "Not Sold" check
+  if (!sold && markdown.includes("Not Sold")) {
+    sold = false;
+  }
+
+  // ── Estimate ──
+  let estimateLow: number | null = null;
+  let estimateHigh: number | null = null;
+  const estMatch = markdown.match(
+    /Estimate:\s*\$([0-9,]+)\s*[-–]\s*\$([0-9,]+)/
+  );
+  if (estMatch) {
+    estimateLow = parseInt(estMatch[1].replace(/,/g, ""), 10);
+    estimateHigh = parseInt(estMatch[2].replace(/,/g, ""), 10);
+  }
+
+  // ── Images ──
+  const cdnImages: string[] = [];
+  const imgRegex = /https:\/\/cdn\.dealeraccelerate\.com\/bagauction\/[^\s"')]+/g;
+  let imgMatch;
+  while ((imgMatch = imgRegex.exec(markdown)) !== null) {
+    let imgUrl = imgMatch[0];
+    // Clean up trailing chars
+    imgUrl = imgUrl.replace(/[)\]]+$/, "");
+    if (imgUrl.includes("1920x1440") && !cdnImages.includes(imgUrl)) {
+      cdnImages.push(imgUrl);
+    }
+  }
+
+  // ── Highlights (bullet points) ──
+  const highlights: string[] = [];
+  const bulletRegex = /^[-*]\s+(.+)$/gm;
+  let bulletMatch;
+  while ((bulletMatch = bulletRegex.exec(markdown)) !== null) {
+    const text = bulletMatch[1].trim();
+    // Filter out navigation items, keep vehicle highlights
+    if (
+      text.length > 20 &&
+      !text.startsWith("[") &&
+      !text.includes("Privacy") &&
+      !text.includes("Cookie") &&
+      !text.includes("ALL")
+    ) {
+      highlights.push(text);
+    }
+  }
+
+  // ── VIN / Chassis ──
+  const vinMatch = markdown.match(/VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i);
+  const chassisMatch = markdown.match(
+    /[Cc]hassis\s*(?:[Nn]o\.?|[Nn]umber)?[:\s]+([A-Za-z0-9\s-]+?)(?:\n|$)/
+  );
+
+  // ── Specialist ──
+  const specialistNameMatch = markdown.match(
+    /(?:Specialist|Contact|VP of|Director of|Senior Specialist)\s*\n+([A-Z][a-z]+ [A-Z][a-z]+)/
+  );
+  const emailMatch = markdown.match(
+    /\[([a-z.]+@(?:hagerty|broadarrow)[.\w]+)\]/
+  );
+  const phoneMatch = markdown.match(
+    /\[(\+?1?[-.]?\d{3}[-.]?\d{3}[-.]?\d{4})\]/
+  );
+
+  // ── History file ──
+  const historyMatch = markdown.match(
+    /https:\/\/www\.broadarrowauctions\.com\/files\/[^\s"')]+/
+  );
+
+  // ── Mileage ──
+  const mileageMatch = markdown.match(
+    /([0-9,]+)\s*(?:miles|mi\b|km\b|kilometers)/i
+  );
+  let mileage: number | null = null;
+  if (mileageMatch) {
+    mileage = parseInt(mileageMatch[1].replace(/,/g, ""), 10);
+  }
+
+  // ── Colors ──
+  const extColorMatch = markdown.match(
+    /(?:exterior|finish(?:ed)?|painted|color)[:\s]+(?:in\s+)?([A-Z][a-z]+(?: [A-Z][a-z]+)*(?:\s+(?:over|with|and)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)?)/i
+  );
+  const intColorMatch = markdown.match(
+    /(?:interior|upholster(?:y|ed)|trim)[:\s]+(?:in\s+)?([A-Z][a-z]+(?: [A-Z][a-z]+)*)/i
+  );
+
+  // ── Engine ──
+  const engineMatch = markdown.match(
+    /(\d[\d.,]+[-\s]*(?:liter|litre|L|cc|ci|cubic)[^\n]{0,80})/i
+  );
+
+  // ── Transmission ──
+  const transMatch = markdown.match(
+    /((?:\d[-\s]*speed\s+)?(?:manual|automatic|sequential|PDK|tiptronic|dual[- ]clutch|DCT|F1|semi-automatic)[^\n]{0,40})/i
+  );
+
+  return {
+    url,
+    title: rawTitle,
+    year,
+    make,
+    model,
+    vin: vinMatch?.[1] || null,
+    chassis_number: chassisMatch?.[1]?.trim() || null,
+    mileage,
+    exterior_color: extColorMatch?.[1]?.trim() || null,
+    interior_color: intColorMatch?.[1]?.trim() || null,
+    transmission: transMatch?.[1]?.trim() || null,
+    engine: engineMatch?.[1]?.trim() || null,
+    sale_price: salePrice,
+    estimate_low: estimateLow,
+    estimate_high: estimateHigh,
+    sold,
+    lot_number: lotNumber,
+    auction_event: auctionEvent,
+    auction_date: null, // Would need event page lookup
+    auction_location: null,
+    image_urls: cdnImages.slice(0, 20),
+    description: highlights.join(" | ") || null,
+    highlights,
+    history_file_url: historyMatch?.[0] || null,
+    specialist_name: specialistNameMatch?.[1] || null,
+    specialist_email: emailMatch?.[1] || null,
+    specialist_phone: phoneMatch?.[1] || null,
+    coachbuilder: null,
+  };
+}
+
 async function extractListing(
   url: string,
   firecrawlKey: string
@@ -233,128 +463,20 @@ async function extractListing(
       },
       body: JSON.stringify({
         url,
-        formats: [
-          "markdown",
-          {
-            type: "json",
-            prompt:
-              "Extract all vehicle auction data from this Broad Arrow Auctions listing page. " +
-              "Include year, make, model, VIN or chassis number, sale price, estimate range, " +
-              "lot number, auction event name, date, location, mileage, colors, engine, " +
-              "transmission, description highlights, whether it sold, coachbuilder, " +
-              "specialist contact info, image URLs (first 10 from CDN), and any history file PDF URLs.",
-            schema: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                year: { type: "number" },
-                make: { type: "string" },
-                model: { type: "string" },
-                vin: { type: "string" },
-                chassis_number: { type: "string" },
-                mileage: { type: "number" },
-                exterior_color: { type: "string" },
-                interior_color: { type: "string" },
-                transmission: { type: "string" },
-                engine: { type: "string" },
-                sale_price: { type: "number" },
-                estimate_low: { type: "number" },
-                estimate_high: { type: "number" },
-                sold: { type: "boolean" },
-                lot_number: { type: "string" },
-                auction_event: { type: "string" },
-                auction_date: { type: "string" },
-                auction_location: { type: "string" },
-                description: { type: "string" },
-                highlights: { type: "array", items: { type: "string" } },
-                coachbuilder: { type: "string" },
-                specialist_name: { type: "string" },
-                specialist_email: { type: "string" },
-                specialist_phone: { type: "string" },
-                history_file_url: { type: "string" },
-                image_urls: { type: "array", items: { type: "string" } },
-              },
-            },
-          },
-        ],
+        formats: ["markdown"],
         onlyMainContent: true,
       }),
     });
 
     const json = await resp.json();
-    const extracted = json.data?.json || {};
     const markdown = json.data?.markdown || "";
 
-    // Also extract image URLs from markdown if json extraction missed them
-    const cdnImages: string[] = [];
-    const imgRegex = /https:\/\/cdn\.dealeraccelerate\.com\/bagauction\/[^\s"')]+/g;
-    let match;
-    while ((match = imgRegex.exec(markdown)) !== null) {
-      const imgUrl = match[0].replace(/\.webp.*$/, ".webp");
-      if (imgUrl.includes("1920x1440") && !cdnImages.includes(imgUrl)) {
-        cdnImages.push(imgUrl);
-      }
+    if (!markdown || markdown.length < 100) {
+      console.error(`      ⚠️  Empty/short markdown for ${url}`);
+      return null;
     }
 
-    // Merge images: prefer extracted, supplement with CDN regex
-    const allImages = [...new Set([...(extracted.image_urls || []), ...cdnImages])].slice(0, 20);
-
-    // Parse year/make/model from title if not extracted
-    const titleMatch = (extracted.title || "")?.match(/^(\d{4})\s+(.+?)$/);
-    let year = extracted.year;
-    let make = extracted.make;
-    let model = extracted.model;
-
-    if (!year && titleMatch) {
-      year = parseInt(titleMatch[1], 10);
-    }
-
-    // Parse sale price from markdown if not extracted
-    let salePrice = extracted.sale_price;
-    if (!salePrice) {
-      const priceMatch = markdown.match(/Sold\s*Price:\s*\$([0-9,]+)/);
-      if (priceMatch) {
-        salePrice = parseInt(priceMatch[1].replace(/,/g, ""), 10);
-      }
-    }
-
-    // Parse lot number
-    let lotNumber = extracted.lot_number;
-    if (!lotNumber) {
-      const lotMatch = markdown.match(/Lot\s+(\d+[A-Za-z]?)\s/);
-      if (lotMatch) lotNumber = lotMatch[1];
-    }
-
-    return {
-      url,
-      title: extracted.title || null,
-      year: year || null,
-      make: make || null,
-      model: model || null,
-      vin: extracted.vin || null,
-      chassis_number: extracted.chassis_number || null,
-      mileage: extracted.mileage || null,
-      exterior_color: extracted.exterior_color || null,
-      interior_color: extracted.interior_color || null,
-      transmission: extracted.transmission || null,
-      engine: extracted.engine || null,
-      sale_price: salePrice || null,
-      estimate_low: extracted.estimate_low || null,
-      estimate_high: extracted.estimate_high || null,
-      sold: extracted.sold ?? (salePrice ? true : false),
-      lot_number: lotNumber || null,
-      auction_event: extracted.auction_event || null,
-      auction_date: extracted.auction_date || null,
-      auction_location: extracted.auction_location || null,
-      image_urls: allImages,
-      description: extracted.description || null,
-      highlights: extracted.highlights || [],
-      history_file_url: extracted.history_file_url || null,
-      specialist_name: extracted.specialist_name || null,
-      specialist_email: extracted.specialist_email || null,
-      specialist_phone: extracted.specialist_phone || null,
-      coachbuilder: extracted.coachbuilder || null,
-    };
+    return parseMarkdown(markdown, url);
   } catch (err: any) {
     console.error(`      ❌ Extract error for ${url}: ${err.message}`);
     return null;
@@ -367,6 +489,22 @@ async function insertToQueue(
   serviceKey: string
 ): Promise<boolean> {
   try {
+    // Check for existing entry by URL
+    const checkResp = await fetch(
+      `${supabaseUrl}/rest/v1/import_queue?listing_url=eq.${encodeURIComponent(vehicle.url)}&select=id`,
+      {
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+        },
+      }
+    );
+    const existing = checkResp.ok ? await checkResp.json() : [];
+    if (existing.length > 0) {
+      // Already in queue, skip
+      return true;
+    }
+
     const resp = await fetch(
       `${supabaseUrl}/rest/v1/import_queue`,
       {
@@ -375,24 +513,25 @@ async function insertToQueue(
           apikey: serviceKey,
           Authorization: `Bearer ${serviceKey}`,
           "Content-Type": "application/json",
-          Prefer: "return=minimal,resolution=merge-duplicates",
+          Prefer: "return=minimal",
         },
         body: JSON.stringify({
-          source_url: vehicle.url,
-          source_type: "broad_arrow",
+          listing_url: vehicle.url,
+          listing_title: vehicle.title,
+          listing_price: vehicle.sale_price,
+          listing_year: vehicle.year,
+          listing_make: vehicle.make,
+          listing_model: vehicle.model,
+          thumbnail_url: vehicle.image_urls[0] || null,
           status: "pending",
-          raw_data: vehicle,
-          title: vehicle.title,
-          year: vehicle.year,
-          make: vehicle.make,
-          model: vehicle.model,
-          vin: vehicle.vin || vehicle.chassis_number,
-          sale_price: vehicle.sale_price,
-          image_urls: vehicle.image_urls,
-          auction_source: "Broad Arrow",
-          lot_number: vehicle.lot_number,
-          auction_event: vehicle.auction_event,
-          created_at: new Date().toISOString(),
+          priority: 5,
+          raw_data: {
+            ...vehicle,
+            source: "broad_arrow",
+            auction_source: "Broad Arrow",
+            extractor: "backfill-broadarrow-full",
+            extracted_at: new Date().toISOString(),
+          },
         }),
       }
     );
