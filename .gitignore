@@ -128,3 +128,13 @@ extraction-agent
 
 # Playwright reports (generated)
 playwright-report/
+
+# Extraction data dumps (large JSON output from scrapers)
+data/conceptcarz/
+data/sources/*.json
+
+# Bot screenshots (auto-generated, not useful in repo)
+screenshots/bot-findings/
+
+# Ephemeral agent coordination files
+AGENT_COORDINATION.md
