@@ -79,14 +79,14 @@ const Login = () => {
 
             if (retryError) throw retryError;
             if (retryUser) {
-              console.log('Account created and login successful, navigating to vehicles');
+              // Account created and login successful
               const returnUrl = searchParams.get('returnUrl') || '/vehicles';
               navigate(returnUrl);
             }
           } else if (signInError) {
             throw signInError;
           } else if (user) {
-            console.log('Login successful, navigating to vehicles');
+            // Login successful
             const returnUrl = searchParams.get('returnUrl') || '/vehicles';
             navigate(returnUrl);
           }
@@ -130,7 +130,7 @@ const Login = () => {
           if (error) throw error;
 
           if (user) {
-            console.log('Phone authentication successful, navigating to vehicles');
+            // Phone auth successful
             const returnUrl = searchParams.get('returnUrl') || '/vehicles';
             navigate(returnUrl);
           }
@@ -206,8 +206,8 @@ const Login = () => {
         <div className="main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           <div style={{ width: '320px' }}>
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <h1 className="heading-1" style={{ marginBottom: '8px' }}>Nuke</h1>
-              <p className="text text-muted">Vehicle Digital Identity Platform</p>
+              <h1 className="heading-1" style={{ marginBottom: '8px' }}>n-zero</h1>
+              <p className="text text-muted">Collector Vehicle Intelligence</p>
             </div>
             
             

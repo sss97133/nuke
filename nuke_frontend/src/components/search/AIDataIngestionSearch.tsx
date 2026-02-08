@@ -252,10 +252,8 @@ export default function AIDataIngestionSearch() {
         setShowAutocomplete(combinedResults.length > 0 || !!response.ai_suggestion);
         setSelectedAutocompleteIndex(-1);
 
-        // Log search performance
-        console.log(`🔍 Search: "${trimmedInput}" → ${response.results.length} results in ${response.search_time_ms}ms`);
       } catch (error) {
-        console.error('Autocomplete error:', error);
+        // Autocomplete error - fail silently
         setAutocompleteResults([]);
         setAutocompleteAISuggestion(null);
         setAutocompleteTotalCount(null);
@@ -395,7 +393,7 @@ export default function AIDataIngestionSearch() {
             setCurrentVehicleData(vehicle);
           }
         } catch (error) {
-          console.warn('Failed to load vehicle data for critique:', error);
+          // Failed to load vehicle data for critique - ignore
         }
       } else {
         setCurrentVehicleData(null);
@@ -519,8 +517,6 @@ export default function AIDataIngestionSearch() {
     const normalizedUrl = normalizeUrlInput(rawText);
     const effectiveText = normalizedUrl || rawText;
 
-    console.log('processInput called', { input: effectiveText, hasImage: !!attachedImage, isProcessing });
-    
     if (!effectiveText && !attachedImage) {
       setError('Please enter text or attach an image');
       return;
@@ -691,8 +687,6 @@ export default function AIDataIngestionSearch() {
 
           if (matchingVehicleId) {
             // Found potential match - use image matching to verify
-            console.log(`Found potential match: ${matchingVehicleId}, verifying with image analysis...`);
-            
             const matchResult = await vehicleImageMatcher.matchListingToVehicle(
               matchingVehicleId,
               effectiveText,
@@ -768,7 +762,7 @@ export default function AIDataIngestionSearch() {
           setIsProcessing(false);
           return;
         } catch (err: any) {
-          console.error('URL matching error:', err);
+          // URL matching failed - fall through to normal flow
           // Fall through to normal flow
         }
       }
@@ -805,7 +799,7 @@ export default function AIDataIngestionSearch() {
         setShowPreview(true);
       }
     } catch (err: any) {
-      console.error('Processing error:', err);
+      // Processing error - fall back to basic search if possible
       // If AI services are down (Gateway/edge function), still allow basic search for text-only input.
       // This keeps "header search" usable even when extraction is unavailable.
       if (!attachedImage && input.trim()) {
@@ -881,7 +875,7 @@ export default function AIDataIngestionSearch() {
       setExtractionPreview(null);
       setShowPreview(false);
     } catch (err: any) {
-      console.error('Save error:', err);
+      // Save error
       setError(err.message || 'Failed to save data');
     } finally {
       setIsProcessing(false);
@@ -889,8 +883,6 @@ export default function AIDataIngestionSearch() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    console.log('handleKeyDown', { key: e.key, showAutocomplete, autocompleteResultsLength: autocompleteResults.length, selectedIndex: selectedAutocompleteIndex });
-    
     // Handle autocomplete navigation
     if (showAutocomplete && autocompleteResults.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -937,7 +929,6 @@ export default function AIDataIngestionSearch() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Enter pressed, processing input', { showPreview, input: input.trim() });
       if (!showPreview) {
         const trimmedInput = input.trim();
         const maybeUrl = normalizeUrlInput(trimmedInput);
@@ -1051,7 +1042,7 @@ export default function AIDataIngestionSearch() {
       showToast(createdVisible ? 'Organization created' : 'Organization found', createdVisible ? 'success' : 'info');
       navigate(`/org/${data.organization_id}`);
     } catch (err: any) {
-      console.error('Create org from URL error:', err);
+      // Create org from URL failed
       setError(err?.message || 'Failed to create organization from URL');
     } finally {
       setIsProcessing(false);
@@ -1407,7 +1398,6 @@ export default function AIDataIngestionSearch() {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('GO button clicked', { input: input.trim(), hasImage: !!attachedImage, isProcessing });
                 setActionsOpen(false);
                 setShowAutocomplete(false);
                 processInput();

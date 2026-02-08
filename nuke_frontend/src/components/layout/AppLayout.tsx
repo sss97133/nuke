@@ -428,7 +428,8 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       minWidth: '160px'
                     }}
                   >
-                    {/* Vehicles button - expands to right */}
+                    {/* Vehicles button - only for logged-in users */}
+                    {session && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -454,14 +455,20 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       <span>Vehicles</span>
                       <span style={{ fontSize: '7pt', marginLeft: '8px' }}>▶</span>
                     </button>
+                    )}
                     <Link to="/search" className={`nav-link ${isActivePage('/search') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Search</Link>
                     <Link to="/auctions" className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Auctions</Link>
                     <Link to={orgNavPath} className={`nav-link ${isActivePage('/org') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Organizations</Link>
+                    {session && (
+                    <>
                     <Link to="/invoices" className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Invoices</Link>
                     <Link to="/restoration" className={`nav-link ${isActivePage('/restoration') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Restoration Intake</Link>
+                    </>
+                    )}
                     <Link to="/market" className={`nav-link ${isActivePage('/market') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Market</Link>
+                    {session && (
                     <Link to="/market/contracts" className={`nav-link ${isActivePage('/market/contracts') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Contract Station</Link>
-                    <a href="https://n-zero.dev/" target="_blank" rel="noopener noreferrer" className="nav-link" style={{ display: 'block', padding: '8px 12px', textDecoration: 'none' }} onClick={() => setNZeroMenuOpen(false)}>n-zero</a>
+                    )}
                   </div>
 
                   {/* Vehicles panel - pops out to the RIGHT */}
