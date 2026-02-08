@@ -1,0 +1,22 @@
+{
+  "name": "@dealerscan/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "dealerscan": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@dealerscan/shared": "*",
+    "@supabase/supabase-js": "^2.75.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "~5.8.3"
+  }
+}

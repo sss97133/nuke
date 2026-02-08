@@ -1,0 +1,19 @@
+{
+  "name": "dealerscan",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/shared",
+    "packages/web",
+    "packages/desktop",
+    "packages/cli"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@dealerscan/web",
+    "dev:web": "npm run dev --workspace=@dealerscan/web",
+    "dev:desktop": "npm run dev --workspace=@dealerscan/desktop",
+    "build": "npm run build --workspace=@dealerscan/web",
+    "build:web": "npm run build --workspace=@dealerscan/web",
+    "build:desktop": "npm run make --workspace=@dealerscan/desktop"
+  }
+}

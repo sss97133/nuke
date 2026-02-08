@@ -1,0 +1,41 @@
+{
+  "name": "@dealerscan/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DealerScan Desktop - Batch process dealer jacket documents",
+  "main": ".vite/build/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dealerscan/shared": "*",
+    "@stripe/stripe-js": "^8.5.3",
+    "@supabase/supabase-js": "^2.75.0",
+    "electron-store": "^10.0.0",
+    "lucide-react": "^0.525.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.6.0"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.6.0",
+    "@electron-forge/maker-dmg": "^7.6.0",
+    "@electron-forge/maker-squirrel": "^7.6.0",
+    "@electron-forge/maker-zip": "^7.6.0",
+    "@electron-forge/plugin-vite": "^7.6.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.3.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.3",
+    "vite": "^6.4.1"
+  }
+}
