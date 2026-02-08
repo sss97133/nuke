@@ -92,7 +92,7 @@ serve(async (req) => {
  */
 async function scrapeBaTPrice(batUrl: string): Promise<BaTPriceData> {
   console.log(`  📡 Scraping: ${batUrl}`);
-  
+
   try {
     // Fetch the HTML page
     const response = await fetch(batUrl, {
@@ -111,29 +111,50 @@ async function scrapeBaTPrice(batUrl: string): Promise<BaTPriceData> {
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const title = titleMatch ? titleMatch[1] : '';
 
-    // Extract price from title: "sold for $11,000"
-    const priceMatch = title.match(/\$([\d,]+)/);
     const lotMatch = title.match(/Lot #([\d,]+)/);
     const dateMatch = title.match(/(\w+ \d+, \d{4})/);
 
-    // Try to find price in page content
-    let pagePrice = null;
-    const pricePatterns = [
-      /sold for \$([\d,]+)/i,
-      /final bid: \$([\d,]+)/i,
-      /\$([\d,]+)\s*(?:was|is|final)/i,
-    ];
+    // PRIORITY 1: JSON-LD "price" field (most reliable, machine-readable)
+    let price: number | null = null;
+    const jsonLdPrice = html.match(/"price"\s*:\s*(\d+)/);
+    if (jsonLdPrice) {
+      price = parseInt(jsonLdPrice[1], 10);
+      if (!Number.isFinite(price) || price <= 0) price = null;
+    }
 
-    for (const pattern of pricePatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        pagePrice = match[1].replace(/,/g, '');
-        break;
+    // PRIORITY 2: Extract price from title tag (e.g., "sold for $11,000")
+    if (!price) {
+      const priceMatch = title.match(/\$([\d,]+)/);
+      if (priceMatch) {
+        price = parseInt(priceMatch[1].replace(/,/g, ''), 10);
+        if (!Number.isFinite(price) || price <= 0) price = null;
       }
     }
 
-    const priceFromTitle = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : null;
-    const price = priceFromTitle || (pagePrice ? parseInt(pagePrice) : null);
+    // PRIORITY 3: Search ONLY the listing-stats table for sold/bid prices
+    // CRITICAL: Do NOT search the full HTML - user comments contain "sold for $X"
+    // patterns that pollute extraction (e.g., "should have sold for $160k")
+    if (!price) {
+      const statsTable = html.match(/<table[^>]*(?:id=["']listing-bid["']|class=["'][^"']*listing-stats[^"']*["'])[^>]*>[\s\S]*?<\/table>/i);
+      if (statsTable) {
+        const statsHtml = statsTable[0];
+        const pricePatterns = [
+          /Sold\s+(?:for|to)[\s\S]*?(?:USD\s*)?\$([\d,]+)/i,
+          /Winning\s+Bid[\s\S]*?(?:USD\s*)?\$([\d,]+)/i,
+          /High\s+Bid[\s\S]*?(?:USD\s*)?\$([\d,]+)/i,
+          /Current\s+Bid[\s\S]*?(?:USD\s*)?\$([\d,]+)/i,
+        ];
+        for (const pattern of pricePatterns) {
+          const match = statsHtml.match(pattern);
+          if (match) {
+            price = parseInt(match[1].replace(/,/g, ''), 10);
+            if (!Number.isFinite(price) || price <= 0) { price = null; continue; }
+            break;
+          }
+        }
+      }
+    }
+
     const lotNumber = lotMatch ? lotMatch[1].replace(/,/g, '') : null;
     const dateFromTitle = dateMatch ? dateMatch[1] : null;
 

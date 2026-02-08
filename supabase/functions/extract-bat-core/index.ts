@@ -1947,6 +1947,67 @@ serve(async (req) => {
       if (error) console.warn(`auction_events upsert failed (non-fatal): ${error.message}`);
     }
 
+    // bat_listings (BaT-specific auction data table)
+    if (vehicleId) {
+      const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
+      const endAtIso = essentials.auction_end_at ||
+        (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
+      const batListingPayload: any = {
+        vehicle_id: vehicleId,
+        bat_listing_url: listingUrlCanonical.endsWith('/') ? listingUrlCanonical : `${listingUrlCanonical}/`,
+        bat_lot_number: essentials.lot_number || null,
+        bat_listing_title: identity.title || null,
+        auction_end_date: essentials.auction_end_date || null,
+        sale_date: hasSale ? essentials.auction_end_date : null,
+        sale_price: hasSale ? essentials.sale_price : null,
+        final_bid: hasSale ? essentials.sale_price : (essentials.high_bid || null),
+        seller_username: essentials.seller_username || null,
+        buyer_username: hasSale ? (essentials.buyer_username || null) : null,
+        comment_count: essentials.comment_count || 0,
+        bid_count: essentials.bid_count || 0,
+        view_count: essentials.view_count || 0,
+        watcher_count: essentials.watcher_count || 0,
+        listing_status: hasSale ? 'sold' : (essentials.reserve_status === 'reserve_not_met' ? 'ended' : 'active'),
+        updated_at: new Date().toISOString(),
+      };
+
+      try {
+        // Check if bat_listings record exists for this URL (with or without trailing slash)
+        const urlWithSlash = listingUrlCanonical.endsWith('/') ? listingUrlCanonical : `${listingUrlCanonical}/`;
+        const urlWithoutSlash = listingUrlCanonical.endsWith('/') ? listingUrlCanonical.slice(0, -1) : listingUrlCanonical;
+
+        const { data: existingBatListing } = await supabase
+          .from("bat_listings")
+          .select("id")
+          .or(`bat_listing_url.eq.${urlWithSlash},bat_listing_url.eq.${urlWithoutSlash}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingBatListing?.id) {
+          // Update existing
+          const { error: batUpdateErr } = await supabase
+            .from("bat_listings")
+            .update(batListingPayload)
+            .eq("id", existingBatListing.id);
+          if (batUpdateErr) console.warn(`bat_listings update failed (non-fatal): ${batUpdateErr.message}`);
+        } else {
+          // Insert new
+          const { error: batInsertErr } = await supabase
+            .from("bat_listings")
+            .insert(batListingPayload);
+          if (batInsertErr) {
+            const code = String((batInsertErr as any)?.code || "");
+            // Ignore duplicate key violations (race condition with parallel extractors)
+            if (code !== "23505") {
+              console.warn(`bat_listings insert failed (non-fatal): ${batInsertErr.message}`);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn(`bat_listings write failed (non-fatal): ${e?.message || String(e)}`);
+      }
+    }
+
     // Save raw listing description history (for Description Entries UI)
     if (vehicleId && descriptionRaw) {
       await trySaveExtractionMetadata({

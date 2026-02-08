@@ -658,9 +658,10 @@ serve(async (req) => {
         .reduce((acc: number, n: number) => (n > acc ? n : acc), 0)
 
       // Safety net: If the core extractor didn't set final_price, infer it from the SOLD system comment.
+      // CRITICAL: Only use system-generated "sold" comments, NOT user comments that happen to contain
+      // "sold for" text. User comments like "should have sold for $160k" pollute price extraction.
       const soldCommentText =
         commentsWithIdentities.find((c: any) => String(c?.comment_type || '').toLowerCase() === 'sold')?.comment_text ||
-        commentsWithIdentities.find((c: any) => /\bsold\s+on\b|\bsold\s+for\b/i.test(String(c?.comment_text || '')))?.comment_text ||
         null
 
       const parseMoney = (raw: string | null): number | null => {
@@ -710,8 +711,16 @@ serve(async (req) => {
       // If we inferred SOLD (either from the system comment or from an existing external_listings.final_price),
       // persist it back into external_listings so the rest of the system (auctionPulse, header owner guess, etc.)
       // becomes consistent. Also ensure `current_bid` matches `final_price` for sold listings.
-      if (extListing?.id && inferredFinalPrice && inferredFinalPrice > 0) {
-        const existingStatus = String(extListing?.listing_status || '').toLowerCase()
+      //
+      // CRITICAL: Do NOT override extract-bat-core's determination. If the core extractor already
+      // set the listing status (especially "ended" for Reserve Not Met), don't downgrade to "sold"
+      // based on comment-inferred prices which can be polluted by user speculation.
+      const coreExtractorAlreadyRan = (extListing as any)?.metadata?.source === 'extract-bat-core'
+      const existingStatusFromCore = String(extListing?.listing_status || '').toLowerCase()
+      const coreSetEnded = coreExtractorAlreadyRan && existingStatusFromCore === 'ended'
+
+      if (extListing?.id && inferredFinalPrice && inferredFinalPrice > 0 && !coreSetEnded) {
+        const existingStatus = existingStatusFromCore
         const existingFinal =
           (typeof extListing?.final_price === 'number' && Number.isFinite(extListing.final_price) && extListing.final_price > 0)
             ? Math.floor(extListing.final_price)
