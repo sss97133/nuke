@@ -21,6 +21,10 @@ import UpdateSalePriceModal from '../../components/vehicle/UpdateSalePriceModal'
 import { FollowAuctionCard } from '../../components/auction/FollowAuctionCard';
 import OrganizationInvestmentCard from '../../components/organization/OrganizationInvestmentCard';
 import { CircularAvatar } from '../../components/common/CircularAvatar';
+import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
+import { useIsMobile } from '../../hooks/useIsMobile';
+import { MiniLineChart } from '../../components/charts/MiniLineChart';
+import type { DataSeries } from '../../components/charts/MiniLineChart';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -284,6 +288,80 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLocationDropdown, showOwnerClaimDropdown, showOwnerPopover, showAccessInfo]);
 
+  // Fetch data for Year/Make/Model/Seller/Auction popovers
+  useEffect(() => {
+    if (!activePopover || !vehicle) return;
+    let cancelled = false;
+    setPopoverLoading(true);
+    setPopoverData(null);
+
+    const fetchPopoverData = async () => {
+      try {
+        if (activePopover === 'year' && vehicle.year) {
+          const { data } = await supabase.rpc('get_year_market_stats', { p_year: vehicle.year }).maybeSingle();
+          if (!cancelled) setPopoverData(data || { year: vehicle.year });
+        } else if (activePopover === 'make' && vehicle.make) {
+          const { data } = await supabase.rpc('get_make_market_stats', { p_make: vehicle.make }).maybeSingle();
+          if (!cancelled) setPopoverData(data || { make: vehicle.make });
+        } else if (activePopover === 'model' && vehicle.make) {
+          const model = (vehicle as any)?.normalized_model || vehicle?.model;
+          const { data } = await supabase.rpc('get_model_market_stats', { p_make: vehicle.make, p_model: model || '' }).maybeSingle();
+          if (!cancelled) setPopoverData(data || { make: vehicle.make, model });
+        } else if (activePopover === 'seller') {
+          const sellerHandle = normalizePartyHandle(
+            (auctionPulse as any)?.seller_username ||
+            (auctionPulse as any)?.metadata?.seller_username ||
+            (auctionPulse as any)?.metadata?.seller ||
+            (vehicle as any)?.bat_seller ||
+            (vehicle as any)?.origin_metadata?.bat_seller ||
+            (vehicle as any)?.origin_metadata?.seller ||
+            null
+          );
+          if (sellerHandle) {
+            const { data: identity } = await supabase
+              .from('external_identities')
+              .select('id, platform, handle, proof_url, claimed_by, first_seen_at, last_seen_at')
+              .ilike('handle', sellerHandle)
+              .limit(1)
+              .maybeSingle();
+            const { count: auctionCount } = await supabase
+              .from('auction_events')
+              .select('id', { count: 'exact', head: true })
+              .or(`seller_username.ilike.%${sellerHandle}%`);
+            if (!cancelled) setPopoverData({
+              handle: sellerHandle,
+              identity,
+              auctionCount: auctionCount || 0,
+            });
+          } else {
+            if (!cancelled) setPopoverData({ handle: null });
+          }
+        } else if (activePopover === 'auction') {
+          const v = vehicle as any;
+          if (!cancelled) setPopoverData({
+            platform: v?.profile_origin || v?.discovery_source || (auctionPulse as any)?.platform,
+            listingUrl: (auctionPulse as any)?.listing_url || v?.bat_auction_url || v?.discovery_url || v?.listing_url,
+            bidCount: (auctionPulse as any)?.bid_count || v?.bid_count,
+            viewCount: (auctionPulse as any)?.view_count,
+            watcherCount: (auctionPulse as any)?.watcher_count,
+            commentCount: (auctionPulse as any)?.comment_count,
+            listingStatus: (auctionPulse as any)?.listing_status || v?.auction_outcome,
+            currentBid: (auctionPulse as any)?.current_bid,
+            finalPrice: (auctionPulse as any)?.final_price,
+          });
+        }
+      } catch (err) {
+        console.warn('Popover data fetch failed:', err);
+        if (!cancelled) setPopoverData({});
+      } finally {
+        if (!cancelled) setPopoverLoading(false);
+      }
+    };
+
+    fetchPopoverData();
+    return () => { cancelled = true; };
+  }, [activePopover, vehicle, auctionPulse]);
+
   // Derive current owner (best guess) from BaT data
   const ownerGuess = useMemo(() => {
     const v = vehicle as any;
@@ -471,44 +549,53 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const v = vehicle as any;
     const city = v?.city;
     const state = v?.state;
+    const zip = v?.zip_code;
     const country = v?.country;
     const batLoc = v?.bat_location;
     const listingLoc = v?.listing_location || v?.listing_location_raw;
-    
-    // City code mappings for major metro areas
-    const cityCodes: Record<string, string> = {
-      'atlanta': 'ATL', 'los angeles': 'LAX', 'new york': 'NYC', 'chicago': 'CHI',
-      'miami': 'MIA', 'dallas': 'DFW', 'houston': 'HOU', 'phoenix': 'PHX',
-      'san francisco': 'SFO', 'seattle': 'SEA', 'denver': 'DEN', 'boston': 'BOS',
-      'detroit': 'DTW', 'minneapolis': 'MSP', 'san diego': 'SAN', 'las vegas': 'LAS',
-      'portland': 'PDX', 'austin': 'AUS', 'nashville': 'BNA', 'charlotte': 'CLT',
-      'raleigh': 'RDU', 'tampa': 'TPA', 'orlando': 'MCO', 'philadelphia': 'PHL',
-      'pittsburgh': 'PIT', 'cleveland': 'CLE', 'cincinnati': 'CVG', 'st louis': 'STL',
-      'kansas city': 'MCI', 'indianapolis': 'IND', 'columbus': 'CMH', 'milwaukee': 'MKE',
-      'salt lake city': 'SLC', 'sacramento': 'SMF', 'san jose': 'SJC', 'san antonio': 'SAT',
+
+    // Extract state from bat_location if needed
+    const extractState = (loc: string) => {
+      const m = loc.match(/,\s*([A-Z]{2})\b/);
+      return m ? m[1] : null;
     };
-    
-    // Best: city code if major metro
-    if (city) {
-      const code = cityCodes[city.toLowerCase()];
-      if (code) return { short: code, full: `${city}, ${state || ''}`.trim() };
+
+    const resolvedState = state && state !== ':' && state.length <= 3 ? state : (
+      batLoc ? extractState(batLoc) : listingLoc ? extractState(listingLoc) : null
+    );
+
+    // Build responsive levels: full → medium → compact → minimal
+    if (zip && city && resolvedState) {
+      return {
+        short: `${zip} ${resolvedState}`,
+        full: `${zip} ${city}, ${resolvedState}`,
+        compact: zip,
+        minimal: resolvedState,
+      };
     }
-    // Next: state abbreviation (but skip if it's corrupted data like ":")
-    if (state && state !== ':' && state.length <= 3) return { short: state, full: city ? `${city}, ${state}` : state };
-    // Fallback: bat_location or listing_location (extract state if possible)
+    if (zip && resolvedState) {
+      return { short: `${zip} ${resolvedState}`, full: `${zip} ${resolvedState}`, compact: zip, minimal: resolvedState };
+    }
+    if (zip) {
+      return { short: zip, full: zip, compact: zip, minimal: zip };
+    }
+    if (city && resolvedState) {
+      return { short: `${city}, ${resolvedState}`, full: `${city}, ${resolvedState}`, compact: resolvedState, minimal: resolvedState };
+    }
+    if (resolvedState) {
+      return { short: resolvedState, full: resolvedState, compact: resolvedState, minimal: resolvedState };
+    }
     if (batLoc && batLoc !== 'United States') {
-      const stateMatch = batLoc.match(/,\s*([A-Z]{2})\b/);
-      return { short: stateMatch ? stateMatch[1] : batLoc.slice(0, 3).toUpperCase(), full: batLoc };
+      return { short: batLoc, full: batLoc, compact: batLoc.slice(0, 5), minimal: batLoc.slice(0, 2).toUpperCase() };
     }
     if (listingLoc) {
-      const stateMatch = listingLoc.match(/,\s*([A-Z]{2})\b/);
-      return { short: stateMatch ? stateMatch[1] : listingLoc.slice(0, 3).toUpperCase(), full: listingLoc };
+      return { short: listingLoc, full: listingLoc, compact: listingLoc.slice(0, 5), minimal: listingLoc.slice(0, 2).toUpperCase() };
     }
-    // Country only
-    if (country && country !== 'USA' && country !== 'US') return { short: country.slice(0, 3).toUpperCase(), full: country };
-    
+    if (country && country !== 'USA' && country !== 'US') {
+      return { short: country.slice(0, 3).toUpperCase(), full: country, compact: country.slice(0, 3).toUpperCase(), minimal: country.slice(0, 2).toUpperCase() };
+    }
     return null;
-  }, [(vehicle as any)?.city, (vehicle as any)?.state, (vehicle as any)?.country, (vehicle as any)?.bat_location, (vehicle as any)?.listing_location]);
+  }, [(vehicle as any)?.city, (vehicle as any)?.state, (vehicle as any)?.country, (vehicle as any)?.bat_location, (vehicle as any)?.listing_location, (vehicle as any)?.zip_code]);
   
   // Cycle through trend periods
   const toggleTrendPeriod = (e: React.MouseEvent) => {
@@ -544,6 +631,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [futureAuctionListing, setFutureAuctionListing] = useState<any | null>(null);
   const [showOrgInvestmentCard, setShowOrgInvestmentCard] = useState<string | null>(null);
   const [orgCardAnchor, setOrgCardAnchor] = useState<HTMLElement | null>(null);
+  const [activePopover, setActivePopover] = useState<'year' | 'make' | 'model' | 'seller' | 'auction' | null>(null);
+  const [popoverData, setPopoverData] = useState<any>(null);
+  const [popoverLoading, setPopoverLoading] = useState(false);
+  const isMobile = useIsMobile();
+  const titleRef = useRef<HTMLDivElement>(null);
+  const sellerPopoverRef = useRef<HTMLDivElement>(null);
+  const auctionPopoverRef = useRef<HTMLDivElement>(null);
 
   const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
   // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
@@ -2521,11 +2615,263 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         paddingBottom: 2,
         position: 'static'
       }}>
-        {/* 1. Title */}
-        <div style={{ flex: '0 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-            {identityLabel}
-          </span>
+        {/* 1. Title — clickable Year / Make / Model segments */}
+        <div ref={titleRef} style={{ flex: '0 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'center', position: 'relative' }}>
+          {vehicle?.year && (
+            <span
+              onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'year' ? null : 'year'); }}
+              style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 0.15s' }}
+              onMouseEnter={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'var(--text-muted)'; }}
+              onMouseLeave={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'transparent'; }}
+            >
+              {vehicle.year}
+            </span>
+          )}
+          {vehicle?.make && (
+            <span
+              onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'make' ? null : 'make'); }}
+              style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 0.15s' }}
+              onMouseEnter={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'var(--text-muted)'; }}
+              onMouseLeave={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'transparent'; }}
+            >
+              {vehicle.make}
+            </span>
+          )}
+          {displayModel && (
+            <span
+              onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'model' ? null : 'model'); }}
+              style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 0.15s', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}
+              onMouseEnter={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'var(--text-muted)'; }}
+              onMouseLeave={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'transparent'; }}
+            >
+              {cleanedModelForHeader}
+            </span>
+          )}
+          {(vehicle as any)?.series && (
+            <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              {(vehicle as any).series}
+            </span>
+          )}
+          {!vehicle?.year && !vehicle?.make && !displayModel && (
+            <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap' }}>{identityLabel}</span>
+          )}
+
+          {/* Year Popup */}
+          <HeaderPopover
+            open={activePopover === 'year'}
+            onClose={() => setActivePopover(null)}
+            title={`${vehicle?.year || ''} Vehicles`}
+            width={320}
+          >
+            {popoverLoading ? (
+              <div style={{ color: 'var(--text-muted)' }}>Loading year data...</div>
+            ) : popoverData ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: '10pt' }}>{vehicle?.year} Market Overview</div>
+                {popoverData.avg_price != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Market Stats</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Total listings</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
+                    </div>
+                    {popoverData.median_price != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Median price</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.median_price)}</span>
+                      </div>
+                    )}
+                    {popoverData.sell_through_pct != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Sell-through</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {popoverData.top_makes && Array.isArray(popoverData.top_makes) && popoverData.top_makes.length > 0 && (
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Top Makes</div>
+                    {popoverData.top_makes.slice(0, 3).map((m: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
+                        <span>{m.make || m.name}</span>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>{m.count || m.volume}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!popoverData.avg_price && (
+                  <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    No aggregated market data available yet for {vehicle?.year} vehicles.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-muted)' }}>No data available</div>
+            )}
+          </HeaderPopover>
+
+          {/* Make Popup */}
+          <HeaderPopover
+            open={activePopover === 'make'}
+            onClose={() => setActivePopover(null)}
+            title={vehicle?.make || 'Make'}
+            width={320}
+          >
+            {popoverLoading ? (
+              <div style={{ color: 'var(--text-muted)' }}>Loading make data...</div>
+            ) : popoverData ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: '10pt' }}>{vehicle?.make} Market Overview</div>
+                {popoverData.avg_price != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Make Stats</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Total listed</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
+                    </div>
+                    {popoverData.median_price != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Median price</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.median_price)}</span>
+                      </div>
+                    )}
+                    {popoverData.sell_through_pct != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Sell-through</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {popoverData.top_models && Array.isArray(popoverData.top_models) && popoverData.top_models.length > 0 && (
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Top Models by Volume</div>
+                    {popoverData.top_models.slice(0, 5).map((m: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
+                        <span>{m.model || m.name}</span>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                          {m.avg_price ? formatCurrency(m.avg_price) : ''} {m.count ? `(${m.count})` : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!popoverData.avg_price && (
+                  <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    No aggregated market data available yet for {vehicle?.make}.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-muted)' }}>No data available</div>
+            )}
+          </HeaderPopover>
+
+          {/* Model Popup */}
+          <HeaderPopover
+            open={activePopover === 'model'}
+            onClose={() => setActivePopover(null)}
+            title={`${vehicle?.make || ''} ${displayModel || ''}`}
+            width={340}
+          >
+            {popoverLoading ? (
+              <div style={{ color: 'var(--text-muted)' }}>Loading model data...</div>
+            ) : popoverData ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: '10pt' }}>{vehicle?.make} {displayModel}</div>
+                {popoverData.avg_price != null && (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Advisors</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Price range (p25–p75)</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                          {popoverData.p25 != null ? `${formatCurrency(popoverData.p25)}–${formatCurrency(popoverData.p75)}` : '—'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
+                      </div>
+                      {popoverData.sell_through_pct != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Sell-through</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
+                        </div>
+                      )}
+                      {popoverData.avg_days_on_market != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Avg. days on market</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{Math.round(popoverData.avg_days_on_market)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Enthusiasts</div>
+                      {popoverData.production_count != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Production</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.production_count?.toLocaleString() || '—'}</span>
+                        </div>
+                      )}
+                      {popoverData.survival_rate != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Survival rate</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(popoverData.survival_rate * 100).toFixed(0)}%</span>
+                        </div>
+                      )}
+                      {popoverData.rarity_label && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Rarity</span>
+                          <span style={{ fontWeight: 700 }}>{popoverData.rarity_label}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Listed</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {popoverData.trend_direction && (
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Speculators</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Price trend</span>
+                      <span style={{
+                        fontWeight: 700,
+                        color: popoverData.trend_direction === 'up' ? '#166534' : popoverData.trend_direction === 'down' ? '#dc2626' : 'var(--text)',
+                      }}>
+                        {popoverData.trend_direction === 'up' ? '↑ Rising' : popoverData.trend_direction === 'down' ? '↓ Falling' : '→ Stable'}
+                      </span>
+                    </div>
+                    {popoverData.heat_score_avg != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Heat score</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.heat_score_avg.toFixed(1)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!popoverData.avg_price && (
+                  <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    No aggregated market data available yet for this model.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-muted)' }}>No data available</div>
+            )}
+          </HeaderPopover>
         </div>
 
         {/* 2. Badges Section */}
@@ -2622,39 +2968,34 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {/* Auction metadata (seller/location/house/buyer/timer) */}
           {hasAuctionContext && (
             <>
-              {headerSeller && (
-                <div className="badge-priority-3">
-                  {headerSeller.href ? (
-                    <a
-                      href={headerSeller.href}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ textDecoration: 'none', color: 'inherit' }}
+              {headerSeller && (() => {
+                const sellerPlatformUrl = headerSeller.href || (vehicle as any)?.discovery_url || (vehicle as any)?.bat_auction_url || 'https://bringatrailer.com';
+                // Responsive: full → label only → favicon
+                const showCompact = isMobile;
+
+                return (
+                  <div ref={sellerPopoverRef} className="badge-priority-3" style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActivePopover(activePopover === 'seller' ? null : 'seller');
+                      }}
                       title={headerSeller.title}
-                    >
-                      <span
-                        className="badge"
-                        style={{
-                          fontSize: '8px',
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          color: baseTextColor,
-                          lineHeight: 1,
-                        }}
-                      >
-                        {headerSeller.roleLabel}: {headerSeller.label}
-                      </span>
-                    </a>
-                  ) : (
-                    <span
-                      className="badge"
-                      title={headerSeller.title}
-                      style={{
+                      style={showCompact ? {
+                        width: 18,
+                        height: 18,
+                        borderRadius: 999,
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface)',
+                        padding: 0,
+                        margin: 0,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxSizing: 'border-box',
+                      } : {
                         fontSize: '8px',
                         fontWeight: 700,
                         display: 'inline-flex',
@@ -2666,13 +3007,77 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         border: '1px solid var(--border)',
                         color: baseTextColor,
                         lineHeight: 1,
+                        cursor: 'pointer',
                       }}
                     >
-                      {headerSeller.roleLabel}: {headerSeller.label}
-                    </span>
-                  )}
-                </div>
-              )}
+                      {showCompact ? (
+                        <FaviconIcon url={sellerPlatformUrl} size={14} style={{ margin: 0 }} />
+                      ) : (
+                        <>{headerSeller.roleLabel}: {headerSeller.label}</>
+                      )}
+                    </button>
+                    <HeaderPopover
+                      open={activePopover === 'seller'}
+                      onClose={() => setActivePopover(null)}
+                      title={`${headerSeller.roleLabel}: ${headerSeller.label}`}
+                      width={280}
+                    >
+                      {popoverLoading ? (
+                        <div style={{ color: 'var(--text-muted)' }}>Loading seller data...</div>
+                      ) : popoverData ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <FaviconIcon url={sellerPlatformUrl} size={16} />
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '9pt' }}>{headerSeller.label}</div>
+                              <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{headerSeller.roleLabel}</div>
+                            </div>
+                          </div>
+                          {popoverData.identity && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Platform</span>
+                                <span>{popoverData.identity.platform || '—'}</span>
+                              </div>
+                              {popoverData.identity.first_seen_at && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span style={{ color: 'var(--text-muted)' }}>First seen</span>
+                                  <span style={{ fontFamily: 'monospace' }}>{new Date(popoverData.identity.first_seen_at).toLocaleDateString()}</span>
+                                </div>
+                              )}
+                              {popoverData.identity.claimed_by && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span style={{ color: 'var(--text-muted)' }}>Claimed</span>
+                                  <span style={{ fontWeight: 700, color: '#166534' }}>Yes</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Auctions listed</span>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.auctionCount || 0}</span>
+                            </div>
+                          </div>
+                          {headerSeller.href && (
+                            <a
+                              href={headerSeller.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: '7pt', color: 'var(--link)' }}
+                            >
+                              View full profile
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ color: 'var(--text-muted)' }}>No seller data available</div>
+                      )}
+                    </HeaderPopover>
+                  </div>
+                );
+              })()}
               {!locationDisplay?.short && headerLocationLabel && (
                 <div className="badge-priority-3">
                   <span
@@ -2692,7 +3097,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       lineHeight: 1,
                     }}
                   >
-                    LOC {headerLocationLabel}
+                    {headerLocationLabel}
                   </span>
                 </div>
               )}
@@ -2776,58 +3181,136 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   );
                 }
 
-                // For auctions: show "Auction: X" format
+                // For auctions: show favicon icon badge (matching live auction rail pattern)
+                const auctionUrl = headerAuctionHouse.url || '';
+                const isBatAuction = headerAuctionHouse.label === 'Bring a Trailer' || auctionUrl.includes('bringatrailer.com');
+                const platformUrlForIcon = auctionUrl || (
+                  headerAuctionHouse.label === 'Cars & Bids' ? 'https://carsandbids.com' :
+                  headerAuctionHouse.label === 'Hagerty Marketplace' ? 'https://hagerty.com' :
+                  headerAuctionHouse.label === 'PCarMarket' ? 'https://pcarmarket.com' :
+                  'https://n-zero.com'
+                );
                 return (
-                  <div className="badge-priority-3">
-                    {headerAuctionHouse.url ? (
-                      <a
-                        href={headerAuctionHouse.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ textDecoration: 'none', color: 'inherit' }}
-                        title={`Auction house: ${headerAuctionHouse.label}`}
-                      >
-                        <span
-                          className="badge"
-                          style={{
-                            fontSize: '8px',
-                            fontWeight: 700,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            background: 'var(--surface)',
-                            border: '1px solid var(--border)',
-                            color: baseTextColor,
-                            lineHeight: 1,
-                          }}
-                        >
-                          Auction: {headerAuctionHouse.label}
-                        </span>
-                      </a>
-                    ) : (
-                      <span
-                        className="badge"
-                        title={`Auction house: ${headerAuctionHouse.label}`}
-                        style={{
-                          fontSize: '8px',
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          color: baseTextColor,
-                          lineHeight: 1,
-                        }}
-                      >
-                        Auction: {headerAuctionHouse.label}
-                      </span>
-                    )}
+                  <div ref={auctionPopoverRef} className="badge-priority-3" style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActivePopover(activePopover === 'auction' ? null : 'auction');
+                      }}
+                      title={`${headerAuctionHouse.label} — Click for details`}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 999,
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface)',
+                        padding: 0,
+                        margin: 0,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      {isBatAuction ? (
+                        <img src="/vendor/bat/favicon.ico" alt="BaT" style={{ width: 14, height: 14, objectFit: 'contain' }} />
+                      ) : (
+                        <FaviconIcon url={platformUrlForIcon} size={14} style={{ margin: 0 }} />
+                      )}
+                    </button>
+                    <HeaderPopover
+                      open={activePopover === 'auction'}
+                      onClose={() => setActivePopover(null)}
+                      title={headerAuctionHouse.label}
+                      width={280}
+                    >
+                      {popoverLoading ? (
+                        <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
+                      ) : popoverData ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {isBatAuction ? (
+                              <img src="/vendor/bat/favicon.ico" alt="BaT" style={{ width: 16, height: 16 }} />
+                            ) : (
+                              <FaviconIcon url={platformUrlForIcon} size={16} />
+                            )}
+                            <span style={{ fontWeight: 700, fontSize: '9pt' }}>{headerAuctionHouse.label}</span>
+                          </div>
+                          {popoverData.listingUrl && (
+                            <a
+                              href={popoverData.listingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: '7pt', color: 'var(--link)', wordBreak: 'break-all' }}
+                            >
+                              View original listing
+                            </a>
+                          )}
+                          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Auction Stats</div>
+                            {typeof popoverData.bidCount === 'number' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Bids</span>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.bidCount}</span>
+                              </div>
+                            )}
+                            {typeof popoverData.viewCount === 'number' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Views</span>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.viewCount.toLocaleString()}</span>
+                              </div>
+                            )}
+                            {typeof popoverData.watcherCount === 'number' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Watchers</span>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.watcherCount.toLocaleString()}</span>
+                              </div>
+                            )}
+                            {typeof popoverData.commentCount === 'number' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Comments</span>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.commentCount.toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
+                          {popoverData.listingStatus && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <div style={{ fontWeight: 700, fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Outcome</div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Status</span>
+                                <span style={{
+                                  fontWeight: 700,
+                                  color: popoverData.listingStatus === 'sold' ? '#166534' :
+                                    popoverData.listingStatus === 'reserve_not_met' ? '#dc2626' : baseTextColor,
+                                }}>
+                                  {popoverData.listingStatus === 'sold' ? 'SOLD' :
+                                    popoverData.listingStatus === 'reserve_not_met' ? 'Reserve Not Met' :
+                                    popoverData.listingStatus === 'active' ? 'Active' :
+                                    popoverData.listingStatus.replace(/_/g, ' ')}
+                                </span>
+                              </div>
+                              {typeof popoverData.finalPrice === 'number' && popoverData.finalPrice > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span style={{ color: 'var(--text-muted)' }}>Final price</span>
+                                  <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.finalPrice)}</span>
+                                </div>
+                              )}
+                              {typeof popoverData.currentBid === 'number' && popoverData.currentBid > 0 && !popoverData.finalPrice && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span style={{ color: 'var(--text-muted)' }}>Current bid</span>
+                                  <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.currentBid)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ color: 'var(--text-muted)' }}>No auction data available</div>
+                      )}
+                    </HeaderPopover>
                   </div>
                 );
               })()}
@@ -2954,23 +3437,24 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   e.stopPropagation();
                   setShowLocationDropdown((prev) => !prev);
                 }}
+                className="badge"
                 style={{
                   fontSize: '8px',
                   fontWeight: 700,
-                  fontFamily: 'monospace',
-                  letterSpacing: '0.5px',
                   display: 'inline-flex',
                   alignItems: 'center',
+                  gap: 4,
                   cursor: 'pointer',
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   padding: '2px 6px',
-                  color: 'var(--text)',
-                  borderRadius: '4px',
+                  color: baseTextColor,
+                  borderRadius: 4,
+                  lineHeight: 1,
                 }}
                 title={`Location: ${locationDisplay.full || locationDisplay.short}`}
               >
-                LOC {locationDisplay.short}
+                {isMobile ? (locationDisplay.compact || locationDisplay.short) : locationDisplay.short}
               </button>
               
               {/* Location Dropdown */}
@@ -3231,6 +3715,31 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               {ownerPopoverData.lastSeenAt ? new Date(ownerPopoverData.lastSeenAt).toLocaleDateString() : '—'}
                             </span>
                           </div>
+                        </div>
+
+                        {/* Portfolio stats */}
+                        <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                          <div style={{ fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6 }}>PORTFOLIO</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Vehicles won + sold</span>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                              {(ownerPopoverData.auctionsWon || 0) + (ownerPopoverData.auctionsSold || 0)}
+                            </span>
+                          </div>
+                          {ownerPopoverData.firstSeenAt && ownerPopoverData.lastSeenAt && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Trading velocity</span>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                                {(() => {
+                                  const first = new Date(ownerPopoverData.firstSeenAt!).getTime();
+                                  const last = new Date(ownerPopoverData.lastSeenAt!).getTime();
+                                  const years = Math.max((last - first) / (365.25 * 24 * 60 * 60 * 1000), 0.5);
+                                  const total = (ownerPopoverData.auctionsWon || 0) + (ownerPopoverData.auctionsSold || 0);
+                                  return `${(total / years).toFixed(1)}/yr`;
+                                })()}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         <div style={{ marginTop: 10, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -4759,6 +5268,54 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </div>
                 ))}
               </div>
+
+              {/* Deal Analysis Section */}
+              {(() => {
+                const estimateEntry = priceEntries.find(e => e.id === 'estimate');
+                const saleEntry = priceEntries.find(e => e.id === 'sale' || e.id === 'bat_sale');
+                const askingEntry = priceEntries.find(e => e.id === 'asking');
+                const auctionEntry = priceEntries.find(e => e.id === 'auction');
+                const comparePrice = saleEntry?.amount || auctionEntry?.amount || askingEntry?.amount;
+                const estimatePrice = estimateEntry?.amount;
+
+                if (estimatePrice && comparePrice && estimatePrice > 0 && comparePrice > 0) {
+                  const gap = estimatePrice - comparePrice;
+                  const gapPct = (gap / comparePrice) * 100;
+                  const isUnderpriced = gapPct > 5;
+                  const isOverpriced = gapPct < -5;
+                  const verdict = isUnderpriced
+                    ? `UNDERPRICED by ${Math.abs(gapPct).toFixed(0)}%`
+                    : isOverpriced
+                      ? `OVERPRICED by ${Math.abs(gapPct).toFixed(0)}%`
+                      : 'FAIR MARKET';
+                  const verdictColor = isUnderpriced ? '#166534' : isOverpriced ? '#dc2626' : 'var(--text)';
+
+                  return (
+                    <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: '7pt', color: 'var(--text-muted)' }}>
+                        Deal Analysis
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Nuke Estimate vs Price</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: gap > 0 ? '#166534' : gap < 0 ? '#dc2626' : 'var(--text)' }}>
+                          {gap > 0 ? '+' : ''}{formatCurrency(gap)} ({gapPct > 0 ? '+' : ''}{gapPct.toFixed(0)}%)
+                        </span>
+                      </div>
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '6px 0',
+                        fontWeight: 800,
+                        fontSize: '9pt',
+                        color: verdictColor,
+                        letterSpacing: '0.5px',
+                      }}>
+                        {verdict}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {isOwnerLike && (
                 <div style={{ marginTop: 12, borderTop: '1px solid #e5e7eb', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>

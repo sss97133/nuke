@@ -958,13 +958,13 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             </div>
           </div>
 
-          {/* Inserted By - Show only inserter name, rest in hover */}
+          {/* Record Origin - provenance with timestamp and source */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
-              Inserted By
+              Record Origin
             </div>
-            <div 
-              style={{ fontSize: '9pt' }}
+            <div
+              style={{ fontSize: '9pt', display: 'flex', flexDirection: 'column', gap: 2 }}
               title={(() => {
                 const parts: string[] = [];
                 const inserterName = context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown';
@@ -975,7 +975,19 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 return parts.length > 0 ? parts.join('\n') : undefined;
               })()}
             >
-              {context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown'}
+              <span>{context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown'}</span>
+              {provenance?.inserted_at && (
+                <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                  {new Date(provenance.inserted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {' '}
+                  {new Date(provenance.inserted_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              {provenance?.evidence_count != null && (
+                <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                  {provenance.evidence_count} evidence point{provenance.evidence_count !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
           </div>
 
