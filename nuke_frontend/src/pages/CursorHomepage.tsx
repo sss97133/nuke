@@ -7,6 +7,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { getCanonicalBodyStyle } from '../services/bodyStyleTaxonomy';
 import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
 import { parseMoneyNumber } from '../lib/auctionUtils';
+import { VehicleSearchService } from '../services/vehicleSearchService';
 import { preloadImageBatch, optimizeImageUrl } from '../lib/imageOptimizer';
 import ActiveAuctionsPanel from '../components/dashboard/ActiveAuctionsPanel';
 import FBMarketplacePanel from '../components/dashboard/FBMarketplacePanel';
@@ -58,6 +59,14 @@ interface HypeVehicle {
   profile_origin?: string | null;
   origin_organization_id?: string | null;
   listing_start_date?: string;
+  // Nuke Estimate fields
+  nuke_estimate?: number;
+  nuke_estimate_confidence?: number;
+  deal_score?: number;
+  deal_score_label?: string;
+  heat_score?: number;
+  heat_score_label?: string;
+  is_record_price?: boolean;
 }
 
 type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
@@ -75,7 +84,7 @@ const SALES_PERIODS: { value: SalesTimePeriod; label: string; days: number | nul
   { value: '10y', label: '10y', days: 365 * 10 },
   { value: 'all', label: 'all', days: null },
 ];
-type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
+type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views' | 'deal_score' | 'heat_score';
 type SortDirection = 'asc' | 'desc';
 
 const getDisplayPriceValue = (vehicle: HypeVehicle | null | undefined): number | null => {
@@ -487,6 +496,8 @@ const CursorHomepage: React.FC = () => {
   });
   const [currentZip, setCurrentZip] = useState(filters.zipCode || '');
   const [currentRadius, setCurrentRadius] = useState(filters.radiusMiles || 50);
+  // Cache zip -> { lat, lng } for distance filtering (populated when location filter is active)
+  const [locationZipCoords, setLocationZipCoords] = useState<Record<string, { lat: number; lng: number }>>({});
   const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('nuke_homepage_cardsPerRow');
@@ -646,6 +657,44 @@ const CursorHomepage: React.FC = () => {
     
     return result;
   }, [filters]);
+
+  // Populate zip coords cache for distance-based location filtering
+  useEffect(() => {
+    const zipsToFetch: string[] = [];
+    if (filters.locations?.length) {
+      filters.locations.forEach(loc => {
+        if (loc.zipCode?.length === 5 && /^\d+$/.test(loc.zipCode)) zipsToFetch.push(loc.zipCode);
+      });
+    }
+    if (filters.zipCode?.length === 5 && /^\d+$/.test(filters.zipCode) && !zipsToFetch.includes(filters.zipCode)) {
+      zipsToFetch.push(filters.zipCode);
+    }
+    if (zipsToFetch.length === 0) {
+      setLocationZipCoords({});
+      return;
+    }
+    let cancelled = false;
+    const fetchCoords = async () => {
+      const next: Record<string, { lat: number; lng: number }> = {};
+      for (const zip of zipsToFetch) {
+        if (cancelled) return;
+        const { data } = await supabase
+          .from('vehicles')
+          .select('gps_latitude, gps_longitude')
+          .eq('zip_code', zip)
+          .not('gps_latitude', 'is', null)
+          .not('gps_longitude', 'is', null)
+          .limit(1)
+          .maybeSingle();
+        if (data?.gps_latitude != null && data?.gps_longitude != null) {
+          next[zip] = { lat: Number(data.gps_latitude), lng: Number(data.gps_longitude) };
+        }
+      }
+      if (!cancelled) setLocationZipCoords(prev => ({ ...prev, ...next }));
+    };
+    void fetchCoords();
+    return () => { cancelled = true; };
+  }, [filters.locations, filters.zipCode]);
 
   const vehiclesToRender = useMemo(() => {
     // When searching / filtering, cap how many cards we paint at once to avoid UI stutter.
@@ -1667,19 +1716,28 @@ const CursorHomepage: React.FC = () => {
       // #endregion
     }
     
-    // Location filtering - support multiple locations
-    if ((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.zipCode.length === 5)) {
+    // Location filtering - support multiple locations with radius (distance) or exact zip
+    const activeLocations: Array<{ zipCode: string; radiusMiles: number }> =
+      filters.locations && filters.locations.length > 0
+        ? filters.locations
+        : filters.zipCode && filters.zipCode.length === 5 && filters.radiusMiles > 0
+          ? [{ zipCode: filters.zipCode, radiusMiles: filters.radiusMiles }]
+          : [];
+    if (activeLocations.length > 0) {
       result = result.filter(v => {
-        const vehicleZip = (v as any).zip_code || (v as any).location_zip;
-        if (!vehicleZip) return false;
-        
-        // Check against multiple locations
-        if (filters.locations && filters.locations.length > 0) {
-          return filters.locations.some(loc => vehicleZip === loc.zipCode);
-        }
-        
-        // Fallback to single zipCode
-        return vehicleZip === filters.zipCode;
+        const vehicleLat = (v as any).gps_latitude != null ? Number((v as any).gps_latitude) : null;
+        const vehicleLng = (v as any).gps_longitude != null ? Number((v as any).gps_longitude) : null;
+        const vehicleZip = (v as any).zip_code || (v as any).location_zip || null;
+        return activeLocations.some(loc => {
+          const coords = locationZipCoords[loc.zipCode];
+          if (vehicleLat != null && vehicleLng != null && coords) {
+            const distance = VehicleSearchService.calculateDistance(coords.lat, coords.lng, vehicleLat, vehicleLng);
+            return distance <= loc.radiusMiles;
+          }
+          // Fallback: exact zip match when no coords or vehicle has no lat/lng
+          if (vehicleZip) return vehicleZip === loc.zipCode;
+          return false;
+        });
       });
     }
     
@@ -1746,7 +1804,7 @@ const CursorHomepage: React.FC = () => {
     }
     
     setFilteredVehicles(result);
-  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, activeSources, domainToFilterKey, getDisplayPriceValue, salesPeriod]);
+  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, activeSources, domainToFilterKey, getDisplayPriceValue, salesPeriod, locationZipCoords]);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
@@ -2977,6 +3035,7 @@ const CursorHomepage: React.FC = () => {
       // PostgREST 400 errors if included in the `select()` list.
       // Simple query: most recent vehicles first, no filters.
       // Try to include canonical taxonomy columns if present; fallback gracefully if migration not applied yet.
+      const locationFields = 'zip_code, gps_latitude, gps_longitude';
       const selectV1 = `
           id, year, make, model, normalized_model, series, trim,
           engine, transmission, transmission_model, drivetrain, body_style, fuel_type,
@@ -2986,7 +3045,9 @@ const CursorHomepage: React.FC = () => {
           auction_outcome, high_bid, winning_bid, bid_count,
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
-          discovery_url, discovery_source, profile_origin
+          discovery_url, discovery_source, profile_origin,
+          nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
+          ${locationFields}
         `;
       const selectV1EngineSize = `
           id, year, make, model, normalized_model, series, trim,
@@ -2997,7 +3058,9 @@ const CursorHomepage: React.FC = () => {
           auction_outcome, high_bid, winning_bid, bid_count,
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
-          discovery_url, discovery_source, profile_origin
+          discovery_url, discovery_source, profile_origin,
+          nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
+          ${locationFields}
         `;
       const selectV2 = `
           id, year, make, model, normalized_model, series, trim,
@@ -3009,7 +3072,9 @@ const CursorHomepage: React.FC = () => {
           auction_outcome, high_bid, winning_bid, bid_count,
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
-          discovery_url, discovery_source, profile_origin
+          discovery_url, discovery_source, profile_origin,
+          nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
+          ${locationFields}
         `;
       const selectV2EngineSize = `
           id, year, make, model, normalized_model, series, trim,
@@ -3021,7 +3086,9 @@ const CursorHomepage: React.FC = () => {
           auction_outcome, high_bid, winning_bid, bid_count,
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
-          discovery_url, discovery_source, profile_origin
+          discovery_url, discovery_source, profile_origin,
+          nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
+          ${locationFields}
         `;
 
       const getMissingColumn = (err: any): string | null => {
@@ -3144,6 +3211,14 @@ const CursorHomepage: React.FC = () => {
             case 'price_low':
               orderColumn = 'sale_price';
               orderAscending = true;
+              break;
+            case 'deal_score':
+              orderColumn = 'deal_score';
+              orderAscending = false;
+              break;
+            case 'heat_score':
+              orderColumn = 'heat_score';
+              orderAscending = false;
               break;
             default:
               orderColumn = 'created_at';
@@ -4969,7 +5044,7 @@ const CursorHomepage: React.FC = () => {
                       fontWeight: 700,
                     }}
                   >
-                    LIVE {displayStats.activeAuctions}
+                    LIVE
                   </button>
                 </>
               )}
@@ -4997,6 +5072,72 @@ const CursorHomepage: React.FC = () => {
                   }}
                 >
                   FB CARS
+                </button>
+              </>
+              {/* Nuke Estimate: Hot Deals sort */}
+              <>
+                <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (sortBy === 'deal_score') {
+                      setSortBy('newest');
+                    } else {
+                      setSortBy('deal_score');
+                      setSortDirection('desc');
+                    }
+                  }}
+                  title="Sort by deal score — vehicles priced below their Nuke Estimate"
+                  style={{
+                    border: sortBy === 'deal_score' ? '1px solid rgba(16,185,129,0.5)' : 'none',
+                    background: sortBy === 'deal_score'
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.15) 100%)',
+                    padding: '1px 6px',
+                    margin: 0,
+                    cursor: 'pointer',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    fontSize: '7pt',
+                    color: sortBy === 'deal_score' ? 'white' : '#10b981',
+                    borderRadius: '999px',
+                    fontWeight: 700,
+                  }}
+                >
+                  DEALS
+                </button>
+              </>
+              {/* Nuke Estimate: Trending sort */}
+              <>
+                <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>|</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (sortBy === 'heat_score') {
+                      setSortBy('newest');
+                    } else {
+                      setSortBy('heat_score');
+                      setSortDirection('desc');
+                    }
+                  }}
+                  title="Sort by heat score — most exciting vehicles right now"
+                  style={{
+                    border: sortBy === 'heat_score' ? '1px solid rgba(239,68,68,0.5)' : 'none',
+                    background: sortBy === 'heat_score'
+                      ? 'linear-gradient(135deg, #f97316 0%, #ef4444 100%)'
+                      : 'linear-gradient(135deg, rgba(249,115,22,0.15) 0%, rgba(239,68,68,0.15) 100%)',
+                    padding: '1px 6px',
+                    margin: 0,
+                    cursor: 'pointer',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    fontSize: '7pt',
+                    color: sortBy === 'heat_score' ? 'white' : '#f97316',
+                    borderRadius: '999px',
+                    fontWeight: 700,
+                  }}
+                >
+                  TRENDING
                 </button>
               </>
               {salesByPeriod.count > 0 && (
@@ -5443,7 +5584,7 @@ const CursorHomepage: React.FC = () => {
                       animation: 'pulse 2s infinite',
                     }}
                   >
-                    LIVE {displayStats.activeAuctions}
+                    LIVE
                   </button>
                 </>
               )}
@@ -6691,7 +6832,7 @@ const CursorHomepage: React.FC = () => {
                     flexDirection: 'column',
                     gap: '6px'
                   }}>
-                    {/* Current location input */}
+                    {/* Single row: location input + active chips (same line) */}
                     <div style={{
                       display: 'flex',
                       gap: '4px',
@@ -6758,30 +6899,36 @@ const CursorHomepage: React.FC = () => {
                       >
                         save
                       </button>
+                      {/* Active locations inline on same row */}
+                      {((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.zipCode.length === 5 && filters.radiusMiles > 0)) && (
+                        <>
+                          <span style={{ fontSize: '7pt', marginLeft: '4px' }}>active:</span>
+                          {(filters.locations && filters.locations.length > 0
+                            ? filters.locations
+                            : [{ zipCode: filters.zipCode!, radiusMiles: filters.radiusMiles }]
+                          ).map((loc, idx) => (
+                            <button
+                              key={loc.zipCode + '-' + loc.radiusMiles + '-' + idx}
+                              onClick={() =>
+                                filters.locations?.length
+                                  ? removeLocation(idx)
+                                  : setFilters({ ...filters, zipCode: '', radiusMiles: 0 })
+                              }
+                              className="button-win95"
+                              style={{
+                                padding: '2px 5px',
+                                fontSize: '7pt',
+                                background: 'var(--grey-300)',
+                                border: '1px solid var(--border)'
+                              }}
+                              title="Remove location"
+                            >
+                              {loc.zipCode} ({loc.radiusMiles}mi) ×
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </div>
-                    
-                    {/* Active locations */}
-                    {filters.locations && filters.locations.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '7pt' }}>active:</span>
-                        {filters.locations.map((loc, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => removeLocation(idx)}
-                            className="button-win95"
-                            style={{
-                              padding: '2px 5px',
-                              fontSize: '7pt',
-                              background: 'var(--grey-300)',
-                              border: '1px solid var(--border)'
-                            }}
-                            title="Remove location"
-                          >
-                            {loc.zipCode} ({loc.radiusMiles}mi) ×
-                          </button>
-                        ))}
-                      </div>
-                    )}
                     
                     {/* Favorites */}
                     {locationFavorites.length > 0 && (

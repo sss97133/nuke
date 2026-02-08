@@ -278,29 +278,14 @@ const PlatformBreakdownChart: React.FC<PlatformBreakdownChartProps> = ({ stats }
     default: '#95a5a6',
   };
 
-  const platformLabels: Record<string, string> = {
-    bat: 'BaT',
-    cars_and_bids: 'C&B',
-    pcarmarket: 'PCM',
-    ebay_motors: 'eBay',
-    mecum: 'Mecum',
-    bonhams: 'Bonhams',
-    rmsothebys: 'RM',
-    collecting_cars: 'CC',
-    hagerty: 'Hagerty',
-  };
-
   return (
     <div style={{ marginTop: 'var(--space-3)' }}>
       <div style={{ fontSize: 'var(--fs-8)', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text-secondary)' }}>
-        AUCTIONS BY PLATFORM
+        AUCTION VOLUME
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-        {stats.slice(0, 6).map((s) => (
+        {stats.slice(0, 6).map((s, i) => (
           <div key={s.platform} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <div style={{ width: 40, fontSize: 'var(--fs-8)', fontWeight: 600, color: 'var(--text)' }}>
-              {platformLabels[s.platform] || s.platform.substring(0, 4).toUpperCase()}
-            </div>
             <div
               style={{
                 flex: 1,
@@ -315,7 +300,7 @@ const PlatformBreakdownChart: React.FC<PlatformBreakdownChartProps> = ({ stats }
                 style={{
                   width: `${(s.count / maxCount) * 100}%`,
                   height: '100%',
-                  background: platformColors[s.platform] || platformColors.default,
+                  background: `hsl(${210 + i * 25}, 60%, 55%)`,
                   borderRadius: 'var(--radius)',
                   transition: 'width 0.3s ease',
                 }}
@@ -871,7 +856,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
               </span>
             </div>
             <div style={{ fontSize: 'var(--fs-10)', color: 'var(--text-secondary)', marginTop: 2 }}>
-              Real-time auction data from BaT, C&B, PCM, and more
+              Ending soonest first
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
@@ -1074,7 +1059,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
             color: 'var(--text-secondary)',
           }}
         >
-          <div>Updated every 60 seconds. Prices and bid counts from source platforms.</div>
+          <div>Updated every 60 seconds</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
             <span style={{ width: 6, height: 6, background: 'var(--success)', borderRadius: '50%' }} />
             <span>Live</span>
