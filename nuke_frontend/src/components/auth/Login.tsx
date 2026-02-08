@@ -207,7 +207,7 @@ const Login = () => {
           <div style={{ width: '320px' }}>
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <h1 className="heading-1" style={{ marginBottom: '8px' }}>n-zero</h1>
-              <p className="text text-muted">Collector Vehicle Intelligence</p>
+              <p className="text text-muted">Provenance Engine</p>
             </div>
             
             
