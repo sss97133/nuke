@@ -3183,7 +3183,9 @@ const CursorHomepage: React.FC = () => {
             case 'deal_score':
               orderColumn = 'deal_score';
               orderAscending = false;
-              q = q.not('deal_score', 'is', null);
+              q = q.not('deal_score', 'is', null)
+                   .gt('deal_score', 0)
+                   .gt('asking_price', 1000);
               break;
             case 'heat_score':
               orderColumn = 'heat_score';
