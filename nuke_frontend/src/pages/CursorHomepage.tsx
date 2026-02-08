@@ -92,7 +92,7 @@ const getDisplayPriceValue = (vehicle: HypeVehicle | null | undefined): number |
   return parseMoneyNumber((vehicle as any).display_price);
 };
 
-const DEBUG_CURSOR_HOMEPAGE = import.meta.env.DEV;
+const DEBUG_CURSOR_HOMEPAGE = false; // Disable for production
 
 /**
  * Image URL normalization for feed cards.
@@ -2384,11 +2384,7 @@ const CursorHomepage: React.FC = () => {
         // Only log on first cache hit so the 30s refresh doesn't spam "instantly" after 30 sec
         if (!hasLoggedCachedStatsRef.current) {
           hasLoggedCachedStatsRef.current = true;
-          console.log('Cached stats loaded:', {
-            totalVehicles: cachedStats.total_vehicles,
-            totalValue: cachedStats.total_value,
-            source: 'portfolio_stats_cache table'
-          });
+          // Cached stats loaded
         }
 
         setDbStats(prev => ({
@@ -2416,11 +2412,7 @@ const CursorHomepage: React.FC = () => {
       const { data: fastStats, error: fastError } = await supabase.rpc('get_portfolio_stats_fast');
 
       if (!fastError && fastStats) {
-        console.log('Fast stats loaded:', {
-          totalVehicles: Number(fastStats.total_vehicles) || 0,
-          forSaleCount: Number(fastStats.for_sale_count) || 0,
-          source: 'get_portfolio_stats_fast RPC'
-        });
+        // Fast stats loaded
 
         setDbStats(prev => ({
           ...prev,
@@ -2442,7 +2434,7 @@ const CursorHomepage: React.FC = () => {
               avgValue: Number(fullStats.avg_value) || prev.avgValue,
               valueRealizedTotal: Number(fullStats.value_realized_total) || prev.valueRealizedTotal,
             }));
-            console.log('Full stats loaded in background');
+            // Full stats loaded
           }
         }).catch(() => {});
 
@@ -2472,11 +2464,7 @@ const CursorHomepage: React.FC = () => {
           valueImported7d: Number(serverStats.value_imported_7d) || 0,
         };
 
-        console.log('Server-side stats loaded:', {
-          totalVehicles: stats.totalVehicles,
-          totalValue: stats.totalValue,
-          source: 'calculate_portfolio_value_server RPC'
-        });
+        // Server-side stats loaded
 
         setDbStats(stats);
         setDbStatsLoading(false);
@@ -2681,13 +2669,7 @@ const CursorHomepage: React.FC = () => {
         valueImported7d,
       };
       
-      console.log('Database stats loaded:', {
-        totalVehicles: stats.totalVehicles,
-        totalValue: stats.totalValue,
-        vehiclesWithValue,
-        vehiclesProcessed: (allVehicles || []).length,
-        totalCountFromQuery: totalCount
-      });
+      // Database stats loaded
       
       // #region agent log
       // #endregion
@@ -3841,7 +3823,7 @@ const CursorHomepage: React.FC = () => {
   const generateRandomFilters = () => {
     const allVehicles = feedVehicles;
     if (allVehicles.length === 0) {
-      alert('Load vehicles first');
+      return; // No vehicles loaded yet
       return;
     }
 
@@ -4779,12 +4761,8 @@ const CursorHomepage: React.FC = () => {
 
                   {statsPanel === 'vehicles' && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
-                      <div><b>{displayStats.totalVehicles.toLocaleString()}</b> visible vehicles</div>
-                      <div><b>{displayStats.vehiclesAddedToday.toLocaleString()}</b> added today</div>
-                      {statsPanelMeta?.pendingPublicCount ? <div><b>{Number(statsPanelMeta.pendingPublicCount).toLocaleString()}</b> pending</div> : null}
-                      {statsPanelMeta?.publicTotalIncludingPending ? <div><b>{Number(statsPanelMeta.publicTotalIncludingPending).toLocaleString()}</b> public total (incl pending)</div> : null}
-                      {statsPanelMeta?.totalVisibleAllRecords ? <div><b>{Number(statsPanelMeta.totalVisibleAllRecords).toLocaleString()}</b> total records (visible to you)</div> : null}
-                      {statsPanelMeta?.publicNonVehicleItems ? <div><b>{Number(statsPanelMeta.publicNonVehicleItems).toLocaleString()}</b> non-vehicle items hidden</div> : null}
+                      <div><b>{displayStats.totalVehicles.toLocaleString()}</b> vehicles</div>
+                      {displayStats.vehiclesAddedToday > 0 && <div><b>+{displayStats.vehiclesAddedToday.toLocaleString()}</b> today</div>}
                     </div>
                   )}
 
@@ -6000,7 +5978,7 @@ const CursorHomepage: React.FC = () => {
                               hideClassic: true,
                               hiddenSources: allOtherKeys
                             };
-                            console.log('[DEBUG] Setting filters', { prev, newFilters });
+                            // filters updated
                             return newFilters;
                           });
                         } else if (searchLower.includes('craigslist') || searchLower.includes('cl')) {
