@@ -222,7 +222,7 @@ const getOriginImages = (vehicle: any): string[] => {
 
 const cleanDisplayMake = (raw: any): string | null => {
   if (!raw) return null;
-  const s = String(raw).replace(/[/_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const s = String(raw).replace(/&#0*38;/g, '&').replace(/&amp;/g, '&').replace(/[/_]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s || s === '*' || s.length > 40) return null;
   // Basic title-case unless it's already all-caps.
   if (s.toUpperCase() === s && s.length <= 6) return s;
@@ -236,6 +236,8 @@ const cleanDisplayModel = (raw: any): string | null => {
   if (!raw) return null;
   let s = String(raw).replace(/\s+/g, ' ').trim();
   if (!s) return null;
+  // Decode common HTML entities that leak from scraped source titles
+  s = s.replace(/&#0*38;/g, '&').replace(/&#0*39;/g, "'").replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
   // Strip common listing junk: " - $12,999 (City)" / "(Dealer Name)" / finance blips.
   s = s.replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?.*$/i, '').trim();
   s = s.replace(/\s*\([^)]*\)\s*$/i, '').trim();
