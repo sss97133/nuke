@@ -12,8 +12,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@docs': path.resolve(__dirname, '../docs'),
     },
   },
+  assetsInclude: ['**/*.md'],
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
