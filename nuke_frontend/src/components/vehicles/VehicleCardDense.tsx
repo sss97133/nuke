@@ -78,6 +78,14 @@ interface VehicleCardDenseProps {
     display_price?: number;
     discovery_url?: string | null;
     discovery_source?: string | null;
+    // Nuke Estimate fields
+    nuke_estimate?: number;
+    nuke_estimate_confidence?: number;
+    deal_score?: number;
+    deal_score_label?: string;
+    heat_score?: number;
+    heat_score_label?: string;
+    is_record_price?: boolean;
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -1727,8 +1735,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               border: 'none',
               zIndex: 10,
             }}>
-              <FaviconIcon url={sourceFaviconUrl} size={14} preserveAspectRatio={true} />
-              {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={14} preserveAspectRatio={true} /> : null}
+              <FaviconIcon url={orgFaviconUrl || sourceFaviconUrl} size={14} preserveAspectRatio={true} />
             </div>
           )}
 
@@ -1780,27 +1787,44 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
                 {(() => {
                   const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
-                  
-                  // Color mapping for alphabet tiers
+
                   const getTierColor = (tier: string) => {
                     switch (tier) {
-                      // User-defined core mapping: C=green, F=purple, S=red.
-                      case 'SSS': return '#7c3aed'; // purple variant
+                      case 'SSS': return '#7c3aed';
                       case 'SS': return '#8b5cf6';
-                      case 'S': return '#ef4444'; // red
-                      case 'A': return '#f59e0b'; // warm
-                      case 'B': return '#3b82f6'; // blue
-                      case 'C': return '#10b981'; // green
-                      case 'D': return '#6b7280'; // gray
-                      case 'E': return '#9ca3af'; // light gray
-                      case 'F': return '#a855f7'; // purple
+                      case 'S': return '#ef4444';
+                      case 'A': return '#f59e0b';
+                      case 'B': return '#3b82f6';
+                      case 'C': return '#10b981';
+                      case 'D': return '#6b7280';
+                      case 'E': return '#9ca3af';
+                      case 'F': return '#a855f7';
                       default: return '#6b7280';
                     }
                   };
-                  
+
+                  const getTierDescription = (tier: string) => {
+                    switch (tier) {
+                      case 'SSS': return 'Legendary — museum-grade, historically significant';
+                      case 'SS': return 'Exceptional — near-perfect documentation and provenance';
+                      case 'S': return 'Outstanding — comprehensive data, high engagement';
+                      case 'A': return 'Strong — well-documented with active history';
+                      case 'B': return 'Good — solid data, verified details';
+                      case 'C': return 'Standard — VIN, price, and photos confirmed';
+                      case 'D': return 'Partial — some key data present';
+                      case 'E': return 'Minimal — basic info only';
+                      case 'F': return 'Incomplete — needs more data';
+                      default: return 'Data completeness grade';
+                    }
+                  };
+
                   if (tierLabel) {
                     return (
-                      <span style={{ fontWeight: 700 }}>
+                      <span
+                        style={{ fontWeight: 700, cursor: 'pointer', position: 'relative' }}
+                        title={`${tierLabel} tier: ${getTierDescription(tierLabel)}`}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      >
                         <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>
                           {tierLabel}
                         </span>{' '}
@@ -2196,8 +2220,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       zIndex: 10,
                     }}
                   >
-                    <FaviconIcon url={sourceFaviconUrl} size={12} preserveAspectRatio={true} />
-                    {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={12} preserveAspectRatio={true} /> : null}
+                    <FaviconIcon url={orgFaviconUrl || sourceFaviconUrl} size={12} preserveAspectRatio={true} />
                   </div>
                 )}
               </div>
@@ -2330,6 +2353,81 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 )}
 
                 {/* Follow Button with ROI (compact at small card sizes) */}
+                {/* Nuke Estimate: Deal Score Badge */}
+                {vehicle.deal_score != null && vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' && (
+                  <div
+                    style={{
+                      background: vehicle.deal_score_label === 'steal'
+                        ? 'rgba(16,185,129,0.92)'
+                        : vehicle.deal_score_label === 'good_deal'
+                        ? 'rgba(59,130,246,0.92)'
+                        : vehicle.deal_score_label === 'overpriced'
+                        ? 'rgba(249,115,22,0.92)'
+                        : vehicle.deal_score_label === 'way_overpriced'
+                        ? 'rgba(239,68,68,0.92)'
+                        : 'rgba(0,0,0,0.7)',
+                      backdropFilter: 'blur(4px)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      color: 'white',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      fontSize: '6.5pt',
+                      fontWeight: 800,
+                      letterSpacing: '0.3px',
+                      textTransform: 'uppercase',
+                      lineHeight: 1.2,
+                    }}
+                    title={`Nuke Estimate: $${vehicle.nuke_estimate?.toLocaleString() || '?'} | Deal score: ${vehicle.deal_score?.toFixed(1)}${vehicle.nuke_estimate_confidence ? ` | ${vehicle.nuke_estimate_confidence}% confidence` : ''}`}
+                  >
+                    {vehicle.deal_score_label === 'steal' ? 'STEAL' :
+                     vehicle.deal_score_label === 'good_deal' ? 'GOOD DEAL' :
+                     vehicle.deal_score_label === 'overpriced' ? 'OVERPRICED' :
+                     vehicle.deal_score_label === 'way_overpriced' ? 'OVERPRICED' :
+                     vehicle.deal_score_label.toUpperCase()}
+                  </div>
+                )}
+                {/* Nuke Estimate: Heat indicator */}
+                {vehicle.heat_score != null && vehicle.heat_score >= 40 && (
+                  <div
+                    style={{
+                      background: vehicle.heat_score >= 80
+                        ? 'rgba(239,68,68,0.92)'
+                        : vehicle.heat_score >= 60
+                        ? 'rgba(249,115,22,0.92)'
+                        : 'rgba(234,179,8,0.92)',
+                      backdropFilter: 'blur(4px)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      color: 'white',
+                      padding: '2px 5px',
+                      borderRadius: '4px',
+                      fontSize: '7pt',
+                      fontWeight: 800,
+                      lineHeight: 1,
+                    }}
+                    title={`Heat score: ${vehicle.heat_score}/100 (${vehicle.heat_score_label || ''})`}
+                  >
+                    {vehicle.heat_score >= 80 ? '\u{1F30B}' : vehicle.heat_score >= 60 ? '\u{1F525}' : '\u{1F321}\u{FE0F}'}
+                  </div>
+                )}
+                {/* Record price crown */}
+                {vehicle.is_record_price && (
+                  <div
+                    style={{
+                      background: 'rgba(234,179,8,0.92)',
+                      backdropFilter: 'blur(4px)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      color: 'white',
+                      padding: '2px 5px',
+                      borderRadius: '4px',
+                      fontSize: '7pt',
+                      fontWeight: 800,
+                      lineHeight: 1,
+                    }}
+                    title="Record price for this make/model/generation"
+                  >
+                    {'\u{1F451}'}
+                  </div>
+                )}
                 {showFollowButton && (
                   <button
                     type="button"
@@ -2340,12 +2438,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     }}
                     disabled={followLoading}
                     style={{
-                      background: isFollowing 
-                        ? 'rgba(59, 130, 246, 0.9)' 
+                      background: isFollowing
+                        ? 'rgba(59, 130, 246, 0.9)'
                         : 'rgba(0, 0, 0, 0.7)',
                       backdropFilter: 'blur(4px)',
-                      border: isFollowing 
-                        ? '1px solid rgba(59, 130, 246, 0.5)' 
+                      border: isFollowing
+                        ? '1px solid rgba(59, 130, 246, 0.5)'
                         : '1px solid rgba(255,255,255,0.2)',
                       color: 'white',
                       padding: isCompactCard ? '0' : '4px 8px',
@@ -2477,8 +2575,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
             {(() => {
               const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
-              
-              // Color mapping for alphabet tiers
+
               const getTierColor = (tier: string) => {
                 switch (tier) {
                   case 'SSS': return '#7c3aed';
@@ -2493,10 +2590,29 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   default: return '#6b7280';
                 }
               };
-              
+
+              const getTierDescription = (tier: string) => {
+                switch (tier) {
+                  case 'SSS': return 'Legendary — museum-grade, historically significant';
+                  case 'SS': return 'Exceptional — near-perfect documentation and provenance';
+                  case 'S': return 'Outstanding — comprehensive data, high engagement';
+                  case 'A': return 'Strong — well-documented with active history';
+                  case 'B': return 'Good — solid data, verified details';
+                  case 'C': return 'Standard — VIN, price, and photos confirmed';
+                  case 'D': return 'Partial — some key data present';
+                  case 'E': return 'Minimal — basic info only';
+                  case 'F': return 'Incomplete — needs more data';
+                  default: return 'Data completeness grade';
+                }
+              };
+
               if (tierLabel) {
                 return (
-                  <span style={{ fontWeight: 700 }}>
+                  <span
+                    style={{ fontWeight: 700, cursor: 'pointer' }}
+                    title={`${tierLabel} tier: ${getTierDescription(tierLabel)}`}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  >
                     <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>{tierLabel}</span> tier
                   </span>
                 );
