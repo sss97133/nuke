@@ -905,13 +905,20 @@ export default function AIDataIngestionSearch() {
           const selected = autocompleteResults[selectedAutocompleteIndex];
           handleAutocompleteSelect(selected);
         } else {
-          // Otherwise, close autocomplete and process input
+          // No item highlighted - close autocomplete and navigate to full search
           setShowAutocomplete(false);
           setSelectedAutocompleteIndex(-1);
-          // Process input directly
-          if (!showPreview) {
-            processInput();
-          } else {
+          const trimmedInput = input.trim();
+          if (trimmedInput && !showPreview) {
+            const maybeUrl = normalizeUrlInput(trimmedInput);
+            if (!trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
+              // Simple text search - navigate to search page
+              navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
+              setInput('');
+            } else {
+              processInput();
+            }
+          } else if (showPreview) {
             confirmAndSave();
           }
         }
