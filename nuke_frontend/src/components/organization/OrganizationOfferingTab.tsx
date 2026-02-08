@@ -1,0 +1,320 @@
+import { useState, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { supabase } from '../../lib/supabase';
+
+// Import markdown files as raw strings via Vite
+import teaserMd from '@docs/investor/N-ZERO_TEASER.md?raw';
+import businessPlanMd from '@docs/investor/N-ZERO_BUSINESS_PLAN.md?raw';
+import informationMemorandumMd from '@docs/investor/N-ZERO_INFORMATION_MEMORANDUM.md?raw';
+import revenueModelMd from '@docs/investor/REVENUE_MODEL.md?raw';
+
+type DocTab = 'teaser' | 'business_plan' | 'information_memorandum' | 'revenue_model';
+
+const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; content: string; pages: string }> = {
+  teaser: {
+    title: 'Executive Summary / Teaser',
+    subtitle: 'Pre-NDA distribution',
+    content: teaserMd,
+    pages: '~4 pages',
+  },
+  business_plan: {
+    title: 'Business Plan',
+    subtitle: 'Comprehensive business plan with appendices',
+    content: businessPlanMd,
+    pages: '~35 pages',
+  },
+  information_memorandum: {
+    title: 'Information Memorandum',
+    subtitle: 'Professional due-diligence document',
+    content: informationMemorandumMd,
+    pages: '~35 pages',
+  },
+  revenue_model: {
+    title: 'Revenue Model',
+    subtitle: 'Detailed revenue streams and projections',
+    content: revenueModelMd,
+    pages: '~3 pages',
+  },
+};
+
+interface Props {
+  organizationId: string;
+  organizationName: string;
+  isOwner: boolean;
+}
+
+export default function OrganizationOfferingTab({ organizationId, organizationName, isOwner }: Props) {
+  const [activeDoc, setActiveDoc] = useState<DocTab>('teaser');
+  const [sessionId] = useState(() => crypto.randomUUID());
+
+  const logAccess = useCallback(async (action: string, document?: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('system_logs').insert({
+        log_type: 'investor_portal',
+        message: action,
+        details: {
+          session_id: sessionId,
+          document: document || null,
+          organization_id: organizationId,
+          user_id: user?.id || 'anonymous',
+          source: 'org_profile',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch {
+      // Silent fail
+    }
+  }, [sessionId, organizationId]);
+
+  useEffect(() => {
+    logAccess('document_viewed', activeDoc);
+  }, [activeDoc, logAccess]);
+
+  const handleExportPDF = async () => {
+    await logAccess('pdf_export_requested', activeDoc);
+    const doc = DOCUMENTS[activeDoc];
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${doc.title} - ${organizationName}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+            color: #1a1a1a;
+          }
+          h1 { font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 8px; }
+          h2 { font-size: 14pt; margin-top: 24px; border-bottom: 1px solid #999; padding-bottom: 4px; }
+          h3 { font-size: 12pt; margin-top: 16px; }
+          table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10pt; }
+          th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+          th { background: #f0f0f0; font-weight: bold; }
+          code { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 9pt; background: #f5f5f5; padding: 1px 4px; }
+          pre { background: #f5f5f5; padding: 12px; font-size: 9pt; overflow-x: auto; border: 1px solid #ddd; }
+          hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }
+          .header-stamp {
+            font-size: 8pt; color: #666; border: 1px solid #ccc;
+            padding: 8px 12px; margin-bottom: 20px; background: #fafafa;
+          }
+          .watermark {
+            position: fixed; bottom: 20px; right: 20px;
+            font-size: 8pt; color: #999;
+          }
+          @media print { body { padding: 20px; } .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="header-stamp">
+          <strong>CONFIDENTIAL</strong> - ${organizationName}<br/>
+          Document: ${doc.title}<br/>
+          Generated: ${new Date().toISOString()}<br/>
+        </div>
+        <div id="content"></div>
+        <div class="watermark">CONFIDENTIAL - ${new Date().toLocaleDateString()}</div>
+      </body>
+      </html>
+    `);
+
+    const contentDiv = printWindow.document.getElementById('content');
+    if (contentDiv) {
+      contentDiv.innerHTML = markdownToHtml(doc.content);
+    }
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+  };
+
+  function markdownToHtml(md: string): string {
+    let html = md
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/```[\s\S]*?```/g, (match) => {
+        const code = match.slice(3, -3).replace(/^\w*\n/, '');
+        return `<pre><code>${code}</code></pre>`;
+      })
+      .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^---$/gm, '<hr/>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+      .replace(/^\|(.+)\|$/gm, (match) => {
+        const cells = match.split('|').filter(c => c.trim());
+        if (cells.every(c => /^[\s-:]+$/.test(c))) return '';
+        return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
+      })
+      .replace(/((?:<tr>.*<\/tr>\n?)+)/g, '<table>$1</table>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br/>');
+    return `<p>${html}</p>`;
+  }
+
+  const doc = DOCUMENTS[activeDoc];
+
+  return (
+    <div style={{ padding: 'var(--space-4)' }}>
+      {/* Document Tabs */}
+      <div style={{
+        display: 'flex',
+        gap: 0,
+        marginBottom: 'var(--space-4)',
+        borderBottom: '2px solid var(--border-medium)',
+      }}>
+        {(Object.entries(DOCUMENTS) as [DocTab, typeof DOCUMENTS[DocTab]][]).map(([key, d]) => (
+          <button
+            key={key}
+            onClick={() => setActiveDoc(key)}
+            style={{
+              padding: '8px 16px',
+              background: activeDoc === key ? 'var(--white)' : 'var(--grey-100)',
+              border: activeDoc === key ? '2px solid var(--border-medium)' : '1px solid var(--border-light)',
+              borderBottom: activeDoc === key ? '2px solid var(--white)' : 'none',
+              marginBottom: activeDoc === key ? '-2px' : '0',
+              fontSize: '8pt',
+              fontWeight: activeDoc === key ? 'bold' : 'normal',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-family)',
+              letterSpacing: '0.5px',
+            }}
+          >
+            {d.title}
+            <span style={{ fontSize: '7pt', color: 'var(--text-disabled)', marginLeft: '6px' }}>
+              {d.pages}
+            </span>
+          </button>
+        ))}
+
+        {/* Export PDF button */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+          <button
+            onClick={handleExportPDF}
+            style={{
+              padding: '6px 14px',
+              background: '#1a1a1a',
+              color: '#fff',
+              border: '1px solid var(--border-medium)',
+              fontSize: '7pt',
+              fontWeight: 'bold',
+              letterSpacing: '1px',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-family)',
+            }}
+          >
+            Export PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Document Content */}
+      <div style={{
+        background: 'var(--white)',
+        border: '2px solid var(--border-medium)',
+        padding: 'var(--space-8) var(--space-10)',
+        minHeight: '600px',
+      }}>
+        <div style={{
+          fontSize: '7pt',
+          color: 'var(--text-disabled)',
+          borderBottom: '1px solid var(--border-light)',
+          paddingBottom: 'var(--space-2)',
+          marginBottom: 'var(--space-6)',
+          display: 'flex',
+          justifyContent: 'space-between',
+        }}>
+          <span>{doc.subtitle}</span>
+          <span>{organizationName} - {new Date().toLocaleDateString()}</span>
+        </div>
+
+        <div className="investor-doc-content">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h1: ({ children }) => (
+                <h1 style={{ fontSize: '16pt', fontWeight: 'bold', borderBottom: '2px solid var(--border-medium)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-6)' }}>{children}</h1>
+              ),
+              h2: ({ children }) => (
+                <h2 style={{ fontSize: '13pt', fontWeight: 'bold', borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-3)', marginTop: 'var(--space-6)' }}>{children}</h2>
+              ),
+              h3: ({ children }) => (
+                <h3 style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: 'var(--space-2)', marginTop: 'var(--space-4)' }}>{children}</h3>
+              ),
+              p: ({ children }) => (
+                <p style={{ fontSize: '9pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>{children}</p>
+              ),
+              ul: ({ children }) => (
+                <ul style={{ fontSize: '9pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol style={{ fontSize: '9pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ol>
+              ),
+              li: ({ children }) => (
+                <li style={{ marginBottom: 'var(--space-1)' }}>{children}</li>
+              ),
+              table: ({ children }) => (
+                <div style={{ overflowX: 'auto', marginBottom: 'var(--space-4)' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '8pt' }}>{children}</table>
+                </div>
+              ),
+              thead: ({ children }) => (
+                <thead style={{ background: 'var(--grey-100)' }}>{children}</thead>
+              ),
+              th: ({ children }) => (
+                <th style={{ border: '1px solid var(--border-medium)', padding: '6px 10px', textAlign: 'left', fontWeight: 'bold', fontSize: '8pt' }}>{children}</th>
+              ),
+              td: ({ children }) => (
+                <td style={{ border: '1px solid var(--border-light)', padding: '5px 10px', fontSize: '8pt' }}>{children}</td>
+              ),
+              code: ({ children, className }) => {
+                if (className?.includes('language-')) {
+                  return (
+                    <pre style={{ background: 'var(--grey-100)', border: '1px solid var(--border-light)', padding: 'var(--space-4)', fontSize: '8pt', fontFamily: "'SF Mono', monospace", overflowX: 'auto', lineHeight: '1.5', marginBottom: 'var(--space-4)' }}>
+                      <code>{children}</code>
+                    </pre>
+                  );
+                }
+                return (
+                  <code style={{ background: 'var(--grey-100)', padding: '1px 4px', fontSize: '8pt', fontFamily: "'SF Mono', monospace", border: '1px solid var(--border-light)' }}>{children}</code>
+                );
+              },
+              pre: ({ children }) => <>{children}</>,
+              blockquote: ({ children }) => (
+                <blockquote style={{ borderLeft: '3px solid var(--border-medium)', paddingLeft: 'var(--space-4)', margin: 'var(--space-3) 0', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '9pt' }}>{children}</blockquote>
+              ),
+              hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: 'var(--space-6) 0' }} />,
+              strong: ({ children }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,
+              a: ({ href, children }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{children}</a>
+              ),
+            }}
+          >
+            {doc.content}
+          </ReactMarkdown>
+        </div>
+
+        <div style={{
+          borderTop: '1px solid var(--border-light)',
+          paddingTop: 'var(--space-4)',
+          marginTop: 'var(--space-8)',
+          fontSize: '7pt',
+          color: 'var(--text-disabled)',
+          textAlign: 'center',
+          lineHeight: '1.6',
+        }}>
+          CONFIDENTIAL - This document is the property of {organizationName}.<br />
+          All access logged and monitored.
+        </div>
+      </div>
+    </div>
+  );
+}

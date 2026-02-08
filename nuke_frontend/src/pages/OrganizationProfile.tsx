@@ -26,6 +26,7 @@ import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationServiceTab } from '../components/organization/OrganizationServiceTab';
 import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
 import OrganizationLegalTab from '../components/organization/OrganizationLegalTab';
+import OrganizationOfferingTab from '../components/organization/OrganizationOfferingTab';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
@@ -1011,6 +1012,7 @@ export default function OrganizationProfile() {
               { id: 'vehicles', priority: 80, label: 'Vehicles' },
               { id: 'images', priority: 70, label: 'Images' },
               { id: 'inventory', priority: 60, label: 'Inventory' },
+              { id: 'offering', priority: 57, label: 'Offering' },
               { id: 'legal', priority: 55, label: 'Legal & SEC' },
               { id: 'contributors', priority: 50, label: 'Contributors' },
               { id: 'marketplace', priority: 40, label: 'Marketplace' },
@@ -3501,6 +3503,15 @@ export default function OrganizationProfile() {
               isOwner={isOwner}
             />
           </div>
+        )}
+
+        {/* Offering Tab */}
+        {activeTab === 'offering' && organization && organizationId && (
+          <OrganizationOfferingTab
+            organizationId={organizationId}
+            organizationName={organization.business_name}
+            isOwner={isOwner}
+          />
         )}
 
         {/* Legal & SEC Tab */}
