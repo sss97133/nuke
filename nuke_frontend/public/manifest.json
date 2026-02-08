@@ -1,7 +1,7 @@
 {
   "name": "n-zero",
   "short_name": "n-zero",
-  "description": "Collector vehicle intelligence platform",
+  "description": "Vehicle provenance engine",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
