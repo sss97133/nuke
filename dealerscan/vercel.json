@@ -1,7 +1,7 @@
 {
   "buildCommand": "cd packages/web && npm run build",
   "outputDirectory": "packages/web/dist",
-  "installCommand": "npm install",
+  "installCommand": "npm install --workspace=packages/shared --workspace=packages/web",
   "framework": null,
   "routes": [
     {
