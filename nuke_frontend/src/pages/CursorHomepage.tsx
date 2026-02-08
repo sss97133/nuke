@@ -3261,7 +3261,7 @@ const CursorHomepage: React.FC = () => {
           // Snapshot of the intended query shape (helps debug schema drift)
           filters: { is_public: true, showPending: filters.showPending, timePeriod },
         });
-        setError(`Failed to load vehicles: ${error.message}`);
+        setError('Unable to load vehicles. Please try refreshing the page.');
         setFeedVehicles([]);
         return;
       }
@@ -3732,7 +3732,7 @@ const CursorHomepage: React.FC = () => {
 
     } catch (error: any) {
       console.error('❌ Unexpected error loading feed:', error);
-      setError(`Unexpected error: ${error?.message || 'Unknown error'}`);
+      setError('Something went wrong. Please try refreshing the page.');
       setFeedVehicles([]);
     } finally {
       setLoading(false);
@@ -7500,35 +7500,30 @@ const CursorHomepage: React.FC = () => {
         {/* Error Display */}
         {error && (
           <div style={{
-            background: '#fee',
-            border: '2px solid #f00',
+            background: 'var(--surface)',
+            border: '2px solid var(--border)',
             padding: 'var(--space-8)',
             margin: 'var(--space-4)',
-            textAlign: 'left'
+            textAlign: 'center'
           }}>
-            <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: '#c00' }}>
-              Error Loading Content
-            </div>
-            <div style={{ fontSize: '9pt', color: '#800', marginBottom: '8px' }}>
+            <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text)' }}>
               {error}
             </div>
-            {debugInfo && (
-              <details style={{ fontSize: '8pt', color: '#666', marginTop: '8px' }}>
-                <summary style={{ cursor: 'pointer', marginBottom: '4px' }}>Debug Info</summary>
-                <pre style={{ 
-                  background: 'var(--surface)', 
-                  padding: '8px', 
-                  border: '1px solid var(--border)',
-                  overflow: 'auto',
-                  fontSize: '7pt'
-                }}>
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-              </details>
-            )}
-            <div style={{ fontSize: '8pt', color: '#666', marginTop: '8px' }}>
-              Check browser console for more details. Verify environment variables are set in Vercel.
-            </div>
+            <button
+              type="button"
+              onClick={() => { setError(null); window.location.reload(); }}
+              style={{
+                background: 'var(--grey-600)',
+                color: 'white',
+                border: '2px solid var(--border)',
+                padding: '6px 16px',
+                fontSize: '9pt',
+                cursor: 'pointer',
+                fontFamily: '"MS Sans Serif", sans-serif',
+              }}
+            >
+              Refresh
+            </button>
           </div>
         )}
 
