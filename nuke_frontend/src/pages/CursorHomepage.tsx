@@ -3553,9 +3553,6 @@ const CursorHomepage: React.FC = () => {
           model: displayModel || v.model,
           display_price: displayPrice,
           image_count: allImages?.length || (optimalImageUrl ? 1 : 0),
-          view_count: 0,
-          event_count: 0,
-          activity_7d: 0,
           hype_score: hypeScore,
           hype_reason: hypeReason,
           primary_image_url: optimalImageUrl,
@@ -3571,8 +3568,6 @@ const CursorHomepage: React.FC = () => {
           external_listings: externalListings.length > 0 ? externalListings : undefined,
           deal_score_label: dealLabel,
           heat_score_label: heatLabel,
-          tier: 'C',
-          tier_label: 'Tier C'
         };
       });
 
