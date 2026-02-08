@@ -1685,20 +1685,6 @@ const CursorHomepage: React.FC = () => {
         // If a source isn't in includedSources, exclude it (don't default to included)
         const isIncluded = includedSources[src] === true;
         
-        // #region agent log
-        if (src === 'bat') {
-          console.log('[DEBUG] BaT vehicle filter check', { 
-            src, 
-            isIncluded, 
-            includedSourcesValue: includedSources[src], 
-            includedSourcesKeys: Object.keys(includedSources), 
-            hideBat: filters.hideBat,
-            vehicleId: v.id,
-            discoveryUrl: v.discovery_url,
-            profileOrigin: v.profile_origin
-          });
-        }
-        // #endregion
         
         return isIncluded;
       });
@@ -3197,10 +3183,12 @@ const CursorHomepage: React.FC = () => {
             case 'deal_score':
               orderColumn = 'deal_score';
               orderAscending = false;
+              q = q.not('deal_score', 'is', null);
               break;
             case 'heat_score':
               orderColumn = 'heat_score';
               orderAscending = false;
+              q = q.not('heat_score', 'is', null);
               break;
             default:
               orderColumn = 'created_at';
@@ -3549,6 +3537,16 @@ const CursorHomepage: React.FC = () => {
         // Attach external_listings array for VehicleCardDense auction badge detection
         const externalListings = externalListingsByVehicleId.get(vehicleId) || [];
         
+        // Derive deal/heat labels client-side from numeric scores
+        const dealScore = v.deal_score != null ? Number(v.deal_score) : null;
+        const heatScore = v.heat_score != null ? Number(v.heat_score) : null;
+        const dealLabel = dealScore != null
+          ? (dealScore >= 20 ? 'steal' : dealScore >= 10 ? 'good_deal' : dealScore >= -5 ? 'fair' : dealScore >= -15 ? 'overpriced' : 'way_overpriced')
+          : null;
+        const heatLabel = heatScore != null
+          ? (heatScore >= 80 ? 'volcanic' : heatScore >= 60 ? 'fire' : heatScore >= 40 ? 'hot' : heatScore >= 20 ? 'warm' : 'cold')
+          : null;
+
         return {
           ...v,
           make: displayMake || v.make,
@@ -3571,6 +3569,8 @@ const CursorHomepage: React.FC = () => {
           all_images: allImages || (optimalImageUrl ? [{ id: `fallback-${v.id}-0`, url: optimalImageUrl, is_primary: true }] : []),
           // Attach external_listings for auction badge detection (VehicleCardDense expects external_listings[0])
           external_listings: externalListings.length > 0 ? externalListings : undefined,
+          deal_score_label: dealLabel,
+          heat_score_label: heatLabel,
           tier: 'C',
           tier_label: 'Tier C'
         };
@@ -5963,9 +5963,6 @@ const CursorHomepage: React.FC = () => {
                             .filter(p => p.key !== 'bat')
                             .map(p => p.key);
                           
-                          // #region agent log
-                          console.log('[DEBUG] Setting BaT filter', { allOtherKeys, sourcePogsKeys: sourcePogs.all.map(p=>p.key), text });
-                          // #endregion
                           
                           setFilters((prev) => {
                             const newFilters = {
@@ -6753,7 +6750,7 @@ const CursorHomepage: React.FC = () => {
                       const updated = [...locationFavorites, newFavorite];
                       saveLocationFavorites(updated);
                     } else {
-                      alert('This location is already in your favorites');
+                      // Already in favorites — silently ignore
                     }
                   }
                 };

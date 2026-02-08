@@ -485,19 +485,6 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
             circleBadge={true}
             circleBadgeBg="rgba(0,0,0,0.8)"
           />
-          <span
-            style={{
-              fontSize: '8px',
-              fontWeight: 700,
-              color: 'white',
-              background: 'rgba(0,0,0,0.7)',
-              padding: '2px 5px',
-              borderRadius: 3,
-              textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-            }}
-          >
-            {getPlatformLabel(listing.platform)}
-          </span>
         </div>
         {/* Countdown overlay at bottom */}
         {listing.end_date && (
