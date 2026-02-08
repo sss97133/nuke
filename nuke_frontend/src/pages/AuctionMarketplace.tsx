@@ -696,9 +696,6 @@ export default function AuctionMarketplace() {
         bat: batCount,
         total: filtered.length,
       });
-      console.log(
-        `Loaded ${filtered.length} active auction listings (${nativeListings?.length || 0} native, ${externalListings?.length || 0} external)`
-      );
     } catch (error) {
       console.error('Error loading listings:', error);
       setListings([]);
@@ -1070,7 +1067,6 @@ export default function AuctionMarketplace() {
             }
           }}
           onBidPlaced={(bidId) => {
-            console.log('Proxy bid placed:', bidId);
             setProxyBidListing(null);
           }}
         />
