@@ -1873,196 +1873,130 @@ export default function OrganizationProfile() {
       minHeight: '100vh',
       width: '100%'
     }}>
-      {/* HEADER: Organization Name - Top Focus */}
+      {/* HEADER */}
       <div style={{
         position: 'sticky',
         top: 'var(--header-height, 40px)',
         zIndex: 900,
         background: 'var(--surface-glass)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid var(--border)',
-        padding: '8px 12px',
-        marginBottom: '12px',
-        boxShadow: 'rgba(0, 0, 0, 0.12) 0px 2px 4px'
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderBottom: '1px solid var(--border)',
+        padding: '10px 20px',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          {/* Organization name - PRIMARY FOCUS */}
-          <div style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-            {headerLogoUrl && (
-              <img
-                src={String(headerLogoUrl).startsWith('//') ? `https:${headerLogoUrl}` : headerLogoUrl}
-                alt=""
-                width={89}
-                height={37}
-                style={{
-                  display: 'block',
-                  maxWidth: 120,
-                  height: 'auto',
-                  imageRendering: 'auto'
-                }}
-                onError={(e) => {
-                  // Hide broken external logos silently
-                  (e.currentTarget as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            )}
-            {/* Show BaT logo for larger displays even if headerLogoUrl fails */}
-            {isBatOrg && !headerLogoUrl && (
-              <img
-                src="/vendor/bat/favicon.ico"
-                alt="Bring a Trailer"
-                width={89}
-                height={37}
-                style={{
-                  display: 'block',
-                  maxWidth: 120,
-                  height: 'auto',
-                  imageRendering: 'auto'
-                }}
-              />
-            )}
-            {/* Favicon from website - show if no logo or as additional identifier */}
-            {organization.website && (
-              <FaviconIcon 
-                url={organization.website} 
-                size={20}
-                style={{ flexShrink: 0 }}
-              />
-            )}
-            <h1 style={{ 
-              fontSize: '20pt', 
-              fontWeight: 700, 
-              color: 'var(--text)', 
-              margin: 0,
-              lineHeight: '1.2',
-              wordBreak: 'break-word'
+        {/* Row 1: Identity */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+          {headerLogoUrl && (
+            <img
+              src={String(headerLogoUrl).startsWith('//') ? `https:${headerLogoUrl}` : headerLogoUrl}
+              alt=""
+              style={{ display: 'block', height: '28px', width: 'auto' }}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          )}
+          {isBatOrg && !headerLogoUrl && (
+            <img src="/vendor/bat/favicon.ico" alt="" style={{ display: 'block', height: '28px', width: 'auto' }} />
+          )}
+          {organization.website && !headerLogoUrl && (
+            <FaviconIcon url={organization.website} size={18} style={{ flexShrink: 0 }} />
+          )}
+          <h1 style={{ fontSize: '15pt', fontWeight: 700, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>
+            {displayName}
+          </h1>
+          {organization.business_type && (
+            <span style={{
+              fontSize: '7pt',
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              padding: '2px 8px',
+              border: '1px solid var(--border-light)',
+              background: 'var(--grey-50)',
             }}>
-              {displayName}
-            </h1>
-            {organization.business_type && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                  {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
-                </div>
-              </div>
-            )}
-          </div>
+              {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
+            </span>
+          )}
 
-          {/* Stock price (if tradable) - Secondary */}
+          {/* Stock ticker inline */}
           {organization.is_tradable && offering && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)' }}>
-                  ${offering.current_share_price.toFixed(2)}
-                </div>
-                <span style={{ fontSize: '9pt', color: 'var(--color-text-muted)' }}>per share</span>
-              </div>
-              <span style={{
-                background: 'var(--surface-hover)',
-                border: '1px solid var(--border)',
-                padding: '2px 6px',
-                borderRadius: '2px',
-                fontSize: '8pt',
-                color: 'var(--success)',
-                fontWeight: 600
-              }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--success)', letterSpacing: '0.5px' }}>
                 {organization.stock_symbol || 'ORG'}
               </span>
-              <button
-                onClick={() => setShowTrade(true)}
-                className="button button-primary button-small"
-                style={{ fontSize: '8pt', fontFamily: '"MS Sans Serif", sans-serif', borderRadius: 0 }}
-              >
-                Trade Shares
+              <span style={{ fontSize: '12pt', fontWeight: 700 }}>
+                ${offering.current_share_price.toFixed(2)}
+              </span>
+              <button onClick={() => setShowTrade(true)} className="button button-primary button-small" style={{ fontSize: '7pt', padding: '3px 10px' }}>
+                Trade
               </button>
             </div>
           )}
+        </div>
 
-          {/* Creator badge with actual username - hide if creator is current user and only a contractor */}
+        {/* Row 2: Actions + Meta */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {organization.discovered_by && (() => {
-            // Find the creator in contributors list
             const creator = contributors.find(c => c.user_id === organization.discovered_by);
             const creatorName = creator?.profiles?.full_name || creator?.profiles?.username || 'Unknown';
             const creatorRole = creator?.role;
-            
-            // Check if creator is the current user
             const isCurrentUser = session?.user?.id === organization.discovered_by;
-            
-            // Hide badge if current user is creator AND they're only a contractor/moderator (not owner/manager)
             if (isCurrentUser) {
               const isCreatorOwner = creatorRole && ['owner', 'co_founder', 'board_member', 'manager'].includes(creatorRole);
-              if (!isCreatorOwner) {
-                // Current user created it but is only contractor/moderator - hide badge
-                return null;
-              }
+              if (!isCreatorOwner) return null;
             }
-            
             return (
-              <a
-                href={`/profile/${organization.discovered_by}`}
-                className="badge badge-secondary"
-                title="View profile"
-                style={{ textDecoration: 'none', fontSize: '8pt', cursor: 'pointer' }}
-              >
-                Created by {creatorName}
+              <a href={`/profile/${organization.discovered_by}`} style={{ fontSize: '7pt', color: 'var(--text-muted)', textDecoration: 'none' }}>
+                by {creatorName}
               </a>
             );
           })()}
+          {organization.website && (
+            <a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+              {organization.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+            </a>
+          )}
+          {organization.phone && (
+            <a href={`tel:${organization.phone}`} style={{ fontSize: '7pt', color: 'var(--text-muted)', textDecoration: 'none' }}>
+              {organization.phone}
+            </a>
+          )}
 
-          {/* Action buttons */}
-          {session && (
-            <>
-              <button
-                onClick={() => setShowWorkOrderForm(true)}
-                className="button button-primary button-small"
-                style={{ fontSize: '8pt', fontFamily: '"MS Sans Serif", sans-serif', borderRadius: 0 }}
-              >
-                Request Work
-              </button>
-              <button
-                onClick={() => setShowContributeModal(true)}
-                className="button button-secondary button-small"
-                style={{ fontSize: '8pt', fontFamily: '"MS Sans Serif", sans-serif', borderRadius: 0 }}
-              >
-                Contribute Data
-              </button>
-              {!isOwner && (
-                <button
-                  onClick={() => setShowOwnershipModal(true)}
-                  className="button button-secondary button-small"
-                  style={{ fontSize: '8pt', fontFamily: '"MS Sans Serif", sans-serif', borderRadius: 0 }}
-                >
-                  Claim Ownership
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+            {session && (
+              <>
+                <button onClick={() => setShowWorkOrderForm(true)} className="button button-primary button-small" style={{ fontSize: '7pt', padding: '3px 10px' }}>
+                  Request Work
                 </button>
-              )}
-            </>
+                <button onClick={() => setShowContributeModal(true)} className="button button-secondary button-small" style={{ fontSize: '7pt', padding: '3px 10px' }}>
+                  Contribute
+                </button>
+                {!isOwner && (
+                  <button onClick={() => setShowOwnershipModal(true)} className="button button-secondary button-small" style={{ fontSize: '7pt', padding: '3px 10px' }}>
+                    Claim
+                  </button>
                 )}
-        </div>
-              </div>
-
-      {/* Primary Image */}
-      {heroCandidates.length > 0 && (
-        <section style={{ margin: '16px' }}>
-          <div
-            style={{
-              position: 'relative',
-              height: '300px',
-              border: '1px solid var(--border)',
-              overflow: 'hidden',
-              background: 'var(--surface)'
-            }}
-          >
-            <img
-              src={heroCandidates[Math.min(primaryHeroSrcIndex, heroCandidates.length - 1)]}
-              alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              onError={() => {
-                setPrimaryHeroSrcIndex((idx) => Math.min(idx + 1, heroCandidates.length - 1));
-              }}
-            />
+              </>
+            )}
           </div>
-        </section>
+        </div>
+      </div>
+
+      {/* Hero Image */}
+      {heroCandidates.length > 0 && (
+        <div style={{
+          height: '220px',
+          overflow: 'hidden',
+          background: '#1a1a1a',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          <img
+            src={heroCandidates[Math.min(primaryHeroSrcIndex, heroCandidates.length - 1)]}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.9 }}
+            onError={() => { setPrimaryHeroSrcIndex((idx) => Math.min(idx + 1, heroCandidates.length - 1)); }}
+          />
+        </div>
       )}
 
       {/* Dynamic Tabs - Respects explicit settings, uses data-driven as fallback */}
@@ -2111,8 +2045,40 @@ export default function OrganizationProfile() {
       }}>
         {activeTab === 'overview' && (
           <>
+            {/* Key Metrics Bar */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: '1px',
+              background: 'var(--border-light)',
+              border: '1px solid var(--border-light)',
+              marginBottom: '16px',
+            }}>
+              {[
+                { label: 'Vehicles', value: vehicles.length },
+                { label: 'Images', value: images.length },
+                { label: 'Events', value: timelineEvents.length },
+                ...(organization.estimated_value || organization.current_value ? [{
+                  label: 'Est. Value',
+                  value: formatUsd(organization.estimated_value || organization.current_value || 0),
+                }] : []),
+              ].map((stat, i) => (
+                <div key={i} style={{
+                  background: 'var(--white)',
+                  padding: '12px 16px',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>
+                    {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+                  </div>
+                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
+            </div>
 
-            {/* GitHub-Style Activity Heatmap */}
+            {/* Activity Heatmap */}
             <div style={{ marginBottom: '16px' }}>
               <OrganizationTimelineHeatmap organizationId={organizationId!} />
             </div>
@@ -2170,18 +2136,19 @@ export default function OrganizationProfile() {
               
               if (sortedAuctions.length > 0) {
                 return (
-                  <div className="card" style={{ marginBottom: '16px', border: '2px solid #dc2626' }}>
-                    <div className="card-header" style={{ 
-                      fontSize: '11pt', 
-                      fontWeight: 700, 
-                      color: '#dc2626',
+                  <div className="card" style={{ marginBottom: '16px', borderTop: '3px solid var(--error)' }}>
+                    <div className="card-header" style={{
+                      fontSize: '9pt',
+                      fontWeight: 700,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      gap: '12px',
-                      flexWrap: 'wrap'
+                      gap: '8px',
                     }}>
-                      <span>LIVE AUCTIONS ({sortedAuctions.length})</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--error)', display: 'inline-block' }} />
+                        LIVE ({sortedAuctions.length})
+                      </span>
                     </div>
                     <div className="card-body">
                       <div
@@ -2225,131 +2192,57 @@ export default function OrganizationProfile() {
 
             {/* Vehicles for Sale / Currently in Service */}
             <div className="card" style={{ marginBottom: '16px' }}>
-              <div className="card-header" style={{ 
-                fontSize: '11pt', 
+              <div className="card-header" style={{
+                fontSize: '9pt',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: '12px',
-                flexWrap: 'wrap'
+                gap: '8px',
               }}>
                 <span>
-                  {intelligence?.effectivePrimaryFocus === 'service' ? 'Currently in Service' : 'Vehicles for Sale'}
+                  {intelligence?.effectivePrimaryFocus === 'service' ? 'In Service' : 'Inventory'}
                   {vehicles.length > 0 && (
-                    <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '8px' }}>
-                      ({vehicles.filter((v: any) => !v.is_sold && v.status === 'active').length})
+                    <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: '6px' }}>
+                      {vehicles.filter((v: any) => !v.is_sold && v.status === 'active').length}
                     </span>
                   )}
                 </span>
-                
-                {/* Controls Row */}
-                <div style={{ display: 'inline-flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* Sort Controls - only show for inventory vehicles */}
-                  {intelligence?.effectivePrimaryFocus !== 'service' && (
-                    <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as OrgSortBy)}
-                        style={{
-                          padding: '2px 6px',
-                          fontSize: '8pt',
-                          border: '1px solid var(--border)',
-                          background: 'var(--surface)',
-                          color: 'var(--text)',
-                          fontFamily: '"MS Sans Serif", sans-serif',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="newest">Newest</option>
-                        <option value="oldest">Oldest</option>
-                        <option value="year">Year</option>
-                        <option value="make">Make</option>
-                        <option value="model">Model</option>
-                        <option value="price_high">Price: High</option>
-                        <option value="price_low">Price: Low</option>
-                      </select>
-                      
-                      <button
-                        onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                        style={{
-                          padding: '2px 8px',
-                          fontSize: '8pt',
-                          border: '1px solid var(--border)',
-                          background: sortDirection === 'asc' ? 'var(--grey-600)' : 'var(--grey-200)',
-                          color: sortDirection === 'asc' ? 'var(--white)' : 'var(--text)',
-                          cursor: 'pointer',
-                          fontFamily: '"MS Sans Serif", sans-serif'
-                        }}
-                        title={`Sort ${sortDirection === 'asc' ? 'Ascending' : 'Descending'}`}
-                      >
-                        {sortDirection === 'asc' ? '↑' : '↓'}
-                      </button>
-                    </div>
-                  )}
 
-                  {/* Grid Controls */}
-                  <div
+                {/* Compact controls */}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  {intelligence?.effectivePrimaryFocus !== 'service' && (
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as OrgSortBy)}
+                      style={{ padding: '2px 4px', fontSize: '7pt', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                    >
+                      <option value="newest">Newest</option>
+                      <option value="oldest">Oldest</option>
+                      <option value="year">Year</option>
+                      <option value="make">Make</option>
+                      <option value="model">Model</option>
+                      <option value="price_high">Price ↓</option>
+                      <option value="price_low">Price ↑</option>
+                    </select>
+                  )}
+                  <input
+                    type="range"
+                    min="1" max="16" step="1"
+                    value={cardsPerRow}
+                    onChange={(e) => setCardsPerRow(parseInt(e.target.value, 10))}
+                    className="nuke-range nuke-range-accent"
+                    style={{ width: '80px' }}
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-                    title={`${cardsPerRow} per row`}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setThumbFitMode(thumbFitMode === 'square' ? 'original' : 'square'); }}
+                    style={{ padding: '1px 5px', fontSize: '7pt', border: '1px solid var(--border)', background: 'var(--grey-200)', color: 'var(--text)', cursor: 'pointer' }}
+                    title={thumbFitMode === 'square' ? 'Original aspect ratio' : 'Square crop'}
                   >
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: '"MS Sans Serif", sans-serif' }}>
-                      {cardsPerRow}/row
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="16"
-                      step="1"
-                      value={cardsPerRow}
-                      onChange={(e) => setCardsPerRow(parseInt(e.target.value, 10))}
-                      className="nuke-range nuke-range-accent"
-                      style={{ width: '110px' }}
-                    />
-                    <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setThumbFitMode('square');
-                        }}
-                        style={{
-                          padding: '1px 6px',
-                          fontSize: '7pt',
-                          border: '1px solid var(--border)',
-                          background: thumbFitMode === 'square' ? 'var(--grey-600)' : 'var(--grey-200)',
-                          color: thumbFitMode === 'square' ? 'var(--white)' : 'var(--text)',
-                          cursor: 'pointer',
-                          borderRadius: '999px',
-                          fontFamily: '"MS Sans Serif", sans-serif'
-                        }}
-                        title="Square crop thumbnails"
-                      >
-                        □
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setThumbFitMode('original');
-                        }}
-                        style={{
-                          padding: '1px 6px',
-                          fontSize: '7pt',
-                          border: '1px solid var(--border)',
-                          background: thumbFitMode === 'original' ? 'var(--grey-600)' : 'var(--grey-200)',
-                          color: thumbFitMode === 'original' ? 'var(--white)' : 'var(--text)',
-                          cursor: 'pointer',
-                          borderRadius: '999px',
-                          fontFamily: '"MS Sans Serif", sans-serif'
-                        }}
-                        title="Original aspect ratio thumbnails"
-                      >
-                        ⊞
-                      </button>
-                    </div>
-                  </div>
+                    {thumbFitMode === 'square' ? '⊞' : '□'}
+                  </button>
                 </div>
               </div>
               <div className="card-body">
@@ -2565,150 +2458,69 @@ export default function OrganizationProfile() {
               title={intelligence?.effectivePrimaryFocus === 'service' ? 'Service Archive' : 'Sold Inventory Archive'}
             />
 
-            {/* Basic Info */}
+            {/* Details */}
             <div className="card" style={{ marginBottom: '16px' }}>
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Organization Details</span>
-                {isOwner && (
-                  <button
-                    className="button button-small button-secondary"
-                    onClick={() => setShowLocationPicker(true)}
-                    style={{ fontSize: '8pt' }}
-                  >
-                    {organization.latitude && organization.longitude ? 'Update Location' : 'Set GPS Location'}
-                  </button>
-                )}
+              <div className="card-header" style={{ fontSize: '9pt', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Details</span>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {isOwner && (
+                    <button className="button button-small button-secondary" onClick={() => setShowLocationPicker(true)} style={{ fontSize: '7pt', padding: '2px 8px' }}>
+                      {organization.latitude ? 'GPS' : 'Set Location'}
+                    </button>
+                  )}
+                  {(isOwner || currentUserRole === 'moderator' || currentUserRole === 'contractor') && (
+                    <button onClick={() => setShowOrganizationEditor(true)} className="button button-small" style={{ fontSize: '7pt', padding: '2px 8px' }}>
+                      Edit
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="card-body" style={{ fontSize: '9pt' }}>
-                {organization.business_type && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Type:</strong> {organization.business_type}
-                  </div>
+              <div className="card-body">
+                {organization.description && (
+                  <p style={{ fontSize: '9pt', lineHeight: 1.5, margin: '0 0 12px 0', color: 'var(--text)' }}>
+                    {organization.description}
+                  </p>
                 )}
-                {(organization.estimated_value || organization.current_value) && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Estimated Value:</strong>{' '}
-                    {typeof organization.estimated_value === 'number'
-                      ? formatUsd(organization.estimated_value)
-                      : (typeof organization.current_value === 'number' ? formatUsd(organization.current_value) : '—')}
-                    {organization.last_valuation_date ? (
-                      <span style={{ marginLeft: '6px', fontSize: '8pt', color: 'var(--text-muted)' }}>
-                        (as of {organization.last_valuation_date})
-                      </span>
-                    ) : null}
-                  </div>
-                )}
-              {organization.description && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Description:</strong> {organization.description}
-                  </div>
-              )}
-                {(organization.inventory_numbers || isOwner) && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Inventory Numbers:</strong> {organization.inventory_numbers || '—'}
-                  </div>
-                )}
-                {(organization.market_share || isOwner) && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Market Share:</strong> {organization.market_share || '—'}
-                  </div>
-                )}
-                {(organization.branding || isOwner) && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Branding:</strong> {organization.branding || '—'}
-                  </div>
-                )}
-                {(organization.labeling || isOwner) && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Labeling:</strong> {organization.labeling || '—'}
-                  </div>
-                )}
-                {organization.address && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Address:</strong> {organization.address}, {organization.city}, {organization.state} {organization.zip_code}
-                  </div>
-                )}
-                {organization.latitude && organization.longitude && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>GPS:</strong> {organization.latitude.toFixed(6)}, {organization.longitude.toFixed(6)}
-                    {' '}
-                    <a 
-                      href={`https://www.google.com/maps?q=${organization.latitude},${organization.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: '8pt', color: 'var(--accent)' }}
-                    >
-                      (view on map)
-                    </a>
-                  </div>
-                )}
-                {organization.phone && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Phone:</strong>{' '}
-                    <a href={`tel:${organization.phone}`} style={{ color: 'var(--accent)', textDecoration: 'none' }} className="hover:underline">
-                      {organization.phone}
-                    </a>
-                  </div>
-                )}
-                {organization.email && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Email:</strong>{' '}
-                    <a href={`mailto:${organization.email}`} style={{ color: 'var(--accent)', textDecoration: 'none' }} className="hover:underline">
-                      {organization.email}
-                    </a>
-                  </div>
-                )}
-                {organization.website && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Website:</strong>{' '}
-                    <a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }} className="hover:underline">
-                      {organization.website}
-                    </a>
-                  </div>
-                )}
-                {organization.labor_rate && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <strong>Labor Rate:</strong> ${organization.labor_rate}/hr
-                    {isOwner && (
-                      <button
-                        onClick={() => setShowLaborRateEditor(true)}
-                        style={{
-                          marginLeft: '8px',
-                          fontSize: '8pt',
-                          padding: '2px 6px',
-                          background: 'transparent',
-                          border: '1px solid var(--border)',
-                          borderRadius: '3px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '8pt' }}>
+                  {organization.business_type && (
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Type</div><div style={{ fontWeight: 600 }}>{formatBusinessTypeLabel(organization.business_type) || organization.business_type}</div></div>
+                  )}
+                  {(organization.estimated_value || organization.current_value) && (
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Value</div><div style={{ fontWeight: 600 }}>{formatUsd(organization.estimated_value || organization.current_value || 0)}</div></div>
+                  )}
+                  {organization.address && (
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</div><div>{organization.city}{organization.state ? `, ${organization.state}` : ''}{organization.zip_code ? ` ${organization.zip_code}` : ''}</div></div>
+                  )}
+                  {organization.phone && (
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phone</div><a href={`tel:${organization.phone}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{organization.phone}</a></div>
+                  )}
+                  {organization.email && (
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</div><a href={`mailto:${organization.email}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{organization.email}</a></div>
+                  )}
+                  {organization.website && (
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Website</div><a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{organization.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></div>
+                  )}
+                  {organization.labor_rate && (
+                    <div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Labor Rate</div>
+                      <div style={{ fontWeight: 600 }}>
+                        ${organization.labor_rate}/hr
+                        {isOwner && <button onClick={() => setShowLaborRateEditor(true)} style={{ marginLeft: '6px', fontSize: '7pt', padding: '1px 4px', background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer' }}>edit</button>}
+                      </div>
+                    </div>
+                  )}
+                  {organization.latitude && organization.longitude && (
+                    <div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>GPS</div>
+                      <a href={`https://www.google.com/maps?q=${organization.latitude},${organization.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: '8pt' }}>
+                        {organization.latitude.toFixed(4)}, {organization.longitude.toFixed(4)}
+                      </a>
+                    </div>
+                  )}
+                </div>
                 {!organization.labor_rate && isOwner && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <button
-                      onClick={() => setShowLaborRateEditor(true)}
-                      className="button button-small button-secondary"
-                      style={{ fontSize: '8pt' }}
-                    >
-                      Set Labor Rate
-                    </button>
-                  </div>
-                )}
-                
-                {/* Edit Organization Details Button */}
-                {(isOwner || currentUserRole === 'moderator' || currentUserRole === 'contractor') && (
-                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                    <button
-                      onClick={() => setShowOrganizationEditor(true)}
-                      className="button button-small"
-                      style={{ fontSize: '8pt' }}
-                    >
-                      ✏️ Edit Organization Details
-                    </button>
+                  <div style={{ marginTop: '8px' }}>
+                    <button onClick={() => setShowLaborRateEditor(true)} className="button button-small button-secondary" style={{ fontSize: '7pt', padding: '2px 8px' }}>Set Labor Rate</button>
                   </div>
                 )}
               </div>
@@ -2750,26 +2562,7 @@ export default function OrganizationProfile() {
               </div>
             )}
 
-            {/* Stats */}
-            <div className="card" style={{ marginBottom: '16px' }}>
-              <div className="card-header">Statistics</div>
-              <div className="card-body" style={{ fontSize: '9pt' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', textAlign: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '14pt', fontWeight: 'bold' }}>{vehicles.length}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Vehicles</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '14pt', fontWeight: 'bold' }}>{images.length}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Images</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '14pt', fontWeight: 'bold' }}>{timelineEvents.length}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Events</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Stats moved to top metrics bar */}
           </>
         )}
 
