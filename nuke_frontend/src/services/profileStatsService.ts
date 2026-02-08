@@ -78,7 +78,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .from('auction_bids')
     .select(`
       *,
-      auction:auction_events(*, vehicle:vehicles(*))
+      auction:auction_listings(*, vehicle:vehicles(*))
     `)
     .eq('bidder_id', userId)
     .order('created_at', { ascending: false })
@@ -343,7 +343,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
             vehicle:vehicles(*)
           `)
           .in('vehicle_id', ids)
-          .order('auction_end_at', { ascending: false })
+          .order('auction_end_date', { ascending: false })
           .limit(100)
       )
     );
@@ -355,8 +355,8 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     }
 
     auctionListings.sort((a: any, b: any) => {
-      const at = a?.auction_end_at ? new Date(a.auction_end_at).getTime() : 0;
-      const bt = b?.auction_end_at ? new Date(b.auction_end_at).getTime() : 0;
+      const at = a?.auction_end_date ? new Date(a.auction_end_date).getTime() : 0;
+      const bt = b?.auction_end_date ? new Date(b.auction_end_date).getTime() : 0;
       return bt - at;
     });
     auctionListings.splice(100);
@@ -375,7 +375,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .from('auction_bids')
     .select(`
       *,
-      auction:auction_events(*, vehicle:vehicles(*)),
+      auction:auction_listings(*, vehicle:vehicles(*)),
       bidder:profiles(*)
     `)
     .in('bidder_id', contributorIds)

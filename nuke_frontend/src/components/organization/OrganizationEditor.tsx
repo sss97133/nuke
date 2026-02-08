@@ -30,11 +30,6 @@ interface OrgData {
   tax_rate?: number;
   latitude?: number;
   longitude?: number;
-  // Neutral facts (human-readable)
-  inventory_numbers?: string;
-  market_share?: string;
-  branding?: string;
-  labeling?: string;
   // Valuation
   estimated_value?: number;
   last_valuation_date?: string;
@@ -82,12 +77,6 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
         tax_rate: data.tax_rate || null,
         latitude: data.latitude || null,
         longitude: data.longitude || null,
-
-        // Neutral facts
-        inventory_numbers: data.inventory_numbers || '',
-        market_share: data.market_share || '',
-        branding: data.branding || '',
-        labeling: data.labeling || '',
 
         // Valuation
         estimated_value: typeof data.estimated_value === 'number' ? data.estimated_value : null,
@@ -487,69 +476,6 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     style={{ fontSize: '9pt', width: '100%' }}
                   />
                 </div>
-              </div>
-            </div>
-
-            {/* Neutral Facts (human-readable) */}
-            <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
-                Neutral Facts
-              </h4>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Inventory Numbers
-                </label>
-                <textarea
-                  className="form-input"
-                  value={formData.inventory_numbers || ''}
-                  onChange={(e) => handleChange('inventory_numbers', e.target.value)}
-                  rows={2}
-                  placeholder='e.g., "120 vehicles listed; 18 in-house; 6 lifts"'
-                  style={{ fontSize: '9pt', width: '100%' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Market Share
-                </label>
-                <textarea
-                  className="form-input"
-                  value={formData.market_share || ''}
-                  onChange={(e) => handleChange('market_share', e.target.value)}
-                  rows={2}
-                  placeholder='e.g., "8% of AZ restoration shops (as-of 2025-06, source: ...)"'
-                  style={{ fontSize: '9pt', width: '100%' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Branding
-                </label>
-                <textarea
-                  className="form-input"
-                  value={formData.branding || ''}
-                  onChange={(e) => handleChange('branding', e.target.value)}
-                  rows={2}
-                  placeholder='e.g., "Correct name: …; Tagline: …; Primary domain: …"'
-                  style={{ fontSize: '9pt', width: '100%' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Labeling
-                </label>
-                <textarea
-                  className="form-input"
-                  value={formData.labeling || ''}
-                  onChange={(e) => handleChange('labeling', e.target.value)}
-                  rows={2}
-                  placeholder='e.g., "auction_house; marketplace; service-first"'
-                  style={{ fontSize: '9pt', width: '100%' }}
-                />
               </div>
             </div>
 

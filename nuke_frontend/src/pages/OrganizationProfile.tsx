@@ -74,11 +74,6 @@ interface Organization {
   discovered_by?: string;
   uploaded_by?: string;
   labor_rate?: number;
-  // Neutral facts (human-readable)
-  inventory_numbers?: string;
-  market_share?: string;
-  branding?: string;
-  labeling?: string;
   // SEC compliance fields
   incorporation_jurisdiction?: string;
   year_incorporated?: number;
@@ -1146,7 +1141,7 @@ export default function OrganizationProfile() {
               .gt('auction_end_time', now) : { data: [], error: null },
             vehicleIds.length > 0 ? supabase
               .from('external_listings')
-              .select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, comment_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
+              .select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
               .in('vehicle_id', vehicleIds)
               .gt('end_date', now) : { data: [], error: null },
             vehicleIds.length > 0 ? supabase
