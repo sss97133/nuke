@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /settings/
+Disallow: /invoices
+Disallow: /vault/
+Disallow: /capture
+Disallow: /dealer/
