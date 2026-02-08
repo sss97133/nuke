@@ -2,13 +2,13 @@
 
 ## One-Liner
 
-**Vehicle data infrastructure.**
+**The data layer for niche hands-on professions.**
 
 ---
 
 ## The Pitch
 
-We turn scattered car history into structured, tradable intelligence.
+Bots that hire humans to fix vehicles. Our data layer identifies undervalued vehicles, calculates the ROI of repairs, vets tradespeople by reliability, and commissions the work. The bot finds the opportunity. The human does the physical work. Our only bottleneck is workspace.
 
 ---
 
@@ -26,9 +26,10 @@ Buyers can't verify claims. Collectors can't prove value. Insurers can't assess 
 
 ## Solution
 
-- Aggregate vehicle history from auctions, forums, marketplaces
-- Structure provenance into verified timelines
-- Connect owners, shops, buyers, insurers around shared records
+- **Simplest possible data pipeline**: submit text, we do the sorting
+- No forms, no fields, no hoops -- just send context and our system structures it
+- 181 purpose-built extraction tools pulling from 10+ platforms
+- Entity resolution, categorization, and trust scoring happen automatically
 
 ---
 
@@ -36,23 +37,26 @@ Buyers can't verify claims. Collectors can't prove value. Insurers can't assess 
 
 | Metric | Count |
 |--------|-------|
-| Vehicle profiles | 18,000+ |
-| Data points indexed | 364,000+ |
-| Images | 1,000,000+ |
-| Platform integrations | BaT, Cars & Bids, Hagerty, RM Sotheby's |
+| Vehicle profiles | 758,000+ |
+| Structured observations | 627,000+ |
+| BaT listings indexed | 132,000+ |
+| AI-analyzed vehicles | 127,000+ |
+| External identities resolved | 491,000+ |
+| Businesses identified | 2,295 |
+| Platform integrations | BaT, Cars & Bids, Hagerty, RM Sotheby's, Mecum, Gooding, PCarMarket |
 
 ---
 
 ## Business Model
 
-- SaaS for builders and shops
-- Marketplace fees
-- Premium reports for buyers, insurers, auctions
+- Margin on bot-commissioned jobs (bot identifies $3K repair → $12K value increase, we take the spread)
+- Tradesperson marketplace fees (vetted workers matched by reliability scores)
+- Data licensing (cost/ROI models, reliability scores to insurers, auction houses, lenders)
 
 ---
 
 ## Vision
 
-Provenance infrastructure for automobiles.
+AI is incredible at identifying opportunities. But the last mile in hands-on trades will always be human. We're not replacing tradespeople -- we're building bots that hire them.
 
-Chrono24 for watches. Artsy for art. **This for cars.**
+Vehicles are the beachhead. The pattern generalizes to any trade where AI can spot the economic opportunity but needs a human to execute. **The only API for fixing old cars is still human interface. We built the data layer that connects the two.**
