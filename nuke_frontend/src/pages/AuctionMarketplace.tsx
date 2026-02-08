@@ -697,7 +697,7 @@ export default function AuctionMarketplace() {
         total: filtered.length,
       });
     } catch (error) {
-      console.error('Error loading listings:', error);
+      // Error loading listings - fail silently
       setListings([]);
       setHiddenNoBidCount(0);
       setHiddenBadDataCount(0);

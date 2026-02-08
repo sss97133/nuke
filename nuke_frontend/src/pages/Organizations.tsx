@@ -104,14 +104,6 @@ export default function Organizations() {
       let orgs: any[] = [];
       let error: any = null;
 
-      // Debug logging
-      console.log('[Organizations] Loading organizations...', {
-        hasSearchQuery: !!searchQuery.trim(),
-        searchQuery: searchQuery,
-        hasSession: !!userSession,
-        userId: userSession?.user?.id
-      });
-
       // If search query exists, use intelligent search
       if (searchQuery.trim()) {
         const searchLower = searchQuery.toLowerCase();
@@ -197,10 +189,6 @@ export default function Organizations() {
         }
       } else {
         // No search - load all public organizations
-        console.log('[Organizations] Fetching all public organizations...');
-        console.log('[Organizations] Supabase URL:', SUPABASE_URL);
-        console.log('[Organizations] Has session:', !!userSession, 'User ID:', userSession?.user?.id);
-        
         const { data, error: orgError, count } = await supabase
           .from('businesses')
           .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at', { count: 'exact' })
@@ -208,38 +196,10 @@ export default function Organizations() {
           .order('created_at', { ascending: false })
           .limit(1000);
         
-        console.log('[Organizations] Query result:', {
-          hasError: !!orgError,
-          error: orgError,
-          dataLength: data?.length || 0,
-          count: count,
-          data: data?.slice(0, 3) // Log first 3 orgs for debugging
-        });
-        
         if (orgError) {
-          console.error('[Organizations] Query error details:', {
-            message: orgError.message,
-            details: orgError.details,
-            hint: orgError.hint,
-            code: orgError.code,
-            statusCode: orgError.status
-          });
-          
-          // If it's an RLS error, provide helpful message
-          if (orgError.code === 'PGRST301' || orgError.message?.includes('permission') || orgError.message?.includes('row-level security')) {
-            console.error('[Organizations] ⚠️  RLS Policy Issue: The query was blocked by Row Level Security policies.');
-            console.error('[Organizations] Check if public access is allowed for is_public = true organizations.');
-          }
-          
           throw orgError;
         }
         orgs = data || [];
-        console.log('[Organizations] Loaded', orgs.length, 'organizations (total available:', count || 'unknown', ')');
-        
-        // Safety check: if count says there are orgs but data is empty, log warning
-        if (count && count > 0 && (!data || data.length === 0)) {
-          console.warn('[Organizations] ⚠️  Count indicates', count, 'organizations exist, but query returned none. Possible RLS or filtering issue.');
-        }
       }
 
       if (error) throw error;
@@ -291,22 +251,16 @@ export default function Organizations() {
         total_sales: 0 // Not needed for card view
       }));
 
-      console.log('[Organizations] Setting organizations state:', enriched.length, 'items');
       setOrganizations(enriched);
     } catch (error) {
-      console.error('[Organizations] Error loading organizations:', error);
-      // Set empty array on error to show "No organizations found" message
+      // Error loading organizations - show empty state
       setOrganizations([]);
     } finally {
       setLoading(false);
-      console.log('[Organizations] Loading complete');
     }
   }, [searchQuery, calculateDistance, userLocation]);
 
   useEffect(() => {
-    // Debug: Log Supabase connection info
-    console.log('[Organizations] Component mounted, Supabase URL:', SUPABASE_URL);
-    
     // Get user location if "near me" is in search
     if (searchQuery && searchQuery.toLowerCase().includes('near me')) {
       navigator.geolocation?.getCurrentPosition(
@@ -317,7 +271,7 @@ export default function Organizations() {
           });
         },
         () => {
-          console.warn('Could not get user location');
+          // Could not get user location - ignore
         }
       );
     }
@@ -652,7 +606,7 @@ export default function Organizations() {
                     onClick={(e) => {
                       e.stopPropagation();
                       // TODO: Toggle follow
-                      alert('Follow feature coming soon');
+                      // Follow feature - coming soon
                     }}
                     style={{
                       position: 'absolute',

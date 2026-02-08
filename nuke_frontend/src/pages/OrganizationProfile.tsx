@@ -709,7 +709,7 @@ export default function OrganizationProfile() {
     try {
       localStorage.setItem('nuke_org_cardsPerRow', String(cardsPerRow));
     } catch (err) {
-      console.warn('Failed to save cardsPerRow:', err);
+      // Failed to save preference - ignore
     }
   }, [cardsPerRow]);
 
@@ -717,7 +717,7 @@ export default function OrganizationProfile() {
     try {
       localStorage.setItem('nuke_org_sortBy', sortBy);
     } catch (err) {
-      console.warn('Failed to save sortBy:', err);
+      // Failed to save preference - ignore
     }
   }, [sortBy]);
 
@@ -725,7 +725,7 @@ export default function OrganizationProfile() {
     try {
       localStorage.setItem('nuke_org_sortDirection', sortDirection);
     } catch (err) {
-      console.warn('Failed to save sortDirection:', err);
+      // Failed to save preference - ignore
     }
   }, [sortDirection]);
 
@@ -733,7 +733,7 @@ export default function OrganizationProfile() {
     try {
       localStorage.setItem('nuke_org_thumbFitMode', thumbFitMode);
     } catch (err) {
-      console.warn('Failed to save thumbFitMode:', err);
+      // Failed to save preference - ignore
     }
   }, [thumbFitMode]);
 
@@ -871,42 +871,29 @@ export default function OrganizationProfile() {
   };
 
   useEffect(() => {
-    console.log('[OrgProfile] useEffect triggered - organizationId:', organizationId);
-    
     if (!organizationId) {
-      console.error('[OrgProfile] No organizationId in useEffect!');
       setLoading(false);
       return;
     }
-    
+
     let isMounted = true;
-    
+
     const load = async () => {
-      if (!isMounted) {
-        console.log('[OrgProfile] Component unmounted, skipping load');
-        return;
-      }
-      
-      console.log('[OrgProfile] Starting load sequence');
-      
+      if (!isMounted) return;
+
       // Load session in parallel
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (isMounted) {
-          console.log('[OrgProfile] Session loaded:', session?.user?.id || 'none');
           setSession(session);
         }
       });
-      
-      // Load organization
-      console.log('[OrgProfile] Calling loadOrganization');
+
       await loadOrganization();
-      console.log('[OrgProfile] loadOrganization completed');
     };
-    
+
     load();
-    
+
     return () => {
-      console.log('[OrgProfile] Cleanup - unmounting');
       isMounted = false;
     };
   }, [organizationId]);
@@ -930,7 +917,7 @@ export default function OrganizationProfile() {
         setImageTags(tagsByImage);
       }
     } catch (error) {
-      console.error('Error loading image tags:', error);
+      // Error loading image tags - silent
     }
   };
 
@@ -961,14 +948,6 @@ export default function OrganizationProfile() {
       
 
       if (orgError) {
-        // Log full error for debugging
-        console.error('[OrgProfile] Supabase error:', {
-          code: (orgError as any)?.code,
-          message: orgError.message,
-          details: (orgError as any)?.details,
-          hint: (orgError as any)?.hint
-        });
-        
         // For now, if there's an error, try to continue anyway (might be RLS issue that resolves)
         // Don't block the page - let it try to render with null org which shows proper error UI
       }
@@ -1004,7 +983,7 @@ export default function OrganizationProfile() {
           const comprehensive = await getOrganizationProfileData(organizationId);
           setComprehensiveData(comprehensive);
         } catch (err) {
-          console.warn('[OrgProfile] Failed to load comprehensive profile data:', err);
+          // Failed to load comprehensive profile data - silent
         }
       })();
       
@@ -1039,7 +1018,7 @@ export default function OrganizationProfile() {
             ]);
           }
         } catch (error) {
-          console.error('[OrgProfile] Error loading organization intelligence:', error);
+          // Error loading organization intelligence - use defaults
           // Fallback to default tabs
           setTabs([
             { id: 'overview', priority: 100, label: 'Overview' },
@@ -1087,7 +1066,7 @@ export default function OrganizationProfile() {
             .order('created_at', { ascending: false });
           
           if (imagesError) {
-            console.error('Error loading images:', imagesError);
+            // Error loading images - show empty
             setImages([]);
           } else {
             setImages(orgImages || []);
@@ -1096,7 +1075,7 @@ export default function OrganizationProfile() {
             }
           }
         } catch (error) {
-          console.error('Exception loading images:', error);
+          // Exception loading images - show empty
           setImages([]);
         }
       })();
@@ -1554,7 +1533,7 @@ export default function OrganizationProfile() {
       (async () => {
         try {
           if (!organizationId) {
-            console.warn('No organizationId, skipping timeline events load');
+            // No organizationId - skip timeline events
             setTimelineEvents([]);
             return;
           }
@@ -1567,7 +1546,7 @@ export default function OrganizationProfile() {
             .limit(50);
           
           if (eventsError) {
-            console.error('Error loading timeline events:', eventsError);
+            // Error loading timeline events - show empty
             setTimelineEvents([]);
             return;
           }
@@ -1590,7 +1569,7 @@ export default function OrganizationProfile() {
           const validEvents = enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value);
           setTimelineEvents(validEvents);
         } catch (error) {
-          console.error('Exception loading timeline events:', error);
+          // Exception loading timeline events - show empty
           setTimelineEvents([]);
         }
       })();
@@ -1811,7 +1790,7 @@ export default function OrganizationProfile() {
   useEffect(() => {
     if (loading && organizationId) {
       const timeout = setTimeout(() => {
-        console.error('[OrgProfile] Loading timeout - forcing error state');
+        // Loading timeout - force error state
         setLoadError('Loading took too long. The organization may be private or the server is slow.');
         setLoading(false);
       }, 10000);
@@ -3509,7 +3488,7 @@ export default function OrganizationProfile() {
                 <MobileVINScanner
                   organizationId={organization.id}
                   onVehicleUpdated={(vehicleId, vin) => {
-                    console.log(`Updated vehicle ${vehicleId} with VIN ${vin}`);
+                    // Vehicle updated with VIN
                     // Refresh the page to show updated data
                     window.location.reload();
                   }}
