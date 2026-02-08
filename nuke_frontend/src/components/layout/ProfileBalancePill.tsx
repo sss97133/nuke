@@ -73,7 +73,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
             setBalance({ available_cents: 0, pending_cents: 0 });
             return;
           }
-          console.error('Error loading balance:', error);
+          // Error loading balance - silent
           setBalance({ available_cents: 0, pending_cents: 0 });
           return;
         }
@@ -84,7 +84,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
           pending_cents: data?.reserved_cents ?? 0
         });
       } catch (err) {
-        console.error('Error loading balance:', err);
+        // Error loading balance - silent
         setBalance({ available_cents: 0, pending_cents: 0 });
       }
     };

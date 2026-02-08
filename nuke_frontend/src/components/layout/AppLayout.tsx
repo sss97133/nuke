@@ -92,9 +92,8 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         const identity = getVehicleIdentityParts(data as any);
         let nextTitle = [...identity.primary, ...identity.differentiators].join(' ').trim();
         
-        // Final sanitization pass to remove any remaining BaT contamination
+        // Sanitize any source-specific patterns from title
         if (nextTitle) {
-          // Remove BaT listing patterns that might have slipped through
           nextTitle = nextTitle.replace(/\s*for sale on BaT Auctions?\s*/gi, ' ').trim();
           nextTitle = nextTitle.replace(/\s*sold for \$[\d,]+ on [A-Z][a-z]+ \d{1,2}, \d{4}\s*/gi, ' ').trim();
           nextTitle = nextTitle.replace(/\s*\(Lot\s*#[\d,]+\s*\)\s*/gi, ' ').trim();
@@ -281,7 +280,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         setUserProfile(data);
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      // Failed to fetch user profile - silent
     }
   };
 
@@ -293,7 +292,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       if (error) throw error;
       setUnreadNotifications(data || 0);
     } catch (error) {
-      console.error('Error loading unread notifications:', error);
+      // Failed to load unread notifications - silent
       setUnreadNotifications(0);
     }
   };
@@ -343,7 +342,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
 
       setQuickVehicles(sorted);
     } catch (error) {
-      console.error('Error loading quick vehicles:', error);
+      // Failed to load quick vehicles - silent
       setQuickVehicles([]);
     } finally {
       setQuickVehiclesLoading(false);
