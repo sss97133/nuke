@@ -1417,8 +1417,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         >
           <ResilientImage
             sources={[
-              vehicle?.image_variants?.thumbnail,
               vehicle?.image_variants?.medium,
+              vehicle?.image_variants?.thumbnail,
               vehicle?.image_variants?.large,
               primaryFromAllImages,
               imageUrl,
@@ -1430,7 +1430,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             objectFit={thumbnailFit}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
-            optimizeSize="thumbnail"
+            optimizeSize="small"
           />
         </div>
         
@@ -1544,7 +1544,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             objectFit={thumbnailFit}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
-            optimizeSize="small"
+            optimizeSize="medium"
           />
           {(showTopLeftBadges || showPriceBadge) && (
             <div
@@ -2376,6 +2376,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       letterSpacing: '0.3px',
                       textTransform: 'uppercase',
                       lineHeight: 1.2,
+                      animation: 'badgeFadeIn 0.2s ease-in',
                     }}
                     title={`Nuke Estimate: $${vehicle.nuke_estimate?.toLocaleString() || '?'} | Deal score: ${vehicle.deal_score?.toFixed(1)}${vehicle.nuke_estimate_confidence ? ` | ${vehicle.nuke_estimate_confidence}% confidence` : ''}`}
                   >
@@ -2403,6 +2404,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       fontSize: '7pt',
                       fontWeight: 800,
                       lineHeight: 1,
+                      animation: 'badgeFadeIn 0.2s ease-in',
                     }}
                     title={`Heat score: ${vehicle.heat_score}/100 (${vehicle.heat_score_label || ''})`}
                   >
@@ -2422,6 +2424,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       fontSize: '7pt',
                       fontWeight: 800,
                       lineHeight: 1,
+                      animation: 'badgeFadeIn 0.2s ease-in',
                     }}
                     title="Record price for this make/model/generation"
                   >

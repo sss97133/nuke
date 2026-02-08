@@ -426,7 +426,7 @@ const CursorHomepage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [serverFilteredCount, setServerFilteredCount] = useState<number | null>(null); // Exact count from DB when filters active
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(undefined);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('ALL'); // Default to ALL - no time filtering
   const [salesPeriod, setSalesPeriod] = useState<SalesTimePeriod>('today'); // For "sold" stats display
   const [viewMode, setViewMode] = useState<ViewMode>('grid'); // Always grid mode
@@ -1253,9 +1253,9 @@ const CursorHomepage: React.FC = () => {
     loadHypeFeed(0, false);
   }, []); // Load once on mount - no filters, no dependencies
 
-  // Also reload when session changes (user logs in/out)
+  // Also reload when session changes (user logs in/out, or session resolves for anon)
   useEffect(() => {
-    if (session !== null) {
+    if (session !== undefined) {
       setPage(0);
       setHasMore(true);
       loadHypeFeed(0, false);
@@ -2838,8 +2838,7 @@ const CursorHomepage: React.FC = () => {
 
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
-    setSession(currentSession);
-    setLoading(false); // Always set loading to false after session check
+    setSession(currentSession ?? null); // null for anon, session object for logged-in
     
     // Load user preference
     if (currentSession?.user) {
@@ -3494,15 +3493,15 @@ const CursorHomepage: React.FC = () => {
         const thumbnailUrl = thumbnailByVehicleId.get(vehicleId) || null;
         const mediumUrl = mediumByVehicleId.get(vehicleId) || null;
         
-        // Fallback chain: thumbnail -> medium -> primary_image_url -> image_url
-        // BUT: Only use images that pass quality checks
+        // Fallback chain: medium -> thumbnail -> primary_image_url -> image_url
+        // Prefer medium (600px) for sharper images; thumbnail (150px) only as fallback
         const normalizedPrimary = v.primary_image_url ? normalizeSupabaseStorageUrl(v.primary_image_url) : null;
         const normalizedImageUrl = v.image_url ? normalizeSupabaseStorageUrl(v.image_url) : null;
-        
+
         // Check each candidate and only use good quality images
-        const optimalImageUrl = 
-          (thumbnailUrl && !isPoorQualityImage(thumbnailUrl)) ? thumbnailUrl :
+        const optimalImageUrl =
           (mediumUrl && !isPoorQualityImage(mediumUrl)) ? mediumUrl :
+          (thumbnailUrl && !isPoorQualityImage(thumbnailUrl)) ? thumbnailUrl :
           (normalizedPrimary && !isPoorQualityImage(normalizedPrimary)) ? normalizedPrimary :
           (normalizedImageUrl && !isPoorQualityImage(normalizedImageUrl)) ? normalizedImageUrl :
           null;
@@ -3558,7 +3557,7 @@ const CursorHomepage: React.FC = () => {
           image_variants: {
             thumbnail: thumbnailUrl || undefined,
             medium: mediumUrl || undefined,
-            large: mediumUrl || optimalImageUrl || undefined,
+            large: normalizedPrimary || mediumUrl || optimalImageUrl || undefined,
           },
           all_images: allImages || (optimalImageUrl ? [{ id: `fallback-${v.id}-0`, url: optimalImageUrl, is_primary: true }] : []),
           // Attach external_listings for auction badge detection (VehicleCardDense expects external_listings[0])
