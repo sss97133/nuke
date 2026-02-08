@@ -146,6 +146,7 @@ export default function VehicleResearchItemsCard({ vehicleId }: { vehicleId: str
 
   return (
     <CollapsibleWidget
+      className="vehicle-profile-section"
       title="Research Notes"
       defaultCollapsed={true}
       badge={<span className="badge badge-secondary">{openItems.length}</span>}
