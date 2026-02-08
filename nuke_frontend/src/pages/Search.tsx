@@ -364,7 +364,7 @@ export default function Search() {
           });
         },
         () => {
-          console.warn('Could not get user location');
+          // Could not get user location - ignore
         }
       );
     }
@@ -445,7 +445,7 @@ export default function Search() {
         actions: [
           { label: 'Library', href: '/library', badge: (resultCounts.reference || 0) + (resultCounts.document || 0) },
           { label: 'Capsule', href: '/capsule' },
-          { label: 'Members', href: '/bat-members', badge: resultCounts.user }
+          { label: 'Members', href: '/members', badge: resultCounts.user }
         ]
       }
     ];
