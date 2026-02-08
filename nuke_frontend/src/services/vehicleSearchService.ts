@@ -258,6 +258,7 @@ export class VehicleSearchService {
         }
 
         // Apply a rough bounding box filter for zip+radius searches (fast pre-filter); precise filtering happens later.
+        // DB columns are gps_latitude, gps_longitude
         if (filters.zipCode && filters.radius && zipCoords) {
           const radiusMiles = filters.radius;
           const lat = zipCoords.latitude;
@@ -265,12 +266,12 @@ export class VehicleSearchService {
           const latDelta = radiusMiles / 69; // ~69 miles per degree latitude
           const lngDelta = radiusMiles / (69 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
           query = query
-            .not('latitude', 'is', null)
-            .not('longitude', 'is', null)
-            .gte('latitude', lat - latDelta)
-            .lte('latitude', lat + latDelta)
-            .gte('longitude', lng - lngDelta)
-            .lte('longitude', lng + lngDelta);
+            .not('gps_latitude', 'is', null)
+            .not('gps_longitude', 'is', null)
+            .gte('gps_latitude', lat - latDelta)
+            .lte('gps_latitude', lat + latDelta)
+            .gte('gps_longitude', lng - lngDelta)
+            .lte('gps_longitude', lng + lngDelta);
         }
 
         return await query.order('created_at', { ascending: false });
@@ -354,12 +355,14 @@ export class VehicleSearchService {
       const filteredVehicles: VehicleSearchResult[] = [];
       
       for (const vehicle of vehicles) {
-        if (vehicle.latitude && vehicle.longitude) {
+        const vlat = (vehicle as any).gps_latitude ?? (vehicle as any).latitude;
+        const vlng = (vehicle as any).gps_longitude ?? (vehicle as any).longitude;
+        if (vlat != null && vlng != null) {
           const distance = this.calculateDistance(
             searchCoords.latitude,
             searchCoords.longitude,
-            vehicle.latitude,
-            vehicle.longitude
+            Number(vlat),
+            Number(vlng)
           );
           
           if (distance <= radiusMiles) {
@@ -381,20 +384,20 @@ export class VehicleSearchService {
 
   static async getZipCodeCoordinates(zipCode: string): Promise<{latitude: number, longitude: number} | null> {
     try {
-      // First try to find coordinates from existing vehicles
+      // First try to find coordinates from existing vehicles (DB columns: gps_latitude, gps_longitude)
       const { data: existingVehicle } = await supabase
         .from('vehicles')
-        .select('latitude, longitude')
+        .select('gps_latitude, gps_longitude')
         .eq('zip_code', zipCode)
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null)
+        .not('gps_latitude', 'is', null)
+        .not('gps_longitude', 'is', null)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (existingVehicle) {
+      if (existingVehicle?.gps_latitude != null && existingVehicle?.gps_longitude != null) {
         return {
-          latitude: existingVehicle.latitude,
-          longitude: existingVehicle.longitude
+          latitude: Number(existingVehicle.gps_latitude),
+          longitude: Number(existingVehicle.gps_longitude)
         };
       }
 

@@ -159,12 +159,6 @@ export function TitleValidationModal({
 
     setComparisons(fields);
     setLoading(false);
-
-    // Check if validation needed
-    const conflicts = fields.filter(f => f.status === 'conflict');
-    if (conflicts.length > 0 && onValidationNeeded) {
-      onValidationNeeded(conflicts);
-    }
   };
 
   const toggleField = (field: string) => {
