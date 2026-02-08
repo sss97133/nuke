@@ -16,6 +16,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useVehicleFollow } from '../../hooks/useVehicleFollow';
 import { formatCurrencyAmount, formatCurrencyFromCents, resolveCurrencyCode } from '../../utils/currency';
 import VehicleHoverCard from './VehicleHoverCard';
+import BadgeHoverPreview, { useBadgeHover } from './BadgeHoverPreview';
+import { DEAL_SCORE_CONFIG, type DealScoreLabel } from '../../constants/dealScore';
 
 const parseMoneyNumber = (val: any): number | null => {
   if (val === null || val === undefined) return null;
@@ -125,6 +127,55 @@ interface VehicleCardDenseProps {
   maxCardWidth?: number;
 }
 
+const getTierColor = (tier: string) => {
+  switch (tier) {
+    case 'SSS': return '#7c3aed';
+    case 'SS': return '#8b5cf6';
+    case 'S': return '#ef4444';
+    case 'A': return '#f59e0b';
+    case 'B': return '#3b82f6';
+    case 'C': return '#10b981';
+    case 'D': return '#6b7280';
+    case 'E': return '#9ca3af';
+    case 'F': return '#a855f7';
+    default: return '#6b7280';
+  }
+};
+
+const getTierDescription = (tier: string) => {
+  switch (tier) {
+    case 'SSS': return 'Legendary — museum-grade, historically significant';
+    case 'SS': return 'Exceptional — near-perfect documentation and provenance';
+    case 'S': return 'Outstanding — comprehensive data, high engagement';
+    case 'A': return 'Strong — well-documented with active history';
+    case 'B': return 'Good — solid data, verified details';
+    case 'C': return 'Standard — VIN, price, and photos confirmed';
+    case 'D': return 'Partial — some key data present';
+    case 'E': return 'Minimal — basic info only';
+    case 'F': return 'Incomplete — needs more data';
+    default: return 'Data completeness grade';
+  }
+};
+
+const getTierNextSteps = (tier: string, vehicle: VehicleCardDenseProps['vehicle']) => {
+  const steps: string[] = [];
+  const raw = String(vehicle.vin || '').trim().toUpperCase();
+  const hasVIN = raw.length >= 4 && !raw.startsWith('VIVA') && !raw.startsWith('TEST') && /^[A-HJ-NPR-Z0-9]{4,17}$/.test(raw);
+  const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
+  const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
+  const eventCount = vehicle.event_count || 0;
+
+  if (!hasVIN) steps.push('Add VIN');
+  if (!hasPrice) steps.push('Add price / estimate');
+  if (imgCount < 5) steps.push(`Add more photos (${imgCount} now, need 5+)`);
+  else if (imgCount < 10) steps.push(`Add more photos (${imgCount} now, 10+ for next tier)`);
+  if (eventCount < 1) steps.push('Log timeline events');
+  if (!vehicle.receipt_count) steps.push('Upload receipts / documentation');
+  if (!vehicle.ownership_verified) steps.push('Verify ownership');
+
+  return steps.slice(0, 4); // max 4 suggestions
+};
+
 const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   vehicle,
   viewMode = 'list',
@@ -174,6 +225,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     }>;
     error: string | null;
   }>({ loading: false, images: [], error: null });
+  const { hoveredBadge, badgeRect, onBadgeEnter, onBadgeLeave } = useBadgeHover();
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [computedCardSize, setComputedCardSize] = React.useState(cardSizePx || 200);
 
@@ -1784,55 +1836,23 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       className=""
                     />
                   ) : null}
-                {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
+                {/* Vehicle Data Profile Grade (F, E, D, C, B, A, S, SSS) */}
                 {(() => {
                   const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
-
-                  const getTierColor = (tier: string) => {
-                    switch (tier) {
-                      case 'SSS': return '#7c3aed';
-                      case 'SS': return '#8b5cf6';
-                      case 'S': return '#ef4444';
-                      case 'A': return '#f59e0b';
-                      case 'B': return '#3b82f6';
-                      case 'C': return '#10b981';
-                      case 'D': return '#6b7280';
-                      case 'E': return '#9ca3af';
-                      case 'F': return '#a855f7';
-                      default: return '#6b7280';
-                    }
-                  };
-
-                  const getTierDescription = (tier: string) => {
-                    switch (tier) {
-                      case 'SSS': return 'Legendary — museum-grade, historically significant';
-                      case 'SS': return 'Exceptional — near-perfect documentation and provenance';
-                      case 'S': return 'Outstanding — comprehensive data, high engagement';
-                      case 'A': return 'Strong — well-documented with active history';
-                      case 'B': return 'Good — solid data, verified details';
-                      case 'C': return 'Standard — VIN, price, and photos confirmed';
-                      case 'D': return 'Partial — some key data present';
-                      case 'E': return 'Minimal — basic info only';
-                      case 'F': return 'Incomplete — needs more data';
-                      default: return 'Data completeness grade';
-                    }
-                  };
-
-                  if (tierLabel) {
-                    return (
-                      <span
-                        style={{ fontWeight: 700, cursor: 'pointer', position: 'relative' }}
-                        title={`${tierLabel} tier: ${getTierDescription(tierLabel)}`}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                      >
-                        <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>
-                          {tierLabel}
-                        </span>{' '}
-                        tier
-                      </span>
-                    );
-                  }
-                  return null;
+                  if (!tierLabel) return null;
+                  return (
+                    <span
+                      style={{ fontWeight: 700, cursor: 'pointer', position: 'relative' }}
+                      onMouseEnter={(e) => onBadgeEnter('tier', e)}
+                      onMouseLeave={onBadgeLeave}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    >
+                      <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>
+                        {tierLabel}
+                      </span>{' '}
+                      <span style={{ opacity: 0.7 }}>profile</span>
+                    </span>
+                  );
                 })()}
 
                 {infoDense && vehicle.uploader_name && (
@@ -1875,6 +1895,41 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 )}
 
                 {infoDense && vehicle.hype_reason && <span>{vehicle.hype_reason}</span>}
+
+                {/* Tier hover preview (gallery view) */}
+                {hoveredBadge === 'tier' && (() => {
+                  const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
+                  if (!tierLabel) return null;
+                  const raw = String(vehicle.vin || '').trim().toUpperCase();
+                  const hasVIN = raw.length >= 4 && !raw.startsWith('VIVA') && !raw.startsWith('TEST') && /^[A-HJ-NPR-Z0-9]{4,17}$/.test(raw);
+                  const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
+                  const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
+                  const nextSteps = getTierNextSteps(tierLabel, vehicle);
+                  return (
+                    <BadgeHoverPreview badgeRect={badgeRect}>
+                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                        <span style={{ color: getTierColor(tierLabel) }}>{tierLabel}</span> Data Profile
+                      </div>
+                      <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.7)', marginBottom: '6px' }}>
+                        {getTierDescription(tierLabel)}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.85)', fontSize: '7pt' }}>
+                        <div>{vehicle.year && vehicle.make && vehicle.model ? '\u2705' : '\u274C'} Year / Make / Model</div>
+                        <div>{hasVIN ? '\u2705' : '\u274C'} VIN</div>
+                        <div>{hasPrice ? '\u2705' : '\u274C'} Price / Estimate</div>
+                        <div>{imgCount >= 5 ? '\u2705' : imgCount >= 1 ? '\u26A0\uFE0F' : '\u274C'} Photos ({imgCount})</div>
+                        <div>{(vehicle.event_count || 0) >= 1 ? '\u2705' : '\u274C'} Timeline events ({vehicle.event_count || 0})</div>
+                        <div>{(vehicle.receipt_count || 0) >= 1 ? '\u2705' : '\u274C'} Receipts ({vehicle.receipt_count || 0})</div>
+                      </div>
+                      {nextSteps.length > 0 && (
+                        <div style={{ marginTop: '6px', paddingTop: '5px', borderTop: '1px solid rgba(255,255,255,0.15)', fontSize: '7pt', color: 'rgba(255,255,255,0.6)' }}>
+                          <div style={{ fontWeight: 600, marginBottom: '2px' }}>Next steps to level up:</div>
+                          {nextSteps.map((s, i) => <div key={i}>{'\u2192'} {s}</div>)}
+                        </div>
+                      )}
+                    </BadgeHoverPreview>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -2354,42 +2409,33 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
                 {/* Follow Button with ROI (compact at small card sizes) */}
                 {/* Nuke Estimate: Deal Score Badge */}
-                {vehicle.deal_score != null && vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' && (
+                {vehicle.deal_score != null && vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' && DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel] && (
                   <div
+                    onMouseEnter={(e) => onBadgeEnter('deal', e)}
+                    onMouseLeave={onBadgeLeave}
                     style={{
-                      background: vehicle.deal_score_label === 'steal'
-                        ? 'rgba(16,185,129,0.92)'
-                        : vehicle.deal_score_label === 'good_deal'
-                        ? 'rgba(59,130,246,0.92)'
-                        : vehicle.deal_score_label === 'overpriced'
-                        ? 'rgba(249,115,22,0.92)'
-                        : vehicle.deal_score_label === 'way_overpriced'
-                        ? 'rgba(239,68,68,0.92)'
-                        : 'rgba(0,0,0,0.7)',
+                      background: DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].colorRgba,
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
                       color: 'white',
                       padding: '2px 6px',
                       borderRadius: '4px',
-                      fontSize: '6.5pt',
+                      fontSize: '8pt',
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                       fontWeight: 800,
                       letterSpacing: '0.3px',
-                      textTransform: 'uppercase',
                       lineHeight: 1.2,
                       animation: 'badgeFadeIn 0.2s ease-in',
                     }}
-                    title={`Nuke Estimate: $${vehicle.nuke_estimate?.toLocaleString() || '?'} | Deal score: ${vehicle.deal_score?.toFixed(1)}${vehicle.nuke_estimate_confidence ? ` | ${vehicle.nuke_estimate_confidence}% confidence` : ''}`}
                   >
-                    {vehicle.deal_score_label === 'steal' ? 'STEAL' :
-                     vehicle.deal_score_label === 'good_deal' ? 'GOOD DEAL' :
-                     vehicle.deal_score_label === 'overpriced' ? 'OVERPRICED' :
-                     vehicle.deal_score_label === 'way_overpriced' ? 'OVERPRICED' :
-                     vehicle.deal_score_label.toUpperCase()}
+                    {DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].display}
                   </div>
                 )}
                 {/* Nuke Estimate: Heat indicator */}
                 {vehicle.heat_score != null && vehicle.heat_score >= 40 && (
                   <div
+                    onMouseEnter={(e) => onBadgeEnter('heat', e)}
+                    onMouseLeave={onBadgeLeave}
                     style={{
                       background: vehicle.heat_score >= 80
                         ? 'rgba(239,68,68,0.92)'
@@ -2406,7 +2452,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       lineHeight: 1,
                       animation: 'badgeFadeIn 0.2s ease-in',
                     }}
-                    title={`Heat score: ${vehicle.heat_score}/100 (${vehicle.heat_score_label || ''})`}
                   >
                     {vehicle.heat_score >= 80 ? '\u{1F30B}' : vehicle.heat_score >= 60 ? '\u{1F525}' : '\u{1F321}\u{FE0F}'}
                   </div>
@@ -2414,6 +2459,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 {/* Record price crown */}
                 {vehicle.is_record_price && (
                   <div
+                    onMouseEnter={(e) => onBadgeEnter('record', e)}
+                    onMouseLeave={onBadgeLeave}
                     style={{
                       background: 'rgba(234,179,8,0.92)',
                       backdropFilter: 'blur(4px)',
@@ -2426,11 +2473,81 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       lineHeight: 1,
                       animation: 'badgeFadeIn 0.2s ease-in',
                     }}
-                    title="Record price for this make/model/generation"
                   >
                     {'\u{1F451}'}
                   </div>
                 )}
+                {/* Badge hover previews */}
+                {hoveredBadge === 'deal' && vehicle.deal_score != null && vehicle.deal_score_label && DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel] && (
+                  <BadgeHoverPreview badgeRect={badgeRect}>
+                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                      <span style={{ color: DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].color }}>
+                        {DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].display}
+                      </span>
+                      {' '}{DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].description}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.8)' }}>
+                      {vehicle.nuke_estimate && <div>Nuke Estimate: ${vehicle.nuke_estimate.toLocaleString()}</div>}
+                      {(vehicle.asking_price || vehicle.display_price) && <div>Asking: ${(vehicle.asking_price || vehicle.display_price)?.toLocaleString()}</div>}
+                      <div>Deal Score: {vehicle.deal_score > 0 ? '+' : ''}{vehicle.deal_score.toFixed(1)}</div>
+                      {vehicle.nuke_estimate_confidence && <div>Confidence: {vehicle.nuke_estimate_confidence}%</div>}
+                    </div>
+                  </BadgeHoverPreview>
+                )}
+                {hoveredBadge === 'heat' && vehicle.heat_score != null && (
+                  <BadgeHoverPreview badgeRect={badgeRect}>
+                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                      {vehicle.heat_score >= 80 ? '\u{1F30B} Volcanic' : vehicle.heat_score >= 60 ? '\u{1F525} Fire' : '\u{1F321}\u{FE0F} Hot'}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.8)' }}>
+                      <div>Heat Score: {vehicle.heat_score}/100</div>
+                      {vehicle.heat_score_label && <div>Level: {vehicle.heat_score_label}</div>}
+                    </div>
+                  </BadgeHoverPreview>
+                )}
+                {hoveredBadge === 'record' && vehicle.is_record_price && (
+                  <BadgeHoverPreview badgeRect={badgeRect}>
+                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>{'\u{1F451}'} Record Price</div>
+                    <div style={{ color: 'rgba(255,255,255,0.8)' }}>
+                      {vehicle.sale_price && <div>Sold: ${vehicle.sale_price.toLocaleString()}</div>}
+                      <div>Record for {vehicle.year} {vehicle.make} {vehicle.model}</div>
+                    </div>
+                  </BadgeHoverPreview>
+                )}
+                {hoveredBadge === 'tier' && (() => {
+                  const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
+                  if (!tierLabel) return null;
+                  const raw = String(vehicle.vin || '').trim().toUpperCase();
+                  const hasVIN = raw.length >= 4 && !raw.startsWith('VIVA') && !raw.startsWith('TEST') && /^[A-HJ-NPR-Z0-9]{4,17}$/.test(raw);
+                  const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
+                  const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
+                  const nextSteps = getTierNextSteps(tierLabel, vehicle);
+                  return (
+                    <BadgeHoverPreview badgeRect={badgeRect}>
+                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                        <span style={{ color: getTierColor(tierLabel) }}>{tierLabel}</span> Data Profile
+                      </div>
+                      <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.7)', marginBottom: '6px' }}>
+                        {getTierDescription(tierLabel)}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.85)', fontSize: '7pt' }}>
+                        <div>{vehicle.year && vehicle.make && vehicle.model ? '\u2705' : '\u274C'} Year / Make / Model</div>
+                        <div>{hasVIN ? '\u2705' : '\u274C'} VIN</div>
+                        <div>{hasPrice ? '\u2705' : '\u274C'} Price / Estimate</div>
+                        <div>{imgCount >= 5 ? '\u2705' : imgCount >= 1 ? '\u26A0\uFE0F' : '\u274C'} Photos ({imgCount})</div>
+                        <div>{(vehicle.event_count || 0) >= 1 ? '\u2705' : '\u274C'} Timeline events ({vehicle.event_count || 0})</div>
+                        <div>{(vehicle.receipt_count || 0) >= 1 ? '\u2705' : '\u274C'} Receipts ({vehicle.receipt_count || 0})</div>
+                      </div>
+                      {nextSteps.length > 0 && (
+                        <div style={{ marginTop: '6px', paddingTop: '5px', borderTop: '1px solid rgba(255,255,255,0.15)', fontSize: '7pt', color: 'rgba(255,255,255,0.6)' }}>
+                          <div style={{ fontWeight: 600, marginBottom: '2px' }}>Next steps to level up:</div>
+                          {nextSteps.map((s, i) => <div key={i}>{'\u2192'} {s}</div>)}
+                        </div>
+                      )}
+                    </BadgeHoverPreview>
+                  );
+                })()}
+
                 {showFollowButton && (
                   <button
                     type="button"
@@ -2575,52 +2692,21 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               opacity: 0.9,
             }}
           >
-            {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
+            {/* Vehicle Data Profile Grade (F, E, D, C, B, A, S, SSS) */}
             {(() => {
               const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
-
-              const getTierColor = (tier: string) => {
-                switch (tier) {
-                  case 'SSS': return '#7c3aed';
-                  case 'SS': return '#8b5cf6';
-                  case 'S': return '#ef4444';
-                  case 'A': return '#f59e0b';
-                  case 'B': return '#3b82f6';
-                  case 'C': return '#10b981';
-                  case 'D': return '#6b7280';
-                  case 'E': return '#9ca3af';
-                  case 'F': return '#a855f7';
-                  default: return '#6b7280';
-                }
-              };
-
-              const getTierDescription = (tier: string) => {
-                switch (tier) {
-                  case 'SSS': return 'Legendary — museum-grade, historically significant';
-                  case 'SS': return 'Exceptional — near-perfect documentation and provenance';
-                  case 'S': return 'Outstanding — comprehensive data, high engagement';
-                  case 'A': return 'Strong — well-documented with active history';
-                  case 'B': return 'Good — solid data, verified details';
-                  case 'C': return 'Standard — VIN, price, and photos confirmed';
-                  case 'D': return 'Partial — some key data present';
-                  case 'E': return 'Minimal — basic info only';
-                  case 'F': return 'Incomplete — needs more data';
-                  default: return 'Data completeness grade';
-                }
-              };
-
-              if (tierLabel) {
-                return (
-                  <span
-                    style={{ fontWeight: 700, cursor: 'pointer' }}
-                    title={`${tierLabel} tier: ${getTierDescription(tierLabel)}`}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  >
-                    <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>{tierLabel}</span> tier
-                  </span>
-                );
-              }
-              return null;
+              if (!tierLabel) return null;
+              return (
+                <span
+                  style={{ fontWeight: 700, cursor: 'pointer' }}
+                  onMouseEnter={(e) => onBadgeEnter('tier', e)}
+                  onMouseLeave={onBadgeLeave}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                >
+                  <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>{tierLabel}</span>{' '}
+                  <span style={{ opacity: 0.7 }}>profile</span>
+                </span>
+              );
             })()}
 
             {infoDense && vehicle.uploader_name && <span style={{ fontWeight: 500 }}>{vehicle.uploader_name}</span>}
