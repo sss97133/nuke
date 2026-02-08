@@ -339,7 +339,7 @@ const saveFilters = (filters: FilterState) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
   } catch (err) {
-    console.warn('Failed to save filters to localStorage:', err);
+    // Failed to save filters to localStorage - ignore
   }
 };
 
@@ -984,7 +984,7 @@ const CursorHomepage: React.FC = () => {
         uniqueBody.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
         setAvailableBodyStyles(uniqueBody);
       } catch (err) {
-        console.error('Error loading filter options:', err);
+        // Error loading filter options - silent
       }
     };
 
@@ -1086,7 +1086,7 @@ const CursorHomepage: React.FC = () => {
           setAvailableModels(sortedModels);
         }
       } catch (err) {
-        console.error('Error loading models for makes:', err);
+        // Error loading models - silent
       }
     };
     loadModelsForMakes();
@@ -1097,7 +1097,7 @@ const CursorHomepage: React.FC = () => {
     try {
       localStorage.setItem('nuke_homepage_searchText', searchText);
     } catch (err) {
-      console.warn('Failed to save search text:', err);
+      // ignore
     }
   }, [searchText]);
 
@@ -1105,7 +1105,7 @@ const CursorHomepage: React.FC = () => {
     try {
       localStorage.setItem('nuke_homepage_sortBy', sortBy);
     } catch (err) {
-      console.warn('Failed to save sortBy:', err);
+      // ignore
     }
   }, [sortBy]);
 
@@ -1113,7 +1113,7 @@ const CursorHomepage: React.FC = () => {
     try {
       localStorage.setItem('nuke_homepage_sortDirection', sortDirection);
     } catch (err) {
-      console.warn('Failed to save sortDirection:', err);
+      // ignore
     }
   }, [sortDirection]);
 
@@ -1178,7 +1178,7 @@ const CursorHomepage: React.FC = () => {
     try {
       localStorage.setItem('nuke_homepage_showFilters', String(showFilters));
     } catch (err) {
-      console.warn('Failed to save showFilters:', err);
+      // ignore
     }
   }, [showFilters]);
 
@@ -1942,7 +1942,7 @@ const CursorHomepage: React.FC = () => {
       }
 
       if (error) {
-        console.error('Error loading filtered stats:', error);
+        // Error loading filtered stats - silent
         return;
       }
 
@@ -2155,7 +2155,7 @@ const CursorHomepage: React.FC = () => {
         valueImported7d,
       });
     } catch (error) {
-      console.error('Error loading filtered stats:', error);
+      // Error loading filtered stats - silent
     } finally {
       setFilteredStatsLoading(false);
     }
@@ -2460,7 +2460,7 @@ const CursorHomepage: React.FC = () => {
       }
 
       // Fallback to client-side calculation if both RPCs fail
-      console.warn('RPC failed, falling back to client-side stats:', fastError || rpcError);
+      // RPC failed - falling back to client-side stats
 
       // Get total vehicle count
       const { count: totalCount, error: countError } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
@@ -2474,7 +2474,7 @@ const CursorHomepage: React.FC = () => {
       });
 
       if (countError) {
-        console.error('Error loading vehicle count:', countError);
+        // Error loading vehicle count - silent
       }
 
       // IMPORTANT: Add explicit limit to avoid Supabase default 1000 row limit!
@@ -2490,7 +2490,7 @@ const CursorHomepage: React.FC = () => {
       });
 
       if (vehiclesError) {
-        console.error('Error loading vehicles for stats:', vehiclesError);
+        // Error loading vehicles for stats - silent
         return;
       }
 
@@ -2597,7 +2597,7 @@ const CursorHomepage: React.FC = () => {
           .lt('created_at', tomorrowStart.toISOString());
       });
       if (createdTodayErr) {
-        console.warn('Error loading vehicles added today:', createdTodayErr);
+        // Error loading vehicles added today - silent
       }
 
       const { data: recentSales } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
@@ -2664,7 +2664,7 @@ const CursorHomepage: React.FC = () => {
       
       setDbStats(stats);
     } catch (error) {
-      console.error('Error loading database stats:', error);
+      // Error loading database stats - silent
       // #region agent log
       // #endregion
     } finally {
@@ -2858,7 +2858,7 @@ const CursorHomepage: React.FC = () => {
             return;
           }
           // For other errors, log as warning but don't break the app
-          console.warn('Error loading user preferences:', prefsError);
+          // Error loading user preferences - silent
           return;
         }
         
@@ -2917,11 +2917,11 @@ const CursorHomepage: React.FC = () => {
       } else {
         // Don't spam console with repeated timeouts; cache should cover most sessions.
         if (statsError?.message !== 'timeout') {
-          console.warn('Failed to load accurate stats:', statsError);
+          // Failed to load accurate stats - silent
         }
       }
     } catch (err) {
-      console.warn('Error loading accurate stats:', err);
+      // Error loading accurate stats - silent
     } finally {
       setStatsLoading(false);
     }
@@ -3248,14 +3248,7 @@ const CursorHomepage: React.FC = () => {
       }
 
       if (error) {
-        // Supabase/PostgREST errors often include a useful `details` / `hint` payload.
-        // Log a structured object so production console isn't just "Object".
-        console.error('❌ Error loading vehicles:', {
-          message: error.message,
-          code: (error as any).code,
-          details: (error as any).details,
-          hint: (error as any).hint,
-        });
+        // Error loading vehicles - set error state for UI
         setDebugInfo({
           when: 'CursorHomepage.loadHypeFeed',
           message: error.message,
@@ -3401,7 +3394,7 @@ const CursorHomepage: React.FC = () => {
             
             if (imgErr) {
               // Non-fatal: continue without thumbnails
-              console.warn('Failed to fetch thumbnail chunk:', imgErr);
+              // Failed to fetch thumbnail chunk - silent
               continue;
             }
             
@@ -3455,7 +3448,7 @@ const CursorHomepage: React.FC = () => {
           }
         }
       } catch (err) {
-        console.warn('Error loading image variants:', err);
+        // Error loading image variants - silent
         // Non-fatal: continue with fallback images
       }
 
@@ -3735,7 +3728,7 @@ const CursorHomepage: React.FC = () => {
       }
 
     } catch (error: any) {
-      console.error('❌ Unexpected error loading feed:', error);
+      // Unexpected error loading feed
       setError('Something went wrong. Please try refreshing the page.');
       setFeedVehicles([]);
     } finally {
@@ -4105,7 +4098,7 @@ const CursorHomepage: React.FC = () => {
         // Silently skip - table structure doesn't support this yet
       } catch (error: any) {
         // For other errors, log as warning but don't break the app
-        console.warn('Error saving user preferences:', error);
+        // Error saving user preferences - silent
       }
     }
   };
@@ -4159,7 +4152,7 @@ const CursorHomepage: React.FC = () => {
           .order('name', { ascending: true });
 
         if (error) {
-          console.error('Error loading sources:', error);
+          // Error loading sources - silent
           // Fallback to hardcoded sources if DB fails
           setActiveSources([
             { id: '1', domain: 'craigslist.org', source_name: 'Craigslist', url: 'https://craigslist.org' },
@@ -4194,7 +4187,7 @@ const CursorHomepage: React.FC = () => {
           setActiveSources(transformedData);
         }
       } catch (err) {
-        console.error('Error loading sources:', err);
+        // Error loading sources - silent
       } finally {
         setSourcesLoading(false);
       }
@@ -4223,7 +4216,7 @@ const CursorHomepage: React.FC = () => {
               .eq('is_public', true)
               .neq('status', 'pending');
             if (retry.error) {
-              console.error('Error loading source counts:', retry.error);
+              // Error loading source counts retry - silent
               return;
             }
             // eslint-disable-next-line @typescript-eslint/no-shadow
@@ -4231,13 +4224,13 @@ const CursorHomepage: React.FC = () => {
             setSourceCounts(buildSourceCounts(vehicles || []));
             return;
           }
-          console.error('Error loading source counts:', error);
+          // Error loading source counts - silent
           return;
         }
 
         setSourceCounts(buildSourceCounts(vehicles || []));
       } catch (err) {
-        console.error('Error loading source counts:', err);
+        // Error loading source counts - silent
       }
     }
 
@@ -6723,7 +6716,7 @@ const CursorHomepage: React.FC = () => {
                     localStorage.setItem(LOCATION_FAVORITES_KEY, JSON.stringify(favs));
                     setLocationFavorites(favs);
                   } catch (err) {
-                    console.warn('Failed to save location favorites:', err);
+                    // Failed to save location favorites - silent
                   }
                 };
                 
