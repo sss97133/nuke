@@ -9,8 +9,10 @@ import teaserMd from '@docs/investor/N-ZERO_TEASER.md?raw';
 import businessPlanMd from '@docs/investor/N-ZERO_BUSINESS_PLAN.md?raw';
 import informationMemorandumMd from '@docs/investor/N-ZERO_INFORMATION_MEMORANDUM.md?raw';
 import revenueModelMd from '@docs/investor/REVENUE_MODEL.md?raw';
+import dataInventoryMd from '@docs/investor/DATA_INVENTORY.md?raw';
+import technicalExhibitsMd from '@docs/investor/TECHNICAL_EXHIBITS.md?raw';
 
-type DocTab = 'teaser' | 'business_plan' | 'information_memorandum' | 'revenue_model';
+type DocTab = 'teaser' | 'business_plan' | 'information_memorandum' | 'revenue_model' | 'data_inventory' | 'technical_exhibits';
 
 interface AccessLog {
   action: string;
@@ -20,28 +22,40 @@ interface AccessLog {
 
 const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; content: string; pages: string }> = {
   teaser: {
-    title: 'Executive Summary / Teaser',
+    title: 'Executive Summary',
     subtitle: 'Pre-NDA distribution',
     content: teaserMd,
-    pages: '~4 pages',
+    pages: '~5 pp',
   },
   business_plan: {
     title: 'Business Plan',
     subtitle: 'Comprehensive business plan with appendices',
     content: businessPlanMd,
-    pages: '~35 pages',
+    pages: '~35 pp',
   },
   information_memorandum: {
     title: 'Information Memorandum',
     subtitle: 'Professional due-diligence document',
     content: informationMemorandumMd,
-    pages: '~35 pages',
+    pages: '~35 pp',
+  },
+  technical_exhibits: {
+    title: 'Technical Exhibits',
+    subtitle: 'Platform architecture, API specification, and data documentation',
+    content: technicalExhibitsMd,
+    pages: '~35 pp',
   },
   revenue_model: {
     title: 'Revenue Model',
     subtitle: 'Detailed revenue streams and projections',
     content: revenueModelMd,
-    pages: '~3 pages',
+    pages: '~4 pp',
+  },
+  data_inventory: {
+    title: 'Data Inventory',
+    subtitle: 'Live system data audit with source queries',
+    content: dataInventoryMd,
+    pages: '~8 pp',
   },
 };
 
