@@ -12,6 +12,7 @@ import { preloadImageBatch, optimizeImageUrl } from '../lib/imageOptimizer';
 import ActiveAuctionsPanel from '../components/dashboard/ActiveAuctionsPanel';
 import FBMarketplacePanel from '../components/dashboard/FBMarketplacePanel';
 import RecentlyAddedPanel from '../components/dashboard/RecentlyAddedPanel';
+import { deriveDealScoreLabel } from '../constants/dealScore';
 // import { ValueTrendsPanel } from '../components/charts'; // Temporarily disabled - import bug
 
 interface HypeVehicle {
@@ -3536,9 +3537,7 @@ const CursorHomepage: React.FC = () => {
         // Derive deal/heat labels client-side from numeric scores
         const dealScore = v.deal_score != null ? Number(v.deal_score) : null;
         const heatScore = v.heat_score != null ? Number(v.heat_score) : null;
-        const dealLabel = dealScore != null
-          ? (dealScore >= 20 ? 'steal' : dealScore >= 10 ? 'good_deal' : dealScore >= -5 ? 'fair' : dealScore >= -15 ? 'overpriced' : 'way_overpriced')
-          : null;
+        const dealLabel = dealScore != null ? deriveDealScoreLabel(dealScore) : null;
         const heatLabel = heatScore != null
           ? (heatScore >= 80 ? 'volcanic' : heatScore >= 60 ? 'fire' : heatScore >= 40 ? 'hot' : heatScore >= 20 ? 'warm' : 'cold')
           : null;

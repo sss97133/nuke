@@ -410,11 +410,13 @@ function computeDealScore(estimatedValue: number, askingPrice: number | null, cr
   const dealScore = rawDeal * freshnessDecay;
 
   let dealScoreLabel: string;
-  if (dealScore >= 20) dealScoreLabel = "steal";
-  else if (dealScore >= 10) dealScoreLabel = "good_deal";
+  if (dealScore >= 25) dealScoreLabel = "plus_3";
+  else if (dealScore >= 15) dealScoreLabel = "plus_2";
+  else if (dealScore >= 5) dealScoreLabel = "plus_1";
   else if (dealScore >= -5) dealScoreLabel = "fair";
-  else if (dealScore >= -15) dealScoreLabel = "overpriced";
-  else dealScoreLabel = "way_overpriced";
+  else if (dealScore >= -15) dealScoreLabel = "minus_1";
+  else if (dealScore >= -25) dealScoreLabel = "minus_2";
+  else dealScoreLabel = "minus_3";
 
   return {
     dealScore: Math.round(dealScore * 100) / 100,

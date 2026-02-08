@@ -10,7 +10,7 @@ const corsHeaders = {
  * Process URL Drop - Universal URL Handler (v2)
  *
  * Handles ANY URL a user drops into the system:
- * - Known platforms (BaT, Cars & Bids, Instagram, YouTube)
+ * - Known platforms (BaT, Cars & Bids, Instagram, YouTube, Facebook)
  * - Auction houses (Mecum, RM Sotheby's, Gooding, etc.)
  * - Events/Rallies (1000 Miglia, Dakar, Pebble Beach)
  * - Dealers, Builders, Collections
@@ -18,6 +18,30 @@ const corsHeaders = {
  *
  * Creates discovery leads for the snowball system to process.
  */
+
+// FB Relay: local server on residential IP, exposed via ngrok
+const FB_RELAY_URL = Deno.env.get('FB_RELAY_URL'); // e.g. https://xxxx.ngrok-free.app
+const FB_RELAY_TOKEN = Deno.env.get('FB_RELAY_TOKEN') || 'nuke-fb-relay-2026';
+
+async function fbRelay(action: 'resolve' | 'scrape', targetUrl: string): Promise<any> {
+  if (!FB_RELAY_URL) return null;
+  try {
+    const resp = await fetch(`${FB_RELAY_URL}/${action}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${FB_RELAY_TOKEN}`,
+      },
+      body: JSON.stringify({ url: targetUrl, action }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!resp.ok) return null;
+    return resp.json();
+  } catch (e) {
+    console.warn(`FB relay ${action} failed:`, e);
+    return null;
+  }
+}
 
 interface URLDropRequest {
   url: string;
@@ -71,6 +95,9 @@ const KNOWN_PLATFORMS: Record<string, { type: string; business_type?: string; ha
   'autotrader.com': { type: 'classified_listing' },
   'classic.com': { type: 'dealer_directory', business_type: 'dealer_aggregator' },
   'classiccars.com': { type: 'classified_listing' },
+
+  // Dealer / builder inventory (Wix, etc.)
+  'victorylapclassics.net': { type: 'vehicle_listing', business_type: 'dealer', handler: 'victorylap' },
 
   // N-Zero internal
   'n-zero.dev': { type: 'n-zero_internal', handler: 'n-zero' },
@@ -180,6 +207,15 @@ serve(async (req) => {
         ({ entityData, entityId, action, message, entityType } = await processFacebookURL(url, supabase, userId));
         break;
 
+      case 'victorylap':
+        if (detection.type === 'vehicle_listing') {
+          ({ entityData, entityId } = await processVictoryLapListingURL(url, supabase));
+          entityType = 'vehicle';
+          action = entityId ? 'extracted' : 'discovered';
+          message = entityId ? 'Victory Lap listing extracted and linked to vehicle.' : 'Victory Lap listing queued.';
+        }
+        break;
+
       default:
         // For all other URLs, use pattern-based analysis + discovery
         if (existingBusiness) {
@@ -265,7 +301,7 @@ serve(async (req) => {
       isOriginalDiscoverer = contributorRank === 1;
 
       // Create opinion/contribution record
-      await supabase
+      const { error: opinionErr } = await supabase
         .from('entity_opinions')
         .insert({
           entity_type: entityType,
@@ -278,11 +314,10 @@ serve(async (req) => {
           source_url: url,
           data_contributed: entityData,
           contribution_score: isOriginalDiscoverer ? 100 : 50
-        })
-        .then(() => {})
-        .catch((err: Error) => {
-          if (!err.message?.includes('23505')) console.error('Opinion error:', err);
         });
+      if (opinionErr && !opinionErr.message?.includes('23505')) {
+        console.error('Opinion error:', opinionErr);
+      }
 
       // Award points
       pointsAwarded = isOriginalDiscoverer ? 100 : 50;
@@ -291,7 +326,7 @@ serve(async (req) => {
         p_category: isOriginalDiscoverer ? 'discovery' : 'data_fill',
         p_points: pointsAwarded,
         p_reason: `Contributed ${entityType} via URL drop`
-      }).catch(() => {}); // Non-critical
+      }); // Non-critical, errors ignored by supabase client
     }
 
     const responsePayload = {
@@ -341,8 +376,7 @@ serve(async (req) => {
           error_message: error.message,
           processed_at: new Date().toISOString(),
         })
-        .eq('id', _inbox_id)
-        .catch(() => {});
+        .eq('id', _inbox_id);
     }
 
     return new Response(
@@ -563,6 +597,16 @@ function detectURLType(url: string): URLDetectionResult {
             confidence = 0.85;
           }
         }
+        if (info.handler === 'victorylap') {
+          const pathLower = parsed.pathname.toLowerCase();
+          if (pathLower.includes('/product-page/')) {
+            type = 'vehicle_listing';
+            confidence = 1.0;
+          } else if (pathLower.includes('/inventory') || pathLower.includes('/portfolio')) {
+            type = 'dealer';
+            confidence = 0.9;
+          }
+        }
         return {
           type,
           platform: domain,
@@ -641,24 +685,19 @@ async function processFacebookURL(
     }
   } catch { /* keep original url */ }
 
-  // Resolve Facebook share links (/share/p/..., /share/r/...)
-  const shareMatch = resolvedUrl.match(/facebook\.com\/share\/[pr]\/([A-Za-z0-9_-]+)/);
+  // Resolve Facebook share links (/share/...) via local relay server
+  const shareMatch = resolvedUrl.match(/facebook\.com\/share\/(?:[pr]\/)?([A-Za-z0-9_-]+)/);
   if (shareMatch) {
-    console.log('Resolving FB share link:', resolvedUrl);
-    try {
-      const resp = await fetch(resolvedUrl, {
-        method: 'HEAD',
-        redirect: 'follow',
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0; +https://n-zero.dev)' },
-        signal: AbortSignal.timeout(8000),
-      });
-      const finalUrl = resp.url;
-      if (finalUrl && finalUrl !== resolvedUrl) {
-        console.log('Share link resolved to:', finalUrl);
-        resolvedUrl = finalUrl;
-      }
-    } catch (e) {
-      console.warn('Failed to resolve share link, continuing with original:', e);
+    console.log('Resolving FB share link via relay:', resolvedUrl);
+    const resolved = await fbRelay('resolve', resolvedUrl);
+    if (resolved?.success && resolved.resolved_url && !resolved.is_login) {
+      console.log('Share link resolved to:', resolved.resolved_url);
+      resolvedUrl = resolved.resolved_url;
+    } else if (resolved?.og_url && !resolved.og_url.includes('/login')) {
+      console.log('Share link resolved via og:url to:', resolved.og_url);
+      resolvedUrl = resolved.og_url;
+    } else {
+      console.warn('FB relay unavailable or returned login, share link unresolved');
     }
   }
 
@@ -667,50 +706,146 @@ async function processFacebookURL(
   // ── Marketplace item ──────────────────────────────────────────────
   const marketplaceItemMatch = resolvedUrl.match(/marketplace\/item\/(\d+)/);
   if (marketplaceItemMatch) {
-    console.log('Facebook Marketplace item detected, calling extract-facebook-marketplace');
-    try {
-      const { data: extractResult, error: extractErr } = await supabase.functions.invoke(
-        'extract-facebook-marketplace',
-        { body: { url: resolvedUrl, user_id: userId } },
-      );
+    const itemId = marketplaceItemMatch[1];
+    const canonicalUrl = `https://www.facebook.com/marketplace/item/${itemId}/`;
+    console.log('Facebook Marketplace item detected:', itemId);
 
-      if (extractErr || !extractResult?.success) {
-        // Extraction failed - still create a discovery lead so we don't lose it
-        console.error('FB Marketplace extraction failed:', extractErr?.message || extractResult?.error);
-        const leadId = await createDiscoveryLead(supabase, {
-          url: resolvedUrl,
-          type: 'facebook_marketplace',
-          suggestedType: 'vehicle_listing',
-          confidence: 0.9,
-          userId,
-          metadata: { extraction_error: extractErr?.message || extractResult?.error, item_id: marketplaceItemMatch[1] },
-        });
-        return {
-          entityData: { item_id: marketplaceItemMatch[1], error: extractErr?.message },
-          entityId: leadId,
-          action: 'extraction_failed',
-          message: `FB Marketplace listing detected but extraction failed. Queued for retry.`,
-          entityType: 'discovery_lead',
-        };
-      }
+    // Check if already exists
+    const { data: existingListing } = await supabase
+      .from('marketplace_listings')
+      .select('id, vehicle_id')
+      .eq('facebook_id', itemId)
+      .maybeSingle();
+
+    if (existingListing) {
+      await supabase.from('marketplace_listings')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('id', existingListing.id);
+
+      // Record the user submission as a sighting (triggers submission_count increment)
+      const { error: sightErr } = await supabase.from('fb_listing_sightings').insert({
+        listing_id: existingListing.id,
+        source: 'user_submission',
+        submitted_by: userId || 'anonymous',
+      });
+      if (sightErr) console.warn('Sighting insert error:', sightErr.message);
+
+      // Fetch updated count
+      const { data: updated } = await supabase
+        .from('marketplace_listings')
+        .select('submission_count')
+        .eq('id', existingListing.id)
+        .maybeSingle();
 
       return {
-        entityData: extractResult,
-        entityId: extractResult.listing_id || extractResult.vehicle_id || null,
-        action: extractResult.is_new ? 'extracted' : 'existing',
-        message: extractResult.is_new
-          ? `FB Marketplace listing extracted! ${extractResult.extracted?.year || ''} ${extractResult.extracted?.make || ''} ${extractResult.extracted?.model || ''} - $${extractResult.extracted?.price || '?'}`
-          : 'FB Marketplace listing already tracked',
+        entityData: { ...existingListing, submission_count: updated?.submission_count },
+        entityId: existingListing.id,
+        action: 'existing',
+        message: `FB Marketplace listing already tracked (shared ${updated?.submission_count || 1}x)`,
+        entityType: 'marketplace_listing',
+      };
+    }
+
+    // Scrape via local relay server (Facebook blocks datacenter IPs)
+    try {
+      const scrapeData = await fbRelay('scrape', canonicalUrl);
+      if (!scrapeData?.success || scrapeData?.is_login) {
+        throw new Error(scrapeData?.error || 'FB relay returned login page or unavailable');
+      }
+
+      const fullTitle = scrapeData.og_title || scrapeData.title_tag || '';
+      const ogDesc = scrapeData.og_description || '';
+      const ogImage = scrapeData.og_image || null;
+      const price = scrapeData.price || null;
+
+      // Parse year/make/model from title
+      const yearMatch = fullTitle.match(/\b(19[2-9]\d|20[0-3]\d)\b/);
+      const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
+      let make: string | null = null;
+      let model: string | null = null;
+      if (year) {
+        const afterYear = fullTitle.split(String(year))[1]?.trim() || '';
+        const words = afterYear.split(/\s+/).filter((w: string) => w.length > 0);
+        if (words.length > 0) make = words[0];
+        if (words.length > 1) model = words.slice(1, 3).join(' ');
+      }
+
+      // Extract location
+      const locMatch = (ogDesc + ' ' + fullTitle).match(/([A-Za-z\s]+),\s*(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b/i);
+      const location = [locMatch?.[1]?.trim(), locMatch?.[2]].filter(Boolean).join(', ') || null;
+
+      // Insert listing
+      const { data: inserted, error: insertErr } = await supabase
+        .from('marketplace_listings')
+        .insert({
+          facebook_id: itemId,
+          platform: 'facebook_marketplace',
+          url: canonicalUrl,
+          title: fullTitle || null,
+          price,
+          description: ogDesc || null,
+          location,
+          parsed_year: year,
+          parsed_make: make,
+          parsed_model: model,
+          image_url: ogImage,
+          all_images: ogImage ? [ogImage] : [],
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (insertErr) {
+        console.error('FB listing insert error:', insertErr);
+        throw insertErr;
+      }
+
+      const listingId = inserted?.id || null;
+      console.log('FB Marketplace listing created:', listingId, fullTitle);
+
+      // Auto-match to existing vehicle
+      let vehicleId: string | null = null;
+      let matchType: string | null = null;
+      if (listingId) {
+        const match = await matchListingToVehicle(supabase, listingId, { year, make, model, vin: null });
+        vehicleId = match.vehicleId;
+        matchType = match.matchType;
+      }
+
+      // Record initial sighting
+      if (listingId) {
+        await supabase.from('fb_listing_sightings').insert({
+          listing_id: listingId,
+          source: 'user_submission',
+          submitted_by: userId || 'anonymous',
+          price_at_sighting: price,
+        });
+      }
+
+      const matchMsg = vehicleId ? ` Matched to vehicle!` : matchType === 'suggested' ? ` Possible vehicle match saved.` : '';
+      return {
+        entityData: { listing_id: listingId, year, make, model, price, vehicle_id: vehicleId },
+        entityId: listingId,
+        action: 'extracted',
+        message: `FB Marketplace listing extracted! ${year || ''} ${make || ''} ${model || ''} - $${price || '?'}${matchMsg}`,
         entityType: 'marketplace_listing',
       };
     } catch (err) {
-      console.error('FB Marketplace invoke error:', err);
+      console.error('FB Marketplace bot scrape failed:', err);
+      // Fallback: create discovery lead
+      const leadId = await createDiscoveryLead(supabase, {
+        url: canonicalUrl,
+        type: 'facebook_marketplace',
+        suggestedType: 'vehicle_listing',
+        confidence: 0.9,
+        userId,
+        metadata: { item_id: itemId, error: err.message, share_url: url !== resolvedUrl ? url : undefined },
+      });
       return {
-        entityData: { item_id: marketplaceItemMatch[1], error: err.message },
-        entityId: null,
-        action: 'error',
-        message: `FB Marketplace extraction error: ${err.message}`,
-        entityType: 'marketplace_listing',
+        entityData: { item_id: itemId, error: err.message },
+        entityId: leadId,
+        action: 'extraction_failed',
+        message: `FB Marketplace listing detected but extraction failed. Queued for retry.`,
+        entityType: 'discovery_lead',
       };
     }
   }
@@ -812,6 +947,104 @@ async function processFacebookURL(
     message: `Facebook URL queued for manual review`,
     entityType: 'social_profile',
   };
+}
+
+// ============================================
+// VEHICLE MATCHING
+// ============================================
+
+const BLOCKED_MAKES = new Set([
+  'harley-davidson', 'harley', 'indian', 'ducati', 'kawasaki', 'suzuki',
+  'yamaha', 'ktm', 'triumph', 'aprilia', 'husqvarna', 'moto guzzi',
+  'can-am', 'polaris', 'arctic cat', 'sea-doo', 'ski-doo',
+  'fleetwood', 'winnebago', 'coachmen', 'jayco', 'thor', 'tiffin',
+  'newmar', 'holiday rambler', 'airstream', 'forest river',
+  'utility', 'wabash', 'great dane', 'hyundai translead', 'stoughton',
+  'mack', 'kenworth', 'peterbilt', 'freightliner', 'western star',
+  'john deere', 'caterpillar', 'case', 'kubota', 'bobcat',
+]);
+
+const BLOCKED_MODEL_PATTERNS = [
+  /\bsoftail\b/i, /\bsportster\b/i, /\bdyna\b/i, /\btouring\b/i,
+  /\bsouthwind\b/i, /\bbounder\b/i, /\bmotorhome\b/i, /\bcamper\b/i,
+  /\btrailer\b/i, /\batv\b/i, /\bquad\b/i, /\bdirt\s*bike\b/i,
+  /\bscooter\b/i, /\bjet\s*ski\b/i, /\bsnowmobile\b/i, /\bboat\b/i,
+  /\bpwc\b/i, /\bside.by.side\b/i, /\butv\b/i, /\brv\b/i,
+];
+
+function isBlockedVehicle(make: string | null, model: string | null): boolean {
+  if (make && BLOCKED_MAKES.has(make.toLowerCase().trim())) return true;
+  const text = `${make || ''} ${model || ''}`.toLowerCase();
+  return BLOCKED_MODEL_PATTERNS.some(p => p.test(text));
+}
+
+async function matchListingToVehicle(
+  supabase: any,
+  listingId: string,
+  parsed: { year: number | null; make: string | null; model: string | null; vin: string | null },
+): Promise<{ vehicleId: string | null; matchType: string | null }> {
+  try {
+    // Skip blocked vehicle types
+    if (isBlockedVehicle(parsed.make, parsed.model)) {
+      return { vehicleId: null, matchType: 'blocked' };
+    }
+
+    // 1. VIN match (highest confidence)
+    if (parsed.vin && parsed.vin.length >= 11) {
+      const { data: vinMatch } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('vin', parsed.vin)
+        .maybeSingle();
+
+      if (vinMatch) {
+        await supabase.from('marketplace_listings')
+          .update({ vehicle_id: vinMatch.id })
+          .eq('id', listingId);
+        console.log(`VIN match: listing ${listingId} → vehicle ${vinMatch.id}`);
+        return { vehicleId: vinMatch.id, matchType: 'vin' };
+      }
+    }
+
+    // 2. Year + Make + Model match
+    if (parsed.year && parsed.make) {
+      const query = supabase
+        .from('vehicles')
+        .select('id')
+        .eq('year', parsed.year)
+        .ilike('make', parsed.make)
+        .limit(2);
+
+      if (parsed.model) {
+        // Use first word of model for matching to avoid over-specificity
+        const modelFirst = parsed.model.split(/\s+/)[0];
+        query.ilike('model', `${modelFirst}%`);
+      }
+
+      const { data: ymmMatches } = await query;
+
+      if (ymmMatches?.length === 1) {
+        // Exactly one match → auto-link
+        await supabase.from('marketplace_listings')
+          .update({ vehicle_id: ymmMatches[0].id })
+          .eq('id', listingId);
+        console.log(`YMM match: listing ${listingId} → vehicle ${ymmMatches[0].id}`);
+        return { vehicleId: ymmMatches[0].id, matchType: 'ymm' };
+      } else if (ymmMatches && ymmMatches.length > 1) {
+        // Multiple matches → suggest but don't auto-link
+        await supabase.from('marketplace_listings')
+          .update({ suggested_vehicle_id: ymmMatches[0].id })
+          .eq('id', listingId);
+        console.log(`YMM ambiguous: listing ${listingId}, ${ymmMatches.length} candidates`);
+        return { vehicleId: null, matchType: 'suggested' };
+      }
+    }
+
+    return { vehicleId: null, matchType: null };
+  } catch (err) {
+    console.warn('Vehicle matching error:', err);
+    return { vehicleId: null, matchType: null };
+  }
 }
 
 // ============================================
@@ -920,6 +1153,38 @@ async function processBaTListingURL(url: string, supabase: any) {
 
   return {
     entityData: vehicle || { listing_url: url },
+    entityId: vehicleId
+  };
+}
+
+// ============================================
+// VICTORY LAP CLASSICS PROCESSOR
+// ============================================
+
+async function processVictoryLapListingURL(url: string, supabase: any) {
+  const { data: coreData, error: coreErr } = await supabase.functions.invoke('extract-victorylap-listing', {
+    body: { url }
+  });
+
+  if (coreErr) {
+    console.error('Victory Lap extract error:', coreErr);
+    throw new Error(coreErr.message || 'Failed to extract Victory Lap listing');
+  }
+
+  const vehicleId = coreData?.vehicle_id ?? coreData?.created_vehicle_ids?.[0] ?? null;
+
+  if (!vehicleId) {
+    return { entityData: { url, ...coreData }, entityId: null };
+  }
+
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select('*')
+    .eq('id', vehicleId)
+    .maybeSingle();
+
+  return {
+    entityData: vehicle || { url, vehicle_id: vehicleId },
     entityId: vehicleId
   };
 }

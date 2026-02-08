@@ -34,6 +34,9 @@ const Portfolio = React.lazy(() => import('../pages/Portfolio'));
 const CreditsSuccess = React.lazy(() => import('../pages/CreditsSuccess'));
 const PortfolioWithdraw = React.lazy(() => import('../pages/PortfolioWithdraw'));
 
+// Investor Offering Portal (Data Room)
+const InvestorOffering = React.lazy(() => import('../pages/InvestorOffering'));
+
 // Investment platform
 const Invest = React.lazy(() => import('../pages/Invest'));
 const MarketIntelligence = React.lazy(() => import('../pages/MarketIntelligence'));
@@ -160,6 +163,9 @@ export const DomainRoutes = () => {
         {/* Developers */}
         <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/docs/api" element={<DevelopersPage />} />
+
+        {/* Investor Offering Portal (Data Room) */}
+        <Route path="/offering" element={<InvestorOffering />} />
 
         {/* Investment Platform */}
         <Route path="/invest" element={<Invest />} />

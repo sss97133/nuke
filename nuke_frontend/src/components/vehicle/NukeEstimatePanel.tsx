@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyAmount } from '../../utils/currency';
+import { DEAL_SCORE_CONFIG, type DealScoreLabel } from '../../constants/dealScore';
 
 interface NukeEstimatePanelProps {
   vehicleId: string;
@@ -43,13 +44,9 @@ interface SurvivalRate {
   confidence_score: number | null;
 }
 
-const DEAL_COLORS: Record<string, string> = {
-  steal: '#10b981',
-  good_deal: '#3b82f6',
-  fair: '#6b7280',
-  overpriced: '#f97316',
-  way_overpriced: '#ef4444',
-};
+const DEAL_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(DEAL_SCORE_CONFIG).map(([k, v]) => [k, v.color])
+);
 
 const HEAT_COLORS: Record<string, string> = {
   volcanic: '#ef4444',
@@ -220,11 +217,8 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                   fontSize: '8pt',
                   fontWeight: 700,
                 }}>
-                  {estimate.deal_score_label === 'steal' ? 'STEAL' :
-                   estimate.deal_score_label === 'good_deal' ? 'GOOD DEAL' :
-                   estimate.deal_score_label === 'overpriced' ? 'OVERPRICED' :
-                   estimate.deal_score_label === 'way_overpriced' ? 'WAY OVERPRICED' :
-                   'FAIR'}
+                  {DEAL_SCORE_CONFIG[estimate.deal_score_label as DealScoreLabel]?.display || estimate.deal_score_label}
+                  {' '}{DEAL_SCORE_CONFIG[estimate.deal_score_label as DealScoreLabel]?.description || ''}
                   {' '}({estimate.deal_score > 0 ? '+' : ''}{estimate.deal_score.toFixed(1)})
                 </div>
               )}

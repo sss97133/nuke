@@ -243,3 +243,25 @@ ps aux | grep -E "(autonomous-bat|playwright|extract-)" | grep -v grep | wc -l
 2. Monitor Playwright extraction progress
 3. Don't restart Firecrawl-dependent extractors - use Playwright
 4. **Don't modify photo pipeline tables/functions** - active development
+
+## TODO: FB Seller Messaging - First-Time Setup
+**Date:** 2026-02-08
+**Status:** Pending manual step
+
+### What needs to happen:
+1. Make sure relay server is running: `deno run --allow-net --allow-env --allow-read --allow-run --allow-sys scripts/fb-relay-server.ts`
+2. Expose via tunnel: `cloudflared tunnel --url http://localhost:8787` (or use `scripts/start-fb-relay.sh`)
+3. Trigger a test message to bootstrap the FB login session:
+   ```bash
+   curl -X POST http://localhost:8787/message \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer nuke-fb-relay-2026" \
+     -d '{"url": "https://www.facebook.com/marketplace/item/3370316233042991/", "action": "message", "message": "Test"}'
+   ```
+4. A Chromium window will open on your Mac — log in to Facebook manually
+5. Close the browser (it auto-closes after 2 min)
+6. Session saves to `~/.fb-playwright-profile` — all future messages reuse it
+
+### After login is done:
+- Test with dry_run first: `dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/functions/v1/message-fb-seller" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"listing_id\": \"3626ac3c-7f93-478a-8e72-7f1df17b941b\"}"'`
+- Then batch mode: same endpoint with `{"batch_size": 5}`
