@@ -159,9 +159,12 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
 
   if (loading) {
     return (
-      <div className="card" style={{ border: '1px solid #c0c0c0', padding: '16px' }}>
-        <div style={{ textAlign: 'center', color: '#666', fontSize: '10pt' }}>
-          Loading document intelligence...
+      <div className="card">
+        <div className="card-header">Document Intelligence</div>
+        <div className="card-body">
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+            Loading document intelligence...
+          </div>
         </div>
       </div>
     );
@@ -170,12 +173,15 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
   // No documents at all
   if (!documentStats || documentStats.total_receipts === 0) {
     return (
-      <div className="card" style={{ border: '1px solid #c0c0c0', padding: '16px' }}>
-        <div style={{ textAlign: 'center', color: '#666', fontSize: '10pt' }}>
-          <FileText size={20} style={{ marginBottom: '8px', opacity: 0.5 }} />
-          <div>No service documents uploaded yet.</div>
-          <div style={{ fontSize: '8pt', marginTop: '4px' }}>
-            Upload receipts and invoices to build a maintenance history.
+      <div className="card">
+        <div className="card-header">Document Intelligence</div>
+        <div className="card-body">
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+            <FileText size={20} style={{ marginBottom: '8px', opacity: 0.5 }} />
+            <div>No service documents uploaded yet.</div>
+            <div style={{ fontSize: '8pt', marginTop: '4px' }}>
+              Upload receipts and invoices to build a maintenance history.
+            </div>
           </div>
         </div>
       </div>
@@ -186,70 +192,59 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
   if (documentStats.pending > 0) {
     return (
       <div
-        className="card"
+        className="card vehicle-document-intelligence-cta"
         onClick={!analyzing ? analyzeDocuments : undefined}
-        style={{
-          border: '1px solid #c0c0c0',
-          padding: '16px',
-          cursor: analyzing ? 'wait' : 'pointer',
-          transition: 'all 0.2s ease',
-          background: analyzing ? '#f9fafb' : undefined,
-        }}
-        onMouseEnter={(e) => !analyzing && (e.currentTarget.style.borderColor = '#8b5cf6')}
-        onMouseLeave={(e) => !analyzing && (e.currentTarget.style.borderColor = '#c0c0c0')}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !analyzing) { e.preventDefault(); analyzeDocuments(); } }}
       >
-        {analyzing ? (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Loader2 size={16} className="animate-spin" color="#8b5cf6" />
-              <span style={{ fontSize: '10pt', fontWeight: 600, color: '#8b5cf6' }}>
-                Analyzing Receipts...
-              </span>
-            </div>
-            <div style={{
-              height: '4px',
-              background: '#e5e7eb',
-              borderRadius: '2px',
-              overflow: 'hidden',
-              marginBottom: '8px'
-            }}>
+        <div className="card-header">Document Intelligence</div>
+        <div className="card-body" style={{ cursor: analyzing ? 'wait' : 'pointer' }}>
+          {analyzing ? (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
+                <Loader2 size={16} className="animate-spin" color="var(--primary)" />
+                <span style={{ fontSize: '10pt', fontWeight: 600, color: 'var(--primary)' }}>
+                  Analyzing Receipts...
+                </span>
+              </div>
               <div style={{
-                height: '100%',
-                width: `${analysisProgress.total > 0 ? (analysisProgress.processed / analysisProgress.total) * 100 : 0}%`,
-                background: '#8b5cf6',
-                transition: 'width 0.5s ease',
-                borderRadius: '2px'
-              }} />
+                height: '4px',
+                background: 'var(--border)',
+                borderRadius: '2px',
+                overflow: 'hidden',
+                marginBottom: '8px'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${analysisProgress.total > 0 ? (analysisProgress.processed / analysisProgress.total) * 100 : 0}%`,
+                  background: 'var(--primary)',
+                  transition: 'width 0.5s ease',
+                  borderRadius: '2px'
+                }} />
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                Processed {analysisProgress.processed} of {analysisProgress.total} documents...
+              </div>
             </div>
-            <div style={{ fontSize: '8pt', color: '#666' }}>
-              Processed {analysisProgress.processed} of {analysisProgress.total} documents...
+          ) : (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
+                <FileText size={16} color="var(--primary)" />
+                <span style={{ fontSize: '10pt', fontWeight: 600 }}>
+                  {documentStats.pending} Receipts Ready to Analyze
+                </span>
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                {documentStats.processed > 0 && `${documentStats.processed} already processed · `}
+                AI will extract vendor, date, cost, and service details
+              </div>
+              <div className="button button-small" style={{ display: 'inline-block' }}>
+                Click to Analyze All
+              </div>
             </div>
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
-              <FileText size={16} color="#8b5cf6" />
-              <span style={{ fontSize: '10pt', fontWeight: 600 }}>
-                {documentStats.pending} Receipts Ready to Analyze
-              </span>
-            </div>
-            <div style={{ fontSize: '8pt', color: '#666', marginBottom: '12px' }}>
-              {documentStats.processed > 0 && `${documentStats.processed} already processed · `}
-              AI will extract vendor, date, cost, and service details
-            </div>
-            <div style={{
-              padding: '6px 12px',
-              background: '#8b5cf6',
-              color: 'white',
-              borderRadius: '2px',
-              fontSize: '8pt',
-              fontWeight: 600,
-              display: 'inline-block'
-            }}>
-              Click to Analyze All
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   }
@@ -396,12 +391,15 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
 
   // All processed but no records created (edge case)
   return (
-    <div className="card" style={{ border: '1px solid #c0c0c0', padding: '16px' }}>
-      <div style={{ textAlign: 'center', color: '#666', fontSize: '10pt' }}>
-        <CheckCircle size={20} style={{ marginBottom: '8px', color: '#10b981' }} />
-        <div>All {documentStats.processed} documents processed.</div>
-        <div style={{ fontSize: '8pt', marginTop: '4px' }}>
-          No service records could be extracted. Documents may not be receipts.
+    <div className="card">
+      <div className="card-header">Document Intelligence</div>
+      <div className="card-body">
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+          <CheckCircle size={20} style={{ marginBottom: '8px', color: 'var(--success)' }} />
+          <div>All {documentStats.processed} documents processed.</div>
+          <div style={{ fontSize: '8pt', marginTop: '4px' }}>
+            No service records could be extracted. Documents may not be receipts.
+          </div>
         </div>
       </div>
     </div>

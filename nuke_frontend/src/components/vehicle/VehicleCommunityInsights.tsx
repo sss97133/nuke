@@ -346,9 +346,12 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
 
   if (loading) {
     return (
-      <div className="card" style={{ border: '1px solid #c0c0c0', padding: '16px' }}>
-        <div style={{ textAlign: 'center', color: '#666', fontSize: '10pt' }}>
-          Loading community insights...
+      <div className="card">
+        <div className="card-header">Community Insights</div>
+        <div className="card-body">
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+            Loading community insights...
+          </div>
         </div>
       </div>
     );
@@ -357,68 +360,59 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
   if (!sentimentData && !marketData) {
     return (
       <div
-        className="card"
+        className="card vehicle-community-insights-cta"
         onClick={!generating ? generateInsights : undefined}
-        style={{
-          border: '1px solid #c0c0c0',
-          padding: '16px',
-          cursor: generating ? 'wait' : 'pointer',
-          transition: 'all 0.2s ease',
-          background: generating ? '#f9fafb' : undefined,
-        }}
-        onMouseEnter={(e) => !generating && (e.currentTarget.style.borderColor = '#3b82f6')}
-        onMouseLeave={(e) => !generating && (e.currentTarget.style.borderColor = '#c0c0c0')}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !generating) { e.preventDefault(); generateInsights(); } }}
       >
-        {generating ? (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} color="#3b82f6" />
-              <span style={{ fontSize: '10pt', fontWeight: 600, color: '#3b82f6' }}>
-                Generating Insights...
-              </span>
-            </div>
-            <div style={{
-              height: '4px',
-              background: '#e5e7eb',
-              borderRadius: '2px',
-              overflow: 'hidden',
-              marginBottom: '8px'
-            }}>
+        <div className="card-header">Community Insights</div>
+        <div className="card-body" style={{ cursor: generating ? 'wait' : 'pointer' }}>
+          {generating ? (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
+                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} color="var(--primary)" />
+                <span style={{ fontSize: '10pt', fontWeight: 600, color: 'var(--primary)' }}>
+                  Generating Insights...
+                </span>
+              </div>
               <div style={{
-                height: '100%',
-                width: `${generatingProgress}%`,
-                background: '#3b82f6',
-                transition: 'width 0.5s ease',
-                borderRadius: '2px'
-              }} />
+                height: '4px',
+                background: 'var(--border)',
+                borderRadius: '2px',
+                overflow: 'hidden',
+                marginBottom: '8px'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${generatingProgress}%`,
+                  background: 'var(--primary)',
+                  transition: 'width 0.5s ease',
+                  borderRadius: '2px'
+                }} />
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                Analyzing auction comments, forum discussions, and social media...
+              </div>
             </div>
-            <div style={{ fontSize: '8pt', color: '#666' }}>
-              Analyzing auction comments, forum discussions, and social media...
+          ) : (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '4px' }}>
+                <Sparkles size={14} color="var(--primary)" />
+                <span>No community insights available yet.</span>
+              </div>
+              <div style={{ fontSize: '8pt', marginTop: '4px' }}>
+                Insights are generated from auction comments, forum discussions, and social media.
+              </div>
+              <div
+                className="button button-small"
+                style={{ marginTop: '12px', display: 'inline-block' }}
+              >
+                Click to Generate
+              </div>
             </div>
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', color: '#666', fontSize: '10pt' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '4px' }}>
-              <Sparkles size={14} color="#3b82f6" />
-              <span>No community insights available yet.</span>
-            </div>
-            <div style={{ fontSize: '8pt', marginTop: '4px' }}>
-              Insights are generated from auction comments, forum discussions, and social media.
-            </div>
-            <div style={{
-              marginTop: '12px',
-              padding: '6px 12px',
-              background: '#3b82f6',
-              color: 'white',
-              borderRadius: '2px',
-              fontSize: '8pt',
-              fontWeight: 600,
-              display: 'inline-block'
-            }}>
-              Click to Generate
-            </div>
-          </div>
-        )}
+          )}
+        </div>
         <style>{`
           @keyframes spin {
             from { transform: rotate(0deg); }

@@ -2160,6 +2160,58 @@ body {
   margin-bottom: 0 !important;
 }
 
+/* Vehicle Profile: unify left-column card look to match Basic Information (compact, same border/header/body) */
+.vehicle-profile-left-column .card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.vehicle-profile-left-column .card .card-header {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--grey-200);
+  font-size: 8pt;
+  font-weight: bold;
+}
+
+.vehicle-profile-left-column .card .card-body {
+  padding: 8px;
+}
+
+.vehicle-profile-left-column .card .card-footer {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--grey-200);
+}
+
+/* Vehicle Profile: CollapsibleWidget sections (Investment Summary, Proof Tasks, Reference Library, etc.) match same style */
+.vehicle-profile-left-column .vehicle-profile-section {
+  background: var(--bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.vehicle-profile-left-column .vehicle-profile-section > button {
+  background: var(--grey-200) !important;
+  padding: 4px 6px !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-size: 8pt !important;
+  font-weight: bold !important;
+  color: var(--text) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.vehicle-profile-left-column .vehicle-profile-section > div[class*="border-t"] {
+  padding: 8px !important;
+  border-top-color: var(--border) !important;
+}
+
 @media (max-width: 768px) {
   .vehicle-profile-two-column {
     display: flex;

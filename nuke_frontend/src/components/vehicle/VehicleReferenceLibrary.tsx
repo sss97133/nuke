@@ -560,6 +560,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
     <>
       <section className="section" id="reference-library-section">
         <CollapsibleWidget
+          className="vehicle-profile-section"
           title="Reference Documents"
           defaultCollapsed={books.length === 0}
           badge={books.length > 0 ? <span className="badge badge-secondary">{books.length}</span> : undefined}

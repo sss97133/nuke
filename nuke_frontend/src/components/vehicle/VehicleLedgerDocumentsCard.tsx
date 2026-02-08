@@ -186,7 +186,7 @@ export function VehicleLedgerDocumentsCard(props: {
   };
 
   return (
-    <div className="card" style={{ marginTop: 'var(--space-3)' }}>
+    <div className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <div>Investment ledger documents</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

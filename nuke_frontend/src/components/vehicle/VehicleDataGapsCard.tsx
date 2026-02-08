@@ -332,6 +332,7 @@ export function VehicleDataGapsCard({
   return (
     <div id="vehicle-proof-tasks">
       <CollapsibleWidget
+        className="vehicle-profile-section"
         title="Proof Tasks"
         defaultCollapsed={true}
         badge={<span className="badge badge-secondary">{sortedGaps.length}</span>}
