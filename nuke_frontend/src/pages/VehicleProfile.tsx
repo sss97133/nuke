@@ -47,6 +47,7 @@ import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
 import VehicleCommunityInsights from '../components/vehicle/VehicleCommunityInsights';
 import VehicleDocumentIntelligence from '../components/vehicle/VehicleDocumentIntelligence';
 import VehicleROISummaryCard from '../components/vehicle/VehicleROISummaryCard';
+import VehiclePerformanceCard from '../components/vehicle/VehiclePerformanceCard';
 import { VehiclePricingValueCard } from '../components/vehicle/VehiclePricingValueCard';
 import NukeEstimatePanel from '../components/vehicle/NukeEstimatePanel';
 import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
@@ -3643,6 +3644,9 @@ const VehicleProfile: React.FC = () => {
 
               {/* Research notes / open questions */}
               <VehicleResearchItemsCard vehicleId={vehicle.id} />
+
+              {/* Performance Profile (video game stats) */}
+              <VehiclePerformanceCard vehicleId={vehicle.id} compact />
 
               {/* Investment Summary */}
               <VehicleROISummaryCard vehicleId={vehicle.id} />
