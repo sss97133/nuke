@@ -32,7 +32,6 @@ interface OrgData {
   longitude?: number;
   // Valuation
   estimated_value?: number;
-  last_valuation_date?: string;
 }
 
 export default function OrganizationEditor({ organizationId, onSaved, onClose }: OrganizationEditorProps) {
@@ -79,8 +78,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
         longitude: data.longitude || null,
 
         // Valuation
-        estimated_value: typeof data.estimated_value === 'number' ? data.estimated_value : null,
-        last_valuation_date: data.last_valuation_date || ''
+        estimated_value: typeof data.estimated_value === 'number' ? data.estimated_value : null
       });
     } catch (err: any) {
       console.error('Error loading organization:', err);
@@ -501,18 +499,6 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                   />
                 </div>
 
-                <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                    Last Valuation Date
-                  </label>
-                  <input
-                    type="date"
-                    className="form-input"
-                    value={formData.last_valuation_date || ''}
-                    onChange={(e) => handleChange('last_valuation_date', e.target.value)}
-                    style={{ fontSize: '9pt', width: '100%' }}
-                  />
-                </div>
               </div>
             </div>
 

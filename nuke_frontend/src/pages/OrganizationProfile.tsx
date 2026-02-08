@@ -67,7 +67,6 @@ interface Organization {
   stock_symbol?: string;
   current_value?: number;
   estimated_value?: number;
-  last_valuation_date?: string;
   total_vehicles?: number;
   total_images?: number;
   total_events?: number;
