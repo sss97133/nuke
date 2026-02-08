@@ -61,7 +61,10 @@ const KNOWN_PLATFORMS: Record<string, { type: string; business_type?: string; ha
   'youtube.com': { type: 'youtube', handler: 'youtube' },
   'youtu.be': { type: 'youtube', handler: 'youtube' },
   'tiktok.com': { type: 'social_media' },
-  'facebook.com': { type: 'social_media' },
+  'facebook.com': { type: 'facebook', handler: 'facebook' },
+  'm.facebook.com': { type: 'facebook', handler: 'facebook' },
+  'fb.com': { type: 'facebook', handler: 'facebook' },
+  'l.facebook.com': { type: 'facebook', handler: 'facebook' },
 
   // Classifieds
   'ebay.com': { type: 'ebay_listing' },
@@ -171,6 +174,10 @@ serve(async (req) => {
         });
         action = 'queued_youtube';
         message = 'YouTube URL queued for extraction';
+        break;
+
+      case 'facebook':
+        ({ entityData, entityId, action, message, entityType } = await processFacebookURL(url, supabase, userId));
         break;
 
       default:
@@ -363,6 +370,13 @@ function mapToLeadType(detectedType: string): string {
     'instagram': 'social_profile',
     'youtube': 'youtube_channel',
     'social_media': 'social_profile',
+    'facebook': 'social_profile',
+    'facebook_marketplace': 'vehicle_listing',
+    'facebook_marketplace_seller': 'person',
+    'facebook_marketplace_search': 'website',
+    'facebook_group': 'organization',
+    'facebook_profile': 'social_profile',
+    'facebook_unknown': 'social_profile',
     'classified_listing': 'vehicle_listing',
     'ebay_listing': 'vehicle_listing',
     'dealer_directory': 'website',
@@ -533,12 +547,28 @@ function detectURLType(url: string): URLDetectionResult {
     // Check known platforms
     for (const [domain, info] of Object.entries(KNOWN_PLATFORMS)) {
       if (hostname.includes(domain)) {
+        // Facebook sub-type detection for higher confidence
+        let confidence = 0.95;
+        let type = info.type;
+        if (info.handler === 'facebook') {
+          const pathLower = parsed.pathname.toLowerCase();
+          if (pathLower.includes('/marketplace/item/')) {
+            type = 'facebook_marketplace';
+            confidence = 1.0;
+          } else if (pathLower.includes('/marketplace/profile/')) {
+            type = 'facebook_marketplace_seller';
+            confidence = 0.9;
+          } else if (pathLower.includes('/marketplace')) {
+            type = 'facebook_marketplace_search';
+            confidence = 0.85;
+          }
+        }
         return {
-          type: info.type,
+          type,
           platform: domain,
           business_type: info.business_type || null,
           handler: info.handler || null,
-          confidence: 0.95
+          confidence,
         };
       }
     }
@@ -567,6 +597,221 @@ function detectURLType(url: string): URLDetectionResult {
   } catch {
     return { type: 'invalid_url', platform: null, business_type: null, handler: null, confidence: 0 };
   }
+}
+
+// ============================================
+// FACEBOOK URL PROCESSOR
+// ============================================
+
+/**
+ * Classifies Facebook URL into sub-type and routes to the right handler.
+ *
+ * Supported URL shapes:
+ *   /marketplace/item/<id>        → extract-facebook-marketplace
+ *   /marketplace/profile/<id>     → seller profile lead
+ *   /share/p/<id>  /share/r/<id>  → resolve redirect, then re-classify
+ *   /groups/<id>                  → group lead
+ *   /l.php?u=<encoded>           → unwrap tracking redirect
+ *   /profile.php?id=<id>         → user profile lead
+ *   /<username>                   → user/page profile lead
+ */
+async function processFacebookURL(
+  url: string,
+  supabase: any,
+  userId?: string,
+): Promise<{ entityData: any; entityId: string | null; action: string; message: string; entityType: string }> {
+  // Resolve Facebook tracking redirects (l.facebook.com/l.php?u=...)
+  let resolvedUrl = url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'l.facebook.com' && parsed.searchParams.has('u')) {
+      resolvedUrl = decodeURIComponent(parsed.searchParams.get('u')!);
+      console.log('Unwrapped FB tracking redirect:', resolvedUrl);
+      // If the unwrapped URL isn't facebook at all, re-detect and bail
+      if (!resolvedUrl.includes('facebook.com') && !resolvedUrl.includes('fb.com')) {
+        // It's an external link shared on FB - process as generic URL
+        return {
+          entityData: { original_fb_url: url, resolved_url: resolvedUrl },
+          entityId: null,
+          action: 'redirected',
+          message: `Facebook tracking link resolved to external URL: ${resolvedUrl}`,
+          entityType: 'discovery_lead',
+        };
+      }
+    }
+  } catch { /* keep original url */ }
+
+  // Resolve Facebook share links (/share/p/..., /share/r/...)
+  const shareMatch = resolvedUrl.match(/facebook\.com\/share\/[pr]\/([A-Za-z0-9_-]+)/);
+  if (shareMatch) {
+    console.log('Resolving FB share link:', resolvedUrl);
+    try {
+      const resp = await fetch(resolvedUrl, {
+        method: 'HEAD',
+        redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0; +https://n-zero.dev)' },
+        signal: AbortSignal.timeout(8000),
+      });
+      const finalUrl = resp.url;
+      if (finalUrl && finalUrl !== resolvedUrl) {
+        console.log('Share link resolved to:', finalUrl);
+        resolvedUrl = finalUrl;
+      }
+    } catch (e) {
+      console.warn('Failed to resolve share link, continuing with original:', e);
+    }
+  }
+
+  const path = new URL(resolvedUrl).pathname.toLowerCase();
+
+  // ── Marketplace item ──────────────────────────────────────────────
+  const marketplaceItemMatch = resolvedUrl.match(/marketplace\/item\/(\d+)/);
+  if (marketplaceItemMatch) {
+    console.log('Facebook Marketplace item detected, calling extract-facebook-marketplace');
+    try {
+      const { data: extractResult, error: extractErr } = await supabase.functions.invoke(
+        'extract-facebook-marketplace',
+        { body: { url: resolvedUrl, user_id: userId } },
+      );
+
+      if (extractErr || !extractResult?.success) {
+        // Extraction failed - still create a discovery lead so we don't lose it
+        console.error('FB Marketplace extraction failed:', extractErr?.message || extractResult?.error);
+        const leadId = await createDiscoveryLead(supabase, {
+          url: resolvedUrl,
+          type: 'facebook_marketplace',
+          suggestedType: 'vehicle_listing',
+          confidence: 0.9,
+          userId,
+          metadata: { extraction_error: extractErr?.message || extractResult?.error, item_id: marketplaceItemMatch[1] },
+        });
+        return {
+          entityData: { item_id: marketplaceItemMatch[1], error: extractErr?.message },
+          entityId: leadId,
+          action: 'extraction_failed',
+          message: `FB Marketplace listing detected but extraction failed. Queued for retry.`,
+          entityType: 'discovery_lead',
+        };
+      }
+
+      return {
+        entityData: extractResult,
+        entityId: extractResult.listing_id || extractResult.vehicle_id || null,
+        action: extractResult.is_new ? 'extracted' : 'existing',
+        message: extractResult.is_new
+          ? `FB Marketplace listing extracted! ${extractResult.extracted?.year || ''} ${extractResult.extracted?.make || ''} ${extractResult.extracted?.model || ''} - $${extractResult.extracted?.price || '?'}`
+          : 'FB Marketplace listing already tracked',
+        entityType: 'marketplace_listing',
+      };
+    } catch (err) {
+      console.error('FB Marketplace invoke error:', err);
+      return {
+        entityData: { item_id: marketplaceItemMatch[1], error: err.message },
+        entityId: null,
+        action: 'error',
+        message: `FB Marketplace extraction error: ${err.message}`,
+        entityType: 'marketplace_listing',
+      };
+    }
+  }
+
+  // ── Marketplace seller profile ────────────────────────────────────
+  if (path.includes('/marketplace/profile/')) {
+    const profileId = path.match(/\/marketplace\/profile\/(\d+)/)?.[1];
+    const leadId = await createDiscoveryLead(supabase, {
+      url: resolvedUrl,
+      type: 'facebook_marketplace_seller',
+      suggestedType: 'person',
+      confidence: 0.85,
+      userId,
+      metadata: { fb_profile_id: profileId, sub_type: 'marketplace_seller' },
+    });
+    return {
+      entityData: { fb_profile_id: profileId, type: 'marketplace_seller' },
+      entityId: leadId,
+      action: 'discovered',
+      message: `FB Marketplace seller profile queued for processing`,
+      entityType: 'social_profile',
+    };
+  }
+
+  // ── Marketplace search/category (not a single listing) ───────────
+  if (path.includes('/marketplace')) {
+    const leadId = await createDiscoveryLead(supabase, {
+      url: resolvedUrl,
+      type: 'facebook_marketplace_search',
+      suggestedType: 'website',
+      confidence: 0.7,
+      userId,
+      metadata: { sub_type: 'marketplace_search' },
+    });
+    return {
+      entityData: { type: 'marketplace_search' },
+      entityId: leadId,
+      action: 'discovered',
+      message: `FB Marketplace search/category page queued`,
+      entityType: 'discovery_lead',
+    };
+  }
+
+  // ── Facebook Group ────────────────────────────────────────────────
+  if (path.includes('/groups/')) {
+    const groupId = path.match(/\/groups\/([^/]+)/)?.[1];
+    const leadId = await createDiscoveryLead(supabase, {
+      url: resolvedUrl,
+      type: 'facebook_group',
+      suggestedType: 'organization',
+      confidence: 0.8,
+      userId,
+      metadata: { fb_group_id: groupId, sub_type: 'group' },
+    });
+    return {
+      entityData: { fb_group_id: groupId, type: 'group' },
+      entityId: leadId,
+      action: 'discovered',
+      message: `Facebook group queued for discovery`,
+      entityType: 'social_profile',
+    };
+  }
+
+  // ── User/Page profile (catchall for /username or /profile.php?id=) ─
+  const profilePhpMatch = resolvedUrl.match(/profile\.php\?id=(\d+)/);
+  const username = path.replace(/^\//, '').split('/')[0];
+  const fbIdentifier = profilePhpMatch?.[1] || (username && username.length > 0 ? username : null);
+
+  if (fbIdentifier) {
+    const leadId = await createDiscoveryLead(supabase, {
+      url: resolvedUrl,
+      type: 'facebook_profile',
+      suggestedType: 'social_profile',
+      confidence: 0.75,
+      userId,
+      metadata: { fb_identifier: fbIdentifier, sub_type: profilePhpMatch ? 'profile_by_id' : 'profile_by_username' },
+    });
+    return {
+      entityData: { fb_identifier: fbIdentifier, type: 'profile' },
+      entityId: leadId,
+      action: 'discovered',
+      message: `Facebook profile (${fbIdentifier}) queued for discovery`,
+      entityType: 'social_profile',
+    };
+  }
+
+  // ── Fallback: generic Facebook URL ────────────────────────────────
+  const leadId = await createDiscoveryLead(supabase, {
+    url: resolvedUrl,
+    type: 'facebook_unknown',
+    suggestedType: 'social_profile',
+    confidence: 0.5,
+    userId,
+  });
+  return {
+    entityData: { type: 'facebook_generic' },
+    entityId: leadId,
+    action: 'discovered',
+    message: `Facebook URL queued for manual review`,
+    entityType: 'social_profile',
+  };
 }
 
 // ============================================

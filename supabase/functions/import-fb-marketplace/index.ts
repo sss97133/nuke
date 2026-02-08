@@ -28,6 +28,92 @@ interface MarketplaceListing {
   listed_days_ago: number | null;
 }
 
+// ─── NON-CAR MAKE BLOCKLIST ───────────────────────────────────────────
+// These makes are NEVER passenger cars/trucks we care about
+const BLOCKED_MAKES = new Set([
+  'harley-davidson', 'harley', 'indian', 'ducati', 'kawasaki', 'suzuki',
+  'yamaha', 'ktm', 'triumph', 'aprilia', 'husqvarna', 'moto guzzi',
+  'can-am', 'polaris', 'arctic cat', 'sea-doo', 'ski-doo',
+  'fleetwood', 'winnebago', 'coachmen', 'jayco', 'thor', 'tiffin',
+  'newmar', 'holiday rambler', 'airstream', 'forest river',
+  'utility', 'wabash', 'great dane', 'hyundai translead', 'stoughton',
+  'mack', 'kenworth', 'peterbilt', 'freightliner', 'western star',
+  'john deere', 'caterpillar', 'case', 'kubota', 'bobcat',
+  'traeger', 'craftsman', 'toro', 'husqvarna',
+]);
+
+// Model names that indicate non-cars
+const BLOCKED_MODEL_PATTERNS = [
+  /\bsoftail\b/i, /\bsportster\b/i, /\bdyna\b/i, /\btouring\b/i,
+  /\bsouthwind\b/i, /\bbounder\b/i, /\bmotorhome\b/i, /\bcamper\b/i,
+  /\btrailer\b/i, /\batv\b/i, /\bquad\b/i, /\bdirt\s*bike\b/i,
+  /\bscooter\b/i, /\bjet\s*ski\b/i, /\bsnowmobile\b/i, /\bboat\b/i,
+  /\bpwc\b/i, /\bside.by.side\b/i, /\butv\b/i, /\brv\b/i,
+  /\b(xr|cr|crf|yz|kx|rm|klx)\d{2,3}\b/i, // dirt bike model codes
+];
+
+// ─── IMAGE VALIDATION ─────────────────────────────────────────────────
+// Pollution patterns - these are NOT vehicle photos
+const IMAGE_POLLUTION_PATTERNS = [
+  /profile/i, /avatar/i, /emoji/i, /static/i, /icon/i,
+  /badge/i, /logo/i, /messenger/i, /rsrc\.php/i,
+  /pixel/i, /tracking/i, /beacon/i, /blank\./i,
+  /_s\.\w+$/, /_t\.\w+$/, /_q\.\w+$/, // tiny FB thumbnails
+];
+
+function isValidVehicleImage(url: string): boolean {
+  if (!url) return false;
+  // Must be from FB CDN
+  if (!url.includes('scontent') && !url.includes('fbcdn')) return false;
+  // Must not be pollution
+  for (const pattern of IMAGE_POLLUTION_PATTERNS) {
+    if (pattern.test(url)) return false;
+  }
+  return true;
+}
+
+// ─── PRICE VALIDATION ─────────────────────────────────────────────────
+function isSuspiciousPrice(price: number | null): boolean {
+  if (price === null) return false;
+  // Obvious placeholder prices
+  if (price === 123456 || price === 1234567 || price === 12345) return true;
+  // Repeating digit patterns like 111111, 999999
+  const s = String(price);
+  if (s.length >= 5 && new Set(s.split('')).size === 1) return true;
+  // Too cheap to be real ($0, $1, $2)
+  if (price <= 2) return true;
+  // Absurdly expensive for what we're looking at
+  if (price > 500000) return true;
+  return false;
+}
+
+// ─── MODEL NAME CLEANUP ──────────────────────────────────────────────
+function cleanModelName(model: string | null): string | null {
+  if (!model) return null;
+  let cleaned = model
+    // Remove trailing special chars FB leaves behind: "gs ·", "F-150 ·"
+    .replace(/\s*[·•▪]\s*$/g, '')
+    // Remove location data jammed into model: "camryAurora, IL146K"
+    .replace(/[A-Z][a-z]+,\s*[A-Z]{2}\d*[Kk]?\s*$/g, '')
+    // Remove trailing commas and junk
+    .replace(/[,\s]+$/, '')
+    // Remove mileage appended to model: "WRXAlbuquerque, NM63K"
+    .replace(/\d+[Kk]\s*$/, '')
+    // Remove city names stuck to model (camelCase boundary: "civicLX" is fine, "camryAurora" is not)
+    // Only remove if it looks like CityName (capital letter mid-word after lowercase)
+    .replace(/([a-z])([A-Z][a-z]{3,}(?:,\s*[A-Z]{2})?)/, '$1')
+    .trim();
+
+  // Reject garbage models
+  if (!cleaned) return null;
+  if (cleaned.length <= 1) return null; // Single char like ":"
+  if (/^[^a-zA-Z0-9]+$/.test(cleaned)) return null; // Only special chars
+  if (cleaned.toLowerCase() === 'small') return null;
+  if (cleaned.toLowerCase() === 'regular cab') return null;
+
+  return cleaned;
+}
+
 /**
  * Parse year, make, model from FB Marketplace title
  * Examples: "1978 Ford F-150", "1987 Chevy C10", "$4,5001972 Chevrolet C10"
@@ -57,7 +143,7 @@ function parseTitle(title: string): { year: number | null; make: string | null; 
   const yearMatch = cleaned.match(/\b(19[2-9]\d|20[0-3]\d)\b/);
   const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
 
-  if (!year) return { year: null, make: null, model: null };
+  if (!year) return { year: null, make: null, model: null, cleanPrice };
 
   // Get text after year
   const afterYear = cleaned.split(String(year))[1]?.trim() || '';
@@ -92,7 +178,6 @@ function parseTitle(title: string): { year: number | null; make: string | null; 
     'mercedes-benz': 'Mercedes-Benz',
     'bmw': 'BMW',
     'jaguar': 'Jaguar',
-    'triumph': 'Triumph',
     'mg': 'MG',
     'austin': 'Austin',
     'alfa': 'Alfa Romeo',
@@ -102,6 +187,21 @@ function parseTitle(title: string): { year: number | null; make: string | null; 
     'honda': 'Honda',
     'mazda': 'Mazda',
     'subaru': 'Subaru',
+    'lexus': 'Lexus',
+    'acura': 'Acura',
+    'infiniti': 'Infiniti',
+    'mitsubishi': 'Mitsubishi',
+    'isuzu': 'Isuzu',
+    'saturn': 'Saturn',
+    'saab': 'Saab',
+    'volvo': 'Volvo',
+    'land rover': 'Land Rover',
+    'rover': 'Rover',
+    'lotus': 'Lotus',
+    'aston martin': 'Aston Martin',
+    'aston': 'Aston Martin',
+    'delorean': 'DeLorean',
+    'shelby': 'Shelby',
   };
 
   const rawMake = words[0]?.toLowerCase() || '';
@@ -111,10 +211,12 @@ function parseTitle(title: string): { year: number | null; make: string | null; 
   const modelWords = words.slice(1, 4);
   // Stop at common suffixes
   const stopWords = ['pickup', 'truck', 'sedan', 'coupe', 'wagon', 'van', 'suv', 'convertible', 'cab', 'bed', 'door'];
-  const model = modelWords
+  const rawModel = modelWords
     .filter(w => !stopWords.includes(w.toLowerCase()))
     .slice(0, 2)
     .join(' ') || null;
+
+  const model = cleanModelName(rawModel);
 
   return { year, make, model, cleanPrice };
 }
@@ -133,6 +235,51 @@ function parseLocation(location: string | null): { city: string | null; state: s
   return { city, state };
 }
 
+/**
+ * Check if a listing is a non-car vehicle type we don't want
+ */
+function isBlockedVehicleType(make: string | null, model: string | null, title: string): boolean {
+  const makeLower = (make || '').toLowerCase().trim();
+  if (BLOCKED_MAKES.has(makeLower)) return true;
+
+  const fullText = `${make || ''} ${model || ''} ${title}`.toLowerCase();
+  for (const pattern of BLOCKED_MODEL_PATTERNS) {
+    if (pattern.test(fullText)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check for duplicate vehicles already in the DB
+ */
+async function isDuplicate(supabase: any, url: string, year: number, make: string | null, model: string | null): Promise<boolean> {
+  // Check by discovery_url first (exact match)
+  const { data: urlMatch } = await supabase
+    .from('vehicles')
+    .select('id')
+    .eq('discovery_url', url)
+    .limit(1)
+    .maybeSingle();
+  if (urlMatch) return true;
+
+  // Check by year+make+model (fuzzy - could be re-scraped listing)
+  if (make && model) {
+    const { data: ymmMatch } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('year', year)
+      .ilike('make', make)
+      .ilike('model', model)
+      .eq('discovery_source', 'facebook_marketplace')
+      .limit(1)
+      .maybeSingle();
+    if (ymmMatch) return true;
+  }
+
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -148,7 +295,7 @@ Deno.serve(async (req) => {
     const batchSize = body.batch_size ?? 50;
     const dryRun = body.dry_run ?? false;
 
-    // Get unlinked marketplace listings - ALL priorities
+    // Get unlinked marketplace listings
     const { data: listings, error: fetchError } = await supabase
       .from('marketplace_listings')
       .select('*')
@@ -169,12 +316,20 @@ Deno.serve(async (req) => {
     const results = {
       processed: 0,
       created: 0,
+      skipped_no_year: 0,
+      skipped_no_make_model: 0,
+      skipped_no_image: 0,
+      skipped_blocked_type: 0,
+      skipped_duplicate: 0,
+      skipped_garbage_model: 0,
       errors: [] as string[],
       vehicles: [] as any[],
     };
 
     for (const listing of listings as MarketplaceListing[]) {
       try {
+        results.processed++;
+
         // Use DB values - they're already parsed by the monitor
         let year = listing.parsed_year;
         let price = listing.price;
@@ -194,29 +349,91 @@ Deno.serve(async (req) => {
           price = parsed.cleanPrice;
         }
 
-        // Skip if still no year - this shouldn't happen for 'classic' priority
+        // ─── QUALITY GATE 1: Must have year ───────────────────────
         if (!year) {
-          results.errors.push(`Skip: ${listing.title.slice(0, 50)} - no year`);
+          results.skipped_no_year++;
           continue;
+        }
+
+        // ─── QUALITY GATE 2: Must have make AND valid model ───────
+        if (!make) {
+          results.skipped_no_make_model++;
+          continue;
+        }
+
+        // Clean model name (remove garbage chars, location data, etc.)
+        model = cleanModelName(model);
+        if (!model) {
+          results.skipped_garbage_model++;
+          continue;
+        }
+
+        // ─── QUALITY GATE 3: Block non-car vehicle types ──────────
+        if (isBlockedVehicleType(make, model, listing.title)) {
+          results.skipped_blocked_type++;
+          continue;
+        }
+
+        // ─── QUALITY GATE 4: Must have at least one valid image ───
+        const validImages = (listing.all_images || []).filter(isValidVehicleImage);
+        const primaryImage = listing.image_url && isValidVehicleImage(listing.image_url)
+          ? listing.image_url
+          : validImages[0] || null;
+
+        if (!primaryImage && validImages.length === 0) {
+          results.skipped_no_image++;
+          continue;
+        }
+
+        // ─── QUALITY GATE 5: Duplicate detection ──────────────────
+        if (!dryRun && await isDuplicate(supabase, listing.url, year, make, model)) {
+          results.skipped_duplicate++;
+          // Still link the listing to prevent re-processing
+          // Find the existing vehicle to link
+          const { data: existing } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('discovery_url', listing.url)
+            .limit(1)
+            .maybeSingle();
+          if (existing) {
+            await supabase
+              .from('marketplace_listings')
+              .update({ vehicle_id: existing.id })
+              .eq('id', listing.id);
+          }
+          continue;
+        }
+
+        // ─── PRICE HANDLING ───────────────────────────────────────
+        // If price looks suspicious, null it out (frontend can show "OBO")
+        let askingPrice = price;
+        let priceNote: string | null = null;
+        if (isSuspiciousPrice(price)) {
+          askingPrice = null;
+          priceNote = 'Price appears suspicious, listed as OBO';
         }
 
         const { city, state } = parseLocation(listing.location);
 
-        // Build vehicle record
+        // Build vehicle record - only quality data goes in
         const vehicleData: Record<string, any> = {
           year,
           make,
           model,
-          asking_price: price,
-          sale_price: null, // Not sold yet
+          asking_price: askingPrice,
+          sale_price: null,
           sale_status: 'for_sale',
           is_for_sale: true,
-          status: 'active', // Make visible in feed immediately
+          status: 'active',
+          is_public: true,
           discovery_url: listing.url,
           discovery_source: 'facebook_marketplace',
           profile_origin: 'facebook_marketplace',
           description: listing.description,
-          primary_image_url: listing.image_url,
+          primary_image_url: primaryImage,
+          city,
+          state,
           origin_metadata: {
             facebook_id: listing.facebook_id,
             seller_name: listing.seller_name,
@@ -224,8 +441,10 @@ Deno.serve(async (req) => {
             city,
             state,
             scraped_at: listing.scraped_at,
-            image_count: listing.all_images?.length || 0,
+            image_count: validImages.length,
             listed_days_ago: listing.listed_days_ago,
+            price_note: priceNote,
+            original_price: price,
           },
         };
 
@@ -237,7 +456,6 @@ Deno.serve(async (req) => {
 
         if (dryRun) {
           results.vehicles.push(vehicleData);
-          results.processed++;
           continue;
         }
 
@@ -264,9 +482,9 @@ Deno.serve(async (req) => {
           })
           .eq('id', listing.id);
 
-        // Import images
-        if (listing.all_images && listing.all_images.length > 0) {
-          const imageRecords = listing.all_images.map((url, i) => ({
+        // Import only valid images (no pollution)
+        if (validImages.length > 0) {
+          const imageRecords = validImages.slice(0, 10).map((url, i) => ({
             vehicle_id: vehicle.id,
             url,
             is_primary: i === 0,
@@ -276,20 +494,10 @@ Deno.serve(async (req) => {
           await supabase
             .from('vehicle_images')
             .insert(imageRecords);
-        } else if (listing.image_url) {
-          await supabase
-            .from('vehicle_images')
-            .insert({
-              vehicle_id: vehicle.id,
-              url: listing.image_url,
-              is_primary: true,
-              source: 'facebook_marketplace',
-            });
         }
 
         results.created++;
         results.vehicles.push({ id: vehicle.id, ...vehicleData });
-        results.processed++;
 
       } catch (e: any) {
         results.errors.push(`Error processing ${listing.id}: ${e.message}`);

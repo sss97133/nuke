@@ -164,6 +164,26 @@ Deno.serve(async (req) => {
           console.log(`Prepaid credits subscription created for user ${userId}: ${credits} credits`)
         }
 
+      } else if (purchaseType === 'dealerscan_credits') {
+        // Handle DealerScan credit purchases
+        const credits = session.metadata?.credits ? parseInt(session.metadata.credits) : 0
+
+        if (credits > 0) {
+          const { data: newBalance, error: dsError } = await supabase.rpc('ds_add_credits', {
+            p_user_id: userId,
+            p_credits: credits,
+            p_stripe_session_id: session.id,
+            p_stripe_payment_intent: session.payment_intent,
+          })
+
+          if (dsError) {
+            console.error('Failed to add DealerScan credits:', dsError)
+            return new Response('Failed to add credits', { status: 500 })
+          }
+
+          console.log(`DealerScan: Added ${credits} credits for user ${userId}, new balance: ${newBalance}`)
+        }
+
       } else if (purchaseType === 'vehicle_transaction') {
         // Handle vehicle transaction facilitation fee
         const transactionId = session.metadata?.transaction_id
