@@ -48,6 +48,7 @@ import VehicleCommunityInsights from '../components/vehicle/VehicleCommunityInsi
 import VehicleDocumentIntelligence from '../components/vehicle/VehicleDocumentIntelligence';
 import VehicleROISummaryCard from '../components/vehicle/VehicleROISummaryCard';
 import { VehiclePricingValueCard } from '../components/vehicle/VehiclePricingValueCard';
+import NukeEstimatePanel from '../components/vehicle/NukeEstimatePanel';
 import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 import VehicleAuctionQuickStartCard from '../components/auction/VehicleAuctionQuickStartCard';
@@ -116,7 +117,7 @@ const CollapsibleGalleryCard: React.FC<{
               vehicleId={vehicleId}
               showUpload={true}
               fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
-              fallbackLabel={vehicle?.profile_origin === 'bat_import' ? 'BaT listing' : 'Listing'}
+              fallbackLabel="Listing"
               fallbackSourceUrl={
                 vehicle?.discovery_url ||
                 vehicle?.bat_auction_url ||
@@ -1061,7 +1062,7 @@ const VehicleProfile: React.FC = () => {
         (payload) => {
           const updatedVehicle = (payload as any)?.new as any;
           if (updatedVehicle) {
-            console.log('[VehicleProfile] Vehicle updated via realtime, refreshing...');
+            // Vehicle updated via realtime
             // Reload vehicle data to get all updated fields (bat_seller, bat_location, etc.)
             loadVehicle();
           }
@@ -1077,7 +1078,7 @@ const VehicleProfile: React.FC = () => {
         },
         (payload) => {
           const event = (payload as any)?.eventType || (payload as any)?.event;
-          console.log(`[VehicleProfile] Vehicle images ${event} via realtime, refreshing...`);
+          // Vehicle images changed via realtime
           // Reload images immediately when source changes, new images added, or images deleted
           loadVehicleImages();
         },
@@ -1672,7 +1673,6 @@ const VehicleProfile: React.FC = () => {
             .eq('id', vehicleId)
             .single();
 
-          console.log('[VehicleProfile] Fallback query executed, result:', { hasData: !!data, hasError: !!error, errorCode: error?.code });
 
           if (error) {
             console.error('[VehicleProfile] Fallback query ERROR:', error);
@@ -1689,15 +1689,6 @@ const VehicleProfile: React.FC = () => {
             return;
           }
           
-          console.log('[VehicleProfile] ✅ Fallback query succeeded, vehicle loaded:', { 
-            id: data.id, 
-            year: data.year,
-            make: data.make,
-            model: data.model,
-            profile_origin: data.profile_origin, 
-            is_public: data.is_public,
-            status: data.status
-          });
           vehicleData = data;
         } catch (fallbackError) {
           console.error('[VehicleProfile] Fallback query exception:', fallbackError);
@@ -1727,7 +1718,6 @@ const VehicleProfile: React.FC = () => {
           comments: rpcData.comments
         };
         
-        console.log(`[VehicleProfile] Loaded via RPC: ${rpcData.stats?.image_count || 0} images, ${rpcData.stats?.event_count || 0} events, valuation: ${rpcData.latest_valuation ? 'yes' : 'no'}`);
       }
 
       // For non-authenticated users, only show public vehicles
@@ -3174,7 +3164,6 @@ const VehicleProfile: React.FC = () => {
                     images = filtered;
                     const lead = filtered.find((u) => isSupabaseHostedImageUrl(u)) || filtered[0] || null;
                     if (lead) setLeadImageUrl(lead);
-                    console.log(`✅ Using ${filtered.length} ${platform.toUpperCase()} URLs from external_listings metadata (fallback)`);
                   }
                 }
               }
@@ -3219,7 +3208,6 @@ const VehicleProfile: React.FC = () => {
             if (!leadImageUrl && images[0]) {
               setLeadImageUrl(images[0]);
             }
-            console.log(`✅ Using ${originImages.length} images from origin_metadata`);
           }
         } catch {
           // ignore
@@ -3288,7 +3276,6 @@ const VehicleProfile: React.FC = () => {
                     if (!leadImageUrl && images[0]) {
                       setLeadImageUrl(images[0]);
                     }
-                    console.log(`✅ Using ${filtered.length} BaT URLs from external_listings metadata`);
                     return; // Skip storage fallback
                   }
                 }
@@ -3385,7 +3372,7 @@ const VehicleProfile: React.FC = () => {
 
   const handleSetPrimaryImage = async (imageId: string) => {
     if (!vehicle || !isAdmin) {
-      alert('Admin privileges required to set primary image');
+      return; // Admin privileges required
       return;
     }
 
@@ -3423,10 +3410,10 @@ const VehicleProfile: React.FC = () => {
 
       // Reload images to reflect the change
       await loadVehicleImages();
-      alert('Primary image updated successfully');
+      // Primary image updated
     } catch (error: any) {
       console.error('Error setting primary image:', error);
-      alert(`Failed to set primary image: ${error.message}`);
+      // Failed to set primary image
     }
   };
 
@@ -3510,7 +3497,6 @@ const VehicleProfile: React.FC = () => {
   }
 
   if (!vehicle) {
-    console.log('Rendering Vehicle Not Found - vehicle state is null, loading:', loading);
     return (
         <div className="card">
           <div className="card-body text-center">
@@ -3529,8 +3515,6 @@ const VehicleProfile: React.FC = () => {
     );
   }
   
-  // console.log('Rendering vehicle profile with vehicle:', vehicle.id); // Removed noisy log
-
   // Debug ownership check (only in development)
   if (process.env.NODE_ENV === 'development') {
     console.debug('Permissions:', {
@@ -3662,6 +3646,12 @@ const VehicleProfile: React.FC = () => {
 
               {/* Investment Summary */}
               <VehicleROISummaryCard vehicleId={vehicle.id} />
+
+              {/* Nuke Estimate: Multi-signal valuation with deal/heat scoring */}
+              <NukeEstimatePanel
+                vehicleId={vehicle.id}
+                vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
+              />
 
               {/* Pricing & Value (Market vs Nuke marks) */}
               <VehiclePricingValueCard
@@ -3872,7 +3862,7 @@ const VehicleProfile: React.FC = () => {
               <div className="card" style={{ border: '2px solid var(--warning)', background: 'var(--warning-dim)' }}>
                 <div className="card-body" style={{ fontSize: '9pt' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 800 }}>BaT base data incomplete</div>
+                    <div style={{ fontWeight: 800 }}>Base data incomplete</div>
                     {checkedAtText && (
                       <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Last check: {checkedAtText}</div>
                     )}
@@ -3884,7 +3874,7 @@ const VehicleProfile: React.FC = () => {
                     </div>
                   )}
                   <div style={{ marginTop: 6, fontSize: '8pt', color: 'var(--text-muted)' }}>
-                    This vehicle is flagged for re-extraction from stored BaT HTML snapshots to fill missing base fields.
+                    This vehicle is flagged for data enrichment to fill missing base fields.
                   </div>
                 </div>
               </div>
