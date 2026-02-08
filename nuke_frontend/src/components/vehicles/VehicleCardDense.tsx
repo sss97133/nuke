@@ -1850,7 +1850,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>
                         {tierLabel}
                       </span>{' '}
-                      <span style={{ opacity: 0.7 }}>profile</span>
+                      tier
                     </span>
                   );
                 })()}
@@ -2704,7 +2704,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 >
                   <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>{tierLabel}</span>{' '}
-                  <span style={{ opacity: 0.7 }}>profile</span>
+                  tier
                 </span>
               );
             })()}
