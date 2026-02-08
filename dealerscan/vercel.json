@@ -1,7 +1,7 @@
 {
   "buildCommand": "cd packages/web && npm run build",
   "outputDirectory": "packages/web/dist",
-  "installCommand": "npm install --workspace=packages/shared --workspace=packages/web",
+  "installCommand": "npm install --ignore-scripts",
   "framework": null,
   "routes": [
     {
