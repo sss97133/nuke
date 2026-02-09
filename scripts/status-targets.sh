@@ -8,29 +8,25 @@
 set -e
 cd /Users/skylar/nuke
 
-BAT_TARGET=222000
-
 echo "=== Extraction targets (see docs/EXTRACTION_TARGETS.md) ==="
 echo ""
 
+# Prefer org-extraction-coverage edge function (has bat_listings + queue_pending + target)
 dotenvx run --quiet -- bash -c '
-  # BaT: bat_listings count (need RPC or vehicles count by discovery_source; fallback to import_queue complete for BaT)
-  # We use import_queue counts: pending + complete for bringatrailer
-  pending=$(curl -s "$VITE_SUPABASE_URL/rest/v1/import_queue?listing_url=ilike.%bringatrailer%&status=eq.pending&select=id" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Prefer: count=exact" -I 2>/dev/null | grep -i content-range | sed -n "s/.*\///p" | tr -d "\r\n")
-  complete=$(curl -s "$VITE_SUPABASE_URL/rest/v1/import_queue?listing_url=ilike.%bringatrailer%&status=eq.complete&select=id" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Prefer: count=exact" -I 2>/dev/null | grep -i content-range | sed -n "s/.*\///p" | tr -d "\r\n")
-  echo "BaT (bringatrailer):"
-  echo "  queue pending:  ${pending:-?}"
-  echo "  queue complete: ${complete:-?}"
-  echo "  target (bat_listings): '"$BAT_TARGET"' (see org-extraction-coverage for live bat_listings count)"
-  echo ""
-  # Other sources: pending only
-  for src in carsandbids pcarmarket collectingcars hagerty ksl; do
-    pattern="%${src}%"
-    count=$(curl -s "$VITE_SUPABASE_URL/rest/v1/import_queue?listing_url=ilike.${pattern}&status=eq.pending&select=id" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Prefer: count=exact" -I 2>/dev/null | grep -i content-range | sed -n "s/.*\///p" | tr -d "\r\n")
-    echo "  ${src} pending: ${count:-0}"
-  done
+  resp=$(curl -s "$VITE_SUPABASE_URL/functions/v1/org-extraction-coverage?all=1" \
+    -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" 2>/dev/null)
+  if echo "$resp" | jq -e ".sources" >/dev/null 2>&1; then
+    echo "$resp" | jq -r ".sources[] | \"\(.label): extracted=\(.extracted // 0) pending=\(.queue_pending // 0) target=\(.target // \"-\")\""
+    echo ""
+    echo "Run verified extraction when BaT (or verified sources) pending > 0."
+    exit 0
+  fi
+  # Fallback: no edge function, show note
+  echo "org-extraction-coverage not available. Pending/complete from import_queue (sample):"
+  curl -s "$VITE_SUPABASE_URL/rest/v1/import_queue?select=status&limit=1" \
+    -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+    -H "Prefer: count=exact" -I 2>/dev/null | grep -i content-range || true
 ' 2>/dev/null || echo "Could not fetch (check .env and Supabase)."
 
 echo ""
-echo "Targets: BaT bat_listings = 222,000 (only BaT has a numeric target)."
-echo "Run verified extraction when BaT (or verified sources) pending > 0."
+echo "Targets: BaT bat_listings = 222,000 (only BaT has a numeric target in code)."

@@ -9,18 +9,24 @@ const path = require('path');
 const fs = require('fs');
 const root = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(root, '.env') });
-require('dotenv').config({ path: path.join(root, 'nuke_api', '.env') });
+require('dotenv').config({ path: path.join(root, 'nuke_api', '.env'), override: true });
+// Supabase pooler SSL often needs cert verification relaxed for Node pg client
+if (process.env.DATABASE_URL?.includes('supabase.com') && process.env.NODE_TLS_REJECT_UNAUTHORIZED === undefined) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
 const { Client } = require('pg');
 
 let DATABASE_URL = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
-// If DATABASE_URL isn't a real Postgres URI, build direct Supabase URL from project + password
-if (!DATABASE_URL?.startsWith('postgres')) {
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const password = process.env.SUPABASE_DB_PASSWORD;
-  const ref = url?.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1];
-  if (ref && password) {
-    DATABASE_URL = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
+// Try direct DB password with pooler URL (Supabase pooler can accept direct password)
+const directPassword = process.env.SUPABASE_DB_PASSWORD;
+if (DATABASE_URL?.includes('pooler.supabase.com') && directPassword) {
+  const match = DATABASE_URL.match(/^(postgresql:\/\/)([^:]+):([^@]+)@(.+)$/);
+  if (match) {
+    DATABASE_URL = `${match[1]}${match[2]}:${encodeURIComponent(directPassword)}@${match[4]}`;
   }
+}
+if (DATABASE_URL?.startsWith('postgres') && !DATABASE_URL.includes('sslmode=')) {
+  DATABASE_URL += (DATABASE_URL.includes('?') ? '&' : '?') + 'sslmode=require';
 }
 
 async function run() {
@@ -49,6 +55,7 @@ async function run() {
 
   const client = new Client({
     connectionString: DATABASE_URL,
+    connectionTimeoutMillis: 15000,
     ssl: process.env.DATABASE_SSL !== 'false' ? { rejectUnauthorized: false } : false,
   });
   try {

@@ -1,15 +1,18 @@
 #!/usr/bin/env npx tsx
 /**
- * Backfill organization_vehicles from bat_listings (and optionally external_listings).
- * Run until the function returns 0. Uses small batches to avoid timeouts.
+ * Backfill organization_vehicles from bat_listings (seller + auction_platform).
+ * Uses id-range batching to avoid timeouts. Run until inserted_seller + inserted_platform is 0.
  *
  * Usage: dotenvx run -- npx tsx scripts/backfill-vehicle-org-claims.ts
- * Or:    dotenvx run -- npx tsx scripts/backfill-vehicle-org-claims.ts --batch 2000
+ *        BATCH_SIZE=2000 dotenvx run -- npx tsx scripts/backfill-vehicle-org-claims.ts
  */
 
 import { createClient } from '@supabase/supabase-js';
 
-const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || process.argv.find(a => a.startsWith('--batch='))?.split('=')[1] || '1000', 10);
+const BATCH_SIZE = parseInt(
+  process.env.BATCH_SIZE || process.argv.find((a) => a.startsWith('--batch='))?.split('=')[1] || '2000',
+  10
+);
 
 async function main() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -21,7 +24,9 @@ async function main() {
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
-  let total = 0;
+  let totalSeller = 0;
+  let totalPlatform = 0;
+  let lastId: string | null = null;
   let n = 0;
 
   console.log(`Backfilling vehicle-org claims from bat_listings (batch size ${BATCH_SIZE})...`);
@@ -29,6 +34,7 @@ async function main() {
   while (true) {
     const { data, error } = await supabase.rpc('backfill_vehicle_org_claims_from_bat_listings', {
       p_batch_size: BATCH_SIZE,
+      p_after_id: lastId,
     });
 
     if (error) {
@@ -36,16 +42,23 @@ async function main() {
       process.exit(1);
     }
 
-    const inserted = typeof data === 'number' ? data : 0;
-    total += inserted;
+    const row = Array.isArray(data) ? data[0] : data;
+    const insertedSeller = row?.inserted_seller ?? 0;
+    const insertedPlatform = row?.inserted_platform ?? 0;
+    lastId = row?.last_id ?? null;
+
+    totalSeller += insertedSeller;
+    totalPlatform += insertedPlatform;
     n += 1;
 
-    if (inserted === 0) {
-      console.log(`Done. Total rows backfilled: ${total} (${n} batches).`);
+    const total = insertedSeller + insertedPlatform;
+    if (total === 0 && !lastId) {
+      console.log(`Done. Batches: ${n}, seller rows: ${totalSeller}, platform rows: ${totalPlatform}.`);
       break;
     }
 
-    process.stdout.write(`  Batch ${n}: +${inserted} (total ${total})\r`);
+    process.stdout.write(`  Batch ${n}: seller +${insertedSeller} platform +${insertedPlatform} (total s:${totalSeller} p:${totalPlatform})\r`);
+    if (!lastId) break;
   }
 
   console.log('\nRefreshing total_vehicles for all orgs...');
