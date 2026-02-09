@@ -42,7 +42,7 @@ This Confidential Memorandum does not constitute an offer, invitation or recomme
 |-----------|-------------|
 | **Data scale with no precedent** | 768,288 vehicles, 28.3M images, 10.8M comments, $41.6B in transaction value tracked. 100 GB database with 922 tables. The largest privately-held collector vehicle dataset. |
 | **Proven AI intelligence** | Valuation engine with 6.3% median error across 447,928 vehicles. Sentiment analysis proving community perception correlates with 89% price premium. Proprietary image classification (YONO). |
-| **Autonomous growth** | System added 561,994 vehicles in the first 8 days of Feb 2026 with zero human intervention. 310 microservices operate continuously. 97.8% of data updated within last 7 days. |
+| **Growth trajectory** | Feb 1-8 we set the foundation for autonomous: 561,994 vehicles in 8 days. From that base, 310 microservices operate continuously; 97.8% of data updated within last 7 days. |
 | **Production-ready distribution** | TypeScript SDK, RESTful API, webhook system. B2B infrastructure is built - not planned. |
 
 ### Key Figures
@@ -108,7 +108,7 @@ Fundraising of **$2,000,000** via Post-Money SAFE (Y Combinator standard) at an 
 | Sep-Nov 2025 | Seed data (~100 vehicles), architecture design |
 | Dec 2025 | Pipeline activation - 9,697 vehicles extracted |
 | Jan 2026 | Autonomous operation begins - 196,417 vehicles added |
-| Feb 2026 | Full scale - 561,994 vehicles added in 8 days |
+| Feb 1-8, 2026 | Setting the foundation for autonomous—561,994 vehicles in 8 days |
 | Feb 8, 2026 | 768,288 vehicles, $41.6B tracked, 28.3M images |
 
 ### Key People

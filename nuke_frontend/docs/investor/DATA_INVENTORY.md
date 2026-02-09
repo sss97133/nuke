@@ -87,7 +87,7 @@ Generated: 2026-02-08 from live database queries
 | Pre-Nov 2025 | ~100 | Seed phase |
 | Dec 2025 | 9,697 | Initial extraction runs |
 | Jan 2026 | 196,417 | Pipeline activation |
-| Feb 1-8 2026 | 561,994 | Full autonomous operation |
+| Feb 1-8 2026 | 561,994 | Setting the foundation for autonomous |
 | Last 24 hours | 8,320 | Ongoing autonomous ingestion |
 
 ### Queue Health

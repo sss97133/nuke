@@ -93,9 +93,9 @@ N-Zero does not compete with existing players. It integrates with everyone via A
 | Through Nov 2025 | ~100 | Seed/development phase |
 | Dec 2025 | 9,697 | Pipeline activation |
 | Jan 2026 | 196,417 | Autonomous operation begins |
-| Feb 1-8, 2026 | 561,994 | Full autonomous scale |
+| Feb 1-8, 2026 | 561,994 | Setting the foundation for autonomous |
 
-**The platform added more vehicles in the last 8 days than in all prior months combined.** The autonomous extraction system is scaling exponentially without additional human capital.
+**Feb 1-8 we set the foundation for autonomous.** The platform added more vehicles in those 8 days than in all prior months combined; from that base, autonomous extraction scales without additional human capital.
 
 ---
 
