@@ -88,3 +88,9 @@ export interface OllamaModel {
 }
 
 export type ExtractionMode = 'cloud' | 'local' | 'hybrid'
+
+/** Per-deal summary of document types for display (e.g. "Title (1), Bill of sale (2)") */
+export interface DocumentTypeSummary {
+  total: number
+  byType: Record<string, number>
+}

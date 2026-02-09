@@ -12,6 +12,7 @@ export type {
   DealMessage,
   OllamaModel,
   ExtractionMode,
+  DocumentTypeSummary,
 } from './types'
 
 // Services
@@ -20,6 +21,7 @@ export {
   getDeals,
   getDeal,
   getDealPages,
+  getDocumentTypeCountsForUser,
   uploadAndExtract,
   updatePageReview,
   getPageSignedUrl,
@@ -27,6 +29,9 @@ export {
   archiveDeal,
   exportDealAsJson,
   exportDealAsCsv,
+  formatDealDisplayName,
+  formatDocumentType,
+  formatDocumentTypeSummary,
 } from './services/extractionService'
 
 export {

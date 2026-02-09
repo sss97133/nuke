@@ -414,23 +414,35 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
 
   const platformFavicons: Record<string, string> = {
     bat: 'https://bringatrailer.com',
+    bringatrailer: 'https://bringatrailer.com',
     cars_and_bids: 'https://carsandbids.com',
+    collecting_cars: 'https://collectingcars.com',
     pcarmarket: 'https://pcarmarket.com',
     ebay_motors: 'https://ebay.com',
-    mecum: 'https://mecum.com',
+    mecum: 'https://www.mecum.com',
     hagerty: 'https://hagerty.com',
+    barrett_jackson: 'https://www.barrett-jackson.com',
+    rm_sothebys: 'https://rmsothebys.com',
+    gooding: 'https://www.goodingco.com',
+    bonhams: 'https://www.bonhams.com',
   };
 
   const getPlatformLabel = (platform: string) => {
     const labels: Record<string, string> = {
       bat: 'BaT',
+      bringatrailer: 'BaT',
       cars_and_bids: 'C&B',
+      collecting_cars: 'CC',
       pcarmarket: 'PCM',
       ebay_motors: 'eBay',
       mecum: 'Mecum',
       hagerty: 'Hagerty',
+      barrett_jackson: 'B-J',
+      rm_sothebys: 'RM Sotheby\'s',
+      gooding: 'Gooding',
+      bonhams: 'Bonhams',
     };
-    return labels[platform] || platform.toUpperCase();
+    return labels[platform] || platform.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   return (
@@ -605,8 +617,8 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
 
   const fetchPage = React.useCallback(async (pageIndex: number, append: boolean) => {
     const from = pageIndex * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
 
+    // 1) Live auctions from external_listings (BaT, CC, C&B when they have rows here)
     const { data: extListings, error: extErr } = await supabase
       .from('external_listings')
       .select(`
@@ -626,15 +638,55 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
       .eq('listing_status', 'active')
       .gt('end_date', nowIso)
       .order('end_date', { ascending: true })
-      .range(from, to);
+      .limit(10000);
 
     if (extErr) throw extErr;
 
-    if (!extListings || extListings.length === 0) {
-      return [];
-    }
+    // 2) Live auctions from vehicles (sync-live-auctions: Mecum, PCarMarket, RM Sotheby's, Gooding, Bonhams, etc.)
+    const { data: liveVehicles, error: vErr } = await supabase
+      .from('vehicles')
+      .select('id, year, make, model, primary_image_url, image_url, listing_url, bat_auction_url, sale_price, auction_end_date, platform_source, origin_metadata')
+      .eq('sale_status', 'auction_live')
+      .eq('auction_status', 'active')
+      .or('listing_url.not.is.null,bat_auction_url.not.is.null')
+      .order('auction_end_date', { ascending: true, nullsFirst: false })
+      .limit(10000);
 
-    const vehicleIds = [...new Set(extListings.map((l) => l.vehicle_id))];
+    if (vErr) throw vErr;
+
+    const fromExt = (extListings || []).map((l) => ({
+      ...l,
+      _source: 'external_listings' as const,
+    }));
+    const fromVehicles = (liveVehicles || []).map((v) => ({
+      id: `v-${v.id}`,
+      vehicle_id: v.id,
+      platform: (v.platform_source || 'unknown').replace(/-/g, '_'),
+      listing_url: v.listing_url || v.bat_auction_url || '',
+      listing_status: 'active',
+      current_bid: v.sale_price ?? null,
+      bid_count: (v.origin_metadata as any)?.bid_count ?? 0,
+      watcher_count: 0,
+      view_count: 0,
+      end_date: v.auction_end_date,
+      start_date: null,
+      updated_at: new Date().toISOString(),
+      _source: 'vehicles' as const,
+      _vehicle: v,
+    }));
+
+    const extVehicleIds = new Set(fromExt.map((l) => l.vehicle_id));
+    const fromVehiclesDeduped = fromVehicles.filter((v) => !extVehicleIds.has(v.vehicle_id));
+    const merged = [...fromExt, ...fromVehiclesDeduped].sort((a, b) => {
+      const aEnd = a.end_date ? new Date(a.end_date).getTime() : Infinity;
+      const bEnd = b.end_date ? new Date(b.end_date).getTime() : Infinity;
+      return aEnd - bEnd;
+    });
+    const pageSlice = merged.slice(from, from + PAGE_SIZE);
+
+    if (pageSlice.length === 0) return { listings: [], total: merged.length };
+
+    const vehicleIds = [...new Set(pageSlice.map((l) => l.vehicle_id))];
     const { data: vehicles } = await supabase
       .from('vehicles')
       .select('id, year, make, model, primary_image_url, image_url')
@@ -642,10 +694,23 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
 
     const vehicleMap = new Map((vehicles || []).map((v) => [v.id, v]));
 
-    return extListings.map((l) => ({
-      ...l,
-      vehicle: vehicleMap.get(l.vehicle_id) || undefined,
-    }));
+    const listings = pageSlice.map((l) => {
+      const vehicle =
+        vehicleMap.get(l.vehicle_id) ??
+        ((l as any)._vehicle
+          ? {
+              id: (l as any)._vehicle.id,
+              year: (l as any)._vehicle.year,
+              make: (l as any)._vehicle.make,
+              model: (l as any)._vehicle.model,
+              primary_image_url: (l as any)._vehicle.primary_image_url,
+              image_url: (l as any)._vehicle.image_url,
+            }
+          : undefined);
+      const { _source, _vehicle, ...rest } = l as any;
+      return { ...rest, vehicle };
+    });
+    return { listings, total: merged.length };
   }, [nowIso]);
 
   // Initial load + refresh: fetch first page, order by ending soonest
@@ -657,21 +722,17 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
         setLoading(true);
         setError(null);
 
-        const [merged, countRes] = await Promise.all([
-          fetchPage(0, false),
-          supabase
-            .from('external_listings')
-            .select('id', { count: 'exact', head: true })
-            .eq('listing_status', 'active')
-            .gt('end_date', nowIso),
-        ]);
+        const result = await fetchPage(0, false);
 
         if (cancelled) return;
+
+        const merged = Array.isArray(result) ? result : (result as { listings: AuctionListing[]; total: number }).listings;
+        const total = Array.isArray(result) ? null : (result as { listings: AuctionListing[]; total: number }).total;
 
         setListings(merged);
         setPage(1);
         setHasMore(merged.length === PAGE_SIZE);
-        setTotalCount(countRes.count ?? null);
+        setTotalCount(total ?? null);
       } catch (e: unknown) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load auctions');
@@ -684,8 +745,9 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
     load();
 
     const interval = setInterval(() => {
-      fetchPage(0, false).then((merged) => {
+      fetchPage(0, false).then((result) => {
         if (cancelled) return;
+        const merged = Array.isArray(result) ? result : (result as { listings: AuctionListing[]; total: number }).listings;
         setListings((prev) => (prev.length <= PAGE_SIZE ? merged : prev));
       }).catch(() => {});
     }, 60000);
@@ -700,7 +762,8 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
     if (loadingMore || !hasMore) return;
     try {
       setLoadingMore(true);
-      const next = await fetchPage(page, true);
+      const result = await fetchPage(page, true);
+      const next = Array.isArray(result) ? result : (result as { listings: AuctionListing[]; total: number }).listings;
       setListings((prev) => [...prev, ...next]);
       setPage((p) => p + 1);
       setHasMore(next.length === PAGE_SIZE);

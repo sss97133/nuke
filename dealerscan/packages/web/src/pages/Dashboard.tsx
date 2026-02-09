@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth, useCredits, getDeals } from '@dealerscan/shared'
+import { useAuth, useCredits, getDeals, getDocumentTypeCountsForUser, formatDealDisplayName, formatDocumentTypeSummary } from '@dealerscan/shared'
 import type { Deal } from '@dealerscan/shared'
 import { Plus, FileText, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react'
 
@@ -15,11 +15,17 @@ export default function Dashboard() {
   const { user } = useAuth()
   const { credits } = useCredits(user?.id)
   const [deals, setDeals] = useState<Deal[]>([])
+  const [docCounts, setDocCounts] = useState<Record<string, { total: number; byType: Record<string, number> }>>({})
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    getDeals().then(setDeals).finally(() => setLoading(false))
+    Promise.all([getDeals(), getDocumentTypeCountsForUser()])
+      .then(([dealsList, counts]) => {
+        setDeals(dealsList)
+        setDocCounts(counts)
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   return (
@@ -47,9 +53,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Deals list */}
+      {/* Deal jackets list */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Your Deals</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Your deal jackets</h2>
         <span className="text-sm text-gray-500">{deals.length} total</span>
       </div>
 
@@ -59,7 +65,7 @@ export default function Dashboard() {
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
           <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900">No deals yet</h3>
-          <p className="mt-1 text-sm text-gray-500">Upload your first dealer jacket to get started.</p>
+          <p className="mt-1 text-sm text-gray-500">Upload your first deal jacket to get started.</p>
           <Link to="/upload" className="mt-4 inline-flex items-center gap-1.5 bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700">
             <Plus className="w-4 h-4" /> Upload Documents
           </Link>
@@ -80,10 +86,13 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 truncate">
-                    {deal.deal_name || `${deal.year || ''} ${deal.make || ''} ${deal.model || ''}`.trim() || 'Untitled Deal'}
+                    {formatDealDisplayName(deal, docCounts[deal.id]?.total ?? deal.total_pages)}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {deal.total_pages} pages
+                    {deal.total_pages} file{deal.total_pages !== 1 ? 's' : ''}
+                    {docCounts[deal.id]?.byType && Object.keys(docCounts[deal.id].byType).length > 0 && (
+                      <> \u00B7 {formatDocumentTypeSummary(docCounts[deal.id].byType)}</>
+                    )}
                     {deal.vin ? ` \u00B7 ${deal.vin}` : ''}
                     {deal.sale_price ? ` \u00B7 $${deal.sale_price.toLocaleString()}` : ''}
                   </p>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/env';
 import { OrgLogo } from '../components/common/OrgLogo';
 import {
   TrendingUp,
@@ -16,7 +17,20 @@ import {
   Plus,
   SlidersHorizontal,
   ArrowUpDown,
+  Info,
 } from 'lucide-react';
+
+/** Canonical Bring a Trailer org – we show extraction coverage (target, queue) and turnover/metrics note */
+const BAT_ORG_ID = 'd2bd6370-11d1-4af0-8dd2-3de2c3899166';
+
+export interface OrgExtractionCoverage {
+  org_id: string;
+  label: string | null;
+  extracted: number | null;
+  queue_pending: number | null;
+  target: number | null;
+  metrics_note?: string;
+}
 
 interface Organization {
   id: string;
@@ -142,6 +156,7 @@ export default function Organizations() {
   const [typeFilter, setTypeFilter] = useState(urlType);
   const [sortKey, setSortKey] = useState<SortKey>(urlSort);
   const [showFilters, setShowFilters] = useState(false);
+  const [coverageByOrg, setCoverageByOrg] = useState<Record<string, OrgExtractionCoverage>>({});
 
   const loadOrganizations = useCallback(async () => {
     try {
@@ -183,6 +198,28 @@ export default function Organizations() {
   useEffect(() => {
     loadOrganizations();
   }, [loadOrganizations]);
+
+  // Fetch extraction coverage for BAT (target 222k, queue) – poll so we show live "loading in" as we scrape
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const url = `${SUPABASE_URL}/functions/v1/org-extraction-coverage?org_id=${encodeURIComponent(BAT_ORG_ID)}`;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        });
+        if (!res.ok) return;
+        const coverage = (await res.json()) as OrgExtractionCoverage;
+        if (coverage?.org_id && (coverage.extracted != null || coverage.target != null)) {
+          setCoverageByOrg(prev => ({ ...prev, [coverage.org_id]: coverage }));
+        }
+      } catch {
+        // Optional: no coverage data
+      }
+    };
+    load();
+    const interval = setInterval(load, 45_000); // refresh every 45s so numbers update as we scrape
+    return () => clearInterval(interval);
+  }, []);
 
   // Extract available types from data
   const availableTypes = useMemo(() => {
@@ -404,7 +441,7 @@ export default function Organizations() {
           gap: '12px',
         }}>
           {displayOrgs.map(org => (
-            <OrgCard key={org.id} org={org} onClick={() => navigate(`/org/${org.id}`)} />
+            <OrgCard key={org.id} org={org} coverage={coverageByOrg[org.id]} onClick={() => navigate(`/org/${org.id}`)} />
           ))}
         </div>
       )}
@@ -413,7 +450,7 @@ export default function Organizations() {
 }
 
 /** Individual org card - investment commodity style */
-function OrgCard({ org, onClick }: { org: Organization; onClick: () => void }) {
+function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: OrgExtractionCoverage | null; onClick: () => void }) {
   const signalScore = org.data_signal_score || 0;
   const signalTier = getSignalTier(signalScore);
   const vehicles = org.total_vehicles || 0;
@@ -589,6 +626,37 @@ function OrgCard({ org, onClick }: { org: Organization; onClick: () => void }) {
             overflow: 'hidden',
           }}>
             {org.description}
+          </div>
+        )}
+
+        {/* Extraction coverage: what we have + what we're loading in (scraping in real time) */}
+        {coverage && (coverage.extracted != null || coverage.target != null) && (
+          <div style={{
+            fontSize: '6.5pt',
+            color: 'var(--text-muted)',
+            lineHeight: 1.35,
+            marginBottom: '6px',
+            padding: '4px 6px',
+            background: 'var(--gray-50)',
+            borderRadius: '3px',
+            borderLeft: '2px solid var(--blue-500)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+              <Info size={9} style={{ flexShrink: 0 }} />
+              <span>
+                {coverage.extracted != null && coverage.target != null
+                  ? `${formatNum(coverage.extracted)} of ~${formatNum(coverage.target)} targeted`
+                  : coverage.extracted != null
+                    ? `${formatNum(coverage.extracted)} loaded`
+                    : `~${coverage.target != null ? formatNum(coverage.target) : ''} targeted`}
+                {coverage.queue_pending != null && coverage.queue_pending > 0 && (
+                  <span> · {formatNum(coverage.queue_pending)} in queue · <span style={{ color: 'var(--blue-600)', fontWeight: 600 }}>loading in…</span></span>
+                )}
+              </span>
+            </div>
+            {coverage.metrics_note && (
+              <div style={{ marginLeft: '13px' }}>{coverage.metrics_note}</div>
+            )}
           </div>
         )}
 

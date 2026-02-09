@@ -4,6 +4,17 @@ import { getSupabase } from '@dealerscan/shared'
 import { FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+// OAuth must return HERE, not to n-zero. Supabase only honors redirectTo if the URL is in Auth → URL Configuration → Redirect URLs.
+function getRedirectBase(): string {
+  if (typeof window === 'undefined') return (import.meta.env.VITE_DEALERSCAN_APP_URL as string) || ''
+  const env = import.meta.env.VITE_DEALERSCAN_APP_URL as string
+  if (env) return env
+  const origin = window.location.origin
+  const host = window.location.hostname
+  if (host.includes('dealerscan') || host.endsWith('vercel.app')) return origin
+  return origin
+}
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,7 +32,7 @@ export default function Login() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+          options: { emailRedirectTo: `${getRedirectBase()}/dashboard` },
         })
         if (error) throw error
         toast.success('Check your email to confirm your account!')
@@ -41,7 +52,7 @@ export default function Login() {
     const supabase = getSupabase()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${getRedirectBase()}/dashboard` },
     })
     if (error) toast.error(error.message)
   }
@@ -57,6 +68,11 @@ export default function Login() {
           <p className="mt-2 text-sm text-gray-600">
             {isSignUp ? 'Create your account - 100 free extractions' : 'Sign in to your account'}
           </p>
+          {typeof window !== 'undefined' && window.location.origin.includes('dealerscan') && (
+            <p className="mt-1 text-xs text-amber-600">
+              If Google sends you to another site, add <code className="bg-amber-100 px-1 rounded">{window.location.origin}/**</code> in Supabase → Auth → URL Configuration → Redirect URLs.
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

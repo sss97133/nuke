@@ -20,6 +20,9 @@ const WORKERS = parseInt(process.env.WORKERS || '3');
 const DELAY_MS = 1500;
 const TIMEOUT_MS = 45000;
 
+/** When set, only dequeue URLs from high-quality sources (BaT, Hagerty, KSL) - no Firecrawl-needed sites. */
+const VERIFIED_SOURCES_ONLY = process.env.VERIFIED_SOURCES_ONLY === '1' || process.env.VERIFIED_SOURCES_ONLY === 'true';
+
 interface ExtractedVehicle {
   title?: string;
   year?: number;
@@ -252,14 +255,18 @@ async function processWorker(workerId: number) {
   let rateLimited = 0;
 
   while (true) {
-    // Claim batch
-    const { data: items } = await supabase
+    // Claim batch (optionally only verified sources to avoid sloppy/Firecrawl-heavy URLs)
+    let query = supabase
       .from('import_queue')
       .select('id, listing_url, attempts')
       .eq('status', 'pending')
       .lt('attempts', 5)
       .order('created_at', { ascending: true })
       .limit(10);
+    if (VERIFIED_SOURCES_ONLY) {
+      query = query.or('listing_url.ilike.%bringatrailer.com%,listing_url.ilike.%hagerty.com%,listing_url.ilike.%ksl.com%');
+    }
+    const { data: items } = await query;
 
     if (!items?.length) {
       console.log(`[W${workerId}] No items, waiting...`);

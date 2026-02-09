@@ -5,6 +5,8 @@ import type { CreditTransaction } from '@dealerscan/shared'
 import { CreditCard, Check, Loader2, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+const redirectBase = (import.meta.env.VITE_DEALERSCAN_APP_URL as string) || (typeof window !== 'undefined' ? window.location.origin : '')
+
 const plans = [
   { id: 'credits_100', name: '100 Extractions', price: '$20', per: '$0.20/each', credits: 100 },
   { id: 'credits_500', name: '500 Extractions', price: '$90', per: '$0.18/each', credits: 500, popular: true },
@@ -22,18 +24,22 @@ export default function BillingPage() {
     getTransactions().then(setTransactions)
     const status = searchParams.get('status')
     if (status === 'success') {
-      toast.success('Credits purchased successfully!')
+      toast.success('Payment received. Credits may take a moment to appear.')
       refreshCredits()
       getTransactions().then(setTransactions)
+      // Webhook can be delayed; retry so user sees credits without reload
+      const t1 = setTimeout(() => { refreshCredits(); getTransactions().then(setTransactions) }, 2000)
+      const t2 = setTimeout(() => { refreshCredits(); getTransactions().then(setTransactions) }, 5000)
+      return () => { clearTimeout(t1); clearTimeout(t2) }
     } else if (status === 'cancelled') {
       toast('Purchase cancelled', { icon: 'info' })
     }
-  }, [])
+  }, [searchParams, refreshCredits])
 
   const handlePurchase = async (planId: string) => {
     setLoading(planId)
     try {
-      const checkoutUrl = await createCheckout(planId, `${window.location.origin}/billing`)
+      const checkoutUrl = await createCheckout(planId, `${redirectBase || window.location.origin}/billing`)
       window.location.href = checkoutUrl
     } catch (err: any) {
       toast.error(err.message)
@@ -96,6 +102,9 @@ export default function BillingPage() {
       </div>
 
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Transaction History</h2>
+      <p className="text-xs text-gray-500 mb-2">
+        Charged but credits not showing? Credits are applied by our payment webhook—usually within a minute. If you were charged and still don&apos;t see credits, contact support with your receipt.
+      </p>
       {transactions.length === 0 ? (
         <p className="text-sm text-gray-500 bg-white border border-gray-200 rounded-xl p-6 text-center">
           No transactions yet.
