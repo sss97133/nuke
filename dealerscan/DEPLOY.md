@@ -65,12 +65,20 @@ Build: from repo root, build the web app (e.g. `npm run build` in `packages/web`
 
 ## 5. Why your updates aren’t on the live site (and how to fix it)
 
-Vercel builds from your **Git repo**, not from your local folder. So until you **commit and push** your changes, the live site (e.g. dealerscan-three.vercel.app) won’t show them.
+Vercel builds from your **Git repo**. If you’ve pushed but the site still shows “Your Deals” / “Untitled Deal”:
 
-- **Commit and push** to the branch Vercel uses (usually `main`).
-- Vercel will **auto-deploy** on push (if that’s enabled), or trigger a deploy from the Vercel dashboard (Deployments → Redeploy / “Deploy” from the latest commit).
+1. **Confirm the project uses this repo**
+   - Vercel Dashboard → your **dealerscan-three** project → **Settings** → **Git**.
+   - **Connected Repository** must be the repo that has the `dealerscan` folder (e.g. `sss97133/nuke`). If it’s a different repo, connect this one or push the same code to that repo.
 
-After a successful deploy, the live site will have the latest code (header App/API links, YMM naming, doc-type breakdown, OAuth fix, etc.).
+2. **Set Root Directory**
+   - **Settings** → **General** → **Root Directory**: set to **`dealerscan`** (so Vercel uses `dealerscan/vercel.json` and builds `packages/web`). Leave blank only if the whole repo is the DealerScan app.
+
+3. **Redeploy**
+   - **Deployments** → open the latest deployment → **⋯** → **Redeploy** (or push an empty commit: `git commit --allow-empty -m "Trigger DealerScan deploy" && git push origin main`).
+
+4. **Hard refresh**
+   - After the new build is Live, do a hard refresh (Cmd+Shift+R) or open the site in an incognito window so the browser doesn’t serve old cached JS.
 
 ## 6. Deploy to Vercel (public)
 
