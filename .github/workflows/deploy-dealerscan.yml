@@ -1,0 +1,39 @@
+# Deploy DealerScan web app to Vercel (dealerscan-three.vercel.app).
+# Runs on push to main when dealerscan/ changes, or on workflow_dispatch.
+name: Deploy DealerScan
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dealerscan/**'
+      - '.github/workflows/deploy-dealerscan.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@49.2.0
+
+      - name: Pull Vercel env (optional)
+        working-directory: ./dealerscan
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel pull --yes --environment=production --token=$VERCEL_TOKEN 2>/dev/null || true
+
+      - name: Build and deploy DealerScan to Vercel
+        working-directory: ./dealerscan
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_DEALERSCAN_APP_URL: https://dealerscan-three.vercel.app
+        run: |
+          echo "Deploying DealerScan (dealerscan-three)..."
+          vercel deploy --prod --yes --token=$VERCEL_TOKEN --scope nzero --name dealerscan-three
