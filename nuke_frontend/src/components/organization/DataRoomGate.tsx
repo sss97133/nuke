@@ -1,5 +1,6 @@
 /**
- * Data room gate: anon = phone → SMS code → NDA; signed in = continue → NDA.
+ * Data room gate: anon = phone (SMS code) or email (no code) → NDA; signed in = continue → NDA.
+ * Never surfaces raw database/API errors; offers email fallback so we don't look like we're blocking or stealing data.
  */
 
 import { useState, useEffect } from 'react';
@@ -26,6 +27,19 @@ This Agreement is governed by the laws of the State of Delaware.
 By signing below, you acknowledge that you have read, understood, and agree to be bound by this Agreement and the platform Terms of Service and Privacy Policy.
 `;
 
+function toFriendlyError(raw: string | undefined): string {
+  if (!raw) return 'Something went wrong. Please try again or use your email instead.';
+  const lower = raw.toLowerCase();
+  if (lower.includes('database') || lower.includes('saving new user') || lower.includes('duplicate') || lower.includes('constraint') || lower.includes('row-level')) {
+    return 'Something went wrong on our side. Please try again or use your email instead to continue.';
+  }
+  if (lower.includes('invalid') && lower.includes('code')) return 'That code isn’t valid. Please try again or request a new code.';
+  if (lower.includes('phone') && (lower.includes('invalid') || lower.includes('not supported'))) {
+    return 'We couldn’t send a code to that number. Please try your email instead.';
+  }
+  return 'Something went wrong. Please try again or use your email instead.';
+}
+
 export interface DataRoomGateProps {
   organizationId: string;
   organizationName: string;
@@ -34,17 +48,21 @@ export interface DataRoomGateProps {
 }
 
 type Step = 'identify' | 'nda';
+type IdentifyMethod = 'phone' | 'email';
 
 export default function DataRoomGate({ organizationId, organizationName, onAccessGranted, onClose }: DataRoomGateProps) {
   const [user, setUser] = useState<{ id: string; email?: string; phone?: string; fullName?: string } | null>(null);
   const [step, setStep] = useState<Step>('identify');
+  const [identifyMethod, setIdentifyMethod] = useState<IdentifyMethod>('phone');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [emailIdentifier, setEmailIdentifier] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: u } }) => {
@@ -68,6 +86,17 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
       setStep('nda');
       return;
     }
+    if (identifyMethod === 'email') {
+      const trimmed = email.trim();
+      if (!trimmed || !trimmed.includes('@')) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+      setEmailIdentifier(trimmed);
+      setMessage('We’ll use this email to connect your access to an account later if you sign up.');
+      setStep('nda');
+      return;
+    }
     if (!phone.trim()) {
       setError('Please enter your phone number');
       return;
@@ -81,7 +110,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
       setShowOtpInput(true);
       setMessage('We sent a code to your phone. Enter it below.');
     } catch (err: any) {
-      setError(err.message || 'Failed to send code');
+      setError(toFriendlyError(err?.message));
     } finally {
       setLoading(false);
     }
@@ -114,7 +143,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
         setMessage(null);
       }
     } catch (err: any) {
-      setError(err.message || 'Invalid code');
+      setError(toFriendlyError(err?.message));
     } finally {
       setLoading(false);
     }
@@ -129,13 +158,14 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
     setError(null);
     setLoading(true);
     try {
+      const identifier = user?.phone ?? user?.email ?? emailIdentifier ?? user?.id ?? null;
       await supabase.from('system_logs').insert({
         log_type: 'investor_portal',
         message: 'data_room_access',
         details: {
           organization_id: organizationId,
           user_id: user?.id ?? null,
-          identifier: user?.phone ?? user?.id ?? null,
+          identifier: identifier ?? (emailIdentifier ? `email:${emailIdentifier}` : null),
           timestamp: new Date().toISOString(),
         },
       }).then(() => {}, () => {});
@@ -150,6 +180,9 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
     setLoading(false);
     onAccessGranted();
   };
+
+  const showPhoneForm = !user && identifyMethod === 'phone';
+  const showEmailForm = !user && identifyMethod === 'email';
 
   return (
     <div
@@ -183,44 +216,81 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
 
           {step === 'identify' && (
             <>
-              <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>
-                {user ? 'Continue to NDA.' : 'Enter your phone number and we’ll text you a code.'}
+              <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-muted)' }}>
+                {user ? 'Continue to NDA.' : 'Enter your phone or email to continue. We’ll use it only to connect your access to an account if you sign up.'}
               </p>
+              {!user && (
+                <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--grey-200)' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setIdentifyMethod('phone'); setError(null); setMessage(null); setShowOtpInput(false); setOtpCode(''); }}
+                    style={{ padding: '8px 12px', fontSize: 13, background: identifyMethod === 'phone' ? 'var(--grey-200)' : 'transparent', border: 'none', cursor: 'pointer', borderBottom: identifyMethod === 'phone' ? '2px solid var(--accent, #3b82f6)' : '2px solid transparent', marginBottom: -1 }}
+                  >
+                    Phone
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIdentifyMethod('email'); setError(null); setMessage(null); setShowOtpInput(false); }}
+                    style={{ padding: '8px 12px', fontSize: 13, background: identifyMethod === 'email' ? 'var(--grey-200)' : 'transparent', border: 'none', cursor: 'pointer', borderBottom: identifyMethod === 'email' ? '2px solid var(--accent, #3b82f6)' : '2px solid transparent', marginBottom: -1 }}
+                  >
+                    Email
+                  </button>
+                </div>
+              )}
               <form onSubmit={user ? (e) => { e.preventDefault(); setStep('nda'); } : showOtpInput ? handleVerifyOtp : handleIdentify}>
                 {user ? (
                   <p style={{ marginBottom: 16, fontSize: 13 }}>Signed in as <strong>{user.fullName || user.email || user.phone || 'you'}</strong></p>
                 ) : (
                   <>
-                    <div style={{ marginBottom: 16 }}>
-                      <input
-                        type="tel"
-                        className="input"
-                        placeholder="Phone (e.g. +1234567890)"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        required={!showOtpInput}
-                        style={{ width: '100%' }}
-                      />
-                    </div>
-                    {showOtpInput && (
+                    {showPhoneForm && (
+                      <>
+                        <div style={{ marginBottom: 16 }}>
+                          <input
+                            type="tel"
+                            className="input"
+                            placeholder="Phone (e.g. 7025551234)"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            required={!showOtpInput}
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                        {showOtpInput && (
+                          <div style={{ marginBottom: 16 }}>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Enter code"
+                              value={otpCode}
+                              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              maxLength={6}
+                              required
+                              style={{ width: '100%' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => { setShowOtpInput(false); setOtpCode(''); setMessage(null); setError(null); }}
+                              style={{ marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)', textDecoration: 'underline' }}
+                            >
+                              ← Back to phone number
+                            </button>
+                            <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>Code not working? Use your <button type="button" onClick={() => { setIdentifyMethod('email'); setShowOtpInput(false); setError(null); setMessage(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', textDecoration: 'underline' }}>email instead</button>.</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {showEmailForm && (
                       <div style={{ marginBottom: 16 }}>
                         <input
-                          type="text"
+                          type="email"
                           className="input"
-                          placeholder="Enter code"
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          maxLength={6}
+                          placeholder="you@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
                           required
                           style={{ width: '100%' }}
                         />
-                        <button
-                          type="button"
-                          onClick={() => { setShowOtpInput(false); setOtpCode(''); setMessage(null); setError(null); }}
-                          style={{ marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)', textDecoration: 'underline' }}
-                        >
-                          ← Back to phone number
-                        </button>
+                        <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>We’ll only use this to link your access to an account if you sign up later. No code required.</p>
                       </div>
                     )}
                   </>
@@ -228,8 +298,8 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
                 {message && <p style={{ color: 'var(--success)', marginBottom: 12, fontSize: 12 }}>{message}</p>}
                 {error && <p style={{ color: 'var(--error)', marginBottom: 12, fontSize: 12 }}>{error}</p>}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="submit" className="button button-primary" disabled={loading} style={{ padding: '10px 18px' }}>
-                    {loading ? '…' : user ? 'Continue' : showOtpInput ? 'Verify' : 'Send code'}
+                  <button type="submit" className="button button-primary" disabled={loading || (showEmailForm && !email.trim().includes('@'))} style={{ padding: '10px 18px' }}>
+                    {loading ? '…' : user ? 'Continue' : showOtpInput ? 'Verify' : identifyMethod === 'email' ? 'Continue with email' : 'Send code'}
                   </button>
                   {onClose && <button type="button" onClick={onClose} className="button" style={{ padding: '10px 18px' }}>Cancel</button>}
                 </div>
@@ -239,6 +309,11 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
 
           {step === 'nda' && (
             <>
+              {(user || emailIdentifier) && (
+                <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-muted)' }}>
+                  Access for {user ? (user.fullName || user.email || user.phone || 'you') : emailIdentifier}
+                </p>
+              )}
               <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>Please read and agree to access the data room.</p>
               <div style={{ maxHeight: 200, overflowY: 'auto', padding: 12, background: 'var(--grey-100)', borderRadius: 8, marginBottom: 16, fontSize: 11, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                 {NDA_AND_TERMS}
