@@ -20,9 +20,6 @@ import {
   Info,
 } from 'lucide-react';
 
-/** Canonical Bring a Trailer org – we show extraction coverage (target, queue) and turnover/metrics note */
-const BAT_ORG_ID = 'd2bd6370-11d1-4af0-8dd2-3de2c3899166';
-
 export interface OrgExtractionCoverage {
   org_id: string;
   label: string | null;
@@ -96,6 +93,7 @@ const TYPE_LABELS: Record<string, string> = {
   builder: 'Builder',
   marketplace: 'Marketplace',
   dealer: 'Dealer',
+  developer: 'Developer',
   motorsport_event: 'Motorsport',
   rally_event: 'Rally',
   fabrication: 'Fabrication',
@@ -157,6 +155,7 @@ export default function Organizations() {
   const [sortKey, setSortKey] = useState<SortKey>(urlSort);
   const [showFilters, setShowFilters] = useState(false);
   const [coverageByOrg, setCoverageByOrg] = useState<Record<string, OrgExtractionCoverage>>({});
+  const [extractionSources, setExtractionSources] = useState<OrgExtractionCoverage[]>([]);
 
   const loadOrganizations = useCallback(async () => {
     try {
@@ -199,25 +198,30 @@ export default function Organizations() {
     loadOrganizations();
   }, [loadOrganizations]);
 
-  // Fetch extraction coverage for BAT (target 222k, queue) – poll so we show live "loading in" as we scrape
+  // Fetch extraction coverage for all sources (BAT, C&B, Craigslist, etc.) – poll so we show live "loading in"
   useEffect(() => {
     const load = async () => {
       try {
-        const url = `${SUPABASE_URL}/functions/v1/org-extraction-coverage?org_id=${encodeURIComponent(BAT_ORG_ID)}`;
-        const res = await fetch(url, {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/org-extraction-coverage?all=1`, {
           headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
         });
         if (!res.ok) return;
-        const coverage = (await res.json()) as OrgExtractionCoverage;
-        if (coverage?.org_id && (coverage.extracted != null || coverage.target != null)) {
-          setCoverageByOrg(prev => ({ ...prev, [coverage.org_id]: coverage }));
-        }
+        const data = (await res.json()) as { sources?: OrgExtractionCoverage[] };
+        const list = data?.sources ?? [];
+        const byOrg: Record<string, OrgExtractionCoverage> = {};
+        list.forEach((c) => {
+          if (c?.org_id && (c.extracted != null || c.target != null)) {
+            byOrg[c.org_id] = c;
+          }
+        });
+        setCoverageByOrg(byOrg);
+        setExtractionSources(list);
       } catch {
         // Optional: no coverage data
       }
     };
     load();
-    const interval = setInterval(load, 45_000); // refresh every 45s so numbers update as we scrape
+    const interval = setInterval(load, 45_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -317,6 +321,34 @@ export default function Organizations() {
           <Plus size={12} /> Add Organization
         </button>
       </div>
+
+      {/* Platform data loading strip: what we have + what we're scraping in real time */}
+      {extractionSources.length > 0 && (
+        <div style={{
+          marginBottom: '12px',
+          padding: '8px 12px',
+          background: 'var(--gray-50)',
+          border: '1px solid var(--border)',
+          borderRadius: '4px',
+          borderLeft: '4px solid var(--blue-500)',
+          fontSize: '8pt',
+          color: 'var(--text)',
+        }}>
+          <span style={{ fontWeight: 600, color: 'var(--text-muted)', marginRight: '8px' }}>Data loading:</span>
+          {extractionSources.map((s, i) => (
+            <span key={s.org_id}>
+              {i > 0 && ' · '}
+              <span>{formatNum(s.extracted ?? 0)} {s.label}</span>
+              {(s.queue_pending ?? 0) > 0 && (
+                <span style={{ color: 'var(--blue-600)', fontWeight: 600 }}> ({formatNum(s.queue_pending!)} in queue)</span>
+              )}
+            </span>
+          ))}
+          {extractionSources.some((s) => (s.queue_pending ?? 0) > 0) && (
+            <span style={{ color: 'var(--blue-600)', fontWeight: 600, marginLeft: '6px' }}>· loading in…</span>
+          )}
+        </div>
+      )}
 
       {/* Market Summary Bar */}
       <div style={{
