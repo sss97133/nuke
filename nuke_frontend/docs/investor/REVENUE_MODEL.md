@@ -35,6 +35,14 @@ The granular data we're building is out there; no one has built the database and
 - Auction houses receive qualified leads they wouldn't have found
 - **Revenue driver**: 119,579 auction events tracked. Pipeline knows which vehicles are undervalued, which sellers are active, which platforms convert best.
 
+#### Two phases: lead pipe → profile hub
+
+**Phase 1 (initial):** User → Nuke API → one auction (e.g. Bring a Trailer). We're the pipe. We send the listing; they host the auction and collect commission; we take ours.
+
+**Phase 2 (once people adopt):** User **claims** a Nuke profile. That profile connects via API to **all** auction houses. We get **behavior signal** from the owner; when it says "ready to sell," we **trigger bring to market**. Whichever auction wins the owner gets to market the vehicle. We're the hub; auctions compete for the listing.
+
+**What makes Phase 2 true:** We **host** the profile (canonical vehicle + owner + history + behavior). We have API connections to multiple auctions. We have behavioral signal to trigger "ready to sell." Owners claim profiles—adoption. Hosting the data is what gives us the position. We give auctions qualified supply; they still run the auction and set their commission.
+
 ### 2. Consignment
 - Similar to auction lead commissions: we help place inventory (vehicles, parts, or services) with the right buyer or venue
 - We take a cut when the consigned item sells through our match
@@ -136,3 +144,13 @@ N-Zero already tracks 192,773 European-make vehicles ($19.5B in tracked value). 
 
 ### Japanese / JDM Market
 ~44,200 JDM vehicles tracked. The US 25-year import rule creates continuous demand. Tracking Japan-to-US export provenance is a unique data product no one else offers.
+
+---
+
+## Appendix: Concept expansion—art car as bridge
+
+This is not a marketing sidebar. It’s a conceptual expansion that clarifies what the platform can hold and why it matters for high-value objects that sit in more than one system.
+
+The question: **How does an art car bridge the gap between vehicle assets and art?** A vehicle asset lives in one system (VIN, mechanical history, collector-car market). Art lives in another (artist, exhibition history, art-market logic). An art car sits in both—still a car, also an artwork. Double provenance; it can trade in both markets. It forces the two systems to meet in one object.
+
+N-Zero already structures the vehicle side. The art car expands the concept: the same object can carry a second layer of meaning and value. If we can hold both dimensions in one profile, we’re the system where that bridge gets built. That’s product and positioning, not dilution. Engaging the artists and institutions at that intersection is how we show up where the question is already being asked: what is this object, and who gets to say?
