@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth, useCredits, getDeals, getDocumentTypeCountsForUser, formatDealDisplayName, formatDocumentTypeSummary } from '@dealerscan/shared'
+import { useAuth, useCredits, getDeals, getDocumentTypeCountsForUser, formatDealDisplayName, formatDocumentTypeSummary, exportAllDealsAsJson } from '@dealerscan/shared'
 import type { Deal } from '@dealerscan/shared'
-import { Plus, FileText, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react'
+import { Plus, FileText, AlertCircle, CheckCircle, Clock, Loader2, Download, Link2 } from 'lucide-react'
+import toast from 'react-hot-toast'
+
+const PROFILE_APP_URL = (import.meta.env.VITE_NZERO_APP_URL || import.meta.env.VITE_PROFILE_APP_URL) as string | undefined
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
   pending: { icon: Clock, color: 'text-gray-500 bg-gray-100', label: 'Pending' },
@@ -17,7 +20,35 @@ export default function Dashboard() {
   const [deals, setDeals] = useState<Deal[]>([])
   const [docCounts, setDocCounts] = useState<Record<string, { total: number; byType: Record<string, number> }>>({})
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const navigate = useNavigate()
+
+  const handleBulkExport = async () => {
+    if (deals.length === 0) return
+    setExporting(true)
+    try {
+      const json = await exportAllDealsAsJson()
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `deal-jackets-export-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`Exported ${deals.length} deal jacket${deals.length === 1 ? '' : 's'}`)
+    } catch (e) {
+      toast.error('Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const profileUrl = (deal: Deal) => {
+    if (!PROFILE_APP_URL) return null
+    const vin = deal.vin || (deal.merged_data as Record<string, string>)?.['vin']
+    if (vin) return `${PROFILE_APP_URL.replace(/\/$/, '')}/vehicle/${encodeURIComponent(vin)}`
+    return PROFILE_APP_URL
+  }
 
   useEffect(() => {
     Promise.all([getDeals(), getDocumentTypeCountsForUser()])
@@ -49,6 +80,9 @@ export default function Dashboard() {
             <Link to="/upload" className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
               <Plus className="w-4 h-4" /> New Upload
             </Link>
+            <Link to="/connect-photos" className="text-sm text-gray-600 hover:text-gray-900 font-medium border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50">
+              Connect photos
+            </Link>
           </div>
         </div>
       )}
@@ -56,7 +90,18 @@ export default function Dashboard() {
       {/* Deal jackets list */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Your deal jackets</h2>
-        <span className="text-sm text-gray-500">{deals.length} total</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{deals.length} total</span>
+          {deals.length > 0 && (
+            <button
+              onClick={handleBulkExport}
+              disabled={exporting}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" /> {exporting ? 'Exporting...' : 'Bulk export'}
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -91,13 +136,24 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500 mt-0.5">
                     {deal.total_pages} file{deal.total_pages !== 1 ? 's' : ''}
                     {docCounts[deal.id]?.byType && Object.keys(docCounts[deal.id].byType).length > 0 && (
-                      <> \u00B7 {formatDocumentTypeSummary(docCounts[deal.id].byType)}</>
+                      <> · {formatDocumentTypeSummary(docCounts[deal.id].byType)}</>
                     )}
-                    {deal.vin ? ` \u00B7 ${deal.vin}` : ''}
-                    {deal.sale_price ? ` \u00B7 $${deal.sale_price.toLocaleString()}` : ''}
+                    {deal.sale_price ? ` · $${deal.sale_price.toLocaleString()}` : ''}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex items-center gap-2">
+                  {profileUrl(deal) && (
+                    <a
+                      href={profileUrl(deal)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
+                      title="Connect to profile"
+                    >
+                      <Link2 className="w-3 h-3" /> Connect
+                    </a>
+                  )}
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${sc.color}`}>{sc.label}</span>
                   <p className="text-xs text-gray-400 mt-1">{new Date(deal.created_at).toLocaleDateString()}</p>
                 </div>

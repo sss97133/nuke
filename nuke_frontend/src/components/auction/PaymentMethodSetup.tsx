@@ -1,10 +1,12 @@
 /**
  * Payment Method Setup Component
- * Modal for adding payment method before first bid
+ * Modal for adding payment method before first bid.
+ * Stripe is lazy-loaded when the modal opens so CSP/network failures don't break the bidding UI.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
+import type { Stripe } from '@stripe/stripe-js';
 import {
   Elements,
   CardElement,
@@ -15,8 +17,6 @@ import AuctionPaymentService from '../../services/auctionPaymentService';
 import '../../design-system.css';
 
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-// IMPORTANT: Never call loadStripe with an empty string (Stripe will throw IntegrationError).
-const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
 interface PaymentMethodSetupProps {
   onSuccess: () => void;
@@ -110,6 +110,36 @@ function PaymentSetupForm({ onSuccess, onCancel }: PaymentMethodSetupProps) {
 }
 
 export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMethodSetupProps) {
+  const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!!stripeKey);
+
+  useEffect(() => {
+    if (!stripeKey) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    loadStripe(stripeKey)
+      .then((stripe) => {
+        if (!cancelled) {
+          setStripeInstance(stripe);
+          setLoadError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Failed to load Stripe.js:', err);
+          setLoadError(err?.message || 'Payment form could not be loaded.');
+          setStripeInstance(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   if (!stripeKey) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -117,6 +147,40 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
           <h2 className="text-2xl font-bold mb-4">Add Payment Method</h2>
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
             Payments are currently unavailable because the Stripe publishable key is not configured.
+          </div>
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <h2 className="text-2xl font-bold mb-4">Add Payment Method</h2>
+          <p className="text-sm text-gray-600">Loading secure payment form…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !stripeInstance) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <h2 className="text-2xl font-bold mb-4">Add Payment Method</h2>
+          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+            {loadError || 'Payment form failed to load.'}
+            <p className="mt-2 text-xs">If you see a content security or script error, your network or organization may be blocking Stripe. Try again later or use a different network.</p>
           </div>
           <div className="mt-4 flex gap-3">
             <button
@@ -141,7 +205,7 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
           outbid, or charged if you win.
         </p>
 
-        <Elements stripe={stripePromise}>
+        <Elements stripe={stripeInstance}>
           <PaymentSetupForm onSuccess={onSuccess} onCancel={onCancel} />
         </Elements>
 

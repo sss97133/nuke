@@ -90,7 +90,15 @@ Fixing this means: extend relationship types, add sync (trigger or job) from lis
   5. Function `refresh_org_total_vehicles()` to recalc `businesses.total_vehicles` from `organization_vehicles`.  
 
 - **Run the backfill (one-off):**  
-  - Script (may hit API statement timeout on large DBs):  
+  - **All sources (recommended):**  
+    - **Via psql (no timeout):** `dotenvx run -- bash scripts/backfill-all-org-vehicle-links-psql.sh`  
+    - Via TS (may hit API timeout on large DBs): `dotenvx run -- npx tsx scripts/backfill-all-org-vehicle-links.ts`  
+    Runs in order: BAT (seller + auction_platform), build_threads (forum → org), vehicles.origin_organization_id, external_listings (seller + platform), timeline_events, then `refresh_org_total_vehicles()`.  
+  - **BAT only (canonical org must show all BAT vehicles):**  
+    `observation_sources` for `slug = 'bat'` points to canonical BAT org `d2bd6370-11d1-4af0-8dd2-3de2c3899166`. Run:  
+    `dotenvx run -- bash scripts/backfill-bat-platform-to-canonical-org.sh`  
+    to link every `bat_listings.vehicle_id` to that org as `auction_platform`. Then the BAT profile shows full vehicle count.  
+  - BAT only (may hit API statement timeout on large DBs):  
     `dotenvx run -- npx tsx scripts/backfill-vehicle-org-claims.ts`  
   - Or via direct psql (no statement timeout):  
     ```bash
@@ -98,3 +106,11 @@ Fixing this means: extend relationship types, add sync (trigger or job) from lis
     SELECT * FROM backfill_vehicle_org_claims_from_bat_listings(5000, NULL);  -- then pass last_id
     SELECT refresh_org_total_vehicles();
     ```
+
+- **Backfill functions (all sources):**  
+  - `backfill_vehicle_org_claims_from_bat_listings(p_batch_size, p_after_id)` – BAT seller + platform.  
+  - `backfill_org_vehicles_from_build_threads(p_batch_size)` – Forum orgs (business_name = forum_sources.slug).  
+  - `backfill_org_vehicles_from_origin_org(p_batch_size)` – vehicles.origin_organization_id → sold_by.  
+  - `backfill_org_vehicles_from_external_listings(p_batch_size)` – external_listings seller + platform.  
+  - `backfill_org_vehicles_from_timeline_events(p_batch_size)` – timeline_events (vehicle_id, organization_id) → work_location.  
+  Run each in a loop until inserted = 0, then `SELECT refresh_org_total_vehicles();`.

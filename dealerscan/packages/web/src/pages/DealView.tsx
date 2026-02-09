@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getDeal, getDealPages, mergeDeal, getPageSignedUrl, exportDealAsJson, exportDealAsCsv, archiveDeal, formatDealDisplayName, formatDocumentTypeSummary } from '@dealerscan/shared'
 import type { Deal, DocumentPage } from '@dealerscan/shared'
-import { FileText, Download, AlertCircle, CheckCircle, Clock, Loader2, Eye, Archive, RefreshCw } from 'lucide-react'
+import { FileText, Download, AlertCircle, CheckCircle, Clock, Loader2, Eye, Archive, RefreshCw, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+const PROFILE_APP_URL = (import.meta.env.VITE_NZERO_APP_URL || import.meta.env.VITE_PROFILE_APP_URL) as string | undefined
 
 export default function DealView() {
   const { id } = useParams<{ id: string }>()
@@ -89,7 +91,17 @@ export default function DealView() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {PROFILE_APP_URL && (deal.vin || (merged as Record<string, string>)?.vin) && (
+            <a
+              href={`${PROFILE_APP_URL.replace(/\/$/, '')}/vehicle/${encodeURIComponent(deal.vin || (merged as Record<string, string>)?.vin || '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
+            >
+              <Link2 className="w-3.5 h-3.5" /> Connect to profile
+            </a>
+          )}
           <button onClick={handleMerge} className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50">
             <RefreshCw className="w-3.5 h-3.5" /> Merge
           </button>

@@ -647,10 +647,13 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       // Fall back to the existing multi-query client search if invoke fails.
       let edgeFunctionWorked = false;
       try {
+        const { data: { user } } = await supabase.auth.getUser();
         const { data: edgeData, error: edgeError } = await supabase.functions.invoke('search', {
           body: {
             query: searchQuery.trim(),
-            limit: 150
+            limit: 24,
+            user_id: user?.id ?? undefined,
+            user_location: userLocation ?? undefined
           }
         });
 

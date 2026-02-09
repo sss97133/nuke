@@ -5,7 +5,7 @@
  * will mirror the actual build/commits.
  *
  * Usage:
- *   npx tsx scripts/sync-nuke-commits-to-org.ts [--dry-run] [--max N]
+ *   npx tsx scripts/sync-nuke-commits-to-org.ts [--dry-run] [--max N] [--org-id=UUID] [--since=YYYY-MM-DD]
  *
  * Env: VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (or VITE_SUPABASE_ANON_KEY for read-only;
  *      inserts require service role or RLS will block).
@@ -18,7 +18,11 @@ import path from 'path';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const MAX_ARG = process.argv.find((a) => a.startsWith('--max='));
-const MAX_COMMITS = MAX_ARG ? parseInt(MAX_ARG.split('=')[1], 10) : 2000;
+const MAX_COMMITS = MAX_ARG ? parseInt(MAX_ARG.split('=')[1], 10) : 10000;
+const SINCE_ARG = process.argv.find((a) => a.startsWith('--since='));
+const SINCE_DATE = SINCE_ARG ? SINCE_ARG.split('=')[1].trim() : '2024-01-01';
+const ORG_ID_ARG = process.argv.find((a) => a.startsWith('--org-id='));
+const TARGET_ORG_ID = ORG_ID_ARG ? ORG_ID_ARG.split('=')[1].trim() : null;
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_KEY =
@@ -40,21 +44,23 @@ interface GitCommit {
   body: string;
 }
 
-function getGitCommits(repoRoot: string, max: number): GitCommit[] {
+function getGitCommits(repoRoot: string, max: number, since: string): GitCommit[] {
   const format = '%H%x00%aI%x00%s%x00%b';
+  const sinceArg = since ? `--since=${since}` : '';
   const out = execSync(
-    `git log --format=${format} -n ${max}`,
+    `git log --format=${format} -n ${max} ${sinceArg}`.trim(),
     { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
   );
   const commits: GitCommit[] = [];
   const parts = out.split('\0');
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
   for (let i = 0; i + 3 <= parts.length; i += 4) {
     const sha = parts[i].trim();
-    const dateStr = parts[i + 1].trim();
-    const date = dateStr.slice(0, 10);
+    const dateStr = (parts[i + 1] || '').trim().slice(0, 10);
     const subject = (parts[i + 2] || '').trim().slice(0, 500);
     const body = (parts[i + 3] || '').trim().slice(0, 2000);
-    if (sha && date) commits.push({ sha, date, subject, body });
+    if (!sha || !isoDate.test(dateStr)) continue;
+    commits.push({ sha, date: dateStr, subject, body });
   }
   return commits;
 }
@@ -62,14 +68,33 @@ function getGitCommits(repoRoot: string, max: number): GitCommit[] {
 async function main() {
   const repoRoot = process.cwd();
   console.log('Repo root:', repoRoot);
-  console.log('Fetching Nuke Ltd business and owner...');
+  console.log('Fetching business and owner...');
 
-  let { data: business, error: bizErr } = await supabase
-    .from('businesses')
-    .select('id')
-    .eq('slug', 'nuke-ltd')
-    .limit(1)
-    .maybeSingle();
+  let business: { id: string } | null = null;
+  let bizErr: Error | null = null;
+
+  if (TARGET_ORG_ID) {
+    const r = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('id', TARGET_ORG_ID)
+      .limit(1)
+      .maybeSingle();
+    business = r.data;
+    bizErr = r.error;
+    if (business?.id) console.log('Using org id:', TARGET_ORG_ID);
+  }
+
+  if (!business?.id) {
+    const r = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('slug', 'nuke-ltd')
+      .limit(1)
+      .maybeSingle();
+    business = r.data;
+    bizErr = r.error;
+  }
 
   if (!business?.id) {
     const r = await supabase
@@ -83,7 +108,7 @@ async function main() {
   }
 
   if (bizErr || !business?.id) {
-    console.error('Could not find Nuke Ltd business:', bizErr?.message || 'no row');
+    console.error('Could not find business:', bizErr?.message || 'no row. Use --org-id=UUID to target a specific org.');
     process.exit(1);
   }
 
@@ -100,10 +125,10 @@ async function main() {
 
   const createdBy = ownership?.owner_id;
   if (!createdBy) {
-    console.warn('No active owner for Nuke Ltd; created_by will need to be set. Checking RLS...');
+    console.warn('No active owner for this business; created_by will need to be set. Checking RLS...');
   }
 
-  console.log('Nuke Ltd business_id:', businessId, 'created_by:', createdBy || '(none)');
+  console.log('business_id:', businessId, 'created_by:', createdBy || '(none)');
 
   const { data: existing } = await supabase
     .from('business_timeline_events')
@@ -116,8 +141,8 @@ async function main() {
   );
   console.log('Existing commit events:', existingShas.size);
 
-  const commits = getGitCommits(repoRoot, MAX_COMMITS);
-  console.log('Git commits (last', MAX_COMMITS, '):', commits.length);
+  const commits = getGitCommits(repoRoot, MAX_COMMITS, SINCE_DATE);
+  console.log('Git commits (since', SINCE_DATE, ', max', MAX_COMMITS, '):', commits.length);
 
   const toInsert = commits.filter((c) => !existingShas.has(c.sha));
   console.log('New commits to insert:', toInsert.length);
@@ -132,24 +157,27 @@ async function main() {
   }
 
   if (!createdBy) {
-    console.error('Cannot insert without created_by (org owner). Add an owner to Nuke Ltd or set created_by in DB.');
+    console.error('Cannot insert without created_by (org owner). Add an owner to the business or set created_by in DB.');
     process.exit(1);
   }
 
-  const rows = toInsert.map((c) => ({
-    business_id: businessId,
-    created_by: createdBy,
-    event_type: 'commit',
-    event_category: 'growth',
-    title: c.subject || `Commit ${c.sha.slice(0, 7)}`,
-    description: c.body || null,
-    event_date: c.date,
-    metadata: {
-      sha: c.sha,
-      repo: 'nuke',
-      source: 'git_sync',
-            },
-  }));
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+  const rows = toInsert
+    .filter((c) => isoDate.test(c.date))
+    .map((c) => ({
+      business_id: businessId,
+      created_by: createdBy,
+      event_type: 'commit',
+      event_category: 'growth',
+      title: (c.subject || `Commit ${c.sha.slice(0, 7)}`).slice(0, 500),
+      description: c.body || null,
+      event_date: c.date,
+      metadata: {
+        sha: c.sha,
+        repo: 'nuke',
+        source: 'git_sync',
+      },
+    }));
 
   const BATCH = 100;
   let inserted = 0;
@@ -164,7 +192,7 @@ async function main() {
     console.log('Inserted', inserted, '/', rows.length);
   }
 
-  console.log('Done. Inserted', inserted, 'commit events for Nuke Ltd.');
+  console.log('Done. Inserted', inserted, 'commit events.');
 }
 
 main().catch((e) => {

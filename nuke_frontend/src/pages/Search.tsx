@@ -24,6 +24,7 @@ export default function Search() {
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [answerSources, setAnswerSources] = useState<Array<{ title: string; href?: string }>>([]);
   const [answerRequestId, setAnswerRequestId] = useState(0);
+  const [showWorkstation, setShowWorkstation] = useState(false);
 
   const haversineMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371000;
@@ -497,85 +498,101 @@ export default function Search() {
           border: '2px solid #000',
           borderRadius: '0px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-            <div>
-              <div style={{ fontSize: '9pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Search Workstation
-              </div>
-              <div style={{ fontSize: '8pt', color: '#666' }}>
-                {focusQuery ? `Focus: ${focusQuery}` : 'Start with a brand, model, or intent'}
-              </div>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
             <button
-              onClick={() => jumpToFilter('all')}
+              type="button"
+              onClick={() => setShowWorkstation((v) => !v)}
               style={{
-                padding: '4px 8px',
+                padding: '6px 10px',
                 fontSize: '8pt',
                 fontWeight: 700,
                 border: '2px solid #000',
                 background: '#fff',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                textAlign: 'left'
               }}
             >
-              View all results
+              {showWorkstation ? 'Hide workstation' : 'Search workstation & quick links'}
             </button>
+            {focusQuery && (
+              <button
+                type="button"
+                onClick={() => jumpToFilter('all')}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '8pt',
+                  fontWeight: 700,
+                  border: '2px solid #000',
+                  background: '#fff',
+                  cursor: 'pointer'
+                }}
+              >
+                View all results
+              </button>
+            )}
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-            {workspaceSections.map((section) => (
-              <div key={section.title} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
-                <div style={{ fontSize: '9pt', fontWeight: 700 }}>{section.title}</div>
-                <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px' }}>{section.helper}</div>
-                <div style={{ display: 'grid', gap: '6px' }}>
-                  {section.actions.map((action) => (
-                    <a
-                      key={action.label}
-                      href={action.href}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '8px',
-                        textDecoration: 'none',
-                        color: '#000',
-                        border: '1px solid var(--border)',
-                        padding: '6px 8px',
-                        background: 'var(--surface)'
-                      }}
-                    >
-                      <span style={{ fontSize: '8pt', fontWeight: 600 }}>{action.label}</span>
-                      {typeof action.badge === 'number' && action.badge > 0 && (
-                        <span style={{ fontSize: '7pt', color: '#666' }}>{action.badge}</span>
-                      )}
-                    </a>
-                  ))}
-                </div>
+          {showWorkstation && (
+            <>
+              <div style={{ fontSize: '8pt', color: '#666', marginTop: '8px', marginBottom: '12px' }}>
+                {focusQuery ? `Focus: ${focusQuery}` : 'Start with a brand, model, or intent'}
               </div>
-            ))}
-          </div>
-
-          {focusQuery && (
-            <div style={{ marginTop: '12px' }}>
-              <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '6px' }}>Jump to a lane</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {laneFilters.filter((lane) => lane.count > 0).map((lane) => (
-                  <button
-                    key={lane.key}
-                    onClick={() => jumpToFilter(lane.key as typeof resultFilter)}
-                    style={{
-                      padding: '4px 8px',
-                      fontSize: '8pt',
-                      fontWeight: 700,
-                      border: '2px solid #000',
-                      background: '#fff',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {lane.label} · {lane.count}
-                  </button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                {workspaceSections.map((section) => (
+                  <div key={section.title} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
+                    <div style={{ fontSize: '9pt', fontWeight: 700 }}>{section.title}</div>
+                    <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px' }}>{section.helper}</div>
+                    <div style={{ display: 'grid', gap: '6px' }}>
+                      {section.actions.map((action) => (
+                        <a
+                          key={action.label}
+                          href={action.href}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                            textDecoration: 'none',
+                            color: '#000',
+                            border: '1px solid var(--border)',
+                            padding: '6px 8px',
+                            background: 'var(--surface)'
+                          }}
+                        >
+                          <span style={{ fontSize: '8pt', fontWeight: 600 }}>{action.label}</span>
+                          {typeof action.badge === 'number' && action.badge > 0 && (
+                            <span style={{ fontSize: '7pt', color: '#666' }}>{action.badge}</span>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
+              {focusQuery && (
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '6px' }}>Jump to a lane</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {laneFilters.filter((lane) => lane.count > 0).map((lane) => (
+                      <button
+                        key={lane.key}
+                        type="button"
+                        onClick={() => jumpToFilter(lane.key as typeof resultFilter)}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '8pt',
+                          fontWeight: 700,
+                          border: '2px solid #000',
+                          background: '#fff',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {lane.label} · {lane.count}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

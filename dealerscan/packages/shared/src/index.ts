@@ -29,6 +29,7 @@ export {
   archiveDeal,
   exportDealAsJson,
   exportDealAsCsv,
+  exportAllDealsAsJson,
   formatDealDisplayName,
   formatDocumentType,
   formatDocumentTypeSummary,

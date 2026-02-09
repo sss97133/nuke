@@ -51,14 +51,16 @@ export interface DataRoomGateProps {
 }
 
 type Step = 'identify' | 'nda';
-type IdentifyMethod = 'phone' | 'email';
+type IdentifyMethod = 'phone' | 'email' | 'password';
 
 export default function DataRoomGate({ organizationId, organizationName, onAccessGranted, onClose }: DataRoomGateProps) {
   const [user, setUser] = useState<{ id: string; email?: string; phone?: string; fullName?: string } | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [step, setStep] = useState<Step>('identify');
   const [identifyMethod, setIdentifyMethod] = useState<IdentifyMethod>('phone');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [accessCode, setAccessCode] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -79,6 +81,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
       } else {
         setUser(null);
       }
+      setAuthChecked(true);
     });
   }, []);
 
@@ -98,6 +101,47 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
       setEmailIdentifier(trimmed);
       setMessage('We’ll use this email to connect your access to an account later if you sign up.');
       setStep('nda');
+      return;
+    }
+    if (identifyMethod === 'password') {
+      const code = accessCode.trim().replace(/\D/g, '');
+      if (!code) {
+        setError('Please enter the access code you were given.');
+        return;
+      }
+      setLoading(true);
+      try {
+        let identifier = 'unknown';
+        try {
+          const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+          const j = await res.json();
+          if (j?.ip) identifier = String(j.ip);
+        } catch {
+          // use 'unknown' so RPC still enforces 2-use bucket for failed IP
+        }
+        const { data, error: rpcError } = await supabase.rpc('validate_data_room_access_code', {
+          p_organization_id: organizationId,
+          p_code: code,
+          p_identifier: identifier,
+        });
+        if (rpcError) throw new Error(rpcError.message);
+        const result = data as { ok: boolean; reason?: string } | null;
+        if (!result?.ok) {
+          if (result?.reason === 'limit_reached') {
+            setError('This code has reached its use limit. Use phone or email instead.');
+          } else {
+            setError('That code isn’t valid. Please check it and try again.');
+          }
+          return;
+        }
+        setEmailIdentifier(null);
+        setMessage('Access granted.');
+        setStep('nda');
+      } catch (err: any) {
+        setError(err?.message?.includes('limit_reached') ? 'This code has reached its use limit. Use phone or email instead.' : 'Something went wrong. Please try again.');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
     if (!phone.trim()) {
@@ -186,6 +230,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
 
   const showPhoneForm = !user && identifyMethod === 'phone';
   const showEmailForm = !user && identifyMethod === 'email';
+  const showPasswordForm = !user && identifyMethod === 'password';
 
   return (
     <div
@@ -219,6 +264,10 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
 
           {step === 'identify' && (
             <>
+              {!authChecked ? (
+                <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>Checking sign-in…</p>
+              ) : (
+                <>
               <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-muted)' }}>
                 {user ? 'Continue to NDA.' : 'Enter your phone or email to continue. We’ll use it only to connect your access to an account if you sign up.'}
               </p>
@@ -237,6 +286,13 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
                     style={{ padding: '8px 12px', fontSize: 13, background: identifyMethod === 'email' ? 'var(--grey-200)' : 'transparent', border: 'none', cursor: 'pointer', borderBottom: identifyMethod === 'email' ? '2px solid var(--accent, #3b82f6)' : '2px solid transparent', marginBottom: -1 }}
                   >
                     Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIdentifyMethod('password'); setError(null); setMessage(null); setShowOtpInput(false); }}
+                    style={{ padding: '8px 12px', fontSize: 13, background: identifyMethod === 'password' ? 'var(--grey-200)' : 'transparent', border: 'none', cursor: 'pointer', borderBottom: identifyMethod === 'password' ? '2px solid var(--accent, #3b82f6)' : '2px solid transparent', marginBottom: -1 }}
+                  >
+                    Password
                   </button>
                 </div>
               )}
@@ -296,25 +352,43 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
                         <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>We’ll only use this to link your access to an account if you sign up later. No code required.</p>
                       </div>
                     )}
+                    {showPasswordForm && (
+                      <div style={{ marginBottom: 16 }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Access code"
+                          value={accessCode}
+                          onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          maxLength={4}
+                          required
+                          style={{ width: '100%' }}
+                          autoComplete="one-time-code"
+                        />
+                        <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>Enter the code you were given. Instant access — no email or phone needed.</p>
+                      </div>
+                    )}
                   </>
                 )}
                 {message && <p style={{ color: 'var(--success)', marginBottom: 12, fontSize: 12 }}>{message}</p>}
                 {error && <p style={{ color: 'var(--error)', marginBottom: 12, fontSize: 12 }}>{error}</p>}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="submit" className="button button-primary" disabled={loading || (showEmailForm && !email.trim().includes('@'))} style={{ padding: '10px 18px' }}>
-                    {loading ? '…' : user ? 'Continue' : showOtpInput ? 'Verify' : identifyMethod === 'email' ? 'Continue with email' : 'Send code'}
+                  <button type="submit" className="button button-primary" disabled={loading || (showEmailForm && !email.trim().includes('@')) || (showPasswordForm && !accessCode.trim())} style={{ padding: '10px 18px' }}>
+                    {loading ? '…' : user ? 'Continue' : showOtpInput ? 'Verify' : identifyMethod === 'email' ? 'Continue with email' : identifyMethod === 'password' ? 'Continue with code' : 'Send code'}
                   </button>
                   {onClose && <button type="button" onClick={onClose} className="button" style={{ padding: '10px 18px' }}>Cancel</button>}
                 </div>
               </form>
+                </>
+              )}
             </>
           )}
 
           {step === 'nda' && (
             <>
-              {(user || emailIdentifier) && (
+              {(user || emailIdentifier !== undefined) && (
                 <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-muted)' }}>
-                  Access for {user ? (user.fullName || user.email || user.phone || 'you') : emailIdentifier}
+                  Access for {user ? (user.fullName || user.email || user.phone || 'you') : emailIdentifier ?? 'Visitor'}
                 </p>
               )}
               <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>Please read and agree to access the data room.</p>

@@ -9,6 +9,9 @@ import TermsOfService from '../pages/TermsOfService';
 import DataDeletion from '../pages/DataDeletion';
 import EULA from '../pages/EULA';
 
+// Search: eager import so /search always works (no lazy-chunk failure)
+import Search from '../pages/Search';
+
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
 const OrganizationRoutes = React.lazy(() => import('./modules/organization/routes'));
@@ -83,12 +86,6 @@ const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
 const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
 const DevelopersPage = React.lazy(() => import('../pages/developers'));
-const Search = React.lazy(() => import('../pages/Search').catch((error) => {
-  console.error('Failed to load Search component:', error);
-  // Return a fallback component
-  return { default: () => <div className="p-4">Search temporarily unavailable. Please refresh the page.</div> };
-}));
-
 export const DomainRoutes = () => {
   return (
     <Suspense fallback={<div className="p-4 text-center">Loading module...</div>}>

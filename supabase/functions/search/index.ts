@@ -225,7 +225,9 @@ serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const queryRaw = normalizeQuery((body as any)?.query ?? (body as any)?.q ?? "");
-    const limit = Math.max(1, Math.min(100, Number((body as any)?.limit ?? 50)));
+    const limit = Math.max(1, Math.min(100, Number((body as any)?.limit ?? 24)));
+    const userId = (body as any)?.user_id ?? null;
+    const userLocation = (body as any)?.user_location ?? null; // { lat, lng } for future ranking (e.g. near me)
 
     if (!queryRaw) {
       const empty: SearchResponse = {
@@ -749,18 +751,21 @@ serve(async (req: Request) => {
       return (typeOrder[a.type] ?? 5) - (typeOrder[b.type] ?? 5);
     });
 
-    const topCitations = results.slice(0, 6).map((r) => ({ type: r.type, id: r.id }));
+    // Return only the requested page size so the client gets a fast, focused set (e.g. 24)
+    const cappedResults = results.slice(0, limit);
+
+    const topCitations = cappedResults.slice(0, 6).map((r) => ({ type: r.type, id: r.id }));
 
     const summary = wantsImages
-      ? `Found ${results.length} results for "${queryRaw}" (images-first).`
-      : `Found ${results.length} results for "${queryRaw}".`;
+      ? `Found ${cappedResults.length} results for "${queryRaw}" (images-first).`
+      : `Found ${cappedResults.length} results for "${queryRaw}".`;
 
     const answerText = wantsImages
       ? `Showing images related to your query. Use the results to jump into the vehicle profiles, and refine by adding a part keyword (e.g. "front fender") or a date constraint ("oldest").`
       : `Showing the most relevant vehicles, organizations, and users for your query. Refine by adding a model/trim, year, or location.`;
 
     const response: SearchResponse = {
-      results,
+      results: cappedResults,
       sections,
       search_summary: summary,
       answer: {
@@ -776,6 +781,7 @@ serve(async (req: Request) => {
         wantsOldest,
         wantsNewest,
         terms,
+        user_context: userId || userLocation ? { has_user_id: !!userId, has_location: !!userLocation } : undefined,
       },
     };
 
