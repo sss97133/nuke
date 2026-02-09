@@ -13,6 +13,7 @@
     "report:make-model-stats": "tsx scripts/report-make-model-stats.ts",
     "sync:nuke-commits": "tsx scripts/sync-nuke-commits-to-org.ts",
     "migrations": "node scripts/run-migrations.cjs",
+    "test:phone-otp": "tsx scripts/test-phone-otp.ts",
     "report:vehicle-health": "node scripts/generate-vehicle-profile-data-health-report.js",
     "report:wikipedia-production": "tsx scripts/scrape-wikipedia-production.ts",
     "monitor:scrape-quality": "tsx scripts/monitor-scrape-quality.ts",
@@ -68,7 +69,7 @@
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.8.2",
-    "@mozilla/readability": "^0.5.0",
+    "@mozilla/readability": "^0.6.0",
     "@supabase/supabase-js": "^2.86.0",
     "better-sqlite3": "^12.6.2",
     "canvas": "^3.2.0",

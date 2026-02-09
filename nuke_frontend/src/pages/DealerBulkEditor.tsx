@@ -259,16 +259,27 @@ const DealerBulkEditor: React.FC = () => {
     
     setAiParsing(true);
     try {
-      // Dynamic import to avoid build errors if xlsx is not installed
-      const XLSX = await import('xlsx');
-      
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(sheet);
+        if (!data || !(data instanceof ArrayBuffer)) return;
+        const ExcelJS = (await import('exceljs')).default;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data);
+        const sheet = workbook.worksheets[0];
+        if (!sheet) return;
+        const rows: Record<string, unknown>[] = [];
+        const headerRow = sheet.getRow(1);
+        const keys = headerRow.values as (string | number | undefined)[]; // 1-indexed, [0] empty
+        const headers = (keys?.slice(1) ?? []).map((k) => String(k ?? ''));
+        sheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const values = row.values as (unknown[] | undefined);
+          const obj: Record<string, unknown> = {};
+          headers.forEach((h, i) => { obj[h] = values?.[i + 1]; });
+          rows.push(obj);
+        });
+        const json = rows;
 
         // Send to AI for parsing
         const { data: parsed, error } = await supabase.functions.invoke('parse-dealer-spreadsheet', {
@@ -292,7 +303,7 @@ const DealerBulkEditor: React.FC = () => {
         setVehicles([...vehicles, ...newVehicles]);
         alert(`Parsed ${newVehicles.length} vehicles from spreadsheet!`);
       };
-      reader.readAsBinaryString(selectedFile);
+      reader.readAsArrayBuffer(selectedFile);
     } catch (error: any) {
       alert('Failed to parse spreadsheet: ' + error.message);
     } finally {
