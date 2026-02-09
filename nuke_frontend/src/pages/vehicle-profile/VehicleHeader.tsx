@@ -231,6 +231,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const locationRef = useRef<HTMLDivElement>(null);
   const ownerClaimRef = useRef<HTMLDivElement>(null);
   const accessRef = useRef<HTMLDivElement>(null);
+  // Popover state for Year/Make/Model/Seller/Auction badges — declare before useEffect that uses them (avoid TDZ when minified).
+  const [activePopover, setActivePopover] = useState<'year' | 'make' | 'model' | 'seller' | 'auction' | null>(null);
+  const [popoverData, setPopoverData] = useState<any>(null);
+  const [popoverLoading, setPopoverLoading] = useState(false);
   const auctionCurrency = useMemo(() => {
     const v: any = vehicle as any;
     const externalListing = v?.external_listings?.[0];
@@ -635,9 +639,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [futureAuctionListing, setFutureAuctionListing] = useState<any | null>(null);
   const [showOrgInvestmentCard, setShowOrgInvestmentCard] = useState<string | null>(null);
   const [orgCardAnchor, setOrgCardAnchor] = useState<HTMLElement | null>(null);
-  const [activePopover, setActivePopover] = useState<'year' | 'make' | 'model' | 'seller' | 'auction' | null>(null);
-  const [popoverData, setPopoverData] = useState<any>(null);
-  const [popoverLoading, setPopoverLoading] = useState(false);
   const isMobile = useIsMobile();
   const titleRef = useRef<HTMLDivElement>(null);
   const sellerPopoverRef = useRef<HTMLDivElement>(null);
