@@ -445,6 +445,9 @@ N-Zero is the infrastructure layer underneath all of them.
 Every revenue stream is aligned with participant success. N-Zero earns when the ecosystem earns.
 
 ### Revenue Stream 1: Auction Lead Commission
+
+**Framework:** N-Zero is the home for buyers and the home for technicians. We are not a dealer tool—we allow dealers to participate when they're willing to operate with full transparency. The industry has long suffered from opacity and from actors who take advantage of buyers; we protect all interests through **maximum transparency**. Transparency is what lets everyone make money fairly: our system gives every price a clear *why* and every listing a clear *what needs to be fixed*, so buyers trust and sellers get paid. We want to rebuild the dealer model, especially for dealers who are struggling and ready to do it right.
+
 N-Zero's AI identifies vehicles likely to sell and matches them to the optimal auction house based on vehicle type, price tier, seller location, and platform demographics.
 
 - **Mechanism**: Commission on successful auction placements originated through N-Zero
@@ -658,18 +661,6 @@ This is not a gimmick - it is the logical extension of the platform's autonomous
 
 **The advisory board is public and transparent.** Agent reasoning, recommendations, and performance are visible. This builds trust with investors, partners, and the community - and generates a new category of operational data that feeds back into the platform.
 
-#### Strategic Network (Human)
-
-The founder maintains strategic relationships across luxury, automotive, technology, and investment domains:
-
-**Philippe Combres** - Publisher & Editor-in-Chief, L'Officiel Saint Barth (49th international edition of France's oldest fashion magazine, distributed in 30+ countries). Deep connections in the luxury/UHNW world. Saint Barthelemy is arguably the most concentrated market of collector car owners globally. Previously at Universal Music. Strategic value: access to the ultra-high-net-worth collector demographic through luxury media channels.
-
-**Scott Goldfarb** - Owner, Goldfarb & Associates, Inc. (Rockville, MD). Leading global supplier of diesel injection pumps, injectors, and turbocharger cores. Active angel investor (PitchBook, CB Insights profiles). 25+ years in automotive aftermarket. Strategic value: deep automotive supply chain expertise, parts marketplace domain knowledge, and angel investment experience.
-
-**Gerard Lopez** - Co-founder of Genii Capital and Mangrove Capital Partners. Early investor in Skype (part of $2.6B exit to eBay, 2005). Former President of Lotus F1 Team (2009-2015). Owner of FC Girondins de Bordeaux and Boavista FC. Founder of Nekton (energy investments) and The Lydian Group (digital assets, 2022). Known collector: 1955 Mercedes-Benz 300SL Gullwing, 1961 Ferrari 250 GT SWB California Spider, 1937 Bugatti Type 57SC Atlantic. Described by Roarington as "a ravenous collector." Strategic value: proven tech investor, motorsport data expertise, world-class collector, digital assets experience relevant to N-Zero's prediction market and derivatives ambitions.
-
-**Josh Harris** - Internet pioneer. Founder of Jupiter Communications and Pseudo.com (first internet television network). Subject of Sundance Grand Jury Prize-winning documentary *We Live in Public* (dir. Ondi Timoner, 2009). Called "The Warhol of the Web" by Time magazine. In the late 1990s, Harris predicted with uncanny accuracy that people would voluntarily trade privacy for connection and value - a prediction that manifested as Facebook, YouTube, and the modern data economy. Harris demonstrated that continuous data streaming creates commercial value, that surveillance becomes normalized when the value proposition is clear, and that behavioral prediction is the ultimate product of data infrastructure. These are the foundational principles N-Zero applies to collector vehicles. Strategic value: conceptual alignment, tech history credibility, and a philosophical framework for why data infrastructure platforms succeed.
-
 #### Key Hire: Co-Founder / CTO
 
 The single most important near-term hire is a technical co-founder or CTO who can:
@@ -812,6 +803,67 @@ All 768K vehicles have been built entirely from freely available public data sou
 | **Regulatory & Legal** | $300,000 | 15% | SEC registration (Form D for derivative market), CFTC DCM application (prediction market), corporate counsel, IP/trademark protection (N-Zero, YONO, Nuke) |
 | **Revenue Launch** | $300,000 | 15% | API monetization infrastructure, first enterprise sales hires, partnership development with auction houses and dealers, initial go-to-market |
 | **Operations & Buffer** | $200,000 | 10% | Office/workspace, insurance, accounting, travel for partnerships, 6-month emergency buffer at current burn |
+
+#### Detailed allocation (how the money is spent)
+
+**1. Co-Founder + Key Hires ($800,000)**  
+- **Technical co-founder/CTO (priority #1):** Cash comp $180–220K/year over the funding period; equity grant per board approval. Expected hire within 0–6 months. Covers architectural ownership, engineering leadership, and key-person risk reduction.  
+- **Engineer 1 (backend/platform):** $140–170K/year; target hire in months 1–3. Owns API scaling, database performance, and production reliability.  
+- **Engineer 2 (ML/B2B or full-stack):** $120–150K/year; target hire in months 6–9. Focus on valuation/ML pipeline, B2B integration, or frontend depending on CTO roadmap.  
+- **Payroll taxes, benefits, and employer costs:** ~18–22% of wages over the period.  
+- **Recruiting:** Contingency for retained search or signing incentives ($15–30K) if needed to close CTO.  
+
+**2. Infrastructure & Scaling ($400,000)**  
+- **Database and compute:** Read replicas, connection pooling, and compute scaling for 10x current traffic; estimated $40–80K over 18 months.  
+- **Storage:** Capacity for 100M+ images and growing observation/audit data; estimated $25–50K.  
+- **API and edge:** Rate limiting, usage metering, and edge capacity for B2B and public API; estimated $30–60K.  
+- **Monitoring, observability, and security:** Logging, alerting, incident response, and security tooling; estimated $40–80K.  
+- **Uptime and reliability:** Backups, disaster recovery, load testing, and hardening; estimated $30–50K.  
+- **Contingency:** Remainder reserved for unexpected scaling (e.g., new data partnerships, traffic spikes).  
+
+**3. Regulatory & Legal ($300,000)**  
+- **SEC:** Form D and any registration or exemption work for derivative/asset market initiatives; estimated $35–75K.  
+- **CFTC:** Designated Contract Market (DCM) application and ongoing compliance for prediction market; estimated $100–180K (phased over 18–24 months).  
+- **Corporate counsel:** Retainer for corporate, contracts, and governance; estimated $4–8K/month over the period ($72–144K).  
+- **IP and trademarks:** USPTO filings and enforcement for N-Zero, YONO, Nuke; estimated $8–20K.  
+
+**4. Revenue Launch ($300,000)**  
+- **API monetization build:** Billing, usage metering, customer dashboards, and tiered access; estimated $40–80K.  
+- **First enterprise/sales capacity:** One full-time or fractional enterprise/sales hire (or equivalent in contract); estimated $90–140K over 12–18 months.  
+- **Partnership development:** Travel, events, and structured outreach to auction houses, dealers, and insurers; estimated $40–70K.  
+- **Go-to-market:** Collateral, trials, demos, and initial marketing; estimated $25–50K.  
+
+**5. Operations & Buffer ($200,000)**  
+- **Office/workspace:** Co-working or small dedicated space; estimated $1.5–2.5K/month over 18 months ($27–45K).  
+- **Insurance:** D&O, E&O, general liability; estimated $15–35K.  
+- **Accounting, payroll, and compliance:** Monthly bookkeeping, payroll, and year-end/tax; estimated $3–5K/month ($54–90K).  
+- **Travel and misc. operations:** Partnership travel, conferences, and operational contingencies; estimated $20–40K.  
+- **Emergency buffer:** 6-month runway at current burn held in reserve; remainder of category.  
+
+Spending is phased to match hiring and milestones; the largest outlays (personnel and legal) are timed to board-approved hiring and regulatory steps. No single category is a black box—each has defined line items and ranges so investors can see exactly how the capital is deployed.
+
+#### Operational priorities: what we're actually buying
+
+**1. Turning on the machines: extraction + storage + security**  
+Compute (cloud vs. own), storage for 100M+ images, securing data. Cloud: ~$8–20K/mo at 3–5x extraction; own metal $30–80K upfront. Storage **$25–50K**; securing data **$15–35K**.
+
+**2. Training proprietary models**  
+GPU/training on our data: **$25–75K** (up to **$50–100K** for larger retrains). Data pipeline **$10–25K**.
+
+**3. Co-founder and team**  
+Security blanket + attract the right co-founder (passionate, tech insider, spokesperson). Lean in the meantime (interns, contractors). Reserve to close when the right person appears.
+
+**4. SEC & legal**  
+**$300K** (SEC, CFTC DCM, counsel, IP).
+
+**5. API monetization**  
+Billing, dashboard, tiers. **$50–100K**. Remainder → organic growth.
+
+**6. Organic growth and partnerships**  
+Travel ($15–35K), press/events/influencer ($25–55K), creative-space partnerships ($40–90K), proof by doing—buy/sell cars, workspace ($30–60K). Fun builds: some are $300–400K; we get **sponsors** (parts brands, dealers, collectors) to back them—like YC backs startups. We curate + catalyst ($40–80K/build); sponsors carry the rest. Builders adopt the tech.
+
+**7. Reserve and buffer**  
+Runway to build in peace; spend wisely, not "use it or lose it" on hires we don't yet need.
 
 ### Why Now?
 

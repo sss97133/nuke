@@ -54,6 +54,8 @@ serve(async (req) => {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/import-classic-auction';
         } else if (url.includes('collectingcars.com')) {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-collecting-cars';
+        } else if (url.includes('barnfinds.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-barn-finds-listing';
         } else if (url.includes('craigslist.org')) {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-craigslist';
         } else {

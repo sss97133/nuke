@@ -12,6 +12,7 @@
 | **PCarMarket**| —                | *none*    | same                                    |
 | **Craigslist**| —                | *none*    | same                                    |
 | **Classic.com** | —              | *none*    | same                                    |
+| **Barn Finds**  | —              | *none*    | discovery + extractor wired; no org target yet |
 
 ## Live auction monitoring (doc)
 

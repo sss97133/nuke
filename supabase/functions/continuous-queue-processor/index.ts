@@ -74,6 +74,12 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     minDelay: 1500,
     maxDelay: 3000,
   },
+  barnfinds: {
+    pattern: "%barnfinds.com%",
+    extractor: "extract-barn-finds-listing",
+    minDelay: 1000,
+    maxDelay: 2000,
+  },
 };
 
 function randomDelay(minMs: number, maxMs: number): Promise<void> {
@@ -89,6 +95,7 @@ function detectSource(url: string): string | null {
   if (url.includes("pcarmarket.com")) return "pcarmarket";
   if (url.includes("hagerty.com")) return "hagerty";
   if (url.includes("classic.com")) return "classic";
+  if (url.includes("barnfinds.com")) return "barnfinds";
   return null;
 }
 
