@@ -950,12 +950,28 @@ export default function OrganizationProfile() {
       return;
     }
 
-    // Prevent PostgREST 400 spam when route params are malformed (e.g. "undefined", "null", etc.).
+    // If param is not a UUID, try loading by slug (e.g. /org/nuke-ltd) then redirect to canonical /org/<id>
     if (!isUuid(organizationId)) {
+      const slug = organizationId.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (!slug) {
+        setLoadError('Organization not found.');
+        setLoading(false);
+        return;
+      }
+      const { data: bySlug } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (bySlug?.id) {
+        navigate(`/org/${bySlug.id}`, { replace: true });
+        return;
+      }
+      setLoadError('Organization not found.');
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
       setLoadError(null);
@@ -1043,12 +1059,12 @@ export default function OrganizationProfile() {
           }
         } catch (error) {
           // Error loading organization intelligence - use defaults
-          // Fallback to default tabs
           setTabs([
             { id: 'overview', priority: 100, label: 'Overview' },
             { id: 'vehicles', priority: 80, label: 'Vehicles' },
             { id: 'images', priority: 70, label: 'Images' },
             { id: 'inventory', priority: 60, label: 'Inventory' },
+            { id: 'offering', priority: 57, label: 'Offering' },
             { id: 'legal', priority: 55, label: 'Legal & SEC' },
             { id: 'contributors', priority: 50, label: 'Contributors' },
             { id: 'marketplace', priority: 40, label: 'Marketplace' },
@@ -2126,8 +2142,8 @@ export default function OrganizationProfile() {
               ))}
             </div>
 
-            {/* Investor materials / Data room CTA — same concept for all orgs: more data = richer deck */}
-            {tabs.some(t => t.id === 'offering') && organization && organizationId && (
+            {/* Business docs for advisors / investment board — always visible on org overview */}
+            {organization && organizationId && (
               <div style={{
                 marginBottom: '16px',
                 padding: '16px 20px',
@@ -2142,10 +2158,10 @@ export default function OrganizationProfile() {
               }}>
                 <div>
                   <div style={{ fontSize: '11pt', fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-                    Investor materials
+                    Business docs for investment board
                   </div>
                   <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                    Confidential deck, business plan, and data room. Authorization and NDA required.
+                    Deck, business plan, data room — what advisors need to show the board.
                   </div>
                 </div>
                 <button
@@ -2168,7 +2184,7 @@ export default function OrganizationProfile() {
                     cursor: 'pointer',
                   }}
                 >
-                  {isOwner || dataRoomAccessGranted ? 'View data room' : 'Request access'}
+                  {isOwner || dataRoomAccessGranted ? 'View business docs' : 'Request access'}
                 </button>
               </div>
             )}
