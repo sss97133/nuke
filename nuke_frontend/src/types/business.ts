@@ -19,6 +19,7 @@ export type BusinessType =
   | 'fabrication'
   | 'racing_team'
   | 'auction_house'
+  | 'developer'
   | 'other';
 
 export type BusinessStatus = 
@@ -454,6 +455,7 @@ export const BUSINESS_TYPES: { value: BusinessType; label: string }[] = [
   { value: 'fabrication', label: 'Fabrication Shop' },
   { value: 'racing_team', label: 'Racing Team' },
   { value: 'auction_house', label: 'Auction House' },
+  { value: 'developer', label: 'Developer' },
   { value: 'sole_proprietorship', label: 'Sole Proprietorship' },
   { value: 'partnership', label: 'Partnership' },
   { value: 'llc', label: 'LLC' },

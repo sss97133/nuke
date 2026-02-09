@@ -37,6 +37,9 @@ function toFriendlyError(raw: string | undefined): string {
   if (lower.includes('phone') && (lower.includes('invalid') || lower.includes('not supported'))) {
     return 'We couldn’t send a code to that number. Please try your email instead.';
   }
+  if (lower.includes('otp') && (lower.includes('provider') || lower.includes('twilio') || lower.includes('authenticate') || lower.includes('20003'))) {
+    return 'We can’t send text codes right now. Please use your email instead to continue.';
+  }
   return 'Something went wrong. Please try again or use your email instead.';
 }
 

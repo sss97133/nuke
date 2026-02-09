@@ -279,6 +279,7 @@ export default function OrganizationProfile() {
     if (v === 'restoration_shop') return 'Restoration Shop';
     if (v === 'performance_shop') return 'Performance Shop';
     if (v === 'garage') return 'Garage';
+    if (v === 'developer') return 'Developer';
     if (v === 'other') return 'Other';
     return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
@@ -1838,20 +1839,21 @@ export default function OrganizationProfile() {
     }
   }, [loading, organizationId]);
 
-  // Fetch extraction coverage for BAT – poll so numbers update in real time as we scrape
+  // Fetch extraction coverage for this org (BAT, C&B, Craigslist, etc.) – poll so numbers update in real time
   useEffect(() => {
-    if (organizationId !== BAT_ORG_ID) {
+    if (!organizationId) {
       setExtractionCoverage(null);
       return;
     }
     let cancelled = false;
     const load = async () => {
       try {
-        const url = `${SUPABASE_URL}/functions/v1/org-extraction-coverage?org_id=${encodeURIComponent(BAT_ORG_ID)}`;
+        const url = `${SUPABASE_URL}/functions/v1/org-extraction-coverage?org_id=${encodeURIComponent(organizationId)}`;
         const res = await fetch(url, { headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as OrgExtractionCoverage;
-        if (!cancelled && data?.org_id) setExtractionCoverage(data);
+        if (!cancelled && data?.org_id && (data.extracted != null || data.target != null)) setExtractionCoverage(data);
+        else if (!cancelled) setExtractionCoverage(null);
       } catch {
         if (!cancelled) setExtractionCoverage(null);
       }

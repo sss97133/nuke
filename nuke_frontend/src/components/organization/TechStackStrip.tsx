@@ -1,5 +1,5 @@
 /**
- * Tech stack for investor teaser page one: logos (Simple Icons) + labels.
+ * Tech stack for investor teaser: icons only (black), name on hover.
  * CDN: https://cdn.simpleicons.org/<slug>
  */
 
@@ -16,6 +16,15 @@ const STACK: { slug: string; name: string }[] = [
   { slug: 'deno', name: 'Deno' },
   { slug: 'pytorch', name: 'PyTorch' },
   { slug: 'vercel', name: 'Vercel' },
+  { slug: 'openai', name: 'OpenAI' },
+  { slug: 'anthropic', name: 'Anthropic' },
+  { slug: 'docker', name: 'Docker' },
+  { slug: 'telegram', name: 'Telegram' },
+  { slug: 'ollama', name: 'Ollama' },
+  { slug: 'modal', name: 'Modal' },
+  { slug: 'cursor', name: 'Cursor' },
+  { slug: 'firecrawl', name: 'Firecrawl' },
+  { slug: 'x', name: 'Grok (xAI)' },
 ];
 
 const ICON_SIZE = 28;
@@ -43,10 +52,10 @@ export default function TechStackStrip() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 8,
+              justifyContent: 'center',
+              width: ICON_SIZE,
+              height: ICON_SIZE,
               color: 'var(--text)',
-              fontSize: '9pt',
-              fontWeight: 500,
             }}
           >
             <img
@@ -54,9 +63,14 @@ export default function TechStackStrip() {
               alt=""
               width={ICON_SIZE}
               height={ICON_SIZE}
-              style={{ display: 'block', flexShrink: 0 }}
+              style={{
+                display: 'block',
+                width: ICON_SIZE,
+                height: ICON_SIZE,
+                objectFit: 'contain',
+                filter: 'brightness(0)',
+              }}
             />
-            <span>{name}</span>
           </span>
         ))}
       </div>
