@@ -21,11 +21,13 @@ export {
   getDeals,
   getDeal,
   getDealPages,
+  getDealExternalImages,
   getDocumentTypeCountsForUser,
   uploadAndExtract,
   updatePageReview,
   getPageSignedUrl,
   mergeDeal,
+  connectPhotos,
   archiveDeal,
   exportDealAsJson,
   exportDealAsCsv,
@@ -34,6 +36,7 @@ export {
   formatDocumentType,
   formatDocumentTypeSummary,
 } from './services/extractionService'
+export type { DealExternalImage } from './services/extractionService'
 
 export {
   createCheckout,

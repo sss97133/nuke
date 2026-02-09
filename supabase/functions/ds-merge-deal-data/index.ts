@@ -19,6 +19,8 @@ const MERGE_PRIORITY: Record<string, string[]> = {
   owner_names: ['title'],
   title_number: ['title'],
   stock_number: ['cost_sheet', 'buyers_order'],
+  vlva: ['cost_sheet', 'buyers_order', 'title'],
+  company_serial: ['cost_sheet', 'buyers_order'],
   deal_date: ['buyers_order', 'bill_of_sale', 'cost_sheet'],
   odometer: ['odometer_disclosure', 'title', 'repair_order'],
 }
@@ -124,9 +126,18 @@ serve(async (req) => {
     if (allExtracted && !anyNeedsReview && !hasConflicts) dealStatus = 'completed'
     else if (allExtracted) dealStatus = 'review'
 
-    // Update deal
+    // Auto-name folder/deal: Year Make Model · company serial (VLVA) or VIN
+    const ymm = [merged.year, merged.make, merged.model].filter(Boolean).join(' ').trim()
+    const serial = (merged.vlva || merged.stock_number || merged.company_serial || '').toString().trim()
+    const vin = (merged.vin || '').toString().trim()
+    const idPart = serial || vin
+    const dealName =
+      ymm && idPart ? `${ymm} · ${idPart}` : ymm || idPart || null
+
+    // Update deal (including auto-renamed deal_name for folder display)
     await supabase.from('ds_deals').update({
       merged_data: { ...merged, _conflicts: conflicts },
+      deal_name: dealName,
       vin: merged.vin || null,
       year: merged.year || null,
       make: merged.make || null,

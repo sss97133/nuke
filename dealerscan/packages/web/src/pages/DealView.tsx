@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getDeal, getDealPages, mergeDeal, getPageSignedUrl, exportDealAsJson, exportDealAsCsv, archiveDeal, formatDealDisplayName, formatDocumentTypeSummary } from '@dealerscan/shared'
-import type { Deal, DocumentPage } from '@dealerscan/shared'
+import { getDeal, getDealPages, getDealExternalImages, mergeDeal, getPageSignedUrl, exportDealAsJson, exportDealAsCsv, archiveDeal, formatDealDisplayName, formatDocumentTypeSummary } from '@dealerscan/shared'
+import type { Deal, DocumentPage, DealExternalImage } from '@dealerscan/shared'
 import { FileText, Download, AlertCircle, CheckCircle, Clock, Loader2, Eye, Archive, RefreshCw, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -12,13 +12,14 @@ export default function DealView() {
   const navigate = useNavigate()
   const [deal, setDeal] = useState<Deal | null>(null)
   const [pages, setPages] = useState<DocumentPage[]>([])
+  const [externalImages, setExternalImages] = useState<DealExternalImage[]>([])
   const [loading, setLoading] = useState(true)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!id) return
-    Promise.all([getDeal(id), getDealPages(id)])
-      .then(([d, p]) => { setDeal(d); setPages(p) })
+    Promise.all([getDeal(id), getDealPages(id), getDealExternalImages(id)])
+      .then(([d, p, ext]) => { setDeal(d); setPages(p); setExternalImages(ext) })
       .finally(() => setLoading(false))
   }, [id])
 
@@ -80,10 +81,11 @@ export default function DealView() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">
-            {formatDealDisplayName(deal, pages.length)}
+            {formatDealDisplayName(deal, pages.length + externalImages.length)}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             {pages.length} file{pages.length !== 1 ? 's' : ''}
+            {externalImages.length > 0 && ` · ${externalImages.length} connected photo${externalImages.length !== 1 ? 's' : ''}`}
             {docSummary ? ` · ${docSummary}` : ''}
             {' · '}{deal.pages_extracted} extracted
             {deal.pages_needing_review > 0 && (
@@ -143,6 +145,27 @@ export default function DealView() {
         </div>
 
         <div className="lg:col-span-2">
+          {externalImages.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">Connected photos</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {externalImages.map((img) => (
+                  <a
+                    key={img.id}
+                    href={img.image_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition-colors block"
+                  >
+                    <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+                      <img src={img.image_url} className="w-full h-full object-cover" alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    </div>
+                    <p className="p-2 text-xs text-gray-500 truncate">#{img.page_number}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Document Pages</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {pages.map(page => (

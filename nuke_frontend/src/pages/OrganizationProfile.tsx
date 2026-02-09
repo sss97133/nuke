@@ -2102,9 +2102,10 @@ export default function OrganizationProfile() {
               marginBottom: '16px',
             }}>
               {[
-                { label: 'Vehicles', value: (organization?.total_vehicles != null && organization.total_vehicles > 0) ? organization.total_vehicles : vehicles.length },
-                { label: 'Images', value: (organization?.total_images != null && organization.total_images > 0) ? organization.total_images : images.length },
-                { label: 'Events', value: (organization?.total_events != null && organization.total_events > 0) ? organization.total_events : timelineEvents.length },
+                // Stats always from DB (businesses.total_*), never from loaded list length
+                { label: 'Vehicles', value: organization?.total_vehicles ?? 0 },
+                { label: 'Images', value: organization?.total_images ?? 0 },
+                { label: 'Events', value: organization?.total_events ?? 0 },
                 ...(organization.estimated_value || organization.current_value ? [{
                   label: 'Est. Value',
                   value: formatUsd(organization.estimated_value || organization.current_value || 0),
@@ -2772,7 +2773,7 @@ export default function OrganizationProfile() {
         {activeTab === 'images' && (
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Images ({images.length})</span>
+              <span>Images ({organization?.total_images != null ? organization.total_images.toLocaleString() : images.length})</span>
               {(canEdit || isOwner) && (
                 <button
                   onClick={() => imageInputRef.current?.click()}

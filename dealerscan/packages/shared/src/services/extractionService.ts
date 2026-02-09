@@ -1,7 +1,18 @@
 import { getSupabase, getSupabaseUrl } from '../lib/supabase'
 import type { Deal, DocumentPage, ExtractionResult } from '../types'
 
-/** Full display name for a deal jacket: Year Make Model + VIN when available, so the row is clearly named. */
+/** Company serial / ID used for folder naming (e.g. VLVA, stock number). Prefer from merged_data. */
+function getDealSerial(deal: Deal): string {
+  const merged = deal.merged_data as Record<string, unknown> | undefined
+  const raw =
+    (merged?.vlva as string) ??
+    (merged?.stock_number as string) ??
+    (merged?.company_serial as string) ??
+    ''
+  return String(raw ?? '').trim()
+}
+
+/** Full display name for a deal jacket: Year Make Model · company serial (e.g. VLVA) or VIN. Used for UI and folder naming. */
 export function formatDealDisplayName(deal: Deal, totalDocs?: number): string {
   const merged = deal.merged_data as Record<string, unknown> | undefined
   const ymm =
@@ -9,10 +20,12 @@ export function formatDealDisplayName(deal: Deal, totalDocs?: number): string {
     (merged?.year || merged?.make || merged?.model
       ? [merged.year, merged.make, merged.model].filter(Boolean).join(' ').trim()
       : '')
+  const serial = getDealSerial(deal)
   const vin = (deal.vin || (merged?.vin as string) || '').trim()
-  if (ymm && vin) return `${ymm} · ${vin}`
+  const idPart = serial || vin
+  if (ymm && idPart) return `${ymm} · ${idPart}`
   if (ymm) return ymm
-  if (vin) return vin
+  if (idPart) return idPart
   if (deal.deal_name?.trim()) return deal.deal_name.trim()
   const n = totalDocs ?? deal.total_pages ?? 0
   return n > 0 ? `${n} deal jacket${n === 1 ? '' : 's'}` : 'Deal jacket'
@@ -82,6 +95,25 @@ export async function getDealPages(dealId: string): Promise<DocumentPage[]> {
   const { data, error } = await supabase
     .from('ds_document_pages')
     .select('*')
+    .eq('deal_id', dealId)
+    .order('page_number', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export interface DealExternalImage {
+  id: string
+  deal_id: string
+  image_url: string
+  page_number: number
+}
+
+export async function getDealExternalImages(dealId: string): Promise<DealExternalImage[]> {
+  const supabase = getSupabase()
+  const { data, error } = await supabase
+    .from('ds_deal_external_images')
+    .select('id, deal_id, image_url, page_number')
     .eq('deal_id', dealId)
     .order('page_number', { ascending: true })
 
@@ -211,6 +243,32 @@ export async function mergeDeal(dealId: string): Promise<any> {
 
   if (!resp.ok) throw new Error('Merge failed')
   return await resp.json()
+}
+
+/** Connect external photo URLs to a deal (reference-only; no download). Creates a new deal if dealId omitted. */
+export async function connectPhotos(
+  urls: string[],
+  dealId?: string
+): Promise<{ deal_id: string }> {
+  const supabase = getSupabase()
+  const SUPABASE_URL = getSupabaseUrl()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not authenticated')
+
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/ds-connect-photos`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ urls, deal_id: dealId ?? undefined }),
+  })
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}))
+    throw new Error(err.error || 'Connect photos failed')
+  }
+  return resp.json()
 }
 
 export async function archiveDeal(dealId: string): Promise<void> {
