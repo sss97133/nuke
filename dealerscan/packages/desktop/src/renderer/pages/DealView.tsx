@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getDeal, getDealPages, mergeDeal, getPageSignedUrl, exportDealAsJson, exportDealAsCsv, archiveDeal } from '@dealerscan/shared'
+import { getDeal, getDealPages, mergeDeal, getPageSignedUrl, exportDealAsJson, exportDealAsCsv, archiveDeal, formatDealDisplayName, formatDocumentTypeSummary } from '@dealerscan/shared'
 import type { Deal, DocumentPage } from '@dealerscan/shared'
 import { FileText, Download, AlertCircle, CheckCircle, Clock, Loader2, Eye, Archive, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -50,7 +50,7 @@ export default function DealView() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${deal.deal_name || deal.vin || 'deal'}.${format}`
+    a.download = `${formatDealDisplayName(deal, pages.length).replace(/[^\w\s-]/g, '') || 'deal'}.${format}`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -66,18 +66,26 @@ export default function DealView() {
 
   const merged = deal.merged_data || {}
   const conflicts = merged._conflicts || {}
+  const docByType: Record<string, number> = {}
+  pages.forEach(p => {
+    const t = (p.document_type || 'document').trim() || 'document'
+    docByType[t] = (docByType[t] || 0) + 1
+  })
+  const docSummary = formatDocumentTypeSummary(docByType)
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 mt-12">
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">
-            {deal.deal_name || `${deal.year || ''} ${deal.make || ''} ${deal.model || ''}`.trim() || 'Untitled Deal'}
+            {formatDealDisplayName(deal, pages.length)}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            {deal.total_pages} pages - {deal.pages_extracted} extracted
+            {pages.length} file{pages.length !== 1 ? 's' : ''}
+            {docSummary ? ` · ${docSummary}` : ''}
+            {' · '}{deal.pages_extracted} extracted
             {deal.pages_needing_review > 0 && (
-              <span className="text-amber-600"> - {deal.pages_needing_review} need review</span>
+              <span className="text-amber-600"> · {deal.pages_needing_review} need review</span>
             )}
           </p>
         </div>

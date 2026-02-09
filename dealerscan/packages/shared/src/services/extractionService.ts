@@ -1,6 +1,40 @@
 import { getSupabase, getSupabaseUrl } from '../lib/supabase'
 import type { Deal, DocumentPage, ExtractionResult } from '../types'
 
+/** Display name: prefer Year Make Model, then deal_name, then "N deal jackets" so we never show "Untitled Deal". */
+export function formatDealDisplayName(deal: Deal, totalDocs?: number): string {
+  const ymm = [deal.year, deal.make, deal.model].filter(Boolean).join(' ').trim()
+  if (ymm) return ymm
+  const merged = deal.merged_data as Record<string, unknown> | undefined
+  if (merged?.year || merged?.make || merged?.model) {
+    const mergedYmm = [merged.year, merged.make, merged.model].filter(Boolean).join(' ').trim()
+    if (mergedYmm) return mergedYmm
+  }
+  if (deal.deal_name?.trim()) return deal.deal_name.trim()
+  const n = totalDocs ?? deal.total_pages ?? 0
+  return n > 0 ? `${n} deal jacket${n === 1 ? '' : 's'}` : 'Deal jacket'
+}
+
+/** Human-readable document type label (e.g. bill_of_sale → Bill of sale). */
+export function formatDocumentType(type: string): string {
+  return type
+    .split(/[_\s]+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
+
+/** Summary string for doc types: "Title (1), Bill of sale (2), Receipt (3)". Omit when only generic "document". */
+export function formatDocumentTypeSummary(byType: Record<string, number>): string {
+  const keys = Object.keys(byType).filter(k => (byType[k] || 0) > 0)
+  const onlyGeneric = keys.length === 1 && (keys[0] || 'document').toLowerCase() === 'document'
+  if (onlyGeneric) return ''
+  const entries = Object.entries(byType)
+    .filter(([, count]) => count > 0)
+    .map(([type, count]) => `${formatDocumentType(type || 'document')} (${count})`)
+    .sort()
+  return entries.join(', ')
+}
+
 export async function createDeal(dealName?: string): Promise<Deal> {
   const supabase = getSupabase()
   const { data: { user } } = await supabase.auth.getUser()
@@ -50,6 +84,30 @@ export async function getDealPages(dealId: string): Promise<DocumentPage[]> {
 
   if (error) throw new Error(error.message)
   return data || []
+}
+
+/** Document type counts per deal (for dashboard: "Title (1), Bill of sale (2), Receipt (3)"). */
+export async function getDocumentTypeCountsForUser(): Promise<Record<string, { total: number; byType: Record<string, number> }>> {
+  const supabase = getSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return {}
+
+  const { data: rows, error } = await supabase
+    .from('ds_document_pages')
+    .select('deal_id, document_type')
+    .eq('user_id', user.id)
+
+  if (error) return {}
+
+  const out: Record<string, { total: number; byType: Record<string, number> }> = {}
+  for (const row of rows || []) {
+    const id = row.deal_id
+    if (!out[id]) out[id] = { total: 0, byType: {} }
+    out[id].total += 1
+    const type = (row.document_type || 'document').trim() || 'document'
+    out[id].byType[type] = (out[id].byType[type] || 0) + 1
+  }
+  return out
 }
 
 export async function uploadAndExtract(

@@ -9,12 +9,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
  *   - Collecting Cars: Uses Typesense API (public API key)
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
+ *   - PCarMarket, Mecum, Barrett-Jackson, RM Sotheby's, Gooding, Bonhams: Firecrawl scrape + extract
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
  *
  * Usage:
  *   POST {"action": "sync"}                      - sync all platforms
- *   POST {"action": "sync", "platform": "bat"}   - sync specific platform
+ *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams)
  *   POST {"action": "status"}                    - get current live auction stats
  */
 
@@ -278,6 +279,204 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
 }
 
 // ============================================
+// Shared: Firecrawl scrape + extract live auctions from listing pages
+// ============================================
+
+const LIVE_AUCTIONS_EXTRACT_SCHEMA = {
+  type: "object",
+  properties: {
+    auctions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "Full URL to the auction/lot page" },
+          title: { type: "string", description: "Vehicle or lot title" },
+        },
+        required: ["url", "title"],
+      },
+    },
+  },
+  required: ["auctions"],
+};
+
+async function syncViaFirecrawlExtract(
+  platform: string,
+  discoveryUrl: string,
+  urlPattern: RegExp,
+  options: { useProxy?: boolean; waitFor?: number } = {}
+): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  try {
+    console.log(`[sync-live-auctions] Fetching ${platform} live auctions from ${discoveryUrl}...`);
+
+    const result = await firecrawlScrape(
+      {
+        url: discoveryUrl,
+        formats: ["markdown", "html"],
+        onlyMainContent: false,
+        waitFor: options.waitFor ?? 4000,
+        ...(options.useProxy ? { proxy: "stealth" as const } : {}),
+        actions: [
+          { type: "scroll", direction: "down", pixels: 2000 },
+          { type: "wait", milliseconds: 1500 },
+          { type: "scroll", direction: "down", pixels: 2000 },
+          { type: "wait", milliseconds: 1000 },
+        ],
+        extract: {
+          schema: LIVE_AUCTIONS_EXTRACT_SCHEMA,
+          prompt:
+            "List every currently live auction or lot on this page. For each one extract the full URL to the lot/auction page and the vehicle or lot title. Only include live/current auctions or lots that can be bid on, not past sales or closed listings.",
+        },
+      },
+      { timeoutMs: 60000, maxAttempts: 2 }
+    );
+
+    if (!result.success && !result.data.html && !result.data.markdown) {
+      return { auctions: [], error: `Firecrawl failed: ${result.error || "No content"}` };
+    }
+
+    const extract = result.data.extract ?? result.raw?.data?.extract;
+    let auctions: { url: string; title: string }[] = [];
+
+    if (extract?.auctions && Array.isArray(extract.auctions)) {
+      auctions = extract.auctions.filter(
+        (a: any) => a?.url && a?.title && urlPattern.test(String(a.url))
+      );
+    }
+
+    if (auctions.length === 0) {
+      const html = result.data.html || result.data.markdown || "";
+      const hrefRegex = /href=["'](https?:\/\/[^"'\s]+)["']/gi;
+      const seen = new Set<string>();
+      let m;
+      while ((m = hrefRegex.exec(html)) !== null) {
+        const u = m[1].replace(/#.*$/, "").replace(/\?.*$/, "").trim();
+        if (urlPattern.test(u) && !seen.has(u)) {
+          seen.add(u);
+          auctions.push({ url: u, title: "" });
+        }
+      }
+      for (const a of auctions) {
+        if (!a.title) {
+          const yearMatch = a.url.match(/(\d{4})/);
+          a.title = yearMatch ? `${yearMatch[1]} Vehicle` : "Auction Lot";
+        }
+      }
+    }
+
+    const liveAuctions: LiveAuction[] = auctions.map((a) => {
+      const url = a.url.replace(/\/$/, "");
+      const titleParts = (a.title || "").trim().split(/\s+/);
+      const yearMatch = (a.title || "").match(/^(\d{4})\s+/);
+      const year = yearMatch ? parseInt(yearMatch[1]) : null;
+      const make = titleParts[0] || null;
+      const model = titleParts.slice(1).join(" ") || null;
+      const externalId = url.split("/").filter(Boolean).pop() || url;
+      return {
+        url,
+        title: a.title || externalId,
+        platform,
+        auction_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        current_bid: null,
+        bid_count: null,
+        no_reserve: false,
+        reserve_met: null,
+        year,
+        make,
+        model,
+        thumbnail_url: null,
+        external_id: externalId,
+        raw_data: { source: "firecrawl_extract", synced_at: new Date().toISOString() },
+      };
+    });
+
+    console.log(`[sync-live-auctions] ${platform}: Found ${liveAuctions.length} live auctions`);
+    return { auctions: liveAuctions, error: null };
+  } catch (e: unknown) {
+    const error = e instanceof Error ? e.message : String(e);
+    return { auctions: [], error: `${platform} sync failed: ${error}` };
+  }
+}
+
+// ============================================
+// PCarMarket Sync (Firecrawl)
+// ============================================
+
+async function syncPCarMarket(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  return syncViaFirecrawlExtract(
+    "pcarmarket",
+    "https://www.pcarmarket.com/listings/",
+    /pcarmarket\.com\/auction\//i,
+    { waitFor: 5000 }
+  );
+}
+
+// ============================================
+// Mecum Sync (Firecrawl, stealth proxy for Cloudflare)
+// ============================================
+
+async function syncMecum(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  return syncViaFirecrawlExtract(
+    "mecum",
+    "https://www.mecum.com/lots/",
+    /mecum\.com\/lots\//i,
+    { useProxy: true, waitFor: 5000 }
+  );
+}
+
+// ============================================
+// Barrett-Jackson Sync (Firecrawl, stealth proxy)
+// ============================================
+
+async function syncBarrettJackson(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  return syncViaFirecrawlExtract(
+    "barrett-jackson",
+    "https://www.barrett-jackson.com/Events/",
+    /barrett-jackson\.com\//i,
+    { useProxy: true, waitFor: 5000 }
+  );
+}
+
+// ============================================
+// RM Sotheby's Sync (Firecrawl)
+// ============================================
+
+async function syncRMSothebys(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  return syncViaFirecrawlExtract(
+    "rm-sothebys",
+    "https://rmsothebys.com/en/auctions",
+    /rmsothebys\.com\//i,
+    { waitFor: 4000 }
+  );
+}
+
+// ============================================
+// Gooding Sync (Firecrawl)
+// ============================================
+
+async function syncGooding(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  return syncViaFirecrawlExtract(
+    "gooding",
+    "https://www.goodingco.com/auctions/",
+    /goodingco\.com\//i,
+    { waitFor: 4000 }
+  );
+}
+
+// ============================================
+// Bonhams Motoring Sync (Firecrawl)
+// ============================================
+
+async function syncBonhams(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+  return syncViaFirecrawlExtract(
+    "bonhams",
+    "https://www.bonhams.com/departments/mot/",
+    /bonhams\.com\//i,
+    { waitFor: 4000 }
+  );
+}
+
+// ============================================
 // Cars & Bids Sync (Firecrawl)
 // ============================================
 
@@ -384,8 +583,14 @@ async function syncToDatabase(
     "bringatrailer": "bringatrailer",
     "collecting-cars": "collectingcars",
     "cars-and-bids": "carsandbids",
+    "pcarmarket": "pcarmarket",
+    "mecum": "mecum",
+    "barrett-jackson": "barrett-jackson",
+    "rm-sothebys": "rmsothebys",
+    "gooding": "goodingco",
+    "bonhams": "bonhams",
   };
-  const urlPattern = platformUrlPatterns[platform] || platform.replace("-", "");
+  const urlPattern = platformUrlPatterns[platform] || platform.replace(/-/g, "");
 
   // Get existing vehicles for this platform that are currently marked as active
   const { data: existingActive } = await supabase
@@ -496,6 +701,12 @@ async function updateSourceRegistry(
     "bringatrailer": "bringatrailer",
     "collecting-cars": "collecting-cars",
     "cars-and-bids": "cars-and-bids",
+    "pcarmarket": "pcarmarket",
+    "mecum": "mecum",
+    "barrett-jackson": "barrett-jackson",
+    "rm-sothebys": "rm-sothebys",
+    "gooding": "gooding",
+    "bonhams": "bonhams",
   };
 
   const slug = slugMap[platform];
@@ -558,14 +769,30 @@ Deno.serve(async (req) => {
         if (url.includes("bringatrailer")) platform = "bringatrailer";
         else if (url.includes("collectingcars")) platform = "collecting-cars";
         else if (url.includes("carsandbids")) platform = "cars-and-bids";
+        else if (url.includes("pcarmarket")) platform = "pcarmarket";
+        else if (url.includes("mecum.com")) platform = "mecum";
+        else if (url.includes("barrett-jackson")) platform = "barrett-jackson";
+        else if (url.includes("rmsothebys")) platform = "rm-sothebys";
+        else if (url.includes("goodingco")) platform = "gooding";
+        else if (url.includes("bonhams.com")) platform = "bonhams";
         byPlatform[platform] = (byPlatform[platform] || 0) + 1;
       }
 
-      // Get source registry status
+      // Get source registry status for all main auction houses
       const { data: sources } = await supabase
         .from("source_registry")
         .select("slug, display_name, last_successful_at, status")
-        .in("slug", ["bringatrailer", "collecting-cars", "cars-and-bids"]);
+        .in("slug", [
+          "bringatrailer",
+          "collecting-cars",
+          "cars-and-bids",
+          "pcarmarket",
+          "mecum",
+          "barrett-jackson",
+          "rm-sothebys",
+          "gooding",
+          "bonhams",
+        ]);
 
       return okJson({
         success: true,
@@ -578,7 +805,27 @@ Deno.serve(async (req) => {
 
     if (action === "sync") {
       const results: SyncResult[] = [];
-      const platforms = targetPlatform ? [targetPlatform] : ["bringatrailer", "collecting-cars", "cars-and-bids"];
+      const allPlatforms = [
+        "bringatrailer",
+        "collecting-cars",
+        "cars-and-bids",
+        "pcarmarket",
+        "mecum",
+        "barrett-jackson",
+        "rm-sothebys",
+        "gooding",
+        "bonhams",
+      ];
+      const platforms = targetPlatform ? [targetPlatform] : allPlatforms;
+
+      const platformAliases: Record<string, string> = {
+        bat: "bringatrailer",
+        cc: "collecting-cars",
+        cab: "cars-and-bids",
+        pcar: "pcarmarket",
+        bj: "barrett-jackson",
+        rm: "rm-sothebys",
+      };
 
       for (const platform of platforms) {
         const startTime = Date.now();
@@ -598,13 +845,32 @@ Deno.serve(async (req) => {
           case "cars-and-bids":
             syncResult = await syncCarsAndBids();
             break;
+          case "pcar":
+          case "pcarmarket":
+            syncResult = await syncPCarMarket();
+            break;
+          case "mecum":
+            syncResult = await syncMecum();
+            break;
+          case "bj":
+          case "barrett-jackson":
+            syncResult = await syncBarrettJackson();
+            break;
+          case "rm":
+          case "rm-sothebys":
+            syncResult = await syncRMSothebys();
+            break;
+          case "gooding":
+            syncResult = await syncGooding();
+            break;
+          case "bonhams":
+            syncResult = await syncBonhams();
+            break;
           default:
             syncResult = { auctions: [], error: `Unknown platform: ${platform}` };
         }
 
-        const normalizedPlatform = platform.replace(/^(bat|cc|cab)$/, (m) =>
-          ({ bat: "bringatrailer", cc: "collecting-cars", cab: "cars-and-bids" }[m] || m)
-        );
+        const normalizedPlatform = platformAliases[platform] || platform;
 
         // Sync to database
         const dbStats = syncResult.error

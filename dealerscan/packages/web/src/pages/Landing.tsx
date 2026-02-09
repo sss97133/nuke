@@ -7,13 +7,19 @@ export default function Landing() {
       {/* Header */}
       <header className="border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold text-xl text-gray-900">
+          <Link to="/" className="flex items-center gap-2 font-bold text-xl text-gray-900">
             <FileText className="w-6 h-6 text-blue-600" />
             DealerScan
-          </div>
-          <Link to="/login" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-            Sign In
           </Link>
+          <nav className="flex items-center gap-6">
+            <Link to="/dashboard" className="text-sm text-gray-600 hover:text-gray-900">App</Link>
+            {(typeof import.meta !== 'undefined' && (import.meta.env.VITE_DEALERSCAN_API_LINK as string)) ? (
+              <a href={import.meta.env.VITE_DEALERSCAN_API_LINK as string} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-600 hover:text-gray-900">API</a>
+            ) : null}
+            <Link to="/login" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+              Sign In
+            </Link>
+          </nav>
         </div>
       </header>
 

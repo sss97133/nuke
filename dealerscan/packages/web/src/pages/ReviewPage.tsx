@@ -127,7 +127,7 @@ export default function ReviewPage() {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-1/2 bg-gray-900 relative overflow-auto">
+        <div className="w-1/2 bg-gray-900 relative flex flex-col min-h-0">
           <div className="absolute top-2 right-2 flex gap-1 z-10">
             <button onClick={() => setZoom(z => Math.min(z + 0.25, 3))} className="bg-black/50 text-white p-1.5 rounded hover:bg-black/70" title="Zoom in">
               <ZoomIn className="w-4 h-4" />
@@ -142,21 +142,22 @@ export default function ReviewPage() {
               <RotateCcw className="w-3 h-3" />
             </button>
           </div>
-          {imageUrl && (
-            <img
-              src={imageUrl}
-              alt="Document"
-              className="transition-all duration-200"
-              style={{
-                transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                transformOrigin: 'center center',
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                imageOrientation: 'from-image',
-              }}
-            />
-          )}
+          <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden p-2">
+            {imageUrl && (
+              <div className="w-full h-full flex items-center justify-center" style={{ minHeight: 0 }}>
+                <img
+                  src={imageUrl}
+                  alt="Document"
+                  className="max-w-full max-h-full w-auto h-auto object-contain transition-transform duration-200"
+                  style={{
+                    transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                    transformOrigin: 'center center',
+                    imageOrientation: 'from-image',
+                  }}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="w-1/2 bg-white overflow-y-auto border-l border-gray-200">

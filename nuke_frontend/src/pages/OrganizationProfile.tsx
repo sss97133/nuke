@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactDOM from 'react-dom';
-import { supabase, SUPABASE_URL } from '../lib/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { FaviconIcon } from '../components/common/FaviconIcon';
 import TradePanel from '../components/trading/TradePanel';
 import AddOrganizationData from '../components/organization/AddOrganizationData';
@@ -27,6 +27,7 @@ import { OrganizationServiceTab } from '../components/organization/OrganizationS
 import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
 import OrganizationLegalTab from '../components/organization/OrganizationLegalTab';
 import OrganizationOfferingTab from '../components/organization/OrganizationOfferingTab';
+import DataRoomGate from '../components/organization/DataRoomGate';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
@@ -38,6 +39,18 @@ import { AdminNotificationService } from '../services/adminNotificationService';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import '../design-system.css';
+
+// Canonical Bring a Trailer org – we show extraction coverage (target 222k, queue) and turnover/metrics note
+const BAT_ORG_ID = 'd2bd6370-11d1-4af0-8dd2-3de2c3899166';
+
+interface OrgExtractionCoverage {
+  org_id: string;
+  label: string | null;
+  extracted: number | null;
+  queue_pending: number | null;
+  target: number | null;
+  metrics_note?: string;
+}
 
 // Types for sorting and controls
 type OrgSortBy = 'newest' | 'oldest' | 'year' | 'make' | 'model' | 'price_high' | 'price_low';
@@ -303,6 +316,9 @@ export default function OrganizationProfile() {
   const [showBaTImporter, setShowBaTImporter] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showVehicleInquiry, setShowVehicleInquiry] = useState(false);
+  const [dataRoomAccessGranted, setDataRoomAccessGranted] = useState(false);
+  const [showDataRoomGate, setShowDataRoomGate] = useState(false);
+  const [extractionCoverage, setExtractionCoverage] = useState<OrgExtractionCoverage | null>(null);
   const [selectedInquiryVehicle, setSelectedInquiryVehicle] = useState<{id: string, name: string} | null>(null);
   const [primaryHeroSrcIndex, setPrimaryHeroSrcIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -359,6 +375,18 @@ export default function OrganizationProfile() {
       setShowOrganizationEditor(true);
     }
   }, [location.search]);
+
+  // Hydrate data room access from sessionStorage for this org
+  useEffect(() => {
+    if (!organizationId) return;
+    try {
+      if (sessionStorage.getItem(`data_room_access_${organizationId}`) === 'true') {
+        setDataRoomAccessGranted(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [organizationId]);
 
   // One-time CSS for "aliveness" bursts
   useEffect(() => {
@@ -1794,6 +1822,32 @@ export default function OrganizationProfile() {
     }
   }, [loading, organizationId]);
 
+  // Fetch extraction coverage for BAT – poll so numbers update in real time as we scrape
+  useEffect(() => {
+    if (organizationId !== BAT_ORG_ID) {
+      setExtractionCoverage(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const url = `${SUPABASE_URL}/functions/v1/org-extraction-coverage?org_id=${encodeURIComponent(BAT_ORG_ID)}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as OrgExtractionCoverage;
+        if (!cancelled && data?.org_id) setExtractionCoverage(data);
+      } catch {
+        if (!cancelled) setExtractionCoverage(null);
+      }
+    };
+    load();
+    const interval = setInterval(load, 45_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [organizationId]);
+
   if (loading) {
     return (
       <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
@@ -2071,6 +2125,99 @@ export default function OrganizationProfile() {
                 </div>
               ))}
             </div>
+
+            {/* Investor materials / Data room CTA — same concept for all orgs: more data = richer deck */}
+            {tabs.some(t => t.id === 'offering') && organization && organizationId && (
+              <div style={{
+                marginBottom: '16px',
+                padding: '16px 20px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12,
+              }}>
+                <div>
+                  <div style={{ fontSize: '11pt', fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                    Investor materials
+                  </div>
+                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                    Confidential deck, business plan, and data room. Authorization and NDA required.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isOwner || dataRoomAccessGranted) {
+                      setActiveTab('offering');
+                    } else {
+                      setShowDataRoomGate(true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 18px',
+                    background: 'var(--accent, #2563eb)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    fontSize: '10pt',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isOwner || dataRoomAccessGranted ? 'View data room' : 'Request access'}
+                </button>
+              </div>
+            )}
+
+            {/* Data coverage: what we have + what we're loading in (scraping in real time) */}
+            {extractionCoverage && (extractionCoverage.extracted != null || extractionCoverage.target != null) && (
+              <div style={{
+                marginBottom: '16px',
+                padding: '12px 16px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                borderLeft: '4px solid var(--blue-500)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Data coverage
+                  </span>
+                  {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
+                    <span style={{
+                      fontSize: '7pt',
+                      fontWeight: 600,
+                      color: 'var(--blue-600)',
+                      background: 'rgba(59, 130, 246, 0.12)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      animation: 'pulse 2s ease-in-out infinite',
+                    }}>
+                      Scraping in progress
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '10pt', color: 'var(--text)', lineHeight: 1.5 }}>
+                  {extractionCoverage.extracted != null && extractionCoverage.target != null
+                    ? `${(extractionCoverage.extracted / 1000).toFixed(0)}k of ~${(extractionCoverage.target / 1000).toFixed(0)}k listings loaded`
+                    : extractionCoverage.extracted != null
+                      ? `${(extractionCoverage.extracted / 1000).toFixed(0)}k loaded`
+                      : `~${extractionCoverage.target != null ? (extractionCoverage.target / 1000).toFixed(0) : ''}k targeted`}
+                  {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
+                    <span> · {extractionCoverage.queue_pending.toLocaleString()} in queue · <strong style={{ color: 'var(--blue-600)' }}>loading in…</strong></span>
+                  )}
+                </div>
+                {extractionCoverage.metrics_note && (
+                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    {extractionCoverage.metrics_note}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Activity Heatmap */}
             <div style={{ marginBottom: '16px' }}>
@@ -3292,13 +3439,27 @@ export default function OrganizationProfile() {
           </div>
         )}
 
-        {/* Offering Tab */}
+        {/* Offering Tab: gated by NDA; anon must verify phone, then sign */}
         {activeTab === 'offering' && organization && organizationId && (
-          <OrganizationOfferingTab
-            organizationId={organizationId}
-            organizationName={organization.business_name}
-            isOwner={isOwner}
-          />
+          (() => {
+            const hasDataRoomAccess = isOwner || dataRoomAccessGranted;
+            if (!hasDataRoomAccess) {
+              return (
+                <DataRoomGate
+                  organizationId={organizationId}
+                  organizationName={organization.business_name}
+                  onAccessGranted={() => setDataRoomAccessGranted(true)}
+                />
+              );
+            }
+            return (
+              <OrganizationOfferingTab
+                organizationId={organizationId}
+                organizationName={organization.business_name}
+                isOwner={isOwner}
+              />
+            );
+          })()
         )}
 
         {/* Legal & SEC Tab */}
@@ -3322,6 +3483,20 @@ export default function OrganizationProfile() {
           currentPrice={offering.current_share_price}
           availableShares={offering.total_shares}
           onClose={() => setShowTrade(false)}
+        />
+      )}
+
+      {/* Data room gate modal (from overview CTA) */}
+      {showDataRoomGate && organization && organizationId && (
+        <DataRoomGate
+          organizationId={organizationId}
+          organizationName={organization.business_name}
+          onAccessGranted={() => {
+            setDataRoomAccessGranted(true);
+            setShowDataRoomGate(false);
+            setActiveTab('offering');
+          }}
+          onClose={() => setShowDataRoomGate(false)}
         />
       )}
 

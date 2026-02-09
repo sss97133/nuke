@@ -3016,6 +3016,7 @@ const CursorHomepage: React.FC = () => {
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin,
+          listing_url, bat_auction_url, platform_source,
           nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
           ${locationFields}
         `;
@@ -3029,6 +3030,7 @@ const CursorHomepage: React.FC = () => {
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin,
+          listing_url, bat_auction_url, platform_source,
           nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
           ${locationFields}
         `;
@@ -3043,6 +3045,7 @@ const CursorHomepage: React.FC = () => {
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin,
+          listing_url, bat_auction_url, platform_source,
           nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
           ${locationFields}
         `;
@@ -3057,6 +3060,7 @@ const CursorHomepage: React.FC = () => {
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin,
+          listing_url, bat_auction_url, platform_source,
           nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
           ${locationFields}
         `;
@@ -4353,7 +4357,7 @@ const CursorHomepage: React.FC = () => {
     setSortDirection('desc');
   }, [salesPeriod]);
 
-  // Toggle for-sale filter
+  // Toggle for-sale filter (sort is left unchanged; user controls order via sort dropdown)
   const toggleForSale = useCallback(() => {
     setFilters((prev) => ({
       ...prev,
@@ -4361,8 +4365,6 @@ const CursorHomepage: React.FC = () => {
       showSoldOnly: false, // Can't show sold when filtering for sale
       hideSold: !prev.forSale ? true : prev.hideSold, // Hide sold when showing for sale
     }));
-    setSortBy('price_high'); // Sort by price when showing for sale
-    setSortDirection('desc');
   }, []);
 
   const openStatsPanel = useCallback((kind: StatsPanelKind) => {
@@ -4489,21 +4491,29 @@ const CursorHomepage: React.FC = () => {
         }
 
         if (statsPanel === 'sold_today') {
-          const { data } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
-            let q = supabase
-              .from('vehicles')
-              .select(selectMini)
-              .eq('is_public', true)
-              .neq('status', 'pending')
-              .not('sale_price', 'is', null)
-              .gte('sale_date', todayISO)
-              .order('sale_date', { ascending: false })
-              .limit(24);
-            if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
-            return q;
-          });
+          const [vehiclesRes, analyticsRes] = await Promise.all([
+            runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+              let q = supabase
+                .from('vehicles')
+                .select(selectMini)
+                .eq('is_public', true)
+                .neq('status', 'pending')
+                .not('sale_price', 'is', null)
+                .gte('sale_date', todayISO)
+                .order('sale_date', { ascending: false })
+                .limit(50);
+              if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+              return q;
+            }),
+            supabase.rpc('get_sold_today_analytics', {
+              p_date: todayISO,
+              p_days_back: 30,
+              p_whales_limit: 10,
+            }).then((r) => r.data as any),
+          ]);
           if (cancelled) return;
-          setStatsPanelRows(Array.isArray(data) ? (data as any[]) : []);
+          setStatsPanelRows(Array.isArray(vehiclesRes?.data) ? (vehiclesRes.data as any[]) : []);
+          setStatsPanelMeta(analyticsRes || null);
           return;
         }
 
@@ -4648,6 +4658,22 @@ const CursorHomepage: React.FC = () => {
                     +today
                   </button>
                 )}
+                {statsPanel === 'sold_today' && (
+                  <button
+                    type="button"
+                    className="button-win95"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      closeStatsPanel();
+                      toggleShowSoldOnly();
+                    }}
+                    style={{ padding: '4px 8px', fontSize: '8pt' }}
+                    title="Filter feed to sold vehicles only"
+                  >
+                    Filter feed
+                  </button>
+                )}
                 <button
                   type="button"
                   className="button-win95"
@@ -4755,6 +4781,78 @@ const CursorHomepage: React.FC = () => {
                       {displayStats.vehiclesAddedToday > 0 && <div><b>+{displayStats.vehiclesAddedToday.toLocaleString()}</b> today</div>}
                     </div>
                   )}
+
+                  {statsPanel === 'sold_today' && statsPanelMeta && (() => {
+                    const today = statsPanelMeta.today || {};
+                    const daily = Array.isArray(statsPanelMeta.daily_history) ? statsPanelMeta.daily_history : (statsPanelMeta.daily_history || []);
+                    const whales = Array.isArray(statsPanelMeta.whales) ? statsPanelMeta.whales : (statsPanelMeta.whales || []);
+                    const todayVol = Number(today.sales_volume) || 0;
+                    const todayCnt = Number(today.sales_count) || 0;
+                    const volumes = daily.map((d: any) => Number(d.sales_volume) || 0).filter((v: number) => v > 0);
+                    const counts = daily.map((d: any) => Number(d.sales_count) || 0);
+                    const sortedVol = [...volumes].sort((a, b) => a - b);
+                    const sortedCnt = [...counts].sort((a, b) => a - b);
+                    const volPercentile = sortedVol.length > 0 && todayVol > 0
+                      ? (sortedVol.filter((v: number) => v < todayVol).length / sortedVol.length) * 100
+                      : 50;
+                    const cntMedian = sortedCnt.length > 0 ? sortedCnt[Math.floor(sortedCnt.length / 2)] : 0;
+                    const volMedian = sortedVol.length > 0 ? sortedVol[Math.floor(sortedVol.length / 2)] : 0;
+                    const goodDay = todayCnt >= cntMedian && todayVol >= volMedian && (sortedCnt.length > 0 || sortedVol.length > 0);
+                    const tempLabel = volPercentile >= 80 ? 'Hot' : volPercentile >= 50 ? 'Warm' : volPercentile >= 20 ? 'Cool' : 'Cold';
+                    const tempColor = volPercentile >= 80 ? '#dc2626' : volPercentile >= 50 ? '#f59e0b' : volPercentile >= 20 ? '#3b82f6' : '#6b7280';
+                    return (
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ fontSize: '8pt', fontWeight: 900, marginBottom: '8px' }}>Today&apos;s market</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                          <div style={{ border: '2px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>SOLD TODAY</div>
+                            <div style={{ fontSize: '12pt', fontWeight: 900 }}>{todayCnt}</div>
+                            <div style={{ fontSize: '9pt' }}>{formatCurrency(todayVol)}</div>
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>avg {formatCurrency(Number(today.avg_sale_price) || 0)}</div>
+                          </div>
+                          <div style={{ border: '2px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>GOOD DAY?</div>
+                            <div style={{ fontSize: '11pt', fontWeight: 900, color: goodDay ? '#059669' : 'var(--text-muted)' }}>
+                              {goodDay ? 'Yes' : 'No'}
+                            </div>
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                              {sortedCnt.length > 0 || sortedVol.length > 0
+                                ? `vs 30d median (${todayCnt} vs ${cntMedian} count, ${formatCurrency(todayVol)} vs ${formatCurrency(volMedian)} vol)`
+                                : 'Not enough history yet'}
+                            </div>
+                          </div>
+                          <div style={{ border: '2px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>MARKET TEMPERATURE</div>
+                            <div style={{ fontSize: '11pt', fontWeight: 900, color: tempColor }}>{tempLabel}</div>
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>volume in top {Math.round(100 - volPercentile)}% (30d)</div>
+                          </div>
+                        </div>
+                        {whales.length > 0 && (
+                          <>
+                            <div style={{ fontSize: '8pt', fontWeight: 900, marginBottom: '6px' }}>Whales (top buyers today)</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                              {whales.slice(0, 10).map((w: any, i: number) => (
+                                <span
+                                  key={i}
+                                  style={{
+                                    padding: '4px 8px',
+                                    background: 'var(--grey-200)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 6,
+                                    fontSize: '7pt',
+                                    fontFamily: 'monospace',
+                                  }}
+                                  title={`${Number(w.vehicle_count) || 0} vehicles`}
+                                >
+                                  {String(w.buyer_display || 'Unknown').replace(/^@/, '')} · {formatCurrency(Number(w.total_spend) || 0)}
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {(statsPanel === 'for_sale' || statsPanel === 'sold_today' || statsPanel === 'auctions' || statsPanel === 'vehicles' || statsPanel === 'value') && (
                     <>
@@ -5115,12 +5213,9 @@ const CursorHomepage: React.FC = () => {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleShowSoldOnly();
+                      openStatsPanel('sold_today');
                     }}
-                    title={filters.showSoldOnly
-                      ? `Viewing ${salesByPeriod.count} sold (${salesByPeriod.label}). Click to change period.`
-                      : `${salesByPeriod.count} sold ${salesByPeriod.label}. Click to filter.`
-                    }
+                    title={`${salesByPeriod.count} sold ${salesByPeriod.label}. Open analytics popup.`}
                     style={{
                       border: 'none',
                       background: 'transparent',
@@ -5129,8 +5224,8 @@ const CursorHomepage: React.FC = () => {
                       cursor: 'pointer',
                       fontFamily: '"MS Sans Serif", sans-serif',
                       fontSize: '7pt',
-                      color: filters.showSoldOnly ? '#7c3aed' : 'var(--text-muted)',
-                      fontWeight: filters.showSoldOnly ? 700 : 400,
+                      color: statsPanel === 'sold_today' ? '#7c3aed' : 'var(--text-muted)',
+                      fontWeight: statsPanel === 'sold_today' ? 700 : 400,
                     }}
                   >
                     {salesByPeriod.count.toLocaleString()} sold {salesByPeriod.label}
@@ -5505,12 +5600,9 @@ const CursorHomepage: React.FC = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      toggleShowSoldOnly();
+                      openStatsPanel('sold_today');
                     }}
-                    title={filters.showSoldOnly
-                      ? `Viewing ${salesByPeriod.count} sold (${salesByPeriod.label}). Click to change period.`
-                      : `${salesByPeriod.count} sold ${salesByPeriod.label}. Click to filter.`
-                    }
+                    title={`${salesByPeriod.count} sold ${salesByPeriod.label}. Open analytics popup.`}
                     style={{
                       border: 'none',
                       background: 'transparent',
@@ -5519,8 +5611,8 @@ const CursorHomepage: React.FC = () => {
                       cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '7pt',
-                      color: filters.showSoldOnly ? '#7c3aed' : 'var(--text)',
-                      fontWeight: filters.showSoldOnly ? 700 : 400,
+                      color: statsPanel === 'sold_today' ? '#7c3aed' : 'var(--text)',
+                      fontWeight: statsPanel === 'sold_today' ? 700 : 400,
                     }}
                   >
                     <b>{salesByPeriod.count.toLocaleString()}</b> sold {salesByPeriod.label}

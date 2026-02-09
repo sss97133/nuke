@@ -1,6 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth, useCredits } from '@dealerscan/shared'
-import { FileText, Upload, CreditCard, LogOut } from 'lucide-react'
+import { FileText, Upload, CreditCard, LogOut, ExternalLink } from 'lucide-react'
+
+const APP_LINK = (import.meta.env.VITE_DEALERSCAN_APP_LINK as string) || '/dashboard'
+const API_LINK = import.meta.env.VITE_DEALERSCAN_API_LINK as string | undefined
 
 export default function Header() {
   const { user, signOut } = useAuth()
@@ -24,6 +27,12 @@ export default function Header() {
               <Link to="/billing" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
                 <CreditCard className="w-3.5 h-3.5" /> Billing
               </Link>
+              <Link to={APP_LINK} className="text-sm text-gray-600 hover:text-gray-900">App</Link>
+              {API_LINK && (
+                <a href={API_LINK} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                  API <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-4">
