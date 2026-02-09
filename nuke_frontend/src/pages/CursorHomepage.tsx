@@ -3056,7 +3056,7 @@ const CursorHomepage: React.FC = () => {
       const locationFields = 'zip_code, gps_latitude, gps_longitude';
       const selectV1 = `
           id, year, make, model, normalized_model, series, trim,
-          engine:engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
           title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
@@ -3070,7 +3070,7 @@ const CursorHomepage: React.FC = () => {
         `;
       const selectV1EngineSize = `
           id, year, make, model, normalized_model, series, trim,
-          engine:engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
           title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
@@ -3084,7 +3084,7 @@ const CursorHomepage: React.FC = () => {
         `;
       const selectV2 = `
           id, year, make, model, normalized_model, series, trim,
-          engine:engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
           canonical_vehicle_type, canonical_body_style,
           title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
@@ -3099,7 +3099,7 @@ const CursorHomepage: React.FC = () => {
         `;
       const selectV2EngineSize = `
           id, year, make, model, normalized_model, series, trim,
-          engine:engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
           canonical_vehicle_type, canonical_body_style,
           title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
