@@ -131,24 +131,17 @@ N-Zero's advisory model reflects its autonomous architecture: AI advisory agents
 
 **AI Advisory Agents (Public):** The advisory board is composed of AI agents - autonomous systems modeled on domain expertise profiles that provide continuous, real-time strategic guidance. Unlike traditional boards that meet quarterly, AI advisors operate 24/7, processing market signals, competitive intelligence, and operational data. The advisory board is public and transparent - agent reasoning and recommendations are visible, building trust and generating operational data.
 
-**Strategic Network:**
-
-- **Philippe Combres** - Publisher & Editor-in-Chief, L'Officiel Saint Barth. Luxury/UHNW connections. Previously Universal Music.
-- **Scott Goldfarb** - Owner, Goldfarb & Associates (global automotive parts). Active angel investor.
-- **Gerard Lopez** - Co-founder Genii Capital & Mangrove Capital Partners. Early Skype investor ($2.6B exit). Former Lotus F1 President. Known collector (300SL Gullwing, 250 GT California Spider, Bugatti 57SC Atlantic).
-- **Josh Harris** - Internet pioneer. Founder of Jupiter Communications & Pseudo.com. Subject of Sundance-winning *We Live in Public* documentary.
-
-**Key Hire Priority:** Technical co-founder/CTO to share architectural ownership, lead engineering, and reduce key-person risk. This is the #1 use of initial funding.
+**Key Hire Priority:** First use of initial funding: a technical co-founder or CTO to share architectural ownership and lead engineering—turning a solo build into a scalable team.
 
 ### Platform Architecture
 
 The N-Zero platform is organized around five layers:
 
 **Layer 1: Ingestion**
-- **Agentic extraction** (primary): AI-driven pipelines from 80+ source types; 310 edge functions run continuously.
+- **Autonomous ingest** (primary): AI-driven pipelines from 80+ source types; 310 edge functions run continuously.
 - **Traditional fallback**: Scheduled scrapers, APIs, Firecrawl where agentic flows aren’t deployed.
 - **User-driven**: Users grant access via the app or by downloading our software and interact through text messaging; fully agentic end-to-end (e.g. ClawdBot-style for car data). Users give access; we do the rest.
-- Self-healing queue management (Ralph Wiggum coordinator)
+- Self-healing queue management (autonomous coordinator)
 - Queue stats: 241,914 completions, 69 pending, system running continuously
 
 **Layer 2: Storage**
@@ -158,10 +151,10 @@ The N-Zero platform is organized around five layers:
 - Every data point carries provenance and confidence score
 
 **Layer 3: Intelligence**
-- Valuation engine (474,484 estimates, 6.3% median error)
-- Sentiment analysis (127,109 vehicles scored)
-- Image classification - YONO (100K+ training images, EfficientNet-B0)
-- Vehicle intelligence extraction (LLM-powered structured field extraction)
+- **Proprietary valuation engine** — 474,484 estimates; median absolute percent error (MAPE) 6.3%; comparable-sales regression with confidence intervals
+- **Sentiment scoring** — 127,109 vehicles; community-perception embeddings correlated with realized price premium
+- **YONO** (proprietary) — EfficientNet-B0 transfer learning, 100K+ labeled training images; inference pipeline for make/angle/quality classification and non-vehicle filtering
+- **Structured field extraction** — LLM-powered schema binding from unstructured listings (VIN, trim, options, provenance)
 
 **Layer 4: API/SDK**
 - Production TypeScript SDK (Nuke SDK)
@@ -178,13 +171,13 @@ The N-Zero platform is organized around five layers:
 ### Data Flow
 
 ```
-Sources (80+ types) → Extractors (310 functions) → Observations (immutable store)
+Sources (80+ types) → Ingestion (310 functions) → Observations (immutable store)
     → AI Analysis (sentiment, valuation, image) → API/SDK → Organizations/Users
 ```
 
 ### Business Entity Tracking
 
-N-Zero tracks **2,401 registered businesses** with 119 data fields per entity:
+N-Zero tracks **2,401 registered businesses**; the schema supports 119 data fields per entity (financials, operational metrics, verification status, geographic data, team composition, service capabilities). **234 entities are classified**; the remainder are pending.
 
 | Business Type | Count |
 |--------------|-------|
@@ -193,9 +186,9 @@ N-Zero tracks **2,401 registered businesses** with 119 data fields per entity:
 | Auction houses | 52 |
 | Restoration shops | 4 |
 | Performance shops | 3 |
-| Pending classification | 2,167 |
+| **Pending classification** | **2,167** |
 
-Each business entity tracks: financials (revenue, GMV, margins), operational metrics (inventory turnover, avg days to sell, project completion rate), verification status, geographic data, team composition, and service capabilities.
+**Priority:** Classify the pending set and refresh entity data. Business-layer coverage and data freshness are focus areas for improvement.
 
 ### Functional Organization
 
@@ -788,6 +781,88 @@ All 768K vehicles have been built entirely from freely available public data sou
 | **Regulatory & Legal** | $300,000 | 15% | SEC registration (Form D for derivative/asset market), CFTC Designated Contract Market application (prediction market), corporate counsel, IP/trademark protection (N-Zero, YONO, Nuke) |
 | **Revenue Launch** | $300,000 | 15% | API monetization infrastructure, first enterprise sales hires, partnership development (auction houses, dealers, insurers), initial go-to-market |
 | **Operations & Buffer** | $200,000 | 10% | Office/workspace, insurance, accounting, travel for partnership development, 6-month emergency buffer at current burn rate |
+
+#### Detailed allocation (how the money is spent)
+
+**1. Co-Founder + Key Hires ($800,000)**  
+- **Technical co-founder/CTO (priority #1):** Cash comp $180–220K/year over the funding period; equity grant per board approval. Expected hire within 0–6 months. Covers architectural ownership, engineering leadership, and key-person risk reduction.  
+- **Engineer 1 (backend/platform):** $140–170K/year; target hire in months 1–3. Owns API scaling, database performance, and production reliability.  
+- **Engineer 2 (ML/B2B or full-stack):** $120–150K/year; target hire in months 6–9. Focus on valuation/ML pipeline, B2B integration, or frontend depending on CTO roadmap.  
+- **Payroll taxes, benefits, and employer costs:** ~18–22% of wages over the period.  
+- **Recruiting:** Contingency for retained search or signing incentives ($15–30K) if needed to close CTO.  
+
+**2. Infrastructure & Scaling ($400,000)**  
+- **Database and compute:** Supabase (or equivalent) read replicas, connection pooling, and compute scaling for 10x current traffic; estimated $40–80K over 18 months.  
+- **Storage:** Capacity for 100M+ images and growing observation/audit data; estimated $25–50K.  
+- **API and edge:** Rate limiting, usage metering, and edge capacity for B2B and public API; estimated $30–60K.  
+- **Monitoring, observability, and security:** Logging, alerting, incident response, and security tooling; estimated $40–80K.  
+- **Uptime and reliability:** Backups, disaster recovery, load testing, and hardening; estimated $30–50K.  
+- **Contingency:** Remainder reserved for unexpected scaling (e.g., new data partnerships, traffic spikes).  
+
+**3. Regulatory & Legal ($300,000)**  
+- **SEC:** Form D and any registration or exemption work for derivative/asset market initiatives; estimated $35–75K.  
+- **CFTC:** Designated Contract Market (DCM) application and ongoing compliance for prediction market; estimated $100–180K (phased over 18–24 months).  
+- **Corporate counsel:** Retainer for corporate, contracts, and governance; estimated $4–8K/month over the period ($72–144K).  
+- **IP and trademarks:** USPTO filings and enforcement for N-Zero, YONO, Nuke; estimated $8–20K.  
+
+**4. Revenue Launch ($300,000)**  
+- **API monetization build:** Billing, usage metering, customer dashboards, and tiered access; estimated $40–80K.  
+- **First enterprise/sales capacity:** One full-time or fractional enterprise/sales hire (or equivalent in contract); estimated $90–140K over 12–18 months.  
+- **Partnership development:** Travel, events, and structured outreach to auction houses, dealers, and insurers; estimated $40–70K.  
+- **Go-to-market:** Collateral, trials, demos, and initial marketing; estimated $25–50K.  
+
+**5. Operations & Buffer ($200,000)**  
+- **Office/workspace:** Co-working or small dedicated space; estimated $1.5–2.5K/month over 18 months ($27–45K).  
+- **Insurance:** D&O, E&O, general liability; estimated $15–35K.  
+- **Accounting, payroll, and compliance:** Monthly bookkeeping, payroll, and year-end/tax; estimated $3–5K/month ($54–90K).  
+- **Travel and misc. operations:** Partnership travel, conferences, and operational contingencies; estimated $20–40K.  
+- **Emergency buffer:** 6-month runway at current burn held in reserve; remainder of category.  
+
+Spending is phased to match hiring and milestones; the largest outlays (personnel and legal) are timed to board-approved hiring and regulatory steps. No single category is a black box—each has defined line items and ranges so investors can see exactly how the capital is deployed.
+
+#### Operational priorities: what we're actually buying
+
+**1. Turning on the machines: extraction + storage + security**  
+The immediate need is running more data processes and securing that data. That means:
+
+- **Compute (cloud vs. own):** Right now extraction runs on Supabase edge + local Playwright where needed. To scale: (a) **Cloud** — more edge invocations, optional dedicated workers (e.g. Fly.io, Railway), or batch GPU for heavy jobs. Estimate $2–4K/mo at current scale → $8–20K/mo at 3–5x extraction volume. (b) **Own metal** — colo or small rack for Playwright farms + storage; higher upfront ($30–80K) but predictable ongoing. We model both; initial preference is cloud for flexibility, with option to move heavy extraction to owned capacity if unit economics justify it.
+- **Storage:** 28M+ images today; path to 100M+. Supabase storage or S3/R2: ~$0.02–0.03/GB/mo. 100M images at ~500KB avg ≈ 50TB → ~$1–1.5K/mo; add audit/backup and headroom → **$25–50K over 18 months**.
+- **Securing data:** Backups, access control, audit logs, and (where needed) compliance tooling. Estimate **$15–35K** over the period.
+
+**2. Training proprietary models on our data**  
+A core expense is turning our data into proprietary models (valuation, sentiment, classification, listing quality).
+
+- **GPU / training runs:** Training and fine-tuning on 768K+ vehicles, 28M+ images, and comment/listing text. Cloud GPU (Lambda, RunPod, or similar): ~$1–2/hr for mid-tier; a serious YONO-style or valuation run can be 50–200 GPU-hours per cycle. Multiple cycles (baseline + iterations): **$25–75K** over 18 months. Larger custom models or frequent retrains can push toward **$50–100K**.
+- **Data pipeline for training:** Curated datasets, versioning, and eval harness. Estimate **$10–25K** (engineering time or tools).
+
+**3. Co-founder and team: security blanket + attracting the right person**  
+Funding is not "burn $800K on salaries." It's a **security blanket** so we can operate without financial panic, and it **enables us to attract the right co-founder** when we find them—someone passionate about the space, a tech insider (accomplished or a dynamic younger person catching the wave), who can be a spokesperson for how the platform and autonomous systems are developing. That's a seduction and a match, not a blind hire. In the meantime we can run lean: interns, contractors, or a small crew. The reserve for "Co-Founder + Key Hires" is there so that when the right person appears, we can close—equity, role, and enough runway to make it compelling. We're not committed to spending it all on headcount; we're committed to having it available so the best match is possible.
+
+**4. SEC & legal (non-negotiable)**  
+Unchanged: SEC (Form D, derivative/asset), CFTC DCM (prediction market), corporate counsel retainer, IP/trademarks. **$300K** as in the table; detailed breakdown stands.
+
+**5. API monetization: what it actually looks like**  
+So we can charge for data and access in a clear, scalable way:
+
+- **Billing and metering:** Usage-based and/or tiered (e.g. $0 / $299 / $999 / enterprise). Stripe (or equivalent) + webhook usage logs → billable events. Build: **$25–50K** (backend + dashboard).
+- **Customer dashboard:** Keys, usage charts, limits, and support. **$15–30K**.
+- **Tiers and packaging:** Free tier (rate-limited), Pro (higher limits, valuation API), Enterprise (SLA, custom fields). Documentation and onboarding flows. **$10–20K**.
+
+Total API monetization build: **$50–100K**; remainder of "Revenue Launch" goes to organic growth and partnerships (below).
+
+**6. Organic growth and partnerships (guerrilla + collaboration)**  
+We don't need a huge ad budget. We need:
+
+- **Gas money and travel:** Drive to dealers, collectors, and events; bring family; get people to list, use the software, and talk about it. **$15–35K**.
+- **Press and influence:** Dinners, events, cool venues (e.g. design district, Venice Biennale–style), influencer and creator friends. Document stories and cars; organic styling of data and narrative. **$25–55K**.
+- **Creative spaces and partnerships:** We're not building everything ourselves. We partner: N0 café concept, cool hotels, design districts—collaborate with the best in their industry, same intentions. Funding lets us show up as a credible partner (e.g. host dinners, pop-ups, data-driven showcases). Real estate or long-term space: prefer **partnership and collaboration** over owning; capital can fund deposits, fit-out support, or event guarantees. **$40–90K** for partnerships and creative-space initiatives.
+- **Proof by doing:** Buy and sell cars ourselves; run a workspace that shows how it should be done. That's marketing and product in one. Margin for inventory and ops: **$30–60K** (could be self-liquidating if cars flip).
+- **Fun builds with preferred builders:** Fund or co-fund builds with builders who adopt the technology. Some builds are serious capital—$300–400K—but we can bring in **sponsors** (parts brands, dealers, collectors) to back them, like Y Combinator backs startups: we curate, they sponsor, builders get the project and adopt the stack. Our capital can be the catalyst (e.g. $40–80K per build as lead or match); sponsor dollars carry the rest. Document the build, the data, and the outcome. Live product validation and stories without us footing the full bill.
+
+**7. Reserve and buffer**  
+The rest is reserve: runway so we can build in peace, collaborate with the right people, and not be financially stressed. We'd rather have the option to spend wisely than be forced to "use it or lose it" on hires we don't yet need.
+
+---
 
 **Capital efficiency note:** The Company has built a data asset tracking $41.6B in vehicle value on ~$1,000-$1,600/month in operating costs. At $2M raised, the 18-24 month runway provides sufficient time to achieve revenue activation (conservative Year 1 target: $1-2M) before requiring additional capital. The autonomous architecture means that engineering hires multiply output rather than maintain existing systems.
 

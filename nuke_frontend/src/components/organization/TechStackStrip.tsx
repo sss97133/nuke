@@ -1,9 +1,9 @@
 /**
- * Tech stack for investor teaser: icons only (black), name on hover.
- * CDN: https://cdn.simpleicons.org/<slug>
+ * Tech stack for investor teaser: logo + name. Uses Simple Icons via jsDelivr (reliable).
+ * Slugs: https://github.com/simple-icons/simple-icons/tree/develop/icons
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 const STACK: { slug: string; name: string }[] = [
   { slug: 'react', name: 'React' },
@@ -16,18 +16,51 @@ const STACK: { slug: string; name: string }[] = [
   { slug: 'deno', name: 'Deno' },
   { slug: 'pytorch', name: 'PyTorch' },
   { slug: 'vercel', name: 'Vercel' },
-  { slug: 'openai', name: 'OpenAI' },
-  { slug: 'anthropic', name: 'Anthropic' },
-  { slug: 'docker', name: 'Docker' },
-  { slug: 'telegram', name: 'Telegram' },
-  { slug: 'ollama', name: 'Ollama' },
-  { slug: 'modal', name: 'Modal' },
-  { slug: 'cursor', name: 'Cursor' },
-  { slug: 'firecrawl', name: 'Firecrawl' },
-  { slug: 'x', name: 'Grok (xAI)' },
 ];
 
 const ICON_SIZE = 28;
+const LOGO_BASE = 'https://cdn.jsdelivr.net/npm/simple-icons@11/icons';
+
+function TechLogo({ slug, name }: { slug: string; name: string }) {
+  const [errored, setErrored] = useState(false);
+  const src = `${LOGO_BASE}/${slug}.svg`;
+  if (errored) {
+    return (
+      <span
+        title={name}
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: 'var(--text)',
+          width: ICON_SIZE,
+          height: ICON_SIZE,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {name.slice(0, 2)}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      width={ICON_SIZE}
+      height={ICON_SIZE}
+      title={name}
+      onError={() => setErrored(true)}
+      style={{
+        display: 'block',
+        width: ICON_SIZE,
+        height: ICON_SIZE,
+        objectFit: 'contain',
+        filter: 'brightness(0)',
+      }}
+    />
+  );
+}
 
 export default function TechStackStrip() {
   return (
@@ -58,19 +91,7 @@ export default function TechStackStrip() {
               color: 'var(--text)',
             }}
           >
-            <img
-              src={`https://cdn.simpleicons.org/${slug}`}
-              alt=""
-              width={ICON_SIZE}
-              height={ICON_SIZE}
-              style={{
-                display: 'block',
-                width: ICON_SIZE,
-                height: ICON_SIZE,
-                objectFit: 'contain',
-                filter: 'brightness(0)',
-              }}
-            />
+            <TechLogo slug={slug} name={name} />
           </span>
         ))}
       </div>

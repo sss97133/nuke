@@ -60,6 +60,7 @@ const KNOWN_PLATFORMS: Record<string, { type: string; business_type?: string; ha
   'collectingcars.com': { type: 'auction_listing', business_type: 'auction_house' },
   'pcarmarket.com': { type: 'auction_listing', business_type: 'auction_house' },
   'hemmings.com': { type: 'auction_listing', business_type: 'auction_house' },
+  'barnfinds.com': { type: 'auction_listing', business_type: 'auction_house', handler: 'barnfinds' },
 
   // Physical Auction Houses
   'mecum.com': { type: 'auction_house', business_type: 'auction_house' },
@@ -180,6 +181,12 @@ serve(async (req) => {
 
       case 'bat':
         ({ entityData, entityId } = await processBaTListingURL(url, supabase));
+        entityType = 'vehicle';
+        action = 'extracted';
+        break;
+
+      case 'barnfinds':
+        ({ entityData, entityId } = await processBarnFindsListingURL(url, supabase));
         entityType = 'vehicle';
         action = 'extracted';
         break;
@@ -1094,6 +1101,49 @@ async function processNZeroVehicleURL(url: string, supabase: any) {
   return {
     entityData: vehicle,
     entityId: vehicleId
+  };
+}
+
+// ============================================
+// BARN FINDS LISTING PROCESSOR
+// ============================================
+
+async function processBarnFindsListingURL(url: string, supabase: any) {
+  const u = new URL(url);
+  u.search = '';
+  u.hash = '';
+  const listingUrlKey = (u.hostname.replace(/^www\./i, '') + (u.pathname || '').replace(/\/+$/, '')).toLowerCase();
+  const { data: existingEl } = await supabase
+    .from('external_listings')
+    .select('vehicle_id')
+    .eq('platform', 'barnfinds')
+    .eq('listing_url_key', listingUrlKey)
+    .maybeSingle();
+  if (existingEl?.vehicle_id) {
+    return { entityData: { listing_url: url }, entityId: existingEl.vehicle_id };
+  }
+
+  const { data: invokeData, error: invokeErr } = await supabase.functions.invoke('extract-barn-finds-listing', {
+    body: { url }
+  });
+
+  if (invokeErr) {
+    throw new Error(invokeErr.message || 'Barn Finds extraction failed');
+  }
+  const ok = invokeData?.success === true && invokeData?.vehicle_id;
+  if (!ok) {
+    throw new Error(invokeData?.error || 'Barn Finds extraction did not return a vehicle');
+  }
+
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select('*')
+    .eq('id', invokeData.vehicle_id)
+    .maybeSingle();
+
+  return {
+    entityData: vehicle ?? { listing_url: url },
+    entityId: invokeData.vehicle_id
   };
 }
 

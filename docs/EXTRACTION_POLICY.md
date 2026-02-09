@@ -62,3 +62,12 @@ VERIFIED_SOURCES_ONLY=1 ./scripts/verified-extraction-run.sh 6
 - smart-queue-worker.sh when it routes to extract-vehicle-data-ai / extract-cars-and-bids-core / import-pcarmarket-listing
 
 For batch processing import_queue, use **Playwright** (autonomous-playwright-extractor, playwright-single-worker, run-playwright-queue) so no Firecrawl credits are spent.
+
+## Firecrawl for C&B, PCarMarket, Hemmings (controlled use)
+
+When Firecrawl credits are available and we want to "hog down" these sources:
+
+- **Prefer** discovery/extraction paths that use direct fetch or Playwright first; use Firecrawl only as fallback or for JS-heavy pages that block Playwright.
+- **Rate-limit:** don’t run Firecrawl-based extractors in unbounded loops; use small batches and delays (e.g. 1–2 req/s) and check `status:targets` between runs.
+- **Validate:** before calling Firecrawl, ensure the URL isn’t already in `vehicles` / `external_listings`; after extraction, validate required fields (year/make/model or VIN) so we don’t mark bad rows complete.
+- **Where it’s used today:** C&B/PCarMarket/Hemmings appear in sync-live-auctions, import-pcarmarket-listing, extract-cars-and-bids-core, and similar edge functions that may call Firecrawl when direct fetch fails. For bulk backfill, prefer adding Playwright paths or running Firecrawl only in a dedicated, rate-limited script with clear targets (see EXTRACTION_TARGETS.md).

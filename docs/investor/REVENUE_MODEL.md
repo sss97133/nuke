@@ -5,23 +5,25 @@
 
 ## Competitive Position: Not a Competitor - An Enabler
 
-N-Zero does not compete with existing players. It provides a service that does not exist and integrates with everyone via API. The platform is designed to make the entire ecosystem more efficient, not to capture market share from incumbents.
+N-Zero does not compete with existing players. We are **direct to consumer**: we are the buyer's confident. Buyers live here. Auctions, dealers, parts suppliers, and insurers are all chasing buyers—we are the shelter where those buyers already are. The platform integrates with everyone via API and makes the whole ecosystem more efficient; we don't capture share from incumbents, we add a layer they plug into.
 
 **Key principle: We slide in alongside everyone. We don't take away, we add.**
 
-- Carfax → Their data is available at ~$700/mo as enrichment. We already go far beyond what they cover using free public sources.
-- Auction houses → We send them leads via commission. They earn more from us.
-- Dealers → We provide data they can't get anywhere else. They sell faster.
-- Parts suppliers → We AI-recommend parts to users. They get sales they'd never see.
-- Insurance → We provide better valuation data. They price more accurately.
+- **Auction houses** → They chase buyers. We send them qualified leads; they earn more from us.
+- **Dealers** → They chase buyers. We give buyers data they can't get elsewhere; dealers get buyers who are ready.
+- **Parts suppliers** → They chase buyers. We AI-recommend parts to our users; they get sales they'd never see otherwise.
+- **Insurance** → They chase buyers. We provide better valuation data; they price more accurately and win more policies.
 
-**The new granular data we're after is simply available. No one has built the database and pipeline to accept it. That's what N-Zero is.**
+The granular data we're building is out there; no one has built the database and pipeline to ingest it. That's what N-Zero is—and we built it where the buyers already live.
 
 ---
 
 ## Revenue Streams
 
 ### 1. Auction Lead Commission
+
+**Framework:** N-Zero is the home for buyers and the home for technicians. We are not a dealer tool—we allow dealers to participate when they're willing to operate with full transparency. The industry has long suffered from opacity and from actors who take advantage of buyers; we protect all interests through **maximum transparency**. Transparency is what lets everyone make money fairly: our system gives every price a clear *why* and every listing a clear *what needs to be fixed*, so buyers trust and sellers get paid. We want to rebuild the dealer model, especially for dealers who are struggling and ready to do it right.
+
 - AI identifies vehicles likely to sell and matches them to the right auction house
 - Commission on successful placements
 - Auction houses receive qualified leads they wouldn't have found

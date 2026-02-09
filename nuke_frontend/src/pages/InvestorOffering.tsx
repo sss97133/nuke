@@ -61,6 +61,7 @@ const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; content: stri
 
 // Simple hash for access code verification (not security-critical - this is a draft portal)
 const ACCESS_CODE_HASH = 'nzero2026';
+const PORTAL_PROFILE_KEY = 'nzero_investor_portal_profile';
 
 export default function InvestorOffering() {
   const [phase, setPhase] = useState<'gate' | 'acknowledge' | 'portal'>('gate');
@@ -71,6 +72,7 @@ export default function InvestorOffering() {
   const [viewerName, setViewerName] = useState('');
   const [viewerEmail, setViewerEmail] = useState('');
   const [viewerOrg, setViewerOrg] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [acknowledged, setAcknowledged] = useState({
     confidential: false,
     noDistribute: false,
@@ -80,6 +82,24 @@ export default function InvestorOffering() {
   const [accessGrantedAt, setAccessGrantedAt] = useState<string | null>(null);
   const [docViewTimes, setDocViewTimes] = useState<Record<string, number>>({});
   const [exportRequested, setExportRequested] = useState(false);
+
+  // Load remembered profile from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PORTAL_PROFILE_KEY);
+      if (raw) {
+        const { name, email, org } = JSON.parse(raw);
+        if (email) {
+          setViewerName(name || '');
+          setViewerEmail(email || '');
+          setViewerOrg(org || '');
+          setRememberMe(true);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Log access event to Supabase
   const logAccess = useCallback(async (entry: AccessLog) => {
@@ -139,6 +159,24 @@ export default function InvestorOffering() {
   const handleAcknowledge = () => {
     const allChecked = Object.values(acknowledged).every(Boolean);
     if (!allChecked) return;
+
+    if (rememberMe) {
+      try {
+        localStorage.setItem(PORTAL_PROFILE_KEY, JSON.stringify({
+          name: viewerName.trim(),
+          email: viewerEmail.trim(),
+          org: viewerOrg.trim(),
+        }));
+      } catch {
+        // ignore
+      }
+    } else {
+      try {
+        localStorage.removeItem(PORTAL_PROFILE_KEY);
+      } catch {
+        // ignore
+      }
+    }
 
     setPhase('portal');
     setAccessGrantedAt(new Date().toISOString());
@@ -463,6 +501,22 @@ export default function InvestorOffering() {
                 }}
               />
             </div>
+            <label style={{
+              display: 'flex',
+              gap: 'var(--space-2)',
+              alignItems: 'center',
+              marginTop: 'var(--space-3)',
+              fontSize: '9pt',
+              cursor: 'pointer',
+            }}>
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                style={{ flexShrink: 0 }}
+              />
+              <span>Remember my info so I don&apos;t have to enter it next time</span>
+            </label>
           </div>
 
           {/* Acknowledgement Checkboxes */}
