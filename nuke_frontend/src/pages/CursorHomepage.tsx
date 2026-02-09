@@ -1525,14 +1525,10 @@ const CursorHomepage: React.FC = () => {
   const buildSourceCounts = useCallback((vehicles: any[]) => {
     const counts: Record<string, number> = {};
     (vehicles || []).forEach((v: any) => {
-      const host = normalizeHost(v?.discovery_url || '');
-      const keyFromHost = host ? domainToFilterKey(host) : '';
-      if (keyFromHost) {
-        counts[keyFromHost] = (counts[keyFromHost] || 0) + 1;
-      }
-      const fallback = classifySource(v);
-      if (fallback && (!keyFromHost || fallback === 'dealer_site') && fallback !== keyFromHost) {
-        counts[fallback] = (counts[fallback] || 0) + 1;
+      // Count each vehicle exactly once using the same key used for filtering (getSourceFilterKey).
+      const key = getSourceFilterKey(v);
+      if (key) {
+        counts[key] = (counts[key] || 0) + 1;
       }
     });
 
@@ -1545,7 +1541,7 @@ const CursorHomepage: React.FC = () => {
       domainCounts[key] = counts[key] || 0;
     });
     return domainCounts;
-  }, [activeSources, domainToFilterKey]);
+  }, [activeSources, domainToFilterKey, getSourceFilterKey]);
 
   // Apply filters and sorting function - defined before useEffect
   const applyFiltersAndSort = useCallback(() => {
