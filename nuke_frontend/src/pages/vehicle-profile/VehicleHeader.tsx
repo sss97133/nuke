@@ -268,6 +268,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return formatUsdCurrency(value);
   };
 
+  // Theme tokens used in many useMemos and JSX; declare early to avoid TDZ when minified.
+  const baseTextColor = 'var(--text)';
+  const mutedTextColor = 'var(--text-muted)';
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -2345,8 +2349,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const lastSoldText = saleDate ? `Last sold ${formatShortDate(saleDate)}` : 'Off-market estimate';
   const canOpenOwnerCard = Boolean(responsibleName);
 
-  const baseTextColor = 'var(--text)';
-  const mutedTextColor = 'var(--text-muted)';
   const hasAuctionContext = Boolean(
     (auctionPulse as any)?.listing_url ||
       (vehicle as any)?.auction_end_date ||
@@ -5008,8 +5010,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               {bidCta.label}
             </a>
           ) : null}
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -5029,6 +5032,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 // User wants to click the price value and see data provenance popup
                 setShowProvenancePopup(true);
                 setShowFollowAuctionCard(false);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                (e.target as HTMLElement).click();
               }
             }}
             style={{
@@ -5216,7 +5225,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 </span>
               )}
             </div>
-          </button>
+          </div>
 
           {priceMenuOpen && (
             <div

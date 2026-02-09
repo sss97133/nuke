@@ -320,27 +320,48 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 const STORAGE_KEY = 'nuke_homepage_filters_v1';
+const REMEMBER_FILTERS_KEY = 'nuke_homepage_rememberFilters';
 const LOCATION_FAVORITES_KEY = 'nuke_homepage_location_favorites';
 
-// Load filters from localStorage
+// Only restore filters/search/sort when user has opted in to "keep filters when I leave"
+const getRememberFilters = (): boolean => {
+  try {
+    return localStorage.getItem(REMEMBER_FILTERS_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+// Load filters from localStorage (only used when rememberFilters is true)
 const loadSavedFilters = (): FilterState | null => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return null;
     const parsed = JSON.parse(saved);
-    // Validate structure and merge with defaults for safety
     return { ...DEFAULT_FILTERS, ...parsed };
   } catch {
     return null;
   }
 };
 
-// Save filters to localStorage
-const saveFilters = (filters: FilterState) => {
+// Save filters to localStorage (only when rememberFilters is true)
+const saveFiltersToStorage = (filters: FilterState) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
-  } catch (err) {
-    // Failed to save filters to localStorage - ignore
+  } catch {
+    // ignore
+  }
+};
+
+// Clear all persisted filter/search/sort so next visit starts clean
+const clearPersistedFiltersAndSort = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem('nuke_homepage_searchText');
+    localStorage.removeItem('nuke_homepage_sortBy');
+    localStorage.removeItem('nuke_homepage_sortDirection');
+  } catch {
+    // ignore
   }
 };
 
@@ -353,6 +374,18 @@ const SOURCE_META: Record<string, { title: string; domain: string }> = {
   classic: { title: 'Classic.com', domain: 'classic.com' },
   dealer_site: { title: 'Dealer Sites', domain: 'autotrader.com' },
 };
+
+/** Detect strings that are HTTP error text stored as source name/domain (e.g. from failed scrapes). */
+function looksLikeHttpError(nameOrDomain: string): boolean {
+  if (!nameOrDomain || typeof nameOrDomain !== 'string') return true;
+  const s = nameOrDomain.toLowerCase().trim();
+  if (/^\d{3}\s/.test(s)) return true; // "404 ...", "500 ..."
+  if (/\b(404|500|502|503)\b/.test(s)) return true;
+  if (/not found|page not found|file or directory not found/i.test(s)) return true;
+  if (/internal server error|server error|bad gateway|service unavailable/i.test(s)) return true;
+  if (/^error\b|^undefined$|^null$/i.test(s)) return true;
+  return false;
+}
 
 const normalizeHost = (url: string | null | undefined): string => {
   try {
@@ -431,7 +464,10 @@ const CursorHomepage: React.FC = () => {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('ALL'); // Default to ALL - no time filtering
   const [salesPeriod, setSalesPeriod] = useState<SalesTimePeriod>('today'); // For "sold" stats display
   const [viewMode, setViewMode] = useState<ViewMode>('grid'); // Always grid mode
+  // When "remember filters" is off (default), every visit starts with no filters and default sort
+  const [rememberFilters, setRememberFilters] = useState<boolean>(getRememberFilters);
   const [sortBy, setSortBy] = useState<SortBy>(() => {
+    if (!getRememberFilters()) return 'newest';
     try {
       const saved = localStorage.getItem('nuke_homepage_sortBy');
       return (saved as SortBy) || 'newest';
@@ -440,6 +476,7 @@ const CursorHomepage: React.FC = () => {
     }
   });
   const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    if (!getRememberFilters()) return 'desc';
     try {
       const saved = localStorage.getItem('nuke_homepage_sortDirection');
       return (saved as SortDirection) || 'desc';
@@ -449,9 +486,13 @@ const CursorHomepage: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState<boolean>(true); // Filter bar visible, individual sections start collapsed
   const [generativeFilters, setGenerativeFilters] = useState<string[]>([]); // Track active generative filters
-  // Start with completely clean filters - no saved state, no defaults
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<FilterState>(() => {
+    if (!getRememberFilters()) return DEFAULT_FILTERS;
+    const saved = loadSavedFilters();
+    return saved ?? DEFAULT_FILTERS;
+  });
   const [searchText, setSearchText] = useState<string>(() => {
+    if (!getRememberFilters()) return '';
     try {
       return localStorage.getItem('nuke_homepage_searchText') || '';
     } catch {
@@ -468,7 +509,7 @@ const CursorHomepage: React.FC = () => {
   // Some environments may not have `vehicles.listing_kind` yet (migration not applied).
   // We optimistically use it, but fall back automatically if PostgREST reports it missing.
   // HOTFIX: Default to false until migration 20260120_vehicle_listing_kind.sql is applied to production
-  const listingKindSupportedRef = useRef<boolean>(true);
+  const listingKindSupportedRef = useRef<boolean>(false);
   const isMissingListingKindColumn = useCallback((err: any) => {
     const code = String((err as any)?.code || '').toUpperCase();
     const message = String(err?.message || '').toLowerCase();
@@ -992,10 +1033,15 @@ const CursorHomepage: React.FC = () => {
     loadFilterOptions();
   }, []);
 
-  // Save filters to localStorage whenever they change
+  // On visit: when "remember filters" is off, clear any persisted filters/sort so next load stays clean
   useEffect(() => {
-    saveFilters(filters);
-  }, [filters]);
+    if (!rememberFilters) clearPersistedFiltersAndSort();
+  }, [rememberFilters]);
+
+  // Save filters to localStorage only when user has opted in to "keep filters when I leave"
+  useEffect(() => {
+    if (rememberFilters) saveFiltersToStorage(filters);
+  }, [rememberFilters, filters]);
 
   // Load available models when makes are selected
   // Uses case-insensitive make matching and normalizes model names to base models
@@ -1010,17 +1056,20 @@ const CursorHomepage: React.FC = () => {
         const makeClauses = filters.makes.map(m => `make.ilike.${m}`).join(',');
         
         // Query distinct models with counts using RPC-style approach
-        // Fetch more rows (2000) to get better coverage of model variants
-        const { data: modelData } = await supabase
-          .from('vehicles')
-          .select('model')
-          .eq('is_public', true)
-          .neq('status', 'pending')
-          .eq('listing_kind', 'vehicle')
-          .or(makeClauses)
-          .not('model', 'is', null)
-          .order('model', { ascending: true })
-          .limit(2000);
+        // Fetch more rows (2000) to get better coverage of model variants (with listing_kind fallback)
+        const { data: modelData } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+          let q = supabase
+            .from('vehicles')
+            .select('model')
+            .eq('is_public', true)
+            .neq('status', 'pending')
+            .or(makeClauses)
+            .not('model', 'is', null)
+            .order('model', { ascending: true })
+            .limit(2000);
+          if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+          return q;
+        });
 
         if (modelData && Array.isArray(modelData)) {
           // Normalize models to base names:
@@ -1095,28 +1144,31 @@ const CursorHomepage: React.FC = () => {
 
   // Save other filter-related state
   useEffect(() => {
+    if (!rememberFilters) return;
     try {
       localStorage.setItem('nuke_homepage_searchText', searchText);
-    } catch (err) {
+    } catch {
       // ignore
     }
-  }, [searchText]);
+  }, [rememberFilters, searchText]);
 
   useEffect(() => {
+    if (!rememberFilters) return;
     try {
       localStorage.setItem('nuke_homepage_sortBy', sortBy);
-    } catch (err) {
+    } catch {
       // ignore
     }
-  }, [sortBy]);
+  }, [rememberFilters, sortBy]);
 
   useEffect(() => {
+    if (!rememberFilters) return;
     try {
       localStorage.setItem('nuke_homepage_sortDirection', sortDirection);
-    } catch (err) {
+    } catch {
       // ignore
     }
-  }, [sortDirection]);
+  }, [rememberFilters, sortDirection]);
 
   useEffect(() => {
     try {
@@ -3008,7 +3060,7 @@ const CursorHomepage: React.FC = () => {
       const locationFields = 'zip_code, gps_latitude, gps_longitude';
       const selectV1 = `
           id, year, make, model, normalized_model, series, trim,
-          engine, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          engine:engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
           title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
@@ -3036,7 +3088,7 @@ const CursorHomepage: React.FC = () => {
         `;
       const selectV2 = `
           id, year, make, model, normalized_model, series, trim,
-          engine, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          engine:engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
           canonical_vehicle_type, canonical_body_style,
           title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
@@ -4164,28 +4216,30 @@ const CursorHomepage: React.FC = () => {
             { id: '5', domain: 'classic.com', source_name: 'Classic.com', url: 'https://classic.com' }
           ]);
         } else {
-          // Transform data to extract domain from URL
-          const transformedData = (data || []).map(source => {
-            // Extract domain from URL
-            let domain = source.url;
-            try {
-              const urlObj = new URL(source.url);
-              domain = urlObj.hostname.replace(/^www\./, '');
-            } catch {
-              // If URL parsing fails, try regex
-              domain = source.url
-                .replace(/^https?:\/\/(www\.)?/, '')
-                .replace(/\/.*$/, '');
-            }
-            
-            return {
-              id: source.id,
-              domain: domain,
-              source_name: source.name,
-              url: source.url
-            };
-          });
-          
+          // Transform data to extract domain from URL; exclude rows that are HTTP error text stored as sources
+          const transformedData = (data || [])
+            .map(source => {
+              let domain = source.url;
+              try {
+                const urlObj = new URL(source.url);
+                domain = urlObj.hostname.replace(/^www\./, '');
+              } catch {
+                domain = source.url
+                  ? source.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '')
+                  : '';
+              }
+              return {
+                id: source.id,
+                domain,
+                source_name: source.name,
+                url: source.url
+              };
+            })
+            .filter(
+              (row) =>
+                !looksLikeHttpError(row.source_name) && !looksLikeHttpError(row.domain)
+            );
+
           setActiveSources(transformedData);
         }
       } catch (err) {
@@ -4261,10 +4315,12 @@ const CursorHomepage: React.FC = () => {
       const key = domainToFilterKey(source.domain);
       if (!key || deduplicatedMap.has(key)) return;
       const meta = SOURCE_META[key];
+      const rawTitle = meta?.title || source.source_name || source.domain;
+      if (looksLikeHttpError(rawTitle) || looksLikeHttpError(source.domain)) return;
       deduplicatedMap.set(key, {
         key,
         domain: meta?.domain || source.domain,
-        title: meta?.title || source.source_name || source.domain,
+        title: rawTitle,
         included: includedSources[key] === true, // Must match filter logic in applyFiltersAndSort
         id: meta ? key : source.id,
         url: meta ? `https://${meta.domain}` : source.url,
@@ -5454,6 +5510,34 @@ const CursorHomepage: React.FC = () => {
                   </button>
                 </div>
               </div>
+              <label
+                title="When on, filters and sort are restored when you come back. When off (default), every visit starts with no filters."
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '7pt',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  marginLeft: '8px'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={rememberFilters}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    const v = e.target.checked;
+                    setRememberFilters(v);
+                    try {
+                      localStorage.setItem(REMEMBER_FILTERS_KEY, v ? 'true' : 'false');
+                    } catch { /* ignore */ }
+                    if (!v) clearPersistedFiltersAndSort();
+                  }}
+                  style={{ width: '11px', height: '11px', cursor: 'pointer' }}
+                />
+                Keep filters
+              </label>
               {activeFilterCount > 0 && (
                 <button
                   onClick={(e) => {
@@ -5835,6 +5919,35 @@ const CursorHomepage: React.FC = () => {
                 status
               </button>
               
+              {/* Remember filters: when off (default), filters reset every time you visit */}
+              <label
+                title="When on, your filters and sort are restored when you come back. When off, every visit starts with no filters."
+                style={{
+                  marginLeft: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '7pt',
+                  cursor: 'pointer',
+                  fontFamily: '"MS Sans Serif", sans-serif',
+                  color: 'var(--text-muted)'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={rememberFilters}
+                  onChange={(e) => {
+                    const v = e.target.checked;
+                    setRememberFilters(v);
+                    try {
+                      localStorage.setItem(REMEMBER_FILTERS_KEY, v ? 'true' : 'false');
+                    } catch { /* ignore */ }
+                    if (!v) clearPersistedFiltersAndSort();
+                  }}
+                  style={{ width: '12px', height: '12px', cursor: 'pointer' }}
+                />
+                Keep filters when I leave
+              </label>
               {/* Reset button */}
               {activeFilterCount > 0 && (
                 <button
@@ -5843,7 +5956,7 @@ const CursorHomepage: React.FC = () => {
                     setSearchText('');
                   }}
                   style={{
-                    marginLeft: 'auto',
+                    marginLeft: '6px',
                     padding: '3px 7px',
                     fontSize: '7pt',
                     border: '1px solid var(--border)',
