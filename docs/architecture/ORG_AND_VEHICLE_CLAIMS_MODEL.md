@@ -82,7 +82,19 @@ Fixing this means: extend relationship types, add sync (trigger or job) from lis
 - **One vehicle, many orgs:** auction platform, dealer/consignor, seller, buyer. Each is a **claim** with a **role**.
 - **Canonical place for claims:** **organization_vehicles** (org_id, vehicle_id, relationship_type).  
   Missing: role set doesn’t include auction_platform/buyer; and listing tables don’t consistently write into `organization_vehicles`, so counts are wrong.
-- **Next steps:**  
-  1. Add relationship types (e.g. `auction_platform`, `buyer`) and any constraints.  
-  2. Sync `bat_listings` / `external_listings` → `organization_vehicles` (seller + optional platform).  
-  3. Backfill existing listings so every org’s vehicle count is accurate.
+- **Implemented (Feb 2025):**  
+  1. Added `auction_platform` and `buyer` to `organization_vehicles.relationship_type` CHECK.  
+  2. Trigger `trg_sync_bat_listing_to_org_vehicles`: on INSERT/UPDATE of `bat_listings`, inserts seller (`sold_by`) and BaT org (`auction_platform`) into `organization_vehicles`.  
+  3. Trigger `trg_sync_external_listing_to_org_vehicles`: same for `external_listings` (seller + platform when mapped to an observation_source).  
+  4. Function `backfill_vehicle_org_claims_from_bat_listings(p_batch_size)` for batched backfill; run until it returns 0.  
+  5. Function `refresh_org_total_vehicles()` to recalc `businesses.total_vehicles` from `organization_vehicles`.  
+
+- **Run the backfill (one-off):**  
+  - Script (may hit API statement timeout on large DBs):  
+    `dotenvx run -- npx tsx scripts/backfill-vehicle-org-claims.ts`  
+  - Or via direct psql (no statement timeout):  
+    ```bash
+    # In a loop until (inserted_seller, inserted_platform) = (0,0); use last_id from previous run.
+    SELECT * FROM backfill_vehicle_org_claims_from_bat_listings(5000, NULL);  -- then pass last_id
+    SELECT refresh_org_total_vehicles();
+    ```

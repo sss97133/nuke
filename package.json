@@ -63,7 +63,8 @@
     "import:craigslist": "tsx scripts/craigslist-import/index.ts",
     "import:craigslist:dry-run": "tsx scripts/craigslist-import/index.ts --dry-run --verbose",
     "extract:verified": "bash scripts/verified-extraction-run.sh",
-    "extract:verified:cron": "bash scripts/cron-verified-extraction.sh"
+    "extract:verified:cron": "bash scripts/cron-verified-extraction.sh",
+    "status:targets": "bash scripts/status-targets.sh"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.8.2",

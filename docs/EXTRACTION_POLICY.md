@@ -1,5 +1,13 @@
 # Extraction policy: conserve Firecrawl, prefer local verified runs
 
+## Rule: check targets before turning on tools
+
+Don't start long-running extraction or cron without looking at **what we're targeting** and current state.
+
+- **Targets:** See **`docs/EXTRACTION_TARGETS.md`**. Only BaT has a numeric target in code (222k bat_listings); others are backlog-clear (pending → 0).
+- **Before running:** `npm run status:targets` (or `./scripts/status-targets.sh`) to print extracted vs pending vs target per source.
+- **Then decide:** If BaT pending is high → verified extraction is on-target. If pending is 0 and we're below target → need discovery + extraction, not just "run for N hours."
+
 ## Rule: no sloppy Firecrawl usage
 
 - **Do not** use Firecrawl for one-off or exploratory scrapes.
