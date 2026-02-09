@@ -1134,4 +1134,4 @@ The Nuke Index would be the first institutional-grade, data-driven, real-time ma
 
 *This document is confidential and intended only for the addressee.*
 *All technical specifications verified from live system on February 8, 2026.*
-*N-Zero is a project of Nuke Ltd (Nevada, 2025).*
+*N-Zero is a project of Nuke Ltd (Nevada, 2022).*

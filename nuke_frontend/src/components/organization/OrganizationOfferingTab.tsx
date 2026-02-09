@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '../../lib/supabase';
+import KeyFiguresWithCharts from './KeyFiguresWithCharts';
+import TechStackStrip from './TechStackStrip';
 
 // Import markdown files as raw strings via Vite
 import teaserMd from '@docs/investor/N-ZERO_TEASER.md?raw';
@@ -175,6 +177,82 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
 
   const doc = DOCUMENTS[activeDoc];
 
+  const teaserParts = useMemo(() => {
+    if (activeDoc !== 'teaser') return null;
+    const oppStart = teaserMd.indexOf('### The Opportunity');
+    const keyStart = teaserMd.indexOf('### Key Figures');
+    if (keyStart === -1) return { intro: teaserMd, middle: '', after: '', hasKeyFigures: false };
+    const keyEnd = teaserMd.indexOf('\n---\n', keyStart);
+    const afterStart = keyEnd === -1 ? teaserMd.length : keyEnd + 1;
+    const intro = oppStart === -1 ? teaserMd.slice(0, keyStart).trimEnd() : teaserMd.slice(0, oppStart).trimEnd();
+    const middle = oppStart === -1 ? '' : teaserMd.slice(oppStart, keyStart).trimEnd();
+    return {
+      intro,
+      middle,
+      after: teaserMd.slice(afterStart).trimStart(),
+      hasKeyFigures: true,
+    };
+  }, [activeDoc]);
+
+  const markdownComponents = {
+    h1: ({ children }: { children?: React.ReactNode }) => (
+      <h1 style={{ fontSize: '16pt', fontWeight: 'bold', borderBottom: '2px solid var(--border-medium)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-6)' }}>{children}</h1>
+    ),
+    h2: ({ children }: { children?: React.ReactNode }) => (
+      <h2 style={{ fontSize: '13pt', fontWeight: 'bold', borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-3)', marginTop: 'var(--space-6)' }}>{children}</h2>
+    ),
+    h3: ({ children }: { children?: React.ReactNode }) => (
+      <h3 style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: 'var(--space-2)', marginTop: 'var(--space-4)' }}>{children}</h3>
+    ),
+    p: ({ children }: { children?: React.ReactNode }) => (
+      <p style={{ fontSize: '9pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>{children}</p>
+    ),
+    ul: ({ children }: { children?: React.ReactNode }) => (
+      <ul style={{ fontSize: '9pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ul>
+    ),
+    ol: ({ children }: { children?: React.ReactNode }) => (
+      <ol style={{ fontSize: '9pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ol>
+    ),
+    li: ({ children }: { children?: React.ReactNode }) => (
+      <li style={{ marginBottom: 'var(--space-1)' }}>{children}</li>
+    ),
+    table: ({ children }: { children?: React.ReactNode }) => (
+      <div style={{ overflowX: 'auto', marginBottom: 'var(--space-4)' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '8pt' }}>{children}</table>
+      </div>
+    ),
+    thead: ({ children }: { children?: React.ReactNode }) => (
+      <thead style={{ background: 'var(--grey-100)' }}>{children}</thead>
+    ),
+    th: ({ children }: { children?: React.ReactNode }) => (
+      <th style={{ border: '1px solid var(--border-medium)', padding: '6px 10px', textAlign: 'left', fontWeight: 'bold', fontSize: '8pt' }}>{children}</th>
+    ),
+    td: ({ children }: { children?: React.ReactNode }) => (
+      <td style={{ border: '1px solid var(--border-light)', padding: '5px 10px', fontSize: '8pt' }}>{children}</td>
+    ),
+    code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+      if (className?.includes('language-')) {
+        return (
+          <pre style={{ background: 'var(--grey-100)', border: '1px solid var(--border-light)', padding: 'var(--space-4)', fontSize: '8pt', fontFamily: "'SF Mono', monospace", overflowX: 'auto', lineHeight: '1.5', marginBottom: 'var(--space-4)' }}>
+            <code>{children}</code>
+          </pre>
+        );
+      }
+      return (
+        <code style={{ background: 'var(--grey-100)', padding: '1px 4px', fontSize: '8pt', fontFamily: "'SF Mono', monospace", border: '1px solid var(--border-light)' }}>{children}</code>
+      );
+    },
+    pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+    blockquote: ({ children }: { children?: React.ReactNode }) => (
+      <blockquote style={{ borderLeft: '3px solid var(--border-medium)', paddingLeft: 'var(--space-4)', margin: 'var(--space-3) 0', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '9pt' }}>{children}</blockquote>
+    ),
+    hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: 'var(--space-6) 0' }} />,
+    strong: ({ children }: { children?: React.ReactNode }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+      <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{children}</a>
+    ),
+  };
+
   return (
     <div style={{ padding: 'var(--space-4)' }}>
       {/* Document Tabs */}
@@ -251,69 +329,19 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
         </div>
 
         <div className="investor-doc-content">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              h1: ({ children }) => (
-                <h1 style={{ fontSize: '16pt', fontWeight: 'bold', borderBottom: '2px solid var(--border-medium)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-6)' }}>{children}</h1>
-              ),
-              h2: ({ children }) => (
-                <h2 style={{ fontSize: '13pt', fontWeight: 'bold', borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-3)', marginTop: 'var(--space-6)' }}>{children}</h2>
-              ),
-              h3: ({ children }) => (
-                <h3 style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: 'var(--space-2)', marginTop: 'var(--space-4)' }}>{children}</h3>
-              ),
-              p: ({ children }) => (
-                <p style={{ fontSize: '9pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>{children}</p>
-              ),
-              ul: ({ children }) => (
-                <ul style={{ fontSize: '9pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ul>
-              ),
-              ol: ({ children }) => (
-                <ol style={{ fontSize: '9pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ol>
-              ),
-              li: ({ children }) => (
-                <li style={{ marginBottom: 'var(--space-1)' }}>{children}</li>
-              ),
-              table: ({ children }) => (
-                <div style={{ overflowX: 'auto', marginBottom: 'var(--space-4)' }}>
-                  <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '8pt' }}>{children}</table>
-                </div>
-              ),
-              thead: ({ children }) => (
-                <thead style={{ background: 'var(--grey-100)' }}>{children}</thead>
-              ),
-              th: ({ children }) => (
-                <th style={{ border: '1px solid var(--border-medium)', padding: '6px 10px', textAlign: 'left', fontWeight: 'bold', fontSize: '8pt' }}>{children}</th>
-              ),
-              td: ({ children }) => (
-                <td style={{ border: '1px solid var(--border-light)', padding: '5px 10px', fontSize: '8pt' }}>{children}</td>
-              ),
-              code: ({ children, className }) => {
-                if (className?.includes('language-')) {
-                  return (
-                    <pre style={{ background: 'var(--grey-100)', border: '1px solid var(--border-light)', padding: 'var(--space-4)', fontSize: '8pt', fontFamily: "'SF Mono', monospace", overflowX: 'auto', lineHeight: '1.5', marginBottom: 'var(--space-4)' }}>
-                      <code>{children}</code>
-                    </pre>
-                  );
-                }
-                return (
-                  <code style={{ background: 'var(--grey-100)', padding: '1px 4px', fontSize: '8pt', fontFamily: "'SF Mono', monospace", border: '1px solid var(--border-light)' }}>{children}</code>
-                );
-              },
-              pre: ({ children }) => <>{children}</>,
-              blockquote: ({ children }) => (
-                <blockquote style={{ borderLeft: '3px solid var(--border-medium)', paddingLeft: 'var(--space-4)', margin: 'var(--space-3) 0', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '9pt' }}>{children}</blockquote>
-              ),
-              hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: 'var(--space-6) 0' }} />,
-              strong: ({ children }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,
-              a: ({ href, children }) => (
-                <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{children}</a>
-              ),
-            }}
-          >
+          {teaserParts?.hasKeyFigures ? (
+            <>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{teaserParts.intro}</ReactMarkdown>
+              <TechStackStrip />
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{teaserParts.middle}</ReactMarkdown>
+              <KeyFiguresWithCharts />
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{teaserParts.after}</ReactMarkdown>
+            </>
+          ) : (
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {doc.content}
           </ReactMarkdown>
+          )}
         </div>
 
         <div style={{
