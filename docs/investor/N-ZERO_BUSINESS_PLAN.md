@@ -574,7 +574,7 @@ Sole architect of the N-Zero platform, responsible for the complete technology s
 | Field | Detail |
 |-------|--------|
 | Legal Name | Nuke Ltd |
-| Incorporation | Nevada, 2025 |
+| Incorporation | Nevada, 2022 |
 | Address | 676 Wells Rd, Boulder City, NV 89005, USA |
 | Website | [nukeltd.com](https://www.nukeltd.com) |
 | Email | info@nukeltd.com |
@@ -764,7 +764,7 @@ All 768K vehicles have been built entirely from freely available public data sou
 
 | Detail | Value |
 |--------|-------|
-| Legal entity | Nuke Ltd (Nevada, 2025) |
+| Legal entity | Nuke Ltd (Nevada, 2022) |
 | Authorized shares | 10,000,000 Common Stock |
 | Issued & outstanding | 1,000,000 |
 | Founder ownership | 100% (Skylar Williams) |

@@ -7,11 +7,11 @@
 
 ### The Opportunity
 
-N-Zero is the data infrastructure layer for the collector vehicle market. Built by Nuke, the platform aggregates, structures, and scores vehicle data from across the fragmented collector ecosystem - turning scattered history into structured, tradable intelligence.
+N-Zero is a **data layer and provenance engine**: a database-structured backbone that integrates seamlessly into any workflow. We aggregate, structure, and score vehicle data from across fragmented sources—turning scattered history into structured, auditable intelligence. Our API can be used in any workflow, human or agent.
 
-There are 43 million collector vehicles in the United States representing over $1 trillion in asset value - yet the market has no unified data backbone. Vehicle histories are fragmented across auction houses, forums, registries, service shops, and private collections. Auction and online sales alone reached $4.8 billion in 2025, growing 10% year-over-year. N-Zero is the system of record that connects all of them.
+**The value problem:** Even at best, vehicle data is hardly tracked. Histories live in auction houses, forums, registries, shops, and private collections with no unified system of record. That gap is the opportunity. We provide the backbone so that vehicles—as **stores of value**, investible assets, and value creators—can be **valued, verified, and financed** with real data. In theory, these commodities could be owned by AI or other entities as vessels of commerce; we aim to help facilitate the **legal storage and ownership** of the asset class of vehicles for entities, users, and organizations.
 
-**We are not an AI wrapper. We are the vehicle the AI drives and maintains.**
+There are 43 million vehicles in the United States that function as stores of value, representing over $1 trillion in asset value. Auction and online sales alone reached $4.8 billion in 2025, growing 10% year-over-year. N-Zero is the system of record that connects them.
 
 ---
 
@@ -38,11 +38,11 @@ There are 43 million collector vehicles in the United States representing over $
 
 N-Zero is a vertically-integrated data platform:
 
-1. **Ingestion** - Autonomous extraction from 80+ source types (auctions, forums, registries, shops, social media, government databases). 310 microservices running continuously.
+1. **Ingestion** - Three paths. **Agentic extraction** is primary: AI-driven pipelines that discover, fetch, and structure data from 80+ source types (auctions, forums, registries, shops, social media, government databases) with minimal human intervention; 310 microservices run continuously. **Traditional fallback tooling** (scheduled scrapers, APIs, Firecrawl) handles sources where agentic flows aren’t deployed yet. **User-driven ingestion**: users grant access via the app or by downloading our software and interact through text messaging; the system is fully agentic end-to-end—like a ClawdBot for car data. Users just give us access; we do the rest.
 
 2. **Intelligence** - AI-powered analysis of every data point: sentiment scoring, valuation estimation, provenance verification, image classification. Every observation is immutable and confidence-scored.
 
-3. **Distribution** - Production TypeScript SDK, RESTful API, webhooks for real-time events. Third parties build on N-Zero.
+3. **Distribution** - Production TypeScript SDK, RESTful API, webhooks for real-time events. An API that can be used in any workflow, human or agent. Third parties build on N-Zero.
 
 **In-House Technology:**
 - **YONO** ("You Only Nuke Once") - Proprietary vehicle image classification trained on 100K+ labeled images
@@ -107,7 +107,7 @@ N-Zero's architecture serves three stakeholder groups:
 - **Vehicles** (the assets themselves) - Complete provenance timelines, valuation scoring, condition intelligence
 - **Users** (collectors, investors, enthusiasts) - Transparent market data for buying, selling, and financing decisions
 
-The platform enables a future where collector vehicles can be **valued, verified, and financed** with the same data confidence as real estate or public equities.
+We offer an **API** that plugs into any workflow—human or agent. The platform enables a future where vehicles as stores of value can be **valued, verified, and financed** with the same data confidence as real estate or public equities, and where legal storage and ownership of the asset class can be facilitated for any entity.
 
 ---
 
@@ -117,7 +117,7 @@ The platform enables a future where collector vehicles can be **valued, verified
 
 Sole founder and architect of Nuke Ltd and the N-Zero platform. Designed and built the entire technology stack: 310 microservices, 922-table database architecture, proprietary ML pipeline (YONO), autonomous extraction coordinator (Ralph Wiggum), and production TypeScript SDK. The platform processes 8,320+ vehicles per day with zero additional headcount.
 
-**Nuke Ltd** - Nevada corporation (2025). 676 Wells Rd, Boulder City, NV 89005. [nukeltd.com](https://www.nukeltd.com)
+**Nuke Ltd** - Nevada corporation (2022). 676 Wells Rd, Boulder City, NV 89005. [nukeltd.com](https://www.nukeltd.com)
 
 ---
 
@@ -126,6 +126,8 @@ Sole founder and architect of Nuke Ltd and the N-Zero platform. Designed and bui
 | Stream | How It Works |
 |--------|-------------|
 | Auction lead commissions | AI matches vehicles to optimal auction houses. Commission on placements. |
+| Consignment | We place inventory (vehicles, parts) with the right buyer or venue; we earn a cut when it sells (like auction lead commissions). |
+| Labor & job brokering | Like Uber for work: we match jobs to workers. Users log what they do, we ingest and send them jobs; they accept the contract and deliver. We earn when the match closes. |
 | Parts sales (AI-recommended) | Platform recommends parts/services based on vehicle data. % on sales. |
 | Transaction escrow | Data-backed escrow for peer-to-peer vehicle transactions. |
 | Derivative & asset market | SEC-filed regulated market for collector vehicles as an asset class. |

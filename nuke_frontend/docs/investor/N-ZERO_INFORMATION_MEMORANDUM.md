@@ -89,21 +89,22 @@ Fundraising of **$2,000,000** via Post-Money SAFE (Y Combinator standard) at an 
 | Denomination | Nuke Ltd |
 | Legal Name | Nuke Ltd |
 | Headquarters | 676 Wells Rd, Boulder City, NV 89005, USA |
-| Date of establishment | 2025 |
+| Date of establishment | 2022 |
 | Incorporation | State of Nevada |
 | NAICS Code | 811111 |
 | Corporate structure | Nevada corporation, single founder |
-| Activity | Collector vehicle data infrastructure platform |
+| Activity | Vehicle data infrastructure & provenance platform (stores of value, investible assets) |
 | Founder & CEO | Skylar Williams |
 | Website | [nukeltd.com](https://www.nukeltd.com) |
 | Email | info@nukeltd.com |
-| Phone | (314) 192-5352 |
+| Phone | (702) 624-6793 |
 
 ### History / Key Milestones
 
 | Date | Milestone |
 |------|-----------|
-| 2025 (early) | Initial development begins |
+| 2022 | Nuke Ltd founded (Nevada) |
+| 2025 (early) | N-Zero platform development accelerates |
 | Sep-Nov 2025 | Seed data (~100 vehicles), architecture design |
 | Dec 2025 | Pipeline activation - 9,697 vehicles extracted |
 | Jan 2026 | Autonomous operation begins - 196,417 vehicles added |
@@ -144,8 +145,9 @@ N-Zero's advisory model reflects its autonomous architecture: AI advisory agents
 The N-Zero platform is organized around five layers:
 
 **Layer 1: Ingestion**
-- 310 Deno TypeScript edge functions
-- Autonomous extraction from auctions, forums, registries, shops, social media, government DBs
+- **Agentic extraction** (primary): AI-driven pipelines from 80+ source types; 310 edge functions run continuously.
+- **Traditional fallback**: Scheduled scrapers, APIs, Firecrawl where agentic flows aren’t deployed.
+- **User-driven**: Users grant access via the app or by downloading our software and interact through text messaging; fully agentic end-to-end (e.g. ClawdBot-style for car data). Users give access; we do the rest.
 - Self-healing queue management (Ralph Wiggum coordinator)
 - Queue stats: 241,914 completions, 69 pending, system running continuously
 
@@ -364,14 +366,14 @@ Source Layer (80+ types)
     ├── Marketplaces → listing scrapers (Hagerty, Classic Driver)
     ├── Social media → content monitoring (Instagram, YouTube)
     ├── Shops → partner API / manual intake
-    └── Owner input → direct submission portal
+    └── Owner input → direct submission portal / app / text messaging
     │
     ▼
-Ingestion Layer (310 edge functions)
+Ingestion Layer (three paths)
     │
-    ├── URL → Firecrawl (JavaScript rendering) → HTML → AI extraction
-    ├── API → Direct integration → Structured data
-    └── Manual → Upload portal → AI extraction
+    ├── Agentic extraction → 310 edge functions, AI-driven discovery & structuring (primary)
+    ├── Traditional fallback → Scheduled scrapers, APIs, Firecrawl where agentic not yet deployed
+    └── User-driven → App or download; users grant access, interact via text; fully agentic (e.g. ClawdBot for car data)
     │
     ▼
 Observation Store (immutable, bitemporal)
@@ -658,6 +660,8 @@ Every revenue stream is aligned with ecosystem participant success:
 | Stream | Mechanism | Data Basis |
 |--------|-----------|-----------|
 | **Auction lead commissions** | AI matches vehicles to optimal auction houses. Commission on placements. | 119,579 auction events, seller behavior patterns |
+| **Consignment** | We place inventory (vehicles, parts) with the right buyer or venue; we earn a cut when it sells (like auction lead commissions). | Same pipeline as auction leads extended to consignment |
+| **Labor & job brokering** | Like Uber for work: we match jobs to workers. Users log what they do, we ingest and send them jobs; they accept the contract and deliver. We earn when the match closes. | User-contributed work history and skills; job posts and contracts |
 | **Parts sales (AI-recommended)** | Platform recommends parts/services based on vehicle data. % on sales. | 768K vehicles, 58K build posts, 10.8M comments |
 | **Transaction escrow** | Data-backed escrow for peer-to-peer transactions. Fee on completed sales. | $41.6B tracked volume, trust scoring |
 | **Derivative & asset market** | SEC-filed regulated market for collector vehicles as asset class. Trading fees. | 474K valuations, 237K price histories |
@@ -666,7 +670,7 @@ Every revenue stream is aligned with ecosystem participant success:
 | **API access** | Tiered B2B data subscriptions for developers and organizations. | 310 microservices, production SDK |
 | **Live auction prediction market** | Kalshi-style prediction contracts on live auction outcomes. Viewers predict final prices in real-time; closest prediction wins. | 10.8M comments, 3.4M bids prove audience engagement. CFTC-regulated framework (Designated Contract Market). |
 
-**Conservative Year 1 Revenue Estimate: $4-5M blended** across auction commissions, parts commissions, escrow fees, API subscriptions, and prediction market rake.
+**Conservative Year 1 Revenue Estimate: $4-5M blended** across auction commissions, consignment, labor/job brokering, parts commissions, escrow fees, API subscriptions, and prediction market rake.
 
 ### Cost Structure (Current)
 
@@ -705,6 +709,8 @@ All 768K vehicles have been built entirely from freely available public data sou
 |--------|------|------|------|
 | API subscriptions | $300K | $1.5M | $5M |
 | Auction lead commissions | $500K | $2M | $5M |
+| Consignment | TBD | TBD | TBD |
+| Labor/job brokering | TBD | TBD | TBD |
 | Parts commissions | $100K | $500K | $2M |
 | Escrow fees | $0 | $500K | $3M |
 | Prediction market | $0 | $500K | $2M |
@@ -1041,5 +1047,5 @@ Owner of a 1970 Plymouth 'Cuda receives AI alert: "Based on 47 similar vehicles 
 
 *This document is confidential and intended only for the addressee.*
 *All data from live system queries on February 8, 2026.*
-*N-Zero is a project of Nuke Ltd (Nevada, 2025).*
+*N-Zero is a project of Nuke Ltd (Nevada, 2022).*
 *Skylar Williams, Founder & CEO*

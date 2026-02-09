@@ -89,7 +89,7 @@ Fundraising of **$2,000,000** via Post-Money SAFE (Y Combinator standard) at an 
 | Denomination | Nuke Ltd |
 | Legal Name | Nuke Ltd |
 | Headquarters | 676 Wells Rd, Boulder City, NV 89005, USA |
-| Date of establishment | 2025 |
+| Date of establishment | 2022 |
 | Incorporation | State of Nevada |
 | NAICS Code | 811111 |
 | Corporate structure | Nevada corporation, single founder |
@@ -97,13 +97,14 @@ Fundraising of **$2,000,000** via Post-Money SAFE (Y Combinator standard) at an 
 | Founder & CEO | Skylar Williams |
 | Website | [nukeltd.com](https://www.nukeltd.com) |
 | Email | info@nukeltd.com |
-| Phone | (314) 192-5352 |
+| Phone | (702) 624-6793 |
 
 ### History / Key Milestones
 
 | Date | Milestone |
 |------|-----------|
-| 2025 (early) | Initial development begins |
+| 2022 | Nuke Ltd founded (Nevada) |
+| 2025 (early) | N-Zero platform development accelerates |
 | Sep-Nov 2025 | Seed data (~100 vehicles), architecture design |
 | Dec 2025 | Pipeline activation - 9,697 vehicles extracted |
 | Jan 2026 | Autonomous operation begins - 196,417 vehicles added |
@@ -1041,5 +1042,5 @@ Owner of a 1970 Plymouth 'Cuda receives AI alert: "Based on 47 similar vehicles 
 
 *This document is confidential and intended only for the addressee.*
 *All data from live system queries on February 8, 2026.*
-*N-Zero is a project of Nuke Ltd (Nevada, 2025).*
+*N-Zero is a project of Nuke Ltd (Nevada, 2022).*
 *Skylar Williams, Founder & CEO*

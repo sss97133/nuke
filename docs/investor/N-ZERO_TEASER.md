@@ -117,7 +117,7 @@ The platform enables a future where collector vehicles can be **valued, verified
 
 Sole founder and architect of Nuke Ltd and the N-Zero platform. Designed and built the entire technology stack: 310 microservices, 922-table database architecture, proprietary ML pipeline (YONO), autonomous extraction coordinator (Ralph Wiggum), and production TypeScript SDK. The platform processes 8,320+ vehicles per day with zero additional headcount.
 
-**Nuke Ltd** - Nevada corporation (2025). 676 Wells Rd, Boulder City, NV 89005. [nukeltd.com](https://www.nukeltd.com)
+**Nuke Ltd** - Nevada corporation (2022). 676 Wells Rd, Boulder City, NV 89005. [nukeltd.com](https://www.nukeltd.com)
 
 ---
 

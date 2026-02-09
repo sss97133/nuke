@@ -231,7 +231,7 @@ At different API pricing tiers:
 2. ~~**Founder bios**~~ → Skylar Williams, Founder & CEO. Found in DB (business_related_persons). ✅
 3. ~~**Revenue model**~~ → 8-stream model documented ✅
 4. ~~**The ask**~~ → $2M Post-Money SAFE, $18M cap, detailed use of funds ✅
-5. ~~**Legal entity**~~ → Nuke Ltd, Nevada 2025, 10M auth / 1M issued, 100% founder, $0 debt ✅
+5. ~~**Legal entity**~~ → Nuke Ltd, Nevada 2022, 10M auth / 1M issued, 100% founder, $0 debt ✅
 6. ~~**Competitive positioning narrative**~~ → "Enabler, Not Competitor" ✅
 7. ~~**Visual identity**~~ → Retro-modern Windows 95, #66ccff logo, 20+ automotive themes ✅
 8. ~~**Current monthly burn rate**~~ → ~$1,000-$1,600/mo (Supabase, OpenAI, Anthropic, Cursor, Firecrawl) ✅

@@ -25,15 +25,15 @@
 
 ### What is N-Zero?
 
-N-Zero is the data infrastructure layer for the collector vehicle market. Built by Nuke, it is an autonomous platform that aggregates vehicle data from across the fragmented collector ecosystem - auctions, forums, registries, service shops, social media, government databases, and private collections - and structures it into verified, confidence-scored intelligence.
+N-Zero is a **data layer and provenance engine**: a database-structured backbone that integrates seamlessly into any workflow. Built by Nuke, it aggregates vehicle data from across fragmented sources—auctions, forums, registries, service shops, social media, government databases, and private collections—and structures it into verified, confidence-scored intelligence.
 
-The platform serves organizations, vehicles, and users as the foundational data layer required for the collector vehicle market to mature into a properly valued, financeable asset class.
+Even at best, vehicle data is hardly tracked; the market has no unified system of record. We provide that backbone. The platform serves organizations, vehicles, and users so that **vehicles as stores of value**—investible assets, value creators, commodities that could in theory be owned by AI or other entities as vessels of commerce—can be properly valued, verified, and financed. We help facilitate the **legal storage and ownership** of the asset class for entities, users, and orgs. We offer an **API** that can be used in any workflow, human or agent.
 
-**Core thesis: Collector vehicles represent over $1 trillion in asset value with less data infrastructure than a $200K house.**
+**Core thesis: Vehicles that function as stores of value represent over $1 trillion in asset value with less data infrastructure than a $200K house.**
 
-### What N-Zero Is NOT
+### How N-Zero Is Built
 
-N-Zero is not an AI wrapper around existing data. It is the vehicle - the platform the AI drives and maintains. The system:
+The system:
 
 - Owns the data pipeline (310 microservices extracting from 80+ source types)
 - Owns the data model (922 database tables, source-agnostic observation architecture)
@@ -51,7 +51,7 @@ Every component was built in-house. There is no dependency on any single third-p
 ```
 [80+ Source Types]
     ↓
-[310 Edge Functions - Autonomous Extraction]
+[Ingestion: Agentic | Traditional Fallback | User Messaging]
     ↓
 [Observation Store - Immutable, Confidence-Scored]
     ↓
@@ -62,11 +62,17 @@ Every component was built in-house. There is no dependency on any single third-p
 [Organizations | Vehicles | Users]
 ```
 
+### Ingestion: Three Paths
+
+- **Agentic extraction** — Primary. AI-driven pipelines discover, fetch, and structure data from 80+ source types (auctions, forums, registries, shops, social media, government databases) with minimal human intervention. 310 edge functions run continuously; Ralph Wiggum coordinates queue health, triage, and routing.
+- **Traditional fallback tooling** — Scheduled scrapers, direct APIs, and tools like Firecrawl cover sources where agentic flows aren’t deployed yet. Same observation store and confidence scoring; ingestion path is the only difference.
+- **User-driven (text messaging / app / download)** — Users grant access through the app or by downloading our software and interact via text messaging. The pipeline is fully agentic: we receive access, then run the same discovery and structuring without manual steps—like a ClawdBot for car data. Users give access; we do the rest.
+
 ### Technology Stack
 
 | Layer | Technology | Scale |
 |-------|-----------|-------|
-| **Ingestion** | 310 Deno TypeScript edge functions | Processing 8,320+ vehicles/day autonomously |
+| **Ingestion** | Agentic + fallback + user messaging; 310 Deno TypeScript edge functions | Processing 8,320+ vehicles/day autonomously |
 | **Database** | PostgreSQL (Supabase) | 100 GB, 922 tables, 768K vehicles |
 | **Backend** | Elixir/Phoenix | High-concurrency, fault-tolerant |
 | **Frontend** | React TypeScript | 93+ pages/components |
@@ -445,21 +451,27 @@ N-Zero's AI identifies vehicles likely to sell and matches them to the optimal a
 - **Data basis**: 119,579 auction events tracked, seller behavior patterns, platform conversion rates
 - **Example**: System identifies a 1970 Plymouth 'Cuda with positive sentiment (0.85) and growing price trend. Routes to BaT (best fit for muscle cars in this price range). Seller consigns, vehicle sells, N-Zero earns commission.
 
-### Revenue Stream 2: AI-Recommended Parts Sales (Commission %)
+### Revenue Stream 2: Consignment
+We help place inventory (vehicles, parts, or services) with the right buyer or venue—similar to auction lead commissions. When consigned inventory sells, we earn a cut. Same pipeline as auction leads: valuation, demand signals, and placement logic extended to consignment flows.
+
+### Revenue Stream 3: Labor & Job Brokering (Like Uber for Work)
+We broker deals by matching jobs to workers. Users join, log what they do (we ingest that); we match labor to skill set and work, then send them jobs. They accept the contract and deliver. We earn when the match closes. Foundational, large opportunity: skill and work data flows into the platform; we use it to match labor supply to demand.
+
+### Revenue Stream 4: AI-Recommended Parts Sales (Commission %)
 Platform recommends specific parts, services, and maintenance based on vehicle data, owner history, and community intelligence.
 
 - **Mechanism**: % commission on parts sales made through AI recommendations
 - **Data basis**: 768K vehicles with specs, 58K build posts with parts data, 10.8M comments mentioning maintenance/parts
 - **Example**: Owner of a 1973 911T receives alert: "Based on 47 similar vehicles, your engine mounts are likely due for replacement. Here are verified parts from 3 suppliers."
 
-### Revenue Stream 3: Transaction Escrow
+### Revenue Stream 5: Transaction Escrow
 Handle peer-to-peer vehicle transactions with data-backed confidence.
 
 - **Mechanism**: Escrow fee on completed transactions (% of sale price)
 - **Data basis**: $41.6B in tracked transaction volume, trust scoring, provenance verification
 - **Value proposition**: Buyer gets verified data. Seller gets qualified buyers. Both get escrow protection.
 
-### Revenue Stream 4: Derivative & Asset Market (SEC-Filed)
+### Revenue Stream 6: Derivative & Asset Market (SEC-Filed)
 Create a regulated derivative and asset market treating collector vehicles as a proper asset class.
 
 - **Mechanism**: Trading fees on derivative instruments, advisor collaboration fees
@@ -467,21 +479,21 @@ Create a regulated derivative and asset market treating collector vehicles as a 
 - **Regulatory**: SEC filing required. Advisor collaborations for fund structures.
 - **Vision**: Collector vehicles become financeable assets with the same data infrastructure as real estate
 
-### Revenue Stream 5: Sponsorship & Event Collaboration
+### Revenue Stream 7: Sponsorship & Event Collaboration
 Partner with auction houses and events (not compete with them) to create data-enhanced experiences.
 
 - **Mechanism**: Sponsorship fees, event collaboration revenue
 - **Data basis**: 137K organization behavior signals, event demographics
 - **Key principle**: N-Zero does NOT run its own auctions. We enhance others' events.
 
-### Revenue Stream 6: Physical Workspaces (Garages)
+### Revenue Stream 8: Physical Workspaces (Garages)
 Build N-Zero garages and workspaces for builders, restorers, and collectors.
 
 - **Mechanism**: Workspace fees + data loop (work done in N-Zero garages feeds platform data)
 - **Physical-digital loop**: Every repair, restoration, and build creates structured data that increases platform value
 - **Scale-up**: Workspaces increase productivity and generate revenue while deepening the data moat
 
-### Revenue Stream 7: Live Auction Prediction Market
+### Revenue Stream 9: Live Auction Prediction Market
 
 A Kalshi-style prediction market where viewers of live auctions can predict final sale prices in real-time. The closest prediction wins.
 
@@ -492,7 +504,7 @@ A Kalshi-style prediction market where viewers of live auctions can predict fina
 - **Network effect**: Prediction data feeds back into the valuation engine. Each prediction event generates thousands of data points about market perception, creating a real-time crowd-sourced price discovery mechanism.
 - **Why it works**: Collector car auctions are entertainment. 10.8M comments and 3.4M bids prove the community already watches and engages. This monetizes that engagement while generating valuable pricing data.
 
-### Revenue Stream 8: API Access (B2B Data Subscriptions)
+### Revenue Stream 10: API Access (B2B Data Subscriptions)
 Tiered API access for developers, organizations, and third-party builders.
 
 - **Mechanism**: Monthly subscription tiers
@@ -504,6 +516,8 @@ Tiered API access for developers, organizations, and third-party builders.
 | Stream | Year 1 Basis | Conservative Annual |
 |--------|-------------|-------------------|
 | Auction leads (2% commission on $100M GMV) | 1,000 leads placed | $2M |
+| Consignment (cut on placed inventory) | Placed consignment volume | TBD |
+| Labor/job brokering (fee on placed & delivered work) | Matched jobs, user-logged work | TBD |
 | Parts commissions (5% on $10M parts) | 50K recommendations | $500K |
 | Escrow (1% on $50M transactions) | 500 transactions | $500K |
 | API subscriptions ($299/mo x 200 orgs) | 200 subscribers | $718K |
@@ -574,7 +588,7 @@ Sole architect of the N-Zero platform, responsible for the complete technology s
 | Field | Detail |
 |-------|--------|
 | Legal Name | Nuke Ltd |
-| Incorporation | Nevada, 2025 |
+| Incorporation | Nevada, 2022 |
 | Address | 676 Wells Rd, Boulder City, NV 89005, USA |
 | Website | [nukeltd.com](https://www.nukeltd.com) |
 | Email | info@nukeltd.com |
@@ -764,7 +778,7 @@ All 768K vehicles have been built entirely from freely available public data sou
 
 | Detail | Value |
 |--------|-------|
-| Legal entity | Nuke Ltd (Nevada, 2025) |
+| Legal entity | Nuke Ltd (Nevada, 2022) |
 | Authorized shares | 10,000,000 Common Stock |
 | Issued & outstanding | 1,000,000 |
 | Founder ownership | 100% (Skylar Williams) |
@@ -805,7 +819,7 @@ The platform is at an inflection point:
 
 1. **Data moat is established** - 768K vehicles, $41.6B tracked, 28.3M images. This took months of engineering; a competitor starting today would take years to replicate.
 2. **Autonomous growth is proven** - 561,994 vehicles added in 8 days with zero human intervention. The system scales without proportional headcount.
-3. **Revenue model is defined** - 8 revenue streams identified, all aligned with ecosystem success. Conservative Year 1: $1-2M.
+3. **Revenue model is defined** - 10 revenue streams identified, all aligned with ecosystem success. Conservative Year 1: $1-2M.
 4. **Production infrastructure is built** - SDK, API, webhooks all production-ready. B2B integration is a sales problem, not a technology problem.
 5. **Market timing is optimal** - Collector car auction market grew 10% in 2025. Online overtook live for the first time. Generational shift is accelerating demand for data-native tools.
 6. **International markets are untapped** - 192K European-make vehicles and 44K JDM vehicles already tracked, providing a beachhead for EU and Japan expansion.
