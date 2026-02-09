@@ -288,9 +288,9 @@ Analysis of 100,711 vehicles with community sentiment data:
 | Through Nov 2025 | ~100 | Development |
 | Dec 2025 | 9,697 | ~313/day |
 | Jan 2026 | 196,417 | ~6,336/day |
-| Feb 1-8, 2026 | 561,994 | ~70,249/day |
+| Feb 1-8, 2026 | 561,994 | ~70,249/day (foundation for autonomous) |
 
-**At current trajectory (8,320 vehicles/day = ~3M/year), N-Zero is rapidly building coverage across the 43 million collector vehicles in the US.**
+**Feb 1-8 set the foundation for autonomous operation.** From that base, growth trajectory (8,320 vehicles/day = ~3M/year) is rapidly building coverage across the 43 million collector vehicles in the US.
 
 ---
 
