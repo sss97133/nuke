@@ -99,10 +99,32 @@ So the product should expose: file → deal mapping, auto-generated names, and d
 
 ---
 
+## Connect photos (external galleries)
+
+Users should be able to **connect image galleries from external sources** (e.g. **SmugMug**, Flickr, Google Photos, etc.) instead of (or in addition to) uploading files.
+
+- **Same pattern as Bring a Trailer:** We have access to the images but **we don’t download them**—we keep them where they are. We store **references only** (image URLs, album/gallery IDs, optional folder structure).
+- **We still use them in analysis:** When we need to run OCR, extraction, or display, we **fetch by URL** (or use the provider’s API). Analysis runs on the same pipeline (document type, YMM/VIN, separation); we just don’t persist the image bytes in our storage.
+- **Flow:** User connects a gallery (OAuth or API key or share link) → we discover image URLs (and any album/collection structure) → we store those references and link them to a deal/vehicle profile → we run separation and extraction by loading images from the source when needed. Display in the app uses the original URLs (or signed/temporary URLs if the source requires it).
+
+So: **Connect photos** = connect external gallery → reference-only storage → same analysis and organization as uploaded files, without copying the images.
+
+---
+
+## Bulk export and connect to profile
+
+- **Bulk export:** Users need to export all deal jackets in one shot (e.g. one JSON or ZIP) so they can move data into their workflow or the framework. Single-deal export exists; add **bulk export** (all deals + pages) as one file.
+- **Connect to profile:** The data is already tied to a profile in the system, but nobody can use it without **the framework** (n-zero, vehicle profile, org). So we need an explicit **Connect to profile** (or **Open in n-zero**) entry point: from a deal jacket, open the corresponding vehicle/org profile in the app where they have the framework to view and use the data.
+- **Upload photos:** Add an **Upload photos** option that does the **same thing** as the deal jacket flow: image analysis, organization (separate by deal jacket), naming (YMM/VIN), extraction, and link to profile. Same pipeline—just another entry point (e.g. from a vehicle profile: “Upload photos” → same analysis and organization, then attached to that profile).
+
+---
+
 ## Delivered as paid service in n-zero
 
 - This pipeline (file vs folder input, separation, auto-naming, per-car repository, link to org) is the **paid service**.
 - **Transparency** (users see how their data is handled) is part of the product.
+- **Bulk export** and **Connect to profile** make the data usable inside the framework.
+- **Upload photos** (same analysis + organization) is the entry point from profiles.
 - Billing/credits apply to extraction and usage; product surface lives in **n-zero**.
 
 ---
@@ -111,7 +133,8 @@ So the product should expose: file → deal mapping, auto-generated names, and d
 
 | Area | Current | Target |
 |------|---------|--------|
-| Input | Upload files or pick folder (folder → one deal) | **Select file(s)** OR **select folder**; file(s) → we create folder(s) and separate |
+| Input | Upload files or pick folder (folder → one deal) | **Select file(s)** OR **select folder** OR **connect external gallery** (SmugMug, etc.); file(s) → we create folder(s) and separate |
+| External galleries | N/A | **Connect photos:** link SmugMug etc.; store image URLs only, no download; use URLs for analysis (like BaT) |
 | Separation | None (all files → one deal) | Detect “new deal jacket” boundaries; one deal per car |
 | Naming | Manual or folder name | Auto-name from VIN / YMM / date when we create folder |
 | Folder mode | Folder = one deal | Folder = one vehicle profile; create in DB, link to org |

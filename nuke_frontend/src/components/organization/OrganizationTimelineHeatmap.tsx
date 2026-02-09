@@ -14,6 +14,8 @@ interface TimelineEvent {
   business_id: string;
   event_type: string;
   event_date: string;
+  title?: string;
+  description?: string;
   cost_amount?: number;
   labor_hours?: number;
   image_urls?: string[];
@@ -27,9 +29,16 @@ interface OrganizationTimelineHeatmapProps {
 export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapProps> = ({ organizationId }) => {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<any>(null);
+  const [selectedDayCommits, setSelectedDayCommits] = useState<{ date: string; events: TimelineEvent[] } | null>(null);
   const [organization, setOrganization] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const year = new Date().getFullYear();
+
+  // GitHub-style: last 53 weeks (rolling), not calendar year
+  const today = new Date();
+  const rangeEnd = today.toISOString().slice(0, 10);
+  const rangeStartDate = new Date(today);
+  rangeStartDate.setDate(rangeStartDate.getDate() - 364);
+  const rangeStart = rangeStartDate.toISOString().slice(0, 10);
 
   useEffect(() => {
     loadEvents();
@@ -54,8 +63,8 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
         .from('business_timeline_events')
         .select('id, business_id, event_type, event_date, cost_amount, labor_hours, image_urls, metadata, title, description, event_category')
         .eq('business_id', organizationId)
-        .gte('event_date', `${year}-01-01`) // Only load events from the selected year onwards
-        .lte('event_date', `${year}-12-31`) // And up to the end of the selected year
+        .gte('event_date', rangeStart)
+        .lte('event_date', rangeEnd)
         .order('event_date', { ascending: false });
 
       if (error) throw error;
@@ -80,28 +89,21 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
     return new Date().toISOString().split('T')[0];
   };
 
-  // Group events by date with activity metrics
-  // Only include events from the selected year to prevent showing incorrect dates
+  // Group events by date with activity metrics (query already filtered to rangeStart..rangeEnd)
   const daily = new Map<string, { events: TimelineEvent[]; count: number; hours: number; value: number; types: Set<string> }>();
-  
+
   for (const event of events) {
     const date = toDateOnly(event.event_date);
-    const eventYear = new Date(date).getFullYear();
-    
-    // Only process events that fall within the selected year
-    // This prevents events with incorrect dates (e.g., 2022 auctions dated as 2025) from appearing
-    if (eventYear !== year) {
-      continue;
-    }
-    
+    if (date < rangeStart || date > rangeEnd) continue;
+
     const entry = daily.get(date) || { events: [], count: 0, hours: 0, value: 0, types: new Set() };
-    
+
     entry.events.push(event);
     entry.count++;
     entry.hours += event.labor_hours || 0;
     entry.value += event.cost_amount || 0;
     entry.types.add(event.event_type);
-    
+
     daily.set(date, entry);
   }
 
@@ -116,11 +118,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
   const calculateMaxStreak = (): number => {
     let maxStreak = 0;
     let currentStreak = 0;
-    const today = new Date().toISOString().split('T')[0];
-    const start = new Date(today);
-    start.setDate(start.getDate() - 364);
-
-    for (let d = new Date(start); d <= new Date(today); d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(rangeStart); d <= new Date(rangeEnd); d.setDate(d.getDate() + 1)) {
       const date = d.toISOString().split('T')[0];
       const count = daily.get(date)?.count || 0;
       if (count > 0) {
@@ -135,21 +133,16 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
 
   const calculateCurrentStreak = (): number => {
     let streak = 0;
-    const today = new Date().toISOString().split('T')[0];
-    const start = new Date(today);
-    start.setDate(start.getDate() - 364);
-
     const dates: string[] = [];
-    for (let d = new Date(start); d <= new Date(today); d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(rangeStart); d <= new Date(rangeEnd); d.setDate(d.getDate() + 1)) {
       dates.push(d.toISOString().split('T')[0]);
     }
-
     for (let i = dates.length - 1; i >= 0; i--) {
       const date = dates[i];
       const count = daily.get(date)?.count || 0;
-      if (date <= today && count > 0) {
+      if (date <= rangeEnd && count > 0) {
         streak++;
-      } else if (date <= today) {
+      } else if (date <= rangeEnd) {
         break;
       }
     }
@@ -159,15 +152,20 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
   const maxStreak = calculateMaxStreak();
   const currentStreak = calculateCurrentStreak();
 
-  // Color intensity - Green shades for organization activity
+  // Color intensity - Green shades; GitHub-style levels for commit-only days (by count)
   const colorForActivity = (hours: number, eventCount: number) => {
-    // If no events at all, return grey
     if (eventCount === 0) return 'var(--heat-0)';
-    
-    // If we have events but no hours (e.g. inventory photos), show light green
-    if (hours <= 0 && eventCount > 0) return 'var(--heat-1)'; // documentation
-    
-    // For actual work hours, use intensity-based colors
+
+    // Events with no hours (e.g. commits, docs): use count-based levels like GitHub
+    if (hours <= 0 && eventCount > 0) {
+      if (eventCount >= 10) return 'var(--heat-5)';
+      if (eventCount >= 6) return 'var(--heat-4)';
+      if (eventCount >= 4) return 'var(--heat-3)';
+      if (eventCount >= 2) return 'var(--heat-2)';
+      return 'var(--heat-1)';
+    }
+
+    // Work hours-based intensity
     if (hours < 1) return 'var(--heat-2)';
     if (hours < 3) return 'var(--heat-3)';
     if (hours < 6) return 'var(--heat-4)';
@@ -184,28 +182,31 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
   const handleDayClick = (date: Date) => {
     const dayYmd = date.toISOString().slice(0, 10);
     const entry = daily.get(dayYmd);
-    
-    if (entry && entry.count > 0) {
-      // Aggregate all images from same-day events for same vehicle
-      const eventsByVehicle = new Map();
-      
-      for (const evt of entry.events) {
-        const vId = evt.metadata?.vehicle_id || 'no-vehicle';
-        if (!eventsByVehicle.has(vId)) {
-          eventsByVehicle.set(vId, { ...evt, aggregated_images: [] });
-        }
-        
-        // Collect images from all events
-        const existing = eventsByVehicle.get(vId);
-        if (evt.image_urls && Array.isArray(evt.image_urls)) {
-          existing.aggregated_images.push(...evt.image_urls);
-        }
-      }
-      
-      // Show the first vehicle's consolidated work order
-      const firstWorkOrder = Array.from(eventsByVehicle.values())[0];
-      setSelectedWorkOrder(firstWorkOrder);
+
+    if (!entry || entry.count === 0) return;
+
+    const allCommits = entry.events.every((e) => e.event_type === 'commit');
+    if (allCommits) {
+      setSelectedDayCommits({ date: dayYmd, events: entry.events });
+      setSelectedWorkOrder(null);
+      return;
     }
+
+    setSelectedDayCommits(null);
+    // Automotive-style: group by vehicle and show work order viewer
+    const eventsByVehicle = new Map();
+    for (const evt of entry.events) {
+      const vId = evt.metadata?.vehicle_id || 'no-vehicle';
+      if (!eventsByVehicle.has(vId)) {
+        eventsByVehicle.set(vId, { ...evt, aggregated_images: [] });
+      }
+      const existing = eventsByVehicle.get(vId);
+      if (evt.image_urls && Array.isArray(evt.image_urls)) {
+        existing.aggregated_images.push(...evt.image_urls);
+      }
+    }
+    const firstWorkOrder = Array.from(eventsByVehicle.values())[0];
+    setSelectedWorkOrder(firstWorkOrder);
   };
 
   return (
@@ -225,33 +226,33 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
         </div>
 
         {/* Mobile scroll hint */}
-        <div style={{ 
-          fontSize: '8pt', 
-          color: 'var(--text-secondary)', 
+        <div style={{
+          fontSize: '8pt',
+          color: 'var(--text-secondary)',
           textAlign: 'center',
           marginBottom: '8px',
           display: 'block'
         }}>
-          ← Swipe to view full year →
+          ← Swipe to view last 53 weeks (GitHub-style) →
         </div>
 
-        {/* Timeline Grid - Mobile-friendly horizontal scroll */}
-        <div 
-          className="timeline-container" 
-          style={{ 
+        {/* Timeline Grid - Rolling 53 weeks like GitHub contribution graph */}
+        <div
+          className="timeline-container"
+          style={{
             position: 'relative',
             overflowX: 'auto',
             overflowY: 'hidden',
-            WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+            WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'thin',
             scrollbarColor: 'rgba(0,0,0,0.2) transparent',
             paddingBottom: '8px'
           }}
         >
-          <div style={{ minWidth: '700px' }}> {/* Ensure full width on mobile */}
+          <div style={{ minWidth: '700px' }}>
             <div
-              key={year}
-              id={`year-${year}`}
+              key={rangeStart}
+              id="timeline-rolling"
               className="rounded-lg p-2"
               style={{
                 background: 'var(--surface)',
@@ -259,9 +260,9 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                 color: 'var(--text)',
               }}
             >
-              {/* Months header */}
+              {/* Month labels for rolling 53 weeks */}
               <div style={{ marginLeft: '30px', marginBottom: '2px' }}>
-                <div 
+                <div
                   style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(53, 12px)',
@@ -269,84 +270,87 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                     justifyContent: 'start'
                   }}
                 >
-                  {Array.from({ length: 12 }, (_, monthIndex) => {
-                    const startWeek = Math.floor((monthIndex * 53) / 12);
-                    const endWeek = Math.floor(((monthIndex + 1) * 53) / 12);
-                    const monthWidth = endWeek - startWeek;
-                    
-                    return (
-                      <div 
-                        key={monthIndex}
+                  {(() => {
+                    const gridStart = new Date(rangeStart);
+                    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+                    const monthLabels: { weekIdx: number; label: string }[] = [];
+                    let lastMonth = -1;
+                    for (let w = 0; w < 53; w++) {
+                      const weekStart = new Date(gridStart);
+                      weekStart.setDate(weekStart.getDate() + w * 7);
+                      const m = weekStart.getMonth();
+                      if (m !== lastMonth) {
+                        monthLabels.push({ weekIdx: w, label: weekStart.toLocaleString('en-US', { month: 'short' }) });
+                        lastMonth = m;
+                      }
+                    }
+                    return monthLabels.map(({ weekIdx, label }, i) => (
+                      <div
+                        key={i}
                         style={{
-                          gridColumn: `${startWeek + 1} / span ${monthWidth}`,
-                          textAlign: 'center',
+                          gridColumn: `${weekIdx + 1} / span ${(monthLabels[i + 1]?.weekIdx ?? 53) - weekIdx}`,
+                          textAlign: 'left',
                           fontSize: '8pt',
                           color: 'var(--text-secondary)',
                           lineHeight: '8px'
                         }}
                       >
-                        {monthIndex + 1}
+                        {label}
                       </div>
-                    );
-                  })}
+                    ));
+                  })()}
                 </div>
               </div>
-              
-              {/* Timeline Grid */}
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--space-3)' }}>
                 <div>
                   {(() => {
-                    const jan1 = new Date(year, 0, 1);
-                    const gridStart = new Date(jan1);
-                    gridStart.setDate(gridStart.getDate() - gridStart.getDay()); // Sunday on/before Jan 1
+                    const gridStart = new Date(rangeStart);
+                    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
                     const totalWeeks = 53;
 
                     return (
                       <div>
-                        <div 
+                        <div
                           className="timeline-grid"
-                          style={{ 
+                          style={{
                             display: 'grid',
                             gridTemplateRows: 'repeat(7, 12px)',
-                            gridTemplateColumns: `repeat(${Math.min(53, totalWeeks)}, 12px)`,
+                            gridTemplateColumns: `repeat(${totalWeeks}, 12px)`,
                             gap: '2px',
                             justifyContent: 'start'
                           }}
                         >
-                          {/* Day boxes: column-first (vertically down, then next column) */}
                           {Array.from({ length: totalWeeks * 7 }, (_, idx) => {
-                            // Calculate column-first position
                             const weekIdx = Math.floor(idx / 7);
                             const dayIdx = idx % 7;
-                            
+
                             const date = new Date(gridStart);
                             date.setDate(date.getDate() + weekIdx * 7 + dayIdx);
-                            const inYear = date.getFullYear() === year;
-                            const dayYmd = date.toISOString().slice(0,10);
-                            const entry = inYear ? daily.get(dayYmd) : undefined;
+                            const dayYmd = date.toISOString().slice(0, 10);
+                            const inRange = dayYmd >= rangeStart && dayYmd <= rangeEnd;
+                            const entry = inRange ? daily.get(dayYmd) : undefined;
                             const hours = entry?.hours || 0;
                             const count = entry?.count || 0;
-                            const clickable = count > 0;
+                            const clickable = inRange && count > 0;
 
                             return (
                               <div
                                 key={idx}
-                                title={`${date.toLocaleDateString()}: ${clickable ? `${count} events • ~${hours.toFixed(1)} hrs${entry?.types ? ` • ${Array.from(entry.types).join(', ')}` : ''}` : 'No activity'}`}
+                                title={`${date.toLocaleDateString()}: ${clickable ? `${count} events • ~${hours.toFixed(1)} hrs${entry?.types ? ` • ${Array.from(entry.types).join(', ')}` : ''}` : inRange ? 'No activity' : ''}`}
                                 className={clickable ? 'hover:ring-2 hover:ring-blue-300 transition-all cursor-pointer' : ''}
                                 onClick={() => {
-                                  if (clickable) {
-                                    handleDayClick(date);
-                                  }
+                                  if (clickable) handleDayClick(date);
                                 }}
                                 style={{
                                   gridRow: dayIdx + 1,
                                   gridColumn: weekIdx + 1,
                                   width: '12px',
                                   height: '12px',
-                                  backgroundColor: inYear ? colorForActivity(hours, count) : 'var(--heat-0)',
+                                  backgroundColor: inRange ? colorForActivity(hours, count) : 'var(--heat-0)',
                                   borderRadius: '2px',
                                   border: clickable ? '1px solid var(--heat-border)' : 'none',
-                                  opacity: inYear ? 1 : 0.3
+                                  opacity: inRange ? 1 : 0.3
                                 }}
                               />
                             );
@@ -356,28 +360,27 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                     );
                   })()}
                 </div>
-                
-                {/* Year button on the right */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'auto', 
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto',
                   gap: 'var(--space-2)',
                   paddingLeft: 'var(--space-2)'
                 }}>
-                  <button
+                  <span
                     className="text-small font-bold"
-                    style={{ 
-                      padding: 'var(--space-1) var(--space-2)', 
-                      fontSize: '8pt', 
+                    style={{
+                      padding: 'var(--space-1) var(--space-2)',
+                      fontSize: '8pt',
                       background: 'var(--grey-200)',
-                      border: '1px inset var(--border-medium)',
+                      border: '1px solid var(--border-medium)',
                       borderRadius: '2px',
                       minWidth: '45px',
                       textAlign: 'center'
                     }}
                   >
-                    {year}
-                  </button>
+                    {rangeStart.slice(0, 4)}–{rangeEnd.slice(0, 4)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -411,15 +414,78 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
         </div>
       </div>
 
-      {/* Work Order Viewer - The Research Terminal */}
-      {selectedWorkOrder && organization && (
+      {/* Commit-only day: list of commits (no automotive receipt) */}
+      {selectedDayCommits && (
+        <div
+          className="card"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            margin: 0,
+            maxHeight: '100vh',
+            overflow: 'auto',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-lg)'
+          }}
+        >
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <h3 className="text font-bold">
+              Activity on {new Date(selectedDayCommits.date + 'Z').toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setSelectedDayCommits(null)}
+              style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}
+            >
+              Close
+            </button>
+          </div>
+          <div className="card-body" style={{ padding: 'var(--space-3)' }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {selectedDayCommits.events.map((evt) => {
+                const sha = evt.metadata?.sha as string | undefined;
+                const repo = evt.metadata?.repo as string | undefined;
+                const commitUrl = repo && sha ? `https://github.com/sss97133/${repo}/commit/${sha}` : null;
+                return (
+                  <li
+                    key={evt.id}
+                    style={{
+                      padding: 'var(--space-2) 0',
+                      borderBottom: '1px solid var(--border)'
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                      {evt.title || 'Commit'}
+                    </div>
+                    {evt.description && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: 4 }}>
+                        {evt.description.slice(0, 200)}
+                        {evt.description.length > 200 ? '…' : ''}
+                      </div>
+                    )}
+                    {commitUrl && (
+                      <a href={commitUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: 'var(--link)' }}>
+                        {sha?.slice(0, 7)} →
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Work Order Viewer - automotive receipts (only when day has work-order/vehicle events) */}
+      {selectedWorkOrder && organization && !selectedDayCommits && (
         <WorkOrderViewer
           event={selectedWorkOrder}
           organizationName={organization.business_name}
           laborRate={organization.labor_rate}
           onClose={() => setSelectedWorkOrder(null)}
           onNavigateEvent={(newEvent) => {
-            // Update to show the new event
             setSelectedWorkOrder(newEvent);
           }}
         />

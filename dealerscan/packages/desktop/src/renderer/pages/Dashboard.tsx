@@ -84,10 +84,9 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500 mt-0.5">
                     {deal.total_pages} file{deal.total_pages !== 1 ? 's' : ''}
                     {docCounts[deal.id]?.byType && Object.keys(docCounts[deal.id].byType).length > 0 && (
-                      <> \u00B7 {formatDocumentTypeSummary(docCounts[deal.id].byType)}</>
+                      <> · {formatDocumentTypeSummary(docCounts[deal.id].byType)}</>
                     )}
-                    {deal.vin ? ` \u00B7 ${deal.vin}` : ''}
-                    {deal.sale_price ? ` \u00B7 $${deal.sale_price.toLocaleString()}` : ''}
+                    {deal.sale_price ? ` · $${deal.sale_price.toLocaleString()}` : ''}
                   </p>
                 </div>
                 <div className="text-right">

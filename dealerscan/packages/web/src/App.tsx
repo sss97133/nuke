@@ -8,6 +8,7 @@ import Upload from './pages/Upload'
 import DealView from './pages/DealView'
 import ReviewPage from './pages/ReviewPage'
 import BillingPage from './pages/BillingPage'
+import ConnectPhotos from './pages/ConnectPhotos'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/deal/:id" element={<ProtectedRoute><DealView /></ProtectedRoute>} />
         <Route path="/review/:dealId/:pageId" element={<ProtectedRoute><ReviewPage /></ProtectedRoute>} />
         <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+        <Route path="/connect-photos" element={<ProtectedRoute><ConnectPhotos /></ProtectedRoute>} />
       </Routes>
     </div>
   )

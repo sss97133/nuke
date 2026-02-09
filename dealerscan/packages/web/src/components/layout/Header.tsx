@@ -24,6 +24,9 @@ export default function Header() {
               <Link to="/upload" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
                 <Upload className="w-3.5 h-3.5" /> Upload
               </Link>
+              <Link to="/connect-photos" className="text-sm text-gray-600 hover:text-gray-900">
+                Connect photos
+              </Link>
               <Link to="/billing" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
                 <CreditCard className="w-3.5 h-3.5" /> Billing
               </Link>

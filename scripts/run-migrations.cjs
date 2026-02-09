@@ -49,6 +49,9 @@ async function run() {
       '20260208110000_nuke_ltd_no_vehicle_deals.sql',
       '20260208120000_business_timeline_events_commit_type.sql',
       '20260208130000_business_type_developer_and_nuke.sql',
+      '20260208140000_data_room_access_codes.sql',
+      '20260208140100_data_room_access_code_accept_915.sql',
+      '20260208140200_data_room_access_code_code_only.sql',
     ];
     console.log('No files specified; running:', files.join(', '));
   }

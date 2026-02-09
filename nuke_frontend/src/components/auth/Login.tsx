@@ -24,6 +24,9 @@ const Login = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
 
+  // Support both returnUrl and redirect (used across the app)
+  const getReturnUrl = () => searchParams.get('returnUrl') || searchParams.get('redirect') || '/vehicles';
+
   useEffect(() => {
     const modeParam = searchParams.get('mode');
     if (modeParam === 'signup' || location.pathname === '/signup') {
@@ -69,7 +72,14 @@ const Login = () => {
               password,
             });
 
-            if (signUpError) throw signUpError;
+            if (signUpError) {
+              const msg = signUpError.message || '';
+              if (msg.includes('Database error') || msg.includes('duplicate') || msg.includes('unique')) {
+                setError('Account creation failed (database). Please try again or use a different email.');
+                return;
+              }
+              throw signUpError;
+            }
 
             // Try to sign in again after creating account
             const { error: retryError, data: { user: retryUser } = { user: null } } = await supabase.auth.signInWithPassword({
@@ -80,26 +90,36 @@ const Login = () => {
             if (retryError) throw retryError;
             if (retryUser) {
               // Account created and login successful
-              const returnUrl = searchParams.get('returnUrl') || '/vehicles';
-              navigate(returnUrl);
+              navigate(getReturnUrl());
             }
           } else if (signInError) {
             throw signInError;
           } else if (user) {
             // Login successful
-            const returnUrl = searchParams.get('returnUrl') || '/vehicles';
-            navigate(returnUrl);
+            navigate(getReturnUrl());
           }
         } else {
           // Sign up with email and password
-          const { error } = await supabase.auth.signUp({
+          const { data: signUpData, error } = await supabase.auth.signUp({
             email,
             password,
           });
 
-          if (error) throw error;
+          if (error) {
+            const msg = error.message || '';
+            if (msg.includes('Database error') || msg.includes('duplicate') || msg.includes('unique')) {
+              setError('Account creation failed (database). Please try again or use a different email. If it persists, contact support.');
+            } else {
+              throw error;
+            }
+            return;
+          }
 
-          setMessage('Check your email for the confirmation link');
+          setMessage(
+            signUpData?.user && !signUpData.user.email_confirmed_at
+              ? 'Check your email for the confirmation link. You can sign in after confirming.'
+              : 'Account created. You can sign in now.'
+          );
           setMode('signin');
         }
       } else {
@@ -131,8 +151,7 @@ const Login = () => {
 
           if (user) {
             // Phone auth successful
-            const returnUrl = searchParams.get('returnUrl') || '/vehicles';
-            navigate(returnUrl);
+            navigate(getReturnUrl());
           }
         }
       }
@@ -147,17 +166,15 @@ const Login = () => {
     try {
       setError(null);
       setLoading(true);
-      
-      // REMOTE-ONLY: Always let Supabase handle OAuth redirects
-      // Supabase will redirect to the configured Site URL after authentication
+      try {
+        sessionStorage.setItem('login_return_url', getReturnUrl());
+      } catch {
+        // ignore
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
-        options: {
-          // Supabase handles redirects via dashboard configuration
-          // No localhost dependencies
-        }
+        options: {},
       });
-      
       if (error) throw error;
     } catch (err: any) {
       setError(err.message || 'Failed to login with GitHub');
@@ -169,17 +186,15 @@ const Login = () => {
     try {
       setError(null);
       setLoading(true);
-      
-      // REMOTE-ONLY: Always let Supabase handle OAuth redirects
-      // Supabase will redirect to the configured Site URL after authentication
+      try {
+        sessionStorage.setItem('login_return_url', getReturnUrl());
+      } catch {
+        // ignore
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          // Supabase handles redirects via dashboard configuration
-          // No localhost dependencies
-        }
+        options: {},
       });
-      
       if (error) throw error;
     } catch (err: any) {
       setError(err.message || 'Failed to login with Google');

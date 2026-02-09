@@ -35,7 +35,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'map'>('cards');
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location'>('relevance');
   const [internalFilter, setInternalFilter] = useState<SearchFilter>('all');
-  const [showBazaar, setShowBazaar] = useState(true);
+  const [showBazaar, setShowBazaar] = useState(false);
   const filterBy = activeFilter ?? internalFilter;
   const setFilterBy = onFilterChange ?? setInternalFilter;
 
@@ -250,6 +250,15 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
         }}>
           {searchSummary}
         </p>
+        {searchQuery && Object.keys(typeCounts).length > 0 && (
+          <p style={{ margin: '0 0 8px 0', color: '#444', fontSize: '8pt', fontWeight: 600 }}>
+            {Object.entries(typeCounts)
+              .filter(([, c]) => c > 0)
+              .map(([type]) => typeLabels[type] || type)
+              .join(' · ')}{' '}
+            for "{searchQuery}"
+          </p>
+        )}
 
         {/* Quick Stats */}
         <div style={{

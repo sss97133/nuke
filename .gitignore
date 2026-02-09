@@ -38,6 +38,9 @@ assembly-*.log
 image-scraping.log
 tier1_analysis_errors.log
 
+# Backfill resume state
+.backfill-vehicle-org-claims-last-id
+
 # Runtime data
 pids
 *.pid

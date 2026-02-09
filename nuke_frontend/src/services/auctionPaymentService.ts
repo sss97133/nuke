@@ -9,15 +9,16 @@ import { loadStripe, type Stripe } from '@stripe/stripe-js';
 // Initialize Stripe (use your publishable key)
 let stripePromise: Promise<Stripe | null> | null = null;
 
-const getStripe = () => {
+const getStripe = (): Promise<Stripe | null> => {
   if (!stripePromise) {
     const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
     if (!key) {
-      // Do not call loadStripe with an empty string / undefined.
-      // Returning null keeps the rest of the UI functional when Stripe isn't configured.
       stripePromise = Promise.resolve(null);
     } else {
-      stripePromise = loadStripe(key);
+      stripePromise = loadStripe(key).catch((err) => {
+        console.error('Stripe load failed:', err);
+        return null;
+      });
     }
   }
   return stripePromise;

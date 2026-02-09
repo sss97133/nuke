@@ -1,15 +1,18 @@
 import { getSupabase, getSupabaseUrl } from '../lib/supabase'
 import type { Deal, DocumentPage, ExtractionResult } from '../types'
 
-/** Display name: prefer Year Make Model, then deal_name, then "N deal jackets" so we never show "Untitled Deal". */
+/** Full display name for a deal jacket: Year Make Model + VIN when available, so the row is clearly named. */
 export function formatDealDisplayName(deal: Deal, totalDocs?: number): string {
-  const ymm = [deal.year, deal.make, deal.model].filter(Boolean).join(' ').trim()
-  if (ymm) return ymm
   const merged = deal.merged_data as Record<string, unknown> | undefined
-  if (merged?.year || merged?.make || merged?.model) {
-    const mergedYmm = [merged.year, merged.make, merged.model].filter(Boolean).join(' ').trim()
-    if (mergedYmm) return mergedYmm
-  }
+  const ymm =
+    [deal.year, deal.make, deal.model].filter(Boolean).join(' ').trim() ||
+    (merged?.year || merged?.make || merged?.model
+      ? [merged.year, merged.make, merged.model].filter(Boolean).join(' ').trim()
+      : '')
+  const vin = (deal.vin || (merged?.vin as string) || '').trim()
+  if (ymm && vin) return `${ymm} · ${vin}`
+  if (ymm) return ymm
+  if (vin) return vin
   if (deal.deal_name?.trim()) return deal.deal_name.trim()
   const n = totalDocs ?? deal.total_pages ?? 0
   return n > 0 ? `${n} deal jacket${n === 1 ? '' : 's'}` : 'Deal jacket'
@@ -250,4 +253,38 @@ export function exportDealAsCsv(deal: Deal): string {
     .map(([k, v]) => `"${k}","${String(v ?? '').replace(/"/g, '""')}"`)
 
   return 'Field,Value\n' + rows.join('\n')
+}
+
+/** Bulk export: all deal jackets (deal + pages) as one JSON file for use in the framework. */
+export async function exportAllDealsAsJson(): Promise<string> {
+  const deals = await getDeals()
+  const pagesByDeal = await Promise.all(deals.map((d) => getDealPages(d.id)))
+  const deal_jackets = deals.map((deal, i) => {
+    const pages = pagesByDeal[i] || []
+    return {
+      deal: {
+        id: deal.id,
+        deal_name: deal.deal_name,
+        vin: deal.vin,
+        year: deal.year,
+        make: deal.make,
+        model: deal.model,
+        owner_name: deal.owner_name,
+        sale_price: deal.sale_price,
+        deal_date: deal.deal_date,
+        merged_data: deal.merged_data,
+        total_pages: deal.total_pages,
+      },
+      pages: pages.map((p) => ({
+        document_type: p.document_type,
+        extracted_data: { ...p.extracted_data, ...p.user_edits },
+        original_filename: p.original_filename,
+      })),
+    }
+  })
+  return JSON.stringify(
+    { exported_at: new Date().toISOString(), deal_jackets },
+    null,
+    2
+  )
 }

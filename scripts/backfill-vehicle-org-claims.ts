@@ -26,10 +26,16 @@ async function main() {
   const supabase = createClient(supabaseUrl, supabaseKey);
   let totalSeller = 0;
   let totalPlatform = 0;
+  const stateFile = process.env.BACKFILL_STATE_FILE || '.backfill-vehicle-org-claims-last-id';
+  const fs = await import('fs');
   let lastId: string | null = null;
+  try {
+    const s = fs.readFileSync(stateFile, 'utf8').trim();
+    if (s) lastId = s;
+  } catch (_) {}
   let n = 0;
 
-  console.log(`Backfilling vehicle-org claims from bat_listings (batch size ${BATCH_SIZE})...`);
+  console.log(`Backfilling vehicle-org claims from bat_listings (batch size ${BATCH_SIZE})${lastId ? ` resuming after ${lastId.slice(0, 8)}...` : '...'}`);
 
   while (true) {
     const { data, error } = await supabase.rpc('backfill_vehicle_org_claims_from_bat_listings', {
@@ -58,7 +64,11 @@ async function main() {
     }
 
     process.stdout.write(`  Batch ${n}: seller +${insertedSeller} platform +${insertedPlatform} (total s:${totalSeller} p:${totalPlatform})\r`);
-    if (!lastId) break;
+    if (lastId) fs.writeFileSync(stateFile, lastId);
+    if (!lastId) {
+      try { fs.unlinkSync(stateFile); } catch (_) {}
+      break;
+    }
   }
 
   console.log('\nRefreshing total_vehicles for all orgs...');

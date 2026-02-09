@@ -1124,13 +1124,14 @@ export default function OrganizationProfile() {
       // Vehicles (simplified, load in background)
       (async () => {
         try {
-          const pageSize = 100;
+          const pageSize = 2000;
+          const maxVehiclesToLoad = 5000;
           let offset = 0;
           let orgVehicles: any[] = [];
           let vehiclesError: any = null;
           let hasMore = true;
 
-          while (hasMore) {
+          while (hasMore && orgVehicles.length < maxVehiclesToLoad) {
             const { data, error } = await supabase
               .from('organization_vehicles')
               .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, sale_price, listing_status, asking_price, cost_basis, days_on_lot')
@@ -1158,65 +1159,45 @@ export default function OrganizationProfile() {
             return;
           }
 
-          // OPTIMIZED: Batch load all vehicle data instead of N+1 queries
           const vehicleIds = (orgVehicles || []).map((ov: any) => ov.vehicle_id).filter(Boolean);
           const now = new Date().toISOString();
           const nowDate = now.split('T')[0];
-          
-          // Batch load all vehicles, images, and auctions at once
-          // Load ACTIVE auctions for display AND SOLD/ENDED listings for sold detection
-          const [allVehicles, allImages, allNativeAuctions, allExternalAuctions, allBatAuctions, soldExternalListings, soldBatListings, endedVehicleListings, allExternalListings] = await Promise.all([
-            vehicleIds.length > 0 ? supabase
-              .from('vehicles')
-              .select('id, year, make, model, vin, current_value, asking_price, purchase_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome')
-              .in('id', vehicleIds) : { data: [], error: null },
-            vehicleIds.length > 0 ? supabase
-              .from('vehicle_images')
-              .select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at')
-              .in('vehicle_id', vehicleIds)
-              .order('is_primary', { ascending: false })
-              .order('created_at', { ascending: true }) : { data: [], error: null },
-            vehicleIds.length > 0 ? supabase
-              .from('vehicle_listings')
-              .select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents')
-              .in('vehicle_id', vehicleIds)
-              .eq('status', 'active')
-              .in('sale_type', ['auction', 'live_auction'])
-              .gt('auction_end_time', now) : { data: [], error: null },
-            vehicleIds.length > 0 ? supabase
-              .from('external_listings')
-              .select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
-              .in('vehicle_id', vehicleIds)
-              .gt('end_date', now) : { data: [], error: null },
-            vehicleIds.length > 0 ? supabase
-              .from('bat_listings')
-              .select('vehicle_id, id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url, bat_listing_title')
-              .in('vehicle_id', vehicleIds)
-              .gt('auction_end_date', nowDate) : { data: [], error: null },
-            // NEW: Load SOLD external listings for comprehensive sold detection
-            vehicleIds.length > 0 ? supabase
-              .from('external_listings')
-              .select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, final_price, sold_at, platform')
-              .in('vehicle_id', vehicleIds)
-              .eq('listing_status', 'sold') : { data: [], error: null },
-            // NEW: Load SOLD/ENDED bat listings
-            vehicleIds.length > 0 ? supabase
-              .from('bat_listings')
-              .select('vehicle_id, id, organization_id, listing_status, auction_end_date, final_bid, bat_listing_title')
-              .in('vehicle_id', vehicleIds)
-              .in('listing_status', ['sold', 'ended']) : { data: [], error: null },
-            // NEW: Load ENDED vehicle listings (past end date implies sold/ended)
-            vehicleIds.length > 0 ? supabase
-              .from('vehicle_listings')
-              .select('vehicle_id, id, status, auction_end_time')
-              .in('vehicle_id', vehicleIds)
-              .lte('auction_end_time', now) : { data: [], error: null },
-            // NEW: Load ALL external listings (to check for ended auctions)
-            vehicleIds.length > 0 ? supabase
-              .from('external_listings')
-              .select('vehicle_id, id, listing_status, end_date')
-              .in('vehicle_id', vehicleIds) : { data: [], error: null }
+
+          const CHUNK = 200;
+          const chunk = <T,>(arr: T[], size: number): T[][] => {
+            const out: T[][] = [];
+            for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+            return out;
+          };
+          const idsChunks = chunk(vehicleIds, CHUNK);
+
+          const runChunked = async (fn: (ids: string[]) => Promise<{ data: any[] | null }>) => {
+            if (idsChunks.length === 0) return [];
+            const results = await Promise.all(idsChunks.map(fn));
+            return results.flatMap(r => r.data || []);
+          };
+
+          const [allVehiclesData, allImagesData, allNativeAuctionsData, allExternalAuctionsData, allBatAuctionsData, soldExternalListingsData, soldBatListingsData, endedVehicleListingsData, allExternalListingsData] = await Promise.all([
+            runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, purchase_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
+            runChunked(ids => supabase.from('vehicle_images').select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at').in('vehicle_id', ids).order('is_primary', { ascending: false }).order('created_at', { ascending: true })),
+            runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents').in('vehicle_id', ids).eq('status', 'active').in('sale_type', ['auction', 'live_auction']).gt('auction_end_time', now)),
+            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata').in('vehicle_id', ids).gt('end_date', now)),
+            runChunked(ids => supabase.from('bat_listings').select('vehicle_id, id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url, bat_listing_title').in('vehicle_id', ids).gt('auction_end_date', nowDate)),
+            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, final_price, sold_at, platform').in('vehicle_id', ids).eq('listing_status', 'sold')),
+            runChunked(ids => supabase.from('bat_listings').select('vehicle_id, id, organization_id, listing_status, auction_end_date, final_bid, bat_listing_title').in('vehicle_id', ids).in('listing_status', ['sold', 'ended'])),
+            runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, auction_end_time').in('vehicle_id', ids).lte('auction_end_time', now)),
+            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, listing_status, end_date').in('vehicle_id', ids)),
           ]);
+
+          const allVehicles = { data: allVehiclesData };
+          const allImages = { data: allImagesData };
+          const allNativeAuctions = { data: allNativeAuctionsData };
+          const allExternalAuctions = { data: allExternalAuctionsData };
+          const allBatAuctions = { data: allBatAuctionsData };
+          const soldExternalListings = { data: soldExternalListingsData };
+          const soldBatListings = { data: soldBatListingsData };
+          const endedVehicleListings = { data: endedVehicleListingsData };
+          const allExternalListings = { data: allExternalListingsData };
           
           // Build lookup maps for O(1) access
           const vehiclesById = new Map((allVehicles.data || []).map(v => [v.id, v]));
@@ -2121,9 +2102,9 @@ export default function OrganizationProfile() {
               marginBottom: '16px',
             }}>
               {[
-                { label: 'Vehicles', value: vehicles.length },
-                { label: 'Images', value: images.length },
-                { label: 'Events', value: timelineEvents.length },
+                { label: 'Vehicles', value: (organization?.total_vehicles != null && organization.total_vehicles > 0) ? organization.total_vehicles : vehicles.length },
+                { label: 'Images', value: (organization?.total_images != null && organization.total_images > 0) ? organization.total_images : images.length },
+                { label: 'Events', value: (organization?.total_events != null && organization.total_events > 0) ? organization.total_events : timelineEvents.length },
                 ...(organization.estimated_value || organization.current_value ? [{
                   label: 'Est. Value',
                   value: formatUsd(organization.estimated_value || organization.current_value || 0),
@@ -2220,11 +2201,7 @@ export default function OrganizationProfile() {
                   )}
                 </div>
                 <div style={{ fontSize: '10pt', color: 'var(--text)', lineHeight: 1.5 }}>
-                  {extractionCoverage.extracted != null && extractionCoverage.target != null
-                    ? `${(extractionCoverage.extracted / 1000).toFixed(0)}k of ~${(extractionCoverage.target / 1000).toFixed(0)}k listings loaded`
-                    : extractionCoverage.extracted != null
-                      ? `${(extractionCoverage.extracted / 1000).toFixed(0)}k loaded`
-                      : `~${extractionCoverage.target != null ? (extractionCoverage.target / 1000).toFixed(0) : ''}k targeted`}
+                  {extractionCoverage.extracted != null && `${(extractionCoverage.extracted / 1000).toFixed(0)}k listings`}
                   {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
                     <span> · {extractionCoverage.queue_pending.toLocaleString()} in queue · <strong style={{ color: 'var(--blue-600)' }}>loading in…</strong></span>
                   )}
@@ -2405,6 +2382,11 @@ export default function OrganizationProfile() {
                 </div>
               </div>
               <div className="card-body">
+                {organization?.total_vehicles != null && organization.total_vehicles > vehicles.length && vehicles.length > 0 && (
+                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    Showing first {vehicles.length.toLocaleString()} of {organization.total_vehicles.toLocaleString()} vehicles.
+                  </div>
+                )}
                 {(() => {
                   // For service orgs: show service vehicles
                   // For inventory orgs: show vehicles for sale
@@ -2730,12 +2712,27 @@ export default function OrganizationProfile() {
         )}
 
         {activeTab === 'vehicles' && (
-            <EnhancedDealerInventory
-              organizationId={organizationId!}
-              userId={session?.user?.id || null}
-              canEdit={canEdit}
-              isOwner={isOwner}
-            />
+            <>
+              {organization?.business_type === 'forum' && vehicles.length === 0 && (
+                <div style={{
+                  fontSize: '9pt',
+                  color: 'var(--text-muted)',
+                  background: 'var(--gray-50)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  padding: '10px 14px',
+                  marginBottom: '12px',
+                }}>
+                  Forum-discovered vehicles are being linked to this organization; inventory will appear here once linked.
+                </div>
+              )}
+              <EnhancedDealerInventory
+                organizationId={organizationId!}
+                userId={session?.user?.id || null}
+                canEdit={canEdit}
+                isOwner={isOwner}
+              />
+            </>
         )}
 
         {activeTab === 'receipts' && organizationId && (

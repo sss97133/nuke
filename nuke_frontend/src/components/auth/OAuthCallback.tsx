@@ -7,10 +7,21 @@ const OAuthCallback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
+    const getReturnUrl = (): string => {
+      try {
+        const url = sessionStorage.getItem('login_return_url');
+        if (url) {
+          sessionStorage.removeItem('login_return_url');
+          return url;
+        }
+      } catch {
+        // ignore
+      }
+      return '/vehicles';
+    };
+
     const handleOAuthCallback = async () => {
       try {
-        // Supabase handles the OAuth callback automatically via URL hash
-        // We just need to wait for it to process and check for session
         const { data, error } = await supabase.auth.getSession();
 
         if (error) {
@@ -21,27 +32,24 @@ const OAuthCallback = () => {
 
         if (data.session) {
           setIsProcessing(false);
-          navigate('/vehicles');
+          navigate(getReturnUrl());
         }
-        // If no session yet, let the auth state change handler below handle it
       } catch (err) {
         setIsProcessing(false);
         navigate('/login?error=oauth_failed');
       }
     };
 
-    // Listen for auth state changes - this is the primary mechanism
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         setIsProcessing(false);
-        navigate('/vehicles');
+        navigate(getReturnUrl());
       } else if (event === 'SIGNED_OUT') {
         setIsProcessing(false);
         navigate('/login');
       }
     });
 
-    // Small delay to let Supabase process the URL hash
     setTimeout(handleOAuthCallback, 100);
 
     return () => {

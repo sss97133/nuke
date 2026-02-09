@@ -85,6 +85,7 @@ const TYPE_LABELS: Record<string, string> = {
   auction_house: 'Auction House',
   dealership: 'Dealership',
   collection: 'Collection',
+  forum: 'Forum',
   specialty_shop: 'Specialty',
   restoration_shop: 'Restoration',
   performance_shop: 'Performance',
@@ -100,6 +101,24 @@ const TYPE_LABELS: Record<string, string> = {
   detailing: 'Detailing',
   concours: 'Concours',
   automotive_expo: 'Expo',
+  club: 'Club',
+  media: 'Media',
+  registry: 'Registry',
+  villa_rental: 'Villa / Rental',
+  event_company: 'Event Company',
+  restaurant_food: 'Restaurant / Food',
+  hotel_lodging: 'Hotel / Lodging',
+  property_management: 'Property',
+  travel_tourism: 'Travel / Tourism',
+  art_creative: 'Art / Creative',
+  retail_other: 'Retail',
+  health_medical: 'Health / Medical',
+  professional_services: 'Professional Services',
+  sport_recreation: 'Sport / Recreation',
+  marine_nautical: 'Marine / Nautical',
+  education: 'Education',
+  construction_services: 'Construction',
+  car_rental: 'Car Rental',
   other: 'Other',
 };
 
@@ -155,7 +174,6 @@ export default function Organizations() {
   const [sortKey, setSortKey] = useState<SortKey>(urlSort);
   const [showFilters, setShowFilters] = useState(false);
   const [coverageByOrg, setCoverageByOrg] = useState<Record<string, OrgExtractionCoverage>>({});
-  const [extractionSources, setExtractionSources] = useState<OrgExtractionCoverage[]>([]);
 
   const loadOrganizations = useCallback(async () => {
     try {
@@ -215,7 +233,6 @@ export default function Organizations() {
           }
         });
         setCoverageByOrg(byOrg);
-        setExtractionSources(list);
       } catch {
         // Optional: no coverage data
       }
@@ -231,7 +248,10 @@ export default function Organizations() {
     return Array.from(types).sort();
   }, [organizations]);
 
-  // Filter + search + sort
+  // Canonical org ids we track for extraction coverage (one row per logical org in the list)
+  const coverageOrgIds = useMemo(() => new Set(Object.keys(coverageByOrg)), [coverageByOrg]);
+
+  // Filter + search + sort + dedupe by name (show single canonical org when we have coverage)
   const displayOrgs = useMemo(() => {
     let filtered = organizations;
 
@@ -249,6 +269,23 @@ export default function Organizations() {
         o.city?.toLowerCase().includes(q) ||
         o.state?.toLowerCase().includes(q)
       );
+    }
+
+    // Dedupe by business_name: when we have coverage for an org_id, show only that canonical row; else keep one with highest total_vehicles
+    const byName = new Map<string, Organization[]>();
+    for (const o of filtered) {
+      const name = (o.business_name || '').trim() || '(unnamed)';
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name)!.push(o);
+    }
+    filtered = [];
+    for (const [, group] of byName) {
+      if (group.length === 1) {
+        filtered.push(group[0]);
+        continue;
+      }
+      const canonical = group.find(o => coverageOrgIds.has(o.id));
+      filtered.push(canonical ?? group.reduce((best, o) => (o.total_vehicles || 0) > (best.total_vehicles || 0) ? o : best));
     }
 
     // Sort
@@ -276,22 +313,22 @@ export default function Organizations() {
     }
 
     return sorted;
-  }, [organizations, typeFilter, searchQuery, sortKey]);
+  }, [organizations, typeFilter, searchQuery, sortKey, coverageOrgIds]);
 
-  // Aggregate stats
+  // Aggregate stats (from display list so counts match what we show after dedupe)
   const stats = useMemo(() => {
-    const withVehicles = organizations.filter(o => (o.total_vehicles || 0) > 0);
-    const totalVehicles = organizations.reduce((sum, o) => sum + (o.total_vehicles || 0), 0);
-    const totalGmv = organizations.reduce((sum, o) => sum + (o.gmv || 0), 0);
-    const totalRevenue = organizations.reduce((sum, o) => sum + (o.total_revenue || 0), 0);
+    const withVehicles = displayOrgs.filter(o => (o.total_vehicles || 0) > 0);
+    const totalVehicles = displayOrgs.reduce((sum, o) => sum + (o.total_vehicles || 0), 0);
+    const totalGmv = displayOrgs.reduce((sum, o) => sum + (o.gmv || 0), 0);
+    const totalRevenue = displayOrgs.reduce((sum, o) => sum + (o.total_revenue || 0), 0);
     return {
-      total: organizations.length,
+      total: displayOrgs.length,
       withVehicles: withVehicles.length,
       totalVehicles,
       totalGmv,
       totalRevenue,
     };
-  }, [organizations]);
+  }, [displayOrgs]);
 
   if (loading) {
     return (
@@ -321,34 +358,6 @@ export default function Organizations() {
           <Plus size={12} /> Add Organization
         </button>
       </div>
-
-      {/* Platform data loading strip: what we have + what we're scraping in real time */}
-      {extractionSources.length > 0 && (
-        <div style={{
-          marginBottom: '12px',
-          padding: '8px 12px',
-          background: 'var(--gray-50)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          borderLeft: '4px solid var(--blue-500)',
-          fontSize: '8pt',
-          color: 'var(--text)',
-        }}>
-          <span style={{ fontWeight: 600, color: 'var(--text-muted)', marginRight: '8px' }}>Data loading:</span>
-          {extractionSources.map((s, i) => (
-            <span key={s.org_id}>
-              {i > 0 && ' · '}
-              <span>{formatNum(s.extracted ?? 0)} {s.label}</span>
-              {(s.queue_pending ?? 0) > 0 && (
-                <span style={{ color: 'var(--blue-600)', fontWeight: 600 }}> ({formatNum(s.queue_pending!)} in queue)</span>
-              )}
-            </span>
-          ))}
-          {extractionSources.some((s) => (s.queue_pending ?? 0) > 0) && (
-            <span style={{ color: 'var(--blue-600)', fontWeight: 600, marginLeft: '6px' }}>· loading in…</span>
-          )}
-        </div>
-      )}
 
       {/* Market Summary Bar */}
       <div style={{
@@ -485,7 +494,8 @@ export default function Organizations() {
 function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: OrgExtractionCoverage | null; onClick: () => void }) {
   const signalScore = org.data_signal_score || 0;
   const signalTier = getSignalTier(signalScore);
-  const vehicles = org.total_vehicles || 0;
+  // Prefer extraction coverage count when we have it (e.g. BAT from bat_listings), else org total
+  const vehicles = (coverage?.extracted != null ? coverage.extracted : org.total_vehicles) || 0;
   const gmv = org.gmv || 0;
   const revenue = org.total_revenue || 0;
   const margin = org.gross_margin_pct || 0;
@@ -676,11 +686,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
               <Info size={9} style={{ flexShrink: 0 }} />
               <span>
-                {coverage.extracted != null && coverage.target != null
-                  ? `${formatNum(coverage.extracted)} of ~${formatNum(coverage.target)} targeted`
-                  : coverage.extracted != null
-                    ? `${formatNum(coverage.extracted)} loaded`
-                    : `~${coverage.target != null ? formatNum(coverage.target) : ''} targeted`}
+                {coverage.extracted != null ? `${formatNum(coverage.extracted)} listings` : ''}
                 {coverage.queue_pending != null && coverage.queue_pending > 0 && (
                   <span> · {formatNum(coverage.queue_pending)} in queue · <span style={{ color: 'var(--blue-600)', fontWeight: 600 }}>loading in…</span></span>
                 )}

@@ -629,7 +629,11 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                 />
               ) : (
                 <Link
-                  to="/login"
+                  to={(() => {
+                    const loc = location.pathname + location.search;
+                    const returnUrl = loc && loc !== '/' ? encodeURIComponent(loc) : '';
+                    return returnUrl ? `/login?returnUrl=${returnUrl}` : '/login';
+                  })()}
                   className="button button-primary"
                   style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}
                 >
