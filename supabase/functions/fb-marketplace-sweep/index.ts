@@ -525,10 +525,10 @@ async function getStats() {
       { count: soldListings },
       { count: locations }
     ] = await Promise.all([
-      supabase.from("marketplace_listings").select("*", { count: "exact", head: true }).eq("platform", "facebook_marketplace"),
-      supabase.from("marketplace_listings").select("*", { count: "exact", head: true }).eq("platform", "facebook_marketplace").eq("status", "active"),
-      supabase.from("marketplace_listings").select("*", { count: "exact", head: true }).eq("platform", "facebook_marketplace").eq("status", "sold"),
-      supabase.from("fb_marketplace_locations").select("*", { count: "exact", head: true }).eq("is_active", true)
+      supabase.from("marketplace_listings").select("*", { count: "estimated", head: true }).eq("platform", "facebook_marketplace"),
+      supabase.from("marketplace_listings").select("*", { count: "estimated", head: true }).eq("platform", "facebook_marketplace").eq("status", "active"),
+      supabase.from("marketplace_listings").select("*", { count: "estimated", head: true }).eq("platform", "facebook_marketplace").eq("status", "sold"),
+      supabase.from("fb_marketplace_locations").select("*", { count: "estimated", head: true }).eq("is_active", true)
     ]);
 
     return jsonResponse({

@@ -25,7 +25,7 @@ serve(async (req) => {
     // Get count of images needing analysis
     const { count: totalRemaining } = await supabase
       .from('vehicle_images')
-      .select('*', { count: 'exact', head: true })
+      .select('*', { count: 'estimated', head: true })
       .is('ai_scan_metadata->appraiser->primary_label', null)
 
     if (!totalRemaining || totalRemaining === 0) {
@@ -311,7 +311,7 @@ Return ONLY valid JSON:
     // Get final count
     const { count: remainingAfter } = await supabase
       .from('vehicle_images')
-      .select('*', { count: 'exact', head: true })
+      .select('*', { count: 'estimated', head: true })
       .is('ai_scan_metadata->appraiser->primary_label', null)
 
     return new Response(

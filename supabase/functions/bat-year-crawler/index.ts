@@ -163,28 +163,28 @@ Deno.serve(async (req) => {
       // Get real stats from DB, not inflated counters
       const { count: pagesScraped } = await supabase
         .from("bat_crawl_state")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "estimated", head: true });
 
       const { count: uniqueUrls } = await supabase
         .from("import_queue")
-        .select("*", { count: "exact", head: true })
+        .select("*", { count: "estimated", head: true })
         .ilike("listing_url", "%bringatrailer%");
 
       const { count: pendingCount } = await supabase
         .from("import_queue")
-        .select("*", { count: "exact", head: true })
+        .select("*", { count: "estimated", head: true })
         .ilike("listing_url", "%bringatrailer%")
         .eq("status", "pending");
 
       const { count: completeCount } = await supabase
         .from("import_queue")
-        .select("*", { count: "exact", head: true })
+        .select("*", { count: "estimated", head: true })
         .ilike("listing_url", "%bringatrailer%")
         .eq("status", "complete");
 
       const { count: batListings } = await supabase
         .from("bat_listings")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "estimated", head: true });
 
       return okJson({
         success: true,
@@ -297,18 +297,18 @@ Deno.serve(async (req) => {
     // Get real stats from DB
     const { count: totalScraped } = await supabase
       .from("bat_crawl_state")
-      .select("*", { count: "exact", head: true })
+      .select("*", { count: "estimated", head: true })
       .eq("crawl_type", crawlType);
 
     const { count: pendingCount } = await supabase
       .from("import_queue")
-      .select("*", { count: "exact", head: true })
+      .select("*", { count: "estimated", head: true })
       .ilike("listing_url", "%bringatrailer%")
       .eq("status", "pending");
 
     const { count: uniqueUrls } = await supabase
       .from("import_queue")
-      .select("*", { count: "exact", head: true })
+      .select("*", { count: "estimated", head: true })
       .ilike("listing_url", "%bringatrailer%");
 
     return okJson({

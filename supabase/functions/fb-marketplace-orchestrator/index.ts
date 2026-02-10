@@ -78,43 +78,43 @@ async function getBrief(): Promise<Response> {
   // Get location coverage
   const { count: totalLocations } = await supabase
     .from("fb_marketplace_locations")
-    .select("*", { count: "exact", head: true })
+    .select("*", { count: "estimated", head: true })
     .eq("is_active", true);
 
   const { count: sweptToday } = await supabase
     .from("fb_marketplace_locations")
-    .select("*", { count: "exact", head: true })
+    .select("*", { count: "estimated", head: true })
     .gte("last_sweep_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
   // Get listing stats
   const { count: totalListings } = await supabase
     .from("marketplace_listings")
-    .select("*", { count: "exact", head: true })
+    .select("*", { count: "estimated", head: true })
     .eq("platform", "facebook_marketplace");
 
   const { count: activeListings } = await supabase
     .from("marketplace_listings")
-    .select("*", { count: "exact", head: true })
+    .select("*", { count: "estimated", head: true })
     .eq("platform", "facebook_marketplace")
     .eq("status", "active");
 
   const { count: vintageListings } = await supabase
     .from("marketplace_listings")
-    .select("*", { count: "exact", head: true })
+    .select("*", { count: "estimated", head: true })
     .eq("platform", "facebook_marketplace")
     .gte("extracted_year", CONFIG.YEAR_MIN)
     .lte("extracted_year", CONFIG.YEAR_MAX);
 
   const { count: soldListings } = await supabase
     .from("marketplace_listings")
-    .select("*", { count: "exact", head: true })
+    .select("*", { count: "estimated", head: true })
     .eq("platform", "facebook_marketplace")
     .eq("status", "sold");
 
   // Get recent activity
   const { count: newToday } = await supabase
     .from("marketplace_listings")
-    .select("*", { count: "exact", head: true })
+    .select("*", { count: "estimated", head: true })
     .eq("platform", "facebook_marketplace")
     .gte("first_seen_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
