@@ -103,6 +103,36 @@ serve(async (req) => {
       }
     }
 
+    // If basic fetch returned very little content, try Firecrawl (handles JS rendering)
+    if (!rawText && rawHtml.length < 2000) {
+      const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
+      if (firecrawlKey) {
+        console.log(`[extract-vehicle-data-ai] Content too short (${rawHtml.length}), trying Firecrawl for JS rendering`)
+        try {
+          const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${firecrawlKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url, formats: ['markdown'], waitFor: 3000 }),
+            signal: AbortSignal.timeout(30000),
+          })
+          if (fcRes.ok) {
+            const fcData = await fcRes.json()
+            if (fcData.success && fcData.data?.markdown) {
+              rawText = fcData.data.markdown
+              console.log(`[extract-vehicle-data-ai] Firecrawl got ${rawText.length} chars of markdown`)
+            }
+          } else {
+            console.log(`[extract-vehicle-data-ai] Firecrawl failed: ${fcRes.status}`)
+          }
+        } catch (fcErr: any) {
+          console.log(`[extract-vehicle-data-ai] Firecrawl error: ${fcErr.message}`)
+        }
+      }
+    }
+
     // If content is still empty, try to extract from URL structure directly
     if (!rawText && rawHtml.length < 500) {
       const urlData = extractVehicleFromUrl(url)
