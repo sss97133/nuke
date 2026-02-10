@@ -179,12 +179,18 @@ serve(async (req) => {
             decision: intelligenceDecision?.decision || 'N/A'
           });
         } else {
+          const errorMsg = extractData.error || 'Extraction failed';
+          // Detect non-vehicle pages (memorabilia, collectibles, etc.) and skip instead of fail
+          const isNonVehicle = errorMsg.includes('No vehicle data found') ||
+            errorMsg.includes('could not find real vehicle data');
+          const status = isNonVehicle ? 'skipped' : 'failed';
+
           await supabase.from('import_queue').update({
-            status: 'failed',
-            error_message: extractData.error || 'Extraction failed',
+            status,
+            error_message: isNonVehicle ? `Non-vehicle page: ${errorMsg.slice(0, 200)}` : errorMsg,
             attempts: item.attempts + 1,
           }).eq('id', item.id);
-          results.push({ id: item.id, status: 'failed', url, error: extractData.error });
+          results.push({ id: item.id, status, url, error: errorMsg });
         }
       } catch (error: any) {
         const errMsg = error?.message || String(error);
