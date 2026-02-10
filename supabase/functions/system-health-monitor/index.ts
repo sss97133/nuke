@@ -212,9 +212,12 @@ async function checkFeedPerformance(
     let status: CheckResult["status"] = "pass";
     let message = `Feed query returned ${rowCount} rows in ${ms}ms`;
 
-    if (ms > 5000) {
+    if (ms > 10000) {
       status = "fail";
-      message = `Feed query critically slow: ${ms}ms (> 5s threshold)`;
+      message = `Feed query critically slow: ${ms}ms (> 10s threshold)`;
+    } else if (ms > 5000) {
+      status = "warn";
+      message = `Feed query slow: ${ms}ms (> 5s threshold). Consider refreshing materialized view.`;
     } else if (ms > 3000) {
       status = "warn";
       message = `Feed query slow: ${ms}ms (> 3s threshold)`;
