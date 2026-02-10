@@ -51,12 +51,13 @@ function detectInputType(query: string): 'vin' | 'url' | 'year' | 'text' | 'empt
 
   // URL patterns
   if (/^https?:\/\//i.test(trimmed) || /^www\./i.test(trimmed)) return 'url';
-  if (/^[a-z0-9-]+\.[a-z]{2,}/i.test(trimmed)) return 'url';
+  // Only match bare domains with known TLDs (avoids false positives like "gt.coupe")
+  if (/^[a-z0-9-]+\.(com|org|net|io|co|edu|gov|uk|de|fr|ca|au|us|info|biz|me|tv)\b/i.test(trimmed)) return 'url';
 
   // Year: exactly 4 digits, reasonable range
   if (/^\d{4}$/.test(trimmed)) {
     const year = parseInt(trimmed);
-    if (year >= 1900 && year <= 2030) return 'year';
+    if (year >= 1886 && year <= new Date().getFullYear() + 2) return 'year';
   }
 
   return 'text';
@@ -123,6 +124,7 @@ serve(async (req) => {
         .from('vehicles')
         .select('id, year, make, model, vin, status, primary_image_url')
         .eq('vin', vin)
+        .eq('is_public', true)
         .limit(5);
 
       if (vehicles?.length) {
@@ -263,10 +265,12 @@ serve(async (req) => {
               .eq('year', year)
               .or(`make.ilike.%${escapeIlike(rest)}%,model.ilike.%${escapeIlike(rest)}%`);
           } else if (tokens.length >= 2) {
-            // Require BOTH make AND model to match (not OR)
-            vehicleQuery = vehicleQuery
-              .ilike('make', `%${escapeIlike(tokens[0])}%`)
-              .ilike('model', `%${escapeIlike(tokens.slice(1).join(' '))}%`);
+            // Try both orderings: token0=make+rest=model OR token0=model+rest=make
+            const t0 = escapeIlike(tokens[0]);
+            const tRest = escapeIlike(tokens.slice(1).join(' '));
+            vehicleQuery = vehicleQuery.or(
+              `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),and(model.ilike.%${t0}%,make.ilike.%${tRest}%)`
+            );
           } else {
             vehicleQuery = vehicleQuery.or(
               `make.ilike.${searchPattern},model.ilike.${searchPattern}`
