@@ -86,7 +86,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
     if (!userId) return;
     setActionLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/vehicles/${vehicleId}?twitch_connected=true`;
+      const redirectUrl = `${window.location.origin}/vehicle/${vehicleId}?twitch_connected=true`;
       const { data, error } = await supabase.functions.invoke('get-twitch-auth-url', {
         body: { user_id: userId, vehicle_id: vehicleId, redirect_url: redirectUrl }
       });

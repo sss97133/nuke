@@ -179,7 +179,7 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
                   {/* Actions */}
                   <div className="flex justify-end mt-4">
                     <Link 
-                      to={`/vehicles/${vehicleId}/timeline/${event.id}`}
+                      to={`/vehicle/${vehicleId}/timeline/${event.id}`}
                       className="text-blue-500 hover:text-blue-700 text-sm mr-4"
                     >
                       View Details

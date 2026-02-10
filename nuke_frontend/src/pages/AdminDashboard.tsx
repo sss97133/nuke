@@ -298,7 +298,7 @@ const AdminDashboard: React.FC = () => {
                       REJECT
                     </button>
                     <button
-                      onClick={() => navigate(`/vehicles/${approval.vehicle_id}`)}
+                      onClick={() => navigate(`/vehicle/${approval.vehicle_id}`)}
                       className="button button-secondary cursor-button"
                       style={{
                         padding: '8px 16px',

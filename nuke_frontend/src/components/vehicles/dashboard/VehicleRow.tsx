@@ -48,7 +48,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
     if (onLogWork) {
       onLogWork();
     } else {
-      navigate(`/vehicles/${vehicleId}?action=log`);
+      navigate(`/vehicle/${vehicleId}?action=log`);
     }
   };
 
@@ -57,7 +57,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
     if (onUpload) {
       onUpload();
     } else {
-      navigate(`/vehicles/${vehicleId}?action=upload`);
+      navigate(`/vehicle/${vehicleId}?action=upload`);
     }
   };
 

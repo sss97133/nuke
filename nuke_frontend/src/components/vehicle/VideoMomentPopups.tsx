@@ -293,7 +293,7 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
                 {comparables.map((comp) => (
                   <a
                     key={comp.id}
-                    href={`/vehicles/${comp.id}`}
+                    href={`/vehicle/${comp.id}`}
                     onClick={(e) => e.stopPropagation()}
                     style={{
                       display: 'block',
@@ -660,7 +660,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                   {historical.map((h) => (
                     <a
                       key={h.id}
-                      href={`/vehicles/${h.vehicle_id}`}
+                      href={`/vehicle/${h.vehicle_id}`}
                       onClick={(e) => e.stopPropagation()}
                       style={{
                         display: 'block',

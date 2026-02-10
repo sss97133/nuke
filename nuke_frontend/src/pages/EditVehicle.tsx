@@ -1334,7 +1334,7 @@ const EditVehicle: React.FC = () => {
                   <div className="flex justify-between">
                     <button
                       type="button"
-                      onClick={() => navigate(`/vehicles/${vehicleId}`)}
+                      onClick={() => navigate(`/vehicle/${vehicleId}`)}
                       className="button button-secondary"
                     >
                       Cancel
