@@ -331,11 +331,15 @@ serve(async (req) => {
           else if (nameLower.startsWith(queryLower)) score = 0.9;
 
           const location = [org.city, org.state].filter(Boolean).join(', ');
+          let websiteHost: string | undefined;
+          if (org.website) {
+            try { websiteHost = new URL(org.website).hostname; } catch { /* malformed URL */ }
+          }
           results.push({
             id: org.id,
             type: 'organization',
             title: org.business_name,
-            subtitle: location || (org.website ? new URL(org.website).hostname : undefined),
+            subtitle: location || websiteHost,
             image_url: org.logo_url || org.profile_image_url,
             relevance_score: score,
             metadata: { website: org.website }
@@ -434,8 +438,13 @@ serve(async (req) => {
       })());
     }
 
-    // Wait for all searches
-    await Promise.all(searches);
+    // Wait for all searches - use allSettled so one failure doesn't kill others
+    const settled = await Promise.allSettled(searches);
+    for (const r of settled) {
+      if (r.status === 'rejected') {
+        console.error('Search category failed:', r.reason?.message || r.reason);
+      }
+    }
 
     // Sort by relevance
     results.sort((a, b) => b.relevance_score - a.relevance_score);
