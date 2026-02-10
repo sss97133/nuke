@@ -34,7 +34,7 @@ serve(async (req) => {
       obsTotalRes,
       legacyCommentsRes,
       nukeEstimatesRes,
-      // Filtered observation counts (smaller, exact is fine)
+      // Filtered observation counts (estimated - exact times out even with filter on 612K+ rows)
       obsCommentsRes,
       obsBidsRes,
       obsVehiclesRes,
@@ -58,14 +58,14 @@ serve(async (req) => {
       supabase.from("vehicle_observations").select("id", { count: "estimated", head: true }),
       supabase.from("auction_comments").select("id", { count: "estimated", head: true }),
       supabase.from("nuke_estimates").select("id", { count: "estimated", head: true }),
-      // Filtered observation counts
-      supabase.from("vehicle_observations").select("id", { count: "exact", head: true }).eq("kind", "comment"),
-      supabase.from("vehicle_observations").select("id", { count: "exact", head: true }).eq("kind", "bid"),
-      supabase.from("vehicle_observations").select("vehicle_id", { count: "exact", head: true }).eq("kind", "comment"),
+      // Filtered observation counts (estimated uses EXPLAIN for filtered queries - instant)
+      supabase.from("vehicle_observations").select("id", { count: "estimated", head: true }).eq("kind", "comment"),
+      supabase.from("vehicle_observations").select("id", { count: "estimated", head: true }).eq("kind", "bid"),
+      supabase.from("vehicle_observations").select("vehicle_id", { count: "estimated", head: true }).eq("kind", "comment"),
       // Small tables: exact count is fine
       supabase.from("bat_listings").select("id", { count: "exact", head: true }),
       supabase.from("bat_listings").select("id", { count: "exact", head: true }).gt("comment_count", 0),
-      supabase.from("bat_user_profiles").select("id", { count: "exact", head: true }),
+      supabase.from("bat_user_profiles").select("username", { count: "estimated", head: true }),
       supabase.from("comment_discoveries").select("id", { count: "exact", head: true }),
       supabase.from("description_discoveries").select("id", { count: "exact", head: true }),
       supabase.from("businesses").select("id", { count: "exact", head: true }),
