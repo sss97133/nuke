@@ -78,29 +78,29 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     return { basePrice: 0, compCount: 0, method: "none" };
   }
 
-  // Try exact match: same make+model, year +/- 3
+  // Try exact match: same make+model, year +/- 5
   const { data: compRows } = await supabase
     .from("clean_vehicle_prices")
     .select("best_price, is_sold, updated_at")
     .ilike("make", make)
     .ilike("model", `%${model}%`)
-    .gte("year", year - 3)
-    .lte("year", year + 3)
+    .gte("year", year - 5)
+    .lte("year", year + 5)
     .gt("best_price", 0)
     .order("updated_at", { ascending: false })
-    .limit(200);
+    .limit(300);
 
   if (!compRows || compRows.length === 0) {
-    // Fallback: same make, any model in same era
+    // Fallback: same make, any model in same era (wider window)
     const { data: makeComps } = await supabase
       .from("clean_vehicle_prices")
       .select("best_price, is_sold, updated_at")
       .ilike("make", make)
-      .gte("year", year - 5)
-      .lte("year", year + 5)
+      .gte("year", year - 10)
+      .lte("year", year + 10)
       .gt("best_price", 0)
       .order("updated_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (!makeComps || makeComps.length === 0) {
       return { basePrice: 0, compCount: 0, method: "none" };
