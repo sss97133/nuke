@@ -510,7 +510,6 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
             style={{
               width: '100%',
               padding: '3px 6px',
-              fontSize: '8pt',
               border: `1px solid ${isModified ? '#f59e0b' : isEmpty ? '#e5e7eb' : 'var(--border)'}`,
               background: isReadOnly ? 'var(--grey-100)' : isEmpty ? '#fafafa' : 'var(--surface)',
               borderRadius: '2px',
