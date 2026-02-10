@@ -212,6 +212,7 @@ serve(async (req) => {
                   save_to_db: true,
                   max_vehicles: 1,
                 }),
+                signal: AbortSignal.timeout(120_000),
               }
             );
 

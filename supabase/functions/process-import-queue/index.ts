@@ -40,44 +40,53 @@ serve(async (req) => {
     for (const item of queueItems) {
       try {
         const url = item.listing_url;
+        if (!url) {
+          await supabase.from('import_queue').update({
+            status: 'failed',
+            error_message: 'listing_url is required',
+            attempts: (item.attempts || 0) + 1,
+          }).eq('id', item.id);
+          results.push({ id: item.id, status: 'failed', url: null, error: 'listing_url is required' });
+          continue;
+        }
         let extractorUrl = null;
 
         if (url.includes('bringatrailer.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/complete-bat-import';
+          extractorUrl = supabaseUrl + '/functions/v1/complete-bat-import';
         } else if (url.includes('carsandbids.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-cars-and-bids-core';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-cars-and-bids-core';
         } else if (url.includes('pcarmarket.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/import-pcarmarket-listing';
+          extractorUrl = supabaseUrl + '/functions/v1/import-pcarmarket-listing';
         } else if (url.includes('hagerty.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-hagerty-listing';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-hagerty-listing';
         } else if (url.includes('classic.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/import-classic-auction';
+          extractorUrl = supabaseUrl + '/functions/v1/import-classic-auction';
         } else if (url.includes('collectingcars.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-collecting-cars';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-collecting-cars';
         } else if (url.includes('barnfinds.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-barn-finds-listing';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-barn-finds-listing';
         } else if (url.includes('craigslist.org')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-craigslist';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-craigslist';
         } else if (url.includes('barrett-jackson.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         } else if (url.includes('broadarrowauctions.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         } else if (url.includes('gaaclassiccars.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-gaa-classics';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-gaa-classics';
         } else if (url.includes('bhauction.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-bh-auction';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-bh-auction';
         } else if (url.includes('bonhams.com') || url.includes('cars.bonhams.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-bonhams';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-bonhams';
         } else if (url.includes('rmsothebys.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-rmsothebys';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-rmsothebys';
         } else if (url.includes('goodingco.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-gooding';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-gooding';
         } else if (url.includes('velocityrestorations.com') || url.includes('coolnvintage.com') || url.includes('brabus.com') || url.includes('icon4x4.com') || url.includes('ringbrothers.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-specialty-builder';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-specialty-builder';
         } else if (url.includes('vanguardmotorsales.com')) {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         } else {
-          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         }
 
         const extractResponse = await fetch(extractorUrl, {
@@ -87,9 +96,13 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ url, save_to_db: true }),
+          signal: AbortSignal.timeout(120_000),
         });
 
-        const extractData = await extractResponse.json();
+        const extractData = await extractResponse.json().catch(() => ({
+          success: false,
+          error: `HTTP ${extractResponse.status}: non-JSON response`,
+        }));
 
         if (extractData.success) {
           const extractedVehicle = extractData.extracted || extractData;
@@ -110,14 +123,15 @@ serve(async (req) => {
                   source_url: url,
                   persist_decision: true
                 }),
+                signal: AbortSignal.timeout(30_000),
               });
-              intelligenceDecision = await intelligenceResponse.json();
+              intelligenceDecision = await intelligenceResponse.json().catch(() => null);
 
               // If DOUBT or REJECT, don't mark as complete
-              if (intelligenceDecision.decision === 'REJECT') {
+              if (intelligenceDecision?.decision === 'REJECT') {
                 await supabase.from('import_queue').update({
                   status: 'rejected',
-                  error_message: `Intelligence REJECT: ${intelligenceDecision.reject_reasons.join(', ')}`,
+                  error_message: `Intelligence REJECT: ${(intelligenceDecision.reject_reasons || []).join(', ')}`,
                   attempts: item.attempts + 1,
                 }).eq('id', item.id);
                 results.push({
@@ -130,10 +144,10 @@ serve(async (req) => {
                 continue;
               }
 
-              if (intelligenceDecision.decision === 'DOUBT') {
+              if (intelligenceDecision?.decision === 'DOUBT') {
                 await supabase.from('import_queue').update({
                   status: 'pending_review',
-                  error_message: `Intelligence DOUBT: ${intelligenceDecision.doubts.map((d: any) => d.reason).join(', ')}`,
+                  error_message: `Intelligence DOUBT: ${(intelligenceDecision.doubts || []).map((d: any) => d.reason).join(', ')}`,
                   attempts: item.attempts + 1,
                 }).eq('id', item.id);
                 results.push({
@@ -172,21 +186,22 @@ serve(async (req) => {
           }).eq('id', item.id);
           results.push({ id: item.id, status: 'failed', url, error: extractData.error });
         }
-      } catch (error) {
+      } catch (error: any) {
+        const errMsg = error?.message || String(error);
         await supabase.from('import_queue').update({
           status: 'failed',
-          error_message: error.message,
-          attempts: item.attempts + 1,
+          error_message: errMsg.slice(0, 500),
+          attempts: (item.attempts || 0) + 1,
         }).eq('id', item.id);
-        results.push({ id: item.id, status: 'failed', url: item.listing_url, error: error.message });
+        results.push({ id: item.id, status: 'failed', url: item.listing_url, error: errMsg });
       }
     }
 
     return new Response(JSON.stringify({ success: true, processed: results.length, results }), 
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
+  } catch (error: any) {
+    return new Response(JSON.stringify({ success: false, error: error?.message || String(error) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
