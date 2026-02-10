@@ -327,7 +327,7 @@ async function callAgent(functionName: string, action: string, params: any): Pro
   const startTime = Date.now();
   
   try {
-    const response = await fetch(`https://your-project.supabase.co/functions/v1/${functionName}`, {
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/${functionName}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,

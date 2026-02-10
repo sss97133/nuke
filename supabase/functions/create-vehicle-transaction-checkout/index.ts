@@ -143,8 +143,8 @@ Deno.serve(async (req) => {
         },
       ],
       mode: 'payment',
-      success_url: `${supabaseUrl.replace('supabase.co', 'vercel.app')}/transaction/${transaction.id}/success`,
-      cancel_url: `${supabaseUrl.replace('supabase.co', 'vercel.app')}/vehicle/${vehicle_id}`,
+      success_url: `${Deno.env.get('FRONTEND_URL') || 'https://nuke-omega.vercel.app'}/transaction/${transaction.id}/success`,
+      cancel_url: `${Deno.env.get('FRONTEND_URL') || 'https://nuke-omega.vercel.app'}/vehicle/${vehicle_id}`,
       client_reference_id: user.id,
       metadata: {
         purchase_type: 'vehicle_transaction',

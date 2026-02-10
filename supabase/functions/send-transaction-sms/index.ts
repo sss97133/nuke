@@ -77,13 +77,13 @@ Deno.serve(async (req) => {
         vehicle:vehicles(year, make, model, vehicle_number)
       `)
       .eq('id', transaction_id)
-      .single()
+      .maybeSingle()
 
     if (txError || !transaction) {
       return json({ error: 'Transaction not found' }, 404)
     }
 
-    const baseUrl = supabaseUrl.replace('supabase.co', 'vercel.app') || 'https://n-zero.dev'
+    const baseUrl = Deno.env.get('FRONTEND_URL') || 'https://nuke-omega.vercel.app'
     const vehicleName = `${transaction.vehicle?.year} ${transaction.vehicle?.make} ${transaction.vehicle?.model}`
     
     const results = []
