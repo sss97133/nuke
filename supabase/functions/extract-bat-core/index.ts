@@ -1200,6 +1200,18 @@ serve(async (req) => {
         vehicleId = String(data.id);
       }
     }
+    // Also check by VIN to prevent duplicate key constraint violations
+    if (!vehicleId && essentials.vin && essentials.vin.length >= 11) {
+      const { data } = await supabase
+        .from("vehicles")
+        .select("id")
+        .eq("vin", essentials.vin)
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) {
+        vehicleId = String(data.id);
+      }
+    }
 
     const createdIds: string[] = [];
     const updatedIds: string[] = [];
