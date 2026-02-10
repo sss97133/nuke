@@ -4632,8 +4632,9 @@ const CursorHomepage: React.FC = () => {
         if (cancelled) return;
         setStatsPanelError(String(e?.message || e || 'Failed to load stats panel'));
       } finally {
-        if (cancelled) return;
-        setStatsPanelLoading(false);
+        if (!cancelled) {
+          setStatsPanelLoading(false);
+        }
       }
     };
 

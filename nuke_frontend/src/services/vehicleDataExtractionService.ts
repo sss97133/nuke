@@ -283,7 +283,7 @@ export class VehicleDataExtractionService {
       if (hasSquarebodyTerms || hasSquarebodyModel || hasSquarebodySeries) {
         confidence = 0.95;
         yearRange = isClassicSquarebody ? '1973-1987' : '1988-1991';
-      } else if (isGM && (hasSquarebodyModel || hasSquarebodySeries)) {
+      } else if (isGM) {
         confidence = 0.85;
         yearRange = isClassicSquarebody ? '1973-1987' : '1988-1991';
       }
