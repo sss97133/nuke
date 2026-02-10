@@ -99,11 +99,11 @@ async function getQueueHealth(supabase: any): Promise<QueueHealth> {
     { count: failed },
     { count: skipped },
   ] = await Promise.all([
-    supabase.from("import_queue").select("id", { count: "exact", head: true }).eq("status", "pending"),
-    supabase.from("import_queue").select("id", { count: "exact", head: true }).eq("status", "processing"),
-    supabase.from("import_queue").select("id", { count: "exact", head: true }).eq("status", "complete"),
-    supabase.from("import_queue").select("id", { count: "exact", head: true }).eq("status", "failed"),
-    supabase.from("import_queue").select("id", { count: "exact", head: true }).eq("status", "skipped"),
+    supabase.from("import_queue").select("id", { count: "estimated", head: true }).eq("status", "pending"),
+    supabase.from("import_queue").select("id", { count: "estimated", head: true }).eq("status", "processing"),
+    supabase.from("import_queue").select("id", { count: "estimated", head: true }).eq("status", "complete"),
+    supabase.from("import_queue").select("id", { count: "estimated", head: true }).eq("status", "failed"),
+    supabase.from("import_queue").select("id", { count: "estimated", head: true }).eq("status", "skipped"),
   ]);
 
   const statusCounts = {
@@ -118,14 +118,14 @@ async function getQueueHealth(supabase: any): Promise<QueueHealth> {
   const staleCutoff = new Date(Date.now() - THRESHOLDS.stale_lock_minutes * 60 * 1000).toISOString();
   const { count: staleLocks } = await supabase
     .from("import_queue")
-    .select("id", { count: "exact", head: true })
+    .select("id", { count: "estimated", head: true })
     .eq("status", "processing")
     .lt("locked_at", staleCutoff);
 
   // Get stuck items (high attempts, still pending)
   const { count: stuckItems } = await supabase
     .from("import_queue")
-    .select("id", { count: "exact", head: true })
+    .select("id", { count: "estimated", head: true })
     .eq("status", "pending")
     .gte("attempts", THRESHOLDS.stuck_attempts);
 
@@ -133,14 +133,14 @@ async function getQueueHealth(supabase: any): Promise<QueueHealth> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { count: completedLastHour } = await supabase
     .from("import_queue")
-    .select("id", { count: "exact", head: true })
+    .select("id", { count: "estimated", head: true })
     .eq("status", "complete")
     .gte("processed_at", oneHourAgo);
 
   // Get error rate (failed / (completed + failed) in last hour)
   const { count: failedLastHour } = await supabase
     .from("import_queue")
-    .select("id", { count: "exact", head: true })
+    .select("id", { count: "estimated", head: true })
     .eq("status", "failed")
     .gte("processed_at", oneHourAgo);
 

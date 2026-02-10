@@ -101,7 +101,7 @@ serve(async (req) => {
     const iso7d = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const countStatus = async (status: string): Promise<number> => {
-      const { count } = await supabase.from("import_queue").select("*", { count: "exact", head: true }).eq("status", status);
+      const { count } = await supabase.from("import_queue").select("*", { count: "estimated", head: true }).eq("status", status);
       return count || 0;
     };
 
@@ -113,10 +113,10 @@ serve(async (req) => {
       countStatus("skipped"),
     ]);
 
-    const { count: totalVehicles } = await supabase.from("vehicles").select("*", { count: "exact", head: true });
+    const { count: totalVehicles } = await supabase.from("vehicles").select("*", { count: "estimated", head: true });
     const { count: vehicles24h } = await supabase
       .from("vehicles")
-      .select("*", { count: "exact", head: true })
+      .select("*", { count: "estimated", head: true })
       .gte("created_at", iso24h);
 
     const { count: activeSources } = await supabase.from("scrape_sources").select("*", { count: "exact", head: true }).eq("is_active", true);
@@ -151,14 +151,14 @@ serve(async (req) => {
 
     let vehicleImageAnalysis: { total: number; analyzed: number; pending: number } | null = null;
     try {
-      const { count: totalImages } = await supabase.from("vehicle_images").select("*", { count: "exact", head: true });
+      const { count: totalImages } = await supabase.from("vehicle_images").select("*", { count: "estimated", head: true });
       const { count: analyzedImages } = await supabase
         .from("vehicle_images")
-        .select("*", { count: "exact", head: true })
+        .select("*", { count: "estimated", head: true })
         .not("ai_scan_metadata->appraiser->primary_label", "is", null);
       const { count: pendingImages } = await supabase
         .from("vehicle_images")
-        .select("*", { count: "exact", head: true })
+        .select("*", { count: "estimated", head: true })
         .is("ai_scan_metadata->appraiser->primary_label", null);
       if (totalImages != null && analyzedImages != null && pendingImages != null) {
         vehicleImageAnalysis = {
