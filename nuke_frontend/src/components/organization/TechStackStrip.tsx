@@ -16,6 +16,8 @@ const STACK: { slug: string; name: string }[] = [
   { slug: 'deno', name: 'Deno' },
   { slug: 'pytorch', name: 'PyTorch' },
   { slug: 'vercel', name: 'Vercel' },
+  { slug: 'openai', name: 'OpenAI' },
+  { slug: 'anthropic', name: 'Anthropic' },
 ];
 
 const ICON_SIZE = 28;
@@ -29,14 +31,19 @@ function TechLogo({ slug, name }: { slug: string; name: string }) {
       <span
         title={name}
         style={{
-          fontSize: 10,
-          fontWeight: 600,
+          fontSize: 9,
+          fontWeight: 700,
           color: 'var(--text)',
           width: ICON_SIZE,
           height: ICON_SIZE,
+          minWidth: ICON_SIZE,
+          minHeight: ICON_SIZE,
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 4,
         }}
       >
         {name.slice(0, 2)}
@@ -46,15 +53,19 @@ function TechLogo({ slug, name }: { slug: string; name: string }) {
   return (
     <img
       src={src}
-      alt=""
+      alt={name}
       width={ICON_SIZE}
       height={ICON_SIZE}
       title={name}
+      loading="lazy"
+      referrerPolicy="no-referrer"
       onError={() => setErrored(true)}
       style={{
         display: 'block',
         width: ICON_SIZE,
         height: ICON_SIZE,
+        minWidth: ICON_SIZE,
+        minHeight: ICON_SIZE,
         objectFit: 'contain',
         filter: 'brightness(0)',
       }}

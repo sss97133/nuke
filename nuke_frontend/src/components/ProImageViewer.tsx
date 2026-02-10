@@ -194,7 +194,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
     setLoading(true);
     
     try {
-      let query = supabase
+      const query = supabase
         .from('vehicle_images')
         .select('*')
         .eq('vehicle_id', vehicleId);
@@ -311,7 +311,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
 
     try {
       // Process comment for tags and URLs
-      let processedContent = newComment.trim();
+      const processedContent = newComment.trim();
       
       // Extract URLs and convert to clickable links
       const urlRegex = /(https?:\/\/[^\s]+)/g;

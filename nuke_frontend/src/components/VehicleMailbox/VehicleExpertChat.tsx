@@ -234,7 +234,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
     if (!isOpen) return
     if (!userId) return
     if (activeModelSignedUrl) return
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+     
     ;(async () => {
       const loadedUserModel = await loadLatestModelForVehicle()
       if (!loadedUserModel) {
@@ -254,7 +254,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
     const path = typeof modelCard?.path === 'string' ? modelCard.path : null
     if (!bucket || !path) return
     if (activeModelPath === path && activeModelBucket === bucket && activeModelSignedUrl) return
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+     
     refreshModelSignedUrl(bucket, path)
   }, [activeModelBucket, activeModelPath, activeModelSignedUrl, messages, refreshModelSignedUrl])
 

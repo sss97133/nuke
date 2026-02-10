@@ -276,7 +276,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
   const calculateFraudScores = (imageMetadata: any, locationData: any): any => {
     let geotag_accuracy_score = 0;
     let timestamp_accuracy_score = 0;
-    let user_pattern_match_score = 50; // Default neutral score
+    const user_pattern_match_score = 50; // Default neutral score
     
     // Geotag accuracy scoring
     if (imageMetadata.gpsLatitude && locationData.currentLatitude) {

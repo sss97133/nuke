@@ -52,7 +52,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
     try {
       setLoading(true);
       // Try ownership_transfers first (current schema), fallback to title_transfers if needed
-      let query = supabase
+      const query = supabase
         .from('ownership_transfers')
         .select(`
           *,

@@ -23,7 +23,7 @@ export class KnowledgeLibraryService {
    */
   static async getUserArticles(userId: string, includePublic = false): Promise<KnowledgeArticle[]> {
     try {
-      let query = supabase
+      const query = supabase
         .from('user_knowledge_library')
         .select('*')
         .eq('user_id', userId)

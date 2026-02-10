@@ -138,7 +138,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
         .order('extracted_at', { ascending: false })
         .limit(5);
 
-      let mapped = (rows || [])
+      const mapped = (rows || [])
         .map((r: any) => ({
           text: (r?.field_value || '').toString(),
           extracted_at: r?.extracted_at ? String(r.extracted_at) : null,

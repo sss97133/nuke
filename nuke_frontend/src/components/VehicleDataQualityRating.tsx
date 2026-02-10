@@ -86,7 +86,7 @@ const VehicleDataQualityRating: React.FC<VehicleDataQualityRatingProps> = ({
         // Group by source type
         const bySource: Record<string, number> = {};
         let humanVerified = 0;
-        let total = fieldSources.length;
+        const total = fieldSources.length;
         
         fieldSources.forEach(source => {
           const sourceType = source.source_type || 'unknown';

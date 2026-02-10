@@ -191,7 +191,7 @@ export class ReferenceDocumentService {
    */
   static async getUserDocuments(userId: string, includePublic = false): Promise<ReferenceDocument[]> {
     try {
-      let query = supabase
+      const query = supabase
         .from('reference_documents')
         .select('*')
         .eq('owner_id', userId)

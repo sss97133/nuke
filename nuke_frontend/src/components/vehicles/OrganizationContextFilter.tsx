@@ -124,14 +124,14 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+               
               togglePinned(org);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 e.stopPropagation();
-                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                 
                 togglePinned(org);
               }
             }}

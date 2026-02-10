@@ -367,7 +367,7 @@ export class UnifiedImageImportService {
         .getPublicUrl(storagePath);
 
       // Step 7: Generate optimized variants (browser only, skip for Node.js/server)
-      let variants: any = { full: urlData.publicUrl };
+      const variants: any = { full: urlData.publicUrl };
       if (typeof window !== 'undefined' && file instanceof File) {
         try {
           const optimizationResult = await imageOptimizationService.generateVariantBlobs(file);

@@ -805,7 +805,7 @@ function parseFolderName(name: string): {
   }
 
   // Remove VIN and year
-  let cleaned = name
+  const cleaned = name
     .replace(/[-#]\s*[A-HJ-NPR-Z0-9]{17}/gi, '')
     .replace(/\b(19|20)\d{2}\b/, '')
     .replace(/[-_]/g, ' ')

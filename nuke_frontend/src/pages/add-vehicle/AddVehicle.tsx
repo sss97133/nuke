@@ -1133,7 +1133,7 @@ Redirecting to vehicle profile...`);
             }
             
             // Try with relationship_type first
-            let upsertData: any = {
+            const upsertData: any = {
               user_id: user.id,
               vehicle_id: vehicleId,
               relationship_type: relationshipType,

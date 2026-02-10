@@ -278,7 +278,7 @@ export default function InvestorOffering() {
 
   // Simple markdown to HTML converter for PDF export
   function markdownToHtml(md: string): string {
-    let html = md
+    const html = md
       // Escape HTML
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

@@ -455,7 +455,7 @@ export default function OrganizationProfile() {
       setShow(true);
       const t = window.setTimeout(() => setShow(false), 900);
       return () => window.clearTimeout(t);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
     }, [vehicleId, intensity]);
 
     if (!show) return null;
@@ -1234,7 +1234,7 @@ export default function OrganizationProfile() {
               const batAuction = batAuctionsByVehicleId.get(ov.vehicle_id);
                 
               // Determine which auction is active (prioritize native, then external, then bat)
-              let auctionListing = nativeAuction || externalAuction || batAuction;
+              const auctionListing = nativeAuction || externalAuction || batAuction;
               let auctionData: any = null;
               
               if (nativeAuction) {
@@ -1453,7 +1453,7 @@ export default function OrganizationProfile() {
             )
           );
 
-          let orgById = new Map<string, { business_name?: string | null; website?: string | null }>();
+          const orgById = new Map<string, { business_name?: string | null; website?: string | null }>();
           if (sellerOrgIds.length > 0) {
             const { data: orgRows } = await supabase
               .from('businesses')
@@ -2092,7 +2092,8 @@ export default function OrganizationProfile() {
       }}>
         {activeTab === 'overview' && (
           <>
-            {/* Key Metrics Bar */}
+            {/* Key Metrics Bar - only show when at least one stat > 0 or Est. Value present */}
+            {(((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0) || organization?.estimated_value || organization?.current_value) && (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
@@ -2102,10 +2103,9 @@ export default function OrganizationProfile() {
               marginBottom: '16px',
             }}>
               {[
-                // Stats always from DB (businesses.total_*), never from loaded list length
-                { label: 'Vehicles', value: organization?.total_vehicles ?? 0 },
-                { label: 'Images', value: organization?.total_images ?? 0 },
-                { label: 'Events', value: organization?.total_events ?? 0 },
+                ...((organization?.total_vehicles ?? 0) > 0 ? [{ label: 'Vehicles', value: organization!.total_vehicles! }] : []),
+                ...((organization?.total_images ?? 0) > 0 ? [{ label: 'Images', value: organization!.total_images! }] : []),
+                ...((organization?.total_events ?? 0) > 0 ? [{ label: 'Events', value: organization!.total_events! }] : []),
                 ...(organization.estimated_value || organization.current_value ? [{
                   label: 'Est. Value',
                   value: formatUsd(organization.estimated_value || organization.current_value || 0),
@@ -2125,6 +2125,7 @@ export default function OrganizationProfile() {
                 </div>
               ))}
             </div>
+            )}
 
             {/* Business docs for advisors / investment board — always visible on org overview */}
             {organization && organizationId && (
@@ -2135,9 +2136,10 @@ export default function OrganizationProfile() {
                 border: '1px solid var(--border)',
                 borderRadius: '8px',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
+                justifyContent: 'center',
+                textAlign: 'center',
                 gap: 12,
               }}>
                 <div>
@@ -2159,7 +2161,7 @@ export default function OrganizationProfile() {
                   }}
                   style={{
                     padding: '10px 18px',
-                    background: 'var(--accent, #2563eb)',
+                    background: 'var(--error, #dc2626)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 8,
@@ -2327,7 +2329,8 @@ export default function OrganizationProfile() {
               return null;
             })()}
 
-            {/* Vehicles for Sale / Currently in Service */}
+            {/* Vehicles for Sale / Currently in Service — only show when org has vehicles */}
+            {(organization?.total_vehicles ?? 0) > 0 && (
             <div className="card" style={{ marginBottom: '16px' }}>
               <div className="card-header" style={{
                 fontSize: '9pt',
@@ -2509,7 +2512,7 @@ export default function OrganizationProfile() {
                   }
                   
                   // Apply sorting based on sortBy and sortDirection
-                  let sorted = [...productsForSale];
+                  const sorted = [...productsForSale];
                   const dir = sortDirection === 'desc' ? 1 : -1;
                   
                   switch (sortBy) {
@@ -2593,8 +2596,9 @@ export default function OrganizationProfile() {
                 })()}
               </div>
             </div>
+            )}
 
-            {/* SOLD INVENTORY BROWSER / SERVICE ARCHIVE - Reference for buyers or completed service work */}
+            {/* SOLD INVENTORY BROWSER / SERVICE ARCHIVE - only show when org has sold vehicles */}
             <SoldInventoryBrowser 
               organizationId={organizationId!} 
               title={intelligence?.effectivePrimaryFocus === 'service' ? 'Service Archive' : 'Sold Inventory Archive'}

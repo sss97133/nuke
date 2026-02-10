@@ -70,7 +70,7 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
       const offset = pageNum * limit;
 
       // Build the content query based on filters
-      let feedItems: FeedItem[] = [];
+      const feedItems: FeedItem[] = [];
 
       // Fetch timeline events (user actions)
       if (filters.contentTypes.includes('all') || filters.contentTypes.includes('timeline_event')) {

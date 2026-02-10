@@ -819,7 +819,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                   const status = claimType === 'title' ? 'approved' : 'pending';
 
                   // Map claim type to proper document URL field
-                  let verificationData: any = {
+                  const verificationData: any = {
                     vehicle_id: vehicle.id,
                     user_id: session.user.id,
                     verification_type: claimType,

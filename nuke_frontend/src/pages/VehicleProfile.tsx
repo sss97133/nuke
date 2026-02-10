@@ -480,7 +480,7 @@ const VehicleProfile: React.FC = () => {
   // We intentionally merge duplicate rows that share the same `listing_url` (multiple import pipelines)
   // so the UI doesn't flip to SOLD just because a stale duplicate row updated last.
   const buildAuctionPulseFromExternalListings = useCallback((rows: any[], vehicleIdForRows: string) => {
-    let arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
+    const arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
     if (arr.length === 0) return null;
     // NOTE: We intentionally do NOT globally drop active listings when a vehicle has a historical sale.
     // Relists exist (e.g. BaT "-2" URLs), and we want the pulse to reflect the current live auction when present.
@@ -2666,7 +2666,7 @@ const VehicleProfile: React.FC = () => {
         return false;
       };
       
-      let filtered = carsAndBidsUrls.filter(u => !isKnownNoise(u));
+      const filtered = carsAndBidsUrls.filter(u => !isKnownNoise(u));
       
       // Combine filtered Cars & Bids URLs with non-Cars & Bids URLs
       const result = [...nonCarsAndBids, ...filtered];

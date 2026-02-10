@@ -88,7 +88,7 @@ export class AdvancedValuationService {
       const aiResult = aiValuation?.[0];
 
       // Calculate base values
-      let baseValue = parseFloat(aiResult?.base_value) || vehicle.purchase_price || 15000;
+      const baseValue = parseFloat(aiResult?.base_value) || vehicle.purchase_price || 15000;
       let partsValue = 0;
       let laborValue = 0;
       let skillAdjustment = 0;

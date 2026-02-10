@@ -36,7 +36,7 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
   }
 
   componentDidCatch(error: any, info: any) {
-    // eslint-disable-next-line no-console
+     
     console.error('ErrorBoundary caught:', error, info);
 
     // React catches dynamic import failures inside Suspense/routes before they reach `window`,

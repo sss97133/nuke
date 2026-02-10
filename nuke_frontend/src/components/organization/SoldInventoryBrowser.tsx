@@ -366,23 +366,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
   }
 
   if (soldVehicles.length === 0) {
-    return (
-      <div className="card">
-        <div 
-          className="card-header" 
-          style={{ fontSize: '11pt', fontWeight: 700, cursor: 'pointer' }}
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          {title}
-          <span style={{ float: 'right', fontSize: '9pt' }}>{isExpanded ? '▼' : '▶'}</span>
-        </div>
-        {isExpanded && (
-          <div className="card-body" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
-            {title.includes('Service') ? 'No completed service work yet' : 'No sold vehicles yet'}
-          </div>
-        )}
-      </div>
-    );
+    return null;
   }
 
   return (

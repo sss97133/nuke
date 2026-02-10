@@ -1748,7 +1748,7 @@ export default function AIDataIngestionSearch() {
             // After saving docs, re-run a fresh evidence check so the next chat step adapts.
             setShowWiringUploader(false);
             setWiringMessages((prev) => [...prev, { role: 'assistant', text: 'Got it. I saved that document. Re-checking evidence…' }]);
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+             
             runWiringWorkbench('evidence refresh');
           }}
         />
