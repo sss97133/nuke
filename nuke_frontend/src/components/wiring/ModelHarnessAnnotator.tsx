@@ -112,7 +112,7 @@ export function ModelHarnessAnnotator({
       // Defer a tick so state is set before import runs
       setTimeout(() => {
         // best-effort; import handles its own errors
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+         
         (async () => {
           didAutoImportRef.current = true;
           await importFromSignedUrl();

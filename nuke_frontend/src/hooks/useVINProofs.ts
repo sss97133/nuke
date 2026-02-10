@@ -87,7 +87,7 @@ export function useVINProofs(vehicleId: string | undefined) {
           .map((v: any) => v.source_image_id)
           .filter(Boolean) as string[];
         
-        let imageUrls: Map<string, string> = new Map();
+        const imageUrls: Map<string, string> = new Map();
         if (imageIds.length > 0) {
           const { data: images } = await supabase
             .from('vehicle_images')

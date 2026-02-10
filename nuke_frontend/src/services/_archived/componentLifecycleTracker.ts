@@ -250,7 +250,7 @@ export class ComponentLifecycleTracker {
   ): Promise<boolean> {
     try {
       // Get or create component lifecycle
-      let { data: existing } = await supabase
+      const { data: existing } = await supabase
         .from('component_lifecycles')
         .select('*')
         .eq('vehicle_id', vehicleId)

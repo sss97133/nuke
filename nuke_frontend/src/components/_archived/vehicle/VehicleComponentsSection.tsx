@@ -39,7 +39,7 @@ const VehicleComponentsSection: React.FC<VehicleComponentsSectionProps> = ({ veh
   const loadComponents = async () => {
     try {
       // First try to load from component_installations table
-      let { data: installedData, error: installError } = await supabase
+      const { data: installedData, error: installError } = await supabase
         .from('component_installations')
         .select('*')
         .eq('vehicle_id', vehicleId)

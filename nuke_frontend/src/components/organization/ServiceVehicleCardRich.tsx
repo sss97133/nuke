@@ -78,10 +78,10 @@ export function ServiceVehicleCardRich({
       if (imagesError) throw imagesError;
 
       // Calculate stats
-      let totalSessions = events?.length || 0;
+      const totalSessions = events?.length || 0;
       let totalImages = 0;
       let totalHours = 0;
-      let workTypes = new Set<string>();
+      const workTypes = new Set<string>();
 
       events?.forEach(event => {
         const meta = event.metadata || {};

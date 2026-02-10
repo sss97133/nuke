@@ -97,7 +97,7 @@ export class VehicleInteractionService {
    */
   static async getRequests(vehicleId: string, includeRequester = true): Promise<InteractionRequestWithUser[]> {
     try {
-      let query = supabase
+      const query = supabase
         .from('vehicle_interaction_requests')
         .select(`
           *,

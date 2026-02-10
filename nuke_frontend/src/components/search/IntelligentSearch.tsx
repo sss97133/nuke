@@ -673,8 +673,8 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
       const analysis = parseSearchQuery(searchQuery);
 
-      let results: SearchResult[] = [];
-      let searchInsights = {
+      const results: SearchResult[] = [];
+      const searchInsights = {
         locations_found: 0,
         vehicles_for_sale: 0,
         stagnant_builds: 0,
@@ -1564,7 +1564,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       // Search reference libraries and documents
       // Try to find the correct table name - might be reference_libraries or library_documents
       let refs: any[] = [];
-      let error: any = null;
+      const error: any = null;
 
       // Try reference_libraries first
       // Use separate queries to avoid .or() syntax issues

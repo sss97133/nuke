@@ -151,7 +151,7 @@ export class PersonalPhotoLibraryService {
     const images = data || [];
     const imageIds = images.map((img: any) => img.id);
     
-    let albumCounts: Record<string, number> = {};
+    const albumCounts: Record<string, number> = {};
     if (imageIds.length > 0) {
       const { data: counts } = await supabase
         .from('image_set_members')
@@ -211,7 +211,7 @@ export class PersonalPhotoLibraryService {
     const images = data || [];
     const imageIds = images.map((img: any) => img.id);
     
-    let albumCounts: Record<string, number> = {};
+    const albumCounts: Record<string, number> = {};
     if (imageIds.length > 0) {
       const { data: counts } = await supabase
         .from('image_set_members')

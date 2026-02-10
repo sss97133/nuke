@@ -92,7 +92,7 @@ export default function WiringPlan() {
     // avoid re-running if we already have a result for the current query
     if (result?.query === initialQuery) return;
     // run once on entry
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+     
     handleGenerate();
     // intentionally omit handleGenerate from deps to prevent loops
     // eslint-disable-next-line react-hooks/exhaustive-deps

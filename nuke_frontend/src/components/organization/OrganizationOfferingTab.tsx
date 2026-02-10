@@ -150,7 +150,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
   };
 
   function markdownToHtml(md: string): string {
-    let html = md
+    const html = md
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/```[\s\S]*?```/g, (match) => {
         const code = match.slice(3, -3).replace(/^\w*\n/, '');
