@@ -113,23 +113,21 @@ serve(async (req) => {
       countStatus("skipped"),
     ]);
 
-    const { count: totalVehicles } = await supabase.from("vehicles").select("*", { count: "estimated", head: true });
-    const { count: vehicles24h } = await supabase
-      .from("vehicles")
-      .select("*", { count: "estimated", head: true })
-      .gte("created_at", iso24h);
-
-    const { count: activeSources } = await supabase.from("scrape_sources").select("*", { count: "estimated", head: true }).eq("is_active", true);
+    const [{ count: totalVehicles }, { count: vehicles24h }, { count: activeSources }] = await Promise.all([
+      supabase.from("vehicles").select("*", { count: "estimated", head: true }),
+      supabase.from("vehicles").select("*", { count: "estimated", head: true }).gte("created_at", iso24h),
+      supabase.from("scrape_sources").select("*", { count: "estimated", head: true }).eq("is_active", true),
+    ]);
 
     // Analysis queue + image analysis progress (best-effort).
     const analysisQueueCounts: Record<string, number> = {};
     const analysisErrorPatterns = new Map<string, number>();
     try {
       const statuses = ["pending", "processing", "retrying", "failed", "completed"];
-      for (const st of statuses) {
-        const { count } = await supabase.from("analysis_queue").select("*", { count: "estimated", head: true }).eq("status", st);
-        analysisQueueCounts[st] = count || 0;
-      }
+      const analysisCounts = await Promise.all(
+        statuses.map(st => supabase.from("analysis_queue").select("*", { count: "estimated", head: true }).eq("status", st))
+      );
+      statuses.forEach((st, i) => { analysisQueueCounts[st] = analysisCounts[i].count || 0; });
 
       const { data: recentAnalysisFailures } = await supabase
         .from("analysis_queue")
@@ -151,15 +149,11 @@ serve(async (req) => {
 
     let vehicleImageAnalysis: { total: number; analyzed: number; pending: number } | null = null;
     try {
-      const { count: totalImages } = await supabase.from("vehicle_images").select("*", { count: "estimated", head: true });
-      const { count: analyzedImages } = await supabase
-        .from("vehicle_images")
-        .select("*", { count: "estimated", head: true })
-        .not("ai_scan_metadata->appraiser->primary_label", "is", null);
-      const { count: pendingImages } = await supabase
-        .from("vehicle_images")
-        .select("*", { count: "estimated", head: true })
-        .is("ai_scan_metadata->appraiser->primary_label", null);
+      const [{ count: totalImages }, { count: analyzedImages }, { count: pendingImages }] = await Promise.all([
+        supabase.from("vehicle_images").select("*", { count: "estimated", head: true }),
+        supabase.from("vehicle_images").select("*", { count: "estimated", head: true }).not("ai_scan_metadata->appraiser->primary_label", "is", null),
+        supabase.from("vehicle_images").select("*", { count: "estimated", head: true }).is("ai_scan_metadata->appraiser->primary_label", null),
+      ]);
       if (totalImages != null && analyzedImages != null && pendingImages != null) {
         vehicleImageAnalysis = {
           total: totalImages || 0,
