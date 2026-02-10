@@ -329,7 +329,7 @@ async function checkDataQuality(
       .from("vehicles")
       .select("id", { count: "exact", head: true })
       .gte("created_at", sevenDaysAgo)
-      .is("thumbnail_url", null);
+      .is("primary_image_url", null);
 
     // Vehicles missing year, make, or model
     const [noYearRes, noMakeRes, noModelRes] = await Promise.all([
