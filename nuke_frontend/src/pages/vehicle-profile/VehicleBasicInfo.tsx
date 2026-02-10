@@ -100,7 +100,18 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       setVinFromImages(null);
       return;
     }
-    
+
+    // Basic VIN format validation: must be alphanumeric, 10-17 chars, not a timestamp
+    const isPlausibleVin = (s: string): boolean => {
+      if (!s || s.length < 10 || s.length > 17) return false;
+      if (!/^[A-HJ-NPR-Z0-9]+$/i.test(s)) return false;
+      // Reject ISO-ish timestamps like "20260210T15"
+      if (/^\d{8}T\d/i.test(s)) return false;
+      // Reject all-numeric strings (not valid VINs)
+      if (/^\d+$/.test(s)) return false;
+      return true;
+    };
+
     // Fetch VIN from multiple sources
     const fetchVinFromMultipleSources = async () => {
       try {
@@ -114,8 +125,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           .limit(1);
 
         if (!fieldSourcesError && fieldSources && fieldSources.length > 0) {
-          const vin = String(fieldSources[0].field_value || '').trim();
-          if (vin && vin.length >= 10) {
+          const vin = String(fieldSources[0].field_value || '').trim().toUpperCase();
+          if (isPlausibleVin(vin)) {
             setVinFromImages(vin);
             return;
           }
@@ -137,8 +148,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
 
             // Check vin_tag
             if (metadata.vin_tag?.vin) {
-              const vin = String(metadata.vin_tag.vin).trim();
-              if (vin && vin.length >= 10) {
+              const vin = String(metadata.vin_tag.vin).trim().toUpperCase();
+              if (isPlausibleVin(vin)) {
                 setVinFromImages(vin);
                 return;
               }
@@ -146,8 +157,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
 
             // Check spid_data
             if (metadata.spid_data?.extracted_data?.vin) {
-              const vin = String(metadata.spid_data.extracted_data.vin).trim();
-              if (vin && vin.length >= 10) {
+              const vin = String(metadata.spid_data.extracted_data.vin).trim().toUpperCase();
+              if (isPlausibleVin(vin)) {
                 setVinFromImages(vin);
                 return;
               }
@@ -155,8 +166,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
 
             // Check appraiser analysis
             if (metadata.appraiser?.extracted_data?.vin) {
-              const vin = String(metadata.appraiser.extracted_data.vin).trim();
-              if (vin && vin.length >= 10) {
+              const vin = String(metadata.appraiser.extracted_data.vin).trim().toUpperCase();
+              if (isPlausibleVin(vin)) {
                 setVinFromImages(vin);
                 return;
               }
@@ -167,15 +178,15 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         // 3. Check origin_metadata for VIN extraction data (from BaT scraping)
         const originMeta = (vehicle as any)?.origin_metadata;
         if (originMeta?.vin_extraction?.best_candidate?.value) {
-          const vin = String(originMeta.vin_extraction.best_candidate.value).trim();
-          if (vin && vin.length >= 10) {
+          const vin = String(originMeta.vin_extraction.best_candidate.value).trim().toUpperCase();
+          if (isPlausibleVin(vin)) {
             setVinFromImages(vin);
             return;
           }
         }
         if (originMeta?.vin) {
-          const vin = String(originMeta.vin).trim();
-          if (vin && vin.length >= 10) {
+          const vin = String(originMeta.vin).trim().toUpperCase();
+          if (isPlausibleVin(vin)) {
             setVinFromImages(vin);
             return;
           }

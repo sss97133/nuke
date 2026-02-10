@@ -1915,7 +1915,7 @@ const CursorHomepage: React.FC = () => {
           // Keep this payload lean: this query runs as you type/search and shouldn't pull display-only fields.
           .select(
             'sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date, created_at, year, make, model, title, vin, discovery_url, discovery_source, profile_origin, image_count',
-            { count: 'exact' }
+            { count: 'estimated' }
           )
           .eq('is_public', true)
           .neq('status', 'pending');
@@ -2514,7 +2514,7 @@ const CursorHomepage: React.FC = () => {
       const { count: totalCount, error: countError } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
         let q = supabase
           .from('vehicles')
-          .select('*', { count: 'exact', head: true })
+          .select('*', { count: 'estimated', head: true })
           .eq('is_public', true)
           .neq('status', 'pending');
         if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
@@ -2636,7 +2636,7 @@ const CursorHomepage: React.FC = () => {
       const { count: createdTodayCount, error: createdTodayErr } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
         let q = supabase
           .from('vehicles')
-          .select('*', { count: 'exact', head: true })
+          .select('*', { count: 'estimated', head: true })
           .eq('is_public', true)
           .neq('status', 'pending');
         if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
@@ -4452,7 +4452,7 @@ const CursorHomepage: React.FC = () => {
             runVehiclesQueryWithListingKindFallback((includeListingKind) => {
               let q = supabase
                 .from('vehicles')
-                .select('*', { count: 'exact', head: true })
+                .select('*', { count: 'estimated', head: true })
                 .eq('is_public', true)
                 .eq('status', 'pending');
               if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
@@ -4461,7 +4461,7 @@ const CursorHomepage: React.FC = () => {
             runVehiclesQueryWithListingKindFallback((includeListingKind) => {
               let q = supabase
                 .from('vehicles')
-                .select('*', { count: 'exact', head: true })
+                .select('*', { count: 'estimated', head: true })
                 .eq('is_public', true);
               if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
               return q;
@@ -4469,7 +4469,7 @@ const CursorHomepage: React.FC = () => {
             runVehiclesQueryWithListingKindFallback((includeListingKind) => {
               let q = supabase
                 .from('vehicles')
-                .select('*', { count: 'exact', head: true });
+                .select('*', { count: 'estimated', head: true });
               if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
               return q;
             }),
@@ -4477,7 +4477,7 @@ const CursorHomepage: React.FC = () => {
               if (!includeListingKind) return { data: null, error: null, count: 0 } as any;
               return supabase
                 .from('vehicles')
-                .select('*', { count: 'exact', head: true })
+                .select('*', { count: 'estimated', head: true })
                 .eq('is_public', true)
                 .neq('status', 'pending')
                 .eq('listing_kind', 'non_vehicle_item');
