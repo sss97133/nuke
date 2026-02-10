@@ -296,14 +296,21 @@ serve(async (req) => {
       auth: { persistSession: false, detectSessionInUrl: false }
     })
 
-    console.log(`[identify-vehicle] Starting identification for: ${image_url.substring(0, 100)}...`)
+    // Normalize Cloudinary URLs to force JPEG format (AVIF/WebP rejected by OpenAI vision)
+    let normalizedImageUrl = image_url
+    if (image_url.includes('res.cloudinary.com') && image_url.includes('/upload/')) {
+      normalizedImageUrl = image_url.replace('/upload/', '/upload/f_jpg/')
+      console.log(`[identify-vehicle] Cloudinary URL detected, forcing JPEG: ${normalizedImageUrl.substring(0, 100)}...`)
+    }
+
+    console.log(`[identify-vehicle] Starting identification for: ${normalizedImageUrl.substring(0, 100)}...`)
 
     // Fetch image ONCE and reuse across all tiers (avoids rate limiting from multiple fetches)
     let imageBase64: string | null = null
-    let imageMimeType: string = detectMimeType(image_url)
+    let imageMimeType: string = detectMimeType(normalizedImageUrl)
     let imageFetchFailed = false
     try {
-      const imageData = await fetchImageAsBase64(image_url)
+      const imageData = await fetchImageAsBase64(normalizedImageUrl)
       imageBase64 = imageData.base64
       imageMimeType = imageData.mimeType
     } catch (fetchErr: any) {
@@ -339,7 +346,7 @@ serve(async (req) => {
 
       const result = await identifyWithTier(
         supabase, user_id || null,
-        imageBase64, imageMimeType, image_url,
+        imageBase64, imageMimeType, normalizedImageUrl,
         context || null, tier
       )
 
