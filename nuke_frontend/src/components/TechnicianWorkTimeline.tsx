@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { WorkSessionService } from '../services/workSessionService';
+import { WorkSessionService } from '../services/workSessionService';
 import type { WorkSession } from '../services/workSessionService';
 import { supabase } from '../lib/supabase';
 

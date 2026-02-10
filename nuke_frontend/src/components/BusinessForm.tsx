@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { BusinessFormData, BusinessType } from '../types/business';
-import type { BUSINESS_TYPES, SPECIALIZATIONS, SERVICES_OFFERED } from '../types/business';
-import type { BusinessService } from '../services/businessService';
+import { BUSINESS_TYPES, SPECIALIZATIONS, SERVICES_OFFERED } from '../types/business';
+import { BusinessService } from '../services/businessService';
 
 interface BusinessFormProps {
   onSuccess?: (business: any) => void;
