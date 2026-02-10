@@ -1201,7 +1201,7 @@ serve(async (req) => {
       }
     }
     // Also check by VIN to prevent duplicate key constraint violations
-    if (!vehicleId && essentials.vin && essentials.vin.length >= 11) {
+    if (!vehicleId && essentials.vin && essentials.vin.length >= 5) {
       const { data } = await supabase
         .from("vehicles")
         .select("id")
