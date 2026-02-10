@@ -133,7 +133,7 @@ async function processQueue(
     .select("*")
     .ilike("listing_url", url.replace(/\//g, "/"))
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (queryError) {
     return { item: null, extracted: null, error: `Queue lookup failed: ${queryError.message}` };
