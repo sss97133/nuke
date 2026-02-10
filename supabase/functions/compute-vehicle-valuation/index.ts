@@ -674,9 +674,35 @@ serve(async (req) => {
       vehicleIds = [body.vehicle_id];
     } else if (body.vehicle_ids && Array.isArray(body.vehicle_ids)) {
       vehicleIds = body.vehicle_ids.slice(0, 100); // Max 100
+    } else if (body.batch_size) {
+      // Auto-discover vehicles that need valuation
+      const batchSize = Math.min(body.batch_size || 50, 100);
+      const { data: candidates, error: candErr } = await supabase
+        .from("vehicles")
+        .select("id")
+        .not("year", "is", null)
+        .not("make", "is", null)
+        .is("nuke_estimate", null)
+        .gt("year", 1900)
+        .limit(batchSize);
+
+      if (candErr) {
+        return new Response(
+          JSON.stringify({ error: `Failed to find candidates: ${candErr.message}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      vehicleIds = (candidates || []).map((v: any) => v.id);
+      if (vehicleIds.length === 0) {
+        return new Response(
+          JSON.stringify({ success: true, computed: 0, errors: 0, message: "No unvalued vehicles with year+make found" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     } else {
       return new Response(
-        JSON.stringify({ error: "Provide vehicle_id or vehicle_ids" }),
+        JSON.stringify({ error: "Provide vehicle_id, vehicle_ids, or batch_size" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
