@@ -1,0 +1,305 @@
+name: System Health Monitor
+
+on:
+  schedule:
+    # Every hour at minute 0
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      contents: read
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL}" ]]; then
+            echo "::error::Missing secret SUPABASE_URL"
+            exit 1
+          fi
+          if [[ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]]; then
+            echo "::error::Missing secret SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+
+      - name: Call system-health-monitor edge function
+        id: health
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/health
+
+          HTTP_CODE="$(
+            curl -sS \
+              --retry 3 --retry-delay 5 --retry-all-errors \
+              --max-time 30 \
+              -o /tmp/health/response.json \
+              -w "%{http_code}" \
+              "${SUPABASE_URL}/functions/v1/system-health-monitor" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/json"
+          )"
+
+          echo "http_code=${HTTP_CODE}"
+
+          if [[ "${HTTP_CODE}" -lt 200 || "${HTTP_CODE}" -ge 300 ]]; then
+            echo "::error::Health monitor returned HTTP ${HTTP_CODE}"
+            cat /tmp/health/response.json >&2 || true
+
+            # Treat a non-2xx as critical so we still create an issue
+            echo '{"status":"critical","message":"Health monitor endpoint returned HTTP '"${HTTP_CODE}"'","checks":[]}' > /tmp/health/response.json
+          fi
+
+          # Validate JSON
+          if ! jq empty /tmp/health/response.json 2>/dev/null; then
+            echo "::error::Response is not valid JSON"
+            echo '{"status":"critical","message":"Health monitor returned invalid JSON","checks":[]}' > /tmp/health/response.json
+          fi
+
+          # Extract status
+          STATUS="$(jq -r '.status // "unknown"' /tmp/health/response.json)"
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "System health status: ${STATUS}"
+
+          # Pretty-print for the log
+          jq '.' /tmp/health/response.json
+
+      - name: Build issue body
+        if: steps.health.outputs.status == 'degraded' || steps.health.outputs.status == 'critical'
+        id: issue
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(jq -r '.status' /tmp/health/response.json)"
+          MESSAGE="$(jq -r '.message // "No message provided"' /tmp/health/response.json)"
+          TIMESTAMP="$(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+
+          # Build severity label
+          if [[ "${STATUS}" == "critical" ]]; then
+            SEVERITY_LABEL="severity-critical"
+          else
+            SEVERITY_LABEL="severity-degraded"
+          fi
+          echo "severity_label=${SEVERITY_LABEL}" >> "$GITHUB_OUTPUT"
+
+          # Build the issue title
+          TITLE="[${STATUS^^}] System Health Alert - ${TIMESTAMP}"
+          echo "title=${TITLE}" >> "$GITHUB_OUTPUT"
+
+          # Build a detailed body from the checks array
+          {
+            echo "## System Health Alert"
+            echo ""
+            echo "**Status:** \`${STATUS}\`"
+            echo "**Detected:** ${TIMESTAMP}"
+            echo "**Message:** ${MESSAGE}"
+            echo ""
+            echo "### Check Results"
+            echo ""
+
+            # Iterate over checks if they exist
+            CHECKS_COUNT="$(jq '.checks | length // 0' /tmp/health/response.json)"
+            if [[ "${CHECKS_COUNT}" -gt 0 ]]; then
+              echo "| Check | Status | Detail |"
+              echo "|-------|--------|--------|"
+              jq -r '.checks[]? | "| \(.name // "unknown") | \(.status // "?") | \(.message // .detail // "-") |"' /tmp/health/response.json
+            else
+              echo "_No individual check details available._"
+            fi
+
+            echo ""
+            echo "### Raw Response"
+            echo ""
+            echo '```json'
+            jq '.' /tmp/health/response.json
+            echo '```'
+            echo ""
+            echo "---"
+            echo "_This issue was automatically created by the [System Health Monitor workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}). It will be auto-closed when the system returns to healthy._"
+          } > /tmp/health/issue_body.md
+
+      - name: Check for existing open issue (prevent duplicates)
+        if: steps.health.outputs.status == 'degraded' || steps.health.outputs.status == 'critical'
+        id: existing
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'automated,health-check',
+              per_page: 10,
+            });
+
+            if (issues.length > 0) {
+              const issue = issues[0];
+              core.info(`Found existing open health-check issue #${issue.number}: ${issue.title}`);
+              core.setOutput('exists', 'true');
+              core.setOutput('issue_number', issue.number);
+            } else {
+              core.info('No existing open health-check issue found');
+              core.setOutput('exists', 'false');
+            }
+
+      - name: Create GitHub Issue
+        if: |
+          (steps.health.outputs.status == 'degraded' || steps.health.outputs.status == 'critical')
+          && steps.existing.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('/tmp/health/issue_body.md', 'utf8');
+            const title = '${{ steps.issue.outputs.title }}'.replace(/'/g, "'");
+            const severityLabel = '${{ steps.issue.outputs.severity_label }}';
+
+            // Ensure labels exist (create if missing)
+            const labelsToEnsure = ['automated', 'health-check', severityLabel];
+            for (const label of labelsToEnsure) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label,
+                });
+              } catch (e) {
+                if (e.status === 404) {
+                  const colors = {
+                    'automated': '0075ca',
+                    'health-check': 'c2e0c6',
+                    'severity-critical': 'd73a4a',
+                    'severity-degraded': 'fbca04',
+                  };
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: colors[label] || 'ededed',
+                    description: `Auto-created by system health monitor`,
+                  });
+                  core.info(`Created label: ${label}`);
+                }
+              }
+            }
+
+            const { data: issue } = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: labelsToEnsure,
+            });
+
+            core.info(`Created issue #${issue.number}: ${issue.html_url}`);
+
+      - name: Update existing issue with latest status
+        if: |
+          (steps.health.outputs.status == 'degraded' || steps.health.outputs.status == 'critical')
+          && steps.existing.outputs.exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('/tmp/health/issue_body.md', 'utf8');
+            const issueNumber = parseInt('${{ steps.existing.outputs.issue_number }}');
+            const severityLabel = '${{ steps.issue.outputs.severity_label }}';
+
+            // Add a comment with the latest status instead of creating a duplicate
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## Update - ${new Date().toISOString()}\n\n${body}`,
+            });
+
+            // Update labels to reflect current severity
+            const labelsToSet = ['automated', 'health-check', severityLabel];
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: labelsToSet,
+            });
+
+            core.info(`Updated existing issue #${issueNumber} with latest health status`);
+
+      - name: Auto-close resolved issues
+        if: steps.health.outputs.status == 'healthy'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'automated,health-check',
+              per_page: 50,
+            });
+
+            for (const issue of issues) {
+              core.info(`Closing resolved issue #${issue.number}: ${issue.title}`);
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `## Resolved\n\nSystem health has returned to **healthy** as of ${new Date().toISOString()}.\n\nAutomatically closing this issue.\n\n---\n_[Workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})_`,
+              });
+
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+            }
+
+            if (issues.length === 0) {
+              core.info('No open health-check issues to close');
+            } else {
+              core.info(`Closed ${issues.length} resolved health-check issue(s)`);
+            }
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          STATUS="${{ steps.health.outputs.status }}"
+          echo "## System Health Monitor" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          case "${STATUS}" in
+            healthy)
+              echo ":white_check_mark: **Status: Healthy**" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            degraded)
+              echo ":warning: **Status: Degraded**" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            critical)
+              echo ":x: **Status: Critical**" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo ":question: **Status: ${STATUS}**" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -f /tmp/health/response.json ]]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            jq '.' /tmp/health/response.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
