@@ -50,15 +50,22 @@ export async function resolveExistingVehicleId(
   }
 
   // 3. By discovery_url pattern (same listing, different scheme/www)
+  // NOTE: ILIKE with leading % can't use btree indexes and causes full table scans.
+  // Wrap in try/catch with a short timeout to avoid blocking the caller.
   if (discoveryUrlIlikePattern && discoveryUrlIlikePattern.trim()) {
-    const { data: byPatternRows } = await supabase
-      .from('vehicles')
-      .select('id')
-      .ilike('discovery_url', discoveryUrlIlikePattern.trim())
-      .limit(1);
-    const row = Array.isArray(byPatternRows) ? byPatternRows[0] : (byPatternRows as { id: string } | null);
-    if (row?.id) {
-      return { vehicleId: row.id };
+    try {
+      const { data: byPatternRows } = await supabase
+        .from('vehicles')
+        .select('id')
+        .ilike('discovery_url', discoveryUrlIlikePattern.trim())
+        .limit(1);
+      const row = Array.isArray(byPatternRows) ? byPatternRows[0] : (byPatternRows as { id: string } | null);
+      if (row?.id) {
+        return { vehicleId: row.id };
+      }
+    } catch (e: any) {
+      // ILIKE timed out on large table — skip pattern matching, proceed with insert
+      console.warn(`[resolveVehicleId] ILIKE pattern match timed out: ${e.message}`);
     }
   }
 
