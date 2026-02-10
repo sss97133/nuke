@@ -154,7 +154,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
           return { latitude: loc.latitude, longitude: loc.longitude };
         }
       }
-    } catch {}
+    } catch { /* ignore */ }
     return null;
   };
 
@@ -279,7 +279,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
         // Notify other components to refresh gallery
         try {
           window.dispatchEvent(new CustomEvent('vehicle_images_updated', { detail: { vehicleId } }));
-        } catch {}
+        } catch { /* ignore */ }
         
         urls.push(result.imageUrl!);
         setUploadStatus(prev => ({ ...prev, [index]: 'completed' }));
@@ -394,13 +394,13 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                 metadata: { image_count: uploadedUrls.length, stage: grp.stage }
               });
           }
-        } catch {}
+        } catch { /* ignore */ }
 
         onEventAdded({ ...eventRecord, image_urls: uploadedUrls });
       }
 
       console.log('Closing wizard...');
-      try { window.dispatchEvent(new CustomEvent('timeline_events_created', { detail: { vehicleId, count: selectedFiles.length, dates: groups.map(g=>g.date) } })); } catch {}
+      try { window.dispatchEvent(new CustomEvent('timeline_events_created', { detail: { vehicleId, count: selectedFiles.length, dates: groups.map(g=>g.date) } })); } catch { /* ignore */ }
       onClose();
     } catch (error) {
       console.error('Unexpected error in handleSubmit:', error);

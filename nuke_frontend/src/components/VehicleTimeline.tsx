@@ -130,7 +130,7 @@ const VehicleTimeline: React.FC<{
       if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
       const d = new Date(s);
       if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-    } catch {}
+    } catch { /* ignore */ }
     return new Date().toISOString().slice(0, 10);
   };
 
@@ -238,7 +238,7 @@ const VehicleTimeline: React.FC<{
         if (s && typeof (s as any).target_ready_hours === 'number') {
           setReadyTargetHours((s as any).target_ready_hours);
         }
-      } catch {}
+      } catch { /* ignore */ }
     } catch (e) {
       // ignore
     }
@@ -578,7 +578,7 @@ const VehicleTimeline: React.FC<{
 
               if (dayAuction.length > 0) {
                 autoOpenedTodayRef.current = true;
-                try { window.localStorage.setItem(alreadyOpenedKey, '1'); } catch {}
+                try { window.localStorage.setItem(alreadyOpenedKey, '1'); } catch { /* ignore */ }
 
                 const activityEvent = {
                   id: `activity-${todayYmd}`,

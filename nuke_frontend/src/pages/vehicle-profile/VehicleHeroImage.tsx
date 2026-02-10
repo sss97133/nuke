@@ -80,7 +80,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
               e.stopPropagation();
               setFitMode((prev) => {
                 const next = prev === 'cover' ? 'contain' : 'cover';
-                try { window.localStorage.setItem('n_zero_hero_image_fit_mode', next); } catch {}
+                try { window.localStorage.setItem('n_zero_hero_image_fit_mode', next); } catch { /* ignore */ }
                 return next;
               });
             }}

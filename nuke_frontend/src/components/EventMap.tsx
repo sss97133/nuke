@@ -181,7 +181,7 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
                 found = { latitude: lat, longitude: lon };
                 break;
               }
-            } catch {}
+            } catch { /* ignore */ }
           }
 
           // 2) Fallback: geocode string location
@@ -201,7 +201,7 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
             updatedIds.push(ev.id);
           }
 
-        } catch {}
+        } catch { /* ignore */ }
       }
       if (updatedIds.length > 0) await loadEvents();
     } catch (e) {

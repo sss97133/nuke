@@ -64,7 +64,7 @@ class ImageOptimizationService {
       try {
         const exif = await exifr.parse(file, { tiff: true });
         orientation = (exif as any)?.Orientation;
-      } catch {}
+      } catch { /* ignore */ }
 
       // Generate each size variant
       for (const [sizeName, config] of Object.entries(this.SIZES)) {
@@ -166,7 +166,7 @@ class ImageOptimizationService {
       try {
         const exif = await exifr.parse(file, { tiff: true });
         orientation = (exif as any)?.Orientation;
-      } catch {}
+      } catch { /* ignore */ }
 
       // Generate each size variant
       for (const [sizeName, config] of Object.entries(this.SIZES)) {

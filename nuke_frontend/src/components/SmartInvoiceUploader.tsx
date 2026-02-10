@@ -189,7 +189,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
       if (mimeType && /image\//.test(mimeType)) {
         setMessage('Running OCR...');
         const Tesseract = (await import('tesseract.js')).default as any;
-        try { if (Tesseract.setLogging) Tesseract.setLogging(false); } catch {}
+        try { if (Tesseract.setLogging) Tesseract.setLogging(false); } catch { /* ignore */ }
         const ocrSrc = await prepareOcrImage(prepared.publicUrl);
         const result = await Tesseract.recognize(ocrSrc, 'eng', { logger: () => {}, tessedit_pageseg_mode: 6 });
         const text: string = String(result?.data?.text || '');
@@ -352,7 +352,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
       setStatus('success');
       setMessage('✅ Saved & Analyzed!');
 
-      try { window.dispatchEvent(new CustomEvent('valuation_updated', { detail: { vehicleId } } as any)); } catch {}
+      try { window.dispatchEvent(new CustomEvent('valuation_updated', { detail: { vehicleId } } as any)); } catch { /* ignore */ }
       onSaved?.({ receiptId: saved.receiptId });
       setTimeout(() => onClose?.(), 1500);
     } catch (e: any) {

@@ -44,7 +44,7 @@ export class ReceiptExtractionService {
     let payload: any = data;
     // If the function returned a JSON string, parse it
     if (typeof payload === 'string') {
-      try { payload = JSON.parse(payload); } catch {}
+      try { payload = JSON.parse(payload); } catch { /* ignore */ }
     }
     if (!payload) throw new Error('Empty extraction response');
     // Handle AWS API Gateway Lambda proxy envelope

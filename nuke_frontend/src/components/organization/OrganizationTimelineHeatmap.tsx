@@ -85,7 +85,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
       if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
       const d = new Date(s);
       if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-    } catch {}
+    } catch { /* ignore */ }
     return new Date().toISOString().split('T')[0];
   };
 
