@@ -26,58 +26,50 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Run all counts in parallel
+    // Use "estimated" counts for large tables (uses pg_class, instant)
+    // "exact" counts on 27M+ row tables timeout silently and return 0
     const [
       vehiclesRes,
       imagesRes,
-      // Observations (current system)
+      obsTotalRes,
+      legacyCommentsRes,
+      nukeEstimatesRes,
+      // Filtered observation counts (smaller, exact is fine)
       obsCommentsRes,
       obsBidsRes,
       obsVehiclesRes,
-      obsTotalRes,
-      // Legacy auction_comments (for reference)
-      legacyCommentsRes,
-      // BaT listings
+      // Small table exact counts (fast)
       batListingsRes,
       batWithCommentsRes,
-      // BaT identity seeds
       batIdentitiesRes,
-      // Discoveries (AI analysis)
       commentDiscRes,
       descDiscRes,
-      // Organizations
       orgsRes,
-      // Active users
       activeUsersRes,
-      // Identity claims
       externalIdentitiesRes,
       claimedIdentitiesRes,
       pendingClaimsRes,
       approvedClaimsRes,
       pendingVerificationsRes,
     ] = await Promise.all([
-      supabase.from("vehicles").select("id", { count: "exact", head: true }),
-      supabase.from("vehicle_images").select("id", { count: "exact", head: true }),
-      // Observations - the actual data source
+      // Large tables: use "estimated" to avoid COUNT(*) timeout
+      supabase.from("vehicles").select("id", { count: "estimated", head: true }),
+      supabase.from("vehicle_images").select("id", { count: "estimated", head: true }),
+      supabase.from("vehicle_observations").select("id", { count: "estimated", head: true }),
+      supabase.from("auction_comments").select("id", { count: "estimated", head: true }),
+      supabase.from("nuke_estimates").select("id", { count: "estimated", head: true }),
+      // Filtered observation counts
       supabase.from("vehicle_observations").select("id", { count: "exact", head: true }).eq("kind", "comment"),
       supabase.from("vehicle_observations").select("id", { count: "exact", head: true }).eq("kind", "bid"),
-      supabase.from("vehicle_observations").select("vehicle_id").eq("kind", "comment").limit(50000),
-      supabase.from("vehicle_observations").select("id", { count: "exact", head: true }),
-      // Legacy table
-      supabase.from("auction_comments").select("id", { count: "exact", head: true }),
-      // BaT
+      supabase.from("vehicle_observations").select("vehicle_id", { count: "exact", head: true }).eq("kind", "comment"),
+      // Small tables: exact count is fine
       supabase.from("bat_listings").select("id", { count: "exact", head: true }),
       supabase.from("bat_listings").select("id", { count: "exact", head: true }).gt("comment_count", 0),
-      // Identity seeds (BaT users with activity data)
       supabase.from("bat_user_profiles").select("id", { count: "exact", head: true }),
-      // AI discoveries
       supabase.from("comment_discoveries").select("id", { count: "exact", head: true }),
       supabase.from("description_discoveries").select("id", { count: "exact", head: true }),
-      // Orgs
       supabase.from("businesses").select("id", { count: "exact", head: true }),
-      // Active users (profiles with email)
       supabase.from("profiles").select("id", { count: "exact", head: true }).not("email", "is", null),
-      // Identity claims system
       supabase.from("external_identities").select("id", { count: "exact", head: true }),
       supabase.from("external_identities").select("id", { count: "exact", head: true }).not("claimed_by_user_id", "is", null),
       supabase.from("external_identity_claims").select("id", { count: "exact", head: true }).eq("status", "pending"),
@@ -85,25 +77,24 @@ serve(async (req) => {
       supabase.from("identity_verification_methods").select("id", { count: "exact", head: true }).eq("status", "pending"),
     ]);
 
-    // Calculate distinct vehicles with comment observations
-    const vehicleIds = new Set(
-      (obsVehiclesRes.data || []).map((r: any) => r.vehicle_id)
-    );
+    const vehicleCount = vehiclesRes.count || 0;
+    const estimateCount = nukeEstimatesRes.count || 0;
 
     const stats = {
       // Top-level fields for dashboard consumption
-      vehicles: vehiclesRes.count || 0,
+      vehicles: vehicleCount,
       images: imagesRes.count || 0,
       comments: legacyCommentsRes.count || 0,
       observations: obsTotalRes.count || 0,
+      nuke_estimates: estimateCount,
       bat_identities: batIdentitiesRes.count || 0,
       active_users: activeUsersRes.count || 0,
       generated_at: new Date().toISOString(),
 
       // Detailed breakdowns
       details: {
-        // Core counts
-        total_vehicles: vehiclesRes.count || 0,
+        // Core counts (estimated for large tables)
+        total_vehicles: vehicleCount,
         total_images: imagesRes.count || 0,
         total_organizations: orgsRes.count || 0,
 
@@ -112,7 +103,15 @@ serve(async (req) => {
           comments: obsCommentsRes.count || 0,
           bids: obsBidsRes.count || 0,
           total: obsTotalRes.count || 0,
-          vehicles_with_comments: vehicleIds.size,
+          vehicles_with_comments: obsVehiclesRes.count || 0,
+        },
+
+        // Valuation coverage
+        valuations: {
+          nuke_estimates: estimateCount,
+          coverage_pct: vehicleCount > 0
+            ? Math.round(1000 * estimateCount / vehicleCount) / 10
+            : 0,
         },
 
         // Identity seeds (claimable profiles)
