@@ -291,6 +291,24 @@ serve(async (req) => {
       )
     }
 
+    // Price hallucination guard: null out suspiciously round prices that aren't in the content
+    const suspiciousRoundPrices = [25000, 50000, 100000, 10000, 75000, 150000, 200000]
+    for (const field of ['price', 'sold_price', 'asking_price'] as const) {
+      if (normalized[field] && suspiciousRoundPrices.includes(normalized[field])) {
+        // Check if this exact price string appears in the actual content
+        const priceStr = String(normalized[field])
+        const priceFormatted = new Intl.NumberFormat('en-US').format(normalized[field])
+        const priceInContent = contentPreview.includes(`$${priceStr}`) ||
+          contentPreview.includes(`$${priceFormatted}`) ||
+          contentPreview.includes(priceFormatted) ||
+          contentPreview.includes(`${priceStr}`)
+        if (!priceInContent) {
+          console.log(`[extract-vehicle-data-ai] Price hallucination guard: ${field}=${normalized[field]} not found in content. Nulling.`)
+          normalized[field] = null
+        }
+      }
+    }
+
     // === FIELD-LEVEL EXTRACTION HEALTH LOGGING ===
     const overallConfidence = extractedJson.confidence || 0.8
     const healthLogger = new ExtractionLogger(supabase, {
@@ -494,70 +512,50 @@ ${content}
 
 Extract the following fields as JSON:
 {
-  "vin": "17-character VIN if found",
-  "year": 1974,
-  "make": "Chevrolet (NORMALIZE: 'Chevy' → 'Chevrolet', 'GMC' → 'GMC')",
-  "model": "Truck (NORMALIZE: 'pickup' → 'Truck', 'truck' → 'Truck', 'Blazer' → 'Blazer'. Note: C/K was the series designation, not the model name)",
-  "series": "C10 (if found: C10, K10, C20, K20, K5, C5, C1500, K1500, R1500, V1500, R2500, V2500, R3500, V3500, etc.)",
-  "trim": "Cheyenne Super (if found: Cheyenne, Silverado, Scottsdale, Custom Deluxe, etc.)",
-  "bed_length": "SWB or LWB (if mentioned: 'shortbed'/'SWB'/'short bed' → 'SWB', 'longbed'/'LWB'/'long bed' → 'LWB')",
-  "engine_status": "No Motor (if mentioned: 'no motor', 'no engine', 'missing engine', 'no motor or transmission' → 'No Motor', otherwise null)",
-  "transmission_status": "No Transmission (if mentioned: 'no transmission', 'no motor or transmission' → 'No Transmission', otherwise null)",
-  "engine": "350 V8 (actual engine if present, null if 'no motor')",
-  "engine_size": "5.7L (actual size if present, null if 'no motor')",
-  "odometer_status": "Broken (if mentioned: 'odometer broken', 'odo broken', 'speedo broken' → 'Broken', otherwise null)",
-  "mileage": 123456,
-  "price": 25000,
-  "asking_price": 25000,
+  "vin": "17-character VIN if found, null if not present",
+  "year": null,
+  "make": "Full manufacturer name (e.g. 'Chevrolet' not 'Chevy', 'Mercedes-Benz' not 'Mercedes')",
+  "model": "Specific model name (e.g. 'Camaro', '911', 'Mustang', 'F-150', 'Corvette', 'GT350'). Use the ACTUAL model name, not generic terms like 'Truck' or 'Car'.",
+  "series": "Series/generation if applicable (e.g. 'C10', 'E30', '997', 'W124')",
+  "trim": "Trim level if found (e.g. 'SS', 'GT', 'Limited', 'Sport')",
+  "engine": "Engine description (e.g. '5.0L V8', '2.5L Flat-4', '6.2L Supercharged V8')",
+  "engine_size": "Displacement if found (e.g. '5.7L', '3.0L')",
+  "mileage": null,
+  "price": null,
+  "asking_price": null,
   "sold_price": null,
   "sold_date": null,
-  "color": "Red",
-  "exterior_color": "Red",
-  "interior_color": "Black",
-  "transmission": "Automatic",
-  "drivetrain": "4WD",
-  "body_style": "Pickup",
-  "body_type": "Pickup",
-  "title_status": "Clean",
-  "description": "Full description text",
+  "color": null,
+  "exterior_color": null,
+  "interior_color": null,
+  "transmission": "Manual or Automatic or specific (e.g. '6-Speed Manual', '4L60E Automatic')",
+  "drivetrain": "RWD, FWD, AWD, or 4WD",
+  "body_style": "Coupe, Sedan, Convertible, Pickup, SUV, Wagon, Hatchback, etc.",
+  "title_status": "Clean, Salvage, Rebuilt, etc. if mentioned",
+  "description": "Full description text from the listing",
   "images": ["url1", "url2"],
   "image_urls": ["url1", "url2"],
   "location": "City, State",
   "seller": "Seller name",
-  "seller_phone": "Phone if found",
-  "seller_email": "Email if found",
   "listing_title": "Full listing title",
-  "confidence": 0.95,
-  "extracted_fields": ["series", "trim", "bed_length", "engine_status"],
-  "source_annotations": {
-    "bed_length_source": "listing_text",
-    "engine_status_source": "listing_text",
-    "trim_source": "title"
-  }
+  "confidence": 0.0
 }
 
 CRITICAL RULES:
 - If the page content does NOT contain vehicle listing data, return: {"no_vehicle_data": true, "confidence": 0}
-- Do NOT fabricate or invent vehicle data. Only extract what is actually present in the content.
-- NORMALIZE make: "Chevy"/"Chevrolet" → "Chevrolet", "GMC" → "GMC"
-- NORMALIZE model: "pickup"/"truck" → "C/K", "Blazer" → "Blazer", "Suburban" → "Suburban"
-- Extract series from title/description: Look for C10/K10/C20/K20/K5/C5, and R/V 1500/2500/3500 (1988-1991 squarebody).
-- Extract trim from title/description: Look for Cheyenne, Silverado, Scottsdale, Custom Deluxe, Big 10, etc.
-- Detect bed length: "shortbed"/"SWB"/"short bed" → "SWB", "longbed"/"LWB"/"long bed" → "LWB"
-- Detect engine status: "no motor"/"no engine"/"missing engine"/"no motor or transmission" → "No Motor", set engine/engine_size to null
-- Detect transmission status: "no transmission"/"no motor or transmission" → "No Transmission", set transmission to null
-- Detect odometer status: "odometer broken"/"odo broken"/"speedo broken" → "Broken", note in description
-- Extract modifications: "lowered on 24's", "lifted", "custom", etc. - note in description
-- Only include fields that are actually found in the content
-- Set confidence (0-1) based on data clarity: 0.9+ = high (all key fields), 0.7-0.9 = medium (most fields), <0.7 = low (missing key data)
+- Do NOT fabricate or invent ANY data. Only extract what is ACTUALLY PRESENT in the content.
+- NEVER guess or estimate prices. If no price/sale amount is explicitly stated, set price/asking_price/sold_price to null.
+- NEVER use round numbers like 50000, 25000, 100000 as prices unless the page EXPLICITLY states that exact amount.
+- For auction results: look for "sold for $X", "hammer price", "winning bid", "high bid" for sold_price.
+- Use the SPECIFIC model name from the listing. "F-150" not "Truck". "911 Carrera" not "Car". "Camaro" not "Coupe".
+- NORMALIZE make names: "Chevy" → "Chevrolet", "Merc"/"MB" → "Mercedes-Benz", "VW" → "Volkswagen"
 - Extract VIN if present (17 characters, no I/O/Q)
-- Extract year from title or description
-- Extract price (remove $ and commas)
-- Extract mileage (handle "56k miles" format)
-- Extract all image URLs found
-- Return null for missing fields, not empty strings
-- List extracted_fields array with all fields you successfully extracted
-- Add source_annotations showing where each field came from (title, description, listing_text, etc.)
+- Extract year from title, heading, or description
+- Extract mileage: handle "56k miles", "56,000 miles", "56000" formats
+- Extract all image URLs found on the page
+- Return null for missing fields, not empty strings or guessed values
+- Set confidence (0-1) based on data quality: 0.9+ = clear listing with all key fields, 0.5-0.9 = partial data, <0.5 = minimal data
+- Only include fields that are actually found in the content
 
 Return ONLY valid JSON, no other text.`
 }
