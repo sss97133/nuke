@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { MarketIndexService, AdvancedMetrics, AssetPerformanceMetrics } from '../../services/marketIndexService';
+import { MarketIndexService } from '../../services/marketIndexService';
+import type { AdvancedMetrics, AssetPerformanceMetrics } from '../../services/marketIndexService';
 
 interface PerformanceMetricsProps {
   assetType: 'index' | 'portfolio';

@@ -11,7 +11,8 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, LineData } from 'lightweight-charts';
+import { createChart } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, CandlestickData, HistogramData, LineData } from 'lightweight-charts';
 import { supabase } from '../../lib/supabase';
 
 interface PriceChartProps {
