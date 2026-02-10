@@ -499,7 +499,7 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
     .from("vehicles")
     .select("id, year, make, model, series, trim, vin, mileage, sale_price, asking_price, current_value, sale_status, sale_date, created_at, updated_at, discovery_url, profile_origin")
     .eq("id", vehicleId)
-    .single();
+    .maybeSingle();
 
   if (vErr || !vehicle) {
     return { error: `Vehicle not found: ${vehicleId}`, vehicleId };

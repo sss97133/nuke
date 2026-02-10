@@ -131,7 +131,7 @@ serve(async (req) => {
             .from("vehicles")
             .select("id, owner_id")
             .eq("vin", vehicle.vin)
-            .single();
+            .maybeSingle();
           existingVehicle = data;
         } else if (matchBy === 'year_make_model' && vehicle.year && vehicle.make && vehicle.model) {
           const { data } = await supabase
@@ -141,7 +141,7 @@ serve(async (req) => {
             .eq("make", vehicle.make)
             .eq("model", vehicle.model)
             .eq("owner_id", userId)
-            .single();
+            .maybeSingle();
           existingVehicle = data;
         }
 
@@ -296,7 +296,7 @@ async function authenticateRequest(req: Request, supabase: any): Promise<{ userI
       .select("user_id, is_active")
       .eq("key_hash", keyHash)
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
     if (keyData && !error) {
       await supabase

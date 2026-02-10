@@ -134,7 +134,7 @@ async function findExistingVehicle(
       .select('id')
       .eq('vin', extracted.vin)
       .limit(1)
-      .single();
+      .maybeSingle();
     if (vinMatch) return { id: vinMatch.id, matchType: 'vin' };
   }
 
@@ -143,7 +143,7 @@ async function findExistingVehicle(
     .select('id')
     .eq('bat_auction_url', extracted.url)
     .limit(1)
-    .single();
+    .maybeSingle();
   if (urlMatch) return { id: urlMatch.id, matchType: 'url' };
 
   if (extracted.year && extracted.make && extracted.model) {
@@ -155,7 +155,7 @@ async function findExistingVehicle(
       .ilike('model', extracted.model)
       .is('bat_auction_url', null)
       .limit(1)
-      .single();
+      .maybeSingle();
     if (ymmMatch) return { id: ymmMatch.id, matchType: 'ymm' };
   }
 
