@@ -6,7 +6,7 @@
  */
 import React, { useState, useCallback, useRef } from 'react';
 import { Upload, X, Image, MapPin, Calendar, Info, Loader2 } from 'lucide-react';
-import type { ImageExifService } from '../../services/imageExifServiceStub';
+import { ImageExifService } from '../../services/imageExifServiceStub';
 import { ImageUploadService } from '../../services/imageUploadService';
 import { processBulkUpload, type BulkUploadResult } from '../../services/duplicateDetectionService';
 import { globalUploadStatusService } from '../../services/globalUploadStatusService';

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import type { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
-import type { Button } from '../ui/button';
-import type { Textarea } from '../ui/textarea';
-import type { Badge } from '../ui/badge';
-import type { Checkbox } from '../ui/checkbox';
+import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+import { Badge } from '../ui/badge';
+import { Checkbox } from '../ui/checkbox';
 import {
   Brain,
   Plus,

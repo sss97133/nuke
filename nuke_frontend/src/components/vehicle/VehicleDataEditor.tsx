@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Plus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import type { VehicleSpecService } from '../../services/vehicleSpecService';
 
 interface VehicleDataEditorProps {
   vehicleId: string;
