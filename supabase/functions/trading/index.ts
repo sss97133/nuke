@@ -97,9 +97,9 @@ async function getWallet(supabase: any, userId: string) {
     .select('*')
     .eq('user_id', userId)
     .eq('currency', 'USD')
-    .single();
+    .maybeSingle();
 
-  if (error && error.code === 'PGRST116') {
+  if (!wallet && !error) {
     // No wallet, create one
     const { data: newWallet, error: createError } = await supabase
       .from('user_wallets')

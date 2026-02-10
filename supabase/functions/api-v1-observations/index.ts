@@ -135,7 +135,7 @@ serve(async (req) => {
           .from("vehicles")
           .select("id")
           .eq("vin", body.vin)
-          .single();
+          .maybeSingle();
 
         if (existingVehicle) {
           vehicleId = existingVehicle.id;
@@ -225,7 +225,7 @@ async function authenticateRequest(req: Request, supabase: any): Promise<{ userI
       .select("user_id, is_active")
       .eq("key_hash", keyHash)
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
     if (keyData && !error) {
       await supabase

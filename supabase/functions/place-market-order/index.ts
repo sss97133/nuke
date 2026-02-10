@@ -143,7 +143,7 @@ serve(async (req) => {
         .from('user_cash_balances')
         .select('available_cents')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       const availableCents = balance?.available_cents || 0;
       const requiredCents = Math.round(totalValue * 100); // Convert to cents
@@ -348,7 +348,7 @@ serve(async (req) => {
       .from(ordersTable)
       .select('status, shares_filled, average_fill_price')
       .eq('id', order.id)
-      .single();
+      .maybeSingle();
 
     const response: OrderResponse = {
       success: true,

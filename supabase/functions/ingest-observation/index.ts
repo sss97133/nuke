@@ -207,8 +207,8 @@ serve(async (req) => {
 
     // Determine confidence level from score
     let confidenceLevel = "medium";
-    if (confidenceScore >= 0.85) confidenceLevel = "high";
-    else if (confidenceScore >= 0.95) confidenceLevel = "verified";
+    if (confidenceScore >= 0.95) confidenceLevel = "verified";
+    else if (confidenceScore >= 0.85) confidenceLevel = "high";
     else if (confidenceScore < 0.4) confidenceLevel = "low";
 
     // Insert observation

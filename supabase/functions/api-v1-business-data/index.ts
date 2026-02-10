@@ -47,7 +47,7 @@ async function authenticateRequest(req: Request): Promise<{
       .from("api_keys")
       .select("user_id, scopes, is_active, expires_at")
       .eq("key_hash", keyHash)
-      .single();
+      .maybeSingle();
 
     if (!keyData) {
       return { userId: null, businessId: null, error: "Invalid API key" };
@@ -68,7 +68,7 @@ async function authenticateRequest(req: Request): Promise<{
       .eq("user_id", keyData.user_id)
       .eq("status", "active")
       .in("role", ["owner", "manager"])
-      .single();
+      .maybeSingle();
 
     // Update last used
     await supabase
@@ -103,7 +103,7 @@ async function authenticateRequest(req: Request): Promise<{
       .eq("user_id", user.id)
       .eq("status", "active")
       .in("role", ["owner", "manager"])
-      .single();
+      .maybeSingle();
 
     return {
       userId: user.id,

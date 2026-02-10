@@ -126,7 +126,7 @@ async function findVehicle(
       .from("vehicles")
       .select("id")
       .eq("vin", hints.vin)
-      .single();
+      .maybeSingle();
     if (data) return data.id;
   }
 

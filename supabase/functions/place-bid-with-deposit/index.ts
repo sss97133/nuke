@@ -69,7 +69,7 @@ serve(async (req) => {
       .from('vehicle_listings')
       .select('*')
       .eq('id', listing_id)
-      .single();
+      .maybeSingle();
 
     if (listingError || !listing) {
       return new Response(
@@ -83,7 +83,7 @@ serve(async (req) => {
       .from('profiles')
       .select('stripe_customer_id, default_payment_method')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (profileError || !profile?.stripe_customer_id || !profile?.default_payment_method) {
       return new Response(

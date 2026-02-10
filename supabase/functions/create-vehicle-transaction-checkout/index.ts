@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       .from('vehicles')
       .select('id, year, make, model, vin, price, user_id, vehicle_number')
       .eq('id', vehicle_id)
-      .single()
+      .maybeSingle()
 
     if (vehicleError || !vehicle) {
       return json({ error: 'Vehicle not found' }, 404)
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       .from('profiles')
       .select('phone_number, full_name')
       .eq('id', seller_id)
-      .single()
+      .maybeSingle()
 
     const seller_phone = seller?.phone_number
     const seller_name = seller?.full_name || 'Seller'
