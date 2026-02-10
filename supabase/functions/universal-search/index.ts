@@ -171,30 +171,13 @@ serve(async (req) => {
 
       const { data: vehicles } = await supabase
         .from('vehicles')
-        .select(`
-          id, year, make, model, vin, status, sale_price, current_value
-        `)
+        .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url')
         .eq('year', year)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
         .limit(sanitizedLimit);
 
       if (vehicles?.length) {
-        // Batch fetch primary images
-        const vehicleIds = vehicles.map(v => v.id);
-        const { data: images } = await supabase
-          .from('vehicle_images')
-          .select('vehicle_id, image_url, is_primary')
-          .in('vehicle_id', vehicleIds)
-          .order('is_primary', { ascending: false });
-
-        const imageMap = new Map<string, string>();
-        for (const img of images || []) {
-          if (!imageMap.has(img.vehicle_id)) {
-            imageMap.set(img.vehicle_id, img.image_url);
-          }
-        }
-
         for (const v of vehicles) {
           const price = v.sale_price || v.current_value;
           results.push({
@@ -202,7 +185,7 @@ serve(async (req) => {
             type: 'vehicle',
             title: `${v.year} ${v.make || ''} ${v.model || ''}`.trim(),
             subtitle: price ? `$${price.toLocaleString()}` : undefined,
-            image_url: imageMap.get(v.id),
+            image_url: v.primary_image_url,
             relevance_score: 0.95,
             metadata: { year: v.year, make: v.make, model: v.model }
           });
@@ -254,7 +237,7 @@ serve(async (req) => {
             // This works even if the RPC has schema issues
             const { data: directResults } = await supabase
               .from('vehicles')
-              .select('id, year, make, model, vin, status, sale_price, current_value')
+              .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url')
               .eq('is_public', true)
               .textSearch('search_vector', tsqueryStr, { type: 'plain', config: 'english' })
               .limit(vehicleLimit);
@@ -270,7 +253,7 @@ serve(async (req) => {
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
           let vehicleQuery = supabase
             .from('vehicles')
-            .select('id, year, make, model, vin, status, sale_price, current_value')
+            .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url')
             .eq('is_public', true);
 
           if (yearMatch) {
@@ -295,20 +278,6 @@ serve(async (req) => {
         }
 
         if (vehicles?.length) {
-          const vehicleIds = vehicles.map((v: any) => v.id);
-          const { data: images } = await supabase
-            .from('vehicle_images')
-            .select('vehicle_id, image_url, is_primary')
-            .in('vehicle_id', vehicleIds)
-            .order('is_primary', { ascending: false });
-
-          const imageMap = new Map<string, string>();
-          for (const img of images || []) {
-            if (!imageMap.has(img.vehicle_id)) {
-              imageMap.set(img.vehicle_id, img.image_url);
-            }
-          }
-
           // Deduplicate by year+make+model to prevent showing identical vehicles
           const seen = new Set<string>();
 
@@ -334,7 +303,7 @@ serve(async (req) => {
               type: 'vehicle',
               title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Vehicle',
               subtitle: price ? `$${price.toLocaleString()}` : v.vin ? `VIN: ${v.vin.slice(-6)}` : undefined,
-              image_url: imageMap.get(v.id),
+              image_url: v.primary_image_url,
               relevance_score: score,
               metadata: { year: v.year, make: v.make, model: v.model, vin: v.vin }
             });
