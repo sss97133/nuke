@@ -60,9 +60,13 @@ function normalizeUrl(raw: string): string {
     u.search = '';
     // Normalize www prefix for consistent matching
     u.hostname = u.hostname.replace(/^www\./, '');
-    return u.toString();
+    // Strip trailing slash for consistent matching with existing DB records
+    let result = u.toString();
+    if (result.endsWith('/')) result = result.slice(0, -1);
+    return result;
   } catch {
-    return String(raw).split('#')[0].split('?')[0];
+    const base = String(raw).split('#')[0].split('?')[0];
+    return base.endsWith('/') ? base.slice(0, -1) : base;
   }
 }
 
@@ -244,31 +248,14 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
       console.log('[pcarmarket] Using provided HTML');
       html = providedHtml;
     } else {
-      // Use Firecrawl if available, otherwise direct fetch
+      // PCarMarket is a React SPA - needs JS rendering for full data
+      // Strategy: Firecrawl first (full JS), direct fetch fallback (meta tags + URL parsing)
       const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+      let firecrawlWorked = false;
 
       if (FIRECRAWL_API_KEY) {
-        console.log('[pcarmarket] Fetching via Firecrawl with LLM extraction...');
-
-        // LLM extraction schema for key fields
-        const extractSchema = {
-          type: 'object',
-          properties: {
-            vin: { type: 'string', description: 'Vehicle VIN or chassis number' },
-            mileage: { type: 'number', description: 'Current mileage/odometer reading' },
-            price: { type: 'number', description: 'Final sale price or current high bid in dollars' },
-            sold: { type: 'boolean', description: 'Whether the auction has sold' },
-            bid_count: { type: 'number', description: 'Number of bids placed' },
-            end_date: { type: 'string', description: 'Auction end date' },
-            seller: { type: 'string', description: 'Seller username' },
-            exterior_color: { type: 'string', description: 'Exterior color' },
-            interior_color: { type: 'string', description: 'Interior color' },
-            transmission: { type: 'string', description: 'Transmission type' },
-            engine: { type: 'string', description: 'Engine description' },
-          },
-        };
-
         try {
+          console.log('[pcarmarket] Fetching via Firecrawl (JS rendering)...');
           const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
             method: 'POST',
             headers: {
@@ -278,9 +265,26 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
             body: JSON.stringify({
               url: url,
               formats: ['rawHtml', 'markdown', 'extract'],
-              extract: { schema: extractSchema },
+              extract: {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    vin: { type: 'string', description: 'Vehicle VIN or chassis number' },
+                    mileage: { type: 'number', description: 'Current mileage/odometer reading' },
+                    price: { type: 'number', description: 'Final sale price or current high bid in dollars' },
+                    sold: { type: 'boolean', description: 'Whether the auction has sold' },
+                    bid_count: { type: 'number', description: 'Number of bids placed' },
+                    end_date: { type: 'string', description: 'Auction end date' },
+                    seller: { type: 'string', description: 'Seller username' },
+                    exterior_color: { type: 'string', description: 'Exterior color' },
+                    interior_color: { type: 'string', description: 'Interior color' },
+                    transmission: { type: 'string', description: 'Transmission type' },
+                    engine: { type: 'string', description: 'Engine description' },
+                  },
+                },
+              },
               waitFor: 10000,
-              timeout: 90000,
+              timeout: 45000,
               mobile: false,
               actions: [
                 { type: 'wait', milliseconds: 5000 },
@@ -289,63 +293,50 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
                 { type: 'scroll', direction: 'down', pixels: 1200 },
                 { type: 'wait', milliseconds: 3000 },
               ],
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-              },
             }),
-            signal: AbortSignal.timeout(100_000),
+            signal: AbortSignal.timeout(55_000),
           });
 
           if (firecrawlResponse.ok) {
             const firecrawlData = await firecrawlResponse.json();
-            if (firecrawlData.success === false) {
-              console.warn('[pcarmarket] Firecrawl returned error, falling back to direct fetch:', firecrawlData.error);
-              throw new Error('firecrawl_failed');
+            if (firecrawlData.success && firecrawlData.data?.rawHtml) {
+              html = firecrawlData.data.rawHtml;
+              // Store LLM extraction for later use
+              const llmExtract = firecrawlData.data?.extract;
+              if (llmExtract) {
+                console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
+                html = JSON.stringify({ llmExtract, html });
+              }
+              console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
+              firecrawlWorked = true;
+            } else {
+              console.warn(`[pcarmarket] Firecrawl returned no data: ${firecrawlData.error || 'empty'}`);
             }
-            html = firecrawlData.data?.rawHtml || firecrawlData.data?.html || '';
-
-            // Store LLM extraction for later use
-            const llmExtract = firecrawlData.data?.extract;
-            if (llmExtract) {
-              console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
-              // Store in html as JSON prefix for downstream parsing
-              html = JSON.stringify({ llmExtract, html }) ;
-            }
-
-            console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
           } else {
-            console.warn(`[pcarmarket] Firecrawl HTTP ${firecrawlResponse.status}, falling back to direct fetch`);
-            throw new Error('firecrawl_failed');
+            console.warn(`[pcarmarket] Firecrawl HTTP ${firecrawlResponse.status}`);
           }
-        } catch (firecrawlErr: any) {
-          // Firecrawl failed - fall back to direct fetch
-          console.log('[pcarmarket] Firecrawl failed, trying direct fetch...');
-          try {
-            const response = await fetch(url, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              },
-              signal: AbortSignal.timeout(30_000),
-            });
-            html = await response.text();
-            console.log(`[pcarmarket] Direct fetch returned ${html.length} chars`);
-          } catch (fetchErr: any) {
-            console.warn(`[pcarmarket] Direct fetch also failed: ${fetchErr.message}`);
-            html = ''; // Will fall through to URL-based parsing
-          }
+        } catch (fcErr: any) {
+          console.warn(`[pcarmarket] Firecrawl failed: ${fcErr.message}`);
         }
-      } else {
-        console.log('[pcarmarket] No Firecrawl key, trying direct fetch...');
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-          }
-        });
-        html = await response.text();
-        console.log(`[pcarmarket] Direct fetch returned ${html.length} chars`);
+      }
+
+      // Fallback: direct fetch for meta tags + URL-based parsing
+      if (!firecrawlWorked) {
+        console.log('[pcarmarket] Using direct fetch fallback (meta tags + URL parsing)...');
+        try {
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+            signal: AbortSignal.timeout(30_000),
+          });
+          html = await response.text();
+          console.log(`[pcarmarket] Direct fetch returned ${html.length} chars`);
+        } catch (fetchErr: any) {
+          console.warn(`[pcarmarket] Direct fetch also failed: ${fetchErr.message}`);
+          html = '';
+        }
       }
     }
 
@@ -427,6 +418,33 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
       } catch (e) {
         console.log('[pcarmarket] Input is not valid JSON, treating as HTML');
       }
+    }
+
+    // Extract meta tags (available even without JS rendering)
+    // PCarMarket uses unquoted attributes: content="..."property=og:title
+    const ogTitle = html.match(/content="([^"]+)"[^>]*property=["']?og:title["']?/i)?.[1] ||
+                    html.match(/property=["']?og:title["']?[^>]*content="([^"]+)"/i)?.[1];
+    const ogDescription = html.match(/content="([^"]+)"[^>]*property=["']?og:description["']?/i)?.[1] ||
+                          html.match(/property=["']?og:description["']?[^>]*content="([^"]+)"/i)?.[1];
+    const ogImage = html.match(/content="([^"]+)"[^>]*property=["']?og:image["']?/i)?.[1] ||
+                    html.match(/property=["']?og:image["']?[^>]*content="([^"]+)"/i)?.[1];
+    const pageTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+
+    if (ogTitle || pageTitle) {
+      const cleanTitle = (ogTitle || pageTitle || '').replace(/\s*\|\s*PCARMARKET$/i, '').trim();
+      if (cleanTitle && !listing.title) {
+        listing.title = cleanTitle;
+        const titleData = parseTitleToVehicle(cleanTitle);
+        if (titleData.year) listing.year = listing.year || titleData.year;
+        if (titleData.make) listing.make = listing.make || titleData.make;
+        if (titleData.model) listing.model = listing.model || titleData.model;
+      }
+    }
+    if (ogDescription && !listing.description) {
+      listing.description = ogDescription;
+    }
+    if (ogImage && (!listing.images || listing.images.length === 0)) {
+      listing.images = [ogImage];
     }
 
     // PRIORITY: Try to extract embedded JSON data (PCarMarket embeds all data as JSON)
@@ -780,6 +798,17 @@ Deno.serve(async (req: Request) => {
       if (existing) vehicleId = existing.id;
     }
 
+    // Fallback: slug-based ILIKE lookup to handle URL normalization mismatches
+    if (!vehicleId && listing.slug) {
+      const { data: existing } = await supabase
+        .from('vehicles')
+        .select('id')
+        .ilike('discovery_url', `%pcarmarket.com/auction/${listing.slug}%`)
+        .limit(1)
+        .maybeSingle();
+      if (existing) vehicleId = existing.id;
+    }
+
     // Step 4: Create or update vehicle
     const vehicleData = {
       year: listing.year,
@@ -834,11 +863,29 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (vehicleError) {
-        throw vehicleError;
+        // Handle unique constraint violation by finding and updating the existing record
+        if (vehicleError.code === '23505' && vehicleError.message?.includes('discovery_url')) {
+          console.warn(`[pcarmarket] Duplicate discovery_url, looking up existing: ${listing.url}`);
+          const { data: dup } = await supabase
+            .from('vehicles')
+            .select('id')
+            .ilike('discovery_url', `%pcarmarket.com/auction/${listing.slug}%`)
+            .limit(1)
+            .maybeSingle();
+          if (dup) {
+            vehicleId = dup.id;
+            await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
+            console.log(`[pcarmarket] Updated existing vehicle after dedup: ${vehicleId}`);
+          } else {
+            throw vehicleError;
+          }
+        } else {
+          throw vehicleError;
+        }
+      } else {
+        vehicleId = newVehicle.id;
+        console.log(`Created new vehicle: ${vehicleId}`);
       }
-
-      vehicleId = newVehicle.id;
-      console.log(`Created new vehicle: ${vehicleId}`);
     }
 
     // Step 5: Link to organization (FIXED - removed listing_url, listing_status columns)
