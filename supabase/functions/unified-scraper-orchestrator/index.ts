@@ -272,28 +272,28 @@ async function getStatus(supabase: any) {
   // Get queue stats
   const { count: pendingCount } = await supabase
     .from('import_queue')
-    .select('*', { count: 'exact', head: true })
+    .select('*', { count: 'estimated', head: true })
     .eq('status', 'pending');
 
   const { count: processingCount } = await supabase
     .from('import_queue')
-    .select('*', { count: 'exact', head: true })
+    .select('*', { count: 'estimated', head: true })
     .eq('status', 'processing');
 
   const { count: completeCount } = await supabase
     .from('import_queue')
-    .select('*', { count: 'exact', head: true })
+    .select('*', { count: 'estimated', head: true })
     .eq('status', 'complete');
 
   // Get recent vehicles
   const { count: vehiclesToday } = await supabase
     .from('vehicles')
-    .select('*', { count: 'exact', head: true })
+    .select('*', { count: 'estimated', head: true })
     .gte('created_at', new Date(Date.now() - 24 * 3600000).toISOString());
 
   const { count: totalVehicles } = await supabase
     .from('vehicles')
-    .select('*', { count: 'exact', head: true });
+    .select('*', { count: 'estimated', head: true });
 
   return new Response(
     JSON.stringify({

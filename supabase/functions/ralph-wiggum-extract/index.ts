@@ -876,16 +876,16 @@ async function extractHemmingsListing(supabase: any, url: string): Promise<any |
 async function getExtractionStatus(supabase: any) {
   const { count: totalVehicles } = await supabase
     .from('vehicles')
-    .select('id', { count: 'exact', head: true });
+    .select('id', { count: 'estimated', head: true });
 
   const { count: todayVehicles } = await supabase
     .from('vehicles')
-    .select('id', { count: 'exact', head: true })
+    .select('id', { count: 'estimated', head: true })
     .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
   const { count: sourcesCount } = await supabase
     .from('scrape_sources')
-    .select('id', { count: 'exact', head: true })
+    .select('id', { count: 'estimated', head: true })
     .eq('is_active', true);
 
   const { data: recentVehicles } = await supabase
@@ -1052,7 +1052,7 @@ async function runExtractionLoop(supabase: any, rounds: number) {
   // Get final status
   const { count: totalVehicles } = await supabase
     .from('vehicles')
-    .select('id', { count: 'exact', head: true });
+    .select('id', { count: 'estimated', head: true });
 
   return new Response(
     JSON.stringify({

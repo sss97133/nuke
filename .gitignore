@@ -138,6 +138,11 @@ data/sources/*.json
 
 # Bot screenshots (auto-generated, not useful in repo)
 screenshots/bot-findings/
+test-screenshots/
+nuke_frontend/test-screenshots/
 
 # Ephemeral agent coordination files
 AGENT_COORDINATION.md
+
+# Analysis reports (generated per session)
+DATA_ANALYSIS_REPORT.md
