@@ -96,8 +96,10 @@ serve(async (req) => {
         );
       } else {
         // List vehicles
-        const page = parseInt(url.searchParams.get("page") || "1");
-        const limit = Math.min(parseInt(url.searchParams.get("limit") || "20"), 100);
+        const rawPage = parseInt(url.searchParams.get("page") || "1");
+        const rawLimit = parseInt(url.searchParams.get("limit") || "20");
+        const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
+        const limit = Math.max(1, Math.min(isNaN(rawLimit) ? 20 : rawLimit, 100));
         const offset = (page - 1) * limit;
         const mine = url.searchParams.get("mine") === "true";
 

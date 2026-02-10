@@ -104,8 +104,13 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const queryType = detectInputType(query);
-    const trimmedQuery = query.trim();
+    // Cap query length to prevent abuse and slow searches
+    const sanitizedQuery = query.length > 500 ? query.slice(0, 500) : query;
+    // Cap limit to reasonable range
+    const sanitizedLimit = Math.max(1, Math.min(typeof limit === 'number' ? limit : 20, 100));
+
+    const queryType = detectInputType(sanitizedQuery);
+    const trimmedQuery = sanitizedQuery.trim();
     const results: SearchResult[] = [];
 
     // ============================================
@@ -172,7 +177,7 @@ serve(async (req) => {
         .eq('year', year)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
-        .limit(limit);
+        .limit(sanitizedLimit);
 
       if (vehicles?.length) {
         // Batch fetch primary images
@@ -226,7 +231,7 @@ serve(async (req) => {
     // --- VEHICLES (full-text search with ts_rank) ---
     if (allowedTypes.includes('vehicle')) {
       searches.push((async () => {
-        const vehicleLimit = Math.ceil(limit / 2);
+        const vehicleLimit = Math.ceil(sanitizedLimit / 2);
 
         // Convert query to tsquery format: "BMW M3 E30" → "BMW & M3 & E30"
         const tsqueryTerms = tokens.map(t => t.replace(/[^a-zA-Z0-9]/g, '')).filter(t => t.length > 0);
@@ -346,7 +351,7 @@ serve(async (req) => {
           .select('id, business_name, website, logo_url, profile_image_url, city, state')
           .eq('is_public', true)
           .ilike('business_name', searchPattern)
-          .limit(Math.ceil(limit / 4));
+          .limit(Math.ceil(sanitizedLimit / 4));
 
         for (const org of orgs || []) {
           const nameLower = (org.business_name || '').toLowerCase();
@@ -377,7 +382,7 @@ serve(async (req) => {
           .from('profiles')
           .select('id, username, full_name, avatar_url, bio')
           .or(`username.ilike.${searchPattern},full_name.ilike.${searchPattern}`)
-          .limit(Math.ceil(limit / 4));
+          .limit(Math.ceil(sanitizedLimit / 4));
 
         for (const p of profiles || []) {
           const displayName = p.full_name || p.username || 'User';
@@ -409,7 +414,7 @@ serve(async (req) => {
           .from('external_identities')
           .select('id, username, display_name, platform, profile_url, avatar_url')
           .or(`username.ilike.${searchPattern},display_name.ilike.${searchPattern}`)
-          .limit(Math.ceil(limit / 4));
+          .limit(Math.ceil(sanitizedLimit / 4));
 
         for (const ei of identities || []) {
           const displayName = ei.display_name || ei.username || 'Unknown';
@@ -472,7 +477,7 @@ serve(async (req) => {
       if (seen.has(r.id)) return false;
       seen.add(r.id);
       return true;
-    }).slice(0, limit);
+    }).slice(0, sanitizedLimit);
 
     // AI fallback if results are sparse
     let aiSuggestion: string | undefined;
