@@ -185,14 +185,18 @@ function parseSellerField(sellerText: string): string | null {
 function parsePCarMarketIdentityFromUrl(url: string): { year: number; make: string; model: string } | null {
   try {
     const u = new URL(url);
-    // Pattern: /auction/2002-aston-martin-db7-v12-vantage-2
-    const m = u.pathname.match(/\/auction\/(\d{4})-([a-z0-9-]+)-(\d+)\/?$/i);
-    if (!m?.[1] || !m?.[2]) return null;
+    // Pattern: /auction/YEAR-slug (slug may or may not end with a numeric dedup suffix)
+    const pathMatch = u.pathname.match(/\/auction\/(\d{4})-(.+?)\/?$/i);
+    if (!pathMatch?.[1] || !pathMatch?.[2]) return null;
 
-    const year = Number(m[1]);
+    const year = Number(pathMatch[1]);
     if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) return null;
 
-    const parts = String(m[2]).split('-').filter(Boolean);
+    // Remove trailing numeric dedup suffix (e.g., "-2" at end of "porsche-911-turbo-2")
+    let slug = pathMatch[2];
+    slug = slug.replace(/-\d+$/, '');
+
+    const parts = slug.split('-').filter(Boolean);
     if (parts.length < 2) return null;
 
     // Handle compound makes, otherwise single word
@@ -262,53 +266,74 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
           },
         };
 
-        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: url,
-            formats: ['rawHtml', 'markdown', 'extract'],
-            extract: { schema: extractSchema },
-            waitFor: 10000,
-            timeout: 90000,
-            mobile: false,
-            actions: [
-              { type: 'wait', milliseconds: 5000 },
-              { type: 'scroll', direction: 'down', pixels: 800 },
-              { type: 'wait', milliseconds: 2000 },
-              { type: 'scroll', direction: 'down', pixels: 1200 },
-              { type: 'wait', milliseconds: 3000 },
-            ],
+        try {
+          const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9',
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+              'Content-Type': 'application/json',
             },
-          }),
-        });
+            body: JSON.stringify({
+              url: url,
+              formats: ['rawHtml', 'markdown', 'extract'],
+              extract: { schema: extractSchema },
+              waitFor: 10000,
+              timeout: 90000,
+              mobile: false,
+              actions: [
+                { type: 'wait', milliseconds: 5000 },
+                { type: 'scroll', direction: 'down', pixels: 800 },
+                { type: 'wait', milliseconds: 2000 },
+                { type: 'scroll', direction: 'down', pixels: 1200 },
+                { type: 'wait', milliseconds: 3000 },
+              ],
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+              },
+            }),
+            signal: AbortSignal.timeout(100_000),
+          });
 
-        if (firecrawlResponse.ok) {
-          const firecrawlData = await firecrawlResponse.json();
-          if (firecrawlData.success === false) {
-            console.error('[pcarmarket] Firecrawl error:', firecrawlData.error);
-            throw new Error(`Firecrawl error: ${firecrawlData.error || 'Unknown error'}`);
+          if (firecrawlResponse.ok) {
+            const firecrawlData = await firecrawlResponse.json();
+            if (firecrawlData.success === false) {
+              console.warn('[pcarmarket] Firecrawl returned error, falling back to direct fetch:', firecrawlData.error);
+              throw new Error('firecrawl_failed');
+            }
+            html = firecrawlData.data?.rawHtml || firecrawlData.data?.html || '';
+
+            // Store LLM extraction for later use
+            const llmExtract = firecrawlData.data?.extract;
+            if (llmExtract) {
+              console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
+              // Store in html as JSON prefix for downstream parsing
+              html = JSON.stringify({ llmExtract, html }) ;
+            }
+
+            console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
+          } else {
+            console.warn(`[pcarmarket] Firecrawl HTTP ${firecrawlResponse.status}, falling back to direct fetch`);
+            throw new Error('firecrawl_failed');
           }
-          html = firecrawlData.data?.rawHtml || firecrawlData.data?.html || '';
-
-          // Store LLM extraction for later use
-          const llmExtract = firecrawlData.data?.extract;
-          if (llmExtract) {
-            console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
-            // Store in html as JSON prefix for downstream parsing
-            html = JSON.stringify({ llmExtract, html }) ;
+        } catch (firecrawlErr: any) {
+          // Firecrawl failed - fall back to direct fetch
+          console.log('[pcarmarket] Firecrawl failed, trying direct fetch...');
+          try {
+            const response = await fetch(url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              },
+              signal: AbortSignal.timeout(30_000),
+            });
+            html = await response.text();
+            console.log(`[pcarmarket] Direct fetch returned ${html.length} chars`);
+          } catch (fetchErr: any) {
+            console.warn(`[pcarmarket] Direct fetch also failed: ${fetchErr.message}`);
+            html = ''; // Will fall through to URL-based parsing
           }
-
-          console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
-        } else {
-          throw new Error(`Firecrawl HTTP error: ${firecrawlResponse.status}`);
         }
       } else {
         console.log('[pcarmarket] No Firecrawl key, trying direct fetch...');
@@ -319,12 +344,6 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
         });
         html = await response.text();
         console.log(`[pcarmarket] Direct fetch returned ${html.length} chars`);
-
-        // Check if we got a JS-required page
-        if (html.includes('You need to enable JavaScript')) {
-          console.error('[pcarmarket] Page requires JavaScript rendering');
-          throw new Error('Page requires JavaScript rendering. Set FIRECRAWL_API_KEY or provide pre-rendered HTML.');
-        }
       }
     }
 
