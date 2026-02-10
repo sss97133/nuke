@@ -105,24 +105,18 @@ serve(async (req) => {
 
       const { data: vehicles } = await supabase
         .from('vehicles')
-        .select(`
-          id, year, make, model, vin, status,
-          vehicle_images!inner(image_url, is_primary)
-        `)
+        .select('id, year, make, model, vin, status, primary_image_url')
         .eq('vin', vin)
         .limit(5);
 
       if (vehicles?.length) {
         for (const v of vehicles) {
-          const images = v.vehicle_images as any[] || [];
-          const primaryImage = images.find((i: any) => i.is_primary)?.image_url || images[0]?.image_url;
-
           results.push({
             id: v.id,
             type: 'vin_match',
             title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Vehicle',
             subtitle: `VIN: ${v.vin}`,
-            image_url: primaryImage,
+            image_url: v.primary_image_url,
             relevance_score: 1.0,
             metadata: { vin: v.vin, status: v.status }
           });
