@@ -330,7 +330,7 @@ const AdminVerifications: React.FC = () => {
         try {
           const url = await secureDocumentService.getSecureDocumentUrl(d.id, 'Thumbnail preview');
           if (url) setSignedUrlMap((m) => ({ ...m, [d.id]: url }));
-        } catch {}
+        } catch { /* ignore */ }
       }
     })();
   }, [pending]);

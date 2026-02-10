@@ -629,7 +629,7 @@ export class VehicleValuationService {
             valuation.totalInvested += hours * 75;
             if (!valuation.dataSources.includes('Work Sessions')) valuation.dataSources.push('Work Sessions');
           }
-        } catch {}
+        } catch { /* ignore */ }
       }
 
       // 5. Calculate final values per new model: market + modifications premium + documentation bonus

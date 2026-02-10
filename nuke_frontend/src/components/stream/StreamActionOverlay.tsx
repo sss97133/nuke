@@ -75,7 +75,7 @@ function playSoundEffect(soundKey: string) {
   setTimeout(() => {
     try {
       ctx.close();
-    } catch {}
+    } catch { /* ignore */ }
   }, 1400);
 }
 

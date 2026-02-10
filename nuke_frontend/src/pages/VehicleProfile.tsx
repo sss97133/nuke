@@ -877,7 +877,7 @@ const VehicleProfile: React.FC = () => {
           reserve: typeof data.reserve === 'number' ? data.reserve : ''
         });
       }
-    } catch {}
+    } catch { /* ignore */ }
   };
 
 
@@ -975,7 +975,7 @@ const VehicleProfile: React.FC = () => {
   };
 
   const copyToClipboard = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); } catch {}
+    try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
   };
 
   const saveSaleSettings = async () => {
@@ -1055,7 +1055,7 @@ const VehicleProfile: React.FC = () => {
       try {
         loadVehicleImages();
         loadTimelineEvents();
-      } catch {}
+      } catch { /* ignore */ }
     };
 
     const timelineHandler = (e: any) => {
@@ -1063,7 +1063,7 @@ const VehicleProfile: React.FC = () => {
       if (!vehicleId || (vid && vid !== vehicleId)) return;
       try {
         loadTimelineEvents();
-      } catch {}
+      } catch { /* ignore */ }
     };
 
     window.addEventListener('vehicle_images_updated', imageHandler);
@@ -1155,7 +1155,7 @@ const VehicleProfile: React.FC = () => {
       } catch {
         try {
           channel.unsubscribe();
-        } catch {}
+        } catch { /* ignore */ }
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1236,7 +1236,7 @@ const VehicleProfile: React.FC = () => {
       } catch {
         try {
           channel.unsubscribe();
-        } catch {}
+        } catch { /* ignore */ }
       }
     };
   }, [vehicle?.id, auctionPulse?.listing_url, auctionPulse?.platform]);
@@ -3544,7 +3544,7 @@ const VehicleProfile: React.FC = () => {
         if (error || !data) {
           console.warn('BaT auto-import failed:', error);
           // Allow retry next time.
-          try { window.localStorage.removeItem(key); } catch {}
+          try { window.localStorage.removeItem(key); } catch { /* ignore */ }
           setBatAutoImportStatus('failed');
           return;
         }
@@ -3559,8 +3559,8 @@ const VehicleProfile: React.FC = () => {
         // Allow retry next time.
         try {
           if (vehicle?.id) window.localStorage.removeItem(`bat_auto_import_attempted_${vehicle.id}`);
-        } catch {}
-        try { setBatAutoImportStatus('failed'); } catch {}
+        } catch { /* ignore */ }
+        try { setBatAutoImportStatus('failed'); } catch { /* ignore */ }
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

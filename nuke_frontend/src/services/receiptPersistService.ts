@@ -158,8 +158,8 @@ export class ReceiptPersistService {
       }
 
       // Trigger valuation refresh events for this vehicle
-      try { window.dispatchEvent(new CustomEvent('valuation_updated', { detail: { vehicleId: params.vehicleId } } as any)); } catch {}
-      try { window.dispatchEvent(new CustomEvent('timeline_updated', { detail: { vehicleId: params.vehicleId } } as any)); } catch {}
+      try { window.dispatchEvent(new CustomEvent('valuation_updated', { detail: { vehicleId: params.vehicleId } } as any)); } catch { /* ignore */ }
+      try { window.dispatchEvent(new CustomEvent('timeline_updated', { detail: { vehicleId: params.vehicleId } } as any)); } catch { /* ignore */ }
       return { id: receipt.id };
     } catch (e: any) {
       return { error: e?.message || 'Failed to save receipt' };

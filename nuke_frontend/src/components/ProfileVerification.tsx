@@ -38,7 +38,7 @@ export const ProfileVerification: React.FC = () => {
         url.searchParams.delete('payment');
         window.history.replaceState({}, '', url.toString());
       }
-    } catch {}
+    } catch { /* ignore */ }
     loadVerificationStatus();
   }, []);
 

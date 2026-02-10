@@ -1849,7 +1849,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     try {
       const t = new Date(end).getTime();
       if (Number.isFinite(t) && t <= Date.now()) return end;
-    } catch {}
+    } catch { /* ignore */ }
     return null;
   })();
   const primaryPrice = getDisplayValue();

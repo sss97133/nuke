@@ -34,7 +34,7 @@ export const LiveService = {
     try {
       const raw = typeof window !== 'undefined' ? localStorage.getItem(`live_status_${userId}`) : null;
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch { /* ignore */ }
     return { live: false, nextStart: null };
   },
 

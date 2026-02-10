@@ -100,7 +100,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
     return () => {
       try {
         supabase.removeChannel(channel);
-      } catch {}
+      } catch { /* ignore */ }
     };
   }, [listing?.id]);
 
@@ -127,7 +127,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
         if (!endRefreshTriggeredRef.current) {
           endRefreshTriggeredRef.current = true;
           window.setTimeout(() => {
-            try { loadActiveListing(); } catch {}
+            try { loadActiveListing(); } catch { /* ignore */ }
           }, 1500);
         }
         return;
