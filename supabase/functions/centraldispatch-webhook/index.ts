@@ -22,6 +22,17 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
+    // Verify webhook secret to prevent unauthorized access
+    const webhookSecret = Deno.env.get('CENTRALDISPATCH_WEBHOOK_SECRET')
+    if (webhookSecret) {
+      const providedSecret = req.headers.get('x-webhook-secret') ||
+                             new URL(req.url).searchParams.get('secret')
+      if (providedSecret !== webhookSecret) {
+        console.error('Invalid webhook secret')
+        return json({ error: 'Unauthorized' }, 401)
+      }
+    }
+
     const event = await req.json()
     console.log('Central Dispatch webhook received:', event)
 
@@ -180,6 +191,14 @@ async function handleInTransit(supabase: any, transaction: any, event: any) {
 }
 
 async function handleDelivered(supabase: any, transaction: any, event: any) {
+  // Only allow delivery for transactions that are in a valid pre-delivery state
+  const validPreDeliveryStatuses = ['in_transit', 'picked_up', 'carrier_assigned', 'fully_signed']
+  if (!validPreDeliveryStatuses.includes(transaction.status) &&
+      !validPreDeliveryStatuses.includes(transaction.shipping_status)) {
+    console.error(`Rejected delivery for transaction ${transaction.id}: invalid status ${transaction.status}/${transaction.shipping_status}`)
+    return
+  }
+
   await supabase
     .from('vehicle_transactions')
     .update({
@@ -202,12 +221,13 @@ async function handleDelivered(supabase: any, transaction: any, event: any) {
     })
   }
 
-  // Transfer vehicle ownership
-  if (transaction.vehicle_id) {
+  // Transfer vehicle ownership only if transaction has been paid
+  if (transaction.vehicle_id && transaction.buyer_id && transaction.payment_confirmed_at) {
     await supabase
       .from('vehicles')
       .update({ user_id: transaction.buyer_id })
       .eq('id', transaction.vehicle_id)
+    console.log(`Vehicle ${transaction.vehicle_id} ownership transferred to ${transaction.buyer_id}`)
   }
 
   console.log('Vehicle delivered - transaction complete!')

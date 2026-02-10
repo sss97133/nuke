@@ -209,7 +209,34 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authenticated user
+    const authHeader = req.headers.get("Authorization");
+    let authenticatedUserId: string | null = null;
+
+    if (authHeader) {
+      const { createClient: createAuthClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const authSupabase = createAuthClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("ANON_KEY") || "",
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user } } = await authSupabase.auth.getUser();
+      authenticatedUserId = user?.id || null;
+    }
+
+    // Require auth - either JWT or service role key
+    const isServiceRole = authHeader?.includes(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "NONE");
+    if (!authenticatedUserId && !isServiceRole) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const { userId, images, notifyPhone } = await req.json();
+
+    // Use authenticated user ID, only allow userId override for service role calls
+    const effectiveUserId = isServiceRole ? (userId || authenticatedUserId) : authenticatedUserId;
 
     if (!images?.length) {
       return new Response(JSON.stringify({ error: "No images provided" }), {
@@ -218,13 +245,17 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Processing ${images.length} images for user ${userId}`);
+    console.log(`Processing ${images.length} images for user ${effectiveUserId}`);
 
-    // Get user's known vehicles for matching
-    const { data: userVehicles } = await supabase
+    // Get user's known vehicles for matching (scoped to user)
+    let vehicleQuery = supabase
       .from("vehicles")
       .select("id, year, make, model, exterior_color")
       .limit(50);
+    if (effectiveUserId) {
+      vehicleQuery = vehicleQuery.eq("user_id", effectiveUserId);
+    }
+    const { data: userVehicles } = await vehicleQuery;
 
     const knownVehicles = (userVehicles || []).map(v => ({
       id: v.id,
@@ -273,7 +304,7 @@ serve(async (req) => {
         }
         // Try to find vehicle from hints
         else if (analysis.hints && Object.keys(analysis.hints).length > 0) {
-          const foundId = await findVehicle(analysis.hints, userId);
+          const foundId = await findVehicle(analysis.hints, effectiveUserId);
           if (foundId) {
             vehicleId = foundId;
             status = "matched";
@@ -308,7 +339,7 @@ serve(async (req) => {
           // Store in pending queue
           await supabase.from("pending_image_assignments").upsert({
             image_url: img.url,
-            user_id: userId,
+            user_id: effectiveUserId,
             ai_hints: analysis.hints,
             ai_description: analysis.description,
             ai_confidence: analysis.confidence,
