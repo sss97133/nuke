@@ -104,7 +104,7 @@ function drawRadar(
       const a = startAngle + i * angleStep;
       const x = cx + r * Math.cos(a);
       const y = cy + r * Math.sin(a);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
     }
     ctx.closePath();
     ctx.strokeStyle = 'rgba(0,0,0,0.08)';

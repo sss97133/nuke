@@ -138,7 +138,7 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
         alt={alt}
         loading={loading}
         decoding="async"
-        // @ts-ignore - fetchPriority is valid but not in older TS types
+        // @ts-expect-error - fetchPriority is valid but not in older TS types
         fetchpriority={fetchPriority}
         style={{ ...baseImgStyle, ...imgStyle, opacity: finalOpacity }}
         onLoad={(e) => {

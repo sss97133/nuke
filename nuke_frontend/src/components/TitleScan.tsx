@@ -65,7 +65,7 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
   const extractImageMetadata = (file: File) => {
     const img = new Image();
     img.onload = () => {
-      // @ts-ignore - EXIF library expects image element
+      // @ts-expect-error - EXIF library expects image element
       EXIF.getData(img, function(this: any) {
         const allTags = EXIF.getAllTags(this);
         const dateTime = EXIF.getTag(this, 'DateTime') || EXIF.getTag(this, 'DateTimeOriginal') || EXIF.getTag(this, 'DateTimeDigitized');
