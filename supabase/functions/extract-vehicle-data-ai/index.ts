@@ -20,6 +20,8 @@ interface ExtractionRequest {
   html?: string
   textContent?: string
   source?: string
+  save_to_db?: boolean
+  max_vehicles?: number
 }
 
 serve(async (req) => {
@@ -28,7 +30,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, html, textContent, source }: ExtractionRequest = await req.json()
+    const { url, html, textContent, source, save_to_db }: ExtractionRequest = await req.json()
 
     if (!url) {
       return new Response(
@@ -326,10 +328,134 @@ serve(async (req) => {
     // Flush logs in background
     healthLogger.flush().catch(err => console.error('Health log flush error:', err))
 
+    // === PERSIST TO DATABASE when save_to_db is true ===
+    let vehicleId: string | null = null
+    let imagesInserted = 0
+
+    if (save_to_db && normalized.year && normalized.make) {
+      try {
+        // Check for existing vehicle by URL or VIN
+        let existing = null
+        if (normalized.vin && normalized.vin.length >= 11) {
+          const { data } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('vin', normalized.vin)
+            .limit(1)
+            .maybeSingle()
+          existing = data
+        }
+        if (!existing && url) {
+          const { data } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('discovery_url', url)
+            .limit(1)
+            .maybeSingle()
+          existing = data
+        }
+
+        const vehiclePayload: Record<string, any> = {
+          year: normalized.year,
+          make: normalized.make,
+          model: normalized.model || null,
+          series: normalized.series || null,
+          trim: normalized.trim || null,
+          vin: normalized.vin || null,
+          mileage: normalized.mileage || null,
+          color: normalized.exterior_color || normalized.color || null,
+          interior_color: normalized.interior_color || null,
+          transmission: normalized.transmission || null,
+          drivetrain: normalized.drivetrain || null,
+          engine_type: normalized.engine || null,
+          body_style: normalized.body_style || null,
+          sale_price: normalized.sold_price || normalized.price || null,
+          asking_price: normalized.price || null,
+          description: normalized.description?.slice(0, 5000) || null,
+          discovery_url: url,
+          profile_origin: source || 'ai_extraction',
+          extractor_version: 'extract-vehicle-data-ai:1.0',
+          status: 'active',
+        }
+
+        if (existing) {
+          vehicleId = existing.id
+          // Update with new data (don't overwrite existing non-null fields)
+          const updates: Record<string, any> = {}
+          for (const [key, val] of Object.entries(vehiclePayload)) {
+            if (val !== null && key !== 'discovery_url' && key !== 'status') {
+              updates[key] = val
+            }
+          }
+          if (Object.keys(updates).length > 0) {
+            await supabase.from('vehicles').update(updates).eq('id', vehicleId)
+          }
+          console.log(`[extract-vehicle-data-ai] Updated existing vehicle: ${vehicleId}`)
+        } else {
+          const { data: inserted, error: insertErr } = await supabase
+            .from('vehicles')
+            .insert(vehiclePayload)
+            .select('id')
+            .single()
+          if (insertErr) {
+            console.error(`[extract-vehicle-data-ai] Vehicle insert failed: ${insertErr.message}`)
+          } else {
+            vehicleId = inserted.id
+            console.log(`[extract-vehicle-data-ai] Created vehicle: ${vehicleId}`)
+          }
+        }
+
+        // Save images to vehicle_images
+        if (vehicleId && normalized.image_urls && normalized.image_urls.length > 0) {
+          const imageRows = normalized.image_urls.slice(0, 50).map((imgUrl: string, idx: number) => ({
+            vehicle_id: vehicleId,
+            image_url: imgUrl,
+            source: 'external_import',
+            source_url: imgUrl,
+            is_external: true,
+            approval_status: 'auto_approved',
+            is_approved: true,
+            redaction_level: 'none',
+            position: idx,
+            display_order: idx,
+            is_primary: idx === 0,
+            exif_data: {
+              source_url: url,
+              discovery_url: url,
+              imported_from: source || 'ai_extraction',
+            },
+          }))
+
+          // Delete existing external_import images to avoid duplicates
+          await supabase
+            .from('vehicle_images')
+            .delete()
+            .eq('vehicle_id', vehicleId)
+            .eq('source', 'external_import')
+
+          const { data: insertedImgs, error: imgErr } = await supabase
+            .from('vehicle_images')
+            .insert(imageRows)
+            .select('id')
+
+          if (imgErr) {
+            console.error(`[extract-vehicle-data-ai] Image insert failed: ${imgErr.message}`)
+          } else {
+            imagesInserted = insertedImgs?.length || imageRows.length
+            console.log(`[extract-vehicle-data-ai] Saved ${imagesInserted} images`)
+          }
+        }
+      } catch (dbErr: any) {
+        console.error(`[extract-vehicle-data-ai] DB save error: ${dbErr.message}`)
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         data: normalized,
+        vehicle_id: vehicleId,
+        images_saved: imagesInserted,
         confidence: extractedJson.confidence || 0.8,
         source: source || 'unknown',
         extractionMethod: 'ai'
