@@ -15,6 +15,7 @@ interface VehicleHoverCardProps {
     sale_price?: number;
     current_value?: number;
     asking_price?: number;
+    display_price?: number;
     sale_date?: string;
     auction_end_date?: string;
     sale_status?: string;
@@ -31,6 +32,14 @@ interface VehicleHoverCardProps {
     transmission?: string;
     engine?: string;
     exterior_color?: string;
+    // Valuation fields from vehicle_valuation_feed
+    nuke_estimate?: number;
+    nuke_estimate_confidence?: number;
+    deal_score?: number;
+    deal_score_label?: string;
+    heat_score?: number;
+    heat_score_label?: string;
+    is_record_price?: boolean;
   };
   position: { x: number; y: number };
   onClose: () => void;
@@ -145,6 +154,10 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         fontSize: '9pt',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         pointerEvents: 'auto',
+        opacity: 1,
+        transform: 'translateY(0)',
+        transition: 'opacity 0.15s ease, transform 0.15s ease',
+        animation: 'hoverCardAppear 0.15s ease',
       }}
       onMouseLeave={onClose}
     >
@@ -281,6 +294,101 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           )}
           {vehicle.receipt_count !== undefined && vehicle.receipt_count > 0 && (
             <span>{vehicle.receipt_count} receipts</span>
+          )}
+        </div>
+      )}
+
+      {/* AI Insights section */}
+      {(vehicle.deal_score || vehicle.heat_score || vehicle.nuke_estimate || vehicle.is_record_price) && (
+        <div style={{
+          padding: '8px',
+          marginBottom: '10px',
+          background: 'var(--grey-50, #f9fafb)',
+          border: '1px solid var(--border)',
+          borderRadius: '4px',
+          fontSize: '8pt',
+        }}>
+          <div style={{ fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
+            AI Take
+          </div>
+
+          {/* Deal verdict */}
+          {vehicle.deal_score != null && vehicle.nuke_estimate != null && price != null && price > 0 && (
+            <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: vehicle.deal_score > 20 ? '#22c55e' : vehicle.deal_score > 0 ? '#84cc16' : vehicle.deal_score > -20 ? '#f59e0b' : '#ef4444',
+                flexShrink: 0,
+              }} />
+              <span style={{ color: 'var(--text)' }}>
+                {vehicle.deal_score > 20
+                  ? `Good deal \u2014 ${Math.round(((vehicle.nuke_estimate - price) / vehicle.nuke_estimate) * 100)}% below market`
+                  : vehicle.deal_score > 0
+                  ? `Fair price \u2014 near market value`
+                  : vehicle.deal_score > -20
+                  ? `Slightly above market`
+                  : `Overpriced \u2014 ${Math.round(((price - vehicle.nuke_estimate) / vehicle.nuke_estimate) * 100)}% above estimate`
+                }
+              </span>
+            </div>
+          )}
+
+          {/* Heat indicator */}
+          {vehicle.heat_score != null && (
+            <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '40px',
+                height: '4px',
+                background: 'var(--border)',
+                borderRadius: '2px',
+                overflow: 'hidden',
+                flexShrink: 0,
+              }}>
+                <div style={{
+                  width: `${Math.min(100, Math.max(5, vehicle.heat_score))}%`,
+                  height: '100%',
+                  background: vehicle.heat_score > 70 ? '#ef4444' : vehicle.heat_score > 40 ? '#f59e0b' : '#6b7280',
+                  transition: 'width 0.3s ease',
+                }} />
+              </div>
+              <span style={{ color: 'var(--text-muted)' }}>
+                {vehicle.heat_score > 70 ? 'Hot' : vehicle.heat_score > 40 ? 'Warm' : 'Low interest'}
+              </span>
+            </div>
+          )}
+
+          {/* Record price badge */}
+          {vehicle.is_record_price && (
+            <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                background: '#fbbf24',
+                color: '#78350f',
+                padding: '1px 6px',
+                borderRadius: '3px',
+                fontSize: '7pt',
+                fontWeight: 600,
+              }}>
+                RECORD
+              </span>
+              <span style={{ color: 'var(--text-muted)' }}>Record price for this model</span>
+            </div>
+          )}
+
+          {/* Nuke estimate */}
+          {vehicle.nuke_estimate != null && vehicle.nuke_estimate > 0 && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', color: 'var(--text-muted)' }}>
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                {formatCurrencyAmount(vehicle.nuke_estimate)}
+              </span>
+              <span style={{ fontSize: '7pt' }}>
+                Nuke estimate
+                {vehicle.nuke_estimate_confidence != null && (
+                  <> ({vehicle.nuke_estimate_confidence}% conf)</>
+                )}
+              </span>
+            </div>
           )}
         </div>
       )}

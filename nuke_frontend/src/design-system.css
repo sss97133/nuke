@@ -2636,6 +2636,11 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes hoverCardAppear {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Profile Page Styles */
 .profile-header {
   display: flex;
