@@ -114,8 +114,65 @@ serve(async (req) => {
       }
     }
 
+    // Check if LLM explicitly said no vehicle data found
+    if (extractedJson.no_vehicle_data === true) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No vehicle data found on this page.',
+          url,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Validate and normalize extracted data
     const normalized = normalizeExtractedData(extractedJson, url)
+
+    // === HALLUCINATION GUARD ===
+    // Check if the content actually contains vehicle-related keywords.
+    // If the page has no vehicle content but the LLM returned data, it hallucinated.
+    const contentLower = contentPreview.toLowerCase()
+    const vehicleKeywords = ['vehicle', 'car', 'truck', 'suv', 'sedan', 'coupe', 'convertible',
+      'mileage', 'odometer', 'vin', 'engine', 'transmission', 'horsepower', 'torque',
+      'mpg', 'drivetrain', 'auction', 'listing', 'for sale', 'sold for', 'bid',
+      'cylinder', 'turbo', 'supercharged', 'exhaust', 'suspension', 'brakes',
+      'interior', 'exterior', 'paint', 'wheels', 'tires', 'carfax', 'autocheck']
+    const makeKeywords = ['ford', 'chevrolet', 'chevy', 'toyota', 'honda', 'bmw', 'mercedes',
+      'porsche', 'audi', 'volkswagen', 'nissan', 'mazda', 'subaru', 'dodge', 'jeep',
+      'ram', 'gmc', 'cadillac', 'lincoln', 'buick', 'lexus', 'acura', 'infiniti',
+      'ferrari', 'lamborghini', 'maserati', 'alfa romeo', 'fiat', 'volvo', 'saab',
+      'jaguar', 'land rover', 'mini', 'rolls-royce', 'bentley', 'aston martin',
+      'mclaren', 'lotus', 'triumph', 'mg', 'austin-healey', 'datsun']
+    const allKeywords = [...vehicleKeywords, ...makeKeywords]
+    const keywordHits = allKeywords.filter(kw => contentLower.includes(kw)).length
+
+    // If fewer than 2 vehicle-related keywords found in the content, likely hallucination
+    if (keywordHits < 2 && contentPreview.length > 100) {
+      console.log(`[extract-vehicle-data-ai] Hallucination guard: only ${keywordHits} vehicle keywords in content. Rejecting.`)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No vehicle data found on this page. The URL does not appear to contain a vehicle listing.',
+          url,
+          keywordsFound: keywordHits,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Also reject if the LLM returned the exact example data from the prompt
+    if (normalized.year === 1974 && normalized.make === 'Chevrolet' && normalized.mileage === 123456) {
+      console.log(`[extract-vehicle-data-ai] Hallucination guard: LLM parroted example data. Rejecting.`)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Extraction failed — the AI could not find real vehicle data on this page.',
+          url,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // === FIELD-LEVEL EXTRACTION HEALTH LOGGING ===
     const overallConfidence = extractedJson.confidence || 0.8
@@ -239,6 +296,8 @@ Extract the following fields as JSON:
 }
 
 CRITICAL RULES:
+- If the page content does NOT contain vehicle listing data, return: {"no_vehicle_data": true, "confidence": 0}
+- Do NOT fabricate or invent vehicle data. Only extract what is actually present in the content.
 - NORMALIZE make: "Chevy"/"Chevrolet" → "Chevrolet", "GMC" → "GMC"
 - NORMALIZE model: "pickup"/"truck" → "C/K", "Blazer" → "Blazer", "Suburban" → "Suburban"
 - Extract series from title/description: Look for C10/K10/C20/K20/K5/C5, and R/V 1500/2500/3500 (1988-1991 squarebody).

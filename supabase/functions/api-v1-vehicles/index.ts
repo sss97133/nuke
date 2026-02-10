@@ -20,12 +20,14 @@ interface VehicleInput {
   year?: number;
   make?: string;
   model?: string;
+  trim?: string;
+  series?: string;
   vin?: string;
   mileage?: number;
   color?: string;
   interior_color?: string;
   transmission?: string;
-  engine?: string;
+  engine_type?: string;
   drivetrain?: string;
   body_style?: string;
   purchase_price?: number;
@@ -44,7 +46,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Authenticate user (JWT or API key)
-    const { userId, error: authError } = await authenticateRequest(req, supabase);
+    const { userId, isServiceRole, error: authError } = await authenticateRequest(req, supabase);
     if (authError || !userId) {
       return new Response(
         JSON.stringify({ error: authError || "Authentication required" }),
@@ -65,10 +67,10 @@ serve(async (req) => {
         const { data, error } = await supabase
           .from("vehicles")
           .select(`
-            id, year, make, model, vin, mileage,
-            color, interior_color, transmission, engine, drivetrain, body_style,
-            purchase_price, description, is_public, created_at, updated_at,
-            owner_id
+            id, year, make, model, trim, series, vin, mileage,
+            color, interior_color, transmission, engine_type, engine_displacement,
+            drivetrain, body_style, sale_price, purchase_price, description,
+            is_public, created_at, updated_at, owner_id, primary_image_url
           `)
           .eq("id", vehicleId)
           .single();
@@ -80,8 +82,8 @@ serve(async (req) => {
           );
         }
 
-        // Check access (owner or public)
-        if (data.owner_id !== userId && !data.is_public) {
+        // Check access (owner, public, or service role)
+        if (!isServiceRole && data.owner_id !== userId && !data.is_public) {
           return new Response(
             JSON.stringify({ error: "Access denied" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -102,13 +104,16 @@ serve(async (req) => {
         let query = supabase
           .from("vehicles")
           .select(`
-            id, year, make, model, vin, mileage,
-            color, transmission, body_style,
-            purchase_price, is_public, created_at, owner_id
+            id, year, make, model, trim, series, vin, mileage,
+            color, transmission, body_style, sale_price,
+            purchase_price, is_public, created_at, owner_id, primary_image_url
           `, { count: "exact" });
 
-        if (mine) {
+        if (mine && !isServiceRole) {
           query = query.eq("owner_id", userId);
+        } else if (isServiceRole) {
+          // Service role: show all public vehicles (no owner filter)
+          query = query.eq("is_public", true);
         } else {
           query = query.or(`owner_id.eq.${userId},is_public.eq.true`);
         }
@@ -138,6 +143,12 @@ serve(async (req) => {
 
     // POST /api/v1/vehicles - Create vehicle
     if (req.method === "POST") {
+      if (isServiceRole) {
+        return new Response(
+          JSON.stringify({ error: "Service role keys are read-only. Use a user API key for write operations." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       const body: VehicleInput = await req.json();
 
       // Validate required fields
@@ -159,7 +170,7 @@ serve(async (req) => {
           color: body.color,
           interior_color: body.interior_color,
           transmission: body.transmission,
-          engine: body.engine,
+          engine_type: body.engine_type,
           drivetrain: body.drivetrain,
           body_style: body.body_style,
           purchase_price: body.purchase_price,
@@ -210,7 +221,7 @@ serve(async (req) => {
       if (body.color !== undefined) updateData.color = body.color;
       if (body.interior_color !== undefined) updateData.interior_color = body.interior_color;
       if (body.transmission !== undefined) updateData.transmission = body.transmission;
-      if (body.engine !== undefined) updateData.engine = body.engine;
+      if (body.engine_type !== undefined) updateData.engine_type = body.engine_type;
       if (body.drivetrain !== undefined) updateData.drivetrain = body.drivetrain;
       if (body.body_style !== undefined) updateData.body_style = body.body_style;
       if (body.purchase_price !== undefined) updateData.purchase_price = body.purchase_price;
@@ -287,13 +298,25 @@ serve(async (req) => {
 /**
  * Authenticate request via JWT or API key
  */
-async function authenticateRequest(req: Request, supabase: any): Promise<{ userId: string | null; error?: string }> {
+async function authenticateRequest(req: Request, supabase: any): Promise<{ userId: string | null; isServiceRole?: boolean; error?: string }> {
   const authHeader = req.headers.get("Authorization");
   const apiKey = req.headers.get("X-API-Key");
 
-  // Try JWT first
+  // Check for service role key or user JWT
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.replace("Bearer ", "");
+
+    // Check if token is a service role JWT (used by MCP servers and internal tools)
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.role === 'service_role') {
+        return { userId: "service-role", isServiceRole: true };
+      }
+    } catch {
+      // Not a valid JWT, continue to other auth methods
+    }
+
+    // Try user JWT
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (user && !error) {
       return { userId: user.id };
@@ -308,22 +331,27 @@ async function authenticateRequest(req: Request, supabase: any): Promise<{ userI
 
     const { data: keyData, error } = await supabase
       .from("api_keys")
-      .select("user_id, scopes, is_active, rate_limit_remaining")
+      .select("user_id, scopes, is_active, rate_limit_remaining, expires_at")
       .eq("key_hash", keyHash)
       .eq("is_active", true)
       .single();
 
     if (keyData && !error) {
+      // Check expiry
+      if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
+        return { userId: null, error: "API key has expired" };
+      }
+
       // Check rate limit
       if (keyData.rate_limit_remaining !== null && keyData.rate_limit_remaining <= 0) {
         return { userId: null, error: "Rate limit exceeded" };
       }
 
-      // Decrement rate limit
+      // Decrement rate limit (fix: use !== null check instead of falsy check)
       await supabase
         .from("api_keys")
         .update({
-          rate_limit_remaining: keyData.rate_limit_remaining ? keyData.rate_limit_remaining - 1 : null,
+          rate_limit_remaining: keyData.rate_limit_remaining !== null ? keyData.rate_limit_remaining - 1 : null,
           last_used_at: new Date().toISOString(),
         })
         .eq("key_hash", keyHash);

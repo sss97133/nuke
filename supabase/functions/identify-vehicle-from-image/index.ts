@@ -2,7 +2,7 @@
  * identify-vehicle-from-image
  *
  * Uses AI vision to identify vehicle year, make, model, and trim from an image.
- * Tiered approach: Gemini Flash (free) → GPT-4o-mini → GPT-4o
+ * Tiered approach: Gemini Flash (free) -> GPT-4o-mini -> GPT-4o
  *
  * Input: { image_url, context?: { title?, description? }, vehicle_id? }
  * Output: { year, make, model, trim, body_style, confidence, reasoning, model_used }
@@ -66,28 +66,70 @@ Be conservative with confidence scores:
 
 If the image doesn't clearly show a vehicle or is too blurry/obscured, set confidence below 0.3.`
 
-async function fetchImageAsBase64(imageUrl: string): Promise<string> {
-  const response = await fetch(imageUrl, {
-    signal: AbortSignal.timeout(15000),
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+/**
+ * Fetch an image and return as base64.
+ * Retries once on 429 with a 2s delay.
+ */
+async function fetchImageAsBase64(imageUrl: string): Promise<{ base64: string; mimeType: string }> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) {
+        // Exponential backoff: 1s, 3s
+        await new Promise(r => setTimeout(r, attempt * 2000))
+        console.log(`[identify-vehicle] Image fetch retry #${attempt}...`)
+      }
+
+      const response = await fetch(imageUrl, {
+        signal: AbortSignal.timeout(20000),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': new URL(imageUrl).origin + '/',
+        }
+      })
+
+      if (response.status === 429) {
+        lastError = new Error(`Rate limited (429) fetching image (attempt ${attempt + 1})`)
+        continue
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)
+      }
+
+      // Detect mime type from response headers or URL
+      const contentType = response.headers.get('content-type') || detectMimeType(imageUrl)
+
+      const arrayBuffer = await response.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+
+      if (uint8Array.length === 0) {
+        throw new Error('Empty image response')
+      }
+
+      // Convert to base64 using chunks to avoid stack overflow on large images
+      const chunkSize = 8192
+      let binary = ''
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+        binary += String.fromCharCode(...chunk)
+      }
+
+      const base64 = btoa(binary)
+      console.log(`[identify-vehicle] Image fetched: ${uint8Array.length} bytes, ${base64.length} base64 chars, type=${contentType}`)
+      return { base64, mimeType: contentType }
+    } catch (err: any) {
+      lastError = err
+      if (err.message?.includes('Rate limited')) continue
+      // Don't retry non-rate-limit errors
+      throw err
     }
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)
   }
 
-  const arrayBuffer = await response.arrayBuffer()
-  const uint8Array = new Uint8Array(arrayBuffer)
-
-  // Convert to base64
-  let binary = ''
-  for (let i = 0; i < uint8Array.length; i++) {
-    binary += String.fromCharCode(uint8Array[i])
-  }
-
-  return btoa(binary)
+  throw lastError || new Error('Failed to fetch image after retries')
 }
 
 function detectMimeType(imageUrl: string): string {
@@ -95,22 +137,30 @@ function detectMimeType(imageUrl: string): string {
   if (lower.includes('.png')) return 'image/png'
   if (lower.includes('.gif')) return 'image/gif'
   if (lower.includes('.webp')) return 'image/webp'
-  return 'image/jpeg' // Default to JPEG
+  return 'image/jpeg'
 }
+
+// Track errors per tier for reporting
+const tierErrors: Record<string, string> = {}
 
 async function identifyWithTier(
   supabase: any,
   userId: string | null,
+  imageBase64: string | null,
+  imageMimeType: string,
   imageUrl: string,
   context: { title?: string; description?: string } | null,
   tier: AnalysisTier
 ): Promise<VehicleIdentification | null> {
   try {
+    console.log(`[identify-vehicle] ${tier}: getting LLM config...`)
     const config = await getLLMConfig(supabase, userId, undefined, undefined, tier)
+    console.log(`[identify-vehicle] ${tier}: provider=${config.provider} model=${config.model} keyLen=${config.apiKey?.length || 0}`)
 
-    // Fetch and encode image
-    const base64Image = await fetchImageAsBase64(imageUrl)
-    const mimeType = detectMimeType(imageUrl)
+    // If we don't have base64 and provider needs it, skip this tier
+    if (!imageBase64 && config.provider !== 'openai') {
+      throw new Error(`Image fetch failed and ${config.provider} requires base64 - skipping`)
+    }
 
     // Build context string if available
     let contextString = ''
@@ -118,7 +168,6 @@ async function identifyWithTier(
       contextString += `\n\nListing title: "${context.title}"`
     }
     if (context?.description) {
-      // Truncate description to avoid token limits
       const truncatedDesc = context.description.substring(0, 500)
       contextString += `\n\nListing description excerpt: "${truncatedDesc}..."`
     }
@@ -126,20 +175,19 @@ async function identifyWithTier(
     const fullPrompt = IDENTIFICATION_PROMPT + (contextString ? `\n\nAdditional context from the listing:${contextString}` : '')
 
     // Build messages based on provider
+    // Use base64 when available, URL pass-through for OpenAI when not
     let messages: any[]
 
     if (config.provider === 'openai') {
+      const imageContent = imageBase64
+        ? { url: `data:${imageMimeType};base64,${imageBase64}`, detail: 'high' }
+        : { url: imageUrl, detail: 'high' as const }
+      console.log(`[identify-vehicle] ${tier}: using ${imageBase64 ? 'base64' : 'URL pass-through'} for OpenAI`)
       messages = [{
         role: 'user',
         content: [
           { type: 'text', text: fullPrompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:${mimeType};base64,${base64Image}`,
-              detail: 'high'
-            }
-          }
+          { type: 'image_url', image_url: imageContent }
         ]
       }]
     } else if (config.provider === 'anthropic') {
@@ -150,15 +198,14 @@ async function identifyWithTier(
             type: 'image',
             source: {
               type: 'base64',
-              media_type: mimeType,
-              data: base64Image
+              media_type: imageMimeType,
+              data: imageBase64
             }
           },
           { type: 'text', text: fullPrompt }
         ]
       }]
     } else if (config.provider === 'google') {
-      // Google/Gemini format - the llmProvider handles conversion
       messages = [{
         role: 'user',
         content: [
@@ -166,7 +213,7 @@ async function identifyWithTier(
           {
             type: 'image_url',
             image_url: {
-              url: `data:${mimeType};base64,${base64Image}`
+              url: `data:${imageMimeType};base64,${imageBase64}`
             }
           }
         ]
@@ -175,11 +222,13 @@ async function identifyWithTier(
       throw new Error(`Unsupported provider: ${config.provider}`)
     }
 
+    console.log(`[identify-vehicle] ${tier}: calling LLM (${config.provider}/${config.model})...`)
     const result = await callLLM(config, messages, {
-      temperature: 0.3, // Lower temperature for more consistent identification
+      temperature: 0.3,
       maxTokens: 1000,
       vision: true
     })
+    console.log(`[identify-vehicle] ${tier}: LLM responded, content length=${result.content?.length || 0}`)
 
     // Parse the JSON response
     const content = result.content || ''
@@ -190,7 +239,6 @@ async function identifyWithTier(
     if (jsonMatch) {
       jsonStr = jsonMatch[1].trim()
     } else {
-      // Try to find JSON object directly
       const objectMatch = content.match(/\{[\s\S]*\}/)
       if (objectMatch) {
         jsonStr = objectMatch[0]
@@ -214,7 +262,8 @@ async function identifyWithTier(
       tier_used: tier
     }
   } catch (error: any) {
-    console.warn(`[identify-vehicle] ${tier} failed:`, error.message)
+    console.error(`[identify-vehicle] ${tier} FAILED: ${error.message}`)
+    tierErrors[tier] = error.message
     return null
   }
 }
@@ -233,7 +282,7 @@ serve(async (req) => {
       vehicle_id,
       user_id,
       min_confidence = 0.5,
-      max_tier = 'tier3' // Don't go to 'expert' by default (expensive)
+      max_tier = 'tier3'
     } = await req.json()
 
     if (!image_url) {
@@ -249,45 +298,73 @@ serve(async (req) => {
 
     console.log(`[identify-vehicle] Starting identification for: ${image_url.substring(0, 100)}...`)
 
+    // Fetch image ONCE and reuse across all tiers (avoids rate limiting from multiple fetches)
+    let imageBase64: string | null = null
+    let imageMimeType: string = detectMimeType(image_url)
+    let imageFetchFailed = false
+    try {
+      const imageData = await fetchImageAsBase64(image_url)
+      imageBase64 = imageData.base64
+      imageMimeType = imageData.mimeType
+    } catch (fetchErr: any) {
+      console.warn(`[identify-vehicle] Failed to fetch image locally: ${fetchErr.message}`)
+      console.log(`[identify-vehicle] Will attempt URL-pass-through mode (OpenAI can fetch URLs directly)`)
+      imageFetchFailed = true
+    }
+
     // Tiered approach: try cheaper models first, escalate if confidence is low
     const tiers: AnalysisTier[] = ['tier1', 'tier2', 'tier3', 'expert']
     const maxTierIndex = tiers.indexOf(max_tier as AnalysisTier)
-    const allowedTiers = tiers.slice(0, maxTierIndex + 1)
+    let allowedTiers = tiers.slice(0, maxTierIndex + 1)
+
+    // If image fetch failed, prioritize OpenAI tiers (can use URL pass-through)
+    // tier2 and tier3 use OpenAI, so start with tier2 when we don't have base64
+    if (imageFetchFailed) {
+      console.log(`[identify-vehicle] Image fetch failed - prioritizing OpenAI tiers (URL pass-through)`)
+      // Reorder: OpenAI tiers first (tier2=gpt-4o-mini, tier3=gpt-4o), then others
+      allowedTiers = allowedTiers.filter(t => t === 'tier2' || t === 'tier3')
+      if (allowedTiers.length === 0) {
+        allowedTiers = ['tier2'] // Fallback to at least tier2
+      }
+    }
 
     let bestResult: VehicleIdentification | null = null
     const attempts: Array<{ tier: string; result: VehicleIdentification | null; error?: string }> = []
 
+    // Clear tier errors
+    for (const t of allowedTiers) { tierErrors[t] = '' }
+
     for (const tier of allowedTiers) {
       console.log(`[identify-vehicle] Trying ${tier}...`)
 
-      const result = await identifyWithTier(supabase, user_id || null, image_url, context || null, tier)
+      const result = await identifyWithTier(
+        supabase, user_id || null,
+        imageBase64, imageMimeType, image_url,
+        context || null, tier
+      )
 
       attempts.push({
         tier,
         result,
-        error: result ? undefined : 'Failed to get result'
+        error: result ? undefined : (tierErrors[tier] || 'Failed to get result')
       })
 
       if (result) {
-        // If confidence meets threshold, we're done
         if (result.confidence >= min_confidence) {
           bestResult = result
           console.log(`[identify-vehicle] ${tier} succeeded with confidence ${result.confidence}`)
           break
         }
 
-        // Keep this result if it's better than what we have
         if (!bestResult || result.confidence > bestResult.confidence) {
           bestResult = result
         }
 
-        // If confidence is very low, try next tier
         if (result.confidence < 0.4) {
           console.log(`[identify-vehicle] ${tier} confidence ${result.confidence} too low, escalating...`)
           continue
         }
 
-        // Moderate confidence - accept it
         console.log(`[identify-vehicle] ${tier} confidence ${result.confidence} acceptable`)
         break
       }
@@ -312,7 +389,6 @@ serve(async (req) => {
       try {
         const updateData: any = {}
 
-        // Only update fields that are missing on the vehicle
         const { data: existingVehicle } = await supabase
           .from('vehicles')
           .select('year, make, model, body_style, origin_metadata')
@@ -333,7 +409,6 @@ serve(async (req) => {
             updateData.body_style = bestResult.body_style
           }
 
-          // Store AI identification in origin_metadata
           const existingMeta = existingVehicle.origin_metadata || {}
           updateData.origin_metadata = {
             ...existingMeta,

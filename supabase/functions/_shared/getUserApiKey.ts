@@ -16,7 +16,11 @@ export async function getUserApiKey(
 ): Promise<ApiKeyResult> {
   // If no user ID, use system key
   if (!userId) {
-    const systemKey = Deno.env.get(systemKeyEnvVar);
+    let systemKey = Deno.env.get(systemKeyEnvVar);
+    // Fallback env var names for Google (GOOGLE_AI_API_KEY -> GEMINI_API_KEY)
+    if (!systemKey && provider === 'google') {
+      systemKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GOOGLE_API_KEY') || null;
+    }
     return {
       apiKey: systemKey || null,
       source: 'system'
@@ -67,7 +71,11 @@ export async function getUserApiKey(
   }
 
   // No user key - use system key
-  const systemKey = Deno.env.get(systemKeyEnvVar);
+  let systemKey = Deno.env.get(systemKeyEnvVar);
+  // Fallback env var names for Google (GOOGLE_AI_API_KEY -> GEMINI_API_KEY)
+  if (!systemKey && provider === 'google') {
+    systemKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GOOGLE_API_KEY') || null;
+  }
   return {
     apiKey: systemKey || null,
     source: 'system'
