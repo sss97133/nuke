@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Transaction not found' }, 404)
     }
 
-    const baseUrl = Deno.env.get('FRONTEND_URL') || 'https://nuke-omega.vercel.app'
+    const baseUrl = Deno.env.get('FRONTEND_URL') || 'https://n-zero.dev'
     const vehicleName = `${transaction.vehicle?.year} ${transaction.vehicle?.make} ${transaction.vehicle?.model}`
     
     const results = []
