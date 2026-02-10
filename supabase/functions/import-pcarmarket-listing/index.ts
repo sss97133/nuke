@@ -666,7 +666,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { listing_url, html: providedHtml } = body;
+    const listing_url = body.listing_url || body.url;
+    const providedHtml = body.html;
 
     if (!listing_url) {
       return new Response(
