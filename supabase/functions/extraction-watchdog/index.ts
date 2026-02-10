@@ -249,18 +249,19 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
   }
 
   // 3. Convert old "Extraction failed" to pending for retry with new extractor
+  // Cap at 10 attempts to prevent infinite retry loops
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { data: genericFails } = await supabase
     .from("import_queue")
     .update({
       status: "pending",
-      attempts: 0,
       error_message: "Retrying with improved extractor",
       next_attempt_at: null,
     })
     .or("error_message.eq.Extraction failed,error_message.eq.extraction failed")
-    .in("status", ["failed", "pending"])
+    .eq("status", "failed")
     .lt("processed_at", oneHourAgo)
+    .lt("attempts", 10)
     .select("id")
     .limit(500); // Batch to avoid overwhelming
 
