@@ -210,14 +210,23 @@ function classify(
   return 'other';
 }
 
+// Types the DB allowed before 20260210000001 (use with --use-only-current-db-types if migration not applied)
+const CURRENT_DB_ALLOWED_TYPES = new Set([
+  'dealer', 'dealership', 'garage', 'auction_house', 'restoration_shop', 'performance_shop',
+  'body_shop', 'detailing', 'marketplace', 'collection', 'specialty_shop', 'builder',
+  'fabrication', 'club', 'media', 'motorsport_event', 'rally_event', 'concours', 'automotive_expo',
+  'registry', 'other',
+]);
+
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
   const outCsv = process.argv.includes('--csv');
   const outSql = process.argv.includes('--sql');
   const revamp = process.argv.includes('--revamp'); // re-classify ALL businesses with new rules
+  const useOnlyCurrentDbTypes = process.argv.includes('--use-only-current-db-types'); // write only types DB already allows (no migration needed)
 
   console.log('Classify pending businesses');
-  console.log('Options:', { dryRun, outCsv, outSql, revamp });
+  console.log('Options:', { dryRun, outCsv, outSql, revamp, useOnlyCurrentDbTypes });
   console.log('');
 
   const { count: total } = await supabase.from('businesses').select('*', { count: 'exact', head: true });
@@ -255,7 +264,7 @@ async function main() {
   }
   const classifiedCount = revamp ? 0 : all.filter((r) => CLASSIFIED_TYPES.has(String(r.business_type || ''))).length;
 
-  await runClassification(pendingList, { dryRun, outCsv, outSql, total: total ?? 0, classifiedCount });
+  await runClassification(pendingList, { dryRun, outCsv, outSql, total: total ?? 0, classifiedCount, useOnlyCurrentDbTypes });
 }
 
 async function runClassification(
@@ -268,9 +277,9 @@ async function runClassification(
     services_offered: string[] | null;
     business_type: string | null;
   }>,
-  opts: { dryRun: boolean; outCsv: boolean; outSql: boolean; total: number; classifiedCount: number }
+  opts: { dryRun: boolean; outCsv: boolean; outSql: boolean; total: number; classifiedCount: number; useOnlyCurrentDbTypes?: boolean }
 ) {
-  const { dryRun, outCsv, outSql, total, classifiedCount } = opts;
+  const { dryRun, outCsv, outSql, total, classifiedCount, useOnlyCurrentDbTypes } = opts;
   const updates: { id: string; business_type: AssignedType }[] = [];
   const byType: Partial<Record<AssignedType, number>> = {};
   const ensureType = (t: AssignedType) => { if (byType[t] == null) byType[t] = 0; };
@@ -280,14 +289,18 @@ async function runClassification(
     ['villa_rental', 'event_company', 'restaurant_food', 'hotel_lodging', 'property_management', 'travel_tourism', 'art_creative', 'retail_other', 'health_medical', 'professional_services', 'sport_recreation', 'marine_nautical', 'education', 'construction_services', 'car_rental', 'other'] as AssignedType[]
   ).forEach(t => ensureType(t));
 
+  const toDbType = (t: AssignedType): AssignedType =>
+    useOnlyCurrentDbTypes && !CURRENT_DB_ALLOWED_TYPES.has(t) ? 'other' : t;
+
   for (const row of pending) {
-    const assigned = classify(
+    const raw = classify(
       row.business_name,
       row.description,
       row.website,
       row.specializations,
       row.services_offered
     );
+    const assigned = toDbType(raw);
     updates.push({ id: row.id, business_type: assigned });
     byType[assigned]++;
   }
