@@ -52,7 +52,7 @@ export async function generateIdentityBasedAvatar(
 async function loadUserIdentity(
   seed: string,
   platform?: 'bat' | 'nzero',
-  userId?: string
+  _userId?: string
 ): Promise<UserIdentity> {
   const identity: UserIdentity = {
     username: seed

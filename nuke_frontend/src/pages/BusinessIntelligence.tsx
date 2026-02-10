@@ -65,7 +65,7 @@ export default function BusinessIntelligence() {
       setLoading(true);
 
       // Load various business metrics in parallel
-      const [vehiclesResult, critiquesResult, analyticsResult] = await Promise.all([
+      const [vehiclesResult, critiquesResult] = await Promise.all([
         // Total vehicles count
         supabase
           .from('vehicles')

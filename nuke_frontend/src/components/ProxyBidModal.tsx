@@ -36,7 +36,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [hasActiveAgreement, setHasActiveAgreement] = useState(false);
+  const [, setHasActiveAgreement] = useState(false);
   const [agreementId, setAgreementId] = useState<string | null>(null);
   const [hasPlatformCredentials, setHasPlatformCredentials] = useState(false);
   const [showCredentialForm, setShowCredentialForm] = useState(false);
@@ -105,7 +105,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
           setHasActiveAgreement(false);
           setStep('agreement');
         }
-      } catch (err) {
+      } catch {
         setHasActiveAgreement(false);
         setStep('agreement');
       } finally {

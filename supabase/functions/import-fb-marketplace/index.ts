@@ -118,7 +118,9 @@ function cleanModelName(model: string | null): string | null {
  * Parse year, make, model from FB Marketplace title
  * Examples: "1978 Ford F-150", "1987 Chevy C10", "$4,5001972 Chevrolet C10"
  */
-function parseTitle(title: string): { year: number | null; make: string | null; model: string | null; cleanPrice: number | null } {
+function parseTitle(title: string | null | undefined): { year: number | null; make: string | null; model: string | null; cleanPrice: number | null } {
+  if (!title) return { year: null, make: null, model: null, cleanPrice: null };
+
   // Extract price - look for year at END of price string (e.g., "$1,9502021" -> price=$1,950, year=2021)
   let cleanPrice: number | null = null;
   const priceMatch = title.match(/^\$?([\d,]+)/);
