@@ -119,7 +119,7 @@ serve(async (req) => {
       .select("*", { count: "estimated", head: true })
       .gte("created_at", iso24h);
 
-    const { count: activeSources } = await supabase.from("scrape_sources").select("*", { count: "exact", head: true }).eq("is_active", true);
+    const { count: activeSources } = await supabase.from("scrape_sources").select("*", { count: "estimated", head: true }).eq("is_active", true);
 
     // Analysis queue + image analysis progress (best-effort).
     const analysisQueueCounts: Record<string, number> = {};
@@ -127,7 +127,7 @@ serve(async (req) => {
     try {
       const statuses = ["pending", "processing", "retrying", "failed", "completed"];
       for (const st of statuses) {
-        const { count } = await supabase.from("analysis_queue").select("*", { count: "exact", head: true }).eq("status", st);
+        const { count } = await supabase.from("analysis_queue").select("*", { count: "estimated", head: true }).eq("status", st);
         analysisQueueCounts[st] = count || 0;
       }
 
@@ -175,7 +175,7 @@ serve(async (req) => {
     try {
       const { count } = await supabase
         .from("organization_images")
-        .select("*", { count: "exact", head: true })
+        .select("*", { count: "estimated", head: true })
         .is("ai_analysis", null)
         .gte("created_at", iso7d);
       if (count != null) {
