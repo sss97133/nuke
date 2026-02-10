@@ -366,7 +366,7 @@ async function handleChatMode(
         .from('vehicle_documents')
         .select('id, document_type, title, vendor_name, amount, currency, document_date, file_url, created_at')
         .eq('vehicle_id', vehicleId)
-        .or(`title.ilike.${ilike},vendor_name.ilike.${ilike},document_type.ilike.${ilike}`)
+        .or(`title.ilike."${ilike}",vendor_name.ilike."${ilike}",document_type.ilike."${ilike}"`)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -374,7 +374,7 @@ async function handleChatMode(
         .from('vehicle_images')
         .select('id, caption, description, created_at, is_document, doc_flag, document_classification, document_category')
         .eq('vehicle_id', vehicleId)
-        .or(`caption.ilike.${ilike},description.ilike.${ilike},document_classification.ilike.${ilike},document_category.ilike.${ilike}`)
+        .or(`caption.ilike."${ilike}",description.ilike."${ilike}",document_classification.ilike."${ilike}",document_category.ilike."${ilike}"`)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -382,7 +382,7 @@ async function handleChatMode(
         .from('timeline_events')
         .select('id, event_type, title, description, event_date, receipt_amount')
         .eq('vehicle_id', vehicleId)
-        .or(`title.ilike.${ilike},description.ilike.${ilike},event_type.ilike.${ilike}`)
+        .or(`title.ilike."${ilike}",description.ilike."${ilike}",event_type.ilike."${ilike}"`)
         .order('event_date', { ascending: false })
         .limit(20);
 

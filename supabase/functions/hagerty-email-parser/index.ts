@@ -224,7 +224,7 @@ serve(async (req) => {
       .from('external_listings')
       .select('id, vehicle_id, current_bid, bid_count')
       .eq('platform', 'hagerty')
-      .or(`listing_url.ilike.%${auctionUuid}%,listing_id.eq.${auctionUuid}`)
+      .or(`listing_url.ilike."%${auctionUuid}%",listing_id.eq."${auctionUuid}"`)
       .limit(1)
       .maybeSingle();
 

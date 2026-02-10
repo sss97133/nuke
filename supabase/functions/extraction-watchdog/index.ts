@@ -293,7 +293,7 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
       })
       .eq("status", "pending")
       .gte("attempts", THRESHOLDS.stuck_attempts)
-      .or(`next_attempt_at.is.null,next_attempt_at.lt.${twoHoursAgo}`)
+      .or(`next_attempt_at.is.null,next_attempt_at.lt."${twoHoursAgo}"`)
       .select("id")
       .limit(200);
 

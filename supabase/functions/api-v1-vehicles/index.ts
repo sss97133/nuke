@@ -117,7 +117,7 @@ serve(async (req) => {
           // Service role: show all public vehicles (no owner filter)
           query = query.eq("is_public", true);
         } else {
-          query = query.or(`owner_id.eq.${userId},is_public.eq.true`);
+          query = query.or(`owner_id.eq."${userId}",is_public.eq.true`);
         }
 
         const { data, error, count } = await query

@@ -48,14 +48,14 @@ async function findTech(telegramId: number) {
 async function linkPhone(phone: string, telegramId: number, username?: string) {
   const p = phone.replace(/[\s\-\+\(\)]/g, "");
   const ph = p.length === 10 ? `1${p}` : p;
-  const { data } = await supabase.from("technician_phone_links").select("id, display_name").eq("phone_number", ph).single();
+  const { data } = await supabase.from("technician_phone_links").select("id, display_name").eq("phone_number", ph).maybeSingle();
   if (!data) return null;
   await supabase.from("technician_phone_links").update({ metadata: { telegram_id: telegramId, telegram_username: username } }).eq("id", data.id);
   return data;
 }
 
 async function getOrCreateVehicle(vin: string, d: any) {
-  const { data: ex } = await supabase.from("vehicles").select("id").eq("vin", vin).single();
+  const { data: ex } = await supabase.from("vehicles").select("id").eq("vin", vin).maybeSingle();
   if (ex) return { id: ex.id, isNew: false };
   const { data: nv } = await supabase.from("vehicles").insert({ vin, year: d.year, make: d.make, model: d.model, source: "telegram" }).select("id").single();
   return { id: nv!.id, isNew: true };
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
   if (text === "/status") {
     if (!tech) { await send(chatId, "Link profile first"); return new Response("OK"); }
     if (tech.active_vin) {
-      const { data: v } = await supabase.from("vehicles").select("year, make, model").eq("id", tech.active_vehicle_id).single();
+      const { data: v } = await supabase.from("vehicles").select("year, make, model").eq("id", tech.active_vehicle_id).maybeSingle();
       await send(chatId, `📍 *${v?.year} ${v?.make} ${v?.model}*\nVIN: \`${tech.active_vin}\``);
     } else {
       await send(chatId, "No active vehicle. Send a VIN.");

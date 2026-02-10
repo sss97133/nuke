@@ -583,6 +583,21 @@ serve(async (req) => {
   BOT_TOKEN = getToken(botParam);
   console.log(`[Telegram] Bot: ${botParam || "default"}, token: ${BOT_TOKEN ? BOT_TOKEN.slice(0, 10) + "..." : "NONE"}`);
 
+  // Auth check for admin endpoints - require service role key
+  const isAdminEndpoint = url.searchParams.has("delete") || url.searchParams.has("setup") ||
+    url.searchParams.has("debug") || url.searchParams.has("test_chat") ||
+    url.searchParams.has("test_file") || url.searchParams.has("version");
+  if (isAdminEndpoint) {
+    const authHeader = req.headers.get("Authorization") || "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!serviceKey || !authHeader.includes(serviceKey)) {
+      return new Response(JSON.stringify({ error: "Admin endpoints require service role authorization" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }
+
   // Delete message endpoint
   const deleteMessageId = url.searchParams.get("delete");
   if (deleteMessageId && BOT_TOKEN) {
@@ -851,7 +866,7 @@ serve(async (req) => {
         const { data: techLink } = await supabase
           .from("technician_phone_links")
           .select("id, display_name, user_id")
-          .or(`metadata->telegram_id.eq.${userId},phone_number.eq.telegram:${userId}`)
+          .or(`metadata->telegram_id.eq."${userId}",phone_number.eq."telegram:${userId}"`)
           .maybeSingle();
 
         // If no tech link found, try to find by user_id matching telegram
