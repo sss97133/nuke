@@ -674,20 +674,29 @@ serve(async (req) => {
     }
 
     // Filter out already-computed (unless force)
+    let cachedResults: any[] = [];
     if (!force) {
       const { data: existing } = await supabase
         .from("nuke_estimates")
-        .select("vehicle_id")
+        .select("*")
         .in("vehicle_id", vehicleIds)
         .eq("is_stale", false);
 
-      const existingIds = new Set((existing || []).map((e: any) => e.vehicle_id));
-      vehicleIds = vehicleIds.filter((id) => !existingIds.has(id));
+      if (existing?.length) {
+        cachedResults = existing;
+        const existingIds = new Set(existing.map((e: any) => e.vehicle_id));
+        vehicleIds = vehicleIds.filter((id) => !existingIds.has(id));
+      }
     }
 
     if (vehicleIds.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: "All vehicles already computed", computed: 0 }),
+        JSON.stringify({
+          success: true,
+          computed: 0,
+          cached: cachedResults.length,
+          results: cachedResults.length <= 5 ? cachedResults : undefined,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -708,12 +717,15 @@ serve(async (req) => {
       }
     }
 
+    const allResults = [...cachedResults, ...results];
+
     return new Response(
       JSON.stringify({
         success: true,
         computed: results.length,
+        cached: cachedResults.length,
         errors: errors.length,
-        results: vehicleIds.length <= 5 ? results : undefined, // Only include details for small batches
+        results: allResults.length <= 5 ? allResults : undefined, // Only include details for small batches
         error_details: errors.length > 0 ? errors : undefined,
       }, null, 2),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
