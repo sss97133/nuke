@@ -12,7 +12,7 @@ import FBMarketplacePanel from '../components/dashboard/FBMarketplacePanel';
 import RecentlyAddedPanel from '../components/dashboard/RecentlyAddedPanel';
 import { deriveDealScoreLabel } from '../constants/dealScore';
 import { FeedStatsBar, FeedGrid, StatsPanelOverlay } from '../components/feed';
-// import { ValueTrendsPanel } from '../components/charts'; // Temporarily disabled - import bug
+// import { ValueTrendsPanel } from '../components/charts'; // Available but not used in current layout
 
 interface HypeVehicle {
   id: string;
