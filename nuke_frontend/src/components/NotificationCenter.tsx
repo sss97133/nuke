@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { NotificationService, type Notification } from '../services/notificationService';
-import { supabase } from '../lib/supabase';
 
 interface NotificationCenterProps {
   userId: string;

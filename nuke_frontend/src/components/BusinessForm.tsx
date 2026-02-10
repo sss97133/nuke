@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { BusinessFormData, BusinessType } from '../types/business';
 import type { BUSINESS_TYPES, SPECIALIZATIONS, SERVICES_OFFERED } from '../types/business';
 import type { BusinessService } from '../services/businessService';
-import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
-import type { useAuth } from '../hooks/useAuth';
 
 interface BusinessFormProps {
   onSuccess?: (business: any) => void;

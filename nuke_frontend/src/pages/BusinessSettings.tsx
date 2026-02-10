@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
   Building2,
@@ -59,7 +59,6 @@ interface LegalDocument {
 }
 
 export default function BusinessSettings() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [company, setCompany] = useState<ParentCompany | null>(null);
   const [qbStatus, setQbStatus] = useState<QuickBooksStatus | null>(null);

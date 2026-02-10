@@ -54,7 +54,6 @@ const AdminMissionControl: React.FC = () => {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
-  const [vehicleImageQueue, setVehicleImageQueue] = useState<any[]>([]);
   const [scanProgress, setScanProgress] = useState<any>(null);
   const [imageScanStats, setImageScanStats] = useState<any>(null);
   const [originBackfillRunning, setOriginBackfillRunning] = useState(false);

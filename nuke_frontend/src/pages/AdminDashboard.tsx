@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import OwnershipVerificationDashboard from '../components/admin/OwnershipVerificationDashboard';
 import AdminAnalytics from './AdminAnalytics';
 import CraigslistQueueDashboard from '../components/admin/CraigslistQueueDashboard';
-import { IDHoverCard } from '../components/admin';
 import '../design-system.css';
 
 interface PendingApproval {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from '../lib/supabase';
 
 interface PartsQuoteGeneratorProps {
@@ -96,13 +96,13 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
     const totals = calculateTotal();
     const selectedRecommendations = Array.from(selectedParts).map(idx => recommendations[idx]);
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('parts_quotes')
       .insert({
         vehicle_id: vehicleId,
         quote_name: `${vehicleInfo.year} ${vehicleInfo.make} ${vehicleInfo.model} - AI Generated`,
         identified_parts: selectedRecommendations,
-        parts: selectedRecommendations.map((r, i) => ({
+        parts: selectedRecommendations.map((r) => ({
           part_name: r.part_name,
           part_number: r.catalog_matches[0]?.part_number,
           quantity: 1,
