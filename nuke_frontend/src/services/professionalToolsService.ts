@@ -55,12 +55,12 @@ export class ProfessionalToolsService {
     const tools: ParsedTool[] = [];
     
     // Use OpenAI to extract structured data if available
-    if (process.env.VITE_OPENAI_API_KEY && imageUrl) {
+    if (import.meta.env.VITE_OPENAI_API_KEY && imageUrl) {
       try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.VITE_OPENAI_API_KEY}`,
+            'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
