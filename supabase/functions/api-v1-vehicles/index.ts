@@ -109,7 +109,7 @@ serve(async (req) => {
             id, year, make, model, trim, series, vin, mileage,
             color, transmission, body_style, sale_price,
             purchase_price, is_public, created_at, owner_id, primary_image_url
-          `, { count: "exact" });
+          `, { count: "estimated" });
 
         if (mine && !isServiceRole) {
           query = query.eq("owner_id", userId);
