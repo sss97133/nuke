@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
       .from('vehicle_transactions')
       .select('*')
       .eq('shipping_listing_id', listingId)
-      .single()
+      .maybeSingle()
 
     if (txError || !transaction) {
       console.error('Transaction not found for listing:', listingId)

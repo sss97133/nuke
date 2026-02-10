@@ -479,7 +479,7 @@ Return ONLY valid JSON:
             .from("vehicles")
             .select("id, year, make, model, source")
             .eq("vin", parsed.vin)
-            .single();
+            .maybeSingle();
 
           if (existingVehicle) {
             msg += `\n\n🚗 Matched: ${existingVehicle.year || "?"} ${existingVehicle.make || "?"} ${existingVehicle.model || "?"}`;
@@ -852,7 +852,7 @@ serve(async (req) => {
           .from("technician_phone_links")
           .select("id, display_name, user_id")
           .or(`metadata->telegram_id.eq.${userId},phone_number.eq.telegram:${userId}`)
-          .single();
+          .maybeSingle();
 
         // If no tech link found, try to find by user_id matching telegram
         let finalTechLink = techLink;
@@ -870,14 +870,14 @@ serve(async (req) => {
             .select("technician_phone_link_id")
             .eq("from_phone", `telegram:${userId}`)
             .limit(1)
-            .single();
+            .maybeSingle();
 
           if (prevSubmission) {
             const { data: linkedTech } = await supabase
               .from("technician_phone_links")
               .select("id, display_name, user_id")
               .eq("id", prevSubmission.technician_phone_link_id)
-              .single();
+              .maybeSingle();
             finalTechLink = linkedTech;
           }
         }
@@ -1013,7 +1013,7 @@ serve(async (req) => {
         .from("technician_phone_links")
         .select("id, display_name, phone_number")
         .eq("phone_number", normalizedPhone)
-        .single();
+        .maybeSingle();
 
       if (techLink) {
         // Link telegram ID to this tech
