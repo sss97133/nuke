@@ -25,7 +25,8 @@ function parseFromMarkdown(md: string, url: string): Record<string, unknown> {
     const line = lines[i];
     if (line.startsWith("# ")) {
       data.title = line.replace(/^#\s+/, "").trim();
-      const titleMatch = data.title && String(data.title).match(/^(?:BF Auction:?\s*)?(\d{4})\s+(.+?)(?:\s+[×x]\s*\d+)?$/i);
+      // Match year-make-model from title, handling prefixes like "Original Paint Survivor: 1955 Jeep CJ5"
+      const titleMatch = data.title && String(data.title).match(/(?:^|:\s*)(\d{4})\s+(.+?)(?:\s+[×x]\s*\d+)?$/i);
       if (titleMatch) {
         data.year = parseInt(titleMatch[1], 10);
         const rest = titleMatch[2];
@@ -99,10 +100,21 @@ serve(async (req) => {
       const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
       if (res.ok) {
         const html = await res.text();
-        const mainMatch = html.match(/<main[^>]*>([\s\S]+?)<\/main>/i) || html.match(/<article[^>]*>([\s\S]+?)<\/article>/i) || html.match(/<div[^>]*class="[^"]*post[^"]*"[^>]*>([\s\S]+?)<\/div>/i);
+        // Extract h1 title separately (it's outside entry-content on Barn Finds)
+        const h1Match = html.match(/<h1[^>]*class="entry-title"[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+        const h1Title = h1Match ? h1Match[1].replace(/<[^>]+>/g, "").trim() : "";
+        // Match entry-content first (Barn Finds WordPress structure), then fallback
+        const mainMatch = html.match(/<div[^>]*class="entry-content"[^>]*>([\s\S]+?)<\/div>\s*(?:<div class="(?:author|post-tags|sharing)|<\/article)/i)
+          || html.match(/<main[^>]*>([\s\S]+?)<\/main>/i)
+          || html.match(/<article[^>]*>([\s\S]+?)<\/article>/i)
+          || html.match(/<div[^>]*class="entry-content"[^>]*>([\s\S]+)/i);
         const content = mainMatch ? mainMatch[1] : html;
         const strip = content.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
-        const text = strip.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "# $1\n").replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n").replace(/<p[^>]*>/gi, "\n").replace(/<li[^>]*>/gi, "\n- ").replace(/<\/p>|<\/li>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/&\#8217;/g, "'").replace(/&\#8220;|&\#8221;/g, '"').replace(/\s+/g, " ").trim();
+        let text = strip.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "# $1\n").replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n").replace(/<p[^>]*>/gi, "\n").replace(/<li[^>]*>/gi, "\n- ").replace(/<\/p>|<\/li>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/&\#8217;/g, "'").replace(/&\#8220;|&\#8221;/g, '"').replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+        // Prepend h1 as markdown heading if not already present
+        if (h1Title && !text.startsWith("# ")) {
+          text = `# ${h1Title}\n${text}`;
+        }
         markdown = text;
       }
     }
@@ -139,10 +151,12 @@ serve(async (req) => {
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
     const platform = "barnfinds";
     const slug = url.replace(/^https?:\/\/[^/]+\//, "").replace(/\/$/, "");
+    // Skip ILIKE pattern (causes full table scan timeout on 800K+ vehicles)
+    // Barn Finds URLs are consistent, so exact match is sufficient
     const { vehicleId } = await resolveExistingVehicleId(supabase, {
       url,
       platform,
-      discoveryUrlIlikePattern: discoveryUrlIlikePattern(url, slug),
+      discoveryUrlIlikePattern: null,
     });
 
     const listingUrlKey = normalizeListingUrlKey(url);
