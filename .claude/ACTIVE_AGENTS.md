@@ -1,26 +1,45 @@
-# ACTIVE AGENTS - Updated 2026-02-10 12:00 UTC
+# ACTIVE AGENTS - Updated 2026-02-10 16:45 UTC
 
-## AUTONOMOUS 8-HOUR SESSION (User away)
+## AUTONOMOUS SESSION — Coordinator (this session)
 
-### QA Agent (COMPLETED - this session)
-- **Focus**: Frontend TypeScript errors, broken routes, deprecated patterns, dead imports
-- **Files**: nuke_frontend/src/**
-- **Status**: DONE - 1 bug fixed (process.env in Vite), full report at /QA_REPORT.md
-- **Commits**: 73005ccd6, e7835df8f (pushed to main)
+### Focus: Bug fixes, performance optimization, valuation backfill
+### Status: ACTIVE — valuation batch running, performance optimization complete
 
-### Edge Function Health Agent (COMPLETED - this session)
-- **Focus**: Testing all critical edge functions, finding errors, fixing + deploying
-- **Files**: supabase/functions/**
-- **Status**: DONE - 4 bugs fixed and deployed, full report at /EDGE_FUNCTION_HEALTH_REPORT.md
-- **Functions fixed**: universal-search, process-url-drop, system-health-monitor, import-fb-marketplace
-- **Commits**: 539deb0ba (pushed to main)
+### Fixes deployed this session:
+1. **system-health-monitor**: AbortError detection + feed index fix (70,000x speedup: 12s → 0.17ms)
+2. **compute-vehicle-valuation**: self-price fallback when no comps found (reduces 5% failure rate)
+3. **api-v1-vehicles**: JSON parse error handling for POST/PATCH
+4. **extract-vehicle-data-ai**: 15s fetch timeout for URL fetching
+5. **Frontend**: Safe JSON error handling in VehicleCommunityInsights, OrganizationProfile, MergeProposalsPanel, ProxyBidModal
+6. **Database**: Recreated idx_vvf_feed_rank, idx_vvf_deal_score, idx_vvf_heat_score without NULLS LAST
+7. **Materialized view**: Refreshed + ANALYZE on vehicle_valuation_feed
+8. **system-health-monitor**: Fixed thumbnail_url → primary_image_url column name
+9. **get_vehicle_profile_data RPC**: 74x speedup (1.1s → 15ms) by selecting only needed image columns (1.5MB → 301KB payload)
+10. **Database**: Added idx_auction_comments_vehicle_source composite index
+11. **extract-specialty-builder**: Added ICON 4x4, Ring Brothers configs; direct fetch preference
+12. **process-import-queue**: Added routing for Barrett-Jackson, Broad Arrow, GAA, Bonhams, RM Sotheby's, Gooding, specialty builders
+13. **classify-pending-businesses**: Added --use-only-current-db-types safety flag
+14. **vehicle_research_items**: Created missing table with RLS policies
 
-### Integration Testing Agent (COMPLETED - this session)
-- **Focus**: MCP server + API integration testing, auth testing, edge cases, rate limits
-- **Files**: supabase/functions/universal-search/**, supabase/functions/api-v1-vehicles/**, supabase/functions/compute-vehicle-valuation/**
-- **Status**: DONE - 45 tests executed, 2 bugs fixed and deployed, full report at /INTEGRATION_TEST_REPORT.md
-- **Fixes**: api-v1-vehicles pagination validation, universal-search input sanitization
-- **Commits**: 9de68f655 (pushed to main)
+### Commits pushed:
+- `f6fb2f1b4` — fix: handle AbortError in health monitor + fix feed index for 70,000x speedup
+- `86ed474f7` — fix: valuation fallback for missing comps, API JSON parsing, frontend error handling
+- `9714502b6` — fix: add 15s fetch timeout to extract-vehicle-data-ai URL fetching
+- `063fad22b` — fix: correct column name in health monitor data quality check
+- `484a85c6d` — feat: add specialty builder configs, import queue routing, classification safety
+- `612c593bc` — perf: optimize vehicle profile RPC — 74x faster (1.1s → 15ms)
+
+### Valuation backfill progress:
+- Start: 475,421 nuke_estimates
+- Current: ~479,654+ (multiple batches completed, another running)
+- Remaining: ~313,000
+- Success rate: 95-97% per batch
+
+### System health:
+- Status: "degraded" (import queue 34K pending, extraction rate below avg, 96% missing images)
+- Feed performance: 71ms (was timing out at 7s+)
+- Vehicle page RPC: 15ms (was 1.1-1.6s)
+- All critical functions operational
 
 ---
 
