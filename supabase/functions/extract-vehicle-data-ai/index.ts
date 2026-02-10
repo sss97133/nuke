@@ -377,6 +377,10 @@ serve(async (req) => {
           existing = data
         }
 
+        // Derive domain slug for discovery_source (e.g. "barrett-jackson" from "www.barrett-jackson.com")
+        let domainSlug = 'ai_extraction'
+        try { domainSlug = new URL(url).hostname.replace(/^www\./, '').replace(/\.com$|\.org$|\.net$|\.co\.uk$/,''); } catch {}
+
         const vehiclePayload: Record<string, any> = {
           year: normalized.year,
           make: normalized.make,
@@ -395,6 +399,7 @@ serve(async (req) => {
           asking_price: normalized.price || null,
           description: normalized.description?.slice(0, 5000) || null,
           discovery_url: url,
+          discovery_source: source || domainSlug,
           profile_origin: source || 'ai_extraction',
           extractor_version: 'extract-vehicle-data-ai:1.0',
           status: 'active',
