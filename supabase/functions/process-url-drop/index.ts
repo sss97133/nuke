@@ -1173,7 +1173,7 @@ async function processBaTListingURL(url: string, supabase: any) {
   const { data: existing } = await supabase
     .from('vehicles')
     .select('id')
-    .or(`listing_url.eq.${url},discovery_url.eq.${url},bat_auction_url.eq.${url}`)
+    .or(`listing_url.eq."${url}",discovery_url.eq."${url}",bat_auction_url.eq."${url}"`)
     .maybeSingle();
 
   if (existing) {
