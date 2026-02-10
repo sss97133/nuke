@@ -108,14 +108,14 @@ async function checkImportQueue(
     // Pending items
     const { count: pendingCount } = await supabase
       .from("import_queue")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "estimated", head: true })
       .eq("status", "pending");
 
     // Stuck jobs: status = 'processing' AND updated_at < now() - 30 min
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const { count: stuckCount } = await supabase
       .from("import_queue")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "estimated", head: true })
       .eq("status", "processing")
       .lt("updated_at", thirtyMinAgo);
 
@@ -252,11 +252,11 @@ async function checkExtractionRate(
     const [last24hRes, last7dRes] = await Promise.all([
       supabase
         .from("vehicles")
-        .select("id", { count: "exact", head: true })
+        .select("id", { count: "estimated", head: true })
         .gte("created_at", oneDayAgo),
       supabase
         .from("vehicles")
-        .select("id", { count: "exact", head: true })
+        .select("id", { count: "estimated", head: true })
         .gte("created_at", sevenDaysAgo),
     ]);
 
@@ -308,7 +308,7 @@ async function checkDataQuality(
     // Count recent vehicles
     const { count: recentTotal } = await supabase
       .from("vehicles")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "estimated", head: true })
       .gte("created_at", sevenDaysAgo);
 
     const total = recentTotal ?? 0;
@@ -327,7 +327,7 @@ async function checkDataQuality(
     // We check by looking for vehicles WITHOUT images
     const { count: withoutImagesCount } = await supabase
       .from("vehicles")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "estimated", head: true })
       .gte("created_at", sevenDaysAgo)
       .is("primary_image_url", null);
 
@@ -335,17 +335,17 @@ async function checkDataQuality(
     const [noYearRes, noMakeRes, noModelRes] = await Promise.all([
       supabase
         .from("vehicles")
-        .select("id", { count: "exact", head: true })
+        .select("id", { count: "estimated", head: true })
         .gte("created_at", sevenDaysAgo)
         .is("year", null),
       supabase
         .from("vehicles")
-        .select("id", { count: "exact", head: true })
+        .select("id", { count: "estimated", head: true })
         .gte("created_at", sevenDaysAgo)
         .is("make", null),
       supabase
         .from("vehicles")
-        .select("id", { count: "exact", head: true })
+        .select("id", { count: "estimated", head: true })
         .gte("created_at", sevenDaysAgo)
         .is("model", null),
     ]);

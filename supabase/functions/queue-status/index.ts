@@ -2,7 +2,7 @@
  * Queue Status
  *
  * Returns current import queue status with processing metrics.
- * Uses count queries for accurate totals.
+ * Uses estimated counts for fast totals on large tables.
  *
  * GET /functions/v1/queue-status
  */
@@ -32,7 +32,7 @@ serve(async (req) => {
     for (const status of statuses) {
       const { count } = await supabase
         .from("import_queue")
-        .select("id", { count: "exact", head: true })
+        .select("id", { count: "estimated", head: true })
         .eq("status", status);
       statusMap[status] = count || 0;
     }
@@ -42,7 +42,7 @@ serve(async (req) => {
       .from("import_queue")
       .select("listing_url, attempts")
       .eq("status", "pending")
-      .limit(100000);
+      .limit(10000);
 
     const pendingBySource: Record<string, { pending: number; extractable: number }> = {};
     pendingItems?.forEach((item: any) => {
@@ -65,7 +65,7 @@ serve(async (req) => {
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     const { count: recentCount } = await supabase
       .from("import_queue")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "estimated", head: true })
       .eq("status", "complete")
       .gte("processed_at", sixHoursAgo);
 
@@ -94,7 +94,7 @@ serve(async (req) => {
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { count: staleLockCount } = await supabase
       .from("import_queue")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "estimated", head: true })
       .or(`status.eq.processing,and(status.eq.pending,locked_at.not.is.null)`)
       .lt("locked_at", tenMinAgo);
 
