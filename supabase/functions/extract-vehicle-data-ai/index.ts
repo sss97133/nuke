@@ -221,7 +221,11 @@ serve(async (req) => {
       // Try to extract JSON from response text
       const jsonMatch = llmResponse.content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        extractedJson = JSON.parse(jsonMatch[0]);
+        try {
+          extractedJson = JSON.parse(jsonMatch[0]);
+        } catch {
+          throw new Error('Failed to parse extracted JSON from LLM response');
+        }
       } else {
         throw new Error('Failed to parse LLM response as JSON');
       }
@@ -302,7 +306,7 @@ serve(async (req) => {
     if (normalized.vin) {
       const vinValidation = validateVin(normalized.vin)
       if (!vinValidation.valid) {
-        healthLogger.logValidationFail('vin', normalized.vin, vinValidation.errorCode!, vinValidation.errorDetails)
+        healthLogger.logValidationFail('vin', normalized.vin, vinValidation.errorCode || 'unknown', vinValidation.errorDetails)
       }
     }
     healthLogger.logField('year', normalized.year, normalized.year ? overallConfidence : 0)
@@ -399,7 +403,7 @@ serve(async (req) => {
             .single()
           if (insertErr) {
             console.error(`[extract-vehicle-data-ai] Vehicle insert failed: ${insertErr.message}`)
-          } else {
+          } else if (inserted?.id) {
             vehicleId = inserted.id
             console.log(`[extract-vehicle-data-ai] Created vehicle: ${vehicleId}`)
           }
