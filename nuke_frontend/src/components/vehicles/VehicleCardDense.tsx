@@ -125,6 +125,8 @@ interface VehicleCardDenseProps {
   minCardWidth?: number;
   /** Maximum card width in grid mode (default: 400px) */
   maxCardWidth?: number;
+  /** Disable internal hover card (when parent manages hover cards) */
+  disableHoverCard?: boolean;
 }
 
 const getTierColor = (tier: string) => {
@@ -198,6 +200,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   responsive = true,
   minCardWidth = 200,
   maxCardWidth = 400,
+  disableHoverCard = false,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [touchStart, setTouchStart] = React.useState(0);
@@ -235,6 +238,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const navigate = useNavigate();
 
   const handleMouseEnterCard = useCallback((e: React.MouseEvent) => {
+    if (disableHoverCard) return;
     // Start timer to show hover card after 400ms delay
     const rect = e.currentTarget.getBoundingClientRect();
     hoverTimeoutRef.current = setTimeout(() => {
@@ -243,7 +247,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         position: { x: rect.right + 10, y: rect.top }
       });
     }, 400);
-  }, []);
+  }, [disableHoverCard]);
 
   const handleMouseLeaveCard = useCallback(() => {
     // Cancel pending hover card
@@ -251,7 +255,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
-    // Don't hide immediately - let the hover card handle its own close
+    // Dismiss hover card after a short delay (allow moving to the hover card)
+    setTimeout(() => {
+      setHoverCard(prev => prev.visible ? { visible: false, position: { x: 0, y: 0 } } : prev);
+    }, 150);
   }, []);
 
   const handleHoverCardClose = useCallback(() => {
