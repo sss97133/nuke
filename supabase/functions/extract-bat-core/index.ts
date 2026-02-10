@@ -1992,7 +1992,7 @@ serve(async (req) => {
         const { data: existingBatListing } = await supabase
           .from("bat_listings")
           .select("id")
-          .or(`bat_listing_url.eq.${urlWithSlash},bat_listing_url.eq.${urlWithoutSlash}`)
+          .in("bat_listing_url", [urlWithSlash, urlWithoutSlash])
           .limit(1)
           .maybeSingle();
 
