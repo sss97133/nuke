@@ -80,6 +80,18 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     minDelay: 1000,
     maxDelay: 2000,
   },
+  mecum: {
+    pattern: "%mecum.com%",
+    extractor: "extract-vehicle-data-ai",
+    minDelay: 1500,
+    maxDelay: 3000,
+  },
+  barrettjackson: {
+    pattern: "%barrett-jackson.com%",
+    extractor: "extract-vehicle-data-ai",
+    minDelay: 2000,
+    maxDelay: 4000,
+  },
 };
 
 function randomDelay(minMs: number, maxMs: number): Promise<void> {
@@ -96,6 +108,8 @@ function detectSource(url: string): string | null {
   if (url.includes("hagerty.com")) return "hagerty";
   if (url.includes("classic.com")) return "classic";
   if (url.includes("barnfinds.com")) return "barnfinds";
+  if (url.includes("mecum.com")) return "mecum";
+  if (url.includes("barrett-jackson.com")) return "barrettjackson";
   return null;
 }
 
