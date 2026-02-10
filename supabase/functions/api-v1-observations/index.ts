@@ -75,7 +75,7 @@ serve(async (req) => {
           id, vehicle_id, source_id, kind,
           observed_at, structured_data, confidence,
           created_at
-        `, { count: "exact" });
+        `, { count: "estimated" });
 
       if (vehicleId) {
         query = query.eq("vehicle_id", vehicleId);
