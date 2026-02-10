@@ -218,44 +218,74 @@ serve(async (req) => {
     // Parallel searches
     const searches: Promise<void>[] = [];
 
-    // --- VEHICLES ---
+    // --- VEHICLES (full-text search with ts_rank) ---
     if (allowedTypes.includes('vehicle')) {
       searches.push((async () => {
-        // Check if query looks like "year make" or "make model"
-        const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
-        const words = tokens;
+        const vehicleLimit = Math.ceil(limit / 2);
 
-        let vehicleQuery = supabase
-          .from('vehicles')
-          .select('id, year, make, model, vin, status, sale_price, current_value')
-          .eq('is_public', true);
+        // Convert query to tsquery format: "BMW M3 E30" → "BMW & M3 & E30"
+        const tsqueryTerms = tokens.map(t => t.replace(/[^a-zA-Z0-9]/g, '')).filter(t => t.length > 0);
+        const tsqueryStr = tsqueryTerms.join(' & ');
 
-        if (yearMatch) {
-          // Query is "1965 mustang" pattern
-          const year = parseInt(yearMatch[1]);
-          const rest = yearMatch[2].toLowerCase();
-          vehicleQuery = vehicleQuery
-            .eq('year', year)
-            .or(`make.ilike.%${escapeIlike(rest)}%,model.ilike.%${escapeIlike(rest)}%`);
-        } else if (words.length >= 2) {
-          // Multiple words: search make AND model
-          const makePattern = `%${escapeIlike(words[0])}%`;
-          const modelPattern = `%${escapeIlike(words.slice(1).join(' '))}%`;
-          vehicleQuery = vehicleQuery.or(
-            `make.ilike.${makePattern},model.ilike.${makePattern},` +
-            `make.ilike.${modelPattern},model.ilike.${modelPattern}`
-          );
-        } else {
-          // Single word: search make or model
-          vehicleQuery = vehicleQuery.or(
-            `make.ilike.${searchPattern},model.ilike.${searchPattern}`
-          );
+        let vehicles: any[] = [];
+
+        // Try full-text search first (uses GIN index on search_vector)
+        if (tsqueryStr) {
+          const { data: ftsResults, error: ftsError } = await supabase
+            .rpc('search_vehicles_fts', {
+              query_text: tsqueryStr,
+              limit_count: vehicleLimit
+            });
+
+          if (!ftsError && ftsResults?.length) {
+            vehicles = ftsResults;
+          } else {
+            // Fallback: use direct textSearch filter on search_vector
+            // This works even if the RPC has schema issues
+            const { data: directResults } = await supabase
+              .from('vehicles')
+              .select('id, year, make, model, vin, status, sale_price, current_value')
+              .eq('is_public', true)
+              .textSearch('search_vector', tsqueryStr, { type: 'plain', config: 'english' })
+              .limit(vehicleLimit);
+
+            if (directResults?.length) {
+              vehicles = directResults;
+            }
+          }
         }
 
-        const { data: vehicles } = await vehicleQuery.limit(Math.ceil(limit / 2));
+        // If full-text search returned nothing, fallback to ILIKE (catches partial matches)
+        if (!vehicles.length) {
+          const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
+          let vehicleQuery = supabase
+            .from('vehicles')
+            .select('id, year, make, model, vin, status, sale_price, current_value')
+            .eq('is_public', true);
+
+          if (yearMatch) {
+            const year = parseInt(yearMatch[1]);
+            const rest = yearMatch[2].toLowerCase();
+            vehicleQuery = vehicleQuery
+              .eq('year', year)
+              .or(`make.ilike.%${escapeIlike(rest)}%,model.ilike.%${escapeIlike(rest)}%`);
+          } else if (tokens.length >= 2) {
+            // Require BOTH make AND model to match (not OR)
+            vehicleQuery = vehicleQuery
+              .ilike('make', `%${escapeIlike(tokens[0])}%`)
+              .ilike('model', `%${escapeIlike(tokens.slice(1).join(' '))}%`);
+          } else {
+            vehicleQuery = vehicleQuery.or(
+              `make.ilike.${searchPattern},model.ilike.${searchPattern}`
+            );
+          }
+
+          const { data: fallbackResults } = await vehicleQuery.limit(vehicleLimit);
+          if (fallbackResults?.length) vehicles = fallbackResults;
+        }
 
         if (vehicles?.length) {
-          const vehicleIds = vehicles.map(v => v.id);
+          const vehicleIds = vehicles.map((v: any) => v.id);
           const { data: images } = await supabase
             .from('vehicle_images')
             .select('vehicle_id, image_url, is_primary')
@@ -269,15 +299,24 @@ serve(async (req) => {
             }
           }
 
+          // Deduplicate by year+make+model to prevent showing identical vehicles
+          const seen = new Set<string>();
+
           for (const v of vehicles) {
+            const dedupeKey = `${v.year}|${(v.make||'').toLowerCase()}|${(v.model||'').toLowerCase()}`;
+            if (seen.has(dedupeKey)) continue;
+            seen.add(dedupeKey);
+
             const titleLower = `${v.year} ${v.make} ${v.model}`.toLowerCase();
             const queryLower = trimmedQuery.toLowerCase();
 
-            // Score: exact match > starts with > contains
-            let score = 0.5;
-            if (titleLower === queryLower) score = 1.0;
-            else if (titleLower.startsWith(queryLower)) score = 0.9;
-            else if (v.make?.toLowerCase() === queryLower || v.model?.toLowerCase() === queryLower) score = 0.85;
+            // Score based on match quality
+            let score = v.relevance || 0.5; // Use ts_rank if available
+            if (titleLower === queryLower) score = Math.max(score, 1.0);
+            else if (titleLower.startsWith(queryLower)) score = Math.max(score, 0.9);
+            else if (v.make?.toLowerCase() === queryLower || v.model?.toLowerCase() === queryLower) score = Math.max(score, 0.85);
+            // Boost score if ALL search terms appear in the title
+            else if (tsqueryTerms.every(t => titleLower.includes(t.toLowerCase()))) score = Math.max(score, 0.8);
 
             const price = v.sale_price || v.current_value;
             results.push({
