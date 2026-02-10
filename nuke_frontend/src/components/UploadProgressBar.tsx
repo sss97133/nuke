@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { uploadManager, type UploadTask } from '../services/uploadManager';
-import type { X, Pause, Play, ChevronUp, ChevronDown, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Pause, Play, ChevronUp, ChevronDown, CheckCircle, AlertCircle } from 'lucide-react';
 
 export const UploadProgressBar: React.FC = () => {
   const [uploads, setUploads] = useState<UploadTask[]>([]);
