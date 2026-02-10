@@ -154,7 +154,7 @@ async function getQueueHealth(supabase: any): Promise<QueueHealth> {
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const oldestPendingHours = oldestPending
     ? (Date.now() - new Date(oldestPending.created_at).getTime()) / (1000 * 60 * 60)
@@ -319,6 +319,7 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
           source: "all",
           continuous: false, // Just do one batch to get things moving
         }),
+        signal: AbortSignal.timeout(15_000), // Don't wait for full processing
       });
 
       if (response.ok) {
