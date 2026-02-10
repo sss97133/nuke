@@ -90,6 +90,7 @@ serve(async (req) => {
             'Accept-Language': 'en-US,en;q=0.5',
           },
           redirect: 'follow',
+          signal: AbortSignal.timeout(15000),
         })
         if (fetchRes.ok) {
           rawHtml = await fetchRes.text()
