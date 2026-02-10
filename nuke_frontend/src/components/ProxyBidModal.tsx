@@ -200,9 +200,14 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
         }
       );
 
-      const depositResult = await depositResponse.json();
+      let depositResult: any;
+      try {
+        depositResult = await depositResponse.json();
+      } catch {
+        throw new Error('Failed to process deposit response');
+      }
 
-      if (!depositResult.success) {
+      if (!depositResponse.ok || !depositResult.success) {
         // If deposit authorization fails, update the bid request status
         await supabase
           .from('proxy_bid_requests')

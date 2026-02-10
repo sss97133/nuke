@@ -153,8 +153,12 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Merge failed');
+        let errorMsg = 'Merge failed';
+        try {
+          const error = await response.json();
+          errorMsg = error.message || errorMsg;
+        } catch { /* non-JSON error response */ }
+        throw new Error(errorMsg);
       }
 
       const result = await response.json();
