@@ -1021,9 +1021,9 @@ serve(async (req) => {
           events.push({
             vehicle_id: targetVehicleId,
             event_type: 'auction_sold',
-            event_date: extracted.auction_end.split('T')[0],
-            title: `Sold for $${extracted.sale_price.toLocaleString()}`,
-            description: `Won by @${extracted.buyer_username || 'unknown'} with ${extracted.bid_count} bids. ${extracted.view_count.toLocaleString()} views.`,
+            event_date: extracted.auction_end ? extracted.auction_end.split('T')[0] : new Date().toISOString().split('T')[0],
+            title: `Sold for $${extracted.sale_price?.toLocaleString() ?? '0'}`,
+            description: `Won by @${extracted.buyer_username || 'unknown'} with ${extracted.bid_count ?? 0} bids. ${extracted.view_count?.toLocaleString() ?? '0'} views.`,
             source: 'hagerty_import',
             metadata: {
               lot_number: extracted.lot_number,
@@ -1036,8 +1036,9 @@ serve(async (req) => {
         }
 
         if (events.length > 0) {
-          await supabase.from('timeline_events').insert(events);
-          console.log(`[hagerty] Created ${events.length} timeline events`);
+          const { error: tlErr } = await supabase.from('timeline_events').insert(events);
+          if (tlErr) console.error(`[hagerty] Timeline insert error: ${tlErr.message}`);
+          else console.log(`[hagerty] Created ${events.length} timeline events`);
         }
       }
     }

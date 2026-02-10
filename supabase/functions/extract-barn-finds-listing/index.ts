@@ -167,6 +167,7 @@ serve(async (req) => {
     } else {
       const { data: inserted, error: insErr } = await supabase.from("vehicles").insert(vehicleRow).select("id").single();
       if (insErr) throw new Error(insErr.message);
+      if (!inserted) throw new Error("Vehicle insert returned no data");
       finalVehicleId = inserted.id;
     }
 
