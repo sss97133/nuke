@@ -92,6 +92,18 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     minDelay: 2000,
     maxDelay: 4000,
   },
+  broadarrow: {
+    pattern: "%broadarrowauctions.com%",
+    extractor: "extract-vehicle-data-ai",
+    minDelay: 1500,
+    maxDelay: 3000,
+  },
+  ksl: {
+    pattern: "%ksl.com%",
+    extractor: "extract-vehicle-data-ai",
+    minDelay: 1000,
+    maxDelay: 2000,
+  },
 };
 
 function randomDelay(minMs: number, maxMs: number): Promise<void> {
@@ -110,6 +122,8 @@ function detectSource(url: string): string | null {
   if (url.includes("barnfinds.com")) return "barnfinds";
   if (url.includes("mecum.com")) return "mecum";
   if (url.includes("barrett-jackson.com")) return "barrettjackson";
+  if (url.includes("broadarrowauctions.com")) return "broadarrow";
+  if (url.includes("ksl.com")) return "ksl";
   return null;
 }
 
