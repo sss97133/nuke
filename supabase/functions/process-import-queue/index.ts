@@ -58,6 +58,24 @@ serve(async (req) => {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-barn-finds-listing';
         } else if (url.includes('craigslist.org')) {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-craigslist';
+        } else if (url.includes('barrett-jackson.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
+        } else if (url.includes('broadarrowauctions.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
+        } else if (url.includes('gaaclassiccars.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-gaa-classics';
+        } else if (url.includes('bhauction.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-bh-auction';
+        } else if (url.includes('bonhams.com') || url.includes('cars.bonhams.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-bonhams';
+        } else if (url.includes('rmsothebys.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-rmsothebys';
+        } else if (url.includes('goodingco.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-gooding';
+        } else if (url.includes('velocityrestorations.com') || url.includes('coolnvintage.com') || url.includes('brabus.com') || url.includes('icon4x4.com') || url.includes('ringbrothers.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-specialty-builder';
+        } else if (url.includes('vanguardmotorsales.com')) {
+          extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
         } else {
           extractorUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/extract-vehicle-data-ai';
         }

@@ -82,9 +82,29 @@ const BUILDER_CONFIGS: Record<string, BuilderConfig> = {
   },
   "coolnvintage.com": {
     name: "Cool N Vintage",
-    inventoryUrl: null,
-    needsPlaywright: true,
+    inventoryUrl: "https://coolnvintage.com/projects/",
+    needsPlaywright: false,
     specializations: ["restoration", "classic_cars"],
+    extractionRules: {
+      requiresDescription: true,
+      extractTimeline: true,
+    }
+  },
+  "icon4x4.com": {
+    name: "ICON 4x4",
+    inventoryUrl: "https://www.icon4x4.com/",
+    needsPlaywright: false,
+    specializations: ["restoration", "custom_conversion"],
+    extractionRules: {
+      requiresDescription: true,
+      extractTimeline: true,
+    }
+  },
+  "ringbrothers.com": {
+    name: "Ring Brothers",
+    inventoryUrl: "https://ringbrothers.com/builds",
+    needsPlaywright: false,
+    specializations: ["restoration", "custom_conversion"],
     extractionRules: {
       requiresDescription: true,
       extractTimeline: true,
@@ -273,15 +293,25 @@ async function extractVehicle(
  * Scrape content using Firecrawl or direct fetch
  */
 async function scrapeWithFirecrawl(url: string): Promise<any> {
-  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
+  // DIRECT FETCH FIRST - Firecrawl credits are exhausted, and most builder sites
+  // serve enough content via direct fetch for extraction
+  console.log(`[specialty-builder] Trying direct fetch first: ${url}`);
+  const directResult = await directFetch(url);
 
+  if (directResult.success && directResult.markdown && directResult.markdown.length > 500) {
+    console.log(`[specialty-builder] Direct fetch succeeded (${directResult.markdown.length} chars)`);
+    return directResult;
+  }
+
+  // Only fall back to Firecrawl if direct fetch returned too little content
+  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
   if (!firecrawlKey) {
-    console.warn("[specialty-builder] Firecrawl not configured, using direct fetch");
-    return await directFetch(url);
+    console.warn("[specialty-builder] Direct fetch insufficient and Firecrawl not configured");
+    return directResult.success ? directResult : { success: false, error: "Direct fetch failed and no Firecrawl key" };
   }
 
   try {
-    console.log(`[specialty-builder] Scraping with Firecrawl: ${url}`);
+    console.log(`[specialty-builder] Direct fetch insufficient (${directResult.markdown?.length || 0} chars), trying Firecrawl: ${url}`);
 
     const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
@@ -302,8 +332,8 @@ async function scrapeWithFirecrawl(url: string): Promise<any> {
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      console.warn(`[specialty-builder] Firecrawl failed: ${data.error}, falling back to direct fetch`);
-      return await directFetch(url);
+      console.warn(`[specialty-builder] Firecrawl also failed: ${data.error}`);
+      return directResult.success ? directResult : { success: false, error: data.error };
     }
 
     return {
@@ -314,8 +344,8 @@ async function scrapeWithFirecrawl(url: string): Promise<any> {
     };
 
   } catch (error: any) {
-    console.warn(`[specialty-builder] Firecrawl error: ${error.message}, falling back to direct fetch`);
-    return await directFetch(url);
+    console.warn(`[specialty-builder] Firecrawl error: ${error.message}`);
+    return directResult.success ? directResult : { success: false, error: error.message };
   }
 }
 
