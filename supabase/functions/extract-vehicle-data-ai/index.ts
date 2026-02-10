@@ -37,8 +37,88 @@ serve(async (req) => {
       )
     }
 
+    // Route to dedicated extractor if one exists for this domain
+    const dedicatedExtractor = getDedicatedExtractor(url)
+    if (dedicatedExtractor && !html && !textContent) {
+      console.log(`[extract-vehicle-data-ai] Routing to dedicated extractor: ${dedicatedExtractor}`)
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        const proxyRes = await fetch(`${supabaseUrl}/functions/v1/${dedicatedExtractor}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url, source }),
+        })
+        if (proxyRes.ok) {
+          const proxyData = await proxyRes.json()
+          // Different extractors use different response shapes
+          const rawResult = proxyData.data || proxyData.extracted || proxyData.vehicle || proxyData
+          // Only accept if the extractor returned meaningful data (at least year or make)
+          if (rawResult && (rawResult.year || rawResult.make || rawResult.vin)) {
+            return new Response(JSON.stringify({
+              success: true,
+              data: normalizeExtractedData(rawResult, url),
+              confidence: proxyData.confidence || 0.9,
+              source: source || dedicatedExtractor,
+              extractionMethod: 'dedicated_extractor',
+              vehicle_id: proxyData.vehicle_id || null,
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+          }
+          console.log(`[extract-vehicle-data-ai] Dedicated extractor returned empty data, falling through`)
+        }
+        console.log(`[extract-vehicle-data-ai] Dedicated extractor failed, falling through to generic`)
+      } catch (proxyErr: any) {
+        console.log(`[extract-vehicle-data-ai] Dedicated extractor error: ${proxyErr.message}`)
+      }
+    }
+
     // Prepare text content for AI analysis
-    const contentToAnalyze = textContent || extractTextFromHTML(html || '')
+    // If no html/textContent provided, fetch the URL directly
+    let rawHtml = html || ''
+    let rawText = textContent || ''
+
+    if (!rawText && !rawHtml) {
+      console.log(`[extract-vehicle-data-ai] No content provided, fetching URL: ${url}`)
+      try {
+        const fetchRes = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+          },
+          redirect: 'follow',
+        })
+        if (fetchRes.ok) {
+          rawHtml = await fetchRes.text()
+          console.log(`[extract-vehicle-data-ai] Fetched ${rawHtml.length} chars from URL`)
+        } else {
+          console.log(`[extract-vehicle-data-ai] URL fetch failed: ${fetchRes.status}`)
+        }
+      } catch (fetchErr: any) {
+        console.log(`[extract-vehicle-data-ai] URL fetch error: ${fetchErr.message}`)
+      }
+    }
+
+    // If content is still empty, try to extract from URL structure directly
+    if (!rawText && rawHtml.length < 500) {
+      const urlData = extractVehicleFromUrl(url)
+      if (urlData) {
+        console.log(`[extract-vehicle-data-ai] URL-only extraction: ${JSON.stringify(urlData)}`)
+        return new Response(JSON.stringify({
+          success: true,
+          data: normalizeExtractedData(urlData, url),
+          confidence: 0.5,
+          source: source || 'url_structure',
+          extractionMethod: 'url_parsing',
+          note: 'Extracted from URL only — page content was unavailable. Data may be incomplete.',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
+    const contentToAnalyze = rawText || extractTextFromHTML(rawHtml)
     const contentPreview = contentToAnalyze.substring(0, 30000) // Limit to 30k chars
 
     // Build AI prompt for extraction
@@ -357,6 +437,78 @@ function extractTextFromHTML(html: string): string {
   }
 
   return extracted.trim()
+}
+
+/**
+ * Map known domains to their dedicated extractor edge functions
+ */
+function getDedicatedExtractor(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '')
+    const extractorMap: Record<string, string> = {
+      'bringatrailer.com': 'bat-simple-extract',
+      'carsandbids.com': 'extract-cars-and-bids-core',
+      'hagerty.com': 'extract-hagerty-listing',
+      'pcarmarket.com': 'import-pcarmarket-listing',
+      'ebay.com': 'extract-ebay-motors',
+      'craigslist.org': 'extract-craigslist',
+      'bonhams.com': 'extract-bonhams',
+      'goodingco.com': 'extract-gooding',
+      'collectingcars.com': 'extract-collecting-cars-simple',
+      'gaaclassiccars.com': 'extract-gaa-classics',
+      'facebook.com': 'extract-facebook-marketplace',
+    }
+    // Also match subdomains (e.g., *.craigslist.org)
+    for (const [domain, extractor] of Object.entries(extractorMap)) {
+      if (hostname === domain || hostname.endsWith('.' + domain)) {
+        return extractor
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Extract structured vehicle data from URL structure when page content is unavailable
+ * e.g. "https://carsandbids.com/auctions/xxx/2004-porsche-911-gt3" → {year: 2004, make: "Porsche", model: "911", trim: "GT3"}
+ */
+function extractVehicleFromUrl(url: string): Record<string, any> | null {
+  try {
+    const parsed = new URL(url)
+    const pathname = parsed.pathname
+
+    // Try to find year-make-model-trim pattern in URL
+    // Pattern: /.../ year - make - model - trim /
+    const slugMatch = pathname.match(/(\d{4})-([\w]+-[\w+][\w-]*)\/?$/i)
+      || pathname.match(/(\d{4})[-/]([\w]+[-/][\w-]+)/i)
+    if (!slugMatch) return null
+
+    const year = parseInt(slugMatch[1])
+    if (year < 1900 || year > 2030) return null
+
+    // Split the rest into parts: "porsche-911-gt3" → ["porsche", "911", "gt3"]
+    const parts = slugMatch[2].split(/[-/]/).filter(p => p.length > 0)
+    if (parts.length < 1) return null
+
+    // Capitalize first letter of each part
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+
+    const make = cap(parts[0])
+    const model = parts.length > 1 ? parts.slice(1, 3).map(cap).join(' ') : null
+    const trim = parts.length > 3 ? parts.slice(3).map(cap).join(' ') : null
+
+    return {
+      year,
+      make,
+      model,
+      trim,
+      listing_url: url,
+    }
+  } catch {
+    return null
+  }
 }
 
 /**
