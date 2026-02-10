@@ -43,7 +43,7 @@ export class ButtonEnhancer {
     button.classList.remove('button-clicked');
 
     // Force reflow to restart animation
-    button.offsetHeight;
+    void button.offsetHeight;
 
     // Add click animation
     button.classList.add('button-clicked');

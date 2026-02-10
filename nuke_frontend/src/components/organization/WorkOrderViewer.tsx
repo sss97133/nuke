@@ -78,13 +78,13 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
     if (event.metadata?.work_performed) {
       workPerformed = JSON.parse(event.metadata.work_performed);
     }
-  } catch (e) { }
-  
+  } catch { /* ignore parse errors */ }
+
   try {
     if (event.metadata?.parts_identified) {
       partsIdentified = JSON.parse(event.metadata.parts_identified);
     }
-  } catch (e) { }
+  } catch { /* ignore parse errors */ }
   
   if (event.metadata?.description) {
     aiDescription = event.metadata.description;

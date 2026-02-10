@@ -783,7 +783,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         setValuation(v);
       } catch {
         setValuation(null);
-      } finally {
       }
     })();
   }, [vehicle?.id, initialValuation]);
