@@ -1,4 +1,4 @@
-import { supabase } from './database-audit';
+import { supabase } from '../lib/supabase';
 
 export interface TableAnalysis {
   tableName: string;

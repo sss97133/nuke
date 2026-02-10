@@ -1265,8 +1265,9 @@ serve(async (req) => {
         extractor_version: EXTRACTOR_VERSION,
       };
 
-      const { data: inserted, error } = await supabase.from("vehicles").insert(insertPayload).select("id").single();
+      const { data: inserted, error } = await supabase.from("vehicles").insert(insertPayload).select("id").maybeSingle();
       if (error) throw new Error(`vehicles insert failed: ${error.message}`);
+      if (!inserted?.id) throw new Error("vehicles insert succeeded but no ID returned");
       vehicleId = String(inserted.id);
       createdIds.push(vehicleId);
     } else {
