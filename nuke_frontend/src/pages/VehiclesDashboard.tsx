@@ -68,7 +68,7 @@ const EmptyDashboard: React.FC = () => (
       Add your first vehicle to start tracking your fleet.
     </div>
     <Link
-      to="/vehicles/add"
+      to="/vehicle/add"
       style={{
         display: 'inline-block',
         padding: '10px 20px',
@@ -211,7 +211,7 @@ const VehiclesDashboard: React.FC = () => {
         </h1>
         <div style={{ display: 'flex', gap: '8px' }}>
           <Link
-            to="/vehicles/list/legacy"
+            to="/vehicle/list/legacy"
             style={{
               padding: '6px 12px',
               fontSize: '7pt',

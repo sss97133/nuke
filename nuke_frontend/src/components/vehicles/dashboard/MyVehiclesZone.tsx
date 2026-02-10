@@ -84,7 +84,7 @@ export const MyVehiclesZone: React.FC<MyVehiclesZoneProps> = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              navigate('/vehicles/add');
+              navigate('/vehicle/add');
             }}
             style={{
               padding: '4px 8px',

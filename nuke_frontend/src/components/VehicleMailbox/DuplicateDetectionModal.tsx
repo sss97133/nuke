@@ -283,7 +283,7 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                 <h4 className="font-medium text-gray-900">Potential Duplicate</h4>
                 <a
-                  href={`/vehicles/${detection.duplicate_vehicle.id}`}
+                  href={`/vehicle/${detection.duplicate_vehicle.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:text-blue-800"

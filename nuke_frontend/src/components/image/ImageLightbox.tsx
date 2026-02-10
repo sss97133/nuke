@@ -1543,7 +1543,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               onClick={() => {
                 // If linked to another vehicle, open that vehicle profile
                 if ((tag as any).linked_vehicle_id) {
-                  window.open(`/vehicles/${(tag as any).linked_vehicle_id}`, '_blank');
+                  window.open(`/vehicle/${(tag as any).linked_vehicle_id}`, '_blank');
                 } else if (tag.tag_name || (tag as any).tag_text) {
                   setSelectedPartName(tag.tag_name || (tag as any).tag_text);
                   setClickablePartModalOpen(true);

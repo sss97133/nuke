@@ -79,7 +79,7 @@ const TimelineEventForm = () => {
       if (insertError) throw insertError;
       
       // Navigate back to vehicle detail page
-      navigate(`/vehicles/${vehicleId}`);
+      navigate(`/vehicle/${vehicleId}`);
     } catch (err) {
       console.error('Error creating timeline event:', err);
       setError('Failed to create timeline event. Please try again.');
