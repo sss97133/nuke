@@ -701,12 +701,19 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       // Execute searches in parallel (3-5 queries instead of 10)
       const searchResults = await Promise.all(essentialSearches);
 
-      // Combine and rank results
+      // Combine and rank results, deduplicating by id (keep highest relevance)
+      const dedupeMap = new Map<string, SearchResult>();
       searchResults.forEach(resultSet => {
         if (resultSet) {
-          results.push(...resultSet);
+          resultSet.forEach(result => {
+            const existing = dedupeMap.get(result.id);
+            if (!existing || result.relevance_score > existing.relevance_score) {
+              dedupeMap.set(result.id, result);
+            }
+          });
         }
       });
+      results.push(...dedupeMap.values());
 
       // Re-rank all results using advanced search service
       if (results.length > 0) {
