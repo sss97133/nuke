@@ -354,7 +354,16 @@ serve(async (req) => {
     let vehicleId: string | null = null
     let imagesInserted = 0
 
-    if (save_to_db && normalized.year && normalized.make) {
+    // Detect non-vehicle items (Mecum road art, memorabilia, etc.)
+    const nonVehiclePatterns = /\b(porcelain|neon sign|gas pump|oil can|jukebox|globe|thermometer|clock|letters|pedal car|framed|coin-operated|slot machine|pinball|quilt|coffee grinder|lot of \d|barber|lamp|phonograph|vending|gumball|scale model|diecast|poster|banner|flag|license plate display|tin sign)\b/i
+    const titleOrModel = `${normalized.title || ''} ${normalized.model || ''}`
+    const looksLikeNonVehicle = nonVehiclePatterns.test(titleOrModel) && !normalized.vin
+
+    if (looksLikeNonVehicle) {
+      console.log(`[extract-vehicle-data-ai] Skipping non-vehicle item: ${titleOrModel.slice(0, 80)}`)
+    }
+
+    if (save_to_db && normalized.year && normalized.make && !looksLikeNonVehicle) {
       try {
         // Check for existing vehicle by URL or VIN
         let existing = null
@@ -423,7 +432,7 @@ serve(async (req) => {
             .from('vehicles')
             .insert(vehiclePayload)
             .select('id')
-            .single()
+            .maybeSingle()
           if (insertErr) {
             console.error(`[extract-vehicle-data-ai] Vehicle insert failed: ${insertErr.message}`)
           } else if (inserted?.id) {
