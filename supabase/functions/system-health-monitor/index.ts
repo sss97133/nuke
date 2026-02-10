@@ -196,7 +196,7 @@ async function checkFeedPerformance(
 
     if (error) {
       // Distinguish timeout from other errors
-      const isTimeout = error.message?.includes("timeout") || error.message?.includes("cancel");
+      const isTimeout = error.message?.includes("timeout") || error.message?.includes("cancel") || error.message?.includes("abort");
       return {
         name: "feed_performance",
         status: isTimeout ? "warn" : "fail",
