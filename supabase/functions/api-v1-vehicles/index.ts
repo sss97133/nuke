@@ -151,7 +151,15 @@ serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const body: VehicleInput = await req.json();
+      let body: VehicleInput;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON in request body" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       // Validate required fields
       if (!body.year && !body.make && !body.model && !body.vin) {
@@ -198,7 +206,15 @@ serve(async (req) => {
 
     // PATCH /api/v1/vehicles/:id - Update vehicle
     if (req.method === "PATCH" && isSpecificVehicle) {
-      const body: VehicleInput = await req.json();
+      let body: VehicleInput;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON in request body" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       // Check ownership
       const { data: existing } = await supabase

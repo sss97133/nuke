@@ -506,9 +506,17 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
   }
 
   // Step 1: Base price from comparables
-  const { basePrice, compCount, method: compMethod } = await getBasePrice(supabase, vehicle);
+  let { basePrice, compCount, method: compMethod } = await getBasePrice(supabase, vehicle);
   if (basePrice <= 0) {
-    return { error: "No comparable sales data available", vehicleId };
+    // Fallback to vehicle's own price data if no comps found
+    const fallbackPrice = vehicle.sale_price || vehicle.asking_price || vehicle.current_value;
+    if (fallbackPrice && fallbackPrice > 0) {
+      basePrice = fallbackPrice;
+      compCount = 0;
+      compMethod = "self_price_fallback";
+    } else {
+      return { error: "No comparable sales data available", vehicleId };
+    }
   }
 
   // Determine price tier

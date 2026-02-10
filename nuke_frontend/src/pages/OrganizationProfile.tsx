@@ -1719,8 +1719,12 @@ export default function OrganizationProfile() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to process article');
+        let errorMsg = 'Failed to process article';
+        try {
+          const error = await response.json();
+          errorMsg = error.error || errorMsg;
+        } catch { /* non-JSON error response */ }
+        throw new Error(errorMsg);
       }
 
       const result = await response.json();

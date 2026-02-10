@@ -256,8 +256,12 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to generate insights');
+        let errorMsg = 'Failed to generate insights';
+        try {
+          const error = await response.json();
+          errorMsg = error.error || errorMsg;
+        } catch { /* non-JSON error response */ }
+        throw new Error(errorMsg);
       }
 
       setGeneratingProgress(100);
