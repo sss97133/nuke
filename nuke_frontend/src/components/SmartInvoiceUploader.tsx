@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { receiptExtractionService } from '../services/receiptExtractionService';
 import { receiptPersistService } from '../services/receiptPersistService';

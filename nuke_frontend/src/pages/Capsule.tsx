@@ -5,7 +5,6 @@ import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
 import ShopFinancials from './ShopFinancials';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
 import ProfessionalToolbox from '../components/profile/ProfessionalToolbox';
-import VehicleMergeInterface from '../components/vehicle/VehicleMergeInterface';
 import { ProfileVerification } from '../components/ProfileVerification';
 import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import CashBalance from '../components/trading/CashBalance';

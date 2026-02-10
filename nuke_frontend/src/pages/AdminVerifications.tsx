@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { secureDocumentService, type SecureDocument, type PIIAuditLog } from '../services/secureDocumentService';
+import { secureDocumentService, type SecureDocument } from '../services/secureDocumentService';
 import { ImageHoverPreview, IDHoverCard } from '../components/admin';
 import { FaviconIcon } from '../components/common/FaviconIcon';
 
@@ -22,7 +22,6 @@ const AdminVerifications: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [limitedView, setLimitedView] = useState<boolean>(false);
   const [signedUrlMap, setSignedUrlMap] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState<'all' | 'id' | 'title' | 'vin' | 'duplicates'>('all');
@@ -149,7 +148,7 @@ const AdminVerifications: React.FC = () => {
         
         // Hydrate user profile data for documents
         const docUserIds = Array.from(new Set((docs || []).map((d: SecureDocument) => d.user_id).filter(Boolean)));
-        let docUserMap: Record<string, any> = {};
+        const docUserMap: Record<string, any> = {};
         if (docUserIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')
@@ -186,8 +185,8 @@ const AdminVerifications: React.FC = () => {
         const shopIds = Array.from(new Set(list.map((r: any) => r.shop_id).filter(Boolean)));
         const userIds = Array.from(new Set(list.map((r: any) => r.requested_by).filter(Boolean)));
         
-        let shopMap: Record<string, any> = {};
-        let userMap: Record<string, any> = {};
+        const shopMap: Record<string, any> = {};
+        const userMap: Record<string, any> = {};
         
         if (shopIds.length > 0) {
           const { data: shops } = await supabase

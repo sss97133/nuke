@@ -1,15 +1,8 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { 
-  PhotoIcon, 
-  DocumentTextIcon, 
+import {
+  PhotoIcon,
   WrenchScrewdriverIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  MapPinIcon,
-  UserIcon,
-  SparklesIcon,
-  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 
 interface EnhancedTimelineEventData {

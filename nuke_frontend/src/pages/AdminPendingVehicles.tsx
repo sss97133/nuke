@@ -80,7 +80,7 @@ export default function AdminPendingVehicles() {
   const sourceVehicle = async (vehicleId: string) => {
     setSourcing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('analyze-and-source-pending', {
+      const { error } = await supabase.functions.invoke('analyze-and-source-pending', {
         body: { vehicle_id: vehicleId, auto_source: true }
       });
 

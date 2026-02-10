@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import EXIF from 'exif-js';
-import { visionAPI, type TitleExtractionResult } from '../api/visionAPI';
+import type { TitleExtractionResult } from '../api/visionAPI';
 import { secureDocumentService } from '../services/secureDocumentService';
 import LiveDocumentCapture from './LiveDocumentCapture';
 

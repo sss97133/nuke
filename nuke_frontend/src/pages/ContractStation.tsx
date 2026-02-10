@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import ContractBuilder from '../components/contract/ContractBuilder';
 import ContractMarketplace from '../components/contract/ContractMarketplace';
@@ -8,7 +7,6 @@ import ContractTransparency from '../components/contract/ContractTransparency';
 type TabType = 'marketplace' | 'builder' | 'my_contracts';
 
 export default function ContractStation() {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('marketplace');
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
