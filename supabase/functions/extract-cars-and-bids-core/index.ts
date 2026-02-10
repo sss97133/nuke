@@ -119,7 +119,36 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
   };
 
   try {
-    // 1. Extract from og:title meta tag
+    // Normalize non-breaking spaces in markdown (C&B uses \u00a0 extensively)
+    const md = markdown ? markdown.replace(/\u00a0/g, ' ') : null;
+
+    // 0. PRIMARY: Extract year/make/model from markdown H1 title
+    // C&B markdown always has: "# 2008 Honda S2000 CR"
+    // This is the most reliable source since Firecrawl strips <head> from React SPAs
+    if (md) {
+      const h1Match = md.match(/^# (\d{4})\s+(\S+)\s+(.+)$/m);
+      if (h1Match) {
+        result.year = parseInt(h1Match[1], 10);
+        result.make = h1Match[2].trim();
+        result.model = h1Match[3].trim();
+        result.title = `${result.year} ${result.make} ${result.model}`;
+        console.log(`✅ C&B: Extracted from H1: ${result.title}`);
+      }
+
+      // Also try Make[Honda] Model[S2000] structured links for validation
+      const makeLinkMatch = md.match(/Make\[([^\]]+)\]/);
+      const modelLinkMatch = md.match(/Model\[([^\]]+)\]/);
+      if (makeLinkMatch && !result.make) {
+        result.make = makeLinkMatch[1].trim();
+      }
+      if (modelLinkMatch && !result.model) {
+        result.model = modelLinkMatch[1].trim();
+      }
+      // If H1 model is more specific than link model, keep H1 version
+      // e.g., H1 has "S2000 CR" but link has just "S2000"
+    }
+
+    // 1. Extract from og:title meta tag (fallback - may not exist for React SPAs)
     // Format: "2008 Honda S2000 CR - ~22,500 Miles, 6-Speed Manual, Rio Yellow Pearl, Unmodified"
     const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
                         html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
@@ -127,13 +156,15 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
       const ogTitle = ogTitleMatch[1];
       console.log('✅ C&B: Found og:title:', ogTitle);
 
-      // Parse year/make/model from beginning
-      const ymmMatch = ogTitle.match(/^(\d{4})\s+(\S+)\s+([^-]+)/);
-      if (ymmMatch) {
-        result.year = parseInt(ymmMatch[1], 10);
-        result.make = ymmMatch[2].trim();
-        result.model = ymmMatch[3].trim();
-        result.title = `${result.year} ${result.make} ${result.model}`;
+      // Parse year/make/model from beginning (only if not already set from markdown)
+      if (!result.year || !result.make) {
+        const ymmMatch = ogTitle.match(/^(\d{4})\s+(\S+)\s+([^-]+)/);
+        if (ymmMatch) {
+          result.year = parseInt(ymmMatch[1], 10);
+          result.make = ymmMatch[2].trim();
+          result.model = ymmMatch[3].trim();
+          result.title = `${result.year} ${result.make} ${result.model}`;
+        }
       }
 
       // Parse mileage from "~22,500 Miles" or "22,500 Miles"
@@ -173,20 +204,21 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
 
     // 2a. Extract structured data from markdown (C&B renders these as key-value pairs)
     // Format: "Mileage21,800" or "VIN1G1YB2D42N5117572" etc.
-    if (markdown) {
+    // NOTE: we use `md` (normalized) instead of `markdown` (raw) throughout
+    if (md) {
       console.log('✅ C&B: Parsing structured data from markdown');
 
       // VIN - 17 characters for post-1980, 11-14 for older vehicles
       // C&B format is "VIN1G1YB2D42N5117572Title" - VIN followed immediately by "Title"
-      const mdVinMatch = markdown.match(/VIN([A-HJ-NPR-Z0-9]{17})(?:Title|[^A-Za-z0-9]|$)/i) ||
-                         markdown.match(/VIN([A-HJ-NPR-Z0-9]{11,17})(?:Title|[^A-Za-z0-9]|$)/i);
+      const mdVinMatch = md.match(/VIN([A-HJ-NPR-Z0-9]{17})(?:Title|[^A-Za-z0-9]|$)/i) ||
+                         md.match(/VIN([A-HJ-NPR-Z0-9]{11,17})(?:Title|[^A-Za-z0-9]|$)/i);
       if (mdVinMatch && !result.vin) {
         result.vin = mdVinMatch[1].toUpperCase();
         console.log('✅ C&B: Found VIN in markdown:', result.vin);
       }
 
-      // Mileage - "Mileage21,800" or "Mileage~21,800"
-      const mdMileageMatch = markdown.match(/Mileage~?([\d,]+)/i);
+      // Mileage - "Mileage21,800" or "Mileage~21,800" or "SaveMileage55,000"
+      const mdMileageMatch = md.match(/(?:Save)?Mileage~?([\d,]+)/i);
       if (mdMileageMatch && !result.mileage) {
         const m = parseInt(mdMileageMatch[1].replace(/,/g, ''), 10);
         if (Number.isFinite(m)) {
@@ -196,35 +228,37 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
       }
 
       // Exterior Color - "Exterior ColorCeramic Matrix Gray"
-      const mdExtColorMatch = markdown.match(/Exterior\s*Color([A-Za-z0-9\s]+?)(?:Interior|Seller|Engine|Drivetrain|Transmission|Body|Location|\n|$)/i);
+      const mdExtColorMatch = md.match(/Exterior\s*Color([A-Za-z0-9\s]+?)(?:Interior|Seller|Engine|Drivetrain|Transmission|Body|Location|\n|$)/i);
       if (mdExtColorMatch && !result.exteriorColor) {
         result.exteriorColor = mdExtColorMatch[1].trim();
         console.log('✅ C&B: Found exterior color in markdown:', result.exteriorColor);
       }
 
-      // Interior Color - "Interior ColorAdrenaline Red"
-      const mdIntColorMatch = markdown.match(/Interior\s*Color([A-Za-z0-9\s]+?)(?:Seller|Engine|Drivetrain|Transmission|Body|Location|\n|$)/i);
+      // Interior Color - "Interior ColorAdrenaline Red" or "Interior ColorBlack/Yellow"
+      const mdIntColorMatch = md.match(/Interior\s*Color([A-Za-z0-9/\-\s]+?)(?:Seller|Engine|Drivetrain|Transmission|Body|Location|\n|$)/i);
       if (mdIntColorMatch && !result.interiorColor) {
         result.interiorColor = mdIntColorMatch[1].trim();
         console.log('✅ C&B: Found interior color in markdown:', result.interiorColor);
       }
 
       // Transmission - "TransmissionAutomatic (8-Speed)" or "TransmissionManual (6-Speed)"
-      const mdTransMatch = markdown.match(/Transmission((?:Automatic|Manual)(?:\s*\([^)]+\))?)/i);
+      const mdTransMatch = md.match(/Transmission((?:Automatic|Manual)(?:\s*\([^)]+\))?)/i);
       if (mdTransMatch && !result.transmission) {
         result.transmission = mdTransMatch[1].trim();
         console.log('✅ C&B: Found transmission in markdown:', result.transmission);
       }
 
-      // Engine - "Engine6.2L Turbocharged V8"
-      const mdEngineMatch = markdown.match(/Engine([^\n]+?)(?:Drivetrain|Transmission|Body|Exterior|Interior|Seller|$)/i);
+      // Engine - "Engine6.2L Turbocharged V8" or "ContactEngine2.2L I4" (Contact prefix from seller section)
+      const mdEngineMatch = md.match(/(?:Contact)?Engine([^\n]+?)(?:Drivetrain|Transmission|Body|Exterior|Interior|Seller|$)/i);
       if (mdEngineMatch && !result.engine) {
         result.engine = mdEngineMatch[1].trim();
         console.log('✅ C&B: Found engine in markdown:', result.engine);
       }
 
-      // Bid/Sale price - "Bid to $61,000" or "Sold for $XX,XXX"
-      const mdBidMatch = markdown.match(/(?:Bid to|Sold for|High Bid|Final Bid)\s*\$?([\d,]+)/i);
+      // Bid/Sale price - "Bid to $61,000" or "Sold for $XX,XXX" or "High Bid$52,000"
+      // Note: C&B markdown may have non-breaking space (\u00a0) between "High" and "Bid"
+      // which is already normalized to regular space by the md variable
+      const mdBidMatch = md.match(/(?:Bid\s*to|Sold\s*for|High\s*Bid|Final\s*Bid)\s*\$?([\d,]+)/i);
       if (mdBidMatch && !result.currentBid) {
         const bid = parseInt(mdBidMatch[1].replace(/,/g, ''), 10);
         if (Number.isFinite(bid) && bid > 0) {
@@ -234,44 +268,63 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
       }
 
       // Location - "Location[Canyon, TX 79015]" or "LocationCanyon, TX"
-      const mdLocationMatch = markdown.match(/Location\[?([A-Za-z0-9,\s]+?)(?:\]|\n|Seller|$)/i);
+      const mdLocationMatch = md.match(/Location\[([^\]]+)\]/i) ||
+                              md.match(/Location([A-Za-z0-9,\s]+?)(?:\n|Seller|$)/i);
       if (mdLocationMatch && !result.location) {
         result.location = mdLocationMatch[1].trim();
         console.log('✅ C&B: Found location in markdown:', result.location);
       }
 
+      // Seller name - "[CARWOWMIAMI](link)" after Seller section
+      const mdSellerMatch = md.match(/Seller[\s\S]*?\[([A-Za-z0-9_-]+)\]\(https:\/\/carsandbids\.com\/user\//i);
+      if (mdSellerMatch && !result.sellerName) {
+        result.sellerName = mdSellerMatch[1].trim();
+        console.log('✅ C&B: Found seller name in markdown:', result.sellerName);
+      }
+
+      // Seller type - "Seller TypeDealer ($199 Documentation Fee)" or "Seller TypePrivate Party"
+      const mdSellerTypeMatch = md.match(/Seller\s*Type([^\n]+?)(?:####|$)/i);
+      if (mdSellerTypeMatch) {
+        const sellerType = mdSellerTypeMatch[1].trim();
+        if (sellerType.toLowerCase().includes('dealer')) {
+          result.sellerId = 'dealer';
+        } else if (sellerType.toLowerCase().includes('private')) {
+          result.sellerId = 'private';
+        }
+      }
+
       // Auction status - check for ended/sold indicators
-      if (markdown.includes('Auction Ended') || markdown.includes('This auction has ended')) {
+      if (md.includes('Auction Ended') || md.includes('This auction has ended')) {
         result.auctionStatus = 'ended';
-      } else if (markdown.includes('Reserve Not Met')) {
+      } else if (md.includes('Reserve Not Met')) {
         result.auctionStatus = 'reserve_not_met';
-      } else if (markdown.includes('Sold for')) {
+      } else if (md.includes('Sold for')) {
         result.auctionStatus = 'sold';
       }
 
       // C&B Specific: Doug's Take
-      const dougsTakeMatch = markdown.match(/Doug['']s Take\s*([\s\S]*?)(?:####\s*Highlights|####\s*Equipment|$)/i);
+      const dougsTakeMatch = md.match(/Doug[''\u2019]s Take\s*([\s\S]*?)(?:####\s*Highlights|####\s*Equipment|$)/i);
       if (dougsTakeMatch && dougsTakeMatch[1]) {
         result.dougsTake = dougsTakeMatch[1].trim().slice(0, 5000);
         console.log('✅ C&B: Found Doug\'s Take:', result.dougsTake.slice(0, 100) + '...');
       }
 
       // C&B Specific: Highlights
-      const highlightsMatch = markdown.match(/####\s*Highlights\s*([\s\S]*?)(?:####\s*Equipment|####\s*Modifications|$)/i);
+      const highlightsMatch = md.match(/####\s*Highlights\s*([\s\S]*?)(?:####\s*Equipment|####\s*Modifications|$)/i);
       if (highlightsMatch && highlightsMatch[1]) {
         result.highlights = highlightsMatch[1].trim().slice(0, 8000);
         console.log('✅ C&B: Found Highlights section');
       }
 
       // C&B Specific: Equipment
-      const equipmentMatch = markdown.match(/####\s*Equipment\s*([\s\S]*?)(?:####\s*Modifications|####\s*Known Flaws|####\s*Recent Service|$)/i);
+      const equipmentMatch = md.match(/####\s*Equipment\s*([\s\S]*?)(?:####\s*Modifications|####\s*Known Flaws|####\s*Recent Service|$)/i);
       if (equipmentMatch && equipmentMatch[1]) {
         result.equipment = equipmentMatch[1].trim().slice(0, 5000);
         console.log('✅ C&B: Found Equipment section');
       }
 
       // C&B Specific: Comment count - "Comments37" or "37 comments"
-      const commentCountMatch = markdown.match(/Comments?(\d+)/i) || markdown.match(/(\d+)\s*comments?/i);
+      const commentCountMatch = md.match(/Comments?(\d+)/i) || md.match(/(\d+)\s*comments?/i);
       if (commentCountMatch) {
         const count = parseInt(commentCountMatch[1], 10);
         if (Number.isFinite(count)) {
@@ -281,7 +334,7 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
       }
 
       // C&B Specific: Bid count - "Bids22" or "22 bids"
-      const bidCountMatch = markdown.match(/Bids?(\d+)/i) || markdown.match(/(\d+)\s*bids?/i);
+      const bidCountMatch = md.match(/Bids?(\d+)/i) || md.match(/(\d+)\s*bids?/i);
       if (bidCountMatch) {
         const count = parseInt(bidCountMatch[1], 10);
         if (Number.isFinite(count)) {
@@ -346,8 +399,10 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
     }
 
     // Also extract images from markdown if provided (markdown often captures images better)
-    if (markdown) {
-      const mdImageMatches = markdown.matchAll(/!\[[^\]]*\]\((https:\/\/media\.carsandbids\.com[^)]+)\)/gi);
+    // For React SPAs like C&B, markdown is often the PRIMARY source of images
+    if (md) {
+      // Markdown image syntax: ![alt](url)
+      const mdImageMatches = md.matchAll(/!\[[^\]]*\]\((https:\/\/media\.carsandbids\.com[^)]+)\)/gi);
       for (const match of mdImageMatches) {
         const imgUrl = match[1].split('?')[0];
         if (!seenImages.has(imgUrl) && !imgUrl.includes('width=80') && !imgUrl.includes('_thumb')) {
@@ -355,8 +410,8 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
           result.images.push(match[1]);
         }
       }
-      // Also try plain URLs in markdown
-      const mdUrlMatches = markdown.matchAll(/https:\/\/media\.carsandbids\.com[^\s\)]+\.(jpg|jpeg|png|webp)/gi);
+      // Also try plain URLs in markdown (not wrapped in image syntax)
+      const mdUrlMatches = md.matchAll(/https:\/\/media\.carsandbids\.com[^\s\)]+\.(jpg|jpeg|png|webp)[^\s\)]*/gi);
       for (const match of mdUrlMatches) {
         const imgUrl = match[0].split('?')[0];
         if (!seenImages.has(imgUrl) && !imgUrl.includes('width=80') && !imgUrl.includes('_thumb')) {
@@ -366,7 +421,7 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
       }
     }
 
-    console.log(`✅ C&B: Found ${result.images.length} images from HTML${markdown ? ' and markdown' : ''}`);
+    console.log(`✅ C&B: Found ${result.images.length} images from HTML${md ? ' and markdown' : ''}`);
     if (result.images.length === 0) {
       // Debug: log a sample of the HTML to see what's there
       console.log('⚠️ C&B: No images found. HTML sample (first 500 chars):', html.slice(0, 500));
