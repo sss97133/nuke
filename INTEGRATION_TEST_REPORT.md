@@ -10,9 +10,11 @@
 
 - **45 tests executed** across 6 MCP tools and 4 edge functions
 - **6 issues found** (2 critical, 2 medium, 2 low)
+- **2 issues fixed and deployed** (M1: pagination validation, L1: search input sanitization)
 - **3 slow endpoints** flagged (>5s response time)
 - **No SQL injection vulnerability** -- Supabase parameterized queries + WAF protect against injection
 - **Auth gap**: 3 of 4 edge functions work without authentication (by design for `--no-verify-jwt` deployment, but important to document)
+- **Commit**: 9de68f655 (pushed to main)
 
 ---
 
@@ -199,10 +201,12 @@ All run in parallel via `Promise.all`, but the ILIKE searches on large tables wi
 
 ### MEDIUM
 
-**M1: API pagination crashes on negative values**
+**M1: API pagination crashes on negative values** -- FIXED
 - **Impact**: page=-1 or limit=-1 returns 500 Internal Server Error
 - **Root cause**: No input validation on page/limit before passing to Supabase `.range()` which throws on negative offsets
-- **Fix**: Add `Math.max(1, page)` and `Math.max(1, limit)` validation
+- **Fix applied**: Added `Math.max(1, isNaN(rawPage) ? 1 : rawPage)` and similar for limit. NaN values default gracefully.
+- **Deployed**: `supabase functions deploy api-v1-vehicles --no-verify-jwt`
+- **Verified**: page=-1 now returns page=1, limit=-1 returns limit=1, limit=NaN returns limit=20
 - **File**: `/Users/skylar/nuke/supabase/functions/api-v1-vehicles/index.ts`
 
 **M2: Valuation returns 200+success:true for errors**
@@ -212,10 +216,14 @@ All run in parallel via `Promise.all`, but the ILIKE searches on large tables wi
 
 ### LOW
 
-**L1: Missing input validation on universal-search**
+**L1: Missing input validation on universal-search** -- FIXED
 - **Impact**: Passing a number instead of string for `query` crashes with "query.trim is not a function"; missing `query` crashes with "Cannot read properties of undefined"
 - **Root cause**: No type checking before calling `.trim()` on query
-- **Note**: The Edge Function Health Agent has already deployed a fix that validates empty strings, but number/missing validation may still need work
+- **Fixes applied**:
+  - Edge Function Health Agent: Added `typeof query !== 'string'` check (already deployed)
+  - Integration Testing Agent: Added query length cap (500 chars) and limit sanitization (1-100 range)
+- **Deployed**: `supabase functions deploy universal-search --no-verify-jwt`
+- **Verified**: Number queries return 400, long strings are truncated, negative limits default to 1
 - **File**: `/Users/skylar/nuke/supabase/functions/universal-search/index.ts`
 
 **L2: Cloudinary image URLs fail in identify_vehicle_image**
