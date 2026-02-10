@@ -58,6 +58,8 @@ function normalizeUrl(raw: string): string {
     const u = new URL(raw);
     u.hash = '';
     u.search = '';
+    // Normalize www prefix for consistent matching
+    u.hostname = u.hostname.replace(/^www\./, '');
     return u.toString();
   } catch {
     return String(raw).split('#')[0].split('?')[0];
