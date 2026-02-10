@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import type { X, Save, AlertCircle, ChevronDown, ChevronUp, Wand2, Upload, FileText, Plus } from 'lucide-react';
+import { FileText, Plus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import type { useAuth } from '../../hooks/useAuth';
-import type { BulkImageUploader } from './BulkImageUploader';
+import { useAuth } from '../../hooks/useAuth';
 import type { VehicleSpecService } from '../../services/vehicleSpecService';
 
 interface VehicleDataEditorProps {

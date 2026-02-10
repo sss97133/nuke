@@ -1,6 +1,6 @@
 import React from 'react';
 import ErrorBoundary from '../ErrorBoundary';
-import type { Car, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Car, AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface VehicleErrorBoundaryProps {
   children: React.ReactNode;

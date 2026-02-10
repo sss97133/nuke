@@ -5,7 +5,7 @@
  * Keeps UI features for batch EXIF preview and category inference.
  */
 import React, { useState, useCallback, useRef } from 'react';
-import type { Upload, X, Image, MapPin, Calendar, Info, Loader2 } from 'lucide-react';
+import { Upload, X, Image, MapPin, Calendar, Info, Loader2 } from 'lucide-react';
 import type { ImageExifService } from '../../services/imageExifServiceStub';
 import { ImageUploadService } from '../../services/imageUploadService';
 import { processBulkUpload, type BulkUploadResult } from '../../services/duplicateDetectionService';
