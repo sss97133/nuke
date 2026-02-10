@@ -358,7 +358,7 @@ serve(async (req) => {
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, username, full_name, avatar_url, bio')
-          .or(`username.ilike.${searchPattern},full_name.ilike.${searchPattern}`)
+          .or(`username.ilike."${searchPattern}",full_name.ilike."${searchPattern}"`)
           .limit(Math.ceil(sanitizedLimit / 4));
 
         for (const p of profiles || []) {
@@ -390,7 +390,7 @@ serve(async (req) => {
         const { data: identities } = await supabase
           .from('external_identities')
           .select('id, username, display_name, platform, profile_url, avatar_url')
-          .or(`username.ilike.${searchPattern},display_name.ilike.${searchPattern}`)
+          .or(`username.ilike."${searchPattern}",display_name.ilike."${searchPattern}"`)
           .limit(Math.ceil(sanitizedLimit / 4));
 
         for (const ei of identities || []) {

@@ -597,7 +597,7 @@ async function syncToDatabase(
     .from("vehicles")
     .select("id, listing_url, bat_auction_url, auction_status, auction_end_date")
     .eq("auction_status", "active")
-    .or(`listing_url.ilike.%${urlPattern}%,bat_auction_url.ilike.%${urlPattern}%`);
+    .or(`listing_url.ilike."%${urlPattern}%",bat_auction_url.ilike."%${urlPattern}%"`);
 
   // Get URL from either listing_url or bat_auction_url
   const getVehicleUrl = (v: { listing_url?: string | null; bat_auction_url?: string | null }) =>
@@ -661,7 +661,7 @@ async function syncToDatabase(
       const { error } = await supabase
         .from("vehicles")
         .update(vehicleData)
-        .or(`listing_url.eq.${auction.url},bat_auction_url.eq.${auction.url}`);
+        .or(`listing_url.eq."${auction.url}",bat_auction_url.eq."${auction.url}"`);
 
       if (!error) {
         stats.updated_count++;

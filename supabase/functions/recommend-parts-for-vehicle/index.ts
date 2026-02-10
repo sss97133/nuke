@@ -127,7 +127,7 @@ Return JSON:
             const { data: catalogMatches } = await supabase
               .from('catalog_parts')
               .select('id, part_number, name, price_current, category')
-              .or(`name.ilike.%${part.part_name}%,part_number.eq.${part.oem_part_number}`)
+              .or(`name.ilike."%${part.part_name}%",part_number.eq."${part.oem_part_number}"`)
               .limit(3)
 
             recommendations.push({

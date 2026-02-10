@@ -46,7 +46,7 @@ serve(async (req) => {
       const { data: userObs } = await supabase
         .from("vehicle_observations")
         .select("kind, structured_data, vehicle_id, observed_at")
-        .or(`structured_data->>author_username.eq.${username}`)
+        .or(`structured_data->>author_username.eq."${username}"`)
         .order("observed_at", { ascending: false })
         .limit(1000);
 

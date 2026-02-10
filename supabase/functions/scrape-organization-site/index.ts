@@ -577,7 +577,7 @@ Deno.serve(async (req) => {
     const { data: externalIdentities } = await supabase
       .from('external_identities')
       .select('platform, handle, profile_url, metadata')
-      .or(`metadata->>organization_id.eq.${organization_id},metadata->>organization_id.is.null`)
+      .or(`metadata->>organization_id.eq."${organization_id}",metadata->>organization_id.is.null`)
       .eq('platform', 'classic_com')
       .limit(10);
     
@@ -605,7 +605,7 @@ Deno.serve(async (req) => {
     const { data: batIdentities } = await supabase
       .from('external_identities')
       .select('platform, handle, profile_url, metadata')
-      .or(`metadata->>organization_id.eq.${organization_id},metadata->>organization_id.is.null`)
+      .or(`metadata->>organization_id.eq."${organization_id}",metadata->>organization_id.is.null`)
       .eq('platform', 'bat')
       .limit(10);
     
