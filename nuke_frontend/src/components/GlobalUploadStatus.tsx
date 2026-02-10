@@ -28,13 +28,6 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get the UploadManager instance (it's a singleton)
-    const getUploadManager = () => {
-      // Import the class dynamically to access the singleton
-      // PersistentImageUpload was removed - use UniversalImageUpload events instead
-      console.log('PersistentImageUpload removed - GlobalUploadStatus needs update');
-    };
-
     // For now, let's create a simple global event system
     const handleGlobalUploadUpdate = (event: CustomEvent) => {
       const { vehicleId, files } = event.detail;

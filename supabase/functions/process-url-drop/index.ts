@@ -180,9 +180,26 @@ serve(async (req) => {
         break;
 
       case 'bat':
-        ({ entityData, entityId } = await processBaTListingURL(url, supabase));
-        entityType = 'vehicle';
-        action = 'extracted';
+        try {
+          ({ entityData, entityId } = await processBaTListingURL(url, supabase));
+          entityType = 'vehicle';
+          action = 'extracted';
+        } catch (batErr: any) {
+          console.warn(`BaT extraction failed (${batErr.message}), creating discovery lead`);
+          const leadId = await createDiscoveryLead(supabase, {
+            url,
+            type: 'bat_listing',
+            suggestedType: 'vehicle_listing',
+            confidence: 0.95,
+            userId,
+            metadata: { error: batErr.message, handler: 'bat', fallback: true },
+          });
+          entityType = 'discovery_lead';
+          entityId = leadId;
+          entityData = { url, error: batErr.message };
+          action = 'queued';
+          message = `BaT listing detected but extraction failed (${batErr.message.includes('RATE_LIMITED') ? 'rate limited' : 'error'}). Queued for retry.`;
+        }
         break;
 
       case 'barnfinds':

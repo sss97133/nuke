@@ -30,7 +30,7 @@ type CapsuleTab =
 
 const Capsule: React.FC = () => {
   const [session, setSession] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [, setUserProfile] = useState<any>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as CapsuleTab | null;
   const [activeTab, setActiveTab] = useState<CapsuleTab>(tabParam || 'dashboard');

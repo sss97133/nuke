@@ -161,19 +161,49 @@ async function checkFeedPerformance(
   try {
     // Simulate the feed query that powers the homepage
     // Fetch a small page from vehicle_valuation_feed ordered by feed_rank_score
-    const { data, error } = await supabase
+    // Use AbortSignal to prevent this check from blocking the entire health report
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+
+    const feedPromise = supabase
       .from("vehicle_valuation_feed")
       .select("vehicle_id, make, model, year, feed_rank_score")
       .order("feed_rank_score", { ascending: false })
-      .limit(20);
+      .limit(20)
+      .abortSignal(controller.signal);
 
+    let data: any[] | null = null;
+    let error: any = null;
+
+    try {
+      const result = await feedPromise;
+      data = result.data;
+      error = result.error;
+    } catch (abortErr: any) {
+      clearTimeout(timeout);
+      const ms = elapsed(t);
+      return {
+        name: "feed_performance",
+        status: "warn",
+        message: `Feed query timed out after ${ms}ms (7s client-side limit). View may need refresh.`,
+        value: { ms, timed_out: true },
+        duration_ms: ms,
+      };
+    }
+
+    clearTimeout(timeout);
     const ms = elapsed(t);
 
     if (error) {
+      // Distinguish timeout from other errors
+      const isTimeout = error.message?.includes("timeout") || error.message?.includes("cancel");
       return {
         name: "feed_performance",
-        status: "fail",
-        message: `Feed query failed: ${error.message}`,
+        status: isTimeout ? "warn" : "fail",
+        message: isTimeout
+          ? `Feed query timed out (${ms}ms). Materialized view may need refresh.`
+          : `Feed query failed: ${error.message}`,
+        value: { ms, timed_out: isTimeout },
         duration_ms: ms,
       };
     }

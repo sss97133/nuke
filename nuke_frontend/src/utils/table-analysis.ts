@@ -38,7 +38,7 @@ export async function analyzeExistingTables(): Promise<TableAnalysis[]> {
       }
 
       // Get row count
-      const { count, error: countError } = await supabase
+      const { count } = await supabase
         .from(tableName)
         .select('*', { count: 'exact', head: true });
 
@@ -79,7 +79,7 @@ export async function analyzeExistingTables(): Promise<TableAnalysis[]> {
   return results;
 }
 
-function analyzeTableStructure(tableName: string, columns: ColumnInfo[], sampleData: any[]): {
+function analyzeTableStructure(_tableName: string, columns: ColumnInfo[], _sampleData: any[]): {
   conflicts: string[];
   recommendations: string[];
   compatibility: 'compatible' | 'needs-modification' | 'incompatible';

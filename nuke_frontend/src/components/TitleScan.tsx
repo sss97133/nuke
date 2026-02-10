@@ -109,7 +109,7 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
       const { supabase } = await import('../lib/supabase');
 
       // Use Supabase Edge Function for sending notifications
-      const { data, error } = await supabase.functions.invoke('send-title-capture-prompt', {
+      const { error } = await supabase.functions.invoke('send-title-capture-prompt', {
         body: {
           vehicleId,
           captureLink,
@@ -137,16 +137,6 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
     }
   };
 
-  const fileToBase64 = (f: File): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(',')[1] || '';
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(f);
-  });
 
   const handleScan = async () => {
     try {

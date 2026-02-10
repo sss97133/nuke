@@ -14,7 +14,7 @@ interface VehiclePermissions {
 export const useVehiclePermissions = (
   vehicleId: string | null,
   session: any,
-  vehicle: any
+  _vehicle: any
 ): VehiclePermissions => {
   const [permissions, setPermissions] = useState<VehiclePermissions>({
     isOwner: false,
@@ -53,7 +53,7 @@ export const useVehiclePermissions = (
             permissionLevel: String(status?.permissionLevel || ''),
             isOwner: Boolean(isOwner)
           });
-        } catch (err) {
+        } catch {
           // Silently fail if logging causes issues
         }
         

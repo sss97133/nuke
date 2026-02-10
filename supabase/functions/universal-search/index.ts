@@ -90,8 +90,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const body: SearchRequest = await req.json();
-    const { query, limit = 20, types, includeAI = true } = body;
+    const body: SearchRequest = await req.json().catch(() => ({} as any));
+    const { query = '', limit = 20, types, includeAI = true } = body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Query is required',
+        results: [],
+        query_type: 'empty',
+        total_count: 0,
+        search_time_ms: Date.now() - startTime
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     const queryType = detectInputType(query);
     const trimmedQuery = query.trim();

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import PurchaseAgreementCreator from './PurchaseAgreementCreator';
-import DigitalSignature from './DigitalSignature';
 
 interface Vehicle {
   id: string;
@@ -62,7 +61,6 @@ export default function PurchaseAgreementManager({
   const [agreements, setAgreements] = useState<PurchaseAgreement[]>([]);
   const [selectedAgreement, setSelectedAgreement] = useState<PurchaseAgreement | null>(null);
   const [showCreator, setShowCreator] = useState(false);
-  const [showSignature, setShowSignature] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -87,13 +85,6 @@ export default function PurchaseAgreementManager({
     setShowCreator(false);
   };
 
-  const handleSignatureCompleted = (signature: any) => {
-    // Refresh the agreement data
-    if (selectedAgreement) {
-      console.log('Signature completed:', signature);
-      setShowSignature(false);
-    }
-  };
 
   if (loading) {
     return (

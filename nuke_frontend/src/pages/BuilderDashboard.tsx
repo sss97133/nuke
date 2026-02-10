@@ -47,7 +47,6 @@ export default function BuilderDashboard() {
   const [fundingRounds, setFundingRounds] = useState<FundingRound[]>([]);
   const [bonds, setBonds] = useState<Bond[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
