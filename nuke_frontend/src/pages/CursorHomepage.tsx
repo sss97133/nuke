@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import { UserInteractionService } from '../services/userInteractionService';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { getCanonicalBodyStyle } from '../services/bodyStyleTaxonomy';
-import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
+import { getCanonicalBodyStyle, getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
 import { parseMoneyNumber } from '../lib/auctionUtils';
 import { VehicleSearchService } from '../services/vehicleSearchService';
-import { preloadImageBatch, optimizeImageUrl } from '../lib/imageOptimizer';
+import { preloadImageBatch } from '../lib/imageOptimizer';
 import ActiveAuctionsPanel from '../components/dashboard/ActiveAuctionsPanel';
 import FBMarketplacePanel from '../components/dashboard/FBMarketplacePanel';
 import RecentlyAddedPanel from '../components/dashboard/RecentlyAddedPanel';
@@ -1983,7 +1982,7 @@ const CursorHomepage: React.FC = () => {
       };
 
       // Execute query (with listing_kind fallback if needed)
-      let query = buildFilteredStatsQuery(listingKindSupportedRef.current);
+      const query = buildFilteredStatsQuery(listingKindSupportedRef.current);
       let { data: vehicles, count, error } = await query;
       if (error && isMissingListingKindColumn(error)) {
         listingKindSupportedRef.current = false;
@@ -4271,7 +4270,7 @@ const CursorHomepage: React.FC = () => {
               // Error loading source counts retry - silent
               return;
             }
-            // eslint-disable-next-line @typescript-eslint/no-shadow
+             
             const vehicles = retry.data as any[];
             setSourceCounts(buildSourceCounts(vehicles || []));
             return;

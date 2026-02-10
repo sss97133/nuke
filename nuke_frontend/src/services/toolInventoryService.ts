@@ -147,7 +147,7 @@ export class ToolInventoryService {
       // For now, we'll use Google search API or a scraping service
       // This is a placeholder - you'd need to implement actual web scraping
       
-      const searchUrl = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(partNumber + ' site:shop.snapon.com')}&key=${process.env.GOOGLE_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}`;
+      const searchUrl = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(partNumber + ' site:shop.snapon.com')}&key=${import.meta.env.VITE_GOOGLE_API_KEY}&cx=${import.meta.env.VITE_GOOGLE_SEARCH_ENGINE_ID}`;
       
       // For demo purposes, construct a likely URL
       const productUrl = `${baseUrl}${partNumber}`;
