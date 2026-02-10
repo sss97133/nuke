@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { CommentService } from '../services/CommentService';
+import { CommentService } from '../services/CommentService';
 
 interface TimelineEventEditorProps {
   eventId: string;

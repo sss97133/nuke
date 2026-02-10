@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { ImageTrackingService } from '../services/imageTrackingService';
+import { ImageTrackingService } from '../services/imageTrackingService';
 
 interface BackfillStats {
   totalImages: number;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { useForm } from 'react-hook-form';
-import type { zodResolver } from '@hookform/resolvers/zod';
-import type { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 

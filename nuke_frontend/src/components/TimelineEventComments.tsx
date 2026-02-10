@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { CommentService } from '../services/CommentService';
+import { CommentService } from '../services/CommentService';
 import type { Comment, AccessLevel } from '../services/CommentService';
 
 interface TimelineEventCommentsProps {
