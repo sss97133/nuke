@@ -429,7 +429,7 @@ async function saveToDatabase(
         .from('vehicles')
         .select('origin_metadata')
         .eq('id', vehicleId)
-        .single();
+        .maybeSingle();
       const existingMeta = (existingVehicle?.origin_metadata as Record<string, unknown>) || {};
       vehicleUpdate.origin_metadata = {
         ...existingMeta,

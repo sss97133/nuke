@@ -134,7 +134,7 @@ async function findOrCreateVehicle(
     .select("id, year, make, model")
     .eq("vin", cleanVin)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     return { ...existing, isNew: false };
@@ -173,7 +173,7 @@ async function linkVehicleToUser(
     .select("vehicle_id")
     .eq("vehicle_id", vehicleId)
     .eq("owner_id", userId)
-    .single();
+    .maybeSingle();
 
   if (existing) return;
 
@@ -292,7 +292,7 @@ serve(async (req) => {
       .from("vault_sms_sessions")
       .select("*")
       .eq("pwa_session_token", session_token)
-      .single();
+      .maybeSingle();
 
     if (sessionError || !session) {
       return new Response(

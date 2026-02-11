@@ -42,7 +42,7 @@ async function getOrCreateTechLink(phone: string, inviterHint?: string) {
     .from("technician_phone_links")
     .select("*")
     .eq("phone_number", normalized)
-    .single();
+    .maybeSingle();
 
   if (existing) return existing;
 
@@ -76,7 +76,7 @@ async function getConversation(techLinkId: string) {
     .from("sms_conversations")
     .select("*")
     .eq("technician_phone_link_id", techLinkId)
-    .single();
+    .maybeSingle();
 
   if (data) return data;
 
@@ -104,7 +104,7 @@ async function getTemplate(
     .select("template_text")
     .eq("template_key", key)
     .eq("personality", personality)
-    .single();
+    .maybeSingle();
 
   return data?.template_text || "";
 }
@@ -374,7 +374,7 @@ async function createTimelineEvent(
     .from("vehicles")
     .select("year, make, model")
     .eq("id", vehicleId)
-    .single();
+    .maybeSingle();
 
   const vehicleName = vehicle
     ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
@@ -832,7 +832,7 @@ serve(async (req) => {
         .from("technician_phone_links")
         .select("metadata")
         .eq("id", techLinkId)
-        .single();
+        .maybeSingle();
 
       const metadata = techData?.metadata || {};
       const prevResponses = metadata.response_times || [];
@@ -876,7 +876,7 @@ serve(async (req) => {
           .from("vehicles")
           .select("id, year, make, model")
           .eq("vin", vinAnalysis.detectedVin)
-          .single();
+          .maybeSingle();
 
         if (!vehicle && vinAnalysis.vehicleHints) {
           // Create new vehicle from VIN decode
@@ -900,7 +900,7 @@ serve(async (req) => {
             .from("sms_work_submissions")
             .select("*")
             .eq("id", pendingId)
-            .single();
+            .maybeSingle();
 
           if (pendingSubmission) {
             await supabase
@@ -974,7 +974,7 @@ serve(async (req) => {
             .from("sms_work_submissions")
             .select("*")
             .eq("id", pendingId)
-            .single();
+            .maybeSingle();
 
           if (pendingSubmission) {
             await createTimelineEvent(vehicleId, pendingSubmission, techLink);
@@ -1012,7 +1012,7 @@ serve(async (req) => {
         .eq("status", "pending")
         .order("offered_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (pendingJob) {
         if (bodyLower === "yes") {
@@ -1112,8 +1112,8 @@ serve(async (req) => {
     return twimlResponse(
       `Hey ${name}! Send me a photo of your work and I'll log it for you.`
     );
-  } catch (error) {
-    console.error("SMS intake error:", error);
+  } catch (error: any) {
+    console.error("SMS intake error:", error instanceof Error ? error.message : String(error));
     return twimlResponse("Oops, something went wrong. Try sending that again?");
   }
 });

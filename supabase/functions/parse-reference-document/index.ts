@@ -109,7 +109,7 @@ serve(async (req) => {
         )
       `)
       .eq('id', documentId)
-      .single();
+      .maybeSingle();
     
     if (docError || !doc) {
       throw new Error('Document not found');

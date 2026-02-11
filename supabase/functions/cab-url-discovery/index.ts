@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
         .from("system_state")
         .select("value")
         .eq("key", "cab_url_discovery")
-        .single();
+        .maybeSingle();
 
       const { count: queuedCount } = await supabase
         .from("import_queue")
@@ -258,7 +258,7 @@ Deno.serve(async (req) => {
         .from("system_state")
         .select("value")
         .eq("key", "cab_url_discovery")
-        .single();
+        .maybeSingle();
 
       let state = stateRow?.value || {
         total_discovered: 0,

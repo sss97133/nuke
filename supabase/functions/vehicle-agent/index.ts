@@ -137,7 +137,7 @@ async function initAgent(vehicleId: string): Promise<VehicleAgent | null> {
     .from("vehicles")
     .select("*")
     .eq("id", vehicleId)
-    .single();
+    .maybeSingle();
 
   if (!vehicle) return null;
 
@@ -377,7 +377,7 @@ serve(async (req) => {
       .from("vehicles")
       .select("*")
       .eq("id", vehicleId)
-      .single();
+      .maybeSingle();
 
     if (!vehicle) {
       return new Response(JSON.stringify({ error: "Vehicle not found" }), {

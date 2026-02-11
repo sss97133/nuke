@@ -592,7 +592,7 @@ async function matchVehicleToParts(
     .from('vehicles')
     .select('id, year, make, model, mileage, vin')
     .eq('id', vehicleId)
-    .single();
+    .maybeSingle();
 
   if (vehicleError || !vehicle) {
     throw new Error(`Vehicle not found: ${vehicleId}`);
@@ -655,7 +655,7 @@ async function matchVehicleToParts(
       .eq('part_type', suggestion.part_type)
       .contains('compatible_makes', [vehicle.make])
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const enriched = {
       ...suggestion,
@@ -1156,7 +1156,7 @@ serve(async (req) => {
             .from('vehicles')
             .select('year, make, model, mileage')
             .eq('id', vehicle_id)
-            .single();
+            .maybeSingle();
           if (vehicle) vehicleData = vehicle;
         }
 

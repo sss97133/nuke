@@ -96,7 +96,7 @@ serve(async (req) => {
         .from('external_identities')
         .select('metadata')
         .eq('id', externalIdentityId)
-        .single();
+        .maybeSingle();
       
       if (identity?.metadata?.access_token) {
         accessToken = identity.metadata.access_token;
@@ -127,8 +127,8 @@ serve(async (req) => {
           .from('external_identities')
           .select('metadata')
           .eq('id', externalIdentityId)
-          .single();
-        
+          .maybeSingle();
+
         igAccountId = identity?.metadata?.instagram_account_id;
       }
     }
@@ -177,7 +177,7 @@ serve(async (req) => {
                       .from('external_identities')
                       .select('metadata')
                       .eq('id', externalIdentityId)
-                      .single();
+                      .maybeSingle();
                     
                     await supabase
                       .from('external_identities')
@@ -227,7 +227,7 @@ serve(async (req) => {
                 .from('external_identities')
                 .select('metadata')
                 .eq('id', externalIdentityId)
-                .single();
+                .maybeSingle();
               
               await supabase
                 .from('external_identities')
@@ -403,7 +403,7 @@ The function attempted to auto-detect but could not find the account ID.`;
             })
             .eq('id', existingContent.id)
             .select('id')
-            .single();
+            .maybeSingle();
 
           if (updateError) throw updateError;
           contentId = updated.id;

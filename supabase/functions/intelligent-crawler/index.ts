@@ -1263,7 +1263,7 @@ async function getCachedCrawlData(searchParams: any) {
     .select('*')
     .eq('cache_key', cacheKey)
     .gt('expires_at', new Date().toISOString())
-    .single()
+    .maybeSingle()
   
   return data?.cached_data || null
 }

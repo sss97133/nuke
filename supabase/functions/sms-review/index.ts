@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       .select("context")
       .eq("phone_number", from)
       .eq("state", "reviewing")
-      .single();
+      .maybeSingle();
 
     if (!session?.context?.photo_ids?.length) {
       return twiml("No active review. Text REVIEW to start.");

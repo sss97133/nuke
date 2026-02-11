@@ -167,8 +167,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error analyzing document:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
@@ -204,8 +204,8 @@ async function analyzeDocument(imageUrl: string): Promise<DocumentDetectionResul
       return { ...result, provider: provider.name };
 
     } catch (error) {
-      console.warn(`❌ ${provider.name} failed:`, error.message);
-      lastError = error;
+      console.warn(`❌ ${provider.name} failed:`, error instanceof Error ? error.message : String(error));
+      lastError = error instanceof Error ? error : new Error(String(error));
       continue; // Try next provider
     }
   }

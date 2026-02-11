@@ -73,7 +73,7 @@ serve(async (req) => {
       .from("marketplace_listings")
       .select("*")
       .eq("id", listing_id)
-      .single();
+      .maybeSingle();
 
     if (listingError || !listing) {
       return new Response(

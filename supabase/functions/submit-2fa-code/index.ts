@@ -138,7 +138,7 @@ serve(async (req) => {
       .from('pending_2fa_requests')
       .select('*, platform_credentials(*)')
       .eq('id', request_id)
-      .single();
+      .maybeSingle();
 
     if (tfaError || !tfaRequest) {
       return new Response(

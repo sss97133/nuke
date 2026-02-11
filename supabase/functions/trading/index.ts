@@ -71,9 +71,9 @@ serve(async (req) => {
 
     return errorResponse(405, "Method not allowed");
 
-  } catch (e: any) {
+  } catch (e) {
     console.error("Trading API error:", e);
-    return errorResponse(500, e.message);
+    return errorResponse(500, e instanceof Error ? e.message : String(e));
   }
 });
 

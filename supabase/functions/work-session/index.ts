@@ -51,7 +51,7 @@ async function getUserVehicles(techLinkId: string) {
     .from("technician_phone_links")
     .select("user_id")
     .eq("id", techLinkId)
-    .single();
+    .maybeSingle();
 
   let orgVehicles: any[] = [];
   if (techLink?.user_id) {

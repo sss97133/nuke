@@ -58,8 +58,8 @@ serve(async (req) => {
       const vehicleId = url.searchParams.get("vehicle_id");
       const vin = url.searchParams.get("vin");
       const kind = url.searchParams.get("kind");
-      const page = parseInt(url.searchParams.get("page") || "1");
-      const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
+      const page = parseInt(url.searchParams.get("page") || "1", 10);
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 100);
       const offset = (page - 1) * limit;
 
       if (!vehicleId && !vin) {

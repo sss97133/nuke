@@ -79,7 +79,7 @@ serve(async (req) => {
         .select('id')
         .eq('id', dealIdInput)
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
       if (error || !deal) {
         return new Response(JSON.stringify({ error: 'Deal not found' }), {
           status: 404,

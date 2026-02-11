@@ -1453,7 +1453,7 @@ Return ONLY valid JSON in this format:
       .from('scrape_sources')
       .select('id')
       .eq('url', source_url)
-      .single();
+      .maybeSingle();
 
     if (existingSource) {
       sourceId = existingSource.id;

@@ -73,7 +73,7 @@ async function getUserByPhone(phone: string): Promise<{ id: string; full_name?: 
     .from("profiles")
     .select("id, full_name")
     .eq("phone_number", normalized)
-    .single();
+    .maybeSingle();
   return profile;
 }
 
@@ -90,7 +90,7 @@ async function getOrCreateSession(phone: string): Promise<VaultSession> {
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     return existing as VaultSession;
@@ -129,9 +129,10 @@ async function updateSession(
     .update(updates)
     .eq("id", sessionId)
     .select("*")
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data) throw new Error(`Session ${sessionId} not found`);
   return data as VaultSession;
 }
 
@@ -144,7 +145,7 @@ async function getUserPreferences(userId: string): Promise<{
     .from("vault_user_preferences")
     .select("default_tier, always_ask")
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
   return data;
 }
 
@@ -555,8 +556,8 @@ serve(async (req) => {
       default:
         return handleHelp();
     }
-  } catch (error) {
-    console.error("Vault SMS webhook error:", error);
+  } catch (error: any) {
+    console.error("Vault SMS webhook error:", error instanceof Error ? error.message : String(error));
     return twiml("Something went wrong. Please try again.");
   }
 });

@@ -152,7 +152,7 @@ serve(async (req) => {
       .from('concierge_quotes')
       .select('*')
       .eq('id', quote_id)
-      .single()
+      .maybeSingle()
 
     if (!quote) {
       return new Response(
@@ -202,7 +202,7 @@ serve(async (req) => {
           .from('concierge_bookings')
           .select('*')
           .eq('id', booking_id)
-          .single()
+          .maybeSingle()
 
         if (booking) {
           results.telegram = await sendTelegram(
