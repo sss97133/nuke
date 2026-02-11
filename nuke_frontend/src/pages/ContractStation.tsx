@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import ContractBuilder from '../components/contract/ContractBuilder';
 import ContractMarketplace from '../components/contract/ContractMarketplace';
@@ -7,9 +8,16 @@ import ContractTransparency from '../components/contract/ContractTransparency';
 type TabType = 'marketplace' | 'builder' | 'my_contracts';
 
 export default function ContractStation() {
+  const { contractId: urlContractId } = useParams<{ contractId?: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('marketplace');
-  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(urlContractId || null);
   const [user, setUser] = useState<any>(null);
+
+  // Sync state when URL param changes (e.g. direct navigation)
+  useEffect(() => {
+    setSelectedContractId(urlContractId || null);
+  }, [urlContractId]);
 
   useEffect(() => {
     loadUser();
@@ -35,7 +43,7 @@ export default function ContractStation() {
           {/* Tabs */}
           <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--border)', marginBottom: '24px' }}>
             <button
-              onClick={() => { setActiveTab('marketplace'); setSelectedContractId(null); }}
+              onClick={() => { setActiveTab('marketplace'); setSelectedContractId(null); navigate('/market/contracts', { replace: true }); }}
               style={{
                 padding: '8px 16px',
                 border: 'none',
@@ -51,7 +59,7 @@ export default function ContractStation() {
               MARKETPLACE
             </button>
             <button
-              onClick={() => { setActiveTab('builder'); setSelectedContractId(null); }}
+              onClick={() => { setActiveTab('builder'); setSelectedContractId(null); navigate('/market/contracts', { replace: true }); }}
               style={{
                 padding: '8px 16px',
                 border: 'none',
@@ -68,7 +76,7 @@ export default function ContractStation() {
             </button>
             {user && (
               <button
-                onClick={() => { setActiveTab('my_contracts'); setSelectedContractId(null); }}
+                onClick={() => { setActiveTab('my_contracts'); setSelectedContractId(null); navigate('/market/contracts', { replace: true }); }}
                 style={{
                   padding: '8px 16px',
                   border: 'none',
@@ -89,29 +97,30 @@ export default function ContractStation() {
 
         {/* Content */}
         {selectedContractId ? (
-          <ContractTransparency 
-            contractId={selectedContractId} 
-            onBack={() => setSelectedContractId(null)}
+          <ContractTransparency
+            contractId={selectedContractId}
+            onBack={() => { setSelectedContractId(null); navigate('/market/contracts', { replace: true }); }}
           />
         ) : (
           <>
             {activeTab === 'marketplace' && (
-              <ContractMarketplace 
-                onSelectContract={(id) => setSelectedContractId(id)}
+              <ContractMarketplace
+                onSelectContract={(id) => { setSelectedContractId(id); navigate(`/market/contracts/${id}`); }}
               />
             )}
             {activeTab === 'builder' && (
-              <ContractBuilder 
+              <ContractBuilder
                 onContractCreated={(id) => {
                   setSelectedContractId(id);
                   setActiveTab('marketplace');
+                  navigate(`/market/contracts/${id}`);
                 }}
               />
             )}
             {activeTab === 'my_contracts' && user && (
-              <ContractMarketplace 
+              <ContractMarketplace
                 curatorId={user.id}
-                onSelectContract={(id) => setSelectedContractId(id)}
+                onSelectContract={(id) => { setSelectedContractId(id); navigate(`/market/contracts/${id}`); }}
               />
             )}
           </>

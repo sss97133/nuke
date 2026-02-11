@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrencyFromCents } from '../../utils/currency';
 
 interface ContractMarketplaceProps {
   curatorId?: string;
@@ -49,7 +50,6 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
     }
   };
 
-  const formatUSD = (cents: number) => cents ? `$${(cents / 1000).toLocaleString()}k` : '$0';
   const formatPct = (pct: number) => pct ? `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%` : '0.00%';
 
   return (
@@ -155,7 +155,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                   <div>
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>AUM</div>
                     <div style={{ fontSize: '12pt', fontWeight: 900 }}>
-                      {formatUSD(contract.total_assets_under_management_cents)}
+                      {formatCurrencyFromCents(contract.total_assets_under_management_cents)}
                     </div>
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
                       {contract.total_investors || 0} investors
@@ -175,7 +175,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                   <div>
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Terms</div>
                     <div style={{ fontSize: '9pt', fontWeight: 700 }}>
-                      Min: {formatUSD(contract.minimum_investment_cents)}
+                      Min: {formatCurrencyFromCents(contract.minimum_investment_cents)}
                     </div>
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
                       {contract.management_fee_pct}% mgmt fee
