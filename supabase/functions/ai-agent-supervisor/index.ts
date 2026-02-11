@@ -138,14 +138,14 @@ async function gatherVehicleContext(supabase: any, vehicle_id: string, user_id: 
     .from('vehicles')
     .select('year, make, model, vin')
     .eq('id', vehicle_id)
-    .single()
+    .maybeSingle()
 
   // Get user location
   const { data: user } = await supabase
     .from('user_metadata')
     .select('location')
     .eq('user_id', user_id)
-    .single()
+    .maybeSingle()
 
   // Get receipts for cost validation
   const { data: receipts } = await supabase
@@ -325,7 +325,7 @@ async function saveEnhancedTags(supabase: any, result: SupervisorResponse, vehic
     .from('vehicle_images')
     .select('id')
     .eq('image_url', image_url)
-    .single()
+    .maybeSingle()
 
   if (!imageRecord) {
     console.error('Image not found for URL:', image_url)
@@ -413,7 +413,7 @@ async function createTimelineEventIfNeeded(supabase: any, result: SupervisorResp
       .from('vehicle_images')
       .select('taken_at')
       .eq('image_url', image_url)
-      .single()
+      .maybeSingle()
 
     if (imageRecord?.taken_at) {
       const eventDate = new Date(imageRecord.taken_at)

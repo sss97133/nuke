@@ -733,7 +733,8 @@ Return JSON:
     // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0])
+      let result: any;
+      try { result = JSON.parse(jsonMatch[0]); } catch { return null; }
       if (result.has_vin_tag && result.vin && result.vin.length === 17) {
         // Validate VIN format (no I, O, Q)
         if (!/[IOQ]/.test(result.vin.toUpperCase())) {
@@ -857,7 +858,8 @@ async function analyzeWithGemini(base64Image: string, prompt: string): Promise<I
     throw new Error('No content in Gemini response')
   }
 
-  const analysis = JSON.parse(content)
+  let analysis: any;
+  try { analysis = JSON.parse(content); } catch { return null; }
   return {
     angle: analysis.angle || 'exterior',
     condition_score: analysis.condition_score || 5,
@@ -912,7 +914,8 @@ async function analyzeWithOpenAIOnly(base64Image: string, prompt: string): Promi
     throw new Error('No content in OpenAI response')
   }
 
-  const analysis = JSON.parse(content)
+  let analysis: any;
+  try { analysis = JSON.parse(content); } catch { return null; }
   return {
     angle: analysis.angle || 'exterior',
     condition_score: analysis.condition_score || 5,
@@ -978,7 +981,8 @@ async function analyzeWithClaude(base64Image: string, prompt: string): Promise<I
     throw new Error('No JSON found in Claude response')
   }
 
-  const analysis = JSON.parse(jsonMatch[0])
+  let analysis: any;
+  try { analysis = JSON.parse(jsonMatch[0]); } catch { return null; }
   return {
     angle: analysis.angle || 'exterior',
     condition_score: analysis.condition_score || 5,

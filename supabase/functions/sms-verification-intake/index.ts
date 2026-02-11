@@ -44,7 +44,7 @@ async function getUserByPhone(phone: string): Promise<{ id: string } | null> {
     .from("profiles")
     .select("id")
     .eq("phone_number", normalized)
-    .single();
+    .maybeSingle();
 
   return profile;
 }

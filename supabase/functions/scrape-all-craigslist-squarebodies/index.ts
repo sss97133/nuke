@@ -497,7 +497,7 @@ serve(async (req) => {
             
             // Filter for squarebody trucks (1973-1991 Chevy/GMC)
             const yearNum = typeof scrapeData.data.year === 'string' 
-              ? parseInt(scrapeData.data.year) 
+              ? parseInt(scrapeData.data.year, 10) 
               : scrapeData.data.year
             const description = (scrapeData.data.description || '').toLowerCase()
             const title = (scrapeData.data.title || '').toLowerCase()
@@ -542,7 +542,7 @@ serve(async (req) => {
             
             // Validate required fields BEFORE entering try block (so we can use continue)
             const yearInt = typeof scrapeData.data.year === 'string' 
-              ? parseInt(scrapeData.data.year) 
+              ? parseInt(scrapeData.data.year, 10) 
               : scrapeData.data.year
             
             if (!yearInt || isNaN(yearInt)) {
@@ -1339,13 +1339,13 @@ function scrapeCraigslistInline(doc: any, url: string): any {
       if (text.includes('condition:')) data.condition = text.replace('condition:', '').trim()
       else if (text.includes('cylinders:')) {
         const cylMatch = text.match(/(\d+)\s+cylinders/)
-        if (cylMatch) data.cylinders = parseInt(cylMatch[1])
+        if (cylMatch) data.cylinders = parseInt(cylMatch[1], 10)
       }
       else if (text.includes('drive:')) data.drivetrain = text.replace('drive:', '').trim()
       else if (text.includes('fuel:')) data.fuel_type = text.replace('fuel:', '').trim()
       else if (text.includes('odometer:')) {
         const odoMatch = text.match(/odometer:\s*([\d,]+)/)
-        if (odoMatch) data.mileage = parseInt(odoMatch[1].replace(/,/g, ''))
+        if (odoMatch) data.mileage = parseInt(odoMatch[1].replace(/,/g, ''), 10)
       }
       else if (text.includes('paint color:')) data.color = text.replace('paint color:', '').trim()
       else if (text.includes('title status:')) data.title_status = text.replace('title status:', '').trim()
@@ -1379,9 +1379,9 @@ function scrapeCraigslistInline(doc: any, url: string): any {
         let mileage: number
         if (numStr.length <= 3 && /k\s*mi/i.test(match[0])) {
           // "125k miles" format
-          mileage = parseInt(numStr) * 1000
+          mileage = parseInt(numStr, 10) * 1000
         } else {
-          mileage = parseInt(numStr)
+          mileage = parseInt(numStr, 10)
         }
         if (mileage > 0 && mileage <= 500000) {
           data.mileage = mileage

@@ -412,7 +412,7 @@ async function extractWithGoogleGemini(
     const errorText = await response.text()
     if (response.status === 429) {
       const retryAfter = response.headers.get('retry-after') || '60'
-      throw Object.assign(new Error('Rate limit exceeded'), { retryAfter: parseInt(retryAfter) })
+      throw Object.assign(new Error('Rate limit exceeded'), { retryAfter: parseInt(retryAfter, 10) })
     }
     throw new Error(`Google API error: ${response.status} - ${errorText}`)
   }
@@ -481,7 +481,7 @@ async function extractWithOpenAI(
     const errorText = await response.text()
     if (response.status === 429) {
       const retryAfter = response.headers.get('retry-after') || '60'
-      throw Object.assign(new Error('Rate limit exceeded'), { retryAfter: parseInt(retryAfter) })
+      throw Object.assign(new Error('Rate limit exceeded'), { retryAfter: parseInt(retryAfter, 10) })
     }
     throw new Error(`OpenAI API error: ${response.status} - ${errorText}`)
   }
@@ -547,7 +547,7 @@ async function extractWithAnthropic(
     const errorText = await response.text()
     if (response.status === 429) {
       const retryAfter = response.headers.get('retry-after') || '60'
-      throw Object.assign(new Error('Rate limit exceeded'), { retryAfter: parseInt(retryAfter) })
+      throw Object.assign(new Error('Rate limit exceeded'), { retryAfter: parseInt(retryAfter, 10) })
     }
     throw new Error(`Anthropic API error: ${response.status} - ${errorText}`)
   }

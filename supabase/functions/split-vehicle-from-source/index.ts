@@ -253,8 +253,9 @@ serve(async (req) => {
         "id, vin, origin_metadata, listing_url, discovery_url, listing_source, discovery_source, bat_auction_url, description, description_source, description_generated_at"
       )
       .eq("id", vehicleId)
-      .single();
+      .maybeSingle();
     if (curErr) throw curErr;
+    if (!currentVehicle) throw new Error("Vehicle not found");
 
     // Does the current vehicle actually point at this source URL?
     // (We only detach fields from the old vehicle when the source matches, so editors can split additional URLs safely.)

@@ -426,7 +426,7 @@ serve(async (req) => {
         .from("import_queue")
         .select("*")
         .eq("listing_url", listing_url)
-        .single();
+        .maybeSingle();
 
       if (findError || !item) {
         return okJson({
@@ -451,7 +451,7 @@ serve(async (req) => {
         .from("import_queue")
         .select("*")
         .eq("id", import_queue_id)
-        .single();
+        .maybeSingle();
 
       if (findError || !item) {
         return okJson({

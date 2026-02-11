@@ -97,7 +97,7 @@ async function startSweep(params: { batch_size?: number }) {
     .from("fb_sweep_jobs")
     .select("id, status, started_at")
     .eq("status", "running")
-    .single();
+    .maybeSingle();
 
   if (existingSweep) {
     return jsonResponse({
@@ -393,7 +393,7 @@ async function upsertListing(
     .select("id, current_price, status")
     .eq("external_id", listing.external_id)
     .eq("platform", "facebook_marketplace")
-    .single();
+    .maybeSingle();
 
   const vehicleInfo = listing.vehicle_info || {};
 
@@ -552,7 +552,7 @@ async function getSweepStatus(params: { sweep_id?: string }) {
       .from("fb_sweep_jobs")
       .select("*")
       .eq("id", params.sweep_id)
-      .single();
+      .maybeSingle();
 
     return jsonResponse(sweep);
   }
@@ -563,7 +563,7 @@ async function getSweepStatus(params: { sweep_id?: string }) {
     .select("*")
     .order("started_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   return jsonResponse(sweep);
 }

@@ -805,9 +805,10 @@ serve(async (req) => {
         .from('build_threads')
         .select('*, forum_sources(*)')
         .eq('id', thread_id)
-        .single();
+        .maybeSingle();
 
-      if (threadError) throw new Error(`Thread not found: ${threadError.message}`);
+      if (threadError) throw new Error(`Thread lookup error: ${threadError.message}`);
+      if (!thread) throw new Error(`Thread not found: ${thread_id}`);
       threadRecord = thread;
       forumRecord = thread.forum_sources;
       threadUrl = thread.thread_url;
@@ -817,9 +818,10 @@ serve(async (req) => {
         .from('forum_sources')
         .select('*')
         .eq('id', forum_id)
-        .single();
+        .maybeSingle();
 
-      if (forumError) throw new Error(`Forum not found: ${forumError.message}`);
+      if (forumError) throw new Error(`Forum lookup error: ${forumError.message}`);
+      if (!forum) throw new Error(`Forum not found: ${forum_id}`);
       forumRecord = forum;
       threadUrl = thread_url!;
 
@@ -828,7 +830,7 @@ serve(async (req) => {
         .from('build_threads')
         .select('*')
         .eq('thread_url', threadUrl)
-        .single();
+        .maybeSingle();
 
       if (existingThread) {
         threadRecord = existingThread;

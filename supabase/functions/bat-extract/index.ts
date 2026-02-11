@@ -137,7 +137,7 @@ async function findExistingVehicle(
       .select('id')
       .eq('vin', extracted.vin)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (vinMatch) {
       return { id: vinMatch.id, matchType: 'vin' };
@@ -150,7 +150,7 @@ async function findExistingVehicle(
     .select('id')
     .eq('bat_auction_url', extracted.url)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (urlMatch) {
     return { id: urlMatch.id, matchType: 'url' };
@@ -167,7 +167,7 @@ async function findExistingVehicle(
       .ilike('model', extracted.model)
       .is('bat_auction_url', null)  // Only match vehicles without BaT URL (user-created)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (ymmMatch) {
       return { id: ymmMatch.id, matchType: 'ymm' };
@@ -262,7 +262,7 @@ function extractTitle(html: string): { title: string | null; year: number | null
     .trim();
 
   const yearMatch = title.match(/\b(19|20)\d{2}\b/);
-  const year = yearMatch ? parseInt(yearMatch[0]) : null;
+  const year = yearMatch ? parseInt(yearMatch[0], 10) : null;
 
   if (year) {
     const afterYear = title.slice(title.indexOf(yearMatch![0]) + yearMatch![0].length).trim();
@@ -336,13 +336,13 @@ function extractAuctionData(html: string): {
   const bid_count = bidCountMatch ? bidCountMatch.length : 0;
 
   const commentHeaderMatch = html.match(/<span class="info-value">(\d+)<\/span>\s*<span class="info-label">Comments<\/span>/i);
-  const comment_count = commentHeaderMatch ? parseInt(commentHeaderMatch[1]) : 0;
+  const comment_count = commentHeaderMatch ? parseInt(commentHeaderMatch[1], 10) : 0;
 
   const viewMatch = html.match(/data-stats-item="views">([0-9,]+)/);
-  const view_count = viewMatch ? parseInt(viewMatch[1].replace(/,/g, '')) : 0;
+  const view_count = viewMatch ? parseInt(viewMatch[1].replace(/,/g, ''), 10) : 0;
 
   const watcherMatch = html.match(/data-stats-item="watchers">([0-9,]+)/);
-  const watcher_count = watcherMatch ? parseInt(watcherMatch[1].replace(/,/g, '')) : 0;
+  const watcher_count = watcherMatch ? parseInt(watcherMatch[1].replace(/,/g, ''), 10) : 0;
 
   const lotMatch = html.match(/<strong>Lot<\/strong>\s*#([0-9,]+)/i);
   const lot_number = lotMatch ? lotMatch[1].replace(/,/g, '') : null;
@@ -360,7 +360,7 @@ function extractAuctionData(html: string): {
   let auction_end_date: string | null = null;
   const endMatch = html.match(/data-ends="(\d+)"/) || html.match(/data-until="(\d+)"/);
   if (endMatch) {
-    const timestamp = parseInt(endMatch[1]);
+    const timestamp = parseInt(endMatch[1], 10);
     const endDate = new Date(timestamp * 1000);
     auction_end_date = endDate.toISOString().split('T')[0];
   } else {
@@ -839,7 +839,7 @@ serve(async (req) => {
           .eq('source', 'bat')
           .eq('source_listing_id', extracted.lot_number)
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (existingEvent) {
           // Update existing

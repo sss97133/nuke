@@ -371,7 +371,7 @@ async function processImage(
       .from('vehicle_image_angles')
       .select('id')
       .eq('image_id', img.id)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       return 'skipped';
@@ -384,7 +384,7 @@ async function processImage(
       .eq('image_id', img.id)
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (recentAudit) {
       return 'skipped'; // Skip if recently processed (within 24 hours)
@@ -619,7 +619,7 @@ async function loadVehicleContext(
     .from('vehicles')
     .select('year, make, model, body_style, vin')
     .eq('id', vehicleId)
-    .single();
+    .maybeSingle();
 
   if (vehicle) {
     context.year = vehicle.year;
@@ -1247,8 +1247,8 @@ async function mapClassificationToAngleId(
     .from('image_coverage_angles')
     .select('id')
     .eq('angle_name', angleName)
-    .single();
-  
+    .maybeSingle();
+
   // If granular angle doesn't exist, try fallback mappings for specific cases
   if (!angle) {
     // Fallback mappings for granular angles that might not exist in DB yet
@@ -1266,7 +1266,7 @@ async function mapClassificationToAngleId(
         .from('image_coverage_angles')
         .select('id')
         .eq('angle_name', angleName)
-        .single();
+        .maybeSingle();
       angle = fallbackAngle;
     }
   }

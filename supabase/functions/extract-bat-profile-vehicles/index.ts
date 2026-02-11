@@ -188,7 +188,7 @@ Deno.serve(async (req: Request) => {
       .select('*')
       .eq('platform', 'bat')
       .eq('handle', batUsername)
-      .single();
+      .maybeSingle();
 
     let externalIdentityId: string;
 
@@ -357,7 +357,7 @@ Deno.serve(async (req: Request) => {
               .from('vehicles')
               .select('created_at, updated_at')
               .eq('id', vehicleId)
-              .single();
+              .maybeSingle();
 
             const justCreated = vehicle && new Date(vehicle.created_at).getTime() > Date.now() - 60000;
 
@@ -366,7 +366,7 @@ Deno.serve(async (req: Request) => {
               .from('bat_listings')
               .select('id, seller_external_identity_id')
               .eq('bat_listing_url', listingUrl)
-              .single();
+              .maybeSingle();
 
             if (batListing && !batListing.seller_external_identity_id) {
               await supabase

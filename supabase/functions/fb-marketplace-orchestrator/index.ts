@@ -125,7 +125,7 @@ async function getBrief(): Promise<Response> {
     .eq("status", "running")
     .order("started_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   return jsonResponse({
     status: "ok",
@@ -171,7 +171,7 @@ async function startSweep(batchSize?: number): Promise<Response> {
     .from("fb_sweep_jobs")
     .select("id")
     .eq("status", "running")
-    .single();
+    .maybeSingle();
 
   if (existingSweep) {
     return jsonResponse({
@@ -486,7 +486,7 @@ async function scrapeLocation(locationName: string): Promise<{
       .from("marketplace_listings")
       .select("id, current_price")
       .eq("facebook_id", listing.id)
-      .single();
+      .maybeSingle();
 
     if (!existing) {
       // Insert new
