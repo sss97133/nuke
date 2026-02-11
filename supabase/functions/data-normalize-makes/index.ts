@@ -185,7 +185,7 @@ serve(async (req) => {
   } catch (e: any) {
     console.error("[data-normalize-makes] Error:", e);
     return new Response(
-      JSON.stringify({ error: e.message, stack: e.stack }),
+      JSON.stringify({ error: e.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

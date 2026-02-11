@@ -224,7 +224,6 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error.message,
-        stack: error.stack,
       }),
       {
         status: 500,
