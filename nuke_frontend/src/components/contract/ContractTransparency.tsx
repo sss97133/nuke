@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrencyFromCents } from '../../utils/currency';
 import { ChevronDown, ChevronRight, ExternalLink, Shield, AlertTriangle } from 'lucide-react';
+import DrillDown from './DrillDown';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -290,23 +291,17 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 700 }}>{contract.contract_symbol}</span>
                 <span>•</span>
-                <span
-                  data-drill="contract-type"
-                  data-value={contract.contract_type}
-                  style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }}
-                  title={`Contract type: ${contract.contract_type}. Click to learn more about ${contract.contract_type} structures.`}
-                >
+                <DrillDown concept={contract.contract_type} value={contract.contract_type}>
                   {contract.contract_type.replace('_', ' ').toUpperCase()}
-                </span>
+                </DrillDown>
                 <span>•</span>
-                <span
-                  data-drill="regulatory-status"
-                  data-value={contract.regulatory_status}
-                  style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }}
-                  title={`Regulatory: ${contract.regulatory_status?.replace('_', ' ').toUpperCase()}. ${contract.regulatory_status === 'reg_d' ? 'SEC Regulation D — accredited investors only. Exemption from SEC registration for private placements.' : ''}`}
-                >
+                <DrillDown concept={contract.regulatory_status} value={contract.regulatory_status}>
                   {contract.regulatory_status?.replace('_', ' ').toUpperCase() || 'UNREGISTERED'}
-                </span>
+                </DrillDown>
+                <span>•</span>
+                <DrillDown concept={contract.risk_level || 'moderate'} value={contract.risk_level}>
+                  {(contract.risk_level || 'moderate').toUpperCase()} RISK
+                </DrillDown>
                 <span>•</span>
                 <span>Curated by {contract.curator_name || 'Unknown'}</span>
               </div>
@@ -461,27 +456,25 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '20px' }}>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
                   <strong>Entity:</strong>
-                  <span data-drill="entity-type" data-value={contract.legal_entity_type} style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} title={`Legal entity: ${contract.legal_entity_type?.replace('_', ' ')}. Defines liability, tax treatment, and ownership structure.`}>
+                  <DrillDown concept={contract.legal_entity_type} value={contract.legal_entity_type}>
                     {contract.legal_entity_type.replace('_', ' ').toUpperCase()}
-                  </span>
+                  </DrillDown>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
                   <strong>Jurisdiction:</strong>
-                  <span data-drill="jurisdiction" data-value={contract.jurisdiction} style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} title={`Jurisdiction: ${contract.jurisdiction}. Governing law for this contract.`}>
-                    {contract.jurisdiction}
-                  </span>
+                  <span>{contract.jurisdiction}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
                   <strong>Regulatory:</strong>
-                  <span data-drill="regulatory-status" data-value={contract.regulatory_status} style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)', color: contract.regulatory_status === 'reg_d' ? 'var(--primary)' : undefined }} title={contract.regulatory_status === 'reg_d' ? 'SEC Regulation D — Private placement exemption. Limited to accredited investors (>$1M net worth or >$200k annual income). No SEC registration required.' : `Regulatory status: ${contract.regulatory_status?.replace('_', ' ')}`}>
+                  <DrillDown concept={contract.regulatory_status} value={contract.regulatory_status}>
                     {contract.regulatory_status.replace('_', ' ').toUpperCase()}
-                  </span>
+                  </DrillDown>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
                   <strong>Transparency:</strong>
-                  <span data-drill="transparency-level" data-value={contract.transparency_level} style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} title={`Transparency: ${contract.transparency_level}. ${contract.transparency_level === 'full' ? 'All holdings and positions visible to investors.' : contract.transparency_level === 'partial' ? 'Summary-level holdings visible. Individual positions may be masked.' : 'Holdings not disclosed to investors.'}`}>
+                  <DrillDown concept={contract.transparency_level} value={contract.transparency_level}>
                     {contract.transparency_level.toUpperCase()}
-                  </span>
+                  </DrillDown>
                 </div>
               </div>
             </div>
