@@ -885,6 +885,14 @@ async function ensureSourceOrganization(sourceUrl: string, siteAnalysis: any, su
   if (siteType === 'auction_house') businessType = 'auction_house';
   else if (siteType === 'marketplace') businessType = 'other'; // marketplace not in allowed types
   
+  // Validate domain to prevent SQL injection
+  // Only allow alphanumeric, dots, and hyphens; must start and end with alphanumeric
+  const domainPattern = /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/i;
+  if (!domainPattern.test(domain)) {
+    console.warn(`Invalid domain format: ${domain}`);
+    return null;
+  }
+
   // Check if org already exists
   const { data: existingOrg } = await supabase
     .from('businesses')
