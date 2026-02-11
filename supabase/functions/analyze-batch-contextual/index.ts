@@ -185,6 +185,11 @@ serve(async (req) => {
       throw new Error('Missing required parameters: event_id, vehicle_id, user_id, image_ids')
     }
 
+    // Cap image batch size to prevent unbounded AI API costs
+    if (image_ids.length > 50) {
+      throw new Error(`Maximum 50 images per batch, received ${image_ids.length}`)
+    }
+
     const originatorContext = typeof originator_context === 'string' ? originator_context.trim() : ''
     const contextQuestions = Array.isArray(context_questions)
       ? context_questions.filter((q) => typeof q === 'string' && q.trim().length > 0).map((q) => q.trim())
