@@ -143,6 +143,7 @@ serve(async (req) => {
     by_source: {} as Record<string, { processed: number; succeeded: number; failed: number }>,
     vehicle_ids: [] as string[],
     errors: [] as string[],
+    errors_truncated: false,
   };
 
   try {
@@ -266,7 +267,7 @@ serve(async (req) => {
 
               metrics.succeeded++;
               metrics.by_source[sourceName].succeeded++;
-              if (vehicleId) metrics.vehicle_ids.push(vehicleId);
+              if (vehicleId && metrics.vehicle_ids.length < 500) metrics.vehicle_ids.push(vehicleId);
 
               // For BaT, also extract comments (non-blocking)
               if (sourceName === "bat" && vehicleId) {
@@ -289,7 +290,8 @@ serve(async (req) => {
             const errorMsg = e.message || String(e);
 
             // Determine if should retry or fail
-            const shouldFail = item.attempts >= 5;
+            const attempts = item.attempts ?? 0;
+            const shouldFail = attempts >= 5;
 
             await supabase
               .from("import_queue")
@@ -304,14 +306,18 @@ serve(async (req) => {
                   ? null
                   : new Date(
                       Date.now() +
-                        Math.min(2 * 60 * 60 * 1000, 5 * 60 * 1000 * Math.pow(2, item.attempts || 0))
+                        Math.min(2 * 60 * 60 * 1000, 5 * 60 * 1000 * Math.pow(2, attempts))
                     ).toISOString(),
               })
               .eq("id", item.id);
 
             metrics.failed++;
             metrics.by_source[sourceName].failed++;
-            metrics.errors.push(`${sourceName}:${item.id.slice(0, 8)}: ${errorMsg.slice(0, 100)}`);
+            if (metrics.errors.length < 100) {
+              metrics.errors.push(`${sourceName}:${item.id.slice(0, 8)}: ${errorMsg.slice(0, 100)}`);
+            } else {
+              metrics.errors_truncated = true;
+            }
           }
         }
       }
