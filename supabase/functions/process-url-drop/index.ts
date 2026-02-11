@@ -1302,7 +1302,7 @@ async function processGenericURL(url: string, supabase: any) {
       const { data: vehicle, error } = await supabase
         .from('vehicles')
         .insert({
-          year: parseInt(year),
+          year: parseInt(year, 10),
           make,
           model: model.split(/[-|]/)[0].trim(),
           vin: `VIVA-${Date.now()}`,

@@ -11,6 +11,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/** Strip characters that have special meaning in PostgREST filter strings */
+function escapePostgrestValue(s: string): string {
+  return String(s || '').replace(/[",().\\]/g, '');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -160,7 +165,8 @@ Return JSON:
             const { data: catalogMatches } = await supabase
               .from('catalog_parts')
               .select('id, part_number, name, price_current, category')
-              .or(`name.ilike."%${part.part_name}%",part_number.eq."${part.oem_part_number}"`)
+              .or(`name.ilike."%${escapePostgrestValue(part.part_name)}%",part_number.eq."${escapePostgrestValue(part.oem_part_number)}"`)
+
               .limit(3)
 
             recommendations.push({
