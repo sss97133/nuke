@@ -117,6 +117,7 @@ serve(async (req) => {
                 formats: ['markdown', 'html'],
                 onlyMainContent: true,
               }),
+              signal: AbortSignal.timeout(30000),
             })
 
             if (response.ok) {
@@ -335,6 +336,7 @@ Respond in JSON format:
         'Authorization': `Bearer ${llmConfig.apiKey}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(30000),
       body: JSON.stringify({
         model: llmConfig.model || 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
@@ -345,7 +347,7 @@ Respond in JSON format:
     if (response.ok) {
       const data = await response.json()
       const content = data.choices?.[0]?.message?.content || '{}'
-      return JSON.parse(content)
+      try { return JSON.parse(content) } catch { /* fall through to fallback */ }
     }
   } catch (e) {
     console.warn('LLM analysis failed:', e)

@@ -323,7 +323,7 @@ async function sourceMissingData(supabase: any, analysis: any) {
     .from('vehicles')
     .select('origin_metadata')
     .eq('id', vehicle_id)
-    .single();
+    .maybeSingle();
 
   if (needs.includes('images') && vehicle?.origin_metadata?.image_urls) {
     const imageUrls = vehicle.origin_metadata.image_urls;
