@@ -88,7 +88,7 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
   },
   barrettjackson: {
     pattern: "%barrett-jackson.com%",
-    extractor: "extract-vehicle-data-ai",
+    extractor: "extract-barrett-jackson",
     minDelay: 2000,
     maxDelay: 4000,
   },
