@@ -121,9 +121,9 @@ serve(async (req) => {
     const { url, userId, opinion, rating, _source } = body;
     _inbox_id = body._inbox_id;
 
-    if (!url) {
+    if (!url || typeof url !== 'string' || url.length > 2048) {
       return new Response(
-        JSON.stringify({ error: 'URL is required' }),
+        JSON.stringify({ error: 'URL is required and must be under 2048 characters' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

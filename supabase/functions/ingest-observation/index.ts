@@ -88,7 +88,7 @@ serve(async (req) => {
       .from("observation_sources")
       .select("id, base_trust_score, supported_observations")
       .eq("slug", input.source_slug)
-      .single();
+      .maybeSingle();
 
     if (sourceError || !source) {
       return new Response(JSON.stringify({

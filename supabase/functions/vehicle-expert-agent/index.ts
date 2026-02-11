@@ -1360,9 +1360,12 @@ Be specific to THIS exact year/make/model. Return as JSON:
     { temperature: 0.3 }
   );
   
-  const literature = JSON.parse(
-    litResponse.content?.match(/\{[\s\S]*\}/)?.[0] || '{}'
-  );
+  let literature: Record<string, unknown> = {};
+  try {
+    literature = JSON.parse(
+      litResponse.content?.match(/\{[\s\S]*\}/)?.[0] || '{}'
+    );
+  } catch { literature = {}; }
   console.log(`  ✅ Literature research complete (${litResponse.duration_ms}ms)`);
   
   return {
@@ -1459,8 +1462,9 @@ Focus on SUBSTANTIVE parts worth >$50. Ignore minor items.`;
   const jsonMatch = content.match(/\[[\s\S]*\]/);
   
   if (jsonMatch) {
-    const parsedComponents = JSON.parse(jsonMatch[0]);
-    
+    let parsedComponents: any[] = [];
+    try { parsedComponents = JSON.parse(jsonMatch[0]); } catch { parsedComponents = []; }
+
     for (const comp of parsedComponents) {
       // Find which specific images show this component
       const relatedImages = images.filter(img => 
@@ -1596,9 +1600,12 @@ Return JSON:
   );
   
   console.log(`  ✅ Environmental extraction complete (${envResponse.duration_ms}ms)`);
-  const envData = JSON.parse(
-    envResponse.content?.match(/\{[\s\S]*\}/)?.[0] || '{}'
-  );
+  let envData: Record<string, unknown> = {};
+  try {
+    envData = JSON.parse(
+      envResponse.content?.match(/\{[\s\S]*\}/)?.[0] || '{}'
+    );
+  } catch { envData = {}; }
   
   return {
     gpsLocations,

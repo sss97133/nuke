@@ -53,6 +53,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ url, source }),
+          signal: AbortSignal.timeout(60000),
         })
         if (proxyRes.ok) {
           const proxyData = await proxyRes.json()
