@@ -179,11 +179,12 @@ async function mergeOrganizations(
           .eq('user_id', contrib.user_id);
       } else {
         // Delete duplicate from source
-        await supabase
+        const { error: deleteError } = await supabase
           .from('organization_contributors')
           .delete()
           .eq('organization_id', sourceId)
           .eq('user_id', contrib.user_id);
+        if (deleteError) console.error('Failed to delete from organization_contributors:', deleteError.message);
       }
     }
   }

@@ -559,11 +559,12 @@ async function saveImages(
   if (imageUrls.length === 0) return 0;
 
   // Delete existing blocket images for this vehicle
-  await supabase
+  const { error: deleteError } = await supabase
     .from('vehicle_images')
     .delete()
     .eq('vehicle_id', vehicleId)
     .eq('source', 'blocket');
+  if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message);
 
   const imageRecords = imageUrls.slice(0, 50).map((imgUrl, i) => ({
     vehicle_id: vehicleId,

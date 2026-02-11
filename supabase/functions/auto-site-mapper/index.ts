@@ -1,6 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 /**
  * AUTO SITE MAPPER
  * 
@@ -65,7 +70,7 @@ Deno.serve(async (req) => {
         return await generateExtractionSchema(params);
       
       default:
-        return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
   } catch (error: any) {
     console.error('Auto site mapper error:', error);
@@ -73,7 +78,7 @@ Deno.serve(async (req) => {
       success: false,
       error: "Site mapping failed",
       timestamp: new Date().toISOString()
-    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
 

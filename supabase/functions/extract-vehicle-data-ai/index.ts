@@ -466,11 +466,12 @@ serve(async (req) => {
           }))
 
           // Delete existing external_import images to avoid duplicates
-          await supabase
+          const { error: deleteError } = await supabase
             .from('vehicle_images')
             .delete()
             .eq('vehicle_id', vehicleId)
             .eq('source', 'external_import')
+          if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message)
 
           const { data: insertedImgs, error: imgErr } = await supabase
             .from('vehicle_images')

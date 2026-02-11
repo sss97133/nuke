@@ -943,11 +943,12 @@ serve(async (req) => {
       }));
 
       // Delete existing cab_import images first to avoid duplicates
-      await supabase
+      const { error: deleteError } = await supabase
         .from("vehicle_images")
         .delete()
         .eq("vehicle_id", vehicleId)
         .eq("source", "external_import");
+      if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message);
 
       console.log(`✅ C&B: Attempting to insert ${imageRows.length} images for vehicle ${vehicleId}`);
       console.log(`✅ C&B: First image row: ${JSON.stringify(imageRows[0])}`);

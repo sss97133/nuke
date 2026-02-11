@@ -535,11 +535,12 @@ async function saveToDatabase(
   let imagesSaved = 0;
   if (extracted.image_urls.length > 0) {
     // Delete existing gooding images for this vehicle
-    await supabase
+    const { error: deleteError } = await supabase
       .from('vehicle_images')
       .delete()
       .eq('vehicle_id', vehicleId)
       .eq('source', 'gooding');
+    if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message);
 
     const imageRecords = extracted.image_urls.slice(0, 100).map((imgUrl, i) => ({
       vehicle_id: vehicleId,

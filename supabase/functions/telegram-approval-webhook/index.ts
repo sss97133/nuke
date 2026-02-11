@@ -14,6 +14,11 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 const BOT_TOKEN = Deno.env.get("TELEGRAM_APPROVAL_BOT_TOKEN");
 const OWNER_CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID") || "7587296683";
 
@@ -124,7 +129,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response("Method not allowed", { status: 405, headers: { ...corsHeaders } });
   }
 
   try {
