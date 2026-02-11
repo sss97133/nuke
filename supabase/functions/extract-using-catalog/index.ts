@@ -606,7 +606,13 @@ Return ONLY valid JSON with the missing fields.`;
     }
 
     const aiData = await aiResponse.json();
-    const backfillData = JSON.parse(aiData.choices[0].message.content);
+    let backfillData;
+    try {
+      backfillData = JSON.parse(aiData.choices[0].message.content);
+    } catch {
+      console.error('Failed to parse AI backfill JSON:', aiData.choices?.[0]?.message?.content?.slice(0, 200));
+      return {};
+    }
     
     // If team_members was extracted, ensure it's in the right format
     if (backfillData.team_members && !Array.isArray(backfillData.team_members)) {

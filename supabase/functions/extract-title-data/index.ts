@@ -125,7 +125,7 @@ async function extractWithAnthropic(imageUrl: string): Promise<ExtractionResult>
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
   // Fetch image and convert to base64
-  const imageResponse = await fetch(imageUrl)
+  const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) })
   if (!imageResponse.ok) throw new Error(`Failed to fetch image: ${imageResponse.status}`)
 
   const imageBuffer = await imageResponse.arrayBuffer()

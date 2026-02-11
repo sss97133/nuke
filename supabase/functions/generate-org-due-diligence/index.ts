@@ -585,7 +585,13 @@ In "missing_critical_fields", identify which database fields are still missing t
           throw new Error('No response from OpenAI (fallback)');
         }
 
-        const report = JSON.parse(reportJson) as DueDiligenceReport;
+        let report: DueDiligenceReport;
+        try {
+          report = JSON.parse(reportJson) as DueDiligenceReport;
+        } catch {
+          console.error('Failed to parse fallback report JSON:', reportJson?.slice(0, 200));
+          return null as unknown as DueDiligenceReport;
+        }
         // Use same validation function as main path (extracted below)
         return validateAndCleanReport(report);
       }
@@ -599,8 +605,14 @@ In "missing_critical_fields", identify which database fields are still missing t
       throw new Error('No response from OpenAI');
     }
 
-    const report = JSON.parse(reportJson) as DueDiligenceReport;
-    
+    let report: DueDiligenceReport;
+    try {
+      report = JSON.parse(reportJson) as DueDiligenceReport;
+    } catch {
+      console.error('Failed to parse report JSON:', reportJson?.slice(0, 200));
+      return null as unknown as DueDiligenceReport;
+    }
+
     // Validate and clean the comprehensive investment-grade report
     return validateAndCleanReport(report);
   } catch (error: any) {
