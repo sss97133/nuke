@@ -141,13 +141,15 @@ serve(async (req) => {
         
         // First, verify this is a Facebook token (not Instagram token)
         const fbMeResponse = await fetch(
-          `https://graph.facebook.com/v18.0/me?access_token=${accessToken}`
+          `https://graph.facebook.com/v18.0/me?access_token=${accessToken}`,
+          { signal: AbortSignal.timeout(15000) }
         );
         
         if (fbMeResponse.ok) {
           // Get Facebook Pages (requires pages_show_list permission)
           const pagesResponse = await fetch(
-            `https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}`
+            `https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}`,
+            { signal: AbortSignal.timeout(15000) }
           );
           
           if (pagesResponse.ok) {
@@ -162,7 +164,8 @@ serve(async (req) => {
               console.log(`[sync-instagram-organization] Checking page: ${page.name} (${page.id})`);
               
               const igAccountResponse = await fetch(
-                `https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${pageToken}`
+                `https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${pageToken}`,
+                { signal: AbortSignal.timeout(15000) }
               );
               
               if (igAccountResponse.ok) {
@@ -213,7 +216,7 @@ serve(async (req) => {
     if (!igAccountId) {
       try {
         console.log('[sync-instagram-organization] Trying /me endpoint to get account ID...');
-        const meResponse = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+        const meResponse = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`, { signal: AbortSignal.timeout(15000) });
         
         if (meResponse.ok) {
           const meData = await meResponse.json();
@@ -255,7 +258,7 @@ serve(async (req) => {
     if (!igAccountId) {
       // Try to get account ID from /me endpoint
       try {
-        const meResponse = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+        const meResponse = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`, { signal: AbortSignal.timeout(15000) });
         if (meResponse.ok) {
           const meData = await meResponse.json();
           if (meData.id) {
@@ -307,7 +310,7 @@ The function attempted to auto-detect but could not find the account ID.`;
 
     console.log(`[sync-instagram-organization] Fetching posts from: ${url.replace(accessToken, 'TOKEN')}`);
 
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Instagram API error: ${response.status} - ${errorText}`);
@@ -465,7 +468,7 @@ async function downloadImageToStorage(
 ): Promise<string | null> {
   try {
     // Fetch image
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(20000) });
     if (!imageResponse.ok) {
       console.warn(`[sync-instagram-organization] Failed to fetch image: ${imageUrl}`);
       return null;

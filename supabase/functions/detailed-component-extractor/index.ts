@@ -140,6 +140,7 @@ Be COMPREHENSIVE. List EVERYTHING you can see.`;
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openaiKey}`,
       },
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [

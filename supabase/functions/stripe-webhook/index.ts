@@ -217,7 +217,8 @@ Deno.serve(async (req) => {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')}`
             },
-            body: JSON.stringify({ transaction_id: transactionId })
+            body: JSON.stringify({ transaction_id: transactionId }),
+            signal: AbortSignal.timeout(30000),
           })
         } catch (err) {
           console.error('Failed to trigger document generation:', err)
@@ -231,10 +232,11 @@ Deno.serve(async (req) => {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')}`
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               transaction_id: transactionId,
               notification_type: 'sign_request'
-            })
+            }),
+            signal: AbortSignal.timeout(30000),
           })
         } catch (err) {
           console.error('Failed to trigger SMS notifications:', err)

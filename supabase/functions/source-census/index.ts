@@ -24,7 +24,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
       const sitemapUrl = "https://bringatrailer.com/sitemap_index.xml";
 
       try {
-        const resp = await fetch(sitemapUrl);
+        const resp = await fetch(sitemapUrl, { signal: AbortSignal.timeout(20000) });
         const xml = await resp.text();
 
         // Count listing sitemap entries
@@ -37,7 +37,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
         const estimatedTotal = listingSitemaps.length * 1000;
 
         // Get active count from main page
-        const activeResp = await fetch("https://bringatrailer.com/auctions/");
+        const activeResp = await fetch("https://bringatrailer.com/auctions/", { signal: AbortSignal.timeout(20000) });
         const activeHtml = await activeResp.text();
         const activeMatch = activeHtml.match(/(\d+)\s*Active\s*Auctions/i);
         const activeCount = activeMatch ? parseInt(activeMatch[1]) : null;
@@ -62,7 +62,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
     async execute(ctx: CensusContext) {
       try {
         // C&B shows total count in search results
-        const resp = await fetch("https://carsandbids.com/past-auctions/");
+        const resp = await fetch("https://carsandbids.com/past-auctions/", { signal: AbortSignal.timeout(20000) });
         const html = await resp.text();
 
         // Look for "X results" or pagination info
@@ -70,7 +70,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
         const total = totalMatch ? parseInt(totalMatch[1].replace(/,/g, '')) : null;
 
         // Active auctions
-        const activeResp = await fetch("https://carsandbids.com/");
+        const activeResp = await fetch("https://carsandbids.com/", { signal: AbortSignal.timeout(20000) });
         const activeHtml = await activeResp.text();
         const activeMatch = activeHtml.match(/(\d+)\s*(?:live|active)/i);
         const active = activeMatch ? parseInt(activeMatch[1]) : null;
@@ -95,7 +95,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
     async execute(ctx: CensusContext) {
       try {
         // Mecum results page shows total
-        const resp = await fetch("https://www.mecum.com/lots/");
+        const resp = await fetch("https://www.mecum.com/lots/", { signal: AbortSignal.timeout(20000) });
         const html = await resp.text();
 
         // Look for total in pagination or results text
@@ -120,7 +120,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
     confidence: 0.90,
     async execute(ctx: CensusContext) {
       try {
-        const resp = await fetch("https://pcarmarket.com/listings/all-results/");
+        const resp = await fetch("https://pcarmarket.com/listings/all-results/", { signal: AbortSignal.timeout(20000) });
         const html = await resp.text();
 
         const totalMatch = html.match(/(\d{1,3}(?:,\d{3})*)\s*(?:results|listings)/i);
@@ -143,7 +143,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
     confidence: 0.85,
     async execute(ctx: CensusContext) {
       try {
-        const resp = await fetch("https://rmsothebys.com/en/results");
+        const resp = await fetch("https://rmsothebys.com/en/results", { signal: AbortSignal.timeout(20000) });
         const html = await resp.text();
 
         const totalMatch = html.match(/(\d{1,3}(?:,\d{3})*)\s*(?:lots|results)/i);
@@ -166,7 +166,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
     confidence: 0.80,
     async execute(ctx: CensusContext) {
       try {
-        const resp = await fetch("https://www.barrett-jackson.com/Archive/");
+        const resp = await fetch("https://www.barrett-jackson.com/Archive/", { signal: AbortSignal.timeout(20000) });
         const html = await resp.text();
 
         const totalMatch = html.match(/(\d{1,3}(?:,\d{3})*)\s*(?:lots|vehicles|results)/i);
@@ -189,7 +189,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
     confidence: 0.85,
     async execute(ctx: CensusContext) {
       try {
-        const resp = await fetch("https://www.hemmings.com/classifieds/cars-for-sale");
+        const resp = await fetch("https://www.hemmings.com/classifieds/cars-for-sale", { signal: AbortSignal.timeout(20000) });
         const html = await resp.text();
 
         const totalMatch = html.match(/(\d{1,3}(?:,\d{3})*)\s*(?:vehicles|listings|results)/i);
@@ -213,7 +213,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
     confidence: 0.85,
     async execute(ctx: CensusContext) {
       try {
-        const resp = await fetch("https://www.hagerty.com/marketplace");
+        const resp = await fetch("https://www.hagerty.com/marketplace", { signal: AbortSignal.timeout(20000) });
         const html = await resp.text();
 
         const totalMatch = html.match(/(\d{1,3}(?:,\d{3})*)\s*(?:vehicles|listings)/i);

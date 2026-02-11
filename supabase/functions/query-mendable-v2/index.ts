@@ -138,6 +138,7 @@ async function mendablePostWithApiKeyHeader(path: string, apiKey: string, payloa
     method: "POST",
     headers: { "Content-Type": "application/json", "api-key": apiKey },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30000),
   });
 
   const text = await res.text();
@@ -157,6 +158,7 @@ async function mendablePostWithBearer(path: string, apiKey: string, payload: Rec
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30000),
   });
 
   const text = await res.text();
