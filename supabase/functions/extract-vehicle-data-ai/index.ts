@@ -166,16 +166,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Get LLM config with automatic fallback (Google → Anthropic → OpenAI)
-    // Google first since Gemini is free and unlimited
+    // Get LLM config with automatic fallback (Anthropic → Google → OpenAI)
+    // Anthropic first since OpenAI quota is exhausted and no Google key configured
     let llmConfig;
     let llmResponse;
-    const providers: LLMProvider[] = ['google', 'anthropic', 'openai'];
+    const providerModels: [LLMProvider, string][] = [
+      ['anthropic', 'claude-3-5-haiku-20241022'],
+      ['google', 'gemini-1.5-flash'],
+      ['openai', 'gpt-4o-mini'],
+    ];
     let lastError: Error | null = null;
 
-    for (const provider of providers) {
+    for (const [provider, model] of providerModels) {
       try {
-        llmConfig = await getLLMConfig(supabase, null, provider, undefined, 'tier2');
+        llmConfig = await getLLMConfig(supabase, null, provider, model);
         console.log(`[extract-vehicle-data-ai] Trying provider: ${llmConfig.provider}/${llmConfig.model}`);
 
         llmResponse = await callLLM(llmConfig, [

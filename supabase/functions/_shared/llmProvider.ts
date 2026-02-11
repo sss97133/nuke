@@ -42,7 +42,7 @@ export const PROVIDER_MODELS: Record<LLMProvider, ProviderModel[]> = {
 
 export const TIER_CONFIGS: Record<AnalysisTier, { provider: LLMProvider; model: string; description: string }> = {
   tier1: { provider: 'google', model: 'gemini-1.5-flash', description: 'Fast, free basic analysis' },
-  tier2: { provider: 'openai', model: 'gpt-4o-mini', description: 'Good quality, low cost' },
+  tier2: { provider: 'google', model: 'gemini-1.5-flash', description: 'Good quality, free' },
   tier3: { provider: 'openai', model: 'gpt-4o', description: 'High quality, balanced cost' },
   expert: { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', description: 'Highest quality, comprehensive analysis' },
 };
@@ -102,8 +102,8 @@ export async function getLLMConfig(
     }
   }
   
-  // Fallback: Try providers in order (free first)
-  const fallbackOrder: LLMProvider[] = ['google', 'openai', 'anthropic'];
+  // Fallback: Try providers in order (Anthropic first since OpenAI quota exhausted)
+  const fallbackOrder: LLMProvider[] = ['anthropic', 'google', 'openai'];
   
   for (const provider of fallbackOrder) {
     const { getUserApiKey } = await import('./getUserApiKey.ts');
