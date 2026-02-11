@@ -73,7 +73,7 @@ serve(async (req) => {
             is_public, created_at, updated_at, owner_id, primary_image_url
           `)
           .eq("id", vehicleId)
-          .single();
+          .maybeSingle();
 
         if (error || !data) {
           return new Response(
@@ -222,7 +222,7 @@ serve(async (req) => {
         .from("vehicles")
         .select("owner_id")
         .eq("id", vehicleId)
-        .single();
+        .maybeSingle();
 
       if (!existing || existing.owner_id !== userId) {
         return new Response(
@@ -273,7 +273,7 @@ serve(async (req) => {
         .from("vehicles")
         .select("owner_id")
         .eq("id", vehicleId)
-        .single();
+        .maybeSingle();
 
       if (!existing || existing.owner_id !== userId) {
         return new Response(
