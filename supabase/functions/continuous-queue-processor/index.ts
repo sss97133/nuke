@@ -284,7 +284,8 @@ serve(async (req) => {
                 }).catch((e) => console.warn(`[queue] Comment extraction trigger failed for ${item.id}:`, e.message));
               }
             } else {
-              throw new Error(extractResult.error || "Extraction failed");
+              const errDetail = typeof extractResult.error === 'string' ? extractResult.error : JSON.stringify(extractResult.error);
+              throw new Error(errDetail || "Extraction failed");
             }
           } catch (e: any) {
             const errorMsg = e.message || String(e);
