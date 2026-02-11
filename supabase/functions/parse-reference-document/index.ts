@@ -222,7 +222,13 @@ Return valid JSON only.`;
   });
   
   const data = await response.json();
-  return JSON.parse(data.choices[0].message.content);
+  const rawContent = data.choices[0]?.message?.content;
+  if (!rawContent) throw new Error('Empty response from OpenAI');
+  try {
+    return JSON.parse(rawContent);
+  } catch {
+    throw new Error(`OpenAI returned invalid JSON: ${rawContent.slice(0, 200)}`);
+  }
 }
 
 // Process extraction in background (non-blocking)
