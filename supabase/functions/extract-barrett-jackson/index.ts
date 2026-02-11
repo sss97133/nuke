@@ -217,8 +217,8 @@ async function scrapeWithFirecrawl(
     body: JSON.stringify({
       url,
       formats: ["markdown", "rawHtml"],
-      waitFor: 3000,
-      timeout: 30000,
+      waitFor: 5000,
+      timeout: 45000,
     }),
   });
 
