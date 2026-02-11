@@ -71,6 +71,7 @@ async function sendMessage(chatId: number, text: string) {
         text,
         parse_mode: "Markdown",
       }),
+      signal: AbortSignal.timeout(10000),
     });
     const result = await response.json();
     if (!result.ok) {
@@ -81,6 +82,7 @@ async function sendMessage(chatId: number, text: string) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: chatId, text }),
+          signal: AbortSignal.timeout(10000),
         });
         const retryResult = await retry.json();
         console.log("[Telegram] Retry result:", retryResult);
@@ -110,7 +112,7 @@ async function getFileUrl(fileId: string): Promise<string | null> {
 
 // Download file from Telegram
 async function downloadFile(fileUrl: string): Promise<Blob> {
-  const response = await fetch(fileUrl);
+  const response = await fetch(fileUrl, { signal: AbortSignal.timeout(30000) });
   return await response.blob();
 }
 
@@ -125,7 +127,8 @@ async function decodeVINWithNHTSA(vin: string): Promise<{
 }> {
   try {
     const response = await fetch(
-      `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`
+      `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`,
+      { signal: AbortSignal.timeout(15000) }
     );
     const data = await response.json();
 
@@ -293,6 +296,7 @@ async function processPhoto(
         "x-api-key": anthropicKey,
         "anthropic-version": "2023-06-01",
       },
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1000,
@@ -338,7 +342,8 @@ Return ONLY valid JSON:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+      let parsed: any;
+      try { parsed = JSON.parse(jsonMatch[0]); } catch { return "Could not parse document data. Please try again."; }
 
       // Validate VIN if present
       let vinStatus = "";
@@ -665,6 +670,7 @@ serve(async (req) => {
         chat_id: testChatId,
         text: "NukeProof bot is working!",
       }),
+      signal: AbortSignal.timeout(10000),
     });
     const result = await response.json();
     return new Response(JSON.stringify(result), {
