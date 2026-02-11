@@ -1,6 +1,7 @@
 #!/bin/bash
 # worker-gaa.sh — GAA Classic Cars Worker
-# Single crawl call, then enrichment passes
+# Per-page crawl to avoid edge function timeout
+# Fetches page 1 to get total_pages, then loops through all pages
 
 DURATION="${1:-28800}"
 END_TIME=$(($(date +%s) + DURATION))
@@ -12,25 +13,32 @@ call_fn() {
   dotenvx run -- bash -c "curl -s -X POST \"\$VITE_SUPABASE_URL/functions/v1/extract-gaa-classics\" -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" -H \"Content-Type: application/json\" -d '$1'" 2>/dev/null
 }
 
-log "Starting GAA Classic Cars extraction"
+crawl_type() {
+  local TYPE="$1"
+  log "Crawling $TYPE page 1 to get total_pages..."
+  RESULT=$(call_fn "{\"action\": \"crawl\", \"type\": \"$TYPE\", \"page\": 1}")
+  TOTAL_PAGES=$(echo "$RESULT" | jq -r '.total_pages // 1' 2>/dev/null)
+  DISCOVERED=$(echo "$RESULT" | jq -r '.discovered // 0' 2>/dev/null)
+  log "$TYPE page 1/$TOTAL_PAGES: $DISCOVERED items"
 
-# Full inventory crawl
-log "Crawling current inventory..."
-RESULT=$(call_fn '{"action": "crawl", "type": "inventory"}')
-log "Inventory: $(echo "$RESULT" | jq -c '{success: .success, discovered: .discovered, processed: .processed}' 2>/dev/null)"
+  # Crawl remaining pages
+  for ((page=2; page<=TOTAL_PAGES; page++)); do
+    [ "$(date +%s)" -ge "$END_TIME" ] && break
+    RESULT=$(call_fn "{\"action\": \"crawl\", \"type\": \"$TYPE\", \"page\": $page}")
+    DISCOVERED=$(echo "$RESULT" | jq -r '.discovered // 0' 2>/dev/null)
+    log "$TYPE page $page/$TOTAL_PAGES: $DISCOVERED items"
+    sleep 1
+  done
+}
 
-sleep 5
+log "Starting GAA Classic Cars per-page extraction"
 
-# Past results
-log "Crawling past results..."
-RESULT=$(call_fn '{"action": "crawl", "type": "results"}')
-log "Results: $(echo "$RESULT" | jq -c '{success: .success, discovered: .discovered, processed: .processed}' 2>/dev/null)"
+# Crawl inventory page by page
+crawl_type "inventory"
 
-sleep 5
+sleep 3
 
-# Combined crawl
-log "Full crawl (all)..."
-RESULT=$(call_fn '{"action": "crawl", "type": "all"}')
-log "All: $(echo "$RESULT" | jq -c '{success: .success, discovered: .discovered, processed: .processed}' 2>/dev/null)"
+# Crawl results page by page
+crawl_type "results"
 
 log "GAA worker complete."

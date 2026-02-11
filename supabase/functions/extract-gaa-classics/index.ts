@@ -142,11 +142,11 @@ function parseListingGrid(html: string): ListingItem[] {
 
     // Extract sale price
     const priceMatch = content.match(/Sale\s*Price:\s*<\/span>\s*<strong>\s*\$?([\d,]+)/i);
-    const sale_price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, "")) : null;
+    const sale_price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, ""), 10) : null;
 
     // Extract highest bid (for not sold)
     const bidMatch = content.match(/Highest\s*Bid:\s*<\/span>\s*<strong>\s*\$?([\d,]+)/i);
-    const highest_bid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, "")) : null;
+    const highest_bid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, ""), 10) : null;
 
     // Check sold/not sold status
     const sold = content.includes("gaa-inventory-sold-banner") || (sale_price !== null && sale_price > 0);
@@ -263,11 +263,11 @@ function extractVehicleDetails(html: string, url: string): ExtractedVehicle {
 
   // Sale price (on results pages)
   const priceMatch = html.match(/Sale\s*Price:\s*<\/span>\s*<strong>\s*\$?([\d,]+)/i);
-  const sale_price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, "")) : null;
+  const sale_price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, ""), 10) : null;
 
   // Highest bid
   const bidMatch = html.match(/Highest\s*Bid:\s*<\/span>\s*<strong>\s*\$?([\d,]+)/i);
-  const highest_bid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, "")) : null;
+  const highest_bid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, ""), 10) : null;
 
   // Sold/not sold status
   const sold = html.includes("gaa-inventory-sold-banner") || (sale_price !== null && sale_price > 0);
@@ -281,7 +281,7 @@ function extractVehicleDetails(html: string, url: string): ExtractedVehicle {
   let mileage: number | null = null;
   const mileageMatch = html.match(/(\d{1,3}(?:,\d{3})*)\s*(?:Actual\s*)?Miles/i);
   if (mileageMatch) {
-    mileage = parseInt(mileageMatch[1].replace(/,/g, ""));
+    mileage = parseInt(mileageMatch[1].replace(/,/g, ""), 10);
   }
 
   // Highlights
@@ -737,13 +737,20 @@ serve(async (req) => {
         const pageUrl = pageNum === 1 ? baseUrl : `${baseUrl}&page=${pageNum}`;
 
         console.log(`[GAA] Crawling ${crawlType} page ${pageNum}...`);
-        const pageResult = await crawlAndInsertPage(supabase, pageUrl, orgId);
+
+        // Fetch the page HTML to get total_pages, then process
+        const pageHtml = await fetchPage(pageUrl);
+        const totalPages = getPageCount(pageHtml);
+        const pageItems = parseListingGrid(pageHtml);
+        const pageResult = await upsertVehiclesFromGrid(supabase, pageItems, orgId);
 
         return okJson({
           success: true,
           action: "crawl",
           type: crawlType,
           page: pageNum,
+          total_pages: totalPages,
+          discovered: pageItems.length,
           ...pageResult,
         });
       }

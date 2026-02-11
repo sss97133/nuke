@@ -167,13 +167,31 @@ async function fetchAuctionLots(auctionCode: string, pageSize = 200): Promise<RM
 
     const data = await response.json();
     const items: RMSLotItem[] = data.items || [];
+    const totalCount: number | undefined = data.totalCount ?? data.total;
 
     allItems.push(...items);
 
     // Check if there are more pages
-    if (items.length < pageSize) {
-      hasMore = false;
-    } else {
+    // Use totalCount when available; otherwise require TWO consecutive short pages
+    // (single short page can happen mid-stream due to API quirks)
+    if (totalCount !== undefined) {
+      hasMore = allItems.length < totalCount;
+    } else if (items.length < pageSize) {
+      // Allow one short page — only stop if we got 0 items
+      if (items.length === 0) {
+        hasMore = false;
+      } else {
+        // Fetch one more page to confirm we're really done
+        page++;
+        if (page > 20) {
+          console.warn('[RMS] Reached page limit, stopping pagination');
+          break;
+        }
+        continue;
+      }
+    }
+
+    if (hasMore) {
       page++;
       // Safety limit
       if (page > 20) {
@@ -482,6 +500,152 @@ serve(async (req) => {
         auction,
         total_lots: vehicles.length,
         processed: applied.length,
+        created: results.created,
+        updated: results.updated,
+        errors: results.errors.length,
+        error_details: results.errors.slice(0, 10),
+      });
+    }
+
+    // Process with HTML fallback — catches lots the API misses
+    if (action === 'process_with_fallback') {
+      if (!auction) {
+        return okJson({ success: false, error: 'Auction code required' }, 400);
+      }
+
+      console.log(`[RMS] Process with fallback for: ${auction}`);
+
+      // Step 1: Normal API extraction
+      const items = await fetchAuctionLots(auction);
+      const vehicles = items.map((item) => transformLotItem(item, auction));
+      const apiUrls = new Set(vehicles.map(v => v.url));
+
+      const results = {
+        api_lots: vehicles.length,
+        html_extra: 0,
+        created: 0,
+        updated: 0,
+        errors: [] as string[],
+      };
+
+      // Save API results
+      for (const vehicle of vehicles) {
+        try {
+          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
+          if (isNew) results.created++;
+          else results.updated++;
+        } catch (err: any) {
+          results.errors.push(`${vehicle.title}: ${err.message}`);
+        }
+      }
+
+      // Step 2: Fetch auction HTML page to find lots not in API
+      try {
+        const htmlUrl = `https://rmsothebys.com/auctions/${auction.toLowerCase()}/lots/`;
+        console.log(`[RMS] Fetching HTML fallback: ${htmlUrl}`);
+        const htmlRes = await fetch(htmlUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+            'Accept': 'text/html',
+          },
+          redirect: 'follow',
+          signal: AbortSignal.timeout(30000),
+        });
+
+        if (htmlRes.ok) {
+          const html = await htmlRes.text();
+          // Extract lot URLs from HTML: /auctions/{code}/lots/{slug}
+          const lotUrlPattern = new RegExp(
+            `href="(/auctions/${auction.toLowerCase()}/lots/[^"]+)"`,
+            'gi'
+          );
+          const htmlLotUrls = new Set<string>();
+          let match;
+          while ((match = lotUrlPattern.exec(html)) !== null) {
+            const fullUrl = `https://rmsothebys.com${match[1]}`;
+            if (!apiUrls.has(fullUrl)) {
+              htmlLotUrls.add(fullUrl);
+            }
+          }
+
+          console.log(`[RMS] Found ${htmlLotUrls.size} lot URLs in HTML not in API`);
+
+          // For each missing lot, try to extract from individual page
+          for (const lotUrl of htmlLotUrls) {
+            try {
+              const lotRes = await fetch(lotUrl, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                  'Accept': 'text/html',
+                },
+                redirect: 'follow',
+                signal: AbortSignal.timeout(15000),
+              });
+
+              if (!lotRes.ok) continue;
+              const lotHtml = await lotRes.text();
+
+              // Extract basic data from individual lot page
+              const titleMatch = lotHtml.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+              const title = titleMatch?.[1]?.trim() || null;
+              if (!title) continue;
+
+              const { year, make, model } = parseTitle(title);
+
+              // Try to find lot number
+              const lotNumMatch = lotHtml.match(/Lot\s*(\d+)/i);
+              const lotNumber = lotNumMatch?.[1] || null;
+
+              // Try to find price
+              const priceMatch = lotHtml.match(/(?:Sold\s+For|Hammer\s+Price)[^$€£]*?([\d,]+)/i);
+              const soldPrice = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : null;
+
+              const fallbackVehicle: ExtractedVehicle = {
+                url: lotUrl,
+                title: title || 'Unknown',
+                year,
+                make,
+                model,
+                lot_number: lotNumber || '',
+                auction_name: auction,
+                auction_code: auction.toUpperCase(),
+                estimate_text: null,
+                sold_price: soldPrice,
+                sold_price_text: null,
+                currency: null,
+                sold: !!soldPrice,
+                is_still_for_sale: false,
+                image_url: null,
+                rms_lot_id: '',
+                rms_auction_id: '',
+                bidding_type: '',
+                collection: null,
+              };
+
+              const { isNew } = await saveVehicle(supabase, fallbackVehicle);
+              results.html_extra++;
+              if (isNew) results.created++;
+              else results.updated++;
+
+              console.log(`[RMS] HTML fallback: ${title}`);
+            } catch (err: any) {
+              results.errors.push(`HTML fallback ${lotUrl}: ${err.message}`);
+            }
+
+            // Small delay between individual page fetches
+            await new Promise(r => setTimeout(r, 500));
+          }
+        }
+      } catch (htmlErr: any) {
+        console.error(`[RMS] HTML fallback fetch error: ${htmlErr.message}`);
+      }
+
+      return okJson({
+        success: true,
+        auction,
+        api_lots: results.api_lots,
+        html_extra_lots: results.html_extra,
+        total_processed: results.api_lots + results.html_extra,
         created: results.created,
         updated: results.updated,
         errors: results.errors.length,

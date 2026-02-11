@@ -16,21 +16,17 @@ AUCTIONS=(PA26 AZ26 CC26 MI26 S0226 PA25 AZ25 MO25 MI25 MT25 PA24 AZ24 MO24 MT24
 
 log "Starting RM Sotheby's extraction for ${#AUCTIONS[@]} auctions"
 
+# Use process_with_fallback for HTML fallback coverage
 for code in "${AUCTIONS[@]}"; do
   [ "$(date +%s)" -ge "$END_TIME" ] && break
 
-  log "Processing auction: $code"
-  RESULT=$(call_fn "{\"action\": \"process\", \"auction\": \"$code\", \"save_to_db\": true}")
-  SUCCESS=$(echo "$RESULT" | jq -r '.success' 2>/dev/null)
-  LOTS=$(echo "$RESULT" | jq -r '.lots_processed // .count // 0' 2>/dev/null)
-  NEW=$(echo "$RESULT" | jq -r '.new_vehicles // 0' 2>/dev/null)
-  log "  $code: success=$SUCCESS lots=$LOTS new=$NEW"
+  log "Processing auction (with fallback): $code"
+  RESULT=$(call_fn "{\"action\": \"process_with_fallback\", \"auction\": \"$code\", \"save_to_db\": true}")
+  API_LOTS=$(echo "$RESULT" | jq -r '.api_lots // 0' 2>/dev/null)
+  HTML_EXTRA=$(echo "$RESULT" | jq -r '.html_extra_lots // 0' 2>/dev/null)
+  CREATED=$(echo "$RESULT" | jq -r '.created // 0' 2>/dev/null)
+  log "  $code: api=$API_LOTS html_extra=$HTML_EXTRA created=$CREATED"
   sleep 3
 done
-
-# Second pass: list_all for any missed lots
-log "Second pass: list_all for comprehensive extraction"
-RESULT=$(call_fn '{"action": "list_all", "save_to_db": true}')
-log "list_all: $(echo "$RESULT" | jq -c '{success: .success, total: .total_lots}' 2>/dev/null)"
 
 log "RM Sotheby's worker complete."
