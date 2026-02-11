@@ -12,8 +12,9 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { SUPABASE_URL } from '../../lib/env';
 
-const API_BASE = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1';
+const API_BASE = `${SUPABASE_URL}/functions/v1`;
 
 const mcpTools = [
   {
