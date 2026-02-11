@@ -627,6 +627,7 @@ Return ONLY the JSON object. No markdown, no explanations, just pure JSON.`
       'x-api-key': anthropicApiKey,
       'anthropic-version': '2023-06-01'
     },
+    signal: AbortSignal.timeout(90000),
     body: JSON.stringify({
       model: anthropicModel,
       max_tokens: 4000,

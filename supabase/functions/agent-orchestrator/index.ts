@@ -333,7 +333,8 @@ async function callAgent(functionName: string, action: string, params: any): Pro
         'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ action, params })
+      body: JSON.stringify({ action, params }),
+      signal: AbortSignal.timeout(30000),
     });
     
     const data = await response.json();

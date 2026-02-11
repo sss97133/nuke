@@ -72,12 +72,13 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
-  } catch (error) {
-    console.error('❌ Error:', error);
+  } catch (error: any) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('❌ Error:', errMsg);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: errMsg,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -98,7 +99,8 @@ async function scrapeBaTPrice(batUrl: string): Promise<BaTPriceData> {
     const response = await fetch(batUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+      },
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) {
@@ -436,8 +438,8 @@ async function fixBatchVehicles(supabase: any) {
         fixed++;
       }
       await new Promise((resolve) => setTimeout(resolve, 2000));
-    } catch (error) {
-      console.error(`Error fixing ${vehicle.id}:`, error);
+    } catch (error: any) {
+      console.error(`Error fixing ${vehicle.id}:`, error instanceof Error ? error.message : String(error));
     }
   }
 

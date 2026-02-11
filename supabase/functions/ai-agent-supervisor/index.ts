@@ -271,6 +271,7 @@ async function callClaudeAPI(prompt: string, image_url: string): Promise<{succes
         'Content-Type': 'application/json',
         'x-api-key': Deno.env.get('ANTHROPIC_API_KEY') || ''
       },
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4000,
@@ -309,11 +310,12 @@ async function callClaudeAPI(prompt: string, image_url: string): Promise<{succes
       return { success: false, error: 'No JSON found in Claude response' }
     }
 
-    const supervisedResult = JSON.parse(jsonMatch[0])
+    let supervisedResult: any;
+    try { supervisedResult = JSON.parse(jsonMatch[0]); } catch { return { success: false, error: 'Invalid JSON in Claude response' }; }
     return { success: true, data: supervisedResult }
 
-  } catch (error) {
-    return { success: false, error: error.message }
+  } catch (error: any) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
 
