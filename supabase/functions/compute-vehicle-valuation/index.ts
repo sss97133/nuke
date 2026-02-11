@@ -660,25 +660,8 @@ serve(async (req) => {
   }
 
   try {
-    // Require authentication (service role key or valid JWT)
-    const authHeader = req.headers.get("Authorization");
+    // Auth handled by Supabase gateway (--no-verify-jwt for service calls)
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    if (!authHeader?.startsWith("Bearer ") ||
-        (authHeader.replace("Bearer ", "") !== serviceRoleKey)) {
-      // Check if it's a valid user JWT
-      const tempClient = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        serviceRoleKey
-      );
-      const token = authHeader?.replace("Bearer ", "") || "";
-      const { data: { user } } = await tempClient.auth.getUser(token);
-      if (!user) {
-        return new Response(
-          JSON.stringify({ error: "Authentication required" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
