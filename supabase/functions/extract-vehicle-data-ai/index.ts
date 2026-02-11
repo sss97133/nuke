@@ -106,7 +106,9 @@ serve(async (req) => {
     }
 
     // If basic fetch returned very little content, try Firecrawl (handles JS rendering)
-    if (!rawText && rawHtml.length < 2000) {
+    // Skip Firecrawl for domains with dedicated extractors - they should handle their own fetching
+    const hasDedicatedExtractor = getDedicatedExtractor(url) !== null
+    if (!rawText && rawHtml.length < 2000 && !hasDedicatedExtractor) {
       const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
       if (firecrawlKey) {
         console.log(`[extract-vehicle-data-ai] Content too short (${rawHtml.length}), trying Firecrawl for JS rendering`)
@@ -619,7 +621,7 @@ function getDedicatedExtractor(url: string): string | null {
   try {
     const hostname = new URL(url).hostname.replace('www.', '')
     const extractorMap: Record<string, string> = {
-      'bringatrailer.com': 'bat-simple-extract',
+      'bringatrailer.com': 'extract-bat-core',
       'carsandbids.com': 'extract-cars-and-bids-core',
       'hagerty.com': 'extract-hagerty-listing',
       'pcarmarket.com': 'import-pcarmarket-listing',
