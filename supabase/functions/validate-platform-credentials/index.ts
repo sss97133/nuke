@@ -167,7 +167,7 @@ serve(async (req) => {
       .from('platform_credentials')
       .select('*')
       .eq('id', credential_id)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !credential) {
       return new Response(

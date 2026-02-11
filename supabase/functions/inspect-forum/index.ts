@@ -313,9 +313,10 @@ serve(async (req) => {
         .from('forum_sources')
         .select('*')
         .eq('id', forum_id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw new Error(`Forum not found: ${error.message}`);
+      if (error) throw new Error(`Forum lookup error: ${error.message}`);
+      if (!data) throw new Error(`Forum not found: ${forum_id}`);
       forumRecord = data;
       forumUrl = data.base_url;
     }
