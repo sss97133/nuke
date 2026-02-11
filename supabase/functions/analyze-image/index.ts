@@ -360,7 +360,8 @@ serve(async (req) => {
                   body: JSON.stringify({
                     vehicle_id: vehicle_id,
                     vin: vinTagData.vin
-                  })
+                  }),
+                  signal: AbortSignal.timeout(30000),
                 })
                   .then(() => console.log('✅ VIN decode triggered'))
                   .catch(err => console.warn('VIN decode trigger failed:', err))
@@ -1204,7 +1205,7 @@ Return ONLY valid JSON with this exact structure:
   try {
     // Download image and convert to base64
     console.log('[runAppraiserBrainGemini] Downloading image...');
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) });
     if (!imageResponse.ok) {
       console.error('[runAppraiserBrainGemini] Failed to download image:', imageResponse.status);
       return { _gemini_error: 'image_download_failed', _error_message: `Status ${imageResponse.status}` };
@@ -1247,7 +1248,8 @@ Return ONLY valid JSON with this exact structure:
             temperature: 0.1,
             maxOutputTokens: 600,
           }
-        })
+        }),
+        signal: AbortSignal.timeout(60000),
       }
     );
 
@@ -1323,7 +1325,7 @@ async function analyzeImageWithRekognition(imageUrl: string) {
   }
 
   // Download image to analyze
-  const imageResponse = await fetch(imageUrl)
+  const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) })
   if (!imageResponse.ok) {
     throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`)
   }
