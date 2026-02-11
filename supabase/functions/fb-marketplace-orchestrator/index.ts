@@ -639,7 +639,6 @@ async function testLocation(location: string): Promise<Response> {
       status: "error",
       location,
       error: error.message,
-      stack: error.stack,
     });
   }
 }

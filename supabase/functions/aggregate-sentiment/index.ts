@@ -61,7 +61,7 @@ serve(async (req) => {
     });
   } catch (e: any) {
     console.error("[aggregate-sentiment] Error:", e);
-    return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
+    return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

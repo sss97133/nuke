@@ -168,7 +168,7 @@ serve(async (req) => {
           .update({
             status: "failed",
             completed_at: new Date().toISOString(),
-            execution_log: { error: err.message, stack: err.stack },
+            execution_log: { error: err.message },
           })
           .eq("id", action.id);
 
