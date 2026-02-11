@@ -114,11 +114,19 @@ serve(async (req) => {
       );
     }
 
-    // Cap observations per vehicle to prevent abuse
+    // Cap observations per vehicle and total to prevent abuse
+    let totalObs = 0;
     for (const v of body.vehicles) {
       if (v.observations && v.observations.length > 50) {
         v.observations = v.observations.slice(0, 50);
       }
+      totalObs += v.observations?.length || 0;
+    }
+    if (totalObs > 5000) {
+      return new Response(
+        JSON.stringify({ error: "Maximum 5000 total observations per batch" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const options = body.options || {};
