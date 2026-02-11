@@ -1298,12 +1298,11 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error(`[extract-leboncoin] Error: ${error.message}`);
-    console.error(error.stack);
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: "Extraction failed",
         extractor_version: EXTRACTOR_VERSION,
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -237,11 +237,10 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('[Contextual Batch Analyzer] Error:', error)
-    console.error('[Contextual Batch Analyzer] Stack:', error.stack)
+    console.error('[Contextual Batch Analyzer] Error:', error?.message || error)
     return new Response(
       JSON.stringify({
-        error: error.message
+        error: 'Batch analysis failed'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

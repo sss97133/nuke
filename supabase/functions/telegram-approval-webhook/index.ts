@@ -83,7 +83,7 @@ async function processApproval(
       .from("claude_approval_requests")
       .select("session_id")
       .eq("request_id", requestId)
-      .single();
+      .maybeSingle();
 
     if (reqData?.session_id) {
       await supabase

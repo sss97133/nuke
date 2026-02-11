@@ -197,7 +197,7 @@ serve(async (req) => {
         .from("vehicles")
         .select("id, year, make, model, sale_price")
         .eq("id", vehicleId)
-        .single();
+        .maybeSingle();
       if (vehicle) vehiclesToProcess = [vehicle];
     } else if (source === "auction_comments") {
       // USE bat_listings to find vehicles with comments (has comment_count metadata)
