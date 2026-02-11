@@ -440,20 +440,43 @@ serve(async (req) => {
       timeoutMs: 40_000,
     });
 
-    if (!gen.ok) {
-      return okJson(
-        { success: false, error: "LLM generation failed", details: { status: gen.status, raw: gen.raw?.error || gen.raw } },
-        500,
-      );
+    if (!gen.ok || !extractJson(gen.content_text || "")) {
+      // LLM failed (quota, timeout, bad JSON) — return snapshot + programmatic fallback
+      const analysisPending = Number(analysisQueueCounts.pending || 0) + Number(analysisQueueCounts.retrying || 0);
+      const fallback = {
+        headlines: [
+          `import_queue: ${pending} pending • ${failed} failed • ${processing} processing`,
+          `vehicles: ${Number(totalVehicles || 0).toLocaleString()} total • ${Number(vehicles24h || 0)} created/24h`,
+          ...(analysisPending > 0 ? [`analysis_queue: ${analysisPending} pending/retrying • ${analysisQueueCounts.failed || 0} failed`] : []),
+          ...(vehicleImageAnalysis ? [`vehicle_images: ${vehicleImageAnalysis.pending} pending analysis • ${vehicleImageAnalysis.analyzed} analyzed`] : []),
+        ].slice(0, 8),
+        priorities_now: topFailDomains.slice(0, 5).map((d) => ({
+          title: `Triage ${d.key} failures (${d.count})`,
+          why: `${d.key} has ${d.count} failed items in import_queue`,
+          steps: [`Review error patterns for ${d.key}`, "Fix extractor, skip bad URLs, or lower priority"],
+        })),
+        priorities_next: [],
+        watchlist: [
+          ...topErrors.slice(0, 5).map((e) => `import: ${e.key} (${e.count})`),
+          ...analysisTopErrors.slice(0, 3).map((e) => `analysis: ${e.key} (${e.count})`),
+        ].slice(0, 10),
+        suggested_sql: [
+          "SELECT status, count(*) FROM import_queue GROUP BY status ORDER BY 2 DESC;",
+          "SELECT source_domain, count(*) FROM import_queue WHERE processing_status='failed' GROUP BY 1 ORDER BY 2 DESC LIMIT 15;",
+        ],
+        suggested_commands: [],
+      };
+
+      return okJson({
+        success: true,
+        llm_fallback: true,
+        llm_error: gen.ok ? "LLM returned invalid JSON" : `LLM error ${gen.status}: ${JSON.stringify(gen.raw?.error || gen.raw).slice(0, 200)}`,
+        snapshot,
+        output: fallback,
+      });
     }
 
     const parsed = extractJson(gen.content_text || "");
-    if (!parsed) {
-      return okJson(
-        { success: false, error: "LLM returned invalid JSON", details: { sample: (gen.content_text || "").slice(0, 600) } },
-        500,
-      );
-    }
 
     const output = {
       headlines: safeStringArray(parsed?.headlines, 12),
