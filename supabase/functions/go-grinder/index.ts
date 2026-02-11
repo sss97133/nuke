@@ -189,7 +189,7 @@ Deno.serve(async (req: Request) => {
       method: "POST",
       headers: { "Content-Type": "application/json", ...invokeHeaders },
       body: JSON.stringify(nextBody),
-    }).catch(() => {});
+    }).then(res => res.text().catch(() => {})).catch(() => {});
   }
 
   return new Response(JSON.stringify(out), {

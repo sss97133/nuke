@@ -90,18 +90,20 @@ serve(async (req) => {
 
     if (pageErr) {
       // Refund credit on failure
-      await supabase.rpc('ds_refund_credit', { p_user_id: user.id, p_description: 'Page creation failed' })
+      const { error: refundError } = await supabase.rpc('ds_refund_credit', { p_user_id: user.id, p_description: 'Page creation failed' })
+      if (refundError) console.error('CRITICAL: Failed to refund credit:', refundError.message)
       throw new Error(`Failed to create page: ${pageErr.message}`)
     }
 
     // Update deal page count
-    await supabase.from('ds_deals')
+    const { error: updateError } = await supabase.from('ds_deals')
       .update({
         total_pages: deal.total_pages ? deal.total_pages + 1 : 1,
         status: 'processing',
         updated_at: new Date().toISOString()
       })
       .eq('id', deal_id)
+    if (updateError) console.error('Failed to update deal:', updateError.message)
 
     // Generate signed URL for the image
     const { data: signedUrl } = await supabase.storage
@@ -109,7 +111,8 @@ serve(async (req) => {
       .createSignedUrl(storage_path, 300) // 5 min
 
     if (!signedUrl?.signedUrl) {
-      await supabase.rpc('ds_refund_credit', { p_user_id: user.id, p_description: 'Failed to get signed URL' })
+      const { error: refundError } = await supabase.rpc('ds_refund_credit', { p_user_id: user.id, p_description: 'Failed to get signed URL' })
+      if (refundError) console.error('CRITICAL: Failed to refund credit:', refundError.message)
       throw new Error('Failed to generate signed URL')
     }
 
@@ -126,7 +129,8 @@ serve(async (req) => {
     if (!extractResp.ok) {
       const errText = await extractResp.text()
       // Refund credit on extraction failure
-      await supabase.rpc('ds_refund_credit', { p_user_id: user.id, p_description: 'Extraction failed' })
+      const { error: refundError } = await supabase.rpc('ds_refund_credit', { p_user_id: user.id, p_description: 'Extraction failed' })
+      if (refundError) console.error('CRITICAL: Failed to refund credit:', refundError.message)
 
       await supabase.from('ds_document_pages').update({
         review_status: 'pending',

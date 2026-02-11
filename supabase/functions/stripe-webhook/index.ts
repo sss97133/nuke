@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
         // This is handled by the transaction service when checking signature status
       } else {
         // Default: Add cash to user account (existing functionality)
-        await supabase.rpc('add_cash_to_user', {
+        const { error: rpcError } = await supabase.rpc('add_cash_to_user', {
           p_user_id: userId,
           p_amount_cents: amountCents,
           p_stripe_payment_id: session.id,
@@ -254,6 +254,8 @@ Deno.serve(async (req) => {
             payment_method: session.payment_method_types?.[0] || 'card'
           }
         })
+
+        if (rpcError) console.error('CRITICAL: Failed to add cash to user:', rpcError.message)
 
         console.log(`Added $${amountCents / 100} (${amountCents} cents) to user ${userId}`)
       }
