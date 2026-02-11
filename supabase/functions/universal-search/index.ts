@@ -268,7 +268,7 @@ serve(async (req) => {
             const rest = yearMatch[2].toLowerCase();
             vehicleQuery = vehicleQuery
               .eq('year', year)
-              .or(`make.ilike.%${escapeIlike(rest)}%,model.ilike.%${escapeIlike(rest)}%`);
+              .or(`make.ilike.%${escapeIlike(escapePostgrestValue(rest))}%,model.ilike.%${escapeIlike(escapePostgrestValue(rest))}%`);
           } else if (tokens.length >= 2) {
             // Try both orderings: token0=make+rest=model OR token0=model+rest=make
             const t0 = escapeIlike(tokens[0]);
