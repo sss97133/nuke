@@ -141,7 +141,7 @@ If you see a receipt, read it to find clues about which vehicle it's for (part n
 
   try {
     // Fetch the image and convert to base64 safely
-    const imageResponse = await fetch(image.image_url);
+    const imageResponse = await fetch(image.image_url, { signal: AbortSignal.timeout(30000) });
     const imageBuffer = await imageResponse.arrayBuffer();
     const uint8Array = new Uint8Array(imageBuffer);
 
@@ -192,7 +192,8 @@ If you see a receipt, read it to find clues about which vehicle it's for (part n
       throw new Error("No JSON found in response");
     }
 
-    const result = JSON.parse(jsonMatch[0]);
+    let result: any;
+    try { result = JSON.parse(jsonMatch[0]); } catch { throw new Error("Invalid JSON in AI response"); }
 
     return {
       image_id: image.id,
@@ -202,13 +203,14 @@ If you see a receipt, read it to find clues about which vehicle it's for (part n
       detected_features: result.detected_features || {}
     };
 
-  } catch (error) {
-    console.error(`Failed to classify image ${image.id}:`, error);
+  } catch (error: any) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to classify image ${image.id}:`, errMsg);
     return {
       image_id: image.id,
       suggested_vehicle_id: null,
       confidence: 0,
-      reasoning: `Classification failed: ${error}`,
+      reasoning: `Classification failed: ${errMsg}`,
       detected_features: {}
     };
   }
@@ -218,7 +220,7 @@ If you see a receipt, read it to find clues about which vehicle it's for (part n
 async function processReceipt(imageId: string, imageUrl: string, vehicleId: string) {
   try {
     // Fetch image
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) });
     const imageBuffer = await imageResponse.arrayBuffer();
     const uint8Array = new Uint8Array(imageBuffer);
 
@@ -261,7 +263,8 @@ async function processReceipt(imageId: string, imageUrl: string, vehicleId: stri
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return;
 
-    const receiptData = JSON.parse(jsonMatch[0]);
+    let receiptData: any;
+    try { receiptData = JSON.parse(jsonMatch[0]); } catch { return; }
 
     // Find active work session for this vehicle (or today's date)
     const today = new Date().toISOString().split('T')[0];
