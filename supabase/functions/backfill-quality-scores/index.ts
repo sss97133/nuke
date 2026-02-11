@@ -36,7 +36,8 @@ serve(async (req) => {
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const batchSize = Math.min(body.batch_size ?? 500, 2000);
+    const rawBatch = Number(body.batch_size);
+    const batchSize = Math.min(Number.isFinite(rawBatch) && rawBatch > 0 ? Math.floor(rawBatch) : 500, 2000);
     const forceAll = body.force_all ?? false;
 
     console.log(`[backfill-quality-scores] batch=${batchSize}, force=${forceAll}`);
@@ -61,8 +62,17 @@ serve(async (req) => {
     // Step 2 & 3: For each vehicle, calculate score via execute_sql then upsert via client
     for (const row of ids) {
       try {
+        // Validate UUID format to prevent SQL injection (row.id comes from DB, but defense-in-depth)
+        const vehicleId = row.id;
+        if (typeof vehicleId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId)) {
+          errors++;
+          if (errors <= 5) console.error(`Invalid UUID for vehicle: ${String(vehicleId)}`);
+          continue;
+        }
+
         // calculate_vehicle_quality_score takes a full vehicles row (v.*)
-        const scoreQuery = `SELECT calculate_vehicle_quality_score(v.*) as score FROM vehicles v WHERE v.id = '${row.id}'`;
+        // Safe: vehicleId is validated as a strict UUID above, preventing SQL injection
+        const scoreQuery = `SELECT calculate_vehicle_quality_score(v.*) as score FROM vehicles v WHERE v.id = '${vehicleId}'`;
 
         const { data: scoreResult, error: scoreErr } = await supabase.rpc("execute_sql", {
           query: scoreQuery,
