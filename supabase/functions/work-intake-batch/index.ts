@@ -158,7 +158,7 @@ async function matchVehicleWithOrg(
       .from("vehicles")
       .select("id, year, make, model, owner_org_id")
       .eq("vin", hints.vin)
-      .single();
+      .maybeSingle();
 
     if (vinMatch) {
       return {
@@ -208,7 +208,7 @@ async function getOrgName(orgId: string): Promise<string> {
     .from("businesses")
     .select("business_name")
     .eq("id", orgId)
-    .single();
+    .maybeSingle();
   return data?.business_name || "unknown";
 }
 
