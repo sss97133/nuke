@@ -304,7 +304,7 @@ async function saveListing(supabase: any, listing: RennlistListing): Promise<{ v
       .select('id')
       .eq('vin', listing.vin)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (vinMatch) {
       // Update existing vehicle with Rennlist data
@@ -336,7 +336,7 @@ async function saveListing(supabase: any, listing: RennlistListing): Promise<{ v
     .select('id')
     .eq('rennlist_url', listing.url)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (urlMatch) {
     // Update existing

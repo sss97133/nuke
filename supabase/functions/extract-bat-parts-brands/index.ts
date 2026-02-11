@@ -54,7 +54,7 @@ serve(async (req) => {
       .from('vehicles')
       .select('year, make, model')
       .eq('id', vehicleId)
-      .single();
+      .maybeSingle();
 
     if (!vehicle) {
       return new Response(

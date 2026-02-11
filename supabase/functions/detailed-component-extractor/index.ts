@@ -58,7 +58,7 @@ serve(async (req) => {
         .from('image_work_extractions')
         .select('detected_work_type, detected_work_description, detected_components')
         .eq('id', work_extraction_id)
-        .single();
+        .maybeSingle();
       
       workContext = workData;
     }
@@ -68,7 +68,7 @@ serve(async (req) => {
       .from('vehicles')
       .select('year, make, model, body_style')
       .eq('id', vehicle_id)
-      .single();
+      .maybeSingle();
 
     // AI Vision Analysis - Extract detailed components
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
