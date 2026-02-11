@@ -346,6 +346,24 @@ async function getContractAssets(contractId: string, supabase: any, userId: stri
     );
   }
 
+  if (byType.real_estate?.length) {
+    fetches.push(
+      supabase.from("properties")
+        .select("id, name, property_type, description, city, region, country, base_price, specs, metadata, status")
+        .in("id", byType.real_estate)
+        .then(({ data }: any) => { (data || []).forEach((p: any) => { detailsMap[p.id] = p; }); })
+    );
+  }
+
+  if (byType.event?.length) {
+    fetches.push(
+      supabase.from("community_events")
+        .select("id, event_name, event_type, description, start_date, end_date, recurring, venue_name, city, state, max_capacity, vehicle_spots, ticket_price_cents, total_revenue_cents, net_profit_cents, status")
+        .in("id", byType.event)
+        .then(({ data }: any) => { (data || []).forEach((e: any) => { detailsMap[e.id] = e; }); })
+    );
+  }
+
   await Promise.all(fetches);
 
   const enrichedAssets = rawAssets.map((asset: any) => ({
@@ -551,6 +569,8 @@ function getAssetDisplayName(asset: any, details: any): string {
     case "organization": return details.business_name || `Org #${asset.asset_id.slice(-8)}`;
     case "bond": return details.issuer_name ? `${details.issuer_name} Bond` : `Bond #${asset.asset_id.slice(-8)}`;
     case "stake": return `Equity Stake #${asset.asset_id.slice(-8)}`;
+    case "real_estate": return details.name || `Property #${asset.asset_id.slice(-8)}`;
+    case "event": return details.event_name || `Event #${asset.asset_id.slice(-8)}`;
     default: return `${asset.asset_type} #${asset.asset_id.slice(-8)}`;
   }
 }

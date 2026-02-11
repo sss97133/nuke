@@ -127,6 +127,24 @@ const CONCEPTS: Record<string, ConceptDef> = {
     summary: 'Investment in workshop/business operations.',
     detail: 'Holds positions in automotive businesses — shops, dealerships, event spaces, storage facilities.',
   },
+  real_estate_fund: {
+    title: 'Real Estate Fund',
+    category: 'contract_type',
+    summary: 'Investment in automotive-adjacent real estate.',
+    detail: 'Garages, showrooms, event venues, storage facilities, tracks. Real estate appreciation + rental income + event revenue. The physical layer of the collector car ecosystem.',
+  },
+  venue_fund: {
+    title: 'Venue Fund',
+    category: 'contract_type',
+    summary: 'Real estate + events combo investment.',
+    detail: 'Owns the property AND the events hosted there. Triple-engine returns: real estate appreciation, vehicle storage fees, and event revenue. The automotive compound model.',
+  },
+  custom: {
+    title: 'Custom Structure',
+    category: 'contract_type',
+    summary: 'Bespoke investment structure with mixed asset classes.',
+    detail: 'May combine vehicles, real estate, events, bonds, equity stakes, and organizational positions. Structure defined by curator. Most flexible but requires careful due diligence.',
+  },
 
   // Transparency
   full: {
