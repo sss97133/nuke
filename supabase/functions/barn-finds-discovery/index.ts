@@ -59,6 +59,7 @@ function okJson(body: unknown, status = 200): Response {
 async function scrapePage(url: string): Promise<string[]> {
   const res = await fetch(url, {
     headers: { "User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml" },
+    signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) return [];
   const html = await res.text();

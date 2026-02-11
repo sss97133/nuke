@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     const { data: existingOrg } = await supabase
       .from('businesses')
       .select('id, business_name, website')
-      .or(`website.eq."${orgWebsite}",website.eq."${orgWebsite.replace(/\/$/, '')}",website.eq."${orgWebsite}/"`)
+      .or(`website.eq."${orgWebsite.replace(/[",().\\]/g, '')}",website.eq."${orgWebsite.replace(/\/$/, '').replace(/[",().\\]/g, '')}",website.eq."${orgWebsite.replace(/[",().\\]/g, '')}/"`)
       .maybeSingle();
 
     if (existingOrg) {
