@@ -13,7 +13,26 @@ serve(async (req) => {
   }
 
   try {
-    const { url } = await req.json()
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!authHeader?.startsWith('Bearer ') || authHeader.replace('Bearer ', '') !== serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      )
+    }
+
+    let body: any
+    try {
+      body = await req.json()
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    const { url } = body
 
     if (!url) {
       return new Response(

@@ -17,7 +17,26 @@ serve(async (req) => {
   }
 
   try {
-    const { vehicle_id, image_ids } = await req.json()
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    if (!authHeader?.startsWith('Bearer ') || authHeader.replace('Bearer ', '') !== serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    let body: any
+    try {
+      body = await req.json()
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const { vehicle_id, image_ids } = body
 
     if (!vehicle_id) {
       return new Response(
@@ -28,7 +47,7 @@ serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      serviceRoleKey
     )
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')

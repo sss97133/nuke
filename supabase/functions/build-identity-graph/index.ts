@@ -32,9 +32,19 @@ serve(async (req) => {
   }
 
   try {
+    // Require service role key authentication
+    const authHeader = req.headers.get("Authorization");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!authHeader?.startsWith("Bearer ") || authHeader.replace("Bearer ", "") !== serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      serviceRoleKey
     );
 
     const body: IdentityRequest = await req.json().catch(() => ({ action: "find_power_users" }));
@@ -46,7 +56,8 @@ serve(async (req) => {
       const { data: userObs } = await supabase
         .from("vehicle_observations")
         .select("kind, structured_data, vehicle_id, observed_at")
-        .or(`structured_data->>author_username.eq."${username}"`)
+        .or(`structured_data->>author_username.eq."${username?.replace(/[",().\\]/g, '')}"`)
+
         .order("observed_at", { ascending: false })
         .limit(1000);
 

@@ -78,6 +78,11 @@ function escapeIlike(s: string): string {
   return s.replace(/([%_\\])/g, '\\$1');
 }
 
+// Escape for PostgREST .or() filter values - strip chars that break filter syntax
+function escapePostgrestValue(s: string): string {
+  return s.replace(/[",().\\]/g, '');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -273,7 +278,7 @@ serve(async (req) => {
             );
           } else {
             vehicleQuery = vehicleQuery.or(
-              `make.ilike.${searchPattern},model.ilike.${searchPattern}`
+              `make.ilike.${escapePostgrestValue(searchPattern)},model.ilike.${escapePostgrestValue(searchPattern)}`
             );
           }
 
@@ -358,7 +363,7 @@ serve(async (req) => {
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, username, full_name, avatar_url, bio')
-          .or(`username.ilike."${searchPattern}",full_name.ilike."${searchPattern}"`)
+          .or(`username.ilike."${escapePostgrestValue(searchPattern)}",full_name.ilike."${escapePostgrestValue(searchPattern)}"`)
           .limit(Math.ceil(sanitizedLimit / 4));
 
         for (const p of profiles || []) {
@@ -390,7 +395,7 @@ serve(async (req) => {
         const { data: identities } = await supabase
           .from('external_identities')
           .select('id, username, display_name, platform, profile_url, avatar_url')
-          .or(`username.ilike."${searchPattern}",display_name.ilike."${searchPattern}"`)
+          .or(`username.ilike."${escapePostgrestValue(searchPattern)}",display_name.ilike."${escapePostgrestValue(searchPattern)}"`)
           .limit(Math.ceil(sanitizedLimit / 4));
 
         for (const ei of identities || []) {
