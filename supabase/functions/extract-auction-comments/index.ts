@@ -236,7 +236,7 @@ serve(async (req) => {
         })
       }
     } catch (e: any) {
-      console.error(`Direct fetch failed: ${e.message}`)
+      console.error(`Direct fetch failed: ${e instanceof Error ? e.message : String(e)}`)
 
       if (platformGuess === 'bat') {
         await trySaveHtmlSnapshot({
@@ -785,7 +785,7 @@ serve(async (req) => {
         .from('bat_listings')
         .upsert(listingPayload, { onConflict: 'bat_listing_url' })
         .select('id')
-        .single()
+        .maybeSingle()
       if (!upsertListingErr && upsertedListing?.id) {
         batListingId = String(upsertedListing.id)
       }
