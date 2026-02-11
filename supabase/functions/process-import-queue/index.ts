@@ -68,7 +68,7 @@ serve(async (req) => {
         } else if (url.includes('craigslist.org')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-craigslist';
         } else if (url.includes('barrett-jackson.com')) {
-          extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-barrett-jackson';
         } else if (url.includes('broadarrowauctions.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         } else if (url.includes('gaaclassiccars.com')) {
