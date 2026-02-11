@@ -113,16 +113,28 @@ serve(async (req) => {
   }
 
   try {
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+    const token = authHeader?.replace('Bearer ', '') ?? ''
+    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const {
-      max_regions = 60, // Increased for upgraded compute/RAM
-      max_listings_per_search = 90, // Increased for upgraded compute/RAM
+      max_regions = 60,
+      max_listings_per_search = 90,
       user_id,
-      regions = null, // Optional: specific regions to search
-      chain_depth = 0, // Function chaining: number of remaining self-invocations (0 = no chaining)
-      regions_processed = [], // Track which regions have been processed (for chaining)
-      skip_regions = [], // Regions to skip (already processed)
-      enable_jitter = false, // Add random delays to avoid detection patterns
-      base_delay = 300 // Base delay between requests in ms (default reduced from 500)
+      regions = null,
+      chain_depth = 0,
+      regions_processed = [],
+      skip_regions = [],
+      enable_jitter = false,
+      base_delay = 300
     } = await req.json()
 
     // Helper function to add jitter to delays

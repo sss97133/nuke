@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
         .from('monitored_auctions')
         .select('*, live_auction_sources(*)')
         .eq('id', monitored_auction_id)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         throw new Error(`Auction not found: ${monitored_auction_id}`);

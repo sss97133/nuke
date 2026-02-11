@@ -660,8 +660,17 @@ serve(async (req) => {
   }
 
   try {
-    // Auth handled by Supabase gateway (--no-verify-jwt for service calls)
+    // Require service role key authentication
+    const authHeader = req.headers.get("Authorization");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const altServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+    const token = authHeader?.replace("Bearer ", "") ?? "";
+    if (!authHeader?.startsWith("Bearer ") || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",

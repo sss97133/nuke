@@ -37,7 +37,7 @@ serve(async (req) => {
       .from('vehicles')
       .select('*')
       .eq('id', vehicle_id)
-      .single();
+      .maybeSingle();
 
     if (vehError || !vehicle) {
       throw new Error('Vehicle not found');
@@ -52,7 +52,7 @@ serve(async (req) => {
         .from('profiles')
         .select('id, full_name, username')
         .eq('id', vehicle.user_id)
-        .single();
+        .maybeSingle();
 
       if (owner) {
         ownershipSignals.push({
@@ -75,12 +75,13 @@ serve(async (req) => {
 
     if (titleDocs && titleDocs.length > 0) {
       const titleDoc = titleDocs[0];
-      // Try to find matching user by name
+      // Try to find matching user by name (may match 0 or multiple)
       const { data: matchingUser } = await supabase
         .from('profiles')
         .select('id, full_name, username')
         .ilike('full_name', `%${titleDoc.owner_name}%`)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       ownershipSignals.push({
         type: 'title_document',
@@ -145,7 +146,7 @@ serve(async (req) => {
           .from('profiles')
           .select('id, full_name, username')
           .eq('id', topUploader[0])
-          .single();
+          .maybeSingle();
 
         if (uploader) {
           ownershipSignals.push({
@@ -167,7 +168,7 @@ serve(async (req) => {
         .from('profiles')
         .select('*')
         .eq('id', vehicle.user_id)
-        .single();
+        .maybeSingle();
 
       if (mainProfile) {
         // Look for similar profiles (same name, nearby location, etc.)

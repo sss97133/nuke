@@ -63,9 +63,21 @@ serve(async (req) => {
   }
 
   try {
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
+    const token = authHeader?.replace('Bearer ', '') ?? '';
+    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      serviceRoleKey
     );
 
     const body = await req.json().catch(() => ({}));
@@ -94,7 +106,7 @@ serve(async (req) => {
         .from('scrape_sources')
         .select('*')
         .eq('id', source_id)
-        .single();
+        .maybeSingle();
       source = data;
       if (source) source_url = source.url || source.domain;
     }

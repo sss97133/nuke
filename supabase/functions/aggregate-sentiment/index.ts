@@ -81,9 +81,9 @@ async function vehicleSentiment(supabase: any, vehicleId: string) {
     .eq("vehicle_id", vehicleId)
     .order("discovered_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (dErr && dErr.code !== "PGRST116") throw dErr;
+  if (dErr) throw dErr;
 
   // Get bat_comments sentiment scores for this vehicle
   const { data: commentScores, error: cErr } = await supabase.rpc("execute_sql", {

@@ -536,15 +536,21 @@ serve(async (req) => {
   }
 
   try {
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+    const altServiceRoleKey = (Deno.env.get('SERVICE_ROLE_KEY') ?? '').trim();
+    const token = (authHeader?.replace('Bearer ', '') ?? '').trim();
+    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
-    const serviceRoleKey = (
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
-      Deno.env.get('SERVICE_ROLE_KEY') ??
-      ''
-    ).trim();
 
     if (!supabaseUrl) throw new Error('Missing SUPABASE_URL');
-    if (!serviceRoleKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -566,9 +572,10 @@ serve(async (req) => {
         .from('forum_sources')
         .select('*')
         .eq('id', forum_id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw new Error(`Forum not found: ${error.message}`);
+      if (error) throw new Error(`Forum lookup failed: ${error.message}`);
+      if (!forum) throw new Error(`Forum not found: ${forum_id}`);
       forumsToProcess = [forum];
     } else {
       // Get forums ready for discovery

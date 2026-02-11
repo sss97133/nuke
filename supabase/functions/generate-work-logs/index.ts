@@ -68,9 +68,20 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
+    const token = authHeader?.replace('Bearer ', '') ?? '';
+    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { vehicleId, organizationId, imageIds, eventDate }: WorkLogRequest = await req.json();
     
@@ -83,7 +94,7 @@ Deno.serve(async (req: Request) => {
       .from('vehicles')
       .select('year, make, model')
       .eq('id', vehicleId)
-      .single();
+      .maybeSingle();
 
     if (vehicleError || !vehicle) {
       throw new Error(`Vehicle not found: ${vehicleId}`);
@@ -96,7 +107,7 @@ Deno.serve(async (req: Request) => {
       .from('businesses')
       .select('business_name, business_type, labor_rate')
       .eq('id', organizationId)
-      .single();
+      .maybeSingle();
 
     const orgName = org?.business_name || 'Unknown Shop';
     
@@ -163,7 +174,7 @@ Deno.serve(async (req: Request) => {
       `)
       .in('image_id', imageIds)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const imageMaker = {
       user_id: deviceAttributions?.actual_contributor_id || images[0]?.user_id || null,
@@ -187,7 +198,7 @@ Deno.serve(async (req: Request) => {
         .from('profiles')
         .select('username')
         .eq('id', uploadedByUserId)
-        .single();
+        .maybeSingle();
       uploadedBy.username = uploaderProfile?.username || null;
     }
 

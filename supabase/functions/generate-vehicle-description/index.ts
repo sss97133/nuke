@@ -13,7 +13,28 @@ serve(async (req) => {
   }
 
   try {
-    const { vehicle_id } = await req.json()
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+    const token = authHeader?.replace('Bearer ', '') ?? ''
+    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    let body: any
+    try {
+      body = await req.json()
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const { vehicle_id } = body
 
     if (!vehicle_id) {
       throw new Error('Vehicle ID is required')
@@ -21,8 +42,7 @@ serve(async (req) => {
 
     // Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     // 1. Fetch Vehicle Data
     const { data: vehicle, error: vehicleError } = await supabase
@@ -33,9 +53,10 @@ serve(async (req) => {
         contributors:vehicle_contributors(user_id, role, profiles(full_name))
       `)
       .eq('id', vehicle_id)
-      .single()
+      .maybeSingle()
 
     if (vehicleError) throw vehicleError
+    if (!vehicle) throw new Error(`Vehicle not found: ${vehicle_id}`)
 
     // 2. Fetch Image Tags (for condition/mods)
     const { data: tags } = await supabase

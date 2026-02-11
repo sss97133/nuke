@@ -24,6 +24,18 @@ serve(async (req) => {
   }
 
   try {
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
+    const token = authHeader?.replace('Bearer ', '') ?? '';
+    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { organizationId, websiteUrl } = await req.json();
 
     if (!organizationId) {
@@ -43,10 +55,10 @@ serve(async (req) => {
       .from('businesses')
       .select('*')
       .eq('id', organizationId)
-      .single();
+      .maybeSingle();
 
     if (orgError || !org) {
-      throw new Error(`Organization not found: ${orgError?.message}`);
+      throw new Error(`Organization not found: ${orgError?.message || organizationId}`);
     }
 
     // Determine website URL
