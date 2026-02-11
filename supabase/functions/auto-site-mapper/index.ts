@@ -324,7 +324,12 @@ Return JSON schema:
   });
   
   const data = await response.json();
-  return JSON.parse(data.choices[0].message.content);
+  try {
+    return JSON.parse(data.choices[0].message.content);
+  } catch {
+    console.error("[auto-site-mapper] Failed to parse LLM response:", data.choices?.[0]?.message?.content?.slice(0, 200));
+    return null;
+  }
 }
 
 async function testExtractionOnSamples(schema: any, sampleUrls: string[]) {
@@ -355,7 +360,8 @@ async function testExtractionOnSamples(schema: any, sampleUrls: string[]) {
 async function testSingleExtraction(url: string, schema: any) {
   // Use Firecrawl to extract using the generated schema
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
-  
+  if (!firecrawlKey) throw new Error('FIRECRAWL_API_KEY not configured');
+
   const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {

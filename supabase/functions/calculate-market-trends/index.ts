@@ -52,8 +52,10 @@ serve(async (req) => {
     const targetMake = body.make || null;
 
     // Use execute_sql to avoid .limit() truncation — get ALL discoveries
-    const makeFilter = targetMake
-      ? `AND COALESCE(cm.canonical_name, v.make) = '${targetMake.replace(/'/g, "''")}'`
+    // Validate make against alphanumeric + spaces/hyphens to prevent SQL injection
+    const safeMake = targetMake ? targetMake.replace(/[^a-zA-Z0-9\s\-\.]/g, '') : null;
+    const makeFilter = safeMake
+      ? `AND COALESCE(cm.canonical_name, v.make) = '${safeMake}'`
       : '';
 
     const { data: rows, error: discError } = await supabase.rpc('execute_sql', {
@@ -100,9 +102,14 @@ serve(async (req) => {
       const make = d.make?.trim();
       if (!make) return;
 
-      const raw: RawExtraction = typeof d.raw_extraction === 'string'
-        ? JSON.parse(d.raw_extraction)
-        : d.raw_extraction ?? {};
+      let raw: RawExtraction;
+      try {
+        raw = typeof d.raw_extraction === 'string'
+          ? JSON.parse(d.raw_extraction)
+          : d.raw_extraction ?? {};
+      } catch {
+        raw = {} as RawExtraction;
+      }
       const signals = raw.market_signals;
       const platform = d.discovery_source || 'unknown';
 
