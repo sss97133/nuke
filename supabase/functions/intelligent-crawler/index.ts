@@ -358,7 +358,7 @@ async function crawlClassicCom(searchParams: any) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   
   const listings: any[] = []
-  const listingElements = doc.querySelectorAll('.vehicle-card, .listing-card, '.search-result')
+  const listingElements = doc.querySelectorAll('.vehicle-card, .listing-card, .search-result')
   
   console.log(`📋 Found ${listingElements.length} Classic.com listings`)
   
@@ -396,7 +396,7 @@ async function crawlCarsCom(searchParams: any) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   
   const listings: any[] = []
-  const listingElements = doc.querySelectorAll('.vehicle-card, .listing-row, '.search-result')
+  const listingElements = doc.querySelectorAll('.vehicle-card, .listing-row, .search-result')
   
   console.log(`📋 Found ${listingElements.length} Cars.com listings`)
   
@@ -490,7 +490,7 @@ async function crawlCarGurus(searchParams: any) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   
   const listings: any[] = []
-  const listingElements = doc.querySelectorAll('.cargurus-listing, '.vehicle-card')
+  const listingElements = doc.querySelectorAll('.cargurus-listing, .vehicle-card')
   
   console.log(`📋 Found ${listingElements.length} CarGurus listings`)
   
@@ -544,7 +544,7 @@ async function crawlCarMax(searchParams: any) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   
   const listings: any[] = []
-  const listingElements = doc.querySelectorAll('.vehicle-card, '.car-tile')
+  const listingElements = doc.querySelectorAll('.vehicle-card, .car-tile')
   
   console.log(`📋 Found ${listingElements.length} CarMax listings`)
   
