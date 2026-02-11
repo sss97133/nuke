@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
       image_url: pu.publicUrl,
       source: "telegram",
       caption: m.caption || null
-    }).select("id").single();
+    }).select("id").maybeSingle();
 
     // Trigger auto-classification in background
     if (imgRow) {
