@@ -160,10 +160,11 @@ serve(async (req) => {
     }
 
     // Clean up state
-    await supabase
+    const { error: deleteError } = await supabase
       .from('oauth_state_tracker')
       .delete()
       .eq('state', state);
+    if (deleteError) console.error('Failed to clean up oauth state:', deleteError.message);
 
     // Redirect back to the app
     const vehicleId = stateData.metadata?.vehicle_id;

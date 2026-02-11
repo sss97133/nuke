@@ -866,11 +866,12 @@ serve(async (req) => {
 
         // Delete existing hagerty/external_import images for this vehicle to avoid duplicates
         // Includes 'external_import' for backwards compatibility during migration
-        await supabase
+        const { error: deleteError } = await supabase
           .from('vehicle_images')
           .delete()
           .eq('vehicle_id', targetVehicleId)
           .in('source', ['hagerty', 'external_import']);
+        if (deleteError) console.error('Failed to delete existing images:', deleteError.message);
 
         const { data: insertedImages, error: imgError } = await supabase
           .from('vehicle_images')
