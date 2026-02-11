@@ -102,14 +102,14 @@ function parsePrice(priceStr: string): { low: number | null; high: number | null
   if (!priceStr) return { low: null, high: null, currency: "USD" };
   const cleaned = priceStr.replace(/[,\s]/g, "");
   const currency = cleaned.includes("€") ? "EUR" : "USD";
-  const numbers = cleaned.match(/[\d]+/g)?.map((n) => parseInt(n)).filter((n) => !isNaN(n) && n >= 100) || [];
+  const numbers = cleaned.match(/[\d]+/g)?.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n) && n >= 100) || [];
   if (numbers.length === 0) return { low: null, high: null, currency };
   return { low: Math.min(...numbers), high: Math.max(...numbers), currency };
 }
 
 function parseBedrooms(str: string): { min: number | null; max: number | null } {
   if (!str) return { min: null, max: null };
-  const numbers = str.match(/\d+/g)?.map((n) => parseInt(n)).filter((n) => !isNaN(n) && n < 20) || [];
+  const numbers = str.match(/\d+/g)?.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n) && n < 20) || [];
   if (numbers.length === 0) return { min: null, max: null };
   return { min: Math.min(...numbers), max: Math.max(...numbers) };
 }

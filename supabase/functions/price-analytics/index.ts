@@ -77,17 +77,21 @@ serve(async (req) => {
 
     // Build WHERE filters
     const conditions: string[] = [];
-    if (filterMake) {
-      conditions.push(`make = '${filterMake.replace(/'/g, "''")}'`);
+    if (filterMake && typeof filterMake === 'string') {
+      const safeMake = filterMake.slice(0, 50).replace(/'/g, "''").replace(/\\/g, '');
+      conditions.push(`make = '${safeMake}'`);
     }
-    if (filterModel) {
-      conditions.push(`model ILIKE '%${filterModel.replace(/'/g, "''")}%'`);
+    if (filterModel && typeof filterModel === 'string') {
+      const safeModel = filterModel.slice(0, 50).replace(/'/g, "''").replace(/\\/g, '');
+      conditions.push(`model ILIKE '%${safeModel}%'`);
     }
     if (yearMin) {
-      conditions.push(`year >= ${parseInt(yearMin)}`);
+      const y = parseInt(yearMin, 10);
+      if (!isNaN(y) && y >= 1800 && y <= 2100) conditions.push(`year >= ${y}`);
     }
     if (yearMax) {
-      conditions.push(`year <= ${parseInt(yearMax)}`);
+      const y = parseInt(yearMax, 10);
+      if (!isNaN(y) && y >= 1800 && y <= 2100) conditions.push(`year <= ${y}`);
     }
 
     const whereClause =
@@ -117,9 +121,9 @@ serve(async (req) => {
       FROM clean_vehicle_prices
       ${whereClause}
       GROUP BY ${groupExpr}
-      HAVING count(*) >= ${minCount}
+      HAVING count(*) >= ${Math.max(1, Math.min(parseInt(String(minCount), 10) || 5, 1000))}
       ORDER BY ${safeSortBy} ${safeSortDir} NULLS LAST
-      LIMIT ${limit}
+      LIMIT ${Math.max(1, Math.min(parseInt(String(limit), 10) || 50, 500))}
     `;
 
     const { data: results, error } = await supabase.rpc("execute_sql", {
@@ -160,7 +164,7 @@ serve(async (req) => {
     );
   } catch (e: any) {
     console.error("[price-analytics] Error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

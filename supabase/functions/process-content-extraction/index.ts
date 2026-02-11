@@ -584,7 +584,7 @@ async function processListingURL(supabase: any, item: QueueItem) {
       .from('vehicles')
       .select('*')
       .eq('id', item.vehicle_id)
-      .single();
+      .maybeSingle();
 
     if (vehicleError) {
       throw new Error(`Vehicle fetch failed: ${vehicleError.message}`);
@@ -866,7 +866,7 @@ async function processVIN(supabase: any, item: QueueItem) {
     .from('vehicles')
     .select('vin')
     .eq('id', item.vehicle_id)
-    .single();
+    .maybeSingle();
 
   if (vehicle?.vin && vehicle.vin !== vin) {
     // VIN conflict!

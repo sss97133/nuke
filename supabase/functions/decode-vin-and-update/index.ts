@@ -76,13 +76,13 @@ Deno.serve(async (req) => {
       }
       decoded.model = model
     }
-    if (getValue(29)) decoded.year = parseInt(getValue(29) || '') // Model Year
+    if (getValue(29)) decoded.year = parseInt(getValue(29) || '', 10) // Model Year
     if (getValue(109)) decoded.trim = getValue(109) // Trim
     
     // Engine
     if (getValue(71)) decoded.engine_size = getValue(71) // Engine Configuration
     if (getValue(72)) decoded.displacement = getValue(72) // Displacement (L)
-    if (getValue(13)) decoded.engine_cylinders = parseInt(getValue(13) || '') // Engine Cylinders
+    if (getValue(13)) decoded.engine_cylinders = parseInt(getValue(13) || '', 10) // Engine Cylinders
     if (getValue(69)) decoded.fuel_type = getValue(69)?.toLowerCase() // Fuel Type
     
     // Drivetrain
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
       
       decoded.body_style = bodyStyle
     }
-    if (getValue(14)) decoded.doors = parseInt(getValue(14) || '') // Doors
+    if (getValue(14)) decoded.doors = parseInt(getValue(14) || '', 10) // Doors
     
     // Other specs
     if (getValue(25)) decoded.manufacturer = getValue(25) // Manufacturer Name

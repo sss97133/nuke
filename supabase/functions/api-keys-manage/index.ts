@@ -154,7 +154,7 @@ serve(async (req) => {
         .from("api_keys")
         .select("user_id")
         .eq("id", keyId)
-        .single();
+        .maybeSingle();
 
       if (!existingKey || existingKey.user_id !== user.id) {
         return new Response(

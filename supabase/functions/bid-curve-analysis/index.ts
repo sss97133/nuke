@@ -65,7 +65,7 @@ serve(async (req) => {
     });
   } catch (e: any) {
     console.error("[bid-curve-analysis] Error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -162,21 +162,21 @@ async function vehicleMode(supabase: any, body: any) {
 async function aggregateMode(supabase: any, body: any) {
   const conditions: string[] = ["b.vehicle_id = v.id", "v.deleted_at IS NULL"];
 
-  if (body.make) {
-    conditions.push(
-      `UPPER(v.make) = '${body.make.toUpperCase().replace(/'/g, "''")}'`
-    );
+  if (body.make && typeof body.make === 'string') {
+    const safeMake = body.make.slice(0, 50).toUpperCase().replace(/'/g, "''").replace(/\\/g, '');
+    conditions.push(`UPPER(v.make) = '${safeMake}'`);
   }
-  if (body.model) {
-    conditions.push(
-      `v.model ILIKE '%${body.model.replace(/'/g, "''")}%'`
-    );
+  if (body.model && typeof body.model === 'string') {
+    const safeModel = body.model.slice(0, 50).replace(/'/g, "''").replace(/\\/g, '');
+    conditions.push(`v.model ILIKE '%${safeModel}%'`);
   }
   if (body.year_min) {
-    conditions.push(`v.year >= ${parseInt(body.year_min)}`);
+    const y = parseInt(body.year_min, 10);
+    if (!isNaN(y) && y >= 1800 && y <= 2100) conditions.push(`v.year >= ${y}`);
   }
   if (body.year_max) {
-    conditions.push(`v.year <= ${parseInt(body.year_max)}`);
+    const y = parseInt(body.year_max, 10);
+    if (!isNaN(y) && y >= 1800 && y <= 2100) conditions.push(`v.year <= ${y}`);
   }
 
   const whereClause = conditions.join(" AND ");
@@ -215,7 +215,7 @@ async function bidderProfileMode(supabase: any, body: any) {
   const username = body.bidder_username;
   if (!username) throw new Error("bidder_username is required for bidder_profile mode");
 
-  const safeUsername = username.replace(/'/g, "''");
+  const safeUsername = String(username).slice(0, 100).replace(/'/g, "''").replace(/\\/g, '');
 
   const { data: profile, error: pErr } = await supabase.rpc("execute_sql", {
     query: `

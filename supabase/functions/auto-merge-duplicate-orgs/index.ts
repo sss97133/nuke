@@ -213,13 +213,13 @@ async function mergeOrganizations(
     .from('businesses')
     .select('*')
     .eq('id', sourceId)
-    .single();
+    .maybeSingle();
 
   const { data: targetOrg } = await supabase
     .from('businesses')
     .select('*')
     .eq('id', targetId)
-    .single();
+    .maybeSingle();
 
   if (sourceOrg && targetOrg) {
     const updates: any = {};
@@ -256,7 +256,7 @@ async function mergeOrganizations(
     .from('businesses')
     .select('id, description, business_type, website, metadata')
     .eq('id', targetId)
-    .single();
+    .maybeSingle();
 
   if (finalTarget && (!finalTarget.description || finalTarget.business_type === 'other') && finalTarget.website) {
     try {
@@ -290,7 +290,7 @@ async function findAndMergeDuplicates(orgId: string, supabase: any): Promise<{ m
     .from('businesses')
     .select('id, business_name, legal_name, website, phone, email, city, state, zip_code, business_type')
     .eq('id', orgId)
-    .single();
+    .maybeSingle();
 
   if (error || !org) {
     return { merged: false };

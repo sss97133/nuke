@@ -432,7 +432,7 @@ async function upsertListings(
       .select("id, current_price, status")
       .eq("external_id", listing.external_id)
       .eq("platform", "facebook_marketplace")
-      .single();
+      .maybeSingle();
 
     if (!existing) {
       // Insert new

@@ -145,7 +145,7 @@ async function getOrCreateTech(telegramUser: TelegramUpdate["message"]["from"]) 
     .from("telegram_technicians")
     .select("*")
     .eq("telegram_id", telegramUser.id)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     // Update last active
@@ -224,7 +224,7 @@ async function setActiveVehicle(
     .from("vehicles")
     .select("id, year, make, model, vin")
     .eq("vin", normalized)
-    .single();
+    .maybeSingle();
 
   // If not found by exact VIN and length is between 6-16, try partial match
   if (!vehicle && normalized.length >= 6 && normalized.length < 17) {
@@ -430,7 +430,7 @@ Ask your boss for an invite code, then send:
     .from("businesses")
     .select("id, business_name")
     .eq("id", tech.business_id)
-    .single();
+    .maybeSingle();
 
   // Check for active vehicle
   if (!tech.active_vehicle_id) {
@@ -446,7 +446,7 @@ Example: /vehicle WBA3A5C51CF123456`;
     .from("vehicles")
     .select("id, year, make, model, vin")
     .eq("id", tech.active_vehicle_id)
-    .single();
+    .maybeSingle();
 
   if (!vehicle) {
     await clearActiveVehicle(tech.id);
@@ -652,7 +652,7 @@ Your boss will receive organized photo updates.`
           .from("businesses")
           .select("business_name")
           .eq("id", tech.business_id)
-          .single();
+          .maybeSingle();
 
         await sendMessage(
           chatId,
@@ -724,7 +724,7 @@ Send /vehicle VIN to set a new one.`
           .from("businesses")
           .select("business_name")
           .eq("id", tech.business_id)
-          .single();
+          .maybeSingle();
 
         statusMsg += `Shop: ${business?.business_name || "Connected"}\n`;
       } else {
@@ -736,7 +736,7 @@ Send /vehicle VIN to set a new one.`
           .from("vehicles")
           .select("year, make, model, vin")
           .eq("id", tech.active_vehicle_id)
-          .single();
+          .maybeSingle();
 
         if (vehicle) {
           statusMsg += `Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model}\n`;

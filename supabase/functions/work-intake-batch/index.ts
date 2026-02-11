@@ -324,7 +324,7 @@ serve(async (req) => {
       .from("technician_phone_links")
       .select("*")
       .eq("id", techLinkId)
-      .single();
+      .maybeSingle();
 
     if (!techLink) {
       return new Response(JSON.stringify({ error: "Technician not found" }), {
@@ -485,7 +485,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("Batch intake error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

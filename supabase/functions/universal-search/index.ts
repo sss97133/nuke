@@ -56,7 +56,7 @@ function detectInputType(query: string): 'vin' | 'url' | 'year' | 'text' | 'empt
 
   // Year: exactly 4 digits, reasonable range
   if (/^\d{4}$/.test(trimmed)) {
-    const year = parseInt(trimmed);
+    const year = parseInt(trimmed, 10);
     if (year >= 1886 && year <= new Date().getFullYear() + 2) return 'year';
   }
 
@@ -174,7 +174,7 @@ serve(async (req) => {
     // YEAR SEARCH - Vehicles from that year
     // ============================================
     if (queryType === 'year') {
-      const year = parseInt(trimmedQuery);
+      const year = parseInt(trimmedQuery, 10);
 
       const { data: vehicles } = await supabase
         .from('vehicles')
@@ -264,7 +264,7 @@ serve(async (req) => {
             .eq('is_public', true);
 
           if (yearMatch) {
-            const year = parseInt(yearMatch[1]);
+            const year = parseInt(yearMatch[1], 10);
             const rest = yearMatch[2].toLowerCase();
             vehicleQuery = vehicleQuery
               .eq('year', year)

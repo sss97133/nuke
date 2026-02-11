@@ -40,7 +40,7 @@ serve(async (req) => {
       .from('image_analysis_cache')
       .select('*')
       .eq('image_url', image_url)
-      .single()
+      .maybeSingle()
 
     let analysisResult: any;
 

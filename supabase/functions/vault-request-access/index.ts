@@ -137,7 +137,7 @@ async function isAdminOrModerator(userId: string): Promise<boolean> {
     .from("profiles")
     .select("user_type")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   return profile?.user_type === "admin" || profile?.user_type === "moderator";
 }
@@ -175,7 +175,7 @@ async function getAttestationWithUser(attestationId: string): Promise<{
     .from("vault_attestations")
     .select("id, user_id, vin, document_type, title_number_masked, vehicle_id")
     .eq("id", attestationId)
-    .single();
+    .maybeSingle();
 
   if (error || !attestation) return null;
 
@@ -184,7 +184,7 @@ async function getAttestationWithUser(attestationId: string): Promise<{
     .from("profiles")
     .select("id, full_name, phone_number")
     .eq("id", attestation.user_id)
-    .single();
+    .maybeSingle();
 
   if (!user) return null;
 
@@ -193,7 +193,7 @@ async function getAttestationWithUser(attestationId: string): Promise<{
     .from("vault_user_preferences")
     .select("notify_on_access_request, notify_via_sms, notify_via_push, push_token, push_token_platform")
     .eq("user_id", attestation.user_id)
-    .single();
+    .maybeSingle();
 
   // Get vehicle if linked
   let vehicle = null;
@@ -202,7 +202,7 @@ async function getAttestationWithUser(attestationId: string): Promise<{
       .from("vehicles")
       .select("year, make, model")
       .eq("id", attestation.vehicle_id)
-      .single();
+      .maybeSingle();
     vehicle = v;
   }
 
@@ -286,7 +286,7 @@ serve(async (req) => {
       .select("id, status, created_at")
       .eq("attestation_id", attestation.id)
       .eq("status", "pending")
-      .single();
+      .maybeSingle();
 
     if (existingRequest) {
       return new Response(

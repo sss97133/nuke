@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
       .from('live_auction_sources')
       .select('*')
       .eq('slug', detectedPlatform)
-      .single();
+      .maybeSingle();
 
     if (sourceError || !source) {
       return new Response(

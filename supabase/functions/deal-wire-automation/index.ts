@@ -49,7 +49,7 @@ serve(async (req: Request) => {
       .from("vehicle_deal_offers")
       .select("*")
       .eq("id", dealId)
-      .single();
+      .maybeSingle();
 
     if (dealError || !deal) {
       return new Response(
@@ -65,7 +65,7 @@ serve(async (req: Request) => {
         "id, year, make, model, trim, vin, mileage, color, nuke_estimate, asking_price, sale_price, condition_rating, overall_desirability_score",
       )
       .eq("id", deal.vehicle_id)
-      .single();
+      .maybeSingle();
 
     const vehicleTitle = vehicle
       ? `${vehicle.year || ""} ${vehicle.make || ""} ${vehicle.model || ""} ${vehicle.trim || ""}`.trim()
@@ -240,10 +240,10 @@ serve(async (req: Request) => {
       JSON.stringify({ error: `Unknown action: ${action}` }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("deal-wire-automation error:", error);
     return new Response(
-      JSON.stringify({ error: error?.message || "Internal server error" }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
