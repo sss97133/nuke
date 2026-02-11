@@ -216,10 +216,11 @@ serve(async (req) => {
     }
 
     // Clean up state
-    await supabase
+    const { error: deleteError } = await supabase
       .from('oauth_state_tracker')
       .delete()
       .eq('state', state);
+    if (deleteError) console.error('Failed to clean up oauth state:', deleteError.message);
 
     // Store access token in environment variable for sync functions
     // Note: In production, you'd want to store this encrypted in a vault
