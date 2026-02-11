@@ -258,7 +258,7 @@ async function setActiveVehicle(
           .from("vehicles")
           .insert({
             vin: normalized,
-            year: parseInt(year),
+            year: parseInt(year, 10),
             make,
             model,
             discovered_via: "telegram_technician",

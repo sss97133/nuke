@@ -75,7 +75,7 @@ Deno.serve(async (req: Request) => {
             .eq('vehicle_id', vehicle.id)
             .eq('execution_type', trigger.execution_type)
             .in('status', ['pending', 'executing'])
-            .single();
+            .maybeSingle();
 
           if (existing) {
             console.log(`  ⏭️  Execution already exists for watchlist ${trigger.watchlist_id}`);

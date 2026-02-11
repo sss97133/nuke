@@ -946,10 +946,10 @@ function parseBaTDate(dateStr: string, referenceDate: Date): Date {
   const dateTimeMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+at\s+(\d+):(\d+)\s+(AM|PM)/i)
   if (dateTimeMatch) {
     const [, month, day, year, hour, minute, ampm] = dateTimeMatch
-    const fullYear = year.length === 2 ? 2000 + parseInt(year) : parseInt(year)
-    const date = new Date(fullYear, parseInt(month) - 1, parseInt(day), 
-      parseInt(hour) + (ampm.toUpperCase() === 'PM' && hour !== '12' ? 12 : 0) + (ampm.toUpperCase() === 'AM' && hour === '12' ? -12 : 0), 
-      parseInt(minute))
+    const fullYear = year.length === 2 ? 2000 + parseInt(year, 10) : parseInt(year, 10)
+    const date = new Date(fullYear, parseInt(month, 10) - 1, parseInt(day, 10), 
+      parseInt(hour, 10) + (ampm.toUpperCase() === 'PM' && hour !== '12' ? 12 : 0) + (ampm.toUpperCase() === 'AM' && hour === '12' ? -12 : 0), 
+      parseInt(minute, 10))
     if (!isNaN(date.getTime())) return date
   }
   
@@ -961,17 +961,17 @@ function parseBaTDate(dateStr: string, referenceDate: Date): Date {
   const year = referenceDate.getFullYear()
   
   const date = new Date(`${month} ${day}, ${year}`)
-  let hours = parseInt(hour)
+  let hours = parseInt(hour, 10)
   if (ampm === 'PM' && hours !== 12) hours += 12
   if (ampm === 'AM' && hours === 12) hours = 0
   
-  date.setHours(hours, parseInt(minute))
+  date.setHours(hours, parseInt(minute, 10))
   return date
 }
 
 function extractNumber(text: string | null | undefined): number {
   if (!text) return 0
   const match = text.match(/(\d+)/)
-  return match ? parseInt(match[1]) : 0
+  return match ? parseInt(match[1], 10) : 0
 }
 
