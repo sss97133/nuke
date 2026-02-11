@@ -363,9 +363,9 @@ function processCsv(csvText: string, userId: string, vehicleId: string | null): 
     // Only include if we have at least year, make, or model
     if (vehicle.year || vehicle.make || vehicle.model || vehicle.vin) {
       // Normalize values
-      if (vehicle.year) vehicle.year = parseInt(vehicle.year);
-      if (vehicle.mileage) vehicle.mileage = parseInt(vehicle.mileage.replace(/[^0-9]/g, ''));
-      if (vehicle.price) vehicle.price = parseInt(vehicle.price.replace(/[^0-9]/g, ''));
+      if (vehicle.year) vehicle.year = parseInt(vehicle.year, 10);
+      if (vehicle.mileage) vehicle.mileage = parseInt(vehicle.mileage.replace(/[^0-9]/g, ''), 10);
+      if (vehicle.price) vehicle.price = parseInt(vehicle.price.replace(/[^0-9]/g, ''), 10);
 
       vehicles.push(vehicle);
     }

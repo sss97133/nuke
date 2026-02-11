@@ -354,7 +354,7 @@ function parseVehicleTitle(title: string): { year: number | null; make: string |
     return { year: null, make: null, model: null };
   }
 
-  const year = parseInt(yearMatch[1]);
+  const year = parseInt(yearMatch[1], 10);
   const rest = title.substring(5).trim();
 
   // Common vehicle makes

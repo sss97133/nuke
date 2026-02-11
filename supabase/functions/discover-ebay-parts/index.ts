@@ -332,7 +332,7 @@ async function extractListingsFromHtml(html: string, markdown: string | null): P
       condition: 'Unknown',
       seller: {
         username: sellerMatch ? sellerMatch[1].trim() : 'unknown',
-        feedbackScore: feedbackMatch ? parseInt(feedbackMatch[1]) : 0,
+        feedbackScore: feedbackMatch ? parseInt(feedbackMatch[1], 10) : 0,
         feedbackPercentage: 0,
       },
       itemUrl: url,

@@ -107,7 +107,7 @@ function parseVehicleFromTitle(
   // Try to match "YEAR MAKE MODEL" pattern
   const ymm = title.match(/(\d{4})\s+([A-Za-z]+(?:\s*-\s*[A-Za-z]+)?)\s+(.+)/);
   if (ymm) {
-    const year = parseInt(ymm[1]);
+    const year = parseInt(ymm[1], 10);
     if (year >= 1900 && year <= 2030) {
       return {
         year,
@@ -120,7 +120,7 @@ function parseVehicleFromTitle(
   // Just try year
   const yearMatch = title.match(/\b(19\d{2}|20[0-2]\d)\b/);
   if (yearMatch) {
-    return { year: parseInt(yearMatch[1]) };
+    return { year: parseInt(yearMatch[1], 10) };
   }
 
   return {};
