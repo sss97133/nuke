@@ -98,6 +98,14 @@ serve(async (req) => {
     const ext = file.name.split(".").pop() || "jpg";
     const storagePath = `nuke-box/${timestamp}_${file.name}`;
 
+    // Enforce file size limit (50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: "File too large. Maximum size is 50MB." }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Upload to Supabase Storage
     const fileBuffer = await file.arrayBuffer();
     const { data: uploadData, error: uploadError } = await supabase.storage

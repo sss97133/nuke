@@ -114,6 +114,13 @@ serve(async (req) => {
       );
     }
 
+    // Cap observations per vehicle to prevent abuse
+    for (const v of body.vehicles) {
+      if (v.observations && v.observations.length > 100) {
+        v.observations = v.observations.slice(0, 100);
+      }
+    }
+
     const options = body.options || {};
     const matchBy = options.match_by || 'vin';
     const skipDuplicates = options.skip_duplicates ?? true;
