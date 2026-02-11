@@ -75,6 +75,7 @@ async function sendTelegramAlert(message: string): Promise<boolean> {
         parse_mode: "HTML",
         disable_web_page_preview: true,
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     const result = await response.json();

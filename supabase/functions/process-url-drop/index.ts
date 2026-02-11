@@ -389,8 +389,9 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
-    console.error('Process URL drop error:', error);
+  } catch (error: any) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Process URL drop error:', errorMessage);
 
     // Write error back to url_inbox if triggered from there
     if (_inbox_id) {
@@ -402,14 +403,14 @@ serve(async (req) => {
         .from('url_inbox')
         .update({
           status: 'failed',
-          error_message: error.message,
+          error_message: errorMessage,
           processed_at: new Date().toISOString(),
         })
         .eq('id', _inbox_id);
     }
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
