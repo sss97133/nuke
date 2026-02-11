@@ -2163,7 +2163,7 @@ serve(async (req) => {
   } catch (e: any) {
     const msg = e?.message ? String(e.message) : String(e);
     console.error("extract-bat-core error:", msg);
-    return new Response(JSON.stringify({ error: msg }), {
+    return new Response(JSON.stringify({ success: false, error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -531,7 +531,7 @@ serve(async (req) => {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[BJ] Error:", msg);
-    return new Response(JSON.stringify({ error: msg }), {
+    return new Response(JSON.stringify({ success: false, error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
