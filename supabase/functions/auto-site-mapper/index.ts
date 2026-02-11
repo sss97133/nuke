@@ -65,15 +65,15 @@ Deno.serve(async (req) => {
         return await generateExtractionSchema(params);
       
       default:
-        return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400 });
+        return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
   } catch (error) {
     console.error('Auto site mapper error:', error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: false,
       error: error.message,
       timestamp: new Date().toISOString()
-    }), { status: 500 });
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 });
 
@@ -118,7 +118,7 @@ async function mapSingleSite(siteUrl: string): Promise<Response> {
     data: result,
     recommendations: generateMappingRecommendations(result),
     timestamp: new Date().toISOString()
-  }));
+  }), { headers: { 'Content-Type': 'application/json' } });
 }
 
 async function mapBatchSites(siteUrls: string[]): Promise<Response> {
@@ -159,7 +159,7 @@ async function mapBatchSites(siteUrls: string[]): Promise<Response> {
     },
     recommendations: generateBatchRecommendations(summary, results),
     timestamp: new Date().toISOString()
-  }));
+  }), { headers: { 'Content-Type': 'application/json' } });
 }
 
 async function discoverAndMap(params: any): Promise<Response> {
@@ -194,7 +194,7 @@ async function discoverAndMap(params: any): Promise<Response> {
       mappable_sites: mappableSites
     },
     timestamp: new Date().toISOString()
-  }));
+  }), { headers: { 'Content-Type': 'application/json' } });
 }
 
 // Helper functions for site analysis

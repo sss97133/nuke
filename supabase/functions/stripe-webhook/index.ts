@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       } else if (purchaseType === 'api_access_subscription') {
         // Handle API access subscription
         const subscriptionType = session.metadata?.subscription_type
-        const credits = session.metadata?.credits ? parseInt(session.metadata.credits) : null
+        const credits = session.metadata?.credits ? parseInt(session.metadata.credits, 10) || null : null
         
         if (!subscriptionType) {
           console.error('Missing subscription_type for API access subscription')
@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
 
       } else if (purchaseType === 'dealerscan_credits') {
         // Handle DealerScan credit purchases
-        const credits = session.metadata?.credits ? parseInt(session.metadata.credits) : 0
+        const credits = session.metadata?.credits ? (parseInt(session.metadata.credits, 10) || 0) : 0
 
         if (credits > 0) {
           const { data: newBalance, error: dsError } = await supabase.rpc('ds_add_credits', {

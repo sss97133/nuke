@@ -9,6 +9,14 @@
       "destination": "/api/quickbooks/:path*"
     },
     {
+      "source": "/api",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/api/landing",
+      "destination": "/index.html"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path*"
     },
