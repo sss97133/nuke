@@ -57,11 +57,12 @@ async function linkPhone(phone: string, telegramId: number, username?: string) {
 async function getOrCreateVehicle(vin: string, d: any) {
   const { data: ex } = await supabase.from("vehicles").select("id").eq("vin", vin).maybeSingle();
   if (ex) return { id: ex.id, isNew: false };
-  const { data: nv } = await supabase.from("vehicles").insert({ vin, year: d.year, make: d.make, model: d.model, source: "telegram" }).select("id").single();
+  const { data: nv } = await supabase.from("vehicles").insert({ vin, year: d.year, make: d.make, model: d.model, source: "telegram" }).select("id").maybeSingle();
   return { id: nv!.id, isNew: true };
 }
 
 Deno.serve(async (req) => {
+  try {
   if (new URL(req.url).searchParams.get("setup") === "true") {
     const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${Deno.env.get("SUPABASE_URL")}/functions/v1/nukeproof-bot`);
     return new Response(JSON.stringify(await r.json()));
@@ -139,4 +140,8 @@ Deno.serve(async (req) => {
 
   await send(chatId, tech ? (tech.active_vin ? `Working on \`${tech.active_vin}\`\nSend photo/note/new VIN` : "Send a VIN") : "Send phone number");
   return new Response("OK");
+  } catch (e: any) {
+    console.error("[nuke-tech-bot] Error:", e?.message || e);
+    return new Response("OK");
+  }
 });
