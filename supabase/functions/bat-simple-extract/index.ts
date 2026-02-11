@@ -227,7 +227,7 @@ function extractTitle(html: string): { title: string | null; year: number | null
   
   // Parse year from title
   const yearMatch = title.match(/\b(19|20)\d{2}\b/);
-  const year = yearMatch ? parseInt(yearMatch[0]) : null;
+  const year = yearMatch ? parseInt(yearMatch[0], 10) : null;
   
   // Everything after the year is make + model
   if (year) {
@@ -305,11 +305,11 @@ function extractAuctionData(html: string): {
   
   // Comment count - from header "<span class="info-value">26</span><span class="info-label">Comments</span>"
   const commentHeaderMatch = html.match(/<span class="info-value">(\d+)<\/span>\s*<span class="info-label">Comments<\/span>/i);
-  const comment_count = commentHeaderMatch ? parseInt(commentHeaderMatch[1]) : 0;
+  const comment_count = commentHeaderMatch ? parseInt(commentHeaderMatch[1], 10) : 0;
   
   // Views - "data-stats-item="views">26,541 views"
   const viewMatch = html.match(/data-stats-item="views">([0-9,]+)/);
-  const view_count = viewMatch ? parseInt(viewMatch[1].replace(/,/g, '')) : 0;
+  const view_count = viewMatch ? parseInt(viewMatch[1].replace(/,/g, ''), 10) : 0;
   
   // Watchers - "data-stats-item="watchers">982 watchers"
   const watcherMatch = html.match(/data-stats-item="watchers">([0-9,]+)/);
@@ -342,7 +342,7 @@ function extractAuctionData(html: string): {
   // Try data-ends (Unix timestamp)
   const endMatch = html.match(/data-ends="(\d+)"/) || html.match(/data-until="(\d+)"/);
   if (endMatch) {
-    const timestamp = parseInt(endMatch[1]);
+    const timestamp = parseInt(endMatch[1], 10);
     const endDate = new Date(timestamp * 1000);
     auction_end_date = endDate.toISOString().split('T')[0];  // YYYY-MM-DD for DATE column
     auction_end_timestamp = endDate.toISOString();  // Full timestamp for timers
