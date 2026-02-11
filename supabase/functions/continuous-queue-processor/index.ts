@@ -281,7 +281,8 @@ serve(async (req) => {
                     auction_url: item.listing_url,
                     vehicle_id: vehicleId,
                   }),
-                }).catch((e) => console.warn(`[queue] Comment extraction trigger failed for ${item.id}:`, e.message));
+                  signal: AbortSignal.timeout(120000),
+                }).catch((e: any) => console.warn(`[queue] Comment extraction trigger failed for ${item.id}:`, e instanceof Error ? e.message : String(e)));
               }
             } else {
               const errDetail = typeof extractResult.error === 'string' ? extractResult.error : JSON.stringify(extractResult.error);
