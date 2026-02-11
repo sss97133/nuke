@@ -250,8 +250,8 @@ async function saveVehicle(
     .from("vehicles")
     .select("id")
     .or(
-      `vin.eq.${vehicle.vin && vehicle.vin.length >= 5 ? vehicle.vin : "IMPOSSIBLE"},` +
-      `make.eq.${vehicle.make || "IMPOSSIBLE"}`
+      `vin.eq.${vehicle.vin && vehicle.vin.length >= 5 ? String(vehicle.vin).replace(/[",().\\]/g, '') : "IMPOSSIBLE"},` +
+      `make.eq.${vehicle.make ? String(vehicle.make).replace(/[",().\\]/g, '') : "IMPOSSIBLE"}`
     )
     .eq("year", vehicle.year || 0)
     .limit(1)

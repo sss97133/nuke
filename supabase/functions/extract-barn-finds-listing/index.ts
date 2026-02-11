@@ -97,7 +97,7 @@ serve(async (req) => {
 
     let markdown: string | null = null;
     if (!useFirecrawl) {
-      const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+      const res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15000) });
       if (res.ok) {
         const html = await res.text();
         // Extract h1 title separately (it's outside entry-content on Barn Finds)

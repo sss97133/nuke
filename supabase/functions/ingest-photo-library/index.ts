@@ -53,7 +53,7 @@ interface PhotoBatch {
 // Classify a single photo
 async function classifyPhoto(photoUrl: string): Promise<PhotoClassification> {
   try {
-    const imageResponse = await fetch(photoUrl);
+    const imageResponse = await fetch(photoUrl, { signal: AbortSignal.timeout(20000) });
     const imageBuffer = await imageResponse.arrayBuffer();
     const uint8Array = new Uint8Array(imageBuffer);
 

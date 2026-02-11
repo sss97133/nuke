@@ -66,6 +66,7 @@ async function sendMessage(chatId: number, text: string, parseMode = "Markdown")
         text,
         parse_mode: parseMode,
       }),
+      signal: AbortSignal.timeout(15000),
     });
     const result = await response.json();
     if (!result.ok) {
@@ -76,6 +77,7 @@ async function sendMessage(chatId: number, text: string, parseMode = "Markdown")
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: chatId, text }),
+          signal: AbortSignal.timeout(15000),
         });
       }
     }
@@ -89,7 +91,8 @@ async function getFileUrl(fileId: string): Promise<string | null> {
   if (!BOT_TOKEN) return null;
 
   const response = await fetch(
-    `https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`
+    `https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`,
+    { signal: AbortSignal.timeout(15000) }
   );
   const data = await response.json();
 
@@ -106,7 +109,7 @@ async function uploadToStorage(
   messageId: number
 ): Promise<string | null> {
   try {
-    const response = await fetch(fileUrl);
+    const response = await fetch(fileUrl, { signal: AbortSignal.timeout(30000) });
     const blob = await response.blob();
 
     const ext = fileUrl.split(".").pop() || "jpg";
@@ -331,7 +334,7 @@ async function analyzeWorkPhoto(
 
   try {
     // Download and convert to base64
-    const imgResponse = await fetch(imageUrl);
+    const imgResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) });
     const arrayBuffer = await imgResponse.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
@@ -385,6 +388,7 @@ Return JSON only:
           },
         ],
       }),
+      signal: AbortSignal.timeout(60000),
     });
 
     const result = await response.json();
@@ -571,7 +575,7 @@ Deno.serve(async (req) => {
     );
     const result = await response.json();
 
-    const meResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getMe`);
+    const meResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getMe`, { signal: AbortSignal.timeout(15000) });
     const botInfo = await meResponse.json();
 
     return new Response(JSON.stringify({

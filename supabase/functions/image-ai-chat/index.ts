@@ -98,7 +98,8 @@ Respond in JSON format:
           }
         ],
         max_tokens: 500
-      })
+      }),
+      signal: AbortSignal.timeout(60000),
     });
 
     if (!response.ok) {
