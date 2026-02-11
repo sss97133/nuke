@@ -963,7 +963,7 @@ Deno.serve(async (req: Request) => {
         .from('vehicles')
         .select('user_id, uploaded_by')
         .eq('id', vehicleId)
-        .single();
+        .maybeSingle();
       
       const userId = vehicle?.user_id || vehicle?.uploaded_by || null;
       
