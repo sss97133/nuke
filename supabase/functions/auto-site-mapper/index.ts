@@ -216,7 +216,8 @@ async function analyzeSiteStructure(siteUrl: string) {
     body: JSON.stringify({
       url: siteUrl,
       limit: 10
-    })
+    }),
+    signal: AbortSignal.timeout(30000),
   });
   
   const crawlData = await response.json();
@@ -320,7 +321,8 @@ Return JSON schema:
       max_tokens: 1000,
       temperature: 0.1,
       response_format: { type: "json_object" }
-    })
+    }),
+    signal: AbortSignal.timeout(30000),
   });
   
   const data = await response.json();
@@ -374,7 +376,8 @@ async function testSingleExtraction(url: string, schema: any) {
       extract: {
         schema: schema.selectors
       }
-    })
+    }),
+    signal: AbortSignal.timeout(30000),
   });
   
   const result = await response.json();
