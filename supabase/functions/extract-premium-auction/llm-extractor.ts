@@ -326,7 +326,8 @@ Be specific - give exact selectors or paths.`;
             temperature: 0.1,
             responseMimeType: 'application/json',
           }
-        })
+        }),
+        signal: AbortSignal.timeout(45000),
       });
 
       if (!response.ok) {
@@ -378,7 +379,8 @@ Be specific - give exact selectors or paths.`;
         max_tokens: 1500,
         temperature: 0.1,
         response_format: { type: 'json_object' }
-      })
+      }),
+      signal: AbortSignal.timeout(45000),
     });
 
     if (!response.ok) {
@@ -504,7 +506,8 @@ Extract only fields that are clearly present. Use null for missing fields.`;
             temperature: 0.1,
             responseMimeType: 'application/json',
           }
-        })
+        }),
+        signal: AbortSignal.timeout(45000),
       });
 
       if (!response.ok) {
@@ -588,7 +591,8 @@ Extract only fields that are clearly present. Use null for missing fields.`;
         max_tokens: 1000, // Reduced from 4000 - simple extractions don't need that much
         temperature: 0.1,
         response_format: { type: 'json_object' }
-      })
+      }),
+      signal: AbortSignal.timeout(45000),
     });
 
     if (!response.ok) {

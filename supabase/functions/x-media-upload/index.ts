@@ -114,6 +114,7 @@ serve(async (req) => {
         media_type: contentType,
         media_category: mediaCategory,
       }),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!initResponse.ok) {
@@ -141,6 +142,7 @@ serve(async (req) => {
         media_data: base64Image,
         segment_index: '0',
       }),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!appendResponse.ok) {
@@ -161,6 +163,7 @@ serve(async (req) => {
         command: 'FINALIZE',
         media_id: mediaId,
       }),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!finalizeResponse.ok) {
@@ -183,6 +186,7 @@ serve(async (req) => {
           media_id: mediaId,
           alt_text: { text: alt_text }
         }),
+        signal: AbortSignal.timeout(30000),
       });
     }
 
@@ -223,7 +227,8 @@ async function refreshToken(identityId: string, refreshToken: string, supabase: 
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refreshToken
-    })
+    }),
+    signal: AbortSignal.timeout(30000),
   });
 
   if (!response.ok) {

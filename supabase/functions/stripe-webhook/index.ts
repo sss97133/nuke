@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
         }
 
         // Update transaction with payment confirmation
-        await supabase
+        const { error: updateError } = await supabase
           .from('vehicle_transactions')
           .update({
             stripe_payment_id: session.payment_intent,
@@ -202,6 +202,10 @@ Deno.serve(async (req) => {
             status: 'pending_documents'
           })
           .eq('id', transactionId)
+
+        if (updateError) {
+          console.error(`Failed to update vehicle_transactions for ${transactionId}:`, updateError)
+        }
 
         console.log(`Vehicle transaction ${transactionId} fee paid: $${amountCents / 100}`)
 
