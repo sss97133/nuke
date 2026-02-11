@@ -19,6 +19,8 @@ const ASSET_TYPE_COLORS: Record<string, string> = {
   bond: '#10b981',
   stake: '#f59e0b',
   organization: '#8b5cf6',
+  real_estate: '#ef4444',
+  event: '#ec4899',
 };
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
@@ -26,6 +28,8 @@ const ASSET_TYPE_LABELS: Record<string, string> = {
   bond: 'Bond',
   stake: 'Stake',
   organization: 'Organization',
+  real_estate: 'Real Estate',
+  event: 'Event',
 };
 
 export default function ContractTransparency({ contractId, onBack }: ContractTransparencyProps) {
@@ -149,6 +153,30 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
           .in('id', byType.stake)
           .then(({ data }) => {
             (data || []).forEach((s: any) => { detailsMap[s.id] = s; });
+          })
+      );
+    }
+
+    if (byType.real_estate?.length) {
+      fetches.push(
+        supabase
+          .from('properties')
+          .select('id, name, property_type, description, city, region, country, base_price, specs, metadata, status')
+          .in('id', byType.real_estate)
+          .then(({ data }) => {
+            (data || []).forEach((p: any) => { detailsMap[p.id] = p; });
+          })
+      );
+    }
+
+    if (byType.event?.length) {
+      fetches.push(
+        supabase
+          .from('community_events')
+          .select('id, event_name, event_type, description, start_date, end_date, recurring, venue_name, city, state, max_capacity, registered_count, vehicle_spots, ticket_price_cents, vip_price_cents, total_revenue_cents, net_profit_cents, status')
+          .in('id', byType.event)
+          .then(({ data }) => {
+            (data || []).forEach((e: any) => { detailsMap[e.id] = e; });
           })
       );
     }
@@ -617,7 +645,8 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                               color: '#fff', fontSize: '9pt', fontWeight: 900,
                             }}>
                               {asset.asset_type === 'bond' ? 'B' : asset.asset_type === 'stake' ? 'S' :
-                               asset.asset_type === 'organization' ? (asset.details?.business_name || 'O').charAt(0).toUpperCase() : '?'}
+                               asset.asset_type === 'organization' ? (asset.details?.business_name || 'O').charAt(0).toUpperCase() :
+                               asset.asset_type === 'real_estate' ? '\u2302' : asset.asset_type === 'event' ? '\u2605' : '?'}
                             </div>
                           )}
                           <div>
@@ -798,6 +827,10 @@ function getAssetName(asset: any): string {
         : `Bond #${asset.asset_id.slice(-8)}`;
     case 'stake':
       return `Equity Stake #${asset.asset_id.slice(-8)}`;
+    case 'real_estate':
+      return asset.details.name || `Property #${asset.asset_id.slice(-8)}`;
+    case 'event':
+      return asset.details.event_name || `Event #${asset.asset_id.slice(-8)}`;
     default:
       return `${asset.asset_type.toUpperCase()} #${asset.asset_id.slice(-8)}`;
   }
@@ -819,6 +852,10 @@ function AssetDetailPanel({ asset, navigate }: { asset: any; navigate: any }) {
       return <StakeDetail asset={asset} d={d} />;
     case 'organization':
       return <OrgDetail asset={asset} d={d} />;
+    case 'real_estate':
+      return <RealEstateDetail asset={asset} d={d} />;
+    case 'event':
+      return <EventDetail asset={asset} d={d} />;
     default:
       return <div style={{ color: 'var(--text-muted)' }}>Unknown asset type.</div>;
   }
@@ -983,6 +1020,101 @@ function OrgDetail({ asset, d }: { asset: any; d: any }) {
   );
 }
 
+function RealEstateDetail({ asset, d }: { asset: any; d: any }) {
+  const specs = d.specs || {};
+  const meta = d.metadata || {};
+  const annualRev = meta.annual_revenue ? `$${(meta.annual_revenue / 1).toLocaleString()}` : null;
+  const capRate = meta.cap_rate_pct;
+  const occupancy = meta.occupancy_pct;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '8px' }}>Property</div>
+        <DetailRow label="Name" value={d.name || '—'} />
+        <DetailRow label="Type" value={(d.property_type || '—').replace('_', ' ')} />
+        <DetailRow label="Location" value={[d.city, d.region, d.country].filter(Boolean).join(', ') || '—'} />
+        <DetailRow label="Status" value={(d.status || '—').replace('_', ' ').toUpperCase()} />
+      </div>
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '8px' }}>Specs</div>
+        {specs.square_feet && <DetailRow label="Square Feet" value={specs.square_feet.toLocaleString()} />}
+        {specs.vehicle_capacity && <DetailRow label="Vehicle Capacity" value={`${specs.vehicle_capacity} cars`} />}
+        {specs.lift_count && <DetailRow label="Lifts" value={specs.lift_count} />}
+        {specs.climate_controlled && <DetailRow label="Climate Control" value="Yes" valueColor="var(--success, #10b981)" />}
+        {specs.security && <DetailRow label="Security" value={specs.security.replace('_', ' ').toUpperCase()} />}
+        {specs.amenities && (
+          <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {specs.amenities.map((a: string, i: number) => (
+              <span key={i} style={{ padding: '1px 6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '3px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+                {a.replace('_', ' ')}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '8px' }}>Financials</div>
+        <DetailRow label="Purchase Price" value={d.base_price ? `$${Number(d.base_price).toLocaleString()}` : formatCurrencyFromCents(asset.entry_price_cents)} />
+        <DetailRow label="Current Value" value={formatCurrencyFromCents(asset.current_value_cents)} />
+        {annualRev && <DetailRow label="Annual Revenue" value={annualRev} />}
+        {capRate && <DetailRow label="Cap Rate" value={`${capRate}%`} />}
+        {occupancy != null && (
+          <>
+            <DetailRow label="Occupancy" value={`${occupancy}%`} />
+            <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ width: `${occupancy}%`, height: '100%', background: occupancy >= 80 ? 'var(--success, #10b981)' : '#f59e0b', borderRadius: '2px' }} />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EventDetail({ asset, d }: { asset: any; d: any }) {
+  const revenueFormatted = d.total_revenue_cents ? formatCurrencyFromCents(d.total_revenue_cents) : '—';
+  const profitFormatted = d.net_profit_cents ? formatCurrencyFromCents(d.net_profit_cents) : '—';
+  const fillPct = d.max_capacity && d.registered_count ? Math.round((d.registered_count / d.max_capacity) * 100) : 0;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '8px' }}>Event</div>
+        <DetailRow label="Name" value={d.event_name || '—'} />
+        <DetailRow label="Type" value={(d.event_type || '—').replace('_', ' ')} />
+        <DetailRow label="Venue" value={d.venue_name || [d.city, d.state].filter(Boolean).join(', ') || '—'} />
+        <DetailRow label="Date" value={d.start_date ? new Date(d.start_date).toLocaleDateString() : '—'} />
+        {d.recurring && d.recurring !== 'once' && (
+          <DetailRow label="Recurring" value={d.recurring.toUpperCase()} valueColor="var(--primary)" />
+        )}
+        <DetailRow label="Status" value={(d.status || '—').replace('_', ' ').toUpperCase()} />
+      </div>
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '8px' }}>Capacity</div>
+        {d.max_capacity && <DetailRow label="Max Capacity" value={d.max_capacity.toLocaleString()} />}
+        {d.registered_count != null && <DetailRow label="Registered" value={d.registered_count.toLocaleString()} />}
+        {d.vehicle_spots && <DetailRow label="Vehicle Spots" value={d.vehicle_spots} />}
+        {fillPct > 0 && (
+          <>
+            <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(fillPct, 100)}%`, height: '100%', background: fillPct >= 90 ? 'var(--danger, #ef4444)' : fillPct >= 60 ? '#f59e0b' : 'var(--success, #10b981)', borderRadius: '2px' }} />
+            </div>
+            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{fillPct}% filled</div>
+          </>
+        )}
+      </div>
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: '8px' }}>Revenue</div>
+        {d.ticket_price_cents > 0 && <DetailRow label="Ticket" value={formatCurrencyFromCents(d.ticket_price_cents)} />}
+        {d.vip_price_cents && <DetailRow label="VIP" value={formatCurrencyFromCents(d.vip_price_cents)} />}
+        <DetailRow label="Total Revenue" value={revenueFormatted} />
+        <DetailRow label="Net Profit" value={profitFormatted} valueColor={d.net_profit_cents > 0 ? 'var(--success, #10b981)' : undefined} />
+      </div>
+    </div>
+  );
+}
+
 /** Hover preview card for asset rows — shows snapshot on 300ms hover */
 function AssetHoverPreview({ asset, children }: { asset: any; children: React.ReactNode }) {
   const [show, setShow] = useState(false);
@@ -1134,6 +1266,48 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Real estate preview */}
+          {asset.asset_type === 'real_estate' && (
+            <div style={{ padding: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.real_estate, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14pt', fontWeight: 900 }}>
+                  {'\u2302'}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 900, fontSize: '11pt' }}>{d.name || 'Property'}</div>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{(d.property_type || '').replace('_', ' ')}</div>
+                </div>
+              </div>
+              <HoverRow label="Location" value={[d.city, d.region].filter(Boolean).join(', ') || '—'} />
+              {d.specs?.square_feet && <HoverRow label="Size" value={`${d.specs.square_feet.toLocaleString()} sqft`} />}
+              {d.specs?.vehicle_capacity && <HoverRow label="Capacity" value={`${d.specs.vehicle_capacity} cars`} />}
+              {d.specs?.lift_count && <HoverRow label="Lifts" value={d.specs.lift_count} />}
+              <HoverRow label="Value" value={formatCurrencyFromCents(asset.current_value_cents || 0)} />
+              {d.metadata?.cap_rate_pct && <HoverRow label="Cap Rate" value={`${d.metadata.cap_rate_pct}%`} />}
+            </div>
+          )}
+
+          {/* Event preview */}
+          {asset.asset_type === 'event' && (
+            <div style={{ padding: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.event, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12pt', fontWeight: 900 }}>
+                  {'\u2605'}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 900, fontSize: '11pt' }}>{d.event_name || 'Event'}</div>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{(d.event_type || '').replace('_', ' ')} {d.recurring && d.recurring !== 'once' ? `• ${d.recurring}` : ''}</div>
+                </div>
+              </div>
+              <HoverRow label="Venue" value={d.venue_name || [d.city, d.state].filter(Boolean).join(', ') || '—'} />
+              <HoverRow label="Date" value={d.start_date ? new Date(d.start_date).toLocaleDateString() : '—'} />
+              {d.max_capacity && <HoverRow label="Capacity" value={d.max_capacity.toLocaleString()} />}
+              {d.vehicle_spots && <HoverRow label="Car Spots" value={d.vehicle_spots} />}
+              {d.total_revenue_cents > 0 && <HoverRow label="Revenue" value={formatCurrencyFromCents(d.total_revenue_cents)} valueColor="var(--success, #10b981)" />}
+              {d.net_profit_cents > 0 && <HoverRow label="Profit" value={formatCurrencyFromCents(d.net_profit_cents)} valueColor="var(--success, #10b981)" />}
             </div>
           )}
         </div>
