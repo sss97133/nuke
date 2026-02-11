@@ -280,7 +280,10 @@ async function insertObservations(
     created_at: new Date().toISOString(),
   }));
 
-  await supabase.from("vehicle_observations").insert(obsRecords);
+  const { error } = await supabase.from("vehicle_observations").insert(obsRecords);
+  if (error) {
+    console.error(`[batch] Failed to insert observations:`, error.message);
+  }
 }
 
 async function authenticateRequest(req: Request, supabase: any): Promise<{ userId: string | null; error?: string }> {

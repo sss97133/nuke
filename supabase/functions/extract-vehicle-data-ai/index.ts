@@ -660,7 +660,7 @@ function extractVehicleFromUrl(url: string): Record<string, any> | null {
       || pathname.match(/(\d{4})[-/]([\w]+[-/][\w-]+)/i)
     if (!slugMatch) return null
 
-    const year = parseInt(slugMatch[1])
+    const year = parseInt(slugMatch[1], 10)
     if (year < 1900 || year > 2030) return null
 
     // Split the rest into parts: "porsche-911-gt3" → ["porsche", "911", "gt3"]
@@ -692,14 +692,14 @@ function extractVehicleFromUrl(url: string): Record<string, any> | null {
 function normalizeExtractedData(data: any, url: string): any {
   return {
     vin: data.vin || null,
-    year: data.year ? parseInt(data.year) : null,
+    year: data.year ? (parseInt(String(data.year), 10) || null) : null,
     make: data.make || data.manufacturer || null,
     model: data.model || null,
     series: data.series || null,
     trim: data.trim || null,
-    mileage: data.mileage ? parseInt(String(data.mileage).replace(/[^0-9]/g, '')) : null,
-    price: data.price || data.asking_price ? parseInt(String(data.price || data.asking_price).replace(/[^0-9]/g, '')) : null,
-    sold_price: data.sold_price ? parseInt(String(data.sold_price).replace(/[^0-9]/g, '')) : null,
+    mileage: data.mileage ? (parseInt(String(data.mileage).replace(/[^0-9]/g, ''), 10) || null) : null,
+    price: data.price || data.asking_price ? (parseInt(String(data.price || data.asking_price).replace(/[^0-9]/g, ''), 10) || null) : null,
+    sold_price: data.sold_price ? (parseInt(String(data.sold_price).replace(/[^0-9]/g, ''), 10) || null) : null,
     sold_date: data.sold_date || null,
     color: data.color || data.exterior_color || null,
     exterior_color: data.exterior_color || data.color || null,
