@@ -255,7 +255,17 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
   const isCurator = currentUser && contract.curator_id === currentUser.id;
 
   return (
-    <div>
+    <div
+      data-contract-id={contract.id}
+      data-contract-symbol={contract.contract_symbol}
+      data-contract-type={contract.contract_type}
+      data-contract-status={contract.status}
+      data-regulatory={contract.regulatory_status}
+      data-transparency={contract.transparency_level}
+      data-curator-id={contract.curator_id}
+      role="main"
+      aria-label={`Contract: ${contract.contract_name}`}
+    >
       {/* Contract Header */}
       <div className="card" style={{ marginBottom: '16px' }}>
         <div className="card-body">
@@ -277,19 +287,42 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                   {contract.status}
                 </span>
               </div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                {contract.contract_symbol} • {contract.contract_type.toUpperCase()} • Curated by {contract.curator_name || 'Unknown'}
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700 }}>{contract.contract_symbol}</span>
+                <span>•</span>
+                <span
+                  data-drill="contract-type"
+                  data-value={contract.contract_type}
+                  style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }}
+                  title={`Contract type: ${contract.contract_type}. Click to learn more about ${contract.contract_type} structures.`}
+                >
+                  {contract.contract_type.replace('_', ' ').toUpperCase()}
+                </span>
+                <span>•</span>
+                <span
+                  data-drill="regulatory-status"
+                  data-value={contract.regulatory_status}
+                  style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }}
+                  title={`Regulatory: ${contract.regulatory_status?.replace('_', ' ').toUpperCase()}. ${contract.regulatory_status === 'reg_d' ? 'SEC Regulation D — accredited investors only. Exemption from SEC registration for private placements.' : ''}`}
+                >
+                  {contract.regulatory_status?.replace('_', ' ').toUpperCase() || 'UNREGISTERED'}
+                </span>
+                <span>•</span>
+                <span>Curated by {contract.curator_name || 'Unknown'}</span>
               </div>
               {contract.contract_description && (
-                <div style={{ fontSize: '9pt', color: 'var(--text)', lineHeight: '14px' }}>
+                <div style={{ fontSize: '9pt', color: 'var(--text)', lineHeight: '16px' }}>
                   {contract.contract_description}
                 </div>
               )}
             </div>
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
               <button className="button button-primary" onClick={() => navigate(`/market/exchange/${contract.contract_symbol}`)}>
                 INVEST NOW
               </button>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textAlign: 'right' }}>
+                Min: {formatCurrencyFromCents(contract.minimum_investment_cents)}
+              </div>
             </div>
           </div>
         </div>
@@ -425,11 +458,31 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
             </div>
             <div>
               <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Legal Structure</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '16px' }}>
-                <strong>Entity:</strong> {contract.legal_entity_type.replace('_', ' ').toUpperCase()}<br />
-                <strong>Jurisdiction:</strong> {contract.jurisdiction}<br />
-                <strong>Regulatory:</strong> {contract.regulatory_status.replace('_', ' ').toUpperCase()}<br />
-                <strong>Transparency:</strong> {contract.transparency_level.toUpperCase()}
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '20px' }}>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
+                  <strong>Entity:</strong>
+                  <span data-drill="entity-type" data-value={contract.legal_entity_type} style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} title={`Legal entity: ${contract.legal_entity_type?.replace('_', ' ')}. Defines liability, tax treatment, and ownership structure.`}>
+                    {contract.legal_entity_type.replace('_', ' ').toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
+                  <strong>Jurisdiction:</strong>
+                  <span data-drill="jurisdiction" data-value={contract.jurisdiction} style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} title={`Jurisdiction: ${contract.jurisdiction}. Governing law for this contract.`}>
+                    {contract.jurisdiction}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
+                  <strong>Regulatory:</strong>
+                  <span data-drill="regulatory-status" data-value={contract.regulatory_status} style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)', color: contract.regulatory_status === 'reg_d' ? 'var(--primary)' : undefined }} title={contract.regulatory_status === 'reg_d' ? 'SEC Regulation D — Private placement exemption. Limited to accredited investors (>$1M net worth or >$200k annual income). No SEC registration required.' : `Regulatory status: ${contract.regulatory_status?.replace('_', ' ')}`}>
+                    {contract.regulatory_status.replace('_', ' ').toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
+                  <strong>Transparency:</strong>
+                  <span data-drill="transparency-level" data-value={contract.transparency_level} style={{ cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} title={`Transparency: ${contract.transparency_level}. ${contract.transparency_level === 'full' ? 'All holdings and positions visible to investors.' : contract.transparency_level === 'partial' ? 'Summary-level holdings visible. Individual positions may be masked.' : 'Holdings not disclosed to investors.'}`}>
+                    {contract.transparency_level.toUpperCase()}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -547,17 +600,45 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </div>
                       <AssetHoverPreview asset={asset}>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '10pt' }}>{assetName}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '8pt', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{
-                              display: 'inline-block',
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '2px',
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {/* Inline thumbnail for vehicles */}
+                          {asset.asset_type === 'vehicle' && asset.details?.primary_image_url ? (
+                            <div style={{
+                              width: '36px', height: '27px', borderRadius: '3px', overflow: 'hidden',
+                              flexShrink: 0, background: 'var(--surface)', border: '1px solid var(--border)',
+                            }}>
+                              <img
+                                src={asset.details.primary_image_url.includes('/storage/v1/object/public/')
+                                  ? asset.details.primary_image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=100&quality=60'
+                                  : asset.details.primary_image_url}
+                                alt=""
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            </div>
+                          ) : (
+                            <div style={{
+                              width: '27px', height: '27px', borderRadius: '3px', flexShrink: 0,
                               background: ASSET_TYPE_COLORS[asset.asset_type] || '#6b7280',
-                            }} />
-                            {asset.asset_type.toUpperCase()} • {asset.curator_notes || 'No notes'}
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: '#fff', fontSize: '9pt', fontWeight: 900,
+                            }}>
+                              {asset.asset_type === 'bond' ? 'B' : asset.asset_type === 'stake' ? 'S' :
+                               asset.asset_type === 'organization' ? (asset.details?.business_name || 'O').charAt(0).toUpperCase() : '?'}
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '10pt' }}>{assetName}</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '8pt', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '2px',
+                                background: ASSET_TYPE_COLORS[asset.asset_type] || '#6b7280',
+                              }} />
+                              {asset.asset_type.toUpperCase()} • {asset.curator_notes || 'No notes'}
+                            </div>
                           </div>
                         </div>
                       </AssetHoverPreview>
