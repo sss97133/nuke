@@ -875,7 +875,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('[gooding] Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
