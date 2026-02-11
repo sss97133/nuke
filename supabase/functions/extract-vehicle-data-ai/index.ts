@@ -166,11 +166,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Get LLM config with automatic fallback (Anthropic → Google → OpenAI)
-    // Anthropic first since OpenAI quota is exhausted
+    // Get LLM config with automatic fallback (Google → Anthropic → OpenAI)
+    // Google first since Gemini is free and unlimited
     let llmConfig;
     let llmResponse;
-    const providers: LLMProvider[] = ['anthropic', 'google', 'openai'];
+    const providers: LLMProvider[] = ['google', 'anthropic', 'openai'];
     let lastError: Error | null = null;
 
     for (const provider of providers) {

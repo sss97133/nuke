@@ -207,6 +207,7 @@ Return valid JSON only.`;
       'Authorization': `Bearer ${OPENAI_KEY}`,
       'Content-Type': 'application/json'
     },
+    signal: AbortSignal.timeout(60000),
     body: JSON.stringify({
       model: 'gpt-4o',
       messages: [{

@@ -75,7 +75,7 @@ serve(async (req) => {
 
     // Fetch the image
     console.log(`[x-media-upload] Fetching image from ${image_url}`);
-    const imageResponse = await fetch(image_url);
+    const imageResponse = await fetch(image_url, { signal: AbortSignal.timeout(30000) });
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`);
     }
