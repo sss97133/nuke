@@ -311,6 +311,14 @@ serve(async (req) => {
       });
     }
 
+    // Cap media URLs to prevent unbounded AI API calls
+    if (mediaUrls.length > 50) {
+      return new Response(JSON.stringify({ error: "Maximum 50 media URLs per request" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     // Get technician info
     const { data: techLink } = await supabase
       .from("technician_phone_links")

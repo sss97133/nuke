@@ -556,7 +556,7 @@ serve(async (req) => {
       start_offset = 0
     } = body;
     
-    const maxListingsToProcess = max_results || max_listings || 100;
+    const maxListingsToProcess = Math.min(max_results || max_listings || 100, 500);
     const startOffset = Number.isFinite(start_offset) ? Math.max(0, Math.floor(start_offset)) : 0;
 
     // Detect and normalize source type based on URL patterns

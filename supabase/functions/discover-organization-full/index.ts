@@ -754,11 +754,17 @@ async function extractAllData(
     try {
       console.log(`   Processing import queue to create vehicle profiles...`);
       
-      // Process in batches
+      // Process in batches with timeout protection
       const batchSize = 20;
       const maxBatches = 10; // Process up to 200 vehicles per discovery run
-      
+      const processingStartTime = Date.now();
+      const maxProcessingTimeMs = 45000; // 45 second timeout for queue processing
+
       for (let batch = 0; batch < maxBatches; batch++) {
+        if (Date.now() - processingStartTime > maxProcessingTimeMs) {
+          console.log(`   ⚠️ Queue processing timeout reached (${maxProcessingTimeMs}ms), stopping gracefully`);
+          break;
+        }
         const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-import-queue`, {
           method: 'POST',
           headers: {
