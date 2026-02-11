@@ -179,7 +179,7 @@ serve(async (req) => {
             decision: intelligenceDecision?.decision || 'N/A'
           });
         } else {
-          const errorMsg = extractData.error || 'Extraction failed';
+          const errorMsg = typeof extractData.error === 'string' ? extractData.error : JSON.stringify(extractData.error) || 'Extraction failed';
           // Detect non-vehicle pages (memorabilia, collectibles, etc.) and skip instead of fail
           const isNonVehicle = errorMsg.includes('No vehicle data found') ||
             errorMsg.includes('could not find real vehicle data');
