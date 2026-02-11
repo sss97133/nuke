@@ -116,8 +116,8 @@ serve(async (req) => {
 
     // Cap observations per vehicle to prevent abuse
     for (const v of body.vehicles) {
-      if (v.observations && v.observations.length > 100) {
-        v.observations = v.observations.slice(0, 100);
+      if (v.observations && v.observations.length > 50) {
+        v.observations = v.observations.slice(0, 50);
       }
     }
 

@@ -312,8 +312,8 @@ serve(async (req) => {
     }
 
     // Cap media URLs to prevent unbounded AI API calls
-    if (mediaUrls.length > 50) {
-      return new Response(JSON.stringify({ error: "Maximum 50 media URLs per request" }), {
+    if (mediaUrls.length > 20) {
+      return new Response(JSON.stringify({ error: "Maximum 20 media URLs per request" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
