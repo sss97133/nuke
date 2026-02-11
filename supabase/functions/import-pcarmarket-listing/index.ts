@@ -971,11 +971,12 @@ Deno.serve(async (req: Request) => {
         console.error('Missing user_id for image import');
       } else {
         // Delete existing PCarMarket images first
-        await supabase
+        const { error: deleteError } = await supabase
           .from('vehicle_images')
           .delete()
           .eq('vehicle_id', vehicleId)
           .eq('source', 'pcarmarket_listing');
+        if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message);
         
         // Import ALL images (not just 10)
         const imageInserts = listing.images.map((imageUrl, index) => ({
