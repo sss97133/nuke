@@ -243,7 +243,8 @@ async function setActiveVehicle(
   if (!vehicle && normalized.length === 17) {
     try {
       const nhtsaResponse = await fetch(
-        `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${normalized}?format=json`
+        `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${normalized}?format=json`,
+        { signal: AbortSignal.timeout(30000) }
       );
       const nhtsaData = await nhtsaResponse.json();
 
@@ -571,7 +572,8 @@ Deno.serve(async (req) => {
 
     const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/telegram-restoration-bot`;
     const response = await fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`
+      `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`,
+      { signal: AbortSignal.timeout(30000) }
     );
     const result = await response.json();
 

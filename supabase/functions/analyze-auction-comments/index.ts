@@ -187,7 +187,12 @@ async function analyzeWithOpenAI(prompt: string, apiKey: string): Promise<Analys
   const data = await resp.json()
   const text = data?.choices?.[0]?.message?.content
   if (!text) throw new Error('OpenAI returned empty content')
-  return JSON.parse(String(text))
+  try {
+    return JSON.parse(String(text))
+  } catch {
+    console.error('Failed to parse OpenAI analysis JSON:', String(text)?.slice(0, 200));
+    return null as unknown as AnalysisResult;
+  }
 }
 
 async function analyzeWithAnthropic(prompt: string, apiKey: string): Promise<AnalysisResult> {
@@ -213,6 +218,11 @@ async function analyzeWithAnthropic(prompt: string, apiKey: string): Promise<Ana
   const data = await resp.json()
   const text = data?.content?.[0]?.text
   if (!text) throw new Error('Anthropic returned empty content')
-  return JSON.parse(String(text))
+  try {
+    return JSON.parse(String(text))
+  } catch {
+    console.error('Failed to parse Anthropic analysis JSON:', String(text)?.slice(0, 200));
+    return null as unknown as AnalysisResult;
+  }
 }
 

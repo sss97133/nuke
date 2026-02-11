@@ -83,6 +83,7 @@ async function validateBatCredentials(username: string, password: string): Promi
       },
       body: formData,
       redirect: 'manual',
+      signal: AbortSignal.timeout(30000),
     });
 
     const setCookieHeaders = response.headers.getSetCookie?.() || [];
@@ -270,6 +271,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${supabaseServiceKey}`,
         },
+        signal: AbortSignal.timeout(15000),
         body: JSON.stringify({
           user_id: credential.user_id,
           notification_type: 'bidding_2fa_required',

@@ -426,7 +426,13 @@ async function extractWithGoogleGemini(
 
   // Extract JSON from response
   const jsonMatch = content.match(/\{[\s\S]*\}/)
-  const extracted = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
+  let extracted;
+  try {
+    extracted = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
+  } catch {
+    console.error('Failed to parse Google extraction JSON:', content?.slice(0, 200));
+    extracted = null;
+  }
 
   return parseExtractionResult(extracted, isImage)
 }
@@ -561,7 +567,13 @@ async function extractWithAnthropic(
 
   // Extract JSON from response (Claude may wrap in markdown)
   const jsonMatch = contentText.match(/\{[\s\S]*\}/)
-  const extracted = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(contentText)
+  let extracted;
+  try {
+    extracted = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(contentText)
+  } catch {
+    console.error('Failed to parse Anthropic extraction JSON:', contentText?.slice(0, 200));
+    extracted = null;
+  }
 
   return parseExtractionResult(extracted, isImage)
 }
