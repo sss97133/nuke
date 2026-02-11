@@ -137,7 +137,39 @@ const VehiclesDashboard: React.FC = () => {
     return { totalValue, avgConfidence, avgInteraction };
   }, [data]);
 
-  if (authLoading || loading) {
+  if (authLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (!user) {
+    return (
+      <div style={{ padding: '48px 16px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '12pt', fontWeight: 700, margin: '0 0 24px 0' }}>
+          Vehicles Dashboard
+        </h1>
+        <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '24px' }}>
+          Sign in to view your vehicles dashboard.
+        </div>
+        <Link
+          to="/login"
+          style={{
+            display: 'inline-block',
+            padding: '10px 20px',
+            fontSize: '9pt',
+            fontWeight: 600,
+            background: 'var(--primary)',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '4px'
+          }}
+        >
+          Sign In
+        </Link>
+      </div>
+    );
+  }
+
+  if (loading) {
     return <DashboardSkeleton />;
   }
 
