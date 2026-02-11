@@ -80,7 +80,7 @@ function parseTitleToVehicle(title: string): { year?: number; make?: string; mod
   // Match year at the start
   const yearMatch = cleanTitle.match(/^(\d{4})\s+/);
   if (yearMatch) {
-    const year = parseInt(yearMatch[1]);
+    const year = parseInt(yearMatch[1], 10);
     if (year >= 1885 && year <= new Date().getFullYear() + 2) {
       result.year = year;
     }
