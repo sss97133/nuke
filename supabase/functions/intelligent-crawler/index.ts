@@ -252,7 +252,7 @@ async function parseBATPremium(element: any, baseUrl: string) {
     for (const pattern of yearPatterns) {
       const match = title.match(pattern)
       if (match) {
-        year = parseInt(match[1])
+        year = parseInt(match[1], 10)
         if (match[0].startsWith("'")) {
           year = year < 50 ? 2000 + year : 1900 + year // '74 = 1974
         }

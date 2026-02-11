@@ -253,7 +253,7 @@ function extractSearchResults(html: string, searchUrl: string): SearchResult {
       const yearMatch = product.description?.match(/\b(19|20)\d{2}\b/) ||
                        product.name?.match(/\b(19|20)\d{2}\b/);
       if (yearMatch) {
-        year = parseInt(yearMatch[0]);
+        year = parseInt(yearMatch[0], 10);
       }
 
       // Parse make from brand name (first word usually)
@@ -268,7 +268,7 @@ function extractSearchResults(html: string, searchUrl: string): SearchResult {
       const listingId = urlMatch ? urlMatch[1] : '';
 
       // Parse price
-      const priceSek = product.offers?.price ? parseInt(product.offers.price) : null;
+      const priceSek = product.offers?.price ? parseInt(product.offers.price, 10) : null;
 
       // Extract description
       const description = product.description || null;
@@ -310,7 +310,7 @@ function extractSearchResults(html: string, searchUrl: string): SearchResult {
 
   // Extract total count from page
   const countMatch = html.match(/(\d+)\s*(?:bilar|annonser|result)/i);
-  const totalCount = countMatch ? parseInt(countMatch[1]) : listings.length;
+  const totalCount = countMatch ? parseInt(countMatch[1], 10) : listings.length;
 
   // Check for pagination
   const currentPage = 1; // TODO: Parse from URL
@@ -365,15 +365,15 @@ function extractSingleListing(html: string, url: string): BlocketExtracted {
   const makeText = getTargetingValue(targeting, 'make_text');
   const modelText = getTargetingValue(targeting, 'model_text');
   const yearStr = getTargetingValue(targeting, 'year');
-  const year = yearStr ? parseInt(yearStr) : null;
+  const year = yearStr ? parseInt(yearStr, 10) : null;
 
   // Price
   const priceStr = getTargetingValue(targeting, 'price');
-  const priceSek = priceStr ? parseInt(priceStr) : null;
+  const priceSek = priceStr ? parseInt(priceStr, 10) : null;
 
   // Mileage (in mil)
   const mileageStr = getTargetingValue(targeting, 'mileage');
-  const mileageMil = mileageStr ? parseInt(mileageStr) : null;
+  const mileageMil = mileageStr ? parseInt(mileageStr, 10) : null;
   const mileageKm = mileageMil ? milToKm(mileageMil) : null;
   const mileageMiles = mileageKm ? kmToMiles(mileageKm) : null;
 
@@ -423,7 +423,7 @@ function extractSingleListing(html: string, url: string): BlocketExtracted {
   let horsepower: number | null = null;
   const hpMatch = (title + ' ' + (description || '')).match(/(\d+)\s*(?:hk|hp|hästkrafter)/i);
   if (hpMatch) {
-    horsepower = parseInt(hpMatch[1]);
+    horsepower = parseInt(hpMatch[1], 10);
   }
 
   return {

@@ -90,7 +90,7 @@ async function processApproval(
         .from("claude_allowed_sessions")
         .upsert({
           session_id: reqData.session_id,
-          chat_id: parseInt(OWNER_CHAT_ID),
+          chat_id: parseInt(OWNER_CHAT_ID, 10),
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         }, { onConflict: "session_id" });
 

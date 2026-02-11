@@ -232,11 +232,11 @@ serve(async (req) => {
             // Extract price
             const priceText = doc?.querySelector('[class*="price"]')?.textContent || '';
             const priceMatch = priceText.match(/\$?([\d,]+)/);
-            const price = extract.price || (priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : null);
+            const price = extract.price || (priceMatch ? parseInt(priceMatch[1].replace(/,/g, ''), 10) : null);
             
             // Extract year, make, model from title
             const yearMatch = title.match(/\b(19|20)\d{2}\b/);
-            const year = extract.year || (yearMatch ? parseInt(yearMatch[0]) : null);
+            const year = extract.year || (yearMatch ? parseInt(yearMatch[0], 10) : null);
             
             const titleParts = title.split(/\s+/);
             let make: string | null = null;

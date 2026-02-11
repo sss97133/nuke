@@ -112,7 +112,7 @@ function extractListingDetails(html: string, url: string): RennlistListing {
     listing.title = jsonLd.name || null;
     listing.vin = jsonLd.vehicleIdentificationNumber || jsonLd.productID || null;
     listing.model = jsonLd.model || null;
-    listing.year = jsonLd.modelDate ? parseInt(jsonLd.modelDate) : null;
+    listing.year = jsonLd.modelDate ? parseInt(jsonLd.modelDate, 10) : null;
     listing.transmission = jsonLd.vehicleTransmission || null;
     listing.description = jsonLd.description || null;
 

@@ -146,7 +146,7 @@ async function queueNewListings(
         listing_url: url,
         source_id: sourceId,
         listing_title: listing.title,
-        listing_year: year ? parseInt(year) : null,
+        listing_year: year ? parseInt(year, 10) : null,
         listing_make: listing.makeName,
         listing_model: listing.modelName,
         listing_price: listing.currentBid,
