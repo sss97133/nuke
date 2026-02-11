@@ -280,7 +280,7 @@ serve(async (req) => {
                     auction_url: item.listing_url,
                     vehicle_id: vehicleId,
                   }),
-                }).catch(() => {});
+                }).catch((e) => console.warn(`[queue] Comment extraction trigger failed for ${item.id}:`, e.message));
               }
             } else {
               throw new Error(extractResult.error || "Extraction failed");

@@ -33,8 +33,10 @@ async function parseSignedRequest(signedRequest: string, appSecret: string): Pro
 
   const actualSig = encodedSig.replace(/-/g, '+').replace(/_/g, '/');
 
-  // Note: In production, compare signatures properly
-  // For now, we'll trust the request if it parses correctly
+  // Verify signature matches
+  if (expectedSigBase64 !== encodedSig) {
+    throw new Error('Invalid signature - request may be forged');
+  }
 
   return data;
 }
@@ -45,7 +47,10 @@ serve(async (req) => {
   }
 
   try {
-    const appSecret = Deno.env.get('FACEBOOK_APP_SECRET') || '';
+    const appSecret = Deno.env.get('FACEBOOK_APP_SECRET');
+    if (!appSecret) {
+      throw new Error('FACEBOOK_APP_SECRET not configured');
+    }
 
     // Facebook sends data as form-urlencoded
     const formData = await req.formData();
@@ -110,7 +115,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('[facebook-data-deletion] Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

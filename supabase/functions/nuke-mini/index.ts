@@ -8,7 +8,12 @@ const supabase = createClient(
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("OK");
-  const data = await req.json();
+  let data;
+  try {
+    data = await req.json();
+  } catch {
+    return new Response("Invalid JSON", { status: 400 });
+  }
   console.log(data);
   return new Response("OK");
 });

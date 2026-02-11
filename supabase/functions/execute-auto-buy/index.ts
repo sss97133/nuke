@@ -3,28 +3,33 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 /**
  * Execute Auto-Buy Order
- * 
+ *
  * When a vehicle price hits a watchlist's target price, this function:
  * 1. Places bid (for auctions)
  * 2. Executes buy-now purchase
  * 3. Handles payment processing
  * 4. Updates execution status
- * 
+ *
  * Like a limit order in stock market - executes automatically when price is right
  */
 
-interface Deno {
-  serve: (handler: (req: Request) => Promise<Response>) => void;
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
     const { executionId, userConfirmed } = await req.json();
 
     if (!executionId) {
       return new Response(
         JSON.stringify({ error: 'executionId required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -70,7 +75,7 @@ Deno.serve(async (req: Request) => {
           status: 'pending_confirmation',
           message: 'Auto-buy requires user confirmation'
         }),
-        { headers: { 'Content-Type': 'application/json' } }
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -158,7 +163,7 @@ Deno.serve(async (req: Request) => {
         execution_id: executionId,
         result
       }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
 
   } catch (error: any) {

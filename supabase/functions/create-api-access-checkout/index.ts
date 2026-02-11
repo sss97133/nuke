@@ -70,7 +70,10 @@ Deno.serve(async (req) => {
     // Get user
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response('Unauthorized', { status: 401 })
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json', ...corsHeaders },
+      })
     }
 
     const { createClient } = await import('jsr:@supabase/supabase-js@2')
@@ -82,7 +85,10 @@ Deno.serve(async (req) => {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return new Response('Unauthorized', { status: 401 })
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json', ...corsHeaders },
+      })
     }
 
     // Create Stripe checkout session
