@@ -38,7 +38,14 @@ serve(async (req) => {
       .from('vehicles')
       .select('year, make, model, vin')
       .eq('id', vehicle_id)
-      .single()
+      .maybeSingle()
+
+    if (!vehicle) {
+      return new Response(
+        JSON.stringify({ error: 'Vehicle not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Get vehicle images
     let query = supabase
@@ -117,7 +124,12 @@ Return JSON:
       if (claudeResp.ok) {
         const claudeData = await claudeResp.json()
         const content = claudeData.content?.[0]?.text || '{}'
-        const analysis = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}')
+        let analysis: any = {}
+        try {
+          analysis = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}')
+        } catch {
+          console.warn(`Failed to parse Claude response for image ${image.id}`)
+        }
 
         console.log(`   📸 Image ${image.id}: Found ${analysis.parts?.length || 0} recommendations`)
 

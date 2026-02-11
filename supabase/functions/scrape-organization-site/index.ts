@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
       .from('businesses')
       .select('id, business_name, metadata')
       .eq('id', organization_id)
-      .single();
+      .maybeSingle();
 
     if (!org) {
       throw new Error(`Organization ${organization_id} not found`);
@@ -410,8 +410,8 @@ Deno.serve(async (req) => {
               is_public: false, // Start private until org claims it
             })
             .select('id')
-            .single();
-          
+            .maybeSingle();
+
           // If duplicate detection merged this vehicle, the trigger will have handled it
           // But we still need to get the final vehicle ID (might be merged into existing)
           let finalVehicleId = newVehicle?.id;

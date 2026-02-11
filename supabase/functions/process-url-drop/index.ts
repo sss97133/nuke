@@ -1088,9 +1088,10 @@ async function processNZeroOrgURL(url: string, supabase: any) {
     .from('organizations')
     .select('*')
     .eq('id', orgId)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!org) throw new Error(`Organization ${orgId} not found`);
 
   return {
     entityData: org,
@@ -1111,9 +1112,10 @@ async function processNZeroVehicleURL(url: string, supabase: any) {
     .from('vehicles')
     .select('*')
     .eq('id', vehicleId)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!vehicle) throw new Error(`Vehicle ${vehicleId} not found`);
 
   return {
     entityData: vehicle,
