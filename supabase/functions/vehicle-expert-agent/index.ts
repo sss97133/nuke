@@ -1259,17 +1259,12 @@ Deno.serve(async (req) => {
     });
     
   } catch (error: any) {
-    console.error('❌ Expert agent error:', error);
-    console.error('Stack:', error.stack);
-    
-    // Production-safe: never 500 the UI for this optional pipeline.
-    // Still return full details to the client so we can debug.
+    console.error('❌ Expert agent error:', error?.message || error);
+
     return new Response(
       JSON.stringify({
         skipped: true,
         reason: 'internal_error',
-        error: error?.message || String(error),
-        errorType: error?.name,
         timestamp: new Date().toISOString()
       }),
       {

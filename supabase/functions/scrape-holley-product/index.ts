@@ -499,7 +499,7 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error("scrape-holley-product error:", error);
-    return new Response(JSON.stringify({ success: false, error: error?.message || String(error) }), {
+    return new Response(JSON.stringify({ success: false, error: "Scraping failed" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
