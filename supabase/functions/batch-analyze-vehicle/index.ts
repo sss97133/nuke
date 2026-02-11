@@ -63,9 +63,9 @@ serve(async (req) => {
       .eq('vehicle_id', vehicle_id)
       .order('taken_at', { ascending: true })
 
-    if (max_images) {
-      query = query.limit(max_images)
-    }
+    // Cap max_images to prevent unbounded AI API calls
+    const safeMaxImages = Math.max(1, Math.min(max_images || 50, 200))
+    query = query.limit(safeMaxImages)
 
     const { data: images, error: imagesError } = await query
 

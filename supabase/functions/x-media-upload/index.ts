@@ -80,7 +80,16 @@ serve(async (req) => {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`);
     }
 
+    // Enforce size limit (20MB) to prevent memory exhaustion
+    const contentLength = parseInt(imageResponse.headers.get('content-length') || '0', 10);
+    if (contentLength > 20 * 1024 * 1024) {
+      throw new Error(`Image too large (${(contentLength / 1024 / 1024).toFixed(1)}MB). Maximum is 20MB.`);
+    }
+
     const imageBuffer = await imageResponse.arrayBuffer();
+    if (imageBuffer.byteLength > 20 * 1024 * 1024) {
+      throw new Error(`Image too large (${(imageBuffer.byteLength / 1024 / 1024).toFixed(1)}MB). Maximum is 20MB.`);
+    }
     const imageBytes = new Uint8Array(imageBuffer);
     const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
 
