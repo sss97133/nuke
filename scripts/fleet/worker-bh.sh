@@ -14,36 +14,40 @@ call_fn() {
 
 log "Starting BH Auction extraction"
 
-# Try batch mode
-log "Running batch extraction..."
-RESULT=$(call_fn '{"batch": true}')
-log "Batch: $(echo "$RESULT" | jq -c '{success: .success, processed: .processed, lots: .lots_found}' 2>/dev/null)"
-
-sleep 5
-
-# Try fetching main auction listing pages to discover slugs
-log "Discovering auction pages..."
-AUCTION_SLUGS=$(dotenvx run -- bash -c 'curl -s "https://bhauction.com/en/" -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" | grep -oE "/en/auction/[^\"]*" | sed "s|/en/auction/||g" | sort -u' 2>/dev/null)
-
-if [ -n "$AUCTION_SLUGS" ]; then
-  log "Found auction slugs: $AUCTION_SLUGS"
-  echo "$AUCTION_SLUGS" | while read -r slug; do
-    [ -z "$slug" ] && continue
-    [ "$(date +%s)" -ge "$END_TIME" ] && break
-    log "  Processing auction: $slug"
-    RESULT=$(call_fn "{\"auction_slug\": \"$slug\"}")
-    log "  $slug: $(echo "$RESULT" | jq -c '{success: .success, lots: .lots_processed}' 2>/dev/null)"
-    sleep 5
+# Phase 1: Use Playwright discovery if available (renders JS SPA)
+if [ -f "scripts/bh-auction-discover.ts" ]; then
+  log "Running Playwright-based BH Auction discovery..."
+  dotenvx run -- npx tsx scripts/bh-auction-discover.ts 2>&1 | while read -r line; do
+    log "  $line"
   done
+  log "Playwright discovery complete"
 else
-  log "No auction slugs found, trying numbered pages..."
-  for page in 1 2 3 4 5; do
-    [ "$(date +%s)" -ge "$END_TIME" ] && break
-    log "  Page $page..."
-    RESULT=$(call_fn "{\"page\": $page}")
-    log "  Page $page: $(echo "$RESULT" | jq -c '{success: .success, lots: .lots_processed}' 2>/dev/null)"
-    sleep 5
-  done
+  log "Playwright script not found, using curl-based discovery..."
+
+  # Try batch mode
+  log "Running batch extraction..."
+  RESULT=$(call_fn '{"batch": true}')
+  log "Batch: $(echo "$RESULT" | jq -c '{success: .success, processed: .processed, lots: .lots_found}' 2>/dev/null)"
+
+  sleep 5
+
+  # Try fetching main auction listing pages to discover slugs
+  log "Discovering auction pages..."
+  AUCTION_SLUGS=$(dotenvx run -- bash -c 'curl -s "https://bhauction.com/en/" -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" | grep -oE "/en/auction/[^\"]*" | sed "s|/en/auction/||g" | sort -u' 2>/dev/null)
+
+  if [ -n "$AUCTION_SLUGS" ]; then
+    log "Found auction slugs: $AUCTION_SLUGS"
+    echo "$AUCTION_SLUGS" | while read -r slug; do
+      [ -z "$slug" ] && continue
+      [ "$(date +%s)" -ge "$END_TIME" ] && break
+      log "  Processing auction: $slug"
+      RESULT=$(call_fn "{\"auction_slug\": \"$slug\", \"batch\": true}")
+      log "  $slug: $(echo "$RESULT" | jq -c '{success: .success, processed: .processed}' 2>/dev/null)"
+      sleep 5
+    done
+  else
+    log "No auction slugs found via curl"
+  fi
 fi
 
 log "BH Auction worker complete."

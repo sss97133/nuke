@@ -325,7 +325,7 @@ function parseYearMakeModel(
     /\$([0-9,]+)/
   );
   const price = priceMatch
-    ? parseInt(priceMatch[1].replace(/,/g, ""))
+    ? parseInt(priceMatch[1].replace(/,/g, ""), 10)
     : undefined;
   if (price && price > 100 && price < 100_000_000) {
     return { price };

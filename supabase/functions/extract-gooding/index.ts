@@ -724,7 +724,108 @@ serve(async (req) => {
       );
     }
 
-    // Batch processing
+    // Discover and enqueue — stores sitemap URLs in import_queue once, avoids re-fetching sitemap
+    if (action === 'discover_and_enqueue') {
+      const urls = await discoverLotsFromSitemap();
+      console.log(`[gooding] Enqueuing ${urls.length} lot URLs...`);
+
+      let enqueued = 0;
+      let skipped = 0;
+
+      // Insert in batches of 100
+      for (let i = 0; i < urls.length; i += 100) {
+        const batch = urls.slice(i, i + 100).map(url => ({
+          listing_url: url,
+          status: 'pending' as const,
+          attempts: 0,
+          priority: 0,
+        }));
+
+        const { data, error } = await supabase
+          .from('import_queue')
+          .upsert(batch, { onConflict: 'listing_url', ignoreDuplicates: true })
+          .select('id');
+
+        if (error) {
+          console.error(`[gooding] Enqueue error: ${error.message}`);
+        }
+        enqueued += data?.length || 0;
+      }
+
+      skipped = urls.length - enqueued;
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          action: 'discover_and_enqueue',
+          total_in_sitemap: urls.length,
+          enqueued,
+          skipped_duplicates: skipped,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Batch from queue — processes Gooding URLs from import_queue instead of re-fetching sitemap
+    if (action === 'batch_from_queue') {
+      const { data: queueItems, error: claimErr } = await supabase.rpc('claim_import_queue_batch', {
+        p_batch_size: limit,
+        p_max_attempts: 3,
+        p_worker_id: 'gooding-batch',
+        p_lock_ttl_seconds: 600,
+      });
+
+      if (claimErr || !queueItems?.length) {
+        return new Response(
+          JSON.stringify({ success: true, message: 'No items in queue', processed: 0 }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Filter to gooding URLs only
+      const goodingItems = queueItems.filter((item: any) =>
+        item.listing_url?.includes('goodingco.com')
+      );
+
+      // Release non-gooding items
+      const otherItems = queueItems.filter((item: any) =>
+        !item.listing_url?.includes('goodingco.com')
+      );
+      if (otherItems.length > 0) {
+        await supabase.from('import_queue').update({
+          status: 'pending',
+          locked_at: null,
+          locked_by: null,
+        }).in('id', otherItems.map((i: any) => i.id));
+      }
+
+      const urls = goodingItems.map((item: any) => item.listing_url);
+      const results = await processBatch(supabase, urls, urls.length);
+
+      // Mark queue items
+      for (const item of goodingItems) {
+        const succeeded = !results.errors.find(e => e.url === item.listing_url);
+        await supabase.from('import_queue').update({
+          status: succeeded ? 'complete' : 'failed',
+          processed_at: new Date().toISOString(),
+          locked_at: null,
+          locked_by: null,
+          error_message: results.errors.find(e => e.url === item.listing_url)?.error || null,
+        }).eq('id', item.id);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          action: 'batch_from_queue',
+          claimed: goodingItems.length,
+          results,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Batch processing (legacy — re-fetches sitemap each time)
     if (action === 'batch') {
       const urls = await discoverLotsFromSitemap();
 

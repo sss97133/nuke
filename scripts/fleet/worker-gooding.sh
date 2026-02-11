@@ -14,32 +14,30 @@ call_fn() {
 
 log "Starting Gooding extraction"
 
-# Discover sitemap
-log "Discovering lots..."
-RESULT=$(call_fn '{"action": "discover"}')
-log "Discover: $(echo "$RESULT" | jq -c '{success: .success, total: .total_lots}' 2>/dev/null)"
+# Step 1: Discover and enqueue sitemap URLs (one-time, avoids re-fetching)
+log "Discovering and enqueuing lots..."
+RESULT=$(call_fn '{"action": "discover_and_enqueue"}')
+TOTAL=$(echo "$RESULT" | jq -r '.total_in_sitemap // 0' 2>/dev/null)
+ENQUEUED=$(echo "$RESULT" | jq -r '.enqueued // 0' 2>/dev/null)
+log "Enqueued: $ENQUEUED of $TOTAL total"
 
 sleep 3
 
-# Batch process in pages of 100
-OFFSET=0
+# Step 2: Batch process from queue
+BATCH=0
 while [ "$(date +%s)" -lt "$END_TIME" ]; do
-  log "Batch: offset=$OFFSET limit=100"
-  RESULT=$(call_fn "{\"action\": \"batch\", \"limit\": 100, \"offset\": $OFFSET}")
-  PROCESSED=$(echo "$RESULT" | jq -r '.processed // 0' 2>/dev/null)
-  NEW=$(echo "$RESULT" | jq -r '.new_vehicles // 0' 2>/dev/null)
-  log "  Processed: $PROCESSED, New: $NEW"
+  BATCH=$((BATCH + 1))
+  log "Batch $BATCH (limit=100)..."
+  RESULT=$(call_fn '{"action": "batch_from_queue", "limit": 100}')
+  CLAIMED=$(echo "$RESULT" | jq -r '.claimed // 0' 2>/dev/null)
+  PROCESSED=$(echo "$RESULT" | jq -r '.results.processed // 0' 2>/dev/null)
+  NEW=$(echo "$RESULT" | jq -r '.results.new_vehicles // 0' 2>/dev/null)
+  log "  Claimed: $CLAIMED, Processed: $PROCESSED, New: $NEW"
 
-  # Stop if no more to process
-  [ "${PROCESSED:-0}" -eq 0 ] && break
+  # Stop if nothing claimed
+  [ "${CLAIMED:-0}" -eq 0 ] && break
 
-  OFFSET=$((OFFSET + 100))
-  sleep 3
+  sleep 1
 done
-
-# Backfill pass
-log "Running backfill..."
-RESULT=$(call_fn '{"action": "backfill", "limit": 200}')
-log "Backfill: $(echo "$RESULT" | jq -c '{success: .success, updated: .updated}' 2>/dev/null)"
 
 log "Gooding worker complete."
