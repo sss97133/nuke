@@ -89,7 +89,15 @@ serve(async (req) => {
       );
     }
 
-    const body: BatchRequest = await req.json();
+    let body: BatchRequest;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!body.vehicles || !Array.isArray(body.vehicles)) {
       return new Response(
@@ -293,12 +301,16 @@ async function authenticateRequest(req: Request, supabase: any): Promise<{ userI
 
     const { data: keyData, error } = await supabase
       .from("api_keys")
-      .select("user_id, is_active")
+      .select("user_id, is_active, expires_at")
       .eq("key_hash", keyHash)
       .eq("is_active", true)
       .maybeSingle();
 
     if (keyData && !error) {
+      // Check expiry
+      if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
+        return { userId: null, error: "API key has expired" };
+      }
       await supabase
         .from("api_keys")
         .update({ last_used_at: new Date().toISOString() })
