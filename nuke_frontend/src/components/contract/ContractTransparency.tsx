@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrencyFromCents } from '../../utils/currency';
@@ -108,7 +108,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
       fetches.push(
         supabase
           .from('vehicles')
-          .select('id, year, make, model, current_value, location, purchase_location, city, state, country, is_public, vin, purchase_price_cents, image_count, receipt_count')
+          .select('id, year, make, model, current_value, location, purchase_location, city, state, country, is_public, vin, purchase_price_cents, image_count, receipt_count, primary_image_url')
           .in('id', byType.vehicle)
           .then(({ data }) => {
             (data || []).forEach((v: any) => { detailsMap[v.id] = v; });
@@ -546,19 +546,21 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '10pt' }}>{assetName}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '8pt', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{
-                            display: 'inline-block',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '2px',
-                            background: ASSET_TYPE_COLORS[asset.asset_type] || '#6b7280',
-                          }} />
-                          {asset.asset_type.toUpperCase()} • {asset.curator_notes || 'No notes'}
+                      <AssetHoverPreview asset={asset}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '10pt' }}>{assetName}</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '8pt', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '2px',
+                              background: ASSET_TYPE_COLORS[asset.asset_type] || '#6b7280',
+                            }} />
+                            {asset.asset_type.toUpperCase()} • {asset.curator_notes || 'No notes'}
+                          </div>
                         </div>
-                      </div>
+                      </AssetHoverPreview>
 
                       <div style={{ fontWeight: 700 }}>
                         {formatCurrencyFromCents(asset.current_value_cents || 0)}
@@ -903,6 +905,175 @@ function OrgDetail({ asset, d }: { asset: any; d: any }) {
           <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>No reputation data available</div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Hover preview card for asset rows — shows snapshot on 300ms hover */
+function AssetHoverPreview({ asset, children }: { asset: any; children: React.ReactNode }) {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleEnter = useCallback((e: React.MouseEvent) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let left = rect.left;
+      let top = rect.bottom + 8;
+      // Card is ~340px wide, ~auto height
+      if (left + 340 > vw) left = vw - 352;
+      if (left < 8) left = 8;
+      if (top + 260 > vh) top = rect.top - 268;
+      if (top < 8) top = 8;
+      setPos({ top, left });
+    }
+    timeoutRef.current = setTimeout(() => setShow(true), 300);
+  }, []);
+
+  const handleLeave = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setShow(false);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+  }, []);
+
+  const d = asset.details;
+
+  return (
+    <div ref={containerRef} onMouseEnter={handleEnter} onMouseLeave={handleLeave} style={{ position: 'relative' }}>
+      {children}
+      {show && d && (
+        <div
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            zIndex: 10000,
+            width: '340px',
+            background: 'var(--bg, #fff)',
+            border: '2px solid var(--border)',
+            borderRadius: '6px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            pointerEvents: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Vehicle preview with thumbnail */}
+          {asset.asset_type === 'vehicle' && (
+            <>
+              {d.primary_image_url && (
+                <div style={{ width: '100%', height: '140px', overflow: 'hidden', background: 'var(--surface)' }}>
+                  <img
+                    src={d.primary_image_url.includes('/storage/v1/object/public/')
+                      ? d.primary_image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=400&quality=75'
+                      : d.primary_image_url}
+                    alt={`${d.year} ${d.make} ${d.model}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+              )}
+              <div style={{ padding: '12px' }}>
+                <div style={{ fontWeight: 900, fontSize: '11pt', marginBottom: '6px' }}>
+                  {d.year} {d.make} {d.model}
+                </div>
+                <HoverRow label="Location" value={[d.city, d.state].filter(Boolean).join(', ') || d.location || '—'} />
+                <HoverRow label="Value" value={formatCurrencyFromCents(asset.current_value_cents || 0)} />
+                {d.purchase_price_cents && (
+                  <HoverRow label="Entry" value={formatCurrencyFromCents(d.purchase_price_cents)} />
+                )}
+                {d.image_count != null && <HoverRow label="Photos" value={d.image_count} />}
+                {d.vin && <HoverRow label="VIN" value={d.vin.slice(0, 3) + '***' + d.vin.slice(-4)} />}
+              </div>
+            </>
+          )}
+
+          {/* Bond preview */}
+          {asset.asset_type === 'bond' && (
+            <div style={{ padding: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.bond, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12pt', fontWeight: 900 }}>B</div>
+                <div>
+                  <div style={{ fontWeight: 900, fontSize: '11pt' }}>{d.issuer_name || 'Bond'}</div>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{d.issuer_type || 'Fixed Income'}</div>
+                </div>
+              </div>
+              <HoverRow label="Principal" value={formatCurrencyFromCents(d.principal_amount_cents)} />
+              <HoverRow label="Rate" value={d.coupon_rate_pct != null ? `${d.coupon_rate_pct}%` : d.interest_rate_pct != null ? `${d.interest_rate_pct}%` : '—'} />
+              <HoverRow label="Term" value={d.term_months ? `${d.term_months}mo` : '—'} />
+              <HoverRow label="Status" value={d.status?.toUpperCase() || '—'} valueColor={d.status === 'active' || d.status === 'current' ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
+              {d.maturity_date && <HoverRow label="Maturity" value={new Date(d.maturity_date).toLocaleDateString()} />}
+            </div>
+          )}
+
+          {/* Stake preview */}
+          {asset.asset_type === 'stake' && (() => {
+            const raised = d.raised_amount_cents || 0;
+            const target = d.target_amount_cents || 0;
+            const pct = target > 0 ? (raised / target * 100) : 0;
+            return (
+              <div style={{ padding: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.stake, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12pt', fontWeight: 900 }}>S</div>
+                  <div>
+                    <div style={{ fontWeight: 900, fontSize: '11pt' }}>Equity Stake</div>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{d.status?.toUpperCase() || 'ACTIVE'}</div>
+                  </div>
+                </div>
+                {d.equity_pct != null && <HoverRow label="Equity" value={`${d.equity_pct}%`} />}
+                <HoverRow label="Raised" value={formatCurrencyFromCents(raised)} />
+                <HoverRow label="Target" value={formatCurrencyFromCents(target)} />
+                {d.profit_share_pct != null && <HoverRow label="Profit Share" value={`${d.profit_share_pct}%`} />}
+                <div style={{ marginTop: '6px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: ASSET_TYPE_COLORS.stake, borderRadius: '2px' }} />
+                </div>
+                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{pct.toFixed(0)}% funded</div>
+              </div>
+            );
+          })()}
+
+          {/* Organization preview */}
+          {asset.asset_type === 'organization' && (
+            <div style={{ padding: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.organization, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12pt', fontWeight: 900 }}>
+                  {(d.business_name || 'O').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 900, fontSize: '11pt' }}>{d.business_name || 'Organization'}</div>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{d.business_type || 'Business'}</div>
+                </div>
+              </div>
+              <HoverRow label="Location" value={[d.city, d.state, d.country].filter(Boolean).join(', ') || '—'} />
+              {d.employee_count != null && <HoverRow label="Employees" value={d.employee_count} />}
+              {d.reputation_score != null && (
+                <>
+                  <HoverRow label="Reputation" value={`${d.reputation_score}/100`} valueColor={d.reputation_score >= 70 ? 'var(--success, #10b981)' : d.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)'} />
+                  <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ width: `${d.reputation_score}%`, height: '100%', background: d.reputation_score >= 70 ? 'var(--success, #10b981)' : d.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)', borderRadius: '2px' }} />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Compact row for hover preview cards */
+function HoverRow({ label, value, valueColor }: { label: string; value: any; valueColor?: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0', fontSize: '8pt' }}>
+      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span style={{ fontWeight: 700, color: valueColor || 'var(--text)' }}>{value}</span>
     </div>
   );
 }

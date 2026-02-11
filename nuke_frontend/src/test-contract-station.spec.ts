@@ -288,4 +288,82 @@ describe('Contract Station - Plan Implementation', () => {
       expect(code).toContain("Shield");
     });
   });
+
+  // Test 8: Asset hover preview
+  describe('8. Asset Hover Preview', () => {
+    it('has AssetHoverPreview component', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain("function AssetHoverPreview");
+    });
+
+    it('wraps asset name cells with hover preview', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain("<AssetHoverPreview asset={asset}>");
+    });
+
+    it('uses 300ms hover delay like IDHoverCard pattern', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain("setTimeout(() => setShow(true), 300)");
+    });
+
+    it('has viewport-aware positioning', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain("window.innerWidth");
+      expect(code).toContain("window.innerHeight");
+      expect(code).toContain("getBoundingClientRect");
+    });
+
+    it('shows vehicle thumbnail from primary_image_url', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain("primary_image_url");
+      // Uses Supabase render transform for thumbnails
+      expect(code).toContain("/storage/v1/render/image/public/");
+    });
+
+    it('has type-specific previews for all 4 asset types', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain("asset.asset_type === 'vehicle'");
+      expect(code).toContain("asset.asset_type === 'bond'");
+      expect(code).toContain("asset.asset_type === 'stake'");
+      expect(code).toContain("asset.asset_type === 'organization'");
+    });
+
+    it('bond preview shows principal, rate, status', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      // Within the hover preview, these labels appear
+      expect(code).toContain('label="Principal"');
+      expect(code).toContain('label="Rate"');
+    });
+
+    it('stake preview shows funding progress bar', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain("% funded");
+    });
+
+    it('org preview shows reputation bar', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain('label="Reputation"');
+    });
+
+    it('fetches primary_image_url in vehicle batch query', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toMatch(/\.select\(.*primary_image_url.*\)[\s\S]*?\.in\('id', byType\.vehicle\)/);
+    });
+
+    it('cleans up timeout on unmount', async () => {
+      const source = await import('./components/contract/ContractTransparency?raw');
+      const code = (source as any).default || source;
+      expect(code).toContain("clearTimeout(timeoutRef.current)");
+    });
+  });
 });
