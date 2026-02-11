@@ -34,6 +34,11 @@ function escapeILikePattern(s: string): string {
   return String(s || '').replace(/([%_\\])/g, '\\$1');
 }
 
+function escapePostgrestValue(s: string): string {
+  // Strip characters that could break out of PostgREST .or() filter syntax.
+  return String(s || '').replace(/[",().\\]/g, '');
+}
+
 function isAllowedHost(host: string, allowedBase: string): boolean {
   const h = String(host || '').toLowerCase();
   const base = String(allowedBase || '').toLowerCase();
@@ -361,7 +366,8 @@ async function handleChatMode(
         });
       }
 
-      const ilike = `%${escapeILikePattern(term)}%`;
+      const safeTerm = escapePostgrestValue(term);
+      const ilike = `%${escapeILikePattern(safeTerm)}%`;
       const { data: matchingDocs } = await supabase
         .from('vehicle_documents')
         .select('id, document_type, title, vendor_name, amount, currency, document_date, file_url, created_at')

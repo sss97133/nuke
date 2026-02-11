@@ -176,7 +176,12 @@ Be COMPREHENSIVE. List EVERYTHING you can see.`;
       throw new Error('Invalid JSON response from AI');
     }
 
-    const components: ComponentDetection[] = JSON.parse(jsonMatch[0]);
+    let components: ComponentDetection[];
+    try {
+      components = JSON.parse(jsonMatch[0]);
+    } catch {
+      throw new Error(`AI returned invalid JSON array: ${jsonMatch[0].slice(0, 200)}`);
+    }
 
     console.log(`[Detailed Component Extractor] Found ${components.length} components`);
 

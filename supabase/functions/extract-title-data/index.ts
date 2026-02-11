@@ -110,7 +110,11 @@ async function extractWithOpenAI(imageUrl: string): Promise<ExtractionResult> {
     const content = data.choices?.[0]?.message?.content
     if (!content) throw new Error('Empty response from OpenAI')
 
-    return JSON.parse(content)
+    try {
+      return JSON.parse(content)
+    } catch {
+      throw new Error(`OpenAI returned invalid JSON: ${content.slice(0, 200)}`)
+    }
   } finally {
     clearTimeout(timeoutId)
   }
@@ -171,7 +175,11 @@ async function extractWithAnthropic(imageUrl: string): Promise<ExtractionResult>
 
     // Extract JSON from response (Claude sometimes wraps in markdown)
     const jsonMatch = content.match(/\{[\s\S]*\}/)
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
+    try {
+      return jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
+    } catch {
+      throw new Error(`Anthropic returned invalid JSON: ${content.slice(0, 200)}`)
+    }
   } finally {
     clearTimeout(timeoutId)
   }
