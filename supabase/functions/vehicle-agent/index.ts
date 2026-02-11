@@ -146,7 +146,7 @@ async function initAgent(vehicleId: string): Promise<VehicleAgent | null> {
     .from("vehicle_agents")
     .select("*")
     .eq("vehicle_id", vehicleId)
-    .single();
+    .maybeSingle();
 
   // Create if doesn't exist
   if (!agent) {

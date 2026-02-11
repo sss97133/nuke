@@ -556,8 +556,9 @@ export class MarketSystemIntegration {
   }
 
   private static calculateDailyChange(offering: any): number | null {
-    // TODO: Implement by comparing current_share_price to opening_price
-    // For now return mock data
-    return Math.random() * 10 - 5; // -5% to +5%
+    if (offering?.current_share_price && offering?.opening_price && offering.opening_price > 0) {
+      return ((offering.current_share_price - offering.opening_price) / offering.opening_price) * 100;
+    }
+    return null;
   }
 }

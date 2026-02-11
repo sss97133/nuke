@@ -132,7 +132,7 @@ function parseListingGrid(html: string): ListingItem[] {
     const makeMatch = content.match(/<div[^>]*class=['"]year-make['"][^>]*>[\s\S]*?<h3>\d{4}<\/h3>\s*<h3>([^<]+)<\/h3>/i);
     const modelMatch = content.match(/<div[^>]*class=['"]model['"][^>]*>([^<]+)<\/div>/i);
 
-    const year = yearMatch ? parseInt(yearMatch[1]) : null;
+    const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
     const make = makeMatch?.[1]?.trim() || null;
     const model = modelMatch?.[1]?.trim() || null;
 
@@ -220,7 +220,7 @@ function extractVehicleDetails(html: string, url: string): ExtractedVehicle {
     const text = yearMakeMatch[1].replace(/<[^>]+>/g, " ").trim();
     const parts = text.split(/\s+/);
     const yearStr = parts[0];
-    year = yearStr ? parseInt(yearStr) : null;
+    year = yearStr ? parseInt(yearStr, 10) : null;
     make = parts.slice(1).join(" ") || null;
   }
 
@@ -353,7 +353,7 @@ function extractVehicleDetails(html: string, url: string): ExtractedVehicle {
 function getPageCount(html: string): number {
   // Pattern: "Page 1 of 54" or "Page 1 of 78"
   const match = html.match(/Page\s*\d+\s*of\s*(\d+)/i);
-  return match ? parseInt(match[1]) : 1;
+  return match ? parseInt(match[1], 10) : 1;
 }
 
 /**

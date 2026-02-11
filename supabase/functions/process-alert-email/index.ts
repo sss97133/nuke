@@ -73,7 +73,7 @@ const SOURCES: SourceConfig[] = [
       );
       if (m)
         return {
-          year: parseInt(m[1]),
+          year: parseInt(m[1], 10),
           make: m[2],
           model: m[3],
           title: m[0],
@@ -104,7 +104,7 @@ const SOURCES: SourceConfig[] = [
       if (m) {
         const parts = m[2].trim().split(/\s+/);
         return {
-          year: parseInt(m[1]),
+          year: parseInt(m[1], 10),
           make: parts[0],
           model: parts.slice(1).join(" "),
           title: `${m[1]} ${m[2].trim()}`,
@@ -308,7 +308,7 @@ function parseYearMakeModel(
   for (const pattern of patterns) {
     const match = subject.match(pattern);
     if (match) {
-      const year = parseInt(match[1]);
+      const year = parseInt(match[1], 10);
       if (year >= 1900 && year <= 2030) {
         return {
           year,

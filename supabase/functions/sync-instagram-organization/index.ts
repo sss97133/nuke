@@ -39,7 +39,8 @@ serve(async (req) => {
     );
 
     const request: SyncRequest = await req.json();
-    const { organization_id, instagram_account_id, instagram_handle, limit = 25, since } = request;
+    const { organization_id, instagram_account_id, instagram_handle, since } = request;
+    const limit = Math.min(request.limit ?? 25, 100);
 
     if (!organization_id) {
       throw new Error('organization_id is required');

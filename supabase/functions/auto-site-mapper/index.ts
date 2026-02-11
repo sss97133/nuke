@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     console.error('Auto site mapper error:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      error: "Site mapping failed",
       timestamp: new Date().toISOString()
     }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }

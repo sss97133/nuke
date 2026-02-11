@@ -1094,7 +1094,7 @@ function computeMetaAnalysis(
 // ═══════════════════════════════════════════════════
 
 async function validate(supabase: any, body: any) {
-  const limit = body.limit || 100;
+  const limit = Math.min(body.limit || 100, 500);
 
   // Get vehicles that have AI analyses
   const { data: aiVehicles, error } = await supabase.rpc("execute_sql", {
