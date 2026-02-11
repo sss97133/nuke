@@ -199,7 +199,8 @@ Return ONLY JSON. Be specific about what you see.`
       model: 'claude-3-opus-20240229',
       max_tokens: 2000,
       messages: [userMessage]
-    })
+    }),
+    signal: AbortSignal.timeout(120000),
   })
 
   if (!response.ok) {
@@ -245,7 +246,7 @@ Return ONLY JSON. Be specific about what you see.`
 
 async function decodeVIN(vin: string): Promise<any> {
   try {
-    const response = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`)
+    const response = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`, { signal: AbortSignal.timeout(15000) })
     const data = await response.json()
     
     if (!data.Results) return null
