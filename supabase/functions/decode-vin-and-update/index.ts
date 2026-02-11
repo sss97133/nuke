@@ -12,8 +12,29 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { vehicle_id, vin } = await req.json()
-    
+    // Require service role key authentication
+    const authHeader = req.headers.get('Authorization')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+    const token = authHeader?.replace('Bearer ', '') ?? ''
+    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    let body: any
+    try {
+      body = await req.json()
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const { vehicle_id, vin } = body
+
     if (!vehicle_id || !vin) {
       throw new Error('Missing vehicle_id or vin')
     }
@@ -115,7 +136,11 @@ Deno.serve(async (req) => {
       .from('vehicles')
       .select('make, model, year, engine_size, transmission, drivetrain, body_style, doors, fuel_type')
       .eq('id', vehicle_id)
-      .single()
+      .maybeSingle()
+
+    if (!currentVehicle) {
+      throw new Error(`Vehicle not found: ${vehicle_id}`)
+    }
 
     // Only update fields that are empty (don't overwrite existing data)
     const updates: any = {}

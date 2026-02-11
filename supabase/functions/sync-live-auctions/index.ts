@@ -27,6 +27,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Strip characters that could inject into PostgREST .or() filter strings */
+function escapePostgrestValue(s: string): string {
+  return s.replace(/[",().\\]/g, "");
+}
+
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 // ============================================
@@ -597,7 +602,7 @@ async function syncToDatabase(
     .from("vehicles")
     .select("id, listing_url, bat_auction_url, auction_status, auction_end_date")
     .eq("auction_status", "active")
-    .or(`listing_url.ilike."%${urlPattern}%",bat_auction_url.ilike."%${urlPattern}%"`);
+    .or(`listing_url.ilike."%${escapePostgrestValue(urlPattern)}%",bat_auction_url.ilike."%${escapePostgrestValue(urlPattern)}%"`);
 
   // Get URL from either listing_url or bat_auction_url
   const getVehicleUrl = (v: { listing_url?: string | null; bat_auction_url?: string | null }) =>
@@ -661,7 +666,7 @@ async function syncToDatabase(
       const { error } = await supabase
         .from("vehicles")
         .update(vehicleData)
-        .or(`listing_url.eq."${auction.url}",bat_auction_url.eq."${auction.url}"`);
+        .or(`listing_url.eq."${escapePostgrestValue(auction.url)}",bat_auction_url.eq."${escapePostgrestValue(auction.url)}"`);
 
       if (!error) {
         stats.updated_count++;

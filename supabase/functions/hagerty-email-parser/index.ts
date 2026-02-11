@@ -25,6 +25,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/** Strip characters that could inject into PostgREST .or() filter strings */
+function escapePostgrestValue(s: string): string {
+  return s.replace(/[",().\\]/g, '');
+}
+
 interface ParsedBid {
   auction_url: string;
   auction_uuid: string;
@@ -224,7 +229,8 @@ serve(async (req) => {
       .from('external_listings')
       .select('id, vehicle_id, current_bid, bid_count')
       .eq('platform', 'hagerty')
-      .or(`listing_url.ilike."%${auctionUuid}%",listing_id.eq."${auctionUuid}"`)
+      .or(`listing_url.ilike."%${escapePostgrestValue(auctionUuid)}%",listing_id.eq."${escapePostgrestValue(auctionUuid)}"`)
+
       .limit(1)
       .maybeSingle();
 

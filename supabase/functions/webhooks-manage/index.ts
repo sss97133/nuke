@@ -97,7 +97,7 @@ serve(async (req) => {
         .select("*")
         .eq("id", endpointId)
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (error || !endpoint) {
         return new Response(
@@ -209,7 +209,7 @@ serve(async (req) => {
         .from("webhook_endpoints")
         .select("user_id")
         .eq("id", endpointId)
-        .single();
+        .maybeSingle();
 
       if (!existing || existing.user_id !== userId) {
         return new Response(
@@ -237,9 +237,16 @@ serve(async (req) => {
         .update(updateData)
         .eq("id", endpointId)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+
+      if (!data) {
+        return new Response(
+          JSON.stringify({ error: "Webhook endpoint not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       return new Response(
         JSON.stringify({
@@ -257,7 +264,7 @@ serve(async (req) => {
         .from("webhook_endpoints")
         .select("user_id")
         .eq("id", endpointId)
-        .single();
+        .maybeSingle();
 
       if (!existing || existing.user_id !== userId) {
         return new Response(
@@ -288,7 +295,7 @@ serve(async (req) => {
         .from("webhook_endpoints")
         .select("user_id")
         .eq("id", webhookId)
-        .single();
+        .maybeSingle();
 
       if (!existing || existing.user_id !== userId) {
         return new Response(
@@ -304,9 +311,16 @@ serve(async (req) => {
         .update({ secret: newSecret })
         .eq("id", webhookId)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+
+      if (!data) {
+        return new Response(
+          JSON.stringify({ error: "Webhook endpoint not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       return new Response(
         JSON.stringify({
@@ -376,7 +390,7 @@ async function authenticateRequest(req: Request, supabase: any): Promise<{ userI
       .select("user_id, is_active")
       .eq("key_hash", keyHash)
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
     if (keyData && !error) {
       await supabase

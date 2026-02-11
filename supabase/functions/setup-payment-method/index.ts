@@ -68,7 +68,7 @@ serve(async (req) => {
       .from('profiles')
       .select('stripe_customer_id, email, full_name')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     let customerId = profile?.stripe_customer_id;
 
@@ -111,7 +111,7 @@ serve(async (req) => {
       .from('profiles')
       .select('payment_methods')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     const paymentMethods = existingProfile?.payment_methods || [];
     

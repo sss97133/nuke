@@ -194,12 +194,12 @@ async function handleChatMode(
       .from('vehicles')
       .select('id, year, make, model, vin, mileage, color, purchase_price, current_value')
       .eq('id', vehicleId)
-      .single();
-    
+      .maybeSingle();
+
     if (vehicleError || !vehicle) {
       throw new Error(`Vehicle not found: ${vehicleId}`);
     }
-    
+
     // Determine vehicle identity (nickname > YMM > VIN)
     const vehicleIdentity = vehicleNickname || 
                            vehicleYmm || 
@@ -484,7 +484,7 @@ async function handleChatMode(
           .from('receipts')
           .select('id, vendor_name, receipt_date, total, subtotal, tax, currency, payment_method, invoice_number, purchase_order, status, raw_json, created_at')
           .eq('id', receiptId)
-          .single();
+          .maybeSingle();
 
         const { data: items } = await supabase
           .from('receipt_items')
@@ -502,7 +502,7 @@ async function handleChatMode(
           .from('vehicle_documents')
           .select('id, vehicle_id, uploaded_by, document_type, title, description, file_url, file_type, amount, vendor_name, currency, created_at, updated_at')
           .eq('id', id)
-          .single();
+          .maybeSingle();
 
         if (!doc) {
           return makeToolResponse({ response: 'Document not found.', ui: { text: 'Document not found.', intent: 'other', cards: [] } });
@@ -606,7 +606,7 @@ async function handleChatMode(
           .from('vehicle_images')
           .select('id, vehicle_id, image_url, safe_preview_url, category, caption, description, created_at, taken_at, is_document, doc_flag, document_classification, document_category, ai_scan_metadata, components, tags')
           .eq('id', id)
-          .single();
+          .maybeSingle();
 
         if (!img) {
           return makeToolResponse({ response: 'Image not found.', ui: { text: 'Image not found.', intent: 'other', cards: [] } });
@@ -666,7 +666,7 @@ async function handleChatMode(
           .from('timeline_events')
           .select('id, event_type, title, description, event_date, mileage_at_event, cost_amount, cost_currency, receipt_data, metadata, parts_used, parts_mentioned, tools_mentioned, labor_hours, service_provider_name, invoice_number, verification_documents')
           .eq('id', id)
-          .single();
+          .maybeSingle();
 
         if (!ev) {
           return makeToolResponse({ response: 'Timeline event not found.', ui: { text: 'Timeline event not found.', intent: 'other', cards: [] } });
@@ -1210,8 +1210,8 @@ Deno.serve(async (req) => {
       .from('vehicles')
       .select('id, year, make, model')
       .eq('id', vehicleId)
-      .single();
-    
+      .maybeSingle();
+
     if (vehicleError || !vehicle) {
       throw new Error(`Vehicle not found: ${vehicleId}`);
     }
@@ -1294,8 +1294,8 @@ async function researchVehicle(vehicleId: string, llmConfig: any): Promise<Vehic
     .from('vehicles')
     .select('year, make, model, vin, purchase_price, purchase_date')
     .eq('id', vehicleId)
-    .single();
-  
+    .maybeSingle();
+
   if (!vehicle) throw new Error('Vehicle not found');
   
   // Get photo timeline
@@ -1633,7 +1633,7 @@ async function generateExpertValuation(
     .from('vehicles')
     .select('purchase_price')
     .eq('id', vehicleId)
-    .single();
+    .maybeSingle();
   
   const purchasePrice = vehicle?.purchase_price || 0;
   const documentedValue = components.reduce((sum, c) => sum + c.estimatedValue, 0);

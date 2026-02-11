@@ -326,7 +326,8 @@ async function authenticateRequest(req: Request, supabase: any): Promise<{ userI
 
     // Check if token is the actual service role key (used by MCP servers and internal tools)
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (serviceRoleKey && token === serviceRoleKey) {
+    const altServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY");
+    if ((serviceRoleKey && token === serviceRoleKey) || (altServiceRoleKey && token === altServiceRoleKey)) {
       return { userId: "service-role", isServiceRole: true };
     }
 

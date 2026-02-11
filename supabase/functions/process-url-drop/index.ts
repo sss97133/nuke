@@ -6,6 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/** Strip characters that could inject into PostgREST .or() filter strings */
+function escapePostgrestValue(s: string): string {
+  return s.replace(/[",().\\]/g, '');
+}
+
 /**
  * Process URL Drop - Universal URL Handler (v2)
  *
@@ -1175,7 +1180,8 @@ async function processBaTListingURL(url: string, supabase: any) {
   const { data: existing } = await supabase
     .from('vehicles')
     .select('id')
-    .or(`listing_url.eq."${url}",discovery_url.eq."${url}",bat_auction_url.eq."${url}"`)
+    .or(`listing_url.eq."${escapePostgrestValue(url)}",discovery_url.eq."${escapePostgrestValue(url)}",bat_auction_url.eq."${escapePostgrestValue(url)}"`)
+
     .maybeSingle();
 
   if (existing) {
