@@ -1035,19 +1035,20 @@ async function saveToDatabase(
 
     return { vehicleId, success: true };
   } catch (error: any) {
-    console.error(`[extract-with-playwright] Database save error: ${error.message}`);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[extract-with-playwright] Database save error: ${errMsg}`);
 
     // Mark queue item as failed if queueId provided
     if (queueId) {
       await supabase.from("import_queue").update({
         status: "failed",
-        error_message: `Playwright fallback save failed: ${error.message}`,
+        error_message: `Playwright fallback save failed: ${errMsg}`,
         locked_at: null,
         locked_by: null,
       }).eq("id", queueId);
     }
 
-    return { vehicleId: null, success: false, error: error.message };
+    return { vehicleId: null, success: false, error: errMsg };
   }
 }
 
@@ -1097,12 +1098,13 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error(`[extract-with-playwright] Error: ${error.message}`);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[extract-with-playwright] Error: ${errMsg}`);
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: errMsg,
         extractor_version: EXTRACTOR_VERSION,
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

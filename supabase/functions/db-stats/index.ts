@@ -51,6 +51,7 @@ serve(async (req) => {
       pendingClaimsRes,
       approvedClaimsRes,
       pendingVerificationsRes,
+      coverageRes,
     ] = await Promise.all([
       // Large tables: use "estimated" to avoid COUNT(*) timeout
       supabase.from("vehicles").select("id", { count: "estimated", head: true }),
@@ -75,6 +76,8 @@ serve(async (req) => {
       supabase.from("external_identity_claims").select("id", { count: "exact", head: true }).eq("status", "pending"),
       supabase.from("external_identity_claims").select("id", { count: "exact", head: true }).eq("status", "approved"),
       supabase.from("identity_verification_methods").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      // Target coverage view
+      supabase.from("source_target_coverage").select("*"),
     ]);
 
     const vehicleCount = vehiclesRes.count || 0;
@@ -143,6 +146,24 @@ serve(async (req) => {
           description_discoveries: descDiscRes.count || 0,
           vehicles_analyzed: (commentDiscRes.count || 0) + (descDiscRes.count || 0),
         },
+
+        // Target market coverage
+        target_coverage: (() => {
+          const rows = coverageRes.data || [];
+          const totals = rows.reduce((acc: any, r: any) => ({
+            total_targets: acc.total_targets + (r.total_targets || 0),
+            in_queue: acc.in_queue + (r.in_queue || 0),
+            extracted: acc.extracted + (r.extracted || 0),
+            gap: acc.gap + (r.gap || 0),
+          }), { total_targets: 0, in_queue: 0, extracted: 0, gap: 0 });
+          return {
+            ...totals,
+            coverage_pct: totals.total_targets > 0
+              ? Math.round(1000 * totals.in_queue / totals.total_targets) / 10
+              : 0,
+            sources: rows,
+          };
+        })(),
 
         // Legacy table (for reference only - data migrated to observations)
         _legacy: {
