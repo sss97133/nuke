@@ -61,11 +61,11 @@ Deno.serve(async (req) => {
       default:
         return await runAutonomousCycle(supabase, authHeader);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Autonomous extraction agent error:', error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString()
     }), { status: 500 });
   }
@@ -159,14 +159,14 @@ async function dailyExtractionRun(supabase: any, params: any, authHeader: string
       // Small delay between sites
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`${site.name} extraction failed:`, error);
       results.push({
         site: site.name,
         url: site.url,
         vehicles_extracted: 0,
         success_rate: 0,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
@@ -233,7 +233,7 @@ async function extractFromHealthySites(supabase: any, healthySites: any[], authH
       totalVehicles += extraction.vehicles_extracted;
       
       console.log(`  ${site.site}: ${extraction.vehicles_extracted} vehicles`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Extraction failed for ${site.site}:`, error);
     }
   }
@@ -276,7 +276,7 @@ async function extractFromSite(siteUrl: string, maxVehicles: number, authHeader:
   });
   
   if (error) {
-    throw new Error(`Function call error: ${error.message}`);
+    throw new Error(`Function call error: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   const result = data || {};
@@ -304,12 +304,12 @@ async function checkSiteHealth(siteUrl: string) {
       last_extraction: new Date().toISOString(),
       issues: response.ok ? [] : [`HTTP ${response.status}`]
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
       status: 'failed',
       response_time: 0,
       last_extraction: null,
-      issues: [error.message]
+      issues: [error instanceof Error ? error.message : String(error)]
     };
   }
 }
@@ -329,11 +329,11 @@ async function updateDegradedSitePatterns(supabase: any, degradedSites: any[]) {
         new_confidence: remapping.confidence,
         changes_made: remapping.changes
       });
-    } catch (error) {
+    } catch (error: any) {
       updateResults.push({
         site: site.site,
         remapping_success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
@@ -359,7 +359,7 @@ async function discoverAdditionalSites(supabase: any) {
       if (mapping.confidence > 0.7) {
         mappedSites.push(mapping);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Failed to map ${site.url}:`, error);
     }
   }

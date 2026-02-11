@@ -493,7 +493,7 @@ serve(async (req) => {
         .from('vehicle_observations')
         .insert({
           vehicle_id: resolvedVehicleId,
-          source_id: (await supabase.from('observation_sources').select('id').eq('slug', 'wayback-machine').single()).data?.id,
+          source_id: (await supabase.from('observation_sources').select('id').eq('slug', 'wayback-machine').maybeSingle()).data?.id,
           kind: 'listing',
           observed_at: listing.snapshot_date,
           source_url: listing.snapshot_url,

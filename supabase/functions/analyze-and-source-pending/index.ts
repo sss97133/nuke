@@ -63,7 +63,7 @@ serve(async (req) => {
     const { data: vehicles, error } = await query;
 
     if (error) {
-      throw new Error(`Failed to fetch vehicles: ${error.message}`);
+      throw new Error(`Failed to fetch vehicles: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     if (!vehicles || vehicles.length === 0) {
@@ -187,7 +187,7 @@ serve(async (req) => {
           sourcingResults.push({
             vehicle_id: analysis.vehicle_id,
             status: 'failed',
-            error: error.message
+            error: error instanceof Error ? error.message : String(error)
           });
         }
       }
@@ -215,7 +215,7 @@ serve(async (req) => {
     console.error('Analyze error:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -285,7 +285,7 @@ async function sourceMissingData(supabase: any, analysis: any) {
             .eq('id', vehicle_id);
 
           if (updateError) {
-            throw new Error(`Update failed: ${updateError.message}`);
+            throw new Error(`Update failed: ${updateError instanceof Error ? updateError.message : String(updateError)}`);
           }
         }
 
@@ -313,7 +313,7 @@ async function sourceMissingData(supabase: any, analysis: any) {
         }
       }
     } catch (error: any) {
-      results.error = error.message;
+      results.error = error instanceof Error ? error.message : String(error);
       results.status = 'partial';
     }
   }

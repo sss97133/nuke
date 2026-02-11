@@ -237,7 +237,7 @@ async function saveVilla(supabase: any, villa: Villa, villaTypeId: string): Prom
     metadata: { project: "lofficiel-concierge", agency: villa.agency_name, scraped_at: new Date().toISOString() },
   };
 
-  const { data: existing } = await supabase.from("properties").select("id").eq("external_id", externalId).single();
+  const { data: existing } = await supabase.from("properties").select("id").eq("external_id", externalId).maybeSingle();
 
   if (existing) {
     await supabase.from("properties").update({ ...property, updated_at: new Date().toISOString() }).eq("id", existing.id);
@@ -280,7 +280,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const agencySlug = body.agency;
 
-    const { data: villaType } = await supabase.from("property_types").select("id").eq("slug", "villa").single();
+    const { data: villaType } = await supabase.from("property_types").select("id").eq("slug", "villa").maybeSingle();
     if (!villaType) throw new Error("Villa type not found");
 
     // If no agency specified, return list

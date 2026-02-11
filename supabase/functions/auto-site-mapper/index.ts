@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       default:
         return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Auto site mapper error:', error);
     return new Response(JSON.stringify({
       success: false,
@@ -135,9 +135,9 @@ async function mapBatchSites(siteUrls: string[]): Promise<Response> {
       
       // Delay between sites to be respectful
       await new Promise(resolve => setTimeout(resolve, 2000));
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to map ${siteUrl}:`, error);
-      errors.push({ site_url: siteUrl, error: error.message });
+      errors.push({ site_url: siteUrl, error: error instanceof Error ? error.message : String(error) });
     }
   }
   

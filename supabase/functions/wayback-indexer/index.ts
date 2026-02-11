@@ -352,7 +352,7 @@ serve(async (req) => {
         const { count: observationCount } = await supabase
           .from('vehicle_observations')
           .select('*', { count: 'exact', head: true })
-          .eq('source_id', (await supabase.from('observation_sources').select('id').eq('slug', 'wayback-machine').single()).data?.id);
+          .eq('source_id', (await supabase.from('observation_sources').select('id').eq('slug', 'wayback-machine').maybeSingle()).data?.id);
 
         return new Response(
           JSON.stringify({
