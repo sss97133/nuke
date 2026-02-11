@@ -324,17 +324,13 @@ async function authenticateRequest(req: Request, supabase: any): Promise<{ userI
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.replace("Bearer ", "");
 
-    // Check if token is a service role JWT (used by MCP servers and internal tools)
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.role === 'service_role') {
-        return { userId: "service-role", isServiceRole: true };
-      }
-    } catch {
-      // Not a valid JWT, continue to other auth methods
+    // Check if token is the actual service role key (used by MCP servers and internal tools)
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (serviceRoleKey && token === serviceRoleKey) {
+      return { userId: "service-role", isServiceRole: true };
     }
 
-    // Try user JWT
+    // Try user JWT (verified by Supabase auth)
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (user && !error) {
       return { userId: user.id };
@@ -352,7 +348,7 @@ async function authenticateRequest(req: Request, supabase: any): Promise<{ userI
       .select("user_id, scopes, is_active, rate_limit_remaining, expires_at")
       .eq("key_hash", keyHash)
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
     if (keyData && !error) {
       // Check expiry
