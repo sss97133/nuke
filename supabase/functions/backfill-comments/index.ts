@@ -124,6 +124,7 @@ serve(async (req) => {
             max_batches: maxBatches,
             batch_number: batchNumber + 1,
           }),
+          signal: AbortSignal.timeout(15000),
         }).catch(e => console.error("Failed to trigger next batch:", e.message));
 
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -174,10 +175,16 @@ serve(async (req) => {
               auction_url: vehicle.bat_auction_url,
               vehicle_id: vehicle.id,
             }),
+            signal: AbortSignal.timeout(120000),
           }
         );
 
-        const result = await response.json();
+        let result: any;
+        try {
+          result = await response.json();
+        } catch {
+          result = { success: false, error: `Non-JSON response (${response.status})` };
+        }
 
         if (result.success) {
           results.success++;
@@ -243,6 +250,7 @@ serve(async (req) => {
           max_batches: maxBatches,
           batch_number: batchNumber + 1,
         }),
+        signal: AbortSignal.timeout(15000),
       }).catch(e => console.error("Failed to trigger next batch:", e.message));
 
       // Small delay to ensure the request is sent

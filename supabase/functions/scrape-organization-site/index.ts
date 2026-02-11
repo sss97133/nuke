@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     // Scrape about page for organization info
     try {
       const aboutUrl = `${baseUrl}/pages/about.cfm`;
-      const aboutResponse = await fetch(aboutUrl);
+      const aboutResponse = await fetch(aboutUrl, { signal: AbortSignal.timeout(15000) });
       if (aboutResponse.ok) {
         const aboutHtml = await aboutResponse.text();
         scrapedData.about = extractOrganizationInfo(aboutHtml);
@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
     // Scrape restoration page for vehicles
     try {
       const restorationUrl = `${baseUrl}/pages/restoration.cfm`;
-      const restorationResponse = await fetch(restorationUrl);
+      const restorationResponse = await fetch(restorationUrl, { signal: AbortSignal.timeout(15000) });
       if (restorationResponse.ok) {
         const restorationHtml = await restorationResponse.text();
         const vehicles = extractVehiclesFromRestoration(restorationHtml, baseUrl);
@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
     // Scrape carsforsale page for inventory
     try {
       const carsforsaleUrl = `${baseUrl}/pages/carsforsale.cfm`;
-      const carsforsaleResponse = await fetch(carsforsaleUrl);
+      const carsforsaleResponse = await fetch(carsforsaleUrl, { signal: AbortSignal.timeout(15000) });
       if (carsforsaleResponse.ok) {
         const carsforsaleHtml = await carsforsaleResponse.text();
         console.log(`📄 Fetched carsforsale page (${carsforsaleHtml.length} chars)`);
@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
     // Scrape gallery page for images AND vehicles
     try {
       const galleryUrl = `${baseUrl}/pages/gallery.cfm`;
-      const galleryResponse = await fetch(galleryUrl);
+      const galleryResponse = await fetch(galleryUrl, { signal: AbortSignal.timeout(15000) });
       if (galleryResponse.ok) {
         const galleryHtml = await galleryResponse.text();
         const images = extractGalleryImages(galleryHtml, baseUrl);
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
     // Scrape brochures page
     try {
       const brochuresUrl = `${baseUrl}/pages/brochures.cfm`;
-      const brochuresResponse = await fetch(brochuresUrl);
+      const brochuresResponse = await fetch(brochuresUrl, { signal: AbortSignal.timeout(15000) });
       if (brochuresResponse.ok) {
         const brochuresHtml = await brochuresResponse.text();
         const brochures = extractBrochures(brochuresHtml, baseUrl);

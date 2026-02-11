@@ -291,8 +291,8 @@ serve(async (req) => {
               import_queue_id: it.id,
             } as any)
             .select("id")
-            .single();
-          if (vErr) throw new Error(`vehicles insert failed: ${vErr.message}`);
+            .maybeSingle();
+          if (vErr || !created) throw new Error(`vehicles insert failed: ${vErr?.message || 'no row returned'}`);
           vehicleId = created.id;
         }
 
