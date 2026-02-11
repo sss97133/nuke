@@ -95,7 +95,7 @@ async function vehicleSentiment(supabase: any, vehicleId: string) {
         percentile_cont(0.50) WITHIN GROUP (ORDER BY sentiment_score)
           FILTER (WHERE sentiment_score IS NOT NULL) AS median_comment_sentiment
       FROM bat_comments
-      WHERE vehicle_id = '${vehicleId}'
+      WHERE vehicle_id = '${vehicleId.replace(/'/g, "''")}'
     `,
   });
 
@@ -155,7 +155,9 @@ async function vehicleSentiment(supabase: any, vehicleId: string) {
 /**
  * Batch mode: process all vehicles with comment_discoveries
  */
-async function batchSentiment(supabase: any, batchSize: number, offset: number) {
+async function batchSentiment(supabase: any, batchSize_raw: number, offset_raw: number) {
+  const batchSize = Math.max(1, Math.min(parseInt(String(batchSize_raw), 10) || 100, 500));
+  const offset = Math.max(0, parseInt(String(offset_raw), 10) || 0);
   // Get vehicles with discoveries that need sentiment
   const { data: vehicles, error: vErr } = await supabase.rpc("execute_sql", {
     query: `

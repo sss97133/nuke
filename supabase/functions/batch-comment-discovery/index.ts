@@ -103,8 +103,8 @@ serve(async (req) => {
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const body = await req.json().catch(() => ({}));
-    const batchSize = Math.min(body.batch_size || 20, 50);
-    const minComments = body.min_comments ?? 5;
+    const batchSize = Math.max(1, Math.min(parseInt(String(body.batch_size ?? 20), 10) || 20, 50));
+    const minComments = Math.max(0, parseInt(String(body.min_comments ?? 5), 10) || 5);
     const maxCommentChars = body.max_comment_chars ?? 12000;
     const shouldContinue = body.continue ?? false;
 

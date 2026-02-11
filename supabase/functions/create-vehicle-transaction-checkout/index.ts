@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     }
 
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return new Response('Unauthorized', { status: 401 })
+    if (!authHeader) return json({ error: 'Unauthorized' }, 401)
 
     const { createClient } = await import('jsr:@supabase/supabase-js@2')
 
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     })
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return new Response('Unauthorized', { status: 401 })
+    if (!user) return json({ error: 'Unauthorized' }, 401)
 
     // Get vehicle details
     const { data: vehicle, error: vehicleError } = await supabase

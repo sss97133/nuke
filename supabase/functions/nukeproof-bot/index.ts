@@ -68,7 +68,12 @@ Deno.serve(async (req) => {
   }
   if (req.method !== "POST") return new Response("OK");
 
-  const u = await req.json();
+  let u;
+  try {
+    u = await req.json();
+  } catch {
+    return new Response("Invalid JSON", { status: 400 });
+  }
   if (!u.message) return new Response("OK");
 
   const { message: m } = u;
