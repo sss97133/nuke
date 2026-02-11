@@ -551,7 +551,7 @@ async function linkToVehicle(listing: ExtractedListing): Promise<string | null> 
       .from("vehicles")
       .select("id")
       .eq("vin", listing.extracted_vin)
-      .single();
+      .maybeSingle();
 
     if (byVin) return byVin.id;
   }
@@ -565,7 +565,7 @@ async function linkToVehicle(listing: ExtractedListing): Promise<string | null> 
       .ilike("make", listing.extracted_make)
       .ilike("model", listing.extracted_model || "%")
       .limit(1)
-      .single();
+      .maybeSingle();
 
     // Only link if high confidence match
     // For now, don't auto-link without VIN - let user verify
@@ -608,7 +608,7 @@ serve(async (req) => {
       .from("marketplace_listings")
       .select("*")
       .eq("external_id", itemId)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       // Update last_seen and return existing

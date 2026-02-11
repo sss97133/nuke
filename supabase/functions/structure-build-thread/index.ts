@@ -48,7 +48,7 @@ serve(async (req) => {
       .from('build_threads')
       .select('id, thread_title, thread_url, vehicle_id, vehicle_hints, author_handle, forum_source_id')
       .eq('id', thread_id)
-      .single()
+      .maybeSingle()
 
     if (threadError || !thread) {
       return new Response(
@@ -62,7 +62,7 @@ serve(async (req) => {
       .from('forum_sources')
       .select('name, slug, base_url')
       .eq('id', thread.forum_source_id)
-      .single()
+      .maybeSingle()
 
     // Get posts (limit to first 60 for context window)
     const { data: posts } = await supabase

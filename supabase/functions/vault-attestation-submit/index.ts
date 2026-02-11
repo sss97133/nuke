@@ -235,7 +235,7 @@ async function findOrCreateVehicle(vin: string): Promise<{
     .select("id, year, make, model")
     .eq("vin", cleanVin)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     return { ...existing, isNew: false };
@@ -397,7 +397,7 @@ serve(async (req) => {
       .select("vehicle_id")
       .eq("vehicle_id", vehicle.id)
       .eq("owner_id", attestation.user_id)
-      .single();
+      .maybeSingle();
 
     if (!existingLink) {
       await supabase.from("user_vehicle_relationships").insert({

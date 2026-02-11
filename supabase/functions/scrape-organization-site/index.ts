@@ -744,7 +744,7 @@ function extractVehiclesFromRestoration(html: string, baseUrl: string): Extracte
       const modelMatch = nearbyDesc.text.match(/\b(2002|911|SL|E-Type|Testarossa)\b/i);
       
       vehicles.push({
-        year: yearMatch ? parseInt(yearMatch[0]) : undefined,
+        year: yearMatch ? parseInt(yearMatch[0], 10) : undefined,
         make: makeMatch ? makeMatch[1] : undefined,
         model: modelMatch ? modelMatch[1] : undefined,
         description: nearbyDesc.text,
@@ -778,7 +778,7 @@ function extractVehiclesFromCarsForSale(html: string, baseUrl: string): Extracte
   
   while ((vehicleMatch = vehiclePattern.exec(cleanHtml)) !== null) {
     matchCount++;
-    const year = parseInt(vehicleMatch[1]);
+    const year = parseInt(vehicleMatch[1], 10);
     // For 2002ad.com, BMW is often implied, so default to BMW if not specified
     const make = 'BMW';
     let model = vehicleMatch[2]?.replace(/BMW\s+/i, '').trim().replace(/\s+/g, ' ');
@@ -919,7 +919,7 @@ function extractBrochures(html: string, baseUrl: string): Array<{
       brochures.push({
         title: context.match(/<[^>]*>([^<]{10,100})<\/[^>]*>/)?.[1]?.trim() || 
                filenameMatch ? `${filenameMatch[1]} ${filenameMatch[2]} ${filenameMatch[3]} Brochure` : undefined,
-        year: yearMatch ? parseInt(yearMatch[0]) : (filenameMatch ? parseInt(filenameMatch[1]) : undefined),
+        year: yearMatch ? parseInt(yearMatch[0], 10) : (filenameMatch ? parseInt(filenameMatch[1], 10) : undefined),
         make: makeMatch ? makeMatch[1] : (filenameMatch ? filenameMatch[2] : undefined),
         model: modelMatch ? modelMatch[1] : (filenameMatch ? filenameMatch[3] : undefined),
         image_url: imgUrl,
@@ -1025,11 +1025,11 @@ function extractVehiclesFromGallery(html: string, baseUrl: string): ExtractedVeh
   for (const img of imageUrls) {
     // Try to extract year/make/model from filename
     const filenameMatch = img.url.match(/(\d{4})[_-]?([A-Za-z0-9]+)/i);
-    const yearFromFilename = filenameMatch ? parseInt(filenameMatch[1]) : null;
+    const yearFromFilename = filenameMatch ? parseInt(filenameMatch[1], 10) : null;
     
     // Try to extract from context
     const yearMatch = img.context.match(/\b((?:19|20)\d{2})\b/);
-    const year = yearMatch ? parseInt(yearMatch[1]) : (yearFromFilename && yearFromFilename >= 1950 && yearFromFilename <= 2025 ? yearFromFilename : null);
+    const year = yearMatch ? parseInt(yearMatch[1], 10) : (yearFromFilename && yearFromFilename >= 1950 && yearFromFilename <= 2025 ? yearFromFilename : null);
     
     // Check if filename suggests a BMW 2002 or related model
     const isBMW2002 = /2002|1600|1800|2000|tii|turbo|cs|cs/i.test(img.url) || 

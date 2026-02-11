@@ -72,7 +72,7 @@ async function getRequestIfOwner(
     .from("vault_access_requests")
     .select("id, attestation_id, status, requested_by, request_reason, approved_duration_hours, url_expires_at")
     .eq("id", requestId)
-    .single();
+    .maybeSingle();
 
   if (error || !request) return null;
 
@@ -81,7 +81,7 @@ async function getRequestIfOwner(
     .from("vault_attestations")
     .select("id, user_id, vin, document_type, vault_token")
     .eq("id", request.attestation_id)
-    .single();
+    .maybeSingle();
 
   if (!attestation) return null;
 
@@ -157,7 +157,7 @@ async function notifyRequester(
     .from("profiles")
     .select("email, phone_number")
     .eq("id", requesterId)
-    .single();
+    .maybeSingle();
 
   if (!requester) return;
 

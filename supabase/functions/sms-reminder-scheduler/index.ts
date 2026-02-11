@@ -109,7 +109,7 @@ async function generateReminders(): Promise<number> {
       .select("template_text")
       .eq("template_key", reminderType)
       .eq("personality", tech.ai_personality || "friendly")
-      .single();
+      .maybeSingle();
 
     if (!template) continue;
 
@@ -123,7 +123,7 @@ async function generateReminders(): Promise<number> {
         .from("vehicles")
         .select("year, make, model")
         .eq("id", tech.assigned_vehicles[0])
-        .single();
+        .maybeSingle();
 
       if (vehicle) {
         message = message.replace(
@@ -245,7 +245,7 @@ async function sendDirect(
     .from("technician_phone_links")
     .select("phone_number")
     .eq("id", techLinkId)
-    .single();
+    .maybeSingle();
 
   if (!tech?.phone_number) return false;
 

@@ -472,7 +472,7 @@ async function findExistingVehicle(
     .select('id')
     .eq('discovery_url', listing.url)
     .limit(1)
-    .single();
+    .maybeSingle();
   if (urlMatch) return { id: urlMatch.id, matchType: 'url' };
 
   // Match by registration number (Swedish plates)
@@ -482,7 +482,7 @@ async function findExistingVehicle(
       .select('id')
       .eq('license_plate', listing.registration_number)
       .limit(1)
-      .single();
+      .maybeSingle();
     if (regMatch) return { id: regMatch.id, matchType: 'reg' };
   }
 
@@ -496,7 +496,7 @@ async function findExistingVehicle(
       .ilike('model', `%${listing.model}%`)
       .is('discovery_url', null)
       .limit(1)
-      .single();
+      .maybeSingle();
     if (ymmMatch) return { id: ymmMatch.id, matchType: 'ymm' };
   }
 
@@ -630,7 +630,7 @@ async function saveExternalListing(
     .eq('platform', 'blocket')
     .eq('listing_url_key', listingUrlKey)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     // Update existing
