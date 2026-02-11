@@ -158,9 +158,11 @@ export const DomainRoutes = () => {
         <Route path="/settings/webhooks" element={<WebhooksPage />} />
         <Route path="/settings/usage" element={<UsageDashboardPage />} />
 
-        {/* Developers */}
+        {/* Developers / Documentation */}
         <Route path="/developers" element={<DevelopersPage />} />
+        <Route path="/docs" element={<DevelopersPage />} />
         <Route path="/docs/api" element={<DevelopersPage />} />
+        <Route path="/docs/*" element={<DevelopersPage />} />
         <Route path="/api" element={<ApiLanding />} />
         <Route path="/api/landing" element={<ApiLanding />} />
 
