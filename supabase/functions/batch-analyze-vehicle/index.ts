@@ -64,7 +64,7 @@ serve(async (req) => {
       .order('taken_at', { ascending: true })
 
     // Cap max_images to prevent unbounded AI API calls
-    const safeMaxImages = Math.max(1, Math.min(max_images || 50, 200))
+    const safeMaxImages = Math.max(1, Math.min(max_images || 50, 100))
     query = query.limit(safeMaxImages)
 
     const { data: images, error: imagesError } = await query
