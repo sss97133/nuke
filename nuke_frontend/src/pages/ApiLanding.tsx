@@ -19,8 +19,8 @@ import type { UniversalSearchResult } from '../services/universalSearchService';
 /* ------------------------------------------------------------------ */
 
 const STATS = [
-  { value: '758K', label: 'Vehicle Profiles' },
-  { value: '627K', label: 'Observations' },
+  { value: '810K', label: 'Vehicle Profiles' },
+  { value: '625K', label: 'Observations' },
   { value: '181', label: 'Extractors' },
   { value: '34', label: 'Source Platforms' },
 ];
@@ -480,7 +480,7 @@ export default function ApiLanding() {
       <div style={s.hero}>
         <div style={s.heroTitle}>Vehicle Intelligence for AI Agents</div>
         <div style={s.heroSubtitle}>
-          Structured data on 758K collector vehicles. Search by VIN, year/make/model, or natural
+          Structured data on 810K collector vehicles. Search by VIN, year/make/model, or natural
           language. Built for MCP, REST, and direct Supabase access.
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
@@ -578,7 +578,7 @@ npx @anthropic/mcp-client@latest \\
 ingest-observation      Normalize, deduplicate, link to vehicle profile
   |
   v
-vehicle_observations    Unified event store (627K+ rows)
+vehicle_observations    Unified event store (625K+ rows)
   |
   v
 discover-from-          AI analysis: sentiment, price signals,
