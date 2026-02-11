@@ -1036,7 +1036,6 @@ RESPONSE RULES (IMPORTANT):
         reason: 'chat_error',
         error: error?.message || String(error),
         errorType: error?.name,
-        stack: error?.stack,
         timestamp: new Date().toISOString()
       }),
       {
@@ -1271,7 +1270,6 @@ Deno.serve(async (req) => {
         reason: 'internal_error',
         error: error?.message || String(error),
         errorType: error?.name,
-        stack: error?.stack,
         timestamp: new Date().toISOString()
       }),
       {

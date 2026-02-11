@@ -713,7 +713,7 @@ serve(async (req) => {
 
     // Store every incoming webhook payload for audit trail
     const { error: rawErr } = await supabase.from("telegram_raw_webhooks").insert({
-      payload: { ...update, _bot: botParam, _token_prefix: BOT_TOKEN?.slice(0, 10) },
+      payload: { ...update, _bot: botParam },
       processed: false,
     });
     if (rawErr) console.error("[Telegram] Raw webhook store error:", rawErr);
