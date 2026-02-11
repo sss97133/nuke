@@ -22,7 +22,7 @@
       "dependencies": [
         "npm:@anthropic-ai/sdk@~0.71.2",
         "npm:@mendable/firecrawl-js@^4.8.2",
-        "npm:@mozilla/readability@0.5",
+        "npm:@mozilla/readability@0.6",
         "npm:@playwright/test@^1.58.0",
         "npm:@supabase/supabase-js@^2.86.0",
         "npm:better-sqlite3@^12.6.2",
