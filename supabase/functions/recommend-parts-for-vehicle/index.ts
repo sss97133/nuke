@@ -144,7 +144,8 @@ Return JSON:
               }
             ]
           }]
-        })
+        }),
+        signal: AbortSignal.timeout(30000),
       })
 
       if (claudeResp.ok) {

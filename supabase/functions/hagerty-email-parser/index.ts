@@ -290,7 +290,7 @@ serve(async (req) => {
         ignoreDuplicates: true
       })
       .select('id')
-      .single();
+      .maybeSingle();
 
     if (bidError) {
       // Might be duplicate, that's OK
