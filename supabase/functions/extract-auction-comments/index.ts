@@ -881,7 +881,7 @@ serve(async (req) => {
           ...(authToUse ? { 'Authorization': authToUse } : {})
         },
         body: JSON.stringify({ auction_event_id: eventId })
-      }).catch(e => console.error('Failed to trigger analysis:', e))
+      }).then(res => res.text().catch(() => {})).catch(e => console.error('Failed to trigger analysis:', e.message))
     }
 
     return new Response(JSON.stringify({

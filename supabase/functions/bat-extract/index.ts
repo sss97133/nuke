@@ -1024,7 +1024,7 @@ serve(async (req) => {
             auction_url: extracted.url,
             vehicle_id: extracted.vehicle_id,
           }),
-        }).catch(e => console.warn(`Comment extraction trigger failed: ${e.message}`));
+        }).then(res => res.text().catch(() => {})).catch(e => console.warn(`Comment extraction trigger failed: ${e.message}`));
       }
 
       healthLogger.flush().catch(err => console.error('Health log flush error:', err));

@@ -247,8 +247,9 @@ Deno.serve(async (req) => {
 
       // Revoke all allowed sessions
       if (text.toLowerCase() === "revoke") {
-        await supabase.from("claude_allowed_sessions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-        await sendMessage(chatId, "🔒 All auto-approve sessions revoked");
+        const { error: deleteError } = await supabase.from("claude_allowed_sessions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        if (deleteError) console.error('Failed to revoke sessions:', deleteError.message);
+        await sendMessage(chatId, deleteError ? "Failed to revoke sessions" : "🔒 All auto-approve sessions revoked");
         return new Response("OK");
       }
 

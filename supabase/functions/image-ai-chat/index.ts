@@ -140,13 +140,14 @@ Respond in JSON format:
           executedActions.push(action);
         } else if (action.type === 'analysis_triggered') {
           // Queue analysis
-          await supabase.rpc('queue_analysis', {
+          const { error: queueError } = await supabase.rpc('queue_analysis', {
             p_vehicle_id: vehicle_id,
             p_analysis_type: action.analysis_type || 'expert_valuation',
             p_priority: 3,
             p_triggered_by: 'ai_chat'
           });
-          
+          if (queueError) console.error('Failed to queue analysis:', queueError.message);
+
           executedActions.push(action);
         }
       }
