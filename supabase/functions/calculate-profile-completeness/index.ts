@@ -91,7 +91,7 @@ async function calculateCompleteness(supabase: any, vehicleId: string) {
     awards,
     assessments
   ] = await Promise.all([
-    supabase.from('vehicles').select('*').eq('id', vehicleId).single(),
+    supabase.from('vehicles').select('*').eq('id', vehicleId).maybeSingle(),
     supabase.from('vehicle_spid_data').select('*').eq('vehicle_id', vehicleId).maybeSingle(),
     supabase.from('vehicle_images').select('id').eq('vehicle_id', vehicleId),
     supabase.from('timeline_events').select('id').eq('vehicle_id', vehicleId),

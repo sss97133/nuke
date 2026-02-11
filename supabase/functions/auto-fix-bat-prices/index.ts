@@ -166,8 +166,8 @@ async function scrapeBaTPrice(batUrl: string): Promise<BaTPriceData> {
       lotNumber,
       title: title,
     };
-  } catch (error) {
-    console.error(`  ❌ Scrape error: ${error.message}`);
+  } catch (error: any) {
+    console.error(`  ❌ Scrape error: ${error instanceof Error ? error.message : String(error)}`);
     return { price: null, saleDate: null, lotNumber: null, title: null };
   }
 }
@@ -254,7 +254,7 @@ async function fixVehiclePrice(supabase: any, vehicleId: string) {
     .eq('id', vehicleId);
 
   if (updateError) {
-    throw new Error(`Update failed: ${updateError.message}`);
+    throw new Error(`Update failed: ${updateError instanceof Error ? updateError.message : String(updateError)}`);
   }
 
   // Log the fix
@@ -352,11 +352,11 @@ async function checkAllVehicles(supabase: any) {
       }
       // Rate limit
       await new Promise((resolve) => setTimeout(resolve, 2000));
-    } catch (error) {
+    } catch (error: any) {
       results.push({
         vehicle_id: vehicle.id,
         status: 'error',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }

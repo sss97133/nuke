@@ -82,10 +82,10 @@ Deno.serve(async (req) => {
       default:
         return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400 });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Orchestrator error:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message,
+    return new Response(JSON.stringify({
+      error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString()
     }), { status: 500 });
   }
@@ -102,10 +102,10 @@ async function getAgentStatus() {
         last_response_ms: response.duration_ms,
         details: response.data
       };
-    } catch (error) {
+    } catch (error: any) {
       status[agentName] = {
         status: 'error',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -149,8 +149,8 @@ async function getScaleMetrics(): Promise<Response> {
       },
       recommendations: generateScaleRecommendations(metrics, daily_rate)
     }));
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), { status: 500 });
   }
 }
 
@@ -163,11 +163,11 @@ async function invokeAgent(agent: string, action: string, params: any): Promise<
   try {
     const response = await callAgent(functionName, action, params);
     return new Response(JSON.stringify(response));
-  } catch (error) {
-    return new Response(JSON.stringify({ 
-      error: error.message,
+  } catch (error: any) {
+    return new Response(JSON.stringify({
+      error: error instanceof Error ? error.message : String(error),
       agent,
-      action 
+      action
     }), { status: 500 });
   }
 }
@@ -249,9 +249,9 @@ async function emergencyDebug(): Promise<Response> {
       recommended_actions: debugResponse.recommendations || [],
       timestamp: new Date().toISOString()
     }));
-  } catch (error) {
-    return new Response(JSON.stringify({ 
-      error: `Emergency debug failed: ${error.message}`,
+  } catch (error: any) {
+    return new Response(JSON.stringify({
+      error: `Emergency debug failed: ${error instanceof Error ? error.message : String(error)}`,
       fallback_diagnostics: await getFallbackDiagnostics()
     }), { status: 500 });
   }
@@ -302,12 +302,12 @@ async function runDailyPipeline(params: any): Promise<Response> {
       if (!result.success && ['firecrawl-optimization', 'database-optimizer'].includes(step.agent)) {
         throw new Error(`Critical step failed: ${step.agent}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       results.push({
         agent: step.agent,
         action: step.action,
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
@@ -348,12 +348,12 @@ async function callAgent(functionName: string, action: string, params: any): Pro
       duration_ms: duration,
       recommendations: data.recommendations
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
       agent: functionName,
       action,
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       duration_ms: Date.now() - startTime
     };
   }

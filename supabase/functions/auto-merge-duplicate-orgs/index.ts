@@ -330,7 +330,7 @@ async function findAndMergeDuplicates(orgId: string, supabase: any): Promise<{ m
         console.log(`✅ Auto-merged duplicate: ${sourceId} → ${targetId} (confidence: ${confidence.toFixed(2)})`);
         return { merged: true, targetId };
       } catch (error: any) {
-        console.error(`❌ Failed to merge: ${error.message}`);
+        console.error(`❌ Failed to merge: ${error instanceof Error ? error.message : String(error)}`);
         return { merged: false };
       }
     }
@@ -387,7 +387,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

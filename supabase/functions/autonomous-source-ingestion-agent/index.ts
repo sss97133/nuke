@@ -143,8 +143,9 @@ serve(async (req) => {
         console.log(`✅ ${candidate.domain}: ${ingestion.listings_queued} listings queued`);
 
       } catch (error: any) {
-        console.error(`❌ Error processing ${candidate.domain}:`, error.message);
-        results.errors.push(`${candidate.domain}: ${error.message}`);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error(`❌ Error processing ${candidate.domain}:`, errMsg);
+        results.errors.push(`${candidate.domain}: ${errMsg}`);
       }
     }
 
@@ -168,7 +169,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error?.message || String(error)
+        error: error instanceof Error ? error.message : String(error)
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );

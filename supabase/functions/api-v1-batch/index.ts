@@ -247,7 +247,7 @@ serve(async (req) => {
         result.vehicles.push({
           index: i,
           status: 'failed',
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -297,7 +297,7 @@ async function insertObservations(
 
   const { error } = await supabase.from("vehicle_observations").insert(obsRecords);
   if (error) {
-    console.error(`[batch] Failed to insert observations:`, error.message);
+    console.error(`[batch] Failed to insert observations:`, error instanceof Error ? error.message : String(error));
   }
 }
 
