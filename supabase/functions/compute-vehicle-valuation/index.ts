@@ -501,7 +501,10 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
     .eq("id", vehicleId)
     .maybeSingle();
 
-  if (vErr || !vehicle) {
+  if (vErr) {
+    return { error: `Vehicle lookup failed for ${vehicleId}: ${vErr.message || String(vErr)}`, vehicleId };
+  }
+  if (!vehicle) {
     return { error: `Vehicle not found: ${vehicleId}`, vehicleId };
   }
 

@@ -384,7 +384,10 @@ async function extractWithGoogleGemini(
 
   if (isImage) {
     // Fetch image and convert to base64
-    const imageResponse = await fetch(input)
+    const imgCtrl = new AbortController();
+    const imgTimeout = setTimeout(() => imgCtrl.abort(), 30000);
+    const imageResponse = await fetch(input, { signal: imgCtrl.signal })
+    clearTimeout(imgTimeout);
     const imageBuffer = await imageResponse.arrayBuffer()
     const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)))
     const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg'
@@ -499,7 +502,12 @@ async function extractWithOpenAI(
     throw new Error('No content in OpenAI response')
   }
 
-  const extracted = JSON.parse(content)
+  let extracted;
+  try {
+    extracted = JSON.parse(content);
+  } catch {
+    throw new Error(`Failed to parse OpenAI response as JSON: ${content.substring(0, 200)}`);
+  }
   return parseExtractionResult(extracted, isImage)
 }
 

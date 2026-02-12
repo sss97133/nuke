@@ -326,7 +326,7 @@ serve(async (req) => {
           // Rate limiting
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error: any) {
-          console.error(`Error scraping listing ${url}:`, error.message);
+          console.error(`Error scraping listing ${url}:`, error instanceof Error ? error.message : String(error));
           // Add basic listing even if scrape fails
           listings.push({
             url,
