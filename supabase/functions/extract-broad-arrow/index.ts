@@ -742,8 +742,8 @@ async function saveToDatabase(
     sale_price: extracted.sale_price,
     asking_price: extracted.estimate_high || null,
     sale_status: extracted.auction_status === 'sold' ? 'sold' :
-                 extracted.auction_status === 'not_sold' ? 'reserve_not_met' :
-                 extracted.auction_status === 'upcoming' ? 'available' : null,
+                 extracted.auction_status === 'not_sold' ? 'not_sold' :
+                 extracted.auction_status === 'upcoming' ? 'upcoming' : null,
     auction_outcome: extracted.auction_status === 'sold' ? 'sold' :
                      extracted.auction_status === 'not_sold' ? 'reserve_not_met' :
                      extracted.auction_status === 'withdrawn' ? 'withdrawn' : null,
