@@ -74,7 +74,7 @@ serve(async (req) => {
         }
         console.log(`[extract-vehicle-data-ai] Dedicated extractor failed, falling through to generic`)
       } catch (proxyErr: any) {
-        console.log(`[extract-vehicle-data-ai] Dedicated extractor error: ${proxyErr.message}`)
+        console.log(`[extract-vehicle-data-ai] Dedicated extractor error: ${proxyErr instanceof Error ? proxyErr.message : String(proxyErr)}`)
       }
     }
 
@@ -102,7 +102,7 @@ serve(async (req) => {
           console.log(`[extract-vehicle-data-ai] URL fetch failed: ${fetchRes.status}`)
         }
       } catch (fetchErr: any) {
-        console.log(`[extract-vehicle-data-ai] URL fetch error: ${fetchErr.message}`)
+        console.log(`[extract-vehicle-data-ai] URL fetch error: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`)
       }
     }
 
@@ -133,7 +133,7 @@ serve(async (req) => {
             console.log(`[extract-vehicle-data-ai] Firecrawl failed: ${fcRes.status}`)
           }
         } catch (fcErr: any) {
-          console.log(`[extract-vehicle-data-ai] Firecrawl error: ${fcErr.message}`)
+          console.log(`[extract-vehicle-data-ai] Firecrawl error: ${fcErr instanceof Error ? fcErr.message : String(fcErr)}`)
         }
       }
     }
@@ -201,13 +201,14 @@ serve(async (req) => {
         break;
       } catch (error: any) {
         lastError = error;
-        console.log(`[extract-vehicle-data-ai] ❌ ${provider} failed: ${error.message}`);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.log(`[extract-vehicle-data-ai] ❌ ${provider} failed: ${errMsg}`);
 
         // If it's a quota error, try next provider
-        if (error.message?.includes('quota') ||
-            error.message?.includes('insufficient') ||
-            error.message?.includes('rate_limit') ||
-            error.message?.includes('429')) {
+        if (errMsg?.includes('quota') ||
+            errMsg?.includes('insufficient') ||
+            errMsg?.includes('rate_limit') ||
+            errMsg?.includes('429')) {
           continue;
         }
 
@@ -490,7 +491,7 @@ serve(async (req) => {
           }
         }
       } catch (dbErr: any) {
-        console.error(`[extract-vehicle-data-ai] DB save error: ${dbErr.message}`)
+        console.error(`[extract-vehicle-data-ai] DB save error: ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`)
       }
     }
 

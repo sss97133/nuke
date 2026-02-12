@@ -258,7 +258,7 @@ serve(async (req) => {
         })
       }
 
-      throw new Error(`Direct HTML fetch failed: ${e.message}. BaT comments may require JavaScript rendering (Firecrawl needed).`)
+      throw new Error(`Direct HTML fetch failed: ${e instanceof Error ? e.message : String(e)}. BaT comments may require JavaScript rendering (Firecrawl needed).`)
     }
     
     // ⚠️ PRIORITY: Extract from embedded JSON comments array (BaT embeds comments as "comments":[{...}])
@@ -881,7 +881,7 @@ serve(async (req) => {
           ...(authToUse ? { 'Authorization': authToUse } : {})
         },
         body: JSON.stringify({ auction_event_id: eventId })
-      }).then(res => res.text().catch(() => {})).catch(e => console.error('Failed to trigger analysis:', e.message))
+      }).then(res => res.text().catch(() => {})).catch(e => console.error('Failed to trigger analysis:', e instanceof Error ? e.message : String(e)))
     }
 
     return new Response(JSON.stringify({

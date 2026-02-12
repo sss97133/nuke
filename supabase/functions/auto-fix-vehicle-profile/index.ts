@@ -200,7 +200,7 @@ Return ONLY JSON. Be specific about what you see.`
       max_tokens: 2000,
       messages: [userMessage]
     }),
-    signal: AbortSignal.timeout(120000),
+    signal: AbortSignal.timeout(60000),
   })
 
   if (!response.ok) {

@@ -514,9 +514,11 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
       basePrice = fallbackPrice;
       compCount = 0;
       compMethod = "self_price_fallback";
-    } else {
-      return { error: "No comparable sales data available", vehicleId };
     }
+  }
+
+  if (basePrice <= 0) {
+    return { error: "No comparable sales data available and no fallback price", vehicleId };
   }
 
   // Determine price tier
@@ -620,7 +622,7 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
   }
 
   // Denormalize to vehicles table
-  await supabase
+  const { error: denormErr } = await supabase
     .from("vehicles")
     .update({
       nuke_estimate: estimatedValue,
@@ -630,6 +632,10 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
       valuation_calculated_at: result.calculated_at,
     })
     .eq("id", vehicleId);
+
+  if (denormErr) {
+    console.error(`[compute-valuation] Denormalization error for ${vehicleId}:`, denormErr);
+  }
 
   // Log to projection_outcomes for feedback loop
   if (estimatedValue > 0) {
@@ -759,7 +765,7 @@ serve(async (req) => {
           results.push(result);
         }
       } catch (e: any) {
-        errors.push({ vehicleId: vid, error: e.message });
+        errors.push({ vehicleId: vid, error: e instanceof Error ? e.message : String(e) });
       }
     }
 
