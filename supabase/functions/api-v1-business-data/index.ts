@@ -120,8 +120,8 @@ async function getSubmissions(
   businessId: string,
   params: URLSearchParams
 ): Promise<{ data: any[]; total: number; pagination: any }> {
-  const limit = Math.min(parseInt(params.get("limit") || "50"), 100);
-  const offset = parseInt(params.get("offset") || "0");
+  const limit = Math.min(parseInt(params.get("limit") || "50", 10), 100);
+  const offset = parseInt(params.get("offset") || "0", 10);
   const since = params.get("since"); // ISO date
   const until = params.get("until"); // ISO date
   const vehicleId = params.get("vehicle_id");

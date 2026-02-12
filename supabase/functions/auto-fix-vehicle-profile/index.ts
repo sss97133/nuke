@@ -258,7 +258,7 @@ async function decodeVIN(vin: string): Promise<any> {
     }
 
     return {
-      year: parseInt(getValue('Model Year')) || null,
+      year: parseInt(getValue('Model Year'), 10) || null,
       make: getValue('Make') || null,
       model: getValue('Model') || null,
       body_style: getValue('Body Class') || null,

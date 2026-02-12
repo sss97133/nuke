@@ -72,7 +72,7 @@ export class NHTSAAdapter implements ServiceAdapter {
           fields: {
             make: fields.make,
             model: fields.model,
-            year: parseInt(fields.model_year) || vehicle.year,
+            year: parseInt(fields.model_year, 10) || vehicle.year,
             body_style: fields.body_class,
             engine_type: fields.engine_model || fields.engine_configuration,
             manufacturer: fields.manufacturer_name,

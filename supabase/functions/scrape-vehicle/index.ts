@@ -88,7 +88,7 @@ function extractVehiclePrice(text: string): number | null {
     const euroMatch = cleaned.match(/^(\d+)\.(\d{3})$/);
     if (euroMatch) {
       // This is European format (e.g., "14.500" = 14500)
-      return parseInt(euroMatch[1] + euroMatch[2]);
+      return parseInt(euroMatch[1] + euroMatch[2], 10);
     }
     
     // Handle standard format: $14,500 (comma as thousands separator)
@@ -102,16 +102,16 @@ function extractVehiclePrice(text: string): number | null {
     // Handle comma-only (thousands separator)
     if (cleaned.includes(',')) {
       cleaned = cleaned.replace(/,/g, '');
-      return parseInt(cleaned);
+      return parseInt(cleaned, 10);
     }
-    
+
     // Handle period-only - need to determine if it's decimal or thousands separator
     if (cleaned.includes('.')) {
       const parts = cleaned.split('.');
       // If exactly 3 digits after period, likely thousands separator (e.g., "14.500")
       if (parts.length === 2 && parts[1].length === 3 && parts[1].match(/^\d{3}$/)) {
         // Thousands separator
-        return parseInt(parts[0] + parts[1]);
+        return parseInt(parts[0] + parts[1], 10);
       } else {
         // Decimal separator, round to integer
         return Math.round(parseFloat(cleaned));
@@ -119,7 +119,7 @@ function extractVehiclePrice(text: string): number | null {
     }
     
     // No separators, just digits
-    return parseInt(cleaned);
+    return parseInt(cleaned, 10);
   };
   
   // First, try to find structured price fields (especially "Asking" which is common on Craigslist)
@@ -1815,7 +1815,7 @@ serve(async (req) => {
       if (data.title) {
         const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
         if (yearMatch) {
-          data.year = parseInt(yearMatch[0])
+          data.year = parseInt(yearMatch[0], 10)
         }
 
         // Simple make/model extraction
@@ -1898,7 +1898,7 @@ serve(async (req) => {
       if (data.title) {
         const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
         if (yearMatch) {
-          data.year = parseInt(yearMatch[0])
+          data.year = parseInt(yearMatch[0], 10)
         }
 
         const parts = data.title.split(' ')
@@ -1967,7 +1967,7 @@ serve(async (req) => {
         
         // First part should be year
         if (slugParts.length > 0 && /^(19|20)\d{2}$/.test(slugParts[0])) {
-          data.year = parseInt(slugParts[0])
+          data.year = parseInt(slugParts[0], 10)
           
           // Rest is make and model
           if (slugParts.length > 1) {
@@ -2044,7 +2044,7 @@ serve(async (req) => {
       if (data.title && (!data.year || !data.make || !data.model)) {
         const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
         if (yearMatch && !data.year) {
-          data.year = parseInt(yearMatch[0])
+          data.year = parseInt(yearMatch[0], 10)
         }
 
         const parts = data.title.split(/\s+/)
@@ -2570,7 +2570,7 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
 function extractImageSize(url: string): number | null {
   const sizeMatch = url.match(/(\d+)x(\d+)/)
   if (sizeMatch) {
-    return parseInt(sizeMatch[1]) * parseInt(sizeMatch[2])
+    return parseInt(sizeMatch[1], 10) * parseInt(sizeMatch[2], 10)
   }
   return null
 }

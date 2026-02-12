@@ -75,7 +75,7 @@ function extractFromRawData(item: any): ExtractedVehicle {
   const title = item.listing_title || "";
   const titleMatch = title.match(/(\d+)?\s*([A-Za-z\s]+?)\s+(.+?)(?:\s*[-–]|$)/);
 
-  const year = parseInt(features.modelYear || item.listing_year || 0) || null;
+  const year = parseInt(features.modelYear || item.listing_year || 0, 10) || null;
   const { value: mileage, unit: mileageUnit } = parseMileage(features.mileage);
 
   // Extract make and model from title if not in raw_data

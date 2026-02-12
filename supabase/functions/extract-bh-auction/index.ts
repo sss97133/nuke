@@ -216,7 +216,7 @@ function extractTitle(text: string): { title: string | null; year: number | null
   const viewMoreMatch = text.match(/VIEW\s+MORE\s+((19|20)\d{2})\s+([A-Za-z][A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-\[\]()]+)*?)(?=\s*(?:Tommykaira|Maintained|Owned|Retains|Debuting|Based|One\s+of|This|The))/i);
 
   if (viewMoreMatch) {
-    const year = parseInt(viewMoreMatch[1]);
+    const year = parseInt(viewMoreMatch[1], 10);
     const fullName = viewMoreMatch[3].trim();
 
     // Parse make and model from full name
@@ -234,7 +234,7 @@ function extractTitle(text: string): { title: string | null; year: number | null
   // Fallback: Look for "LOTS {year} {make} {model} VIEW" pattern
   const lotsMatch = text.match(/LOTS\s+((19|20)\d{2})\s+([A-Za-z][A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-\[\]()]+)*?)\s+VIEW/i);
   if (lotsMatch) {
-    const year = parseInt(lotsMatch[1]);
+    const year = parseInt(lotsMatch[1], 10);
     const fullName = lotsMatch[3].trim();
     const parts = fullName.split(/\s+/);
     let make = parts[0];
@@ -248,7 +248,7 @@ function extractTitle(text: string): { title: string | null; year: number | null
   // Try looking for title in the format "RESULT {year} {make} {model}" at end of page
   const resultMatch = text.match(/RESULT\s+((19|20)\d{2})\s+([A-Za-z][A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-\[\]()]+)*?)\s+PRIVACY/i);
   if (resultMatch) {
-    const year = parseInt(resultMatch[1]);
+    const year = parseInt(resultMatch[1], 10);
     const fullName = resultMatch[3].trim();
     const parts = fullName.split(/\s+/);
     let make = parts[0];
@@ -263,7 +263,7 @@ function extractTitle(text: string): { title: string | null; year: number | null
   const headingMatch = text.match(/(?:^|\s)#\s*((19|20)\d{2})\s+([A-Za-z][A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-\[\]()]+)*?)(?=\s+VIEW|\s*\||\s*$|\s+Formerly|\s+Comes|\s+One\s+of|\s+Fully|\s+In\s+the)/i) ||
     text.match(/(?:^|\s)((19|20)\d{2})\s+([A-Za-z][A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-\[\]()]+)*?)\s+LOT\s+NUMBER/i);
   if (headingMatch) {
-    const year = parseInt(headingMatch[1]);
+    const year = parseInt(headingMatch[1], 10);
     const fullName = headingMatch[3].trim();
     const parts = fullName.split(/\s+/);
     let make = parts[0];

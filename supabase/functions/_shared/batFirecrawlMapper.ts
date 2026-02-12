@@ -356,7 +356,7 @@ export function extractBasicBatDataFromHtml(html: string, batUrl: string): Parti
     data.title = titleMatch[1].trim();
     const vehicleMatch = data.title.match(/^(\d{4})\s+([A-Za-z-]+)\s+(.+)$/);
     if (vehicleMatch) {
-      data.year = parseInt(vehicleMatch[1]);
+      data.year = parseInt(vehicleMatch[1], 10);
       data.make = vehicleMatch[2];
       const modelParts = vehicleMatch[3].split(' ');
       data.model = modelParts.slice(0, 2).join(' ');

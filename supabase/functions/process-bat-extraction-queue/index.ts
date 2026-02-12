@@ -94,6 +94,7 @@ serve(async (req) => {
             `${supabaseUrl}/functions/v1/extract-bat-core`,
             {
               method: 'POST',
+              signal: AbortSignal.timeout(300_000),
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${invokeJwt}`,
