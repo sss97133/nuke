@@ -49,12 +49,10 @@ serve(async (req) => {
       // Use SQL to efficiently find vehicles needing computation
       const query = force
         ? `SELECT vehicle_id FROM clean_vehicle_prices WHERE best_price > 0 LIMIT ${batchSize}`
-        : `(SELECT cvp.vehicle_id FROM clean_vehicle_prices cvp
-            LEFT JOIN nuke_estimates ne ON ne.vehicle_id = cvp.vehicle_id
-            WHERE cvp.best_price > 0 AND ne.id IS NULL
-            LIMIT ${batchSize})
-           UNION ALL
-           (SELECT vehicle_id FROM nuke_estimates WHERE is_stale = true LIMIT ${Math.floor(batchSize / 5)})`;
+        : `SELECT vehicle_id FROM clean_vehicle_prices cvp
+            WHERE cvp.best_price > 0
+            AND NOT EXISTS (SELECT 1 FROM nuke_estimates ne WHERE ne.vehicle_id = cvp.vehicle_id)
+            LIMIT ${batchSize}`;
 
       try {
         const { data: rows } = await supabase.rpc("execute_sql", { query });
