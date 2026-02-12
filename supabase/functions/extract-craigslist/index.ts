@@ -117,7 +117,7 @@ async function extractCraigslistListing(url: string): Promise<CraigslistExtracte
 
   // Extract year from HTML attributes (it's a span class, not attr class)
   const yearStr = extractSpanValue(html, 'year');
-  const year = yearStr ? parseInt(yearStr) : null;
+  const year = yearStr ? parseInt(yearStr, 10) : null;
 
   // Extract make/model from makemodel attribute (it's a span class, not attr class)
   const makeModelStr = extractSpanValue(html, 'makemodel') || '';

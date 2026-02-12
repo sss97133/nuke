@@ -213,7 +213,7 @@ Be strict - if you cannot clearly identify the vehicle or if there's any doubt, 
       // Handle rate limits (429) with retry-after
       if (response.status === 429) {
         const retryAfter = response.headers.get('retry-after') || '60'
-        const delay = parseInt(retryAfter) * 1000
+        const delay = parseInt(retryAfter, 10) * 1000
         
         if (attempt < maxRetries) {
           console.log(`Rate limited, waiting ${retryAfter}s before retry ${attempt + 1}/${maxRetries}`)

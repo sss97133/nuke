@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
 
       } else {
         // Individual vehicles
-        const yearNum = parseInt(year);
+        const yearNum = parseInt(year, 10);
         const { data: vehicles, error } = await supabase
           .from("vehicles")
           .select("id, listing_title, bat_listing_title, year, make, model, sale_price, sold_price")
@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
 
       } else {
         // Individual vehicles
-        const yearNum = parseInt(year);
+        const yearNum = parseInt(year, 10);
         const { data: vehicles, error } = await supabase
           .from("vehicles")
           .select("id, listing_title, bat_listing_title, year, make, model, sale_price, sold_price")
@@ -338,7 +338,7 @@ Deno.serve(async (req) => {
 
     } else {
       // Individual vehicles
-      const yearNum = parseInt(year);
+      const yearNum = parseInt(year, 10);
       const sourceVariations = getSourceVariations(source);
 
       const { data: vehicles, error } = await supabase

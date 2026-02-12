@@ -491,5 +491,5 @@ async function trackToolUsage(supabase: any, tools_and_supplies: any[], user_id:
 function extractTimestampFromUrl(url: string): number {
   // Extract timestamp from URL like: .../1758472168539_njfrm5.jpeg
   const match = url.match(/(\d{13})_/)
-  return match ? parseInt(match[1]) : Date.now()
+  return match ? parseInt(match[1], 10) : Date.now()
 }

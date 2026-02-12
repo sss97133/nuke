@@ -134,14 +134,14 @@ function parseTitle(title: string | null): { year: number | null; make: string |
   // Clean the title
   const cleaned = title
     .replace(/^lot\s*\d+\s*[-:.]?\s*/i, '')  // Remove "Lot 123 - " prefix
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, '&')
     .trim();
 
   // Extract year (4 digits starting with 19 or 20)
   const yearMatch = cleaned.match(/\b(19|20)\d{2}\b/);
-  const year = yearMatch ? parseInt(yearMatch[0]) : null;
+  const year = yearMatch ? parseInt(yearMatch[0], 10) : null;
 
   if (!year) return { year: null, make: null, model: null };
 
@@ -367,8 +367,8 @@ function extractImages(html: string, markdown: string): string[] {
 
   // Sort by image number for consistent ordering
   images.sort((a, b) => {
-    const numA = parseInt(a.match(/-(\d+)\.jpg/)?.[1] || '0');
-    const numB = parseInt(b.match(/-(\d+)\.jpg/)?.[1] || '0');
+    const numA = parseInt(a.match(/-(\d+)\.jpg/)?.[1] || '0', 10);
+    const numB = parseInt(b.match(/-(\d+)\.jpg/)?.[1] || '0', 10);
     return numA - numB;
   });
 

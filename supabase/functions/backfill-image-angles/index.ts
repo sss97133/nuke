@@ -972,7 +972,7 @@ Be precise and consistent. If uncertain, use lower confidence scores.`;
       if (openaiResponse.status === 429) {
         const retryAfter = openaiResponse.headers.get('retry-after');
         const delay = retryAfter 
-          ? parseInt(retryAfter) * 1000 
+          ? parseInt(retryAfter, 10) * 1000
           : baseDelay * Math.pow(2, retries); // Exponential backoff: 1s, 2s, 4s, 8s, 16s
         
         if (retries < maxRetries) {

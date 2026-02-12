@@ -134,7 +134,7 @@ async function confirmVehicle(
 ): Promise<{ vehicleId: string | null; vehicleName: string | null; message: string }> {
 
   // Check if it's a number selection
-  const num = parseInt(input.trim());
+  const num = parseInt(input.trim(), 10);
   if (!isNaN(num) && num >= 1 && num <= availableVehicles.length) {
     const v = availableVehicles[num - 1];
     return {
@@ -164,7 +164,7 @@ async function confirmVehicle(
   let query = supabase.from("vehicles").select("id, year, make, model, vin").limit(5);
 
   if (yearMatch) {
-    query = query.eq("year", parseInt(yearMatch[0]));
+    query = query.eq("year", parseInt(yearMatch[0], 10));
   }
 
   // Check for make/model keywords

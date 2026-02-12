@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
     // Specific assignment: #1=2
     const specific = body.match(/^#(\d+)=([0-5])$/);
     if (specific) {
-      const photoIdx = parseInt(specific[1]) - 1;
+      const photoIdx = parseInt(specific[1], 10) - 1;
       const vehicleNum = specific[2];
 
       if (photoIdx < 0 || photoIdx >= photoIds.length) {

@@ -49,7 +49,7 @@ function extractEbayIndex(html: string, snapshotUrl: string): IndexVehicle[] {
   const titles: string[] = [];
   let match;
   while ((match = titlePattern.exec(html)) !== null) {
-    const year = parseInt(match[1]);
+    const year = parseInt(match[1], 10);
     const make = match[2].trim();
     const model = match[3].trim();
 
@@ -75,7 +75,7 @@ function extractEbayIndex(html: string, snapshotUrl: string): IndexVehicle[] {
     if (parts) {
       const vehicle: IndexVehicle = {
         title,
-        year: parseInt(parts[1]),
+        year: parseInt(parts[1], 10),
         make: parts[2],
         model: parts[3],
         price: prices[i] || undefined,
@@ -108,7 +108,7 @@ function extractCraigslistIndex(html: string, snapshotUrl: string): IndexVehicle
   let match;
   while ((match = listingPattern.exec(html)) !== null) {
     const price = parseFloat(match[1].replace(/,/g, ''));
-    const year = parseInt(match[2]);
+    const year = parseInt(match[2], 10);
     const make = match[3].trim();
     const model = match[4].trim();
 
@@ -126,7 +126,7 @@ function extractCraigslistIndex(html: string, snapshotUrl: string): IndexVehicle
   // Also try to extract from title patterns
   const titlePattern = /(19[4-9][0-9]|20[0-2][0-9])\s+([A-Za-z]+)\s+([A-Za-z0-9]+)/g;
   while ((match = titlePattern.exec(html)) !== null) {
-    const year = parseInt(match[1]);
+    const year = parseInt(match[1], 10);
     const make = match[2].trim();
     const model = match[3].trim();
 

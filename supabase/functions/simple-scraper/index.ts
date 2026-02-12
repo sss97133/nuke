@@ -202,7 +202,7 @@ serve(async (req) => {
       const vin = url.includes('bringatrailer.com') ? extractVin(html) : null
       const yearMatch = title.match(/\b(19|20)\d{2}\b/)
       if (yearMatch) {
-        year = parseInt(yearMatch[0])
+        year = parseInt(yearMatch[0], 10)
       }
 
       // Common make patterns

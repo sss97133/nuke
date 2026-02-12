@@ -154,7 +154,7 @@ async function decodeVINWithNHTSA(vin: string): Promise<{
 
     return {
       valid: isValid,
-      year: year ? parseInt(year) : null,
+      year: year ? parseInt(year, 10) : null,
       make,
       model,
       bodyClass,
@@ -195,7 +195,7 @@ function validateVIN(vin: string): { valid: boolean; normalized: string; errors:
     let sum = 0;
     for (let i = 0; i < 17; i++) {
       const c = normalized[i];
-      const val = /\d/.test(c) ? parseInt(c) : trans[c] || 0;
+      const val = /\d/.test(c) ? parseInt(c, 10) : trans[c] || 0;
       sum += val * weights[i];
     }
     const check = sum % 11;
@@ -614,7 +614,7 @@ serve(async (req) => {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: chatId, message_id: parseInt(deleteMessageId) })
+          body: JSON.stringify({ chat_id: chatId, message_id: parseInt(deleteMessageId, 10) })
         }
       );
       const result = await response.json();
@@ -689,7 +689,7 @@ serve(async (req) => {
         headers: { "Content-Type": "application/json" }
       });
     }
-    const result = await processPhoto(fileUrl, 0, parseInt(testUserId), "test");
+    const result = await processPhoto(fileUrl, 0, parseInt(testUserId, 10), "test");
     return new Response(JSON.stringify({ file_url: fileUrl, result }), {
       headers: { "Content-Type": "application/json" }
     });
