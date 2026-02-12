@@ -9,7 +9,12 @@ const corsHeaders = {
 };
 
 function normalizeUrl(raw: string): string {
-  const u = new URL(raw);
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw new Error(`Invalid URL: ${raw.slice(0, 200)}`);
+  }
   u.hash = '';
   // Keep query string (Classic uses filters sometimes) but normalize www + trailing slash for detail pages.
   u.hostname = u.hostname.replace(/^www\./, '');

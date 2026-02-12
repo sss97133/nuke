@@ -169,7 +169,12 @@ async function extractWebsiteContent(url: string): Promise<{
   contactPage: string | null;
   keyPages: Array<{ url: string; content: string; title: string }>;
 }> {
-  const baseUrl = new URL(url);
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(url);
+  } catch {
+    throw new Error(`Invalid URL for website extraction: ${url.slice(0, 200)}`);
+  }
   const origin = baseUrl.origin;
 
   // Fetch homepage

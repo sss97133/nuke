@@ -46,7 +46,7 @@ async function sendTwilioSMS(to: string, body: string): Promise<any> {
     throw new Error(`Twilio error: ${error}`)
   }
 
-  return await response.json()
+  return await response.json().catch(() => ({ error: `Twilio non-JSON response: ${response.status}` }))
 }
 
 Deno.serve(async (req) => {

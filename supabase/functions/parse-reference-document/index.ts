@@ -222,8 +222,8 @@ Return valid JSON only.`;
     })
   });
   
-  const data = await response.json();
-  const rawContent = data.choices[0]?.message?.content;
+  const data = await response.json().catch(() => ({ error: `OpenAI non-JSON response: ${response.status}` }));
+  const rawContent = data.choices?.[0]?.message?.content;
   if (!rawContent) throw new Error('Empty response from OpenAI');
   try {
     return JSON.parse(rawContent);

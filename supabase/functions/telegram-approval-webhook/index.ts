@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     const response = await fetch(
       `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`
     );
-    const result = await response.json();
+    const result = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
     return new Response(JSON.stringify({ webhook_url: webhookUrl, result }), {
       headers: { "Content-Type": "application/json" },
     });
