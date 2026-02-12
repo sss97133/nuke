@@ -140,10 +140,11 @@ const CONCEPTS: Record<string, ConceptDef> = {
     detail: 'Owns the property AND the events hosted there. Triple-engine returns: real estate appreciation, vehicle storage fees, and event revenue. The automotive compound model.',
   },
   custom: {
-    title: 'Custom Structure',
+    title: 'Curator-Defined Structure',
     category: 'contract_type',
-    summary: 'Bespoke investment structure with mixed asset classes.',
-    detail: 'May combine vehicles, real estate, events, bonds, equity stakes, and organizational positions. Structure defined by curator. Most flexible but requires careful due diligence.',
+    summary: 'Bespoke portfolio assembled by the curator across any asset class.',
+    detail: 'The curator hand-picks the composition — vehicles, real estate, events, bonds, equity stakes, and organizational positions in any combination. No template constraints. The thesis, allocation strategy, and rebalancing logic are defined in the offering documents. Think of it as a blank canvas: the curator is the architect, the contract terms are the blueprint.',
+    requirements: ['Curator must define investment thesis', 'Offering documents must specify asset class limits', 'Rebalancing rules required'],
   },
 
   // Transparency

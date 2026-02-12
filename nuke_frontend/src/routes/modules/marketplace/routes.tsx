@@ -14,12 +14,14 @@ import DebugMarketSegment from '../../../pages/DebugMarketSegment';
 import MarketMovement from '../../../pages/MarketMovement';
 import MarketDashboard from '../../../pages/MarketDashboard';
 import ContractStation from '../../../pages/ContractStation';
+import MarketMap from '../../../components/market/MarketMap';
 
 const MarketplaceModuleRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<MarketDashboard />} />
       <Route path="/dashboard" element={<MarketDashboard />} />
+      <Route path="/map" element={<MarketMap />} />
       <Route path="/browse" element={<BrowseInvestments />} />
       <Route path="/exchange" element={<MarketExchange />} />
       <Route path="/exchange/:symbol" element={<MarketFundDetail />} />

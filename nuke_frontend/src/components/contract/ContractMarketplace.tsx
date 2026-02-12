@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyFromCents } from '../../utils/currency';
+import HoverCard, { HoverStat } from './HoverCard';
+import DrillDown from './DrillDown';
 
 interface ContractMarketplaceProps {
   curatorId?: string;
@@ -222,91 +224,211 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
 
                 <div className="card-body">
                   <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '16px', alignItems: 'center' }}>
+                    {/* Identity */}
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                         <h3 style={{ margin: 0, fontSize: '12pt', fontWeight: 900 }}>
                           {contract.contract_name}
                         </h3>
-                        <span style={{
-                          padding: '2px 8px',
-                          background: contract.status === 'active' ? 'var(--success, #10b981)' :
-                                     contract.status === 'draft' ? 'var(--text-muted)' : 'var(--border)',
-                          color: 'var(--white)',
-                          borderRadius: '4px',
-                          fontSize: '7pt',
-                          fontWeight: 700,
-                          textTransform: 'uppercase'
-                        }}>
-                          {contract.status}
-                        </span>
+                        <HoverCard content={
+                          <div style={{ padding: '10px' }}>
+                            <div style={{ fontWeight: 900, marginBottom: '4px', textTransform: 'uppercase' }}>{contract.status}</div>
+                            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                              {contract.status === 'active' ? 'Accepting subscriptions. NAV updated daily.' :
+                               contract.status === 'approved' ? 'Approved and ready for investment.' :
+                               contract.status === 'draft' ? 'Not yet published. Only visible to curator.' :
+                               'Contract is ' + contract.status}
+                            </div>
+                          </div>
+                        } width={220}>
+                          <span style={{
+                            padding: '2px 8px',
+                            background: contract.status === 'active' ? 'var(--success, #10b981)' :
+                                       contract.status === 'draft' ? 'var(--text-muted)' : 'var(--border)',
+                            color: 'var(--white)',
+                            borderRadius: '4px',
+                            fontSize: '7pt',
+                            fontWeight: 700,
+                            textTransform: 'uppercase'
+                          }}>
+                            {contract.status}
+                          </span>
+                        </HoverCard>
                       </div>
-                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                        {contract.contract_symbol} • {contract.contract_type.toUpperCase()}
+                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700 }}>{contract.contract_symbol}</span>
+                        <span>•</span>
+                        <DrillDown concept={contract.contract_type} value={contract.contract_type}>
+                          {contract.contract_type.replace('_', ' ').toUpperCase()}
+                        </DrillDown>
+                        {contract.regulatory_status && (
+                          <>
+                            <span>•</span>
+                            <DrillDown concept={contract.regulatory_status} value={contract.regulatory_status}>
+                              {contract.regulatory_status.replace('_', ' ').toUpperCase()}
+                            </DrillDown>
+                          </>
+                        )}
                       </div>
                       {contract.curator_name && (
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                          Curated by {contract.curator_name}
-                        </div>
+                        <HoverCard content={
+                          <div style={{ padding: '10px' }}>
+                            <div style={{ fontWeight: 900, marginBottom: '4px' }}>{contract.curator_name}</div>
+                            <HoverStat label="Role" value="Curator / Manager" />
+                            <HoverStat label="Contracts" value={contracts.filter(c => c.curator_name === contract.curator_name).length} />
+                            {contract.curator_bio && <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '6px' }}>{contract.curator_bio}</div>}
+                            {contract.curator_credentials?.length > 0 && (
+                              <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                {contract.curator_credentials.map((c: string, i: number) => (
+                                  <span key={i} style={{ padding: '1px 6px', background: 'var(--primary)', color: '#fff', borderRadius: '3px', fontSize: '7pt', fontWeight: 700 }}>{c}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        } width={240}>
+                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', cursor: 'default', borderBottom: '1px dotted var(--text-muted)', display: 'inline' }}>
+                            Curated by {contract.curator_name}
+                          </div>
+                        </HoverCard>
                       )}
                       {contract.contract_description && (
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '12px' }}>
-                          {contract.contract_description.slice(0, 120)}{contract.contract_description.length > 120 ? '...' : ''}
-                        </div>
+                        <HoverCard content={
+                          <div style={{ padding: '10px' }}>
+                            <div style={{ fontWeight: 700, marginBottom: '6px' }}>{contract.contract_name}</div>
+                            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                              {contract.contract_description}
+                            </div>
+                          </div>
+                        } width={380}>
+                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '12px', cursor: 'default' }}>
+                            {contract.contract_description.slice(0, 100)}{contract.contract_description.length > 100 ? '...' : ''}
+                          </div>
+                        </HoverCard>
                       )}
                     </div>
 
-                    <div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>AUM</div>
-                      <div style={{ fontSize: '12pt', fontWeight: 900 }}>
-                        {formatCurrencyFromCents(contract.total_assets_under_management_cents)}
-                      </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {contract.total_investors || 0} investors
-                      </div>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Performance</div>
-                      <div style={{ fontSize: '12pt', fontWeight: 900, color: contract.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
-                        {formatPct(contract.total_return_pct)}
-                      </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {contract.annualized_return_pct ? formatPct(contract.annualized_return_pct) + ' annualized' : 'N/A'}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Terms</div>
-                      <div style={{ fontSize: '9pt', fontWeight: 700 }}>
-                        Min: {formatCurrencyFromCents(contract.minimum_investment_cents)}
-                      </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {contract.management_fee_pct}% mgmt fee
-                      </div>
-                      {contract.transparency_level && (
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase' }}>
-                          {contract.transparency_level} transparency
+                    {/* AUM */}
+                    <HoverCard content={
+                      <div style={{ padding: '10px' }}>
+                        <div style={{ fontWeight: 900, marginBottom: '6px' }}>Assets Under Management</div>
+                        <HoverStat label="Total AUM" value={formatCurrencyFromCents(contract.total_assets_under_management_cents)} />
+                        <HoverStat label="Investors" value={contract.total_investors || 0} />
+                        <HoverStat label="NAV/Share" value={contract.current_nav_cents ? formatCurrencyFromCents(contract.current_nav_cents) : '—'} />
+                        <HoverStat label="Shares Outstanding" value={contract.total_shares_authorized?.toLocaleString() || '—'} />
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
+                          AUM = total value of all underlying assets managed by this contract.
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    } width={260}>
+                      <div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>AUM</div>
+                        <div style={{ fontSize: '12pt', fontWeight: 900 }}>
+                          {formatCurrencyFromCents(contract.total_assets_under_management_cents)}
+                        </div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {contract.total_investors || 0} investors
+                        </div>
+                      </div>
+                    </HoverCard>
+
+                    {/* Performance */}
+                    <HoverCard content={
+                      <div style={{ padding: '10px' }}>
+                        <div style={{ fontWeight: 900, marginBottom: '6px' }}>Performance Metrics</div>
+                        <HoverStat label="Total Return" value={formatPct(contract.total_return_pct)} color={contract.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
+                        <HoverStat label="Annualized" value={contract.annualized_return_pct ? formatPct(contract.annualized_return_pct) : '—'} />
+                        {contract.volatility_pct != null && <HoverStat label="Volatility" value={`${contract.volatility_pct.toFixed(2)}%`} />}
+                        {contract.sharpe_ratio != null && <HoverStat label="Sharpe Ratio" value={contract.sharpe_ratio.toFixed(2)} />}
+                        {contract.max_drawdown_pct != null && <HoverStat label="Max Drawdown" value={`${contract.max_drawdown_pct.toFixed(2)}%`} color="var(--danger, #ef4444)" />}
+                        {contract.target_returns_pct && <HoverStat label="Target Return" value={`${contract.target_returns_pct}%`} />}
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
+                          Past performance does not guarantee future results.
+                        </div>
+                      </div>
+                    } width={260}>
+                      <div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Performance</div>
+                        <div style={{ fontSize: '12pt', fontWeight: 900, color: contract.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
+                          {formatPct(contract.total_return_pct)}
+                        </div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {contract.annualized_return_pct ? formatPct(contract.annualized_return_pct) + ' ann.' : 'N/A'}
+                        </div>
+                      </div>
+                    </HoverCard>
+
+                    {/* Terms */}
+                    <HoverCard content={
+                      <div style={{ padding: '10px' }}>
+                        <div style={{ fontWeight: 900, marginBottom: '6px' }}>Investment Terms</div>
+                        <HoverStat label="Minimum" value={formatCurrencyFromCents(contract.minimum_investment_cents)} />
+                        {contract.maximum_investment_cents && <HoverStat label="Maximum" value={formatCurrencyFromCents(contract.maximum_investment_cents)} />}
+                        <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0', paddingTop: '4px' }}>
+                          <div style={{ fontWeight: 700, fontSize: '7pt', textTransform: 'uppercase', marginBottom: '4px', color: 'var(--text-muted)' }}>Fee Structure</div>
+                          <HoverStat label="Management" value={`${contract.management_fee_pct}% annually`} />
+                          {contract.performance_fee_pct > 0 && <HoverStat label="Performance" value={`${contract.performance_fee_pct}%`} />}
+                          <HoverStat label="Transaction" value={`${contract.transaction_fee_pct}%`} />
+                          {contract.setup_fee_cents > 0 && <HoverStat label="Setup" value={formatCurrencyFromCents(contract.setup_fee_cents)} />}
+                          {contract.early_exit_fee_pct > 0 && <HoverStat label="Early Exit" value={`${contract.early_exit_fee_pct}%`} color="var(--danger, #ef4444)" />}
+                        </div>
+                        <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0', paddingTop: '4px' }}>
+                          <HoverStat label="Liquidity" value={contract.liquidity_type?.replace('_', ' ')} />
+                          {contract.lockup_period_days && <HoverStat label="Lockup" value={`${contract.lockup_period_days} days`} />}
+                          {contract.redemption_notice_days > 0 && <HoverStat label="Notice Period" value={`${contract.redemption_notice_days} days`} />}
+                        </div>
+                        {contract.risk_level && (
+                          <HoverStat label="Risk Level" value={contract.risk_level.toUpperCase()} color={
+                            contract.risk_level === 'conservative' ? 'var(--success, #10b981)' :
+                            contract.risk_level === 'moderate' ? '#f59e0b' :
+                            'var(--danger, #ef4444)'
+                          } />
+                        )}
+                      </div>
+                    } width={260}>
+                      <div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Terms</div>
+                        <div style={{ fontSize: '9pt', fontWeight: 700 }}>
+                          Min: {formatCurrencyFromCents(contract.minimum_investment_cents)}
+                        </div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {contract.management_fee_pct}% mgmt{contract.performance_fee_pct > 0 ? ` / ${contract.performance_fee_pct}% perf` : ''}
+                        </div>
+                        {contract.risk_level && (
+                          <div style={{ fontSize: '7pt', marginTop: '2px', fontWeight: 700, textTransform: 'uppercase',
+                            color: contract.risk_level === 'conservative' ? 'var(--success, #10b981)' : contract.risk_level === 'moderate' ? '#f59e0b' : 'var(--danger, #ef4444)' }}>
+                            {contract.risk_level}
+                          </div>
+                        )}
+                      </div>
+                    </HoverCard>
                   </div>
 
+                  {/* Tags with hovers */}
                   {contract.tags && contract.tags.length > 0 && (
                     <div style={{ display: 'flex', gap: '4px', marginTop: '12px', flexWrap: 'wrap' }}>
                       {contract.tags.map((tag: string, idx: number) => (
-                        <span
-                          key={idx}
-                          style={{
-                            padding: '2px 8px',
-                            background: 'var(--surface)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '4px',
-                            fontSize: '7pt',
-                            color: 'var(--text-muted)'
-                          }}
-                        >
-                          {tag}
-                        </span>
+                        <HoverCard key={idx} content={
+                          <div style={{ padding: '8px' }}>
+                            <div style={{ fontWeight: 700, marginBottom: '4px' }}>#{tag}</div>
+                            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                              {contracts.filter(c => c.tags?.includes(tag)).length} contract{contracts.filter(c => c.tags?.includes(tag)).length !== 1 ? 's' : ''} with this tag
+                            </div>
+                          </div>
+                        } width={180} delay={200}>
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: '4px',
+                              fontSize: '7pt',
+                              color: 'var(--text-muted)',
+                              cursor: 'default',
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        </HoverCard>
                       ))}
                     </div>
                   )}

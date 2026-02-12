@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import App from './App';
+import SubdomainRouter from './SubdomainRouter';
 import ErrorBoundary from './components/util/ErrorBoundary';
 
 // Recover from deploy drift where a cached entry bundle tries to import a now-missing chunk.
@@ -39,7 +39,7 @@ window.addEventListener('unhandledrejection', (e) => {
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <SubdomainRouter />
     </ErrorBoundary>
   </React.StrictMode>
 );

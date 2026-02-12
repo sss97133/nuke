@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrencyFromCents } from '../../utils/currency';
-import { ChevronDown, ChevronRight, ExternalLink, Shield, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Shield, AlertTriangle, User, Bot, Code, Briefcase } from 'lucide-react';
 import DrillDown from './DrillDown';
+import HoverCard, { HoverStat } from './HoverCard';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -43,6 +44,10 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [investorData, setInvestorData] = useState<any>(null);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [curatorProfile, setCuratorProfile] = useState<any>(null);
+  const [curatorContracts, setCuratorContracts] = useState<any[]>([]);
+  const [curatorStats, setCuratorStats] = useState<any>(null);
+  const [agentInfo, setAgentInfo] = useState<any>(null);
 
   useEffect(() => {
     loadContractData();
@@ -83,8 +88,9 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
       // Load performance data
       loadPerformanceData(contractId);
 
-      // Load investor data if curator
+      // Load curator profile + their other contracts
       if (contractData.curator_id) {
+        loadCuratorProfile(contractData.curator_id, contractId);
         loadInvestorData(contractId, contractData.curator_id);
       }
     } catch (e: any) {
@@ -199,6 +205,53 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
       setPerformanceData(data || []);
     } catch {
       // Performance data may not exist yet
+    }
+  };
+
+  const loadCuratorProfile = async (curatorId: string, currentContractId: string) => {
+    try {
+      const [profileRes, contractsRes, statsRes, agentRes] = await Promise.all([
+        // Curator's profile
+        supabase
+          .from('profiles')
+          .select('id, username, full_name, bio, avatar_url, location, user_type, is_verified, created_at, verification_level')
+          .eq('id', curatorId)
+          .single(),
+        // Their other contracts
+        supabase
+          .from('custom_investment_contracts')
+          .select('id, contract_name, contract_symbol, contract_type, status, total_assets_under_management_cents, total_return_pct')
+          .eq('curator_id', curatorId)
+          .neq('id', currentContractId)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        // Profile stats
+        supabase
+          .from('profile_stats')
+          .select('total_vehicles, total_images, total_contributions, reputation_score, followers_count, profile_views')
+          .eq('user_id', curatorId)
+          .single(),
+        // Check if curator matches an agent (by name or profile user_type)
+        supabase
+          .from('agent_registry')
+          .select('id, name, focus, capabilities, prompt_template')
+          .then(({ data: agents }) => {
+            // Match by curator name or by profile later
+            const match = (agents || []).find((a: any) =>
+              a.name.toLowerCase() === (contractData.curator_name || '').toLowerCase() ||
+              a.id.toLowerCase() === (contractData.curator_name || '').toLowerCase()
+            );
+            return { data: match || null, error: null };
+          }) as any,
+      ]);
+
+      if (profileRes.data) setCuratorProfile(profileRes.data);
+      if (contractsRes.data) setCuratorContracts(contractsRes.data);
+      if (statsRes.data) setCuratorStats(statsRes.data);
+      // Agent check: if the curator's profile username matches an agent or if curator_name matches
+      if (agentRes.data) setAgentInfo(agentRes.data);
+    } catch {
+      // Non-critical — curator info is supplemental
     }
   };
 
@@ -350,6 +403,16 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
           </div>
         </div>
       </div>
+
+      {/* Management — Who's Behind This Contract */}
+      <CuratorPanel
+        contract={contract}
+        curatorProfile={curatorProfile}
+        curatorContracts={curatorContracts}
+        curatorStats={curatorStats}
+        agentInfo={agentInfo}
+        onSelectContract={(id: string) => { navigate(`/market/contracts/${id}`); window.scrollTo(0, 0); }}
+      />
 
       {/* Contract Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
@@ -1110,6 +1173,375 @@ function EventDetail({ asset, d }: { asset: any; d: any }) {
         {d.vip_price_cents && <DetailRow label="VIP" value={formatCurrencyFromCents(d.vip_price_cents)} />}
         <DetailRow label="Total Revenue" value={revenueFormatted} />
         <DetailRow label="Net Profit" value={profitFormatted} valueColor={d.net_profit_cents > 0 ? 'var(--success, #10b981)' : undefined} />
+      </div>
+    </div>
+  );
+}
+
+/** Curator / Agent profile panel — shows who manages the contract */
+function CuratorPanel({
+  contract, curatorProfile, curatorContracts, curatorStats, agentInfo, onSelectContract,
+}: {
+  contract: any;
+  curatorProfile: any;
+  curatorContracts: any[];
+  curatorStats: any;
+  agentInfo: any;
+  onSelectContract: (id: string) => void;
+}) {
+  const isAgent = !!(agentInfo || curatorProfile?.user_type === 'agent');
+  const [showCode, setShowCode] = useState(false);
+
+  return (
+    <div className="card" style={{ marginBottom: '16px' }}>
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isAgent ? <Bot size={14} /> : <User size={14} />}
+          <h3 className="heading-3" style={{ margin: 0 }}>Management</h3>
+          <span style={{
+            padding: '2px 6px',
+            background: isAgent ? '#8b5cf6' : '#3b82f6',
+            color: '#fff',
+            borderRadius: '4px',
+            fontSize: '7pt',
+            fontWeight: 700,
+          }}>
+            {isAgent ? 'AGENT' : 'HUMAN'}
+          </span>
+        </div>
+      </div>
+      <div className="card-body">
+        <div style={{ display: 'grid', gridTemplateColumns: curatorContracts.length > 0 ? '1fr 1fr' : '1fr', gap: '20px' }}>
+          {/* Left: Curator identity */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              {/* Avatar */}
+              {curatorProfile?.avatar_url ? (
+                <img
+                  src={curatorProfile.avatar_url}
+                  alt=""
+                  style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border)' }}
+                />
+              ) : (
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '50%',
+                  background: isAgent ? '#8b5cf6' : 'var(--primary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontSize: '16pt', fontWeight: 900,
+                  border: '2px solid var(--border)',
+                }}>
+                  {isAgent ? <Bot size={20} /> : (contract.curator_name || '?').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <div style={{ fontWeight: 900, fontSize: '12pt' }}>
+                  {curatorProfile?.full_name || contract.curator_name || 'Unknown'}
+                </div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {curatorProfile?.username && <span>@{curatorProfile.username}</span>}
+                  {curatorProfile?.is_verified && (
+                    <span style={{ color: 'var(--success, #10b981)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <Shield size={10} /> VERIFIED
+                    </span>
+                  )}
+                  {curatorProfile?.user_type && curatorProfile.user_type !== 'user' && (
+                    <HoverCard content={
+                      <div style={{ padding: '8px' }}>
+                        <div style={{ fontWeight: 700, marginBottom: '4px' }}>{curatorProfile.user_type.toUpperCase()}</div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                          {curatorProfile.user_type === 'professional' ? 'Verified automotive professional with industry credentials.' :
+                           curatorProfile.user_type === 'dealer' ? 'Licensed dealer with transactional history on the platform.' :
+                           curatorProfile.user_type === 'admin' ? 'Platform administrator with elevated access.' : ''}
+                        </div>
+                      </div>
+                    } width={220}>
+                      <span style={{
+                        padding: '1px 6px', background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: '3px', fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', cursor: 'default',
+                      }}>
+                        {curatorProfile.user_type}
+                      </span>
+                    </HoverCard>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bio */}
+            {(curatorProfile?.bio || contract.curator_bio) && (
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '15px', marginBottom: '10px' }}>
+                {curatorProfile?.bio || contract.curator_bio}
+              </div>
+            )}
+
+            {/* Credentials */}
+            {contract.curator_credentials?.length > 0 && (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                {contract.curator_credentials.map((cred: string, i: number) => (
+                  <HoverCard key={i} content={
+                    <div style={{ padding: '8px' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>{cred}</div>
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        Professional credential held by this curator. Credentials are self-reported — verify independently.
+                      </div>
+                    </div>
+                  } width={200}>
+                    <span style={{
+                      padding: '2px 8px', background: 'var(--primary)', color: '#fff',
+                      borderRadius: '3px', fontSize: '7pt', fontWeight: 700, cursor: 'default',
+                    }}>
+                      {cred}
+                    </span>
+                  </HoverCard>
+                ))}
+              </div>
+            )}
+
+            {/* Operations overview */}
+            {(() => {
+              const allContracts = [contract, ...curatorContracts];
+              const totalAum = allContracts.reduce((s: number, c: any) => s + (c.total_assets_under_management_cents || 0), 0);
+              const withReturns = allContracts.filter((c: any) => c.total_return_pct != null);
+              const avgReturn = withReturns.length > 0
+                ? withReturns.reduce((s: number, c: any) => s + c.total_return_pct, 0) / withReturns.length
+                : null;
+              const activeCount = allContracts.filter((c: any) => c.status === 'active' || c.status === 'approved').length;
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '8px' }}>
+                  <HoverCard content={
+                    <div style={{ padding: '8px' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>Total AUM</div>
+                      <HoverStat label="All contracts" value={formatCurrencyFromCents(totalAum)} />
+                      <HoverStat label="This contract" value={formatCurrencyFromCents(contract.total_assets_under_management_cents)} />
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Total assets under management across all contracts curated by this manager.
+                      </div>
+                    </div>
+                  } width={240}>
+                    <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                      <div style={{ fontSize: '12pt', fontWeight: 900 }}>{formatCurrencyFromCents(totalAum)}</div>
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Total AUM</div>
+                    </div>
+                  </HoverCard>
+                  {avgReturn != null && (
+                    <HoverCard content={
+                      <div style={{ padding: '8px' }}>
+                        <div style={{ fontWeight: 700, marginBottom: '4px' }}>Average Return</div>
+                        {withReturns.map((c: any, i: number) => (
+                          <HoverStat key={i} label={c.contract_symbol || c.contract_name} value={`${c.total_return_pct >= 0 ? '+' : ''}${c.total_return_pct.toFixed(2)}%`}
+                            color={c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
+                        ))}
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Unweighted average across {withReturns.length} contract{withReturns.length !== 1 ? 's' : ''}.
+                        </div>
+                      </div>
+                    } width={240}>
+                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                        <div style={{ fontSize: '12pt', fontWeight: 900, color: avgReturn >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
+                          {avgReturn >= 0 ? '+' : ''}{avgReturn.toFixed(2)}%
+                        </div>
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Avg Return</div>
+                      </div>
+                    </HoverCard>
+                  )}
+                  <HoverCard content={
+                    <div style={{ padding: '8px' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>Contracts</div>
+                      <HoverStat label="Total" value={allContracts.length} />
+                      <HoverStat label="Active" value={activeCount} />
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Investment contracts managed by this curator.
+                      </div>
+                    </div>
+                  } width={200}>
+                    <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                      <div style={{ fontSize: '12pt', fontWeight: 900 }}>{allContracts.length}</div>
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{activeCount} Active</div>
+                    </div>
+                  </HoverCard>
+                  {curatorStats?.total_vehicles != null && (
+                    <HoverCard content={
+                      <div style={{ padding: '8px' }}>
+                        <div style={{ fontWeight: 700, marginBottom: '4px' }}>Personal Vehicles</div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                          Vehicles this curator owns on the platform. Skin in the game — direct ownership experience informs curation.
+                        </div>
+                      </div>
+                    } width={220}>
+                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                        <div style={{ fontSize: '12pt', fontWeight: 900 }}>{curatorStats.total_vehicles}</div>
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Vehicles</div>
+                      </div>
+                    </HoverCard>
+                  )}
+                  {curatorStats?.reputation_score != null && (
+                    <HoverCard content={
+                      <div style={{ padding: '8px' }}>
+                        <div style={{ fontWeight: 700, marginBottom: '4px' }}>Reputation</div>
+                        <HoverStat label="Score" value={`${curatorStats.reputation_score}/100`} />
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Computed from contributions, verifications, community activity, and transaction history.
+                        </div>
+                      </div>
+                    } width={220}>
+                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                        <div style={{ fontSize: '12pt', fontWeight: 900, color: curatorStats.reputation_score >= 70 ? 'var(--success, #10b981)' : curatorStats.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)' }}>
+                          {curatorStats.reputation_score}
+                        </div>
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Reputation</div>
+                      </div>
+                    </HoverCard>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Member since */}
+            {curatorProfile?.created_at && (
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '8px' }}>
+                Member since {new Date(curatorProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                {curatorProfile.location && ` • ${curatorProfile.location}`}
+              </div>
+            )}
+
+            {/* Agent Info — "Read Their Code" */}
+            {isAgent && agentInfo && (
+              <div style={{ marginTop: '12px', padding: '10px', background: '#8b5cf620', border: '1px solid #8b5cf640', borderRadius: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Bot size={14} color="#8b5cf6" />
+                    <span style={{ fontWeight: 900, fontSize: '9pt', color: '#8b5cf6' }}>AGENT: {agentInfo.name}</span>
+                  </div>
+                  <button
+                    onClick={() => setShowCode(!showCode)}
+                    style={{
+                      padding: '2px 8px', border: '1px solid #8b5cf6', borderRadius: '3px',
+                      background: showCode ? '#8b5cf6' : 'transparent', color: showCode ? '#fff' : '#8b5cf6',
+                      fontSize: '7pt', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                    }}
+                  >
+                    <Code size={10} /> {showCode ? 'HIDE CODE' : 'READ CODE'}
+                  </button>
+                </div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <strong>Focus:</strong> {agentInfo.focus}
+                </div>
+                {agentInfo.capabilities?.length > 0 && (
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                    {agentInfo.capabilities.map((cap: string, i: number) => (
+                      <HoverCard key={i} content={
+                        <div style={{ padding: '8px' }}>
+                          <div style={{ fontWeight: 700, marginBottom: '4px' }}>{cap}</div>
+                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                            This agent is capable of performing {cap.toLowerCase()} operations autonomously.
+                          </div>
+                        </div>
+                      } width={200}>
+                        <span style={{
+                          padding: '1px 6px', background: '#8b5cf620', border: '1px solid #8b5cf640',
+                          borderRadius: '3px', fontSize: '7pt', color: '#8b5cf6', fontWeight: 600, cursor: 'default',
+                        }}>
+                          {cap}
+                        </span>
+                      </HoverCard>
+                    ))}
+                  </div>
+                )}
+                {showCode && agentInfo.prompt_template && (
+                  <div style={{
+                    marginTop: '8px', padding: '10px', background: '#0d1117', color: '#c9d1d9',
+                    borderRadius: '4px', fontSize: '8pt', fontFamily: 'monospace', lineHeight: '14px',
+                    maxHeight: '300px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  }}>
+                    {agentInfo.prompt_template}
+                  </div>
+                )}
+                {showCode && !agentInfo.prompt_template && (
+                  <div style={{ marginTop: '8px', padding: '10px', background: '#0d1117', color: '#8b949e', borderRadius: '4px', fontSize: '8pt', fontFamily: 'monospace' }}>
+                    // Agent prompt template not published.{'\n'}
+                    // Agent ID: {agentInfo.id}{'\n'}
+                    // Capabilities: [{agentInfo.capabilities?.join(', ')}]{'\n'}
+                    // Focus: {agentInfo.focus}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Other contracts by this curator */}
+          {curatorContracts.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                <Briefcase size={12} />
+                <span style={{ fontWeight: 700, fontSize: '9pt' }}>Other Contracts by This Curator</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {curatorContracts.map((c: any) => (
+                  <HoverCard key={c.id} content={
+                    <div style={{ padding: '10px' }}>
+                      <div style={{ fontWeight: 900, marginBottom: '6px' }}>{c.contract_name}</div>
+                      <HoverStat label="Symbol" value={c.contract_symbol} />
+                      <HoverStat label="Type" value={c.contract_type?.replace('_', ' ')} />
+                      <HoverStat label="Status" value={c.status?.toUpperCase()} />
+                      <HoverStat label="AUM" value={c.total_assets_under_management_cents ? formatCurrencyFromCents(c.total_assets_under_management_cents) : '—'} />
+                      {c.total_return_pct != null && (
+                        <HoverStat label="Return" value={`${c.total_return_pct >= 0 ? '+' : ''}${c.total_return_pct.toFixed(2)}%`}
+                          color={c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
+                      )}
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
+                        Click to view this contract
+                      </div>
+                    </div>
+                  } width={240}>
+                    <div
+                      onClick={(e) => { e.stopPropagation(); onSelectContract(c.id); }}
+                      style={{
+                        padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: '4px', cursor: 'pointer', transition: 'border-color 0.12s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '9pt' }}>{c.contract_name}</div>
+                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', display: 'flex', gap: '4px', marginTop: '2px' }}>
+                            <span>{c.contract_symbol}</span>
+                            <span>•</span>
+                            <span>{c.contract_type?.replace('_', ' ')}</span>
+                            <span>•</span>
+                            <span style={{
+                              color: c.status === 'active' ? 'var(--success, #10b981)' : 'var(--text-muted)',
+                              fontWeight: 700,
+                            }}>
+                              {c.status?.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          {c.total_assets_under_management_cents ? (
+                            <div style={{ fontWeight: 700, fontSize: '9pt' }}>
+                              {formatCurrencyFromCents(c.total_assets_under_management_cents)}
+                            </div>
+                          ) : null}
+                          {c.total_return_pct != null && (
+                            <div style={{
+                              fontSize: '8pt', fontWeight: 700,
+                              color: c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)',
+                            }}>
+                              {c.total_return_pct >= 0 ? '+' : ''}{c.total_return_pct.toFixed(2)}%
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </HoverCard>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
