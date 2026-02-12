@@ -94,7 +94,7 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
   },
   broadarrow: {
     pattern: "%broadarrowauctions.com%",
-    extractor: "extract-vehicle-data-ai",
+    extractor: "extract-broad-arrow",
     minDelay: 1500,
     maxDelay: 3000,
   },
@@ -109,6 +109,24 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     extractor: "extract-bonhams",
     minDelay: 2000,
     maxDelay: 4000,
+  },
+  rmsothebys: {
+    pattern: "%rmsothebys.com%",
+    extractor: "extract-rmsothebys",
+    minDelay: 2000,
+    maxDelay: 4000,
+  },
+  gooding: {
+    pattern: "%goodingco.com%",
+    extractor: "extract-gooding",
+    minDelay: 2000,
+    maxDelay: 4000,
+  },
+  gaa: {
+    pattern: "%gaaclassiccars.com%",
+    extractor: "extract-gaa-classics",
+    minDelay: 1500,
+    maxDelay: 3000,
   },
 };
 
@@ -131,6 +149,9 @@ function detectSource(url: string): string | null {
   if (url.includes("broadarrowauctions.com")) return "broadarrow";
   if (url.includes("ksl.com")) return "ksl";
   if (url.includes("bonhams.com")) return "bonhams";
+  if (url.includes("rmsothebys.com")) return "rmsothebys";
+  if (url.includes("goodingco.com")) return "gooding";
+  if (url.includes("gaaclassiccars.com")) return "gaa";
   return null;
 }
 

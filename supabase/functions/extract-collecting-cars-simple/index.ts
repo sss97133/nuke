@@ -322,7 +322,7 @@ async function upsertVehicle(
       .from("vehicles")
       .insert(vehicleData)
       .select("id")
-      .single();
+      .maybeSingle();
 
     if (insertError) {
       return { vehicleId: null, created: false, error: `Insert error: ${insertError.message}` };

@@ -138,7 +138,7 @@ serve(async (req) => {
           onConflict: 'vehicle_id,bat_listing_url,part_name,brand_name'
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (!insertError && stored) {
         storedParts.push(stored);

@@ -427,7 +427,7 @@ async function getOrCreateGaaOrg(supabase: SupabaseClient): Promise<string | nul
       },
     })
     .select("id")
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("[GAA] Error creating org:", error);
@@ -515,7 +515,7 @@ async function upsertVehicle(
       .from("vehicles")
       .insert(vehicleData)
       .select("id")
-      .single();
+      .maybeSingle();
 
     if (insertError) {
       return { vehicleId: null, created: false, error: `Insert error: ${insertError.message}` };
@@ -550,8 +550,7 @@ async function saveImages(
   for (const record of imageRecords) {
     const { error } = await supabase
       .from("vehicle_images")
-      .insert(record)
-      .single();
+      .insert(record);
 
     if (error) {
       // Likely duplicate, skip silently

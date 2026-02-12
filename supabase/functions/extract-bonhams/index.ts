@@ -1060,13 +1060,13 @@ serve(async (req) => {
               .from('vehicles')
               .insert(vehicleData)
               .select('id')
-              .single();
+              .maybeSingle();
 
             if (insertError) {
               results.push({ lot: lot.lotNumber, url: lot.url, error: insertError.message });
             } else {
               created++;
-              results.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: newVehicle.id, action: 'created' });
+              results.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: newVehicle?.id, action: 'created' });
 
               // Create external_listings record
               await supabase
@@ -1192,13 +1192,13 @@ serve(async (req) => {
               .from('vehicles')
               .insert(vehicleData)
               .select('id')
-              .single();
+              .maybeSingle();
 
             if (insertError) {
               results.push({ lot: lot.lotNumber, url: lot.url, error: insertError.message });
             } else {
               created++;
-              results.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: newVehicle.id, action: 'created' });
+              results.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: newVehicle?.id, action: 'created' });
 
               // Create external_listings record
               await supabase
@@ -1348,14 +1348,14 @@ serve(async (req) => {
           const { data: newVehicle, error: vehicleError } = await supabase
             .from('vehicles')
             .insert(vehicleData)
-            .select()
-            .single();
+            .select('id')
+            .maybeSingle();
 
           if (vehicleError) {
             throw new Error(`Failed to save vehicle: ${vehicleError.message}`);
           }
 
-          targetVehicleId = newVehicle.id;
+          targetVehicleId = newVehicle?.id;
           console.log(`[Bonhams] Created vehicle: ${targetVehicleId}`);
         }
 

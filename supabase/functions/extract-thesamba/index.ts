@@ -402,7 +402,7 @@ serve(async (req) => {
           .from('vehicles')
           .select('id')
           .eq('discovery_url', extracted.url)
-          .single();
+          .maybeSingle();
 
         if (existingVehicle) {
           // Update existing
@@ -450,8 +450,8 @@ serve(async (req) => {
               status: 'active',
               sale_status: 'available',
             })
-            .select()
-            .single();
+            .select('id')
+            .maybeSingle();
 
           if (insertError) {
             console.error('Insert error:', insertError);
@@ -559,8 +559,8 @@ serve(async (req) => {
                 status: 'active',
                 sale_status: 'available',
               })
-              .select()
-              .single();
+              .select('id')
+              .maybeSingle();
 
             if (insertError) {
               errors.push(`${id}: ${insertError.message}`);

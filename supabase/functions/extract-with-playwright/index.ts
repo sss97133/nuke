@@ -980,13 +980,13 @@ async function saveToDatabase(
           import_queue_id: queueId,
         })
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (createError) {
         throw new Error(`Vehicle insert failed: ${createError.message}`);
       }
 
-      vehicleId = created.id;
+      vehicleId = created?.id;
       console.log(`[extract-with-playwright] Created new vehicle: ${vehicleId}`);
     }
 

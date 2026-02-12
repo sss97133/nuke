@@ -165,7 +165,7 @@ serve(async (req) => {
           vehicle_id: vehicle_id || null,
         })
         .select('id')
-        .single()
+        .maybeSingle()
       if (newEvent?.id && !createErr) {
         eventId = String(newEvent.id)
         console.log(`✅ Created auction_event ${eventId}`)

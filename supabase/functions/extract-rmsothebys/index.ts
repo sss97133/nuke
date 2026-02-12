@@ -320,7 +320,7 @@ async function saveVehicle(
       },
     })
     .select('id')
-    .single();
+    .maybeSingle();
 
   if (vehicleError) {
     throw new Error(`Failed to create vehicle: ${vehicleError.message}`);
