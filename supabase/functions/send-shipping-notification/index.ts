@@ -79,7 +79,7 @@ serve(async (req) => {
           results.push({
             recipient: recipient.recipient_name,
             status: 'failed',
-            error: error.message
+            error: error instanceof Error ? error.message : String(error)
           })
         }
       }
@@ -105,7 +105,7 @@ serve(async (req) => {
 
   } catch (error) {
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400

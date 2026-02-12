@@ -49,7 +49,7 @@ serve(async (req) => {
       .select('id, user_id')
       .eq('id', deal_id)
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (dealErr || !deal) {
       return new Response(JSON.stringify({ error: 'Deal not found' }), {

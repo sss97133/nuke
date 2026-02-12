@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
         vehicle:vehicles(*)
       `)
       .eq('id', transaction_id)
-      .single()
+      .maybeSingle()
 
     if (txError || !transaction) {
       return json({ error: 'Transaction not found' }, 404)

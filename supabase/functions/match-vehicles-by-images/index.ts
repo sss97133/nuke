@@ -45,7 +45,7 @@ serve(async (req) => {
       .from('vehicles')
       .select('*, vehicle_images(*)')
       .eq('id', source_vehicle_id)
-      .single()
+      .maybeSingle()
 
     if (sourceError || !sourceVehicle) {
       return new Response(
