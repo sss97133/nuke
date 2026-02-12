@@ -146,25 +146,25 @@ function parseBidField(bidText: string): {
   // Extract price (handle both "$39,000" and "$39000")
   const priceMatch = bidText.match(/\$?([\d,]+)/);
   if (priceMatch) {
-    result.price = parseInt(priceMatch[1].replace(/,/g, ''));
+    result.price = parseInt(priceMatch[1].replace(/,/g, ''), 10);
   }
 
   // Extract bid count
   const bidMatch = bidText.match(/([\d,]+)\s*Bids?/i);
   if (bidMatch) {
-    result.bidCount = parseInt(bidMatch[1].replace(/,/g, ''));
+    result.bidCount = parseInt(bidMatch[1].replace(/,/g, ''), 10);
   }
 
   // Extract views
   const viewMatch = bidText.match(/([\d,]+)\s*Views?/i);
   if (viewMatch) {
-    result.viewCount = parseInt(viewMatch[1].replace(/,/g, ''));
+    result.viewCount = parseInt(viewMatch[1].replace(/,/g, ''), 10);
   }
 
   // Extract saves/watches
   const saveMatch = bidText.match(/([\d,]+)\s*Saves?/i);
   if (saveMatch) {
-    result.watchCount = parseInt(saveMatch[1].replace(/,/g, ''));
+    result.watchCount = parseInt(saveMatch[1].replace(/,/g, ''), 10);
   }
 
   // Extract end date (e.g., "Ended Apr 16, 2019" or "Apr 16, 2019")
@@ -615,13 +615,13 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
     const highBidMatch = html.match(/High bid:\s*\$?([\d,]+)/i);
     const currentBidMatch = html.match(/Current bid:\s*\$?([\d,]+)/i);
     if (finalBidMatch) {
-      listing.salePrice = parseInt(finalBidMatch[1].replace(/,/g, ''));
+      listing.salePrice = parseInt(finalBidMatch[1].replace(/,/g, ''), 10);
       listing.auctionOutcome = 'sold';
     } else if (highBidMatch) {
-      listing.salePrice = parseInt(highBidMatch[1].replace(/,/g, ''));
+      listing.salePrice = parseInt(highBidMatch[1].replace(/,/g, ''), 10);
       listing.auctionOutcome = null;
     } else if (currentBidMatch) {
-      listing.salePrice = parseInt(currentBidMatch[1].replace(/,/g, ''));
+      listing.salePrice = parseInt(currentBidMatch[1].replace(/,/g, ''), 10);
       listing.auctionOutcome = null;
     }
 
@@ -629,13 +629,13 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
     const bidCountMatch = html.match(/([\d,]+)\s+bids?/i) ||
                           html.match(/bid(?:s)?[:\s]*([\d,]+)/i);
     if (bidCountMatch) {
-      listing.bidCount = parseInt(bidCountMatch[1].replace(/,/g, ''));
+      listing.bidCount = parseInt(bidCountMatch[1].replace(/,/g, ''), 10);
     }
 
     // Extract view count
     const viewCountMatch = html.match(/([\d,]+)\s+views?/i);
     if (viewCountMatch) {
-      listing.viewCount = parseInt(viewCountMatch[1].replace(/,/g, ''));
+      listing.viewCount = parseInt(viewCountMatch[1].replace(/,/g, ''), 10);
     }
 
     // Extract auction end date from JSON fields in HTML

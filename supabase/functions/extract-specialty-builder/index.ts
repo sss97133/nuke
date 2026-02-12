@@ -355,11 +355,15 @@ async function scrapeWithFirecrawl(url: string): Promise<any> {
 async function directFetch(url: string): Promise<any> {
   console.log(`[specialty-builder] Direct fetch: ${url}`);
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     },
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!response.ok) {
     return { success: false, error: `HTTP ${response.status}` };

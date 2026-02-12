@@ -486,7 +486,7 @@ async function saveToDatabase(
       throw new Error(`Failed to insert vehicle: ${insertError?.message || insertError}`);
     }
 
-    vehicleId = newVehicle.id;
+    vehicleId = newVehicle?.id;
   }
 
   // Update/insert external_listings
