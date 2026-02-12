@@ -367,7 +367,7 @@ async function getOriginalityMultiplier(supabase: any, vehicleId: string): Promi
   // Check vehicle_condition_profiles or condition assessments for originality signals
   const { data: profile } = await supabase
     .from("vehicle_condition_profiles")
-    .select("overall_score, components")
+    .select("overall_score")
     .eq("vehicle_id", vehicleId)
     .limit(1);
 
