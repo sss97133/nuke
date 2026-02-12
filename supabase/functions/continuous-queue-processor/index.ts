@@ -278,8 +278,10 @@ serve(async (req) => {
             if (extractResult.success) {
               const vehicleId =
                 extractResult.vehicle_id ||
+                extractResult.vehicleId ||
                 extractResult.created_vehicle_ids?.[0] ||
-                extractResult.updated_vehicle_ids?.[0];
+                extractResult.updated_vehicle_ids?.[0] ||
+                null;
 
               // Mark complete
               await supabase

@@ -109,7 +109,7 @@ serve(async (req) => {
 
         if (extractData.success) {
           const extractedVehicle = extractData.extracted || extractData;
-          let vehicleId = extractedVehicle.vehicle_id || null;
+          let vehicleId = extractedVehicle.vehicle_id || extractedVehicle.vehicleId || extractData.vehicle_id || extractData.vehicleId || null;
           let intelligenceDecision = null;
 
           // INTELLIGENCE LAYER: Validate before accepting
