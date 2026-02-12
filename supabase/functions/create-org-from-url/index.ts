@@ -36,7 +36,12 @@ function normalizeInputUrl(raw: string): string {
 }
 
 function canonicalizeDomain(url: string): string {
-  const u = new URL(url);
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new Error(`Invalid URL: ${url.slice(0, 200)}`);
+  }
   return u.hostname.replace(/^www\./, "").toLowerCase();
 }
 
@@ -468,7 +473,9 @@ serve(async (req) => {
         }
       }
     } else {
-      const businessName = extracted?.business_name || inferNameFromDomain(new URL(website).hostname);
+      let websiteHostname: string;
+      try { websiteHostname = new URL(website).hostname; } catch { websiteHostname = website; }
+      const businessName = extracted?.business_name || inferNameFromDomain(websiteHostname);
 
       const insertRow: any = {
         business_name: businessName,
