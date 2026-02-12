@@ -129,7 +129,11 @@ If a photo can't be matched to a vehicle, add its index to "unmatched".`;
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (parseErr) {
+        console.error("Failed to parse batch analysis JSON:", parseErr);
+      }
     }
   } catch (e) {
     console.error("Batch analysis failed:", e);

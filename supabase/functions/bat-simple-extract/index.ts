@@ -1100,7 +1100,7 @@ serve(async (req) => {
             res.text().then(t => console.error(`Comment extraction failed: ${res.status} - ${t}`));
           }
         }).catch(e => {
-          console.error(`Failed to trigger comment extraction: ${e.message}`);
+          console.error(`Failed to trigger comment extraction: ${e instanceof Error ? e.message : String(e)}`);
         });
       }
 

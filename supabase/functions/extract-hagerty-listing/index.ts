@@ -681,7 +681,7 @@ async function fetchHagertyPage(url: string): Promise<{ html: string; source: st
     if (err.name === 'AbortError') {
       console.log(`[hagerty] Direct fetch timeout, trying Firecrawl...`);
     } else {
-      console.log(`[hagerty] Direct fetch failed: ${err.message}, trying Firecrawl...`);
+      console.log(`[hagerty] Direct fetch failed: ${err instanceof Error ? err.message : String(err)}, trying Firecrawl...`);
     }
   }
 
