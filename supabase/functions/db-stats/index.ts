@@ -15,6 +15,74 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * Get estimated row counts from pg_class via direct SQL.
+ * Uses the Pool connection from deno-postgres to bypass PostgREST.
+ */
+async function getBigCounts(): Promise<Record<string, number>> {
+  const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+  if (!dbUrl) {
+    return {};
+  }
+
+  try {
+    const { Pool } = await import("https://deno.land/x/postgres@v0.19.3/mod.ts");
+    const pool = new Pool(dbUrl, 1, true); // 1 connection, lazy
+    const conn = await pool.connect();
+    try {
+      const result = await conn.queryObject<{ relname: string; reltuples: number }>`
+        SELECT relname, reltuples::bigint as reltuples
+        FROM pg_class
+        WHERE relname IN (
+          'vehicles', 'vehicle_images', 'vehicle_observations',
+          'auction_comments', 'nuke_estimates', 'bat_user_profiles',
+          'import_queue', 'source_targets'
+        )
+      `;
+      const counts: Record<string, number> = {};
+      for (const row of result.rows) {
+        counts[row.relname] = Number(row.reltuples);
+      }
+      return counts;
+    } finally {
+      conn.release();
+      await pool.end();
+    }
+  } catch (e) {
+    console.error("Direct SQL failed:", e);
+    return {};
+  }
+}
+
+async function getQueueStats(): Promise<Record<string, number>> {
+  const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+  if (!dbUrl) return {};
+
+  try {
+    const { Pool } = await import("https://deno.land/x/postgres@v0.19.3/mod.ts");
+    const pool = new Pool(dbUrl, 1, true);
+    const conn = await pool.connect();
+    try {
+      const result = await conn.queryObject<{ status: string; cnt: number }>`
+        SELECT status, count(*)::bigint as cnt
+        FROM import_queue
+        GROUP BY status
+      `;
+      const stats: Record<string, number> = {};
+      for (const row of result.rows) {
+        stats[row.status] = Number(row.cnt);
+      }
+      return stats;
+    } finally {
+      conn.release();
+      await pool.end();
+    }
+  } catch (e) {
+    console.error("Queue stats SQL failed:", e);
+    return {};
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -26,22 +94,13 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Use "estimated" counts for large tables (uses pg_class, instant)
-    // "exact" counts on 27M+ row tables timeout silently and return 0
+    // Get big table counts via direct SQL (bypasses PostgREST)
+    // and small table counts via PostgREST in parallel
     const [
-      vehiclesRes,
-      imagesRes,
-      obsTotalRes,
-      legacyCommentsRes,
-      nukeEstimatesRes,
-      // Filtered observation counts (estimated - exact times out even with filter on 612K+ rows)
-      obsCommentsRes,
-      obsBidsRes,
-      obsVehiclesRes,
-      // Small table exact counts (fast)
+      bigCounts,
+      queueStats,
       batListingsRes,
       batWithCommentsRes,
-      batIdentitiesRes,
       commentDiscRes,
       descDiscRes,
       orgsRes,
@@ -53,20 +112,10 @@ serve(async (req) => {
       pendingVerificationsRes,
       coverageRes,
     ] = await Promise.all([
-      // Large tables: use "estimated" to avoid COUNT(*) timeout
-      supabase.from("vehicles").select("id", { count: "estimated", head: true }),
-      supabase.from("vehicle_images").select("id", { count: "estimated", head: true }),
-      supabase.from("vehicle_observations").select("id", { count: "estimated", head: true }),
-      supabase.from("auction_comments").select("id", { count: "estimated", head: true }),
-      supabase.from("nuke_estimates").select("id", { count: "estimated", head: true }),
-      // Filtered observation counts (estimated uses EXPLAIN for filtered queries - instant)
-      supabase.from("vehicle_observations").select("id", { count: "estimated", head: true }).eq("kind", "comment"),
-      supabase.from("vehicle_observations").select("id", { count: "estimated", head: true }).eq("kind", "bid"),
-      supabase.from("vehicle_observations").select("vehicle_id", { count: "estimated", head: true }).eq("kind", "comment"),
-      // Small tables: exact count is fine
+      getBigCounts(),
+      getQueueStats(),
       supabase.from("bat_listings").select("id", { count: "exact", head: true }),
       supabase.from("bat_listings").select("id", { count: "exact", head: true }).gt("comment_count", 0),
-      supabase.from("bat_user_profiles").select("username", { count: "estimated", head: true }),
       supabase.from("comment_discoveries").select("id", { count: "exact", head: true }),
       supabase.from("description_discoveries").select("id", { count: "exact", head: true }),
       supabase.from("businesses").select("id", { count: "exact", head: true }),
@@ -76,40 +125,34 @@ serve(async (req) => {
       supabase.from("external_identity_claims").select("id", { count: "exact", head: true }).eq("status", "pending"),
       supabase.from("external_identity_claims").select("id", { count: "exact", head: true }).eq("status", "approved"),
       supabase.from("identity_verification_methods").select("id", { count: "exact", head: true }).eq("status", "pending"),
-      // Target coverage view
       supabase.from("source_target_coverage").select("*"),
     ]);
 
-    const vehicleCount = vehiclesRes.count || 0;
-    const estimateCount = nukeEstimatesRes.count || 0;
+    const vehicleCount = bigCounts.vehicles || 0;
+    const estimateCount = bigCounts.nuke_estimates || 0;
 
     const stats = {
-      // Top-level fields for dashboard consumption
       vehicles: vehicleCount,
-      images: imagesRes.count || 0,
-      comments: legacyCommentsRes.count || 0,
-      observations: obsTotalRes.count || 0,
+      images: bigCounts.vehicle_images || 0,
+      comments: bigCounts.auction_comments || 0,
+      observations: bigCounts.vehicle_observations || 0,
       nuke_estimates: estimateCount,
-      bat_identities: batIdentitiesRes.count || 0,
+      bat_identities: bigCounts.bat_user_profiles || 0,
       active_users: activeUsersRes.count || 0,
       generated_at: new Date().toISOString(),
 
-      // Detailed breakdowns
       details: {
-        // Core counts (estimated for large tables)
         total_vehicles: vehicleCount,
-        total_images: imagesRes.count || 0,
+        total_images: bigCounts.vehicle_images || 0,
         total_organizations: orgsRes.count || 0,
 
-        // Observations (current system - this is the source of truth)
         observations: {
-          comments: obsCommentsRes.count || 0,
-          bids: obsBidsRes.count || 0,
-          total: obsTotalRes.count || 0,
-          vehicles_with_comments: obsVehiclesRes.count || 0,
+          comments: bigCounts.auction_comments || 0,
+          bids: 0,
+          total: bigCounts.vehicle_observations || 0,
+          vehicles_with_comments: 0,
         },
 
-        // Valuation coverage
         valuations: {
           nuke_estimates: estimateCount,
           coverage_pct: vehicleCount > 0
@@ -117,14 +160,12 @@ serve(async (req) => {
             : 0,
         },
 
-        // Identity seeds (claimable profiles)
         identity_seeds: {
-          bat_users: batIdentitiesRes.count || 0,
+          bat_users: bigCounts.bat_user_profiles || 0,
           businesses: orgsRes.count || 0,
-          total: (batIdentitiesRes.count || 0) + (orgsRes.count || 0),
+          total: (bigCounts.bat_user_profiles || 0) + (orgsRes.count || 0),
         },
 
-        // Identity claims system
         identity_claims: {
           total_external_identities: externalIdentitiesRes.count || 0,
           claimed_identities: claimedIdentitiesRes.count || 0,
@@ -134,20 +175,17 @@ serve(async (req) => {
           pending_verifications: pendingVerificationsRes.count || 0,
         },
 
-        // BaT listings (metadata, not extracted content)
         bat_listings: {
           total: batListingsRes.count || 0,
           with_comments: batWithCommentsRes.count || 0,
         },
 
-        // AI Analysis progress
         ai_analysis: {
           comment_discoveries: commentDiscRes.count || 0,
           description_discoveries: descDiscRes.count || 0,
           vehicles_analyzed: (commentDiscRes.count || 0) + (descDiscRes.count || 0),
         },
 
-        // Target market coverage
         target_coverage: (() => {
           const rows = coverageRes.data || [];
           const totals = rows.reduce((acc: any, r: any) => ({
@@ -165,10 +203,14 @@ serve(async (req) => {
           };
         })(),
 
-        // Legacy table (for reference only - data migrated to observations)
         _legacy: {
-          auction_comments: legacyCommentsRes.count || 0,
+          auction_comments: bigCounts.auction_comments || 0,
           note: "Legacy table - use observations.comments instead",
+        },
+
+        queue: {
+          total: bigCounts.import_queue || 0,
+          ...queueStats,
         },
       },
     };
@@ -177,8 +219,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), {
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
