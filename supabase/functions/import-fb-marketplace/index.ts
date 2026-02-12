@@ -466,7 +466,7 @@ Deno.serve(async (req) => {
           .from('vehicles')
           .insert(vehicleData)
           .select('id')
-          .single();
+          .maybeSingle();
 
         if (insertError) {
           results.errors.push(`Insert error: ${insertError.message}`);
