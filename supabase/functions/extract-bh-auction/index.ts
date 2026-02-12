@@ -752,13 +752,13 @@ serve(async (req) => {
           const { data: newVehicle, error: vehicleError } = await supabase
             .from('vehicles')
             .insert(vehicleData)
-            .select()
-            .single();
+            .select('id')
+            .maybeSingle();
 
           if (vehicleError) {
             throw new Error(`Failed to save vehicle: ${vehicleError.message}`);
           }
-          vehicleId = newVehicle.id;
+          vehicleId = newVehicle?.id;
           console.log(`[BH Auction] Created vehicle: ${vehicleId}`);
         }
 
@@ -896,8 +896,8 @@ serve(async (req) => {
               const { data: newVehicle } = await supabase
                 .from('vehicles')
                 .insert(vehicleData)
-                .select()
-                .single();
+                .select('id')
+                .maybeSingle();
               vehicleId = newVehicle?.id || null;
             }
 

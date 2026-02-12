@@ -105,13 +105,13 @@ Deno.serve(async (req) => {
           }
         })
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (createError) {
         throw new Error(`Failed to create organization: ${createError.message}`);
       }
 
-      organizationId = newOrg.id;
+      organizationId = newOrg?.id;
       console.log(`✅ Created new organization: ${seller_name}`);
       
       // Auto-merge duplicates after creation

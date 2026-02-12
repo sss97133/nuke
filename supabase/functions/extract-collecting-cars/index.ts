@@ -222,7 +222,7 @@ serve(async (req) => {
             interior_color: extracted.interior_color,
           })
           .select("id")
-          .single();
+          .maybeSingle();
 
         if (insertError) {
           console.error("Vehicle insert error:", insertError);

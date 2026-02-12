@@ -203,9 +203,9 @@ serve(async (req) => {
           updated_at: now,
         })
         .select('id')
-        .single();
+        .maybeSingle();
       if (insertErr) throw insertErr;
-      vehicleId = inserted.id;
+      vehicleId = inserted?.id;
     } else {
       await supabase
         .from('vehicles')

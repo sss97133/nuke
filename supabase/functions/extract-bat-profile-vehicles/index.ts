@@ -204,11 +204,11 @@ Deno.serve(async (req: Request) => {
           profile_url: profileUrl,
           display_name: batUsername,
         })
-        .select()
-        .single();
+        .select('id')
+        .maybeSingle();
 
       if (createError) throw createError;
-      externalIdentityId = newIdentity.id;
+      externalIdentityId = newIdentity?.id;
       console.log(`Created new external_identity: ${externalIdentityId}`);
     }
 
@@ -345,10 +345,10 @@ Deno.serve(async (req: Request) => {
               .from('vehicles')
               .insert(vehicleData)
               .select('id')
-              .single();
-            
+              .maybeSingle();
+
             if (vehicleError) throw vehicleError;
-            vehicleId = newVehicle.id;
+            vehicleId = newVehicle?.id;
           }
 
           if (vehicleId) {

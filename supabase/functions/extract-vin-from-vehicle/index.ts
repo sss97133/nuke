@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
       .from('vehicles')
       .select('id, vin, year, make, model, description, origin_metadata, imported_by, created_by_user_id, discovered_by, owner_id, selling_organization_id, origin_organization_id, discovery_url, platform_url, bat_auction_url')
       .eq('id', vehicle_id)
-      .single()
+      .maybeSingle()
 
     if (vErr || !vehicle) throw new Error(vErr?.message || 'Vehicle not found')
 

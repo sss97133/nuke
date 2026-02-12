@@ -848,7 +848,7 @@ serve(async (req) => {
           .select('id')
           .eq('vin', extracted.vin)
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (vinMatch) {
           existingVehicle = vinMatch;
@@ -904,14 +904,14 @@ serve(async (req) => {
             is_public: true,
             status: 'active',
           })
-          .select()
-          .single();
+          .select('id')
+          .maybeSingle();
 
         if (insertError) {
           throw new Error(`Failed to create vehicle: ${insertError.message}`);
         }
 
-        vehicle_id = newVehicle.id;
+        vehicle_id = newVehicle?.id;
         console.log(`Created new vehicle: ${vehicle_id}`);
       }
 
