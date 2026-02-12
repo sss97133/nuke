@@ -125,7 +125,7 @@ async function extractCraigslistListing(url: string): Promise<CraigslistExtracte
 
   // Extract other attributes from HTML
   const mileageStr = extractAttrValue(html, 'auto_miles');
-  const mileage = mileageStr ? parseInt(mileageStr.replace(/,/g, '')) : null;
+  const mileage = mileageStr ? parseInt(mileageStr.replace(/,/g, ''), 10) : null;
 
   const exterior_color = extractAttrValue(html, 'auto_paint');
   const transmission = extractAttrValue(html, 'auto_transmission');

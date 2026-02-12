@@ -132,7 +132,7 @@ function parseValue(value: string, valueType: string): {
 
   // Extract numeric value
   const numMatch = text.match(/([0-9,]+(?:\.[0-9]+)?)/);
-  const amount = numMatch ? parseInt(numMatch[1].replace(/,/g, '')) : null;
+  const amount = numMatch ? parseInt(numMatch[1].replace(/,/g, ''), 10) : null;
 
   return { amount, currency, text };
 }
