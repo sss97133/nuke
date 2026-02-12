@@ -271,8 +271,8 @@ serve(async (req) => {
               .or(`make.ilike.%${escapeIlike(escapePostgrestValue(rest))}%,model.ilike.%${escapeIlike(escapePostgrestValue(rest))}%`);
           } else if (tokens.length >= 2) {
             // Try both orderings: token0=make+rest=model OR token0=model+rest=make
-            const t0 = escapeIlike(tokens[0]);
-            const tRest = escapeIlike(tokens.slice(1).join(' '));
+            const t0 = escapeIlike(escapePostgrestValue(tokens[0]));
+            const tRest = escapeIlike(escapePostgrestValue(tokens.slice(1).join(' ')));
             vehicleQuery = vehicleQuery.or(
               `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),and(model.ilike.%${t0}%,make.ilike.%${tRest}%)`
             );
