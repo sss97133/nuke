@@ -179,7 +179,7 @@ serve(async (req) => {
       });
 
       if (step1Result.error) {
-        throw new Error(`Step 1 (${APPROVED_BAT_EXTRACTORS.CORE_DATA}) failed: ${step1Result.error.message}`);
+        throw new Error(`Step 1 (${APPROVED_BAT_EXTRACTORS.CORE_DATA}) failed: ${step1Result.error?.message || step1Result.error}`);
       }
 
       const vehicleId = step1Result.data?.created_vehicle_ids?.[0] || 
@@ -264,7 +264,7 @@ serve(async (req) => {
         });
 
         if (fallbackResult.error) {
-          throw new Error(`Both ${strategy.functionName} and AI extractor failed: ${fallbackResult.error.message}`);
+          throw new Error(`Both ${strategy.functionName} and AI extractor failed: ${fallbackResult.error?.message || fallbackResult.error}`);
         }
 
         return new Response(
