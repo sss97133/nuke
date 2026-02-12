@@ -108,7 +108,23 @@ Be generous with is_automotive - include shop environments, tools in use, parts 
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
 
-    return JSON.parse(jsonMatch[0]);
+    let parsed: PhotoClassification | null = null;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error('Failed to parse Claude classification response:', parseError, 'Raw match:', jsonMatch[0].substring(0, 500));
+    }
+    if (!parsed) {
+      return {
+        is_automotive: false,
+        confidence: 0,
+        category: 'not_automotive' as const,
+        vehicle_hints: {},
+        is_receipt: false,
+        quality_score: 0
+      };
+    }
+    return parsed;
   } catch (error) {
     console.error("Classification failed:", error);
     return {

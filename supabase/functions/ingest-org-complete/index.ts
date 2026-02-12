@@ -258,24 +258,31 @@ Return JSON:
 
         if (llmResponse.ok) {
           const llmData = await llmResponse.json();
-          const orgInfo = JSON.parse(llmData.choices[0].message.content);
-          
-          const { data: newOrg, error: insertError } = await supabase
-            .from('businesses')
-            .insert({
-              website: url,
-              business_name: orgInfo.business_name || domain,
-              description: orgInfo.description,
-              metadata: {
-                source: 'automated_ingestion',
-                extracted_at: new Date().toISOString(),
-              },
-            })
-            .select('id')
-            .single();
+          let orgInfo: any = null;
+          try {
+            orgInfo = JSON.parse(llmData.choices[0].message.content);
+          } catch (parseError) {
+            console.error('Failed to parse org info LLM response:', parseError, 'Raw content:', llmData.choices?.[0]?.message?.content?.substring(0, 500));
+          }
 
-          if (!insertError && newOrg) {
-            return newOrg.id;
+          if (orgInfo) {
+            const { data: newOrg, error: insertError } = await supabase
+              .from('businesses')
+              .insert({
+                website: url,
+                business_name: orgInfo.business_name || domain,
+                description: orgInfo.description,
+                metadata: {
+                  source: 'automated_ingestion',
+                  extracted_at: new Date().toISOString(),
+                },
+              })
+              .select('id')
+              .single();
+
+            if (!insertError && newOrg) {
+              return newOrg.id;
+            }
           }
         }
       }
@@ -551,11 +558,18 @@ Return JSON:
 
       if (llmResponse.ok) {
         const llmData = await llmResponse.json();
-        const structure = JSON.parse(llmData.choices[0].message.content);
-        return {
-          domain,
-          ...structure,
-        };
+        let structure: any = null;
+        try {
+          structure = JSON.parse(llmData.choices[0].message.content);
+        } catch (parseError) {
+          console.error('Failed to parse site structure LLM response:', parseError, 'Raw content:', llmData.choices?.[0]?.message?.content?.substring(0, 500));
+        }
+        if (structure) {
+          return {
+            domain,
+            ...structure,
+          };
+        }
       }
     }
 
@@ -680,8 +694,15 @@ Return JSON:
 
         if (llmResponse.ok) {
           const llmData = await llmResponse.json();
-          const response = JSON.parse(llmData.choices[0].message.content);
-          return Array.isArray(response.patterns) ? response.patterns : (response.patterns || []);
+          let response: any = null;
+          try {
+            response = JSON.parse(llmData.choices[0].message.content);
+          } catch (parseError) {
+            console.error('Failed to parse extraction patterns LLM response:', parseError, 'Raw content:', llmData.choices?.[0]?.message?.content?.substring(0, 500));
+          }
+          if (response) {
+            return Array.isArray(response.patterns) ? response.patterns : (response.patterns || []);
+          }
         }
       }
     } else {
@@ -755,8 +776,15 @@ Return JSON:
 
         if (llmResponse.ok) {
           const llmData = await llmResponse.json();
-          const response = JSON.parse(llmData.choices[0].message.content);
-          return Array.isArray(response.patterns) ? response.patterns : (response.patterns || []);
+          let response: any = null;
+          try {
+            response = JSON.parse(llmData.choices[0].message.content);
+          } catch (parseError) {
+            console.error('Failed to parse extraction patterns LLM response:', parseError, 'Raw content:', llmData.choices?.[0]?.message?.content?.substring(0, 500));
+          }
+          if (response) {
+            return Array.isArray(response.patterns) ? response.patterns : (response.patterns || []);
+          }
         }
       }
     }

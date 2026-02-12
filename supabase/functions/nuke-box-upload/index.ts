@@ -90,8 +90,20 @@ serve(async (req) => {
       );
     }
 
-    const metadata = metadataStr ? JSON.parse(metadataStr) : {};
-    const classification = classificationStr ? JSON.parse(classificationStr) : {};
+    let metadata: any = {};
+    try {
+      metadata = metadataStr ? JSON.parse(metadataStr) : {};
+    } catch (parseError) {
+      console.error('Failed to parse metadata from form data:', parseError, 'Raw:', String(metadataStr).substring(0, 500));
+      metadata = {};
+    }
+    let classification: any = {};
+    try {
+      classification = classificationStr ? JSON.parse(classificationStr) : {};
+    } catch (parseError) {
+      console.error('Failed to parse classification from form data:', parseError, 'Raw:', String(classificationStr).substring(0, 500));
+      classification = {};
+    }
 
     // Generate unique filename
     const timestamp = Date.now();
