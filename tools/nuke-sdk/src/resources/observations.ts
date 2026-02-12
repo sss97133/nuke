@@ -127,7 +127,7 @@ export class Observations {
         yield observation;
       }
 
-      hasMore = page < response.pagination.pages;
+      hasMore = response.pagination.pages ? page < response.pagination.pages : (response.pagination.has_more ?? false);
       page++;
     }
   }

@@ -48,6 +48,12 @@ tags:
     description: Bulk import operations
   - name: Webhooks
     description: Webhook endpoint management
+  - name: Valuations
+    description: Vehicle valuation estimates (Nuke Estimates)
+  - name: Listings
+    description: External auction/marketplace listings
+  - name: Comparables
+    description: Comparable vehicle sales for valuation context
 
 paths:
   /api-v1-vehicles:
@@ -492,6 +498,185 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api-v1-valuations:
+    get:
+      tags: [Valuations]
+      summary: Get vehicle valuation
+      description: |
+        Returns the Nuke Estimate (valuation) for a vehicle, including confidence scoring,
+        deal score, and heat score. Falls back to vehicle pricing fields if no dedicated
+        estimate exists.
+      operationId: getValuation
+      parameters:
+        - name: vehicle_id
+          in: query
+          description: Vehicle UUID
+          schema:
+            type: string
+            format: uuid
+        - name: vin
+          in: query
+          description: Vehicle VIN (alternative to vehicle_id)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Valuation data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Valuation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api-v1-listings:
+    get:
+      tags: [Listings]
+      summary: List external listings
+      description: |
+        Returns external auction and marketplace listings for vehicles. Filter by
+        vehicle, platform (bat, cars_and_bids, etc.), or listing status.
+      operationId: listListings
+      parameters:
+        - name: vehicle_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: vin
+          in: query
+          schema:
+            type: string
+        - name: platform
+          in: query
+          description: Filter by platform
+          schema:
+            type: string
+            enum: [bat, cars_and_bids, pcarmarket, hagerty, rm_sothebys, mecum, gooding, broad_arrow, bonhams]
+        - name: status
+          in: query
+          description: Filter by listing status
+          schema:
+            type: string
+            enum: [active, sold, expired, ended]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Paginated list of external listings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExternalListing'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api-v1-comps:
+    get:
+      tags: [Comparables]
+      summary: Find comparable sales
+      description: |
+        Returns comparable vehicle sales for valuation context. Query by year/make/model
+        or VIN to find similar sold vehicles, with summary statistics (avg, median, min, max prices).
+      operationId: getComps
+      parameters:
+        - name: make
+          in: query
+          required: true
+          description: Vehicle make (or provide vin)
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: vin
+          in: query
+          description: Resolve make/model/year from VIN
+          schema:
+            type: string
+        - name: year_range
+          in: query
+          description: Years +/- from target year to include
+          schema:
+            type: integer
+            default: 3
+        - name: min_price
+          in: query
+          schema:
+            type: integer
+        - name: max_price
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Comparable sales with summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comparable'
+                  summary:
+                    $ref: '#/components/schemas/CompsSummary'
+                  query:
+                    type: object
+                    properties:
+                      make:
+                        type: string
+                      model:
+                        type: string
+                        nullable: true
+                      year:
+                        type: integer
+                        nullable: true
+                      year_range:
+                        type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -919,6 +1104,172 @@ components:
           type: integer
         pages:
           type: integer
+
+    Valuation:
+      type: object
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+        estimated_value:
+          type: number
+          description: Primary valuation estimate in USD
+        value_low:
+          type: number
+          nullable: true
+        value_high:
+          type: number
+          nullable: true
+        confidence_score:
+          type: number
+          nullable: true
+          description: 0-1 confidence in the estimate
+        deal_score:
+          type: number
+          nullable: true
+        deal_score_label:
+          type: string
+          nullable: true
+          enum: [steal, great, good, fair, overpriced]
+        heat_score:
+          type: number
+          nullable: true
+        heat_score_label:
+          type: string
+          nullable: true
+        price_tier:
+          type: string
+          nullable: true
+        signal_weights:
+          type: object
+          nullable: true
+        model_version:
+          type: string
+          nullable: true
+        calculated_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_stale:
+          type: boolean
+          nullable: true
+        source:
+          type: string
+          enum: [nuke_estimates, vehicle_fields]
+
+    ExternalListing:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vehicle_id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+        listing_url:
+          type: string
+          format: uri
+        listing_id:
+          type: string
+        listing_status:
+          type: string
+          enum: [active, sold, expired, ended]
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        current_bid:
+          type: number
+          nullable: true
+        reserve_price:
+          type: number
+          nullable: true
+        buy_now_price:
+          type: number
+          nullable: true
+        bid_count:
+          type: integer
+          nullable: true
+        view_count:
+          type: integer
+          nullable: true
+        watcher_count:
+          type: integer
+          nullable: true
+        final_price:
+          type: number
+          nullable: true
+        sold_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Comparable:
+      type: object
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+        year:
+          type: integer
+        make:
+          type: string
+        model:
+          type: string
+        trim:
+          type: string
+          nullable: true
+        vin:
+          type: string
+          nullable: true
+        sale_price:
+          type: number
+        mileage:
+          type: integer
+          nullable: true
+        transmission:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        condition_rating:
+          type: number
+          nullable: true
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        location:
+          type: string
+          nullable: true
+
+    CompsSummary:
+      type: object
+      nullable: true
+      properties:
+        count:
+          type: integer
+        avg_price:
+          type: number
+        median_price:
+          type: number
+        min_price:
+          type: number
+        max_price:
+          type: number
 
     Error:
       type: object

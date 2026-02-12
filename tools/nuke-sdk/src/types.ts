@@ -25,7 +25,8 @@ export interface PaginatedResponse<T> {
     page: number;
     limit: number;
     total: number;
-    pages: number;
+    pages?: number;
+    has_more?: boolean;
   };
 }
 
@@ -230,6 +231,107 @@ export interface BatchResult {
     status: 'created' | 'updated' | 'skipped' | 'failed';
     error?: string;
   }>;
+}
+
+// Valuation Types
+export interface Valuation {
+  vehicle_id: string;
+  estimated_value: number | null;
+  value_low: number | null;
+  value_high: number | null;
+  confidence_score: number | null;
+  deal_score: number | null;
+  deal_score_label: string | null;
+  heat_score: number | null;
+  heat_score_label: string | null;
+  price_tier: string | null;
+  signal_weights: Record<string, number> | null;
+  model_version: string | null;
+  calculated_at: string | null;
+  is_stale: boolean | null;
+  source: 'nuke_estimates' | 'vehicle_fields';
+  vehicle_summary?: string;
+}
+
+export interface ValuationGetParams {
+  vehicle_id?: string;
+  vin?: string;
+}
+
+// External Listing Types
+export interface ExternalListing {
+  id: string;
+  vehicle_id: string;
+  platform: string;
+  listing_url: string;
+  listing_id: string;
+  listing_status: string;
+  start_date: string | null;
+  end_date: string | null;
+  current_bid: number | null;
+  reserve_price: number | null;
+  buy_now_price: number | null;
+  bid_count: number | null;
+  view_count: number | null;
+  watcher_count: number | null;
+  final_price: number | null;
+  sold_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListingListParams extends PaginationParams {
+  vehicle_id?: string;
+  vin?: string;
+  platform?: string;
+  status?: 'active' | 'sold' | 'expired' | 'ended';
+}
+
+// Comparable Types
+export interface Comparable {
+  vehicle_id: string;
+  year: number;
+  make: string;
+  model: string;
+  trim: string | null;
+  vin: string | null;
+  sale_price: number;
+  mileage: number | null;
+  transmission: string | null;
+  color: string | null;
+  condition_rating: number | null;
+  image_url: string | null;
+  location: string | null;
+}
+
+export interface CompsSummary {
+  count: number;
+  avg_price: number;
+  median_price: number;
+  min_price: number;
+  max_price: number;
+}
+
+export interface CompsResponse {
+  data: Comparable[];
+  summary: CompsSummary | null;
+  query: {
+    make: string;
+    model: string | null;
+    year: number | null;
+    year_range: number;
+  };
+}
+
+export interface CompsGetParams {
+  make?: string;
+  model?: string;
+  year?: number;
+  vin?: string;
+  year_range?: number;
+  min_price?: number;
+  max_price?: number;
+  limit?: number;
 }
 
 // Webhook Payload Types (for receiving webhooks)
