@@ -82,6 +82,27 @@ const MCP_TOOLS: McpTool[] = [
 })
 // => { leads_found: 23, new_vehicles: 4, observations_created: 47 }`,
   },
+  {
+    name: 'api-v1-valuations',
+    description: 'Get Nuke Estimates for any vehicle. Returns valuation with confidence scoring, deal score, heat score, and price range.',
+    example: `curl "https://api.nuke.build/functions/v1/api-v1-valuations?vin=WP0AB0916KS121279" \\
+  -H "X-API-Key: nk_live_xxx"
+// => { data: { estimated_value: 185000, confidence_score: 0.87, deal_score_label: "great" } }`,
+  },
+  {
+    name: 'api-v1-listings',
+    description: 'Query external auction and marketplace listings. Filter by platform (BaT, C&B, Hagerty), status, and vehicle.',
+    example: `curl "https://api.nuke.build/functions/v1/api-v1-listings?platform=bat&status=sold&limit=10" \\
+  -H "X-API-Key: nk_live_xxx"
+// => { data: [{ platform: "bat", final_price: 56000, bid_count: 42, ... }], pagination: {...} }`,
+  },
+  {
+    name: 'api-v1-comps',
+    description: 'Find comparable vehicle sales. Returns similar sold vehicles with summary stats (avg, median, min, max prices).',
+    example: `curl "https://api.nuke.build/functions/v1/api-v1-comps?make=Porsche&model=911&year=1973" \\
+  -H "X-API-Key: nk_live_xxx"
+// => { summary: { avg_price: 185000, median_price: 172000 }, data: [...] }`,
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -613,6 +634,32 @@ observation_            Structured discoveries with confidence scores
         <div style={s.card}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
             <span style={s.stepNumber}>2</span>
+            <span style={{ fontWeight: 'bold' }}>Install the SDK</span>
+          </div>
+          <div style={s.cardDesc}>
+            The official TypeScript SDK follows Stripe/Plaid patterns. Includes typed resources
+            for vehicles, valuations, listings, comps, observations, webhooks, and batch imports.
+          </div>
+          <CodeBlock
+            code={`npm install @nuke/sdk
+
+import Nuke from '@nuke/sdk';
+const nuke = new Nuke('nk_live_...');
+
+// Get comparable sales
+const comps = await nuke.comps.get({ make: 'Porsche', model: '911', year: 1973 });
+console.log(comps.summary); // { avg_price, median_price, min_price, max_price }
+
+// Get a valuation
+const val = await nuke.valuations.get({ vin: 'WP0AB0916KS121279' });
+console.log(val.estimated_value, val.deal_score_label);`}
+          />
+        </div>
+
+        {/* Step 3 */}
+        <div style={s.card}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+            <span style={s.stepNumber}>3</span>
             <span style={{ fontWeight: 'bold' }}>Make Your First Call</span>
           </div>
           <div style={s.cardDesc}>
@@ -629,10 +676,10 @@ curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/universal-search" \\
           />
         </div>
 
-        {/* Step 3 */}
+        {/* Step 4 */}
         <div style={s.card}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-            <span style={s.stepNumber}>3</span>
+            <span style={s.stepNumber}>4</span>
             <span style={{ fontWeight: 'bold' }}>Connect via MCP</span>
           </div>
           <div style={s.cardDesc}>
@@ -655,10 +702,10 @@ curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/universal-search" \\
           />
         </div>
 
-        {/* Step 4 */}
+        {/* Step 5 */}
         <div style={s.card}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-            <span style={s.stepNumber}>4</span>
+            <span style={s.stepNumber}>5</span>
             <span style={{ fontWeight: 'bold' }}>Set Up Webhooks (Optional)</span>
           </div>
           <div style={s.cardDesc}>

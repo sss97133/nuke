@@ -37,11 +37,14 @@ import { Vehicles } from './resources/vehicles';
 import { Observations } from './resources/observations';
 import { Webhooks } from './resources/webhooks';
 import { Batch } from './resources/batch';
+import { Valuations } from './resources/valuations';
+import { Listings } from './resources/listings';
+import { Comps } from './resources/comps';
 import { NukeError, NukeAPIError, NukeAuthenticationError, NukeRateLimitError } from './errors';
 
 const DEFAULT_BASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '1.0.0';
+const SDK_VERSION = '1.1.0';
 
 export default class Nuke {
   private apiKey: string;
@@ -53,6 +56,9 @@ export default class Nuke {
   public observations: Observations;
   public webhooks: Webhooks;
   public batch: Batch;
+  public valuations: Valuations;
+  public listings: Listings;
+  public comps: Comps;
 
   constructor(apiKey: string, config?: Partial<NukeConfig>) {
     if (!apiKey) {
@@ -68,6 +74,9 @@ export default class Nuke {
     this.observations = new Observations(this);
     this.webhooks = new Webhooks(this);
     this.batch = new Batch(this);
+    this.valuations = new Valuations(this);
+    this.listings = new Listings(this);
+    this.comps = new Comps(this);
   }
 
   /**
