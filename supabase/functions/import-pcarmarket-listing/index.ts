@@ -746,7 +746,7 @@ Deno.serve(async (req: Request) => {
           is_active: true,
         })
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (newSource) {
         sourceId = newSource.id;
@@ -860,7 +860,7 @@ Deno.serve(async (req: Request) => {
         .from('vehicles')
         .insert(vehicleData)
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (vehicleError) {
         // Handle unique constraint violation by finding and updating the existing record
@@ -948,7 +948,7 @@ Deno.serve(async (req: Request) => {
           .from('external_listings')
           .insert(externalListingData)
           .select('id')
-          .single();
+          .maybeSingle();
 
         if (!listingError && newListing) {
           console.log(`Created external_listing: ${newListing.id}`);
@@ -976,7 +976,7 @@ Deno.serve(async (req: Request) => {
           .delete()
           .eq('vehicle_id', vehicleId)
           .eq('source', 'pcarmarket_listing');
-        if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message);
+        if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError?.message || deleteError);
         
         // Import ALL images (not just 10)
         const imageInserts = listing.images.map((imageUrl, index) => ({
@@ -1103,7 +1103,7 @@ Deno.serve(async (req: Request) => {
   } catch (error: any) {
     console.error('Error importing PCarMarket listing:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error || 'Internal server error') }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
