@@ -313,30 +313,49 @@ serve(async (req) => {
                 }).catch((e: any) => console.warn(`[queue] Comment extraction trigger failed for ${item.id}:`, e instanceof Error ? e.message : String(e)));
               }
             } else {
-              const errDetail = typeof extractResult.error === 'string' ? extractResult.error : JSON.stringify(extractResult.error);
-              throw new Error(errDetail || "Extraction failed");
+              // Propagate the real error from the extractor
+              const errDetail = typeof extractResult.error === 'string'
+                ? extractResult.error
+                : extractResult.error ? JSON.stringify(extractResult.error) : null;
+              const httpNote = extractResponse.ok ? '' : ` (HTTP ${extractResponse.status})`;
+              throw new Error(errDetail || `Extraction failed${httpNote}`);
             }
           } catch (e: any) {
             const errorMsg = e.message || String(e);
 
+            // Categorize the failure for triage
+            const category = errorMsg.includes('RATE_LIMITED') || errorMsg.includes('429') ? 'rate_limited'
+              : errorMsg.includes('BLOCKED') || errorMsg.includes('403') || errorMsg.includes('Cloudflare') ? 'blocked'
+              : errorMsg.includes('REDIRECT') ? 'redirect'
+              : errorMsg.includes('timeout') || errorMsg.includes('Timeout') || errorMsg.includes('TIMEOUT') ? 'timeout'
+              : errorMsg.includes('INVALID_PAGE') ? 'invalid_page'
+              : errorMsg.includes('duplicate key') ? 'duplicate'
+              : errorMsg.includes('Missing required') ? 'missing_fields'
+              : 'extraction_failed';
+
+            // Rate-limited and blocked errors should retry more aggressively
+            const isTransient = category === 'rate_limited' || category === 'blocked' || category === 'timeout';
+
             // Determine if should retry or fail
             const attempts = item.attempts ?? 0;
-            const shouldFail = attempts >= 5;
+            const maxAttempts = isTransient ? 8 : 5;
+            const shouldFail = attempts >= maxAttempts;
 
             await supabase
               .from("import_queue")
               .update({
                 status: shouldFail ? "failed" : "pending",
                 error_message: errorMsg,
+                failure_category: category,
                 processed_at: new Date().toISOString(),
                 locked_at: null,
                 locked_by: null,
-                // Backoff: 5min * 2^attempts, max 2 hours
+                // Transient errors: longer backoff (10min base). Others: 5min base. Max 2 hours.
                 next_attempt_at: shouldFail
                   ? null
                   : new Date(
                       Date.now() +
-                        Math.min(2 * 60 * 60 * 1000, 5 * 60 * 1000 * Math.pow(2, attempts))
+                        Math.min(2 * 60 * 60 * 1000, (isTransient ? 10 : 5) * 60 * 1000 * Math.pow(2, attempts))
                     ).toISOString(),
               })
               .eq("id", item.id);
