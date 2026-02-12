@@ -228,7 +228,7 @@ serve(async (req) => {
             is_public: false,
           })
           .select()
-          .single();
+          .maybeSingle();
 
         if (createError) {
           throw createError;

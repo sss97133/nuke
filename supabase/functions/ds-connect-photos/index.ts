@@ -92,7 +92,7 @@ serve(async (req) => {
         .from('ds_deals')
         .insert({ user_id: user.id, deal_name: null })
         .select('id')
-        .single()
+        .maybeSingle()
       if (error || !newDeal) {
         return new Response(JSON.stringify({ error: 'Failed to create deal' }), {
           status: 500,

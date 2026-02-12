@@ -696,13 +696,13 @@ serve(async (req) => {
                     .from('vehicles')
                     .insert(vehicleInsert)
                     .select('id')
-                    .single()
+                    .maybeSingle()
 
-                  console.log(`  📊 Insert result:`, { 
-                    hasData: !!newVehicle, 
+                  console.log(`  📊 Insert result:`, {
+                    hasData: !!newVehicle,
                     hasError: !!vehicleError,
                     vehicleId: newVehicle?.id,
-                    errorMessage: vehicleError?.message 
+                    errorMessage: vehicleError?.message
                   })
 
                   if (vehicleError) {
@@ -853,8 +853,8 @@ serve(async (req) => {
                                 total_contributions: 0
                               })
                               .select('id')
-                              .single();
-                            
+                              .maybeSingle();
+
                             if (!ghostError && newGhost?.id) {
                               ghostUserId = newGhost.id;
                             }
@@ -881,8 +881,8 @@ serve(async (req) => {
                               }
                             })
                             .select('id')
-                            .single();
-                          
+                            .maybeSingle();
+
                           // Create device attribution if ghost user exists
                           if (!imageInsertError && imageData?.id && ghostUserId) {
                             await supabase

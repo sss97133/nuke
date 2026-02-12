@@ -325,7 +325,7 @@ serve(async (req) => {
 
     let newVehicle: any = null;
     {
-      const attempt = await admin.from("vehicles").insert(baseInsertPayload).select("id").single();
+      const attempt = await admin.from("vehicles").insert(baseInsertPayload).select("id").maybeSingle();
       if (!attempt.error) {
         newVehicle = attempt.data;
       } else {
@@ -345,7 +345,7 @@ serve(async (req) => {
             retryPayload.discovery_url = null;
             retryPayload.discovery_source = null;
           }
-          const retry = await admin.from("vehicles").insert(retryPayload).select("id").single();
+          const retry = await admin.from("vehicles").insert(retryPayload).select("id").maybeSingle();
           if (retry.error) throw retry.error;
           newVehicle = retry.data;
         } else {
