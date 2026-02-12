@@ -33,6 +33,7 @@ import VehicleThumbnail from '../components/VehicleThumbnail';
 import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
 import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
 import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
+import StorefrontSettings from '../components/organization/StorefrontSettings';
 import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
 import { getOrganizationProfileData } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
@@ -2065,7 +2066,7 @@ export default function OrganizationProfile() {
           borderBottom: '2px solid var(--border)',
           padding: '0 16px'
         }}>
-          {(['overview', 'vehicles', 'images', 'inventory', 'contributors', 'marketplace', 'notifications'] as const).map(tab => (
+          {(['overview', 'vehicles', 'images', 'inventory', 'contributors', 'marketplace', 'notifications', 'storefront'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -3494,6 +3495,16 @@ export default function OrganizationProfile() {
             isOwner={isOwner}
             canEdit={canEdit}
           />
+        )}
+
+        {/* Storefront Settings Tab */}
+        {activeTab === 'storefront' && organization && (isOwner || canEdit) && (
+          <div style={{ padding: 16 }}>
+            <StorefrontSettings
+              organization={organization}
+              onSave={() => loadOrganization()}
+            />
+          </div>
         )}
       </div>
 

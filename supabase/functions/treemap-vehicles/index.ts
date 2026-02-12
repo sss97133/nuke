@@ -30,17 +30,149 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const viewMode = url.searchParams.get("view") || "source";
     const source = url.searchParams.get("source");
+    const segment = url.searchParams.get("segment");
     const make = url.searchParams.get("make");
     const model = url.searchParams.get("model");
     const year = url.searchParams.get("year");
+    const nested = url.searchParams.get("nested") === "true";
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     let hierarchy: any;
     let stats: any;
 
+    // NESTED MODE: returns 2 levels in one call for treemap display
+    if (nested) {
+      const { data, error } = await supabase.rpc("treemap_nested", {
+        p_view: viewMode,
+        p_filter: segment || null,
+      });
+      if (error) throw error;
+
+      hierarchy = data;
+      // Compute stats from nested data
+      const children = hierarchy?.children || [];
+      const totalValue = children.reduce((s: number, c: any) => s + (c.value || 0), 0);
+      const totalCount = children.reduce((s: number, c: any) => s + (c.count || 0), 0);
+      stats = { totalValue, totalCount, level: viewMode === "segment" ? "segments" : "brands", nested: true };
+
+      return new Response(
+        JSON.stringify({ hierarchy, stats, filters: { segment, make, model, year }, generated_at: new Date().toISOString() }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // SEGMENT VIEW: Segment → Make → Model → Year
+    if (viewMode === "segment") {
+      if (!segment) {
+        // Top level: all segments
+        const { data, error } = await supabase.rpc("treemap_by_segment");
+        if (error) throw error;
+
+        const children = (data || []).map((r: any) => ({
+          name: r.name,
+          value: Number(r.value),
+          count: Number(r.count)
+        }));
+
+        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
+        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
+
+        hierarchy = { name: "All Segments", value: totalValue, count: totalCount, children };
+        stats = { totalValue, totalCount, level: "segments" };
+
+      } else if (!make) {
+        // Makes within a segment
+        const { data, error } = await supabase.rpc("treemap_makes_by_segment", { p_segment: segment });
+        if (error) throw error;
+
+        const children = (data || []).map((r: any) => ({
+          name: r.name,
+          value: Number(r.value),
+          count: Number(r.count)
+        }));
+
+        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
+        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
+
+        hierarchy = { name: segment, value: totalValue, count: totalCount, children };
+        stats = { totalValue, totalCount, level: "makes", segment };
+
+      } else if (!model) {
+        // Models for segment + make (reuse brand model function)
+        const { data, error } = await supabase.rpc("treemap_models_by_brand", { p_make: make });
+        if (error) throw error;
+
+        const children = (data || []).map((r: any) => ({
+          name: r.name,
+          value: Number(r.value),
+          count: Number(r.count)
+        }));
+
+        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
+        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
+
+        hierarchy = { name: `${segment} › ${make}`, value: totalValue, count: totalCount, children };
+        stats = { totalValue, totalCount, level: "models", segment, make };
+
+      } else if (!year) {
+        // Years for segment + make + model
+        const { data, error } = await supabase.rpc("treemap_years", {
+          p_source: null,
+          p_make: make,
+          p_model: model
+        });
+        if (error) throw error;
+
+        const children = (data || []).map((r: any) => ({
+          name: r.name,
+          value: Number(r.value),
+          count: Number(r.count)
+        }));
+
+        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
+        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
+
+        hierarchy = { name: `${segment} › ${make} › ${model}`, value: totalValue, count: totalCount, children };
+        stats = { totalValue, totalCount, level: "years", segment, make, model };
+
+      } else {
+        // Individual vehicles
+        const yearNum = parseInt(year);
+        const { data: vehicles, error } = await supabase
+          .from("vehicles")
+          .select("id, listing_title, bat_listing_title, year, make, model, sale_price, sold_price")
+          .or("sale_price.gt.0,sold_price.gt.0")
+          .is("deleted_at", null)
+          .eq("year", yearNum)
+          .ilike("make", make)
+          .ilike("model", model)
+          .order("sale_price", { ascending: false })
+          .limit(200);
+
+        if (error) throw error;
+
+        let totalValue = 0;
+        const children = (vehicles || []).map((v: any) => {
+          const price = v.sale_price || v.sold_price || 0;
+          totalValue += price;
+          const title = v.listing_title || v.bat_listing_title || `${v.year} ${v.make} ${v.model}`;
+          return {
+            id: v.id,
+            name: title.length > 40 ? title.slice(0, 40) + '...' : title,
+            fullName: title,
+            value: price,
+            count: 1,
+            isVehicle: true
+          };
+        });
+
+        hierarchy = { name: `${segment} › ${make} › ${model} › ${year}`, value: totalValue, count: children.length, children };
+        stats = { totalValue, totalCount: children.length, level: "vehicles", segment, make, model, year };
+      }
+
     // BRAND VIEW: Brand → Model → Year
-    if (viewMode === "brand") {
+    } else if (viewMode === "brand") {
       if (!make) {
         // Top level: all brands
         const { data, error } = await supabase.rpc("treemap_by_brand");
@@ -119,7 +251,7 @@ Deno.serve(async (req) => {
           const title = v.listing_title || v.bat_listing_title || `${v.year} ${v.make} ${v.model}`;
           return {
             id: v.id,
-            name: title.length > 40 ? title.slice(0, 40) + '…' : title,
+            name: title.length > 40 ? title.slice(0, 40) + '...' : title,
             fullName: title,
             value: price,
             count: 1,
@@ -234,7 +366,7 @@ Deno.serve(async (req) => {
         const title = v.listing_title || v.bat_listing_title || `${v.year} ${v.make} ${v.model}`;
         return {
           id: v.id,
-          name: title.length > 40 ? title.slice(0, 40) + '…' : title,
+          name: title.length > 40 ? title.slice(0, 40) + '...' : title,
           fullName: title,
           value: price,
           count: 1,
@@ -247,7 +379,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ hierarchy, stats, filters: { source, make, model, year }, generated_at: new Date().toISOString() }),
+      JSON.stringify({ hierarchy, stats, filters: { source, segment, make, model, year }, generated_at: new Date().toISOString() }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

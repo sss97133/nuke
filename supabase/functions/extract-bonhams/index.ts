@@ -642,7 +642,8 @@ async function extractCatalogFromJsonLd(auctionUrl: string): Promise<CatalogResu
   console.log(`[Bonhams] Fetching catalog via JSON-LD: ${auctionUrl}`);
 
   try {
-    const response = await fetch(auctionUrl, {
+    let response = await fetch(auctionUrl, {
+      redirect: 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -658,6 +659,25 @@ async function extractCatalogFromJsonLd(auctionUrl: string): Promise<CatalogResu
       },
     });
 
+    // Handle 308 redirects manually if redirect: 'follow' didn't work
+    if (response.status === 308 || response.status === 307 || response.status === 301 || response.status === 302) {
+      const location = response.headers.get('location');
+      if (location) {
+        const redirectUrl = location.startsWith('http') ? location : new URL(location, auctionUrl).href;
+        console.log(`[Bonhams] Following ${response.status} redirect to: ${redirectUrl}`);
+        response = await fetch(redirectUrl, {
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+        });
+      }
+    }
+
+    console.log(`[Bonhams] Response status: ${response.status}, url: ${response.url}, redirected: ${response.redirected}`);
+
     if (!response.ok) {
       console.error(`[Bonhams] Catalog fetch failed: ${response.status} - ${response.statusText}`);
       // Try to get error body
@@ -668,6 +688,8 @@ async function extractCatalogFromJsonLd(auctionUrl: string): Promise<CatalogResu
 
     const html = await response.text();
     console.log(`[Bonhams] Fetched ${html.length} bytes from catalog page`);
+    const hasJsonLd = html.includes('application/ld+json');
+    console.log(`[Bonhams] Has JSON-LD: ${hasJsonLd}, HTML starts with: ${html.slice(0, 200)}`);
 
     // Extract JSON-LD script - Bonhams uses data-next-head attribute
     // Pattern: <script type="application/ld+json" data-next-head="">{"@context":...}</script>
@@ -1086,8 +1108,23 @@ serve(async (req) => {
       const catalog = await extractCatalogFromJsonLd(catalog_url);
 
       if (!catalog) {
+        // Debug: try fetching the URL directly to see what we get
+        let debugInfo: any = {};
+        try {
+          const debugResp = await fetch(catalog_url, {
+            redirect: 'manual',
+            headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+          });
+          debugInfo = {
+            status: debugResp.status,
+            redirected: debugResp.redirected,
+            location: debugResp.headers.get('location'),
+            url: debugResp.url,
+            bodyLength: (await debugResp.text().catch(() => '')).length,
+          };
+        } catch (e: any) { debugInfo.fetchError = e.message; }
         return new Response(
-          JSON.stringify({ error: 'Failed to extract catalog from JSON-LD' }),
+          JSON.stringify({ error: 'Failed to extract catalog from JSON-LD', debug: debugInfo }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

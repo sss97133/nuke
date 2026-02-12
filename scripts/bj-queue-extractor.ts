@@ -2,29 +2,23 @@
 /**
  * Barrett-Jackson Queue Extractor
  *
- * Resilient Playwright-based processor for BJ URLs in import_queue.
- * Key improvements over bj-docket-extractor.ts:
- *   - NEW page per URL (no reusing dead pages)
- *   - Restarts browser after 5 consecutive crashes
- *   - Claims batches from import_queue using claim_import_queue_batch RPC
- *   - --workers N flag for parallel browser instances
- *   - 2s delay between URLs per worker
+ * Uses Playwright for page extraction + direct PostgreSQL for DB operations.
+ * Bypasses PostgREST (which has persistent schema cache issues).
  *
  * Usage:
  *   dotenvx run -- npx tsx scripts/bj-queue-extractor.ts
- *   dotenvx run -- npx tsx scripts/bj-queue-extractor.ts --workers 3
- *   dotenvx run -- npx tsx scripts/bj-queue-extractor.ts --workers 5 --batch-size 50
+ *   dotenvx run -- npx tsx scripts/bj-queue-extractor.ts --workers 2 --batch-size 30
  */
 
 import { chromium, Browser, BrowserContext } from 'playwright';
-import { createClient } from '@supabase/supabase-js';
+import pg from 'pg';
 import * as dotenv from 'dotenv';
 
 dotenv.config({ path: '.env' });
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Build connection string from Supabase env vars
+const DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD!;
+const DATABASE_URL = `postgresql://postgres.qkgaybvrernstplzjaam:${DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`;
 
 // Parse CLI args
 const args = process.argv.slice(2);
@@ -34,12 +28,19 @@ function getArg(name: string, defaultVal: number): number {
   return defaultVal;
 }
 
-const NUM_WORKERS = getArg('workers', 3);
-const BATCH_SIZE = getArg('batch-size', 50);
+const NUM_WORKERS = getArg('workers', 2);
+const BATCH_SIZE = getArg('batch-size', 30);
 const DELAY_MS = getArg('delay', 2000);
 const MAX_CONSECUTIVE_CRASHES = 5;
 
-// Stats
+// Create a connection pool
+const pool = new pg.Pool({
+  connectionString: DATABASE_URL,
+  max: NUM_WORKERS + 2,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
 const stats = {
   total: 0,
   success: 0,
@@ -68,24 +69,36 @@ async function extractLotPage(context: BrowserContext, url: string): Promise<any
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(2000);
 
-    const data = await page.evaluate(() => {
-      function getText(selector: string): string | null {
-        return document.querySelector(selector)?.textContent?.trim() || null;
-      }
+    // Use string-based evaluate to avoid tsx __name transformation bug
+    // Check for Cloudflare block
+    const pageTitle = await page.title();
+    if (pageTitle.includes('blocked') || pageTitle.includes('Attention Required') || pageTitle.includes('Just a moment')) {
+      throw new Error('BLOCKED by Cloudflare/bot protection');
+    }
+
+    const bodyText = await page.evaluate('document.body.innerText.slice(0, 200)');
+    if (bodyText.includes('Sorry, you have been blocked') || bodyText.includes('ray ID')) {
+      throw new Error('BLOCKED by Cloudflare/bot protection');
+    }
+
+    const data = await page.evaluate(`(() => {
+      const getText = (selector) => {
+        const el = document.querySelector(selector);
+        return el ? el.textContent.trim() : null;
+      };
 
       const title = getText('h1') || getText('[class*="title"]') || '';
-
-      const yearMatch = title.match(/\b(19\d{2}|20[0-2]\d)\b/);
+      const yearMatch = title.match(/\\b(19\\d{2}|20[0-2]\\d)\\b/);
       const year = yearMatch ? parseInt(yearMatch[1]) : null;
 
       const lotText = document.body.innerText;
-      const lotMatch = lotText.match(/Lot\s*#?\s*(\d+)/i);
+      const lotMatch = lotText.match(/Lot\\s*#?\\s*(\\d+)/i);
       const lotNumber = lotMatch ? lotMatch[1] : null;
 
-      const vinMatch = lotText.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i);
+      const vinMatch = lotText.match(/VIN[:\\s]*([A-HJ-NPR-Z0-9]{17})/i);
       const vin = vinMatch ? vinMatch[1] : null;
 
-      const images: string[] = [];
+      const images = [];
       document.querySelectorAll('img').forEach((img) => {
         const src = img.src || img.dataset.src;
         if (src && (src.includes('cloudinary') || src.includes('barrett-jackson')) &&
@@ -94,28 +107,19 @@ async function extractLotPage(context: BrowserContext, url: string): Promise<any
         }
       });
 
-      const specs: Record<string, string> = {};
-      const specPatterns = [
-        /Engine[:\s]*([^\n]+)/i,
-        /Transmission[:\s]*([^\n]+)/i,
-        /Mileage[:\s]*([\d,]+)/i,
-        /Miles[:\s]*([\d,]+)/i,
-        /Exterior[:\s]*([^\n]+)/i,
-        /Interior[:\s]*([^\n]+)/i,
-      ];
-      specPatterns.forEach((pattern) => {
-        const match = lotText.match(pattern);
-        if (match) {
-          const key = pattern.source.split('[')[0].toLowerCase();
-          specs[key] = match[1].trim();
-        }
+      const specs = {};
+      const specKeys = ['Engine', 'Transmission', 'Mileage', 'Miles', 'Exterior', 'Interior'];
+      specKeys.forEach((key) => {
+        const re = new RegExp(key + '[:\\\\s]*([^\\\\n]+)', 'i');
+        const match = lotText.match(re);
+        if (match) specs[key.toLowerCase()] = match[1].trim();
       });
 
       const descEl = document.querySelector('[class*="description"]') ||
                      document.querySelector('[class*="highlights"]');
-      const description = descEl?.textContent?.trim().slice(0, 2000) || null;
+      const description = descEl ? descEl.textContent.trim().slice(0, 2000) : null;
 
-      const priceMatch = lotText.match(/\$[\d,]+(?:\.\d{2})?/g);
+      const priceMatch = lotText.match(/\\$[\\d,]+(?:\\.\\d{2})?/g);
       const hammerPrice = priceMatch ? priceMatch[priceMatch.length - 1] : null;
 
       return {
@@ -129,7 +133,7 @@ async function extractLotPage(context: BrowserContext, url: string): Promise<any
         hammerPrice,
         url: window.location.href,
       };
-    });
+    })()`);
 
     return data;
   } finally {
@@ -150,121 +154,117 @@ async function saveLot(lot: any, queueItemId: string): Promise<string | null> {
   const mileage = lot.specs?.mileage ? parseInt(lot.specs.mileage.replace(/,/g, '')) : null;
   const price = lot.hammerPrice ? parseInt(lot.hammerPrice.replace(/[$,]/g, '')) : null;
 
-  // Check for existing vehicle by discovery_url
-  const { data: existing } = await supabase
-    .from('vehicles')
-    .select('id')
-    .eq('discovery_url', lot.url)
-    .maybeSingle();
+  const client = await pool.connect();
+  try {
+    // Check for existing vehicle
+    const existing = await client.query(
+      'SELECT id FROM vehicles WHERE discovery_url = $1 LIMIT 1',
+      [lot.url]
+    );
 
-  let vehicleId: string | null = null;
+    let vehicleId: string | null = null;
 
-  if (existing) {
-    vehicleId = existing.id;
-    await supabase.from('vehicles').update({
-      title: lot.title?.slice(0, 200),
-      year: lot.year,
-      make,
-      model,
-      vin: lot.vin,
-      mileage,
-      sale_price: price,
-      engine: lot.specs?.engine,
-      transmission: lot.specs?.transmission,
-      color: lot.specs?.exterior,
-      interior_color: lot.specs?.interior,
-      description: lot.description,
-      status: price ? 'sold' : 'active',
-      updated_at: new Date().toISOString(),
-    }).eq('id', vehicleId);
-  } else {
-    const { data: newVehicle, error } = await supabase.from('vehicles').insert({
-      title: lot.title?.slice(0, 200),
-      year: lot.year,
-      make,
-      model,
-      vin: lot.vin,
-      mileage,
-      sale_price: price,
-      engine: lot.specs?.engine,
-      transmission: lot.specs?.transmission,
-      color: lot.specs?.exterior,
-      interior_color: lot.specs?.interior,
-      description: lot.description,
-      discovery_source: 'barrett-jackson',
-      discovery_url: lot.url,
-      status: price ? 'sold' : 'active',
-      is_public: true,
-    }).select('id').single();
+    const metadata = JSON.stringify({
+      source: 'bj_queue_extractor',
+      engine: lot.specs?.engine || null,
+      lot_number: lot.lotNumber || null,
+      imported_at: new Date().toISOString(),
+    });
 
-    if (error) {
-      throw new Error(`DB insert error: ${error.message}`);
+    if (existing.rows.length > 0) {
+      vehicleId = existing.rows[0].id;
+      await client.query(
+        `UPDATE vehicles SET title=$1, year=$2, make=$3, model=$4, vin=$5, mileage=$6,
+         sale_price=$7, transmission=$8, color=$9, interior_color=$10,
+         description=$11, status=$12, origin_metadata=$13, updated_at=NOW()
+         WHERE id=$14`,
+        [lot.title?.slice(0, 200), lot.year, make, model, lot.vin, mileage,
+         price, lot.specs?.transmission, lot.specs?.exterior,
+         lot.specs?.interior, lot.description, price ? 'sold' : 'active', metadata, vehicleId]
+      );
+    } else {
+      const insertResult = await client.query(
+        `INSERT INTO vehicles (title, year, make, model, vin, mileage, sale_price,
+         transmission, color, interior_color, description,
+         discovery_source, discovery_url, status, is_public, origin_metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+         RETURNING id`,
+        [lot.title?.slice(0, 200), lot.year, make, model, lot.vin, mileage, price,
+         lot.specs?.transmission, lot.specs?.exterior, lot.specs?.interior,
+         lot.description, 'barrett-jackson', lot.url, price ? 'sold' : 'active', true, metadata]
+      );
+      vehicleId = insertResult.rows[0].id;
     }
-    vehicleId = newVehicle.id;
+
+    // Save images
+    if (lot.images?.length > 0 && vehicleId) {
+      const values: any[] = [];
+      const placeholders: string[] = [];
+      lot.images.forEach((imgUrl: string, i: number) => {
+        const offset = i * 4;
+        placeholders.push(`($${offset+1},$${offset+2},$${offset+3},$${offset+4})`);
+        values.push(vehicleId, imgUrl, i, 'barrett_jackson_import');
+      });
+      await client.query(
+        `INSERT INTO vehicle_images (vehicle_id, image_url, position, source)
+         VALUES ${placeholders.join(',')}
+         ON CONFLICT DO NOTHING`,
+        values
+      );
+    }
+
+    // Mark queue item complete
+    await client.query(
+      `UPDATE import_queue SET status='complete', vehicle_id=$1, processed_at=NOW()
+       WHERE id=$2`,
+      [vehicleId, queueItemId]
+    );
+
+    return vehicleId;
+  } finally {
+    client.release();
   }
-
-  // Save images
-  if (lot.images?.length > 0 && vehicleId) {
-    const imageRecords = lot.images.map((img_url: string, i: number) => ({
-      vehicle_id: vehicleId,
-      image_url: img_url,
-      position: i,
-      source: 'barrett_jackson_import',
-      is_external: true,
-    }));
-    await supabase.from('vehicle_images').insert(imageRecords);
-  }
-
-  // Mark queue item complete
-  await supabase.from('import_queue').update({
-    status: 'complete',
-    vehicle_id: vehicleId,
-    processed_at: new Date().toISOString(),
-  }).eq('id', queueItemId);
-
-  return vehicleId;
 }
 
 async function claimBatch(workerId: string): Promise<any[]> {
-  const { data, error } = await supabase.rpc('claim_import_queue_batch', {
-    p_batch_size: BATCH_SIZE,
-    p_max_attempts: 3,
-    p_worker_id: workerId,
-    p_lock_ttl_seconds: 600,
-  });
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      WITH candidates AS (
+        SELECT id FROM import_queue
+        WHERE status = 'pending'
+          AND COALESCE(attempts, 0) < 10
+          AND source_id = '23b5bd94-bbe3-441e-8688-3ab1aec30680'
+          AND listing_url LIKE '%barrett-jackson%'
+        ORDER BY COALESCE(priority, 0) DESC, created_at ASC
+        LIMIT $1
+        FOR UPDATE SKIP LOCKED
+      ),
+      claimed AS (
+        UPDATE import_queue iq
+        SET status = 'processing',
+            attempts = COALESCE(iq.attempts, 0) + 1,
+            locked_at = NOW(),
+            locked_by = $2
+        FROM candidates c
+        WHERE iq.id = c.id
+        RETURNING iq.*
+      )
+      SELECT * FROM claimed
+    `, [BATCH_SIZE, workerId]);
 
-  if (error) {
-    log(workerId, `Claim error: ${error.message}`);
-    return [];
+    return result.rows;
+  } finally {
+    client.release();
   }
-
-  // Filter to BJ URLs only
-  const bjItems = (data || []).filter((item: any) =>
-    item.listing_url?.includes('barrett-jackson')
-  );
-
-  // Release non-BJ items back to pending
-  const nonBjItems = (data || []).filter((item: any) =>
-    !item.listing_url?.includes('barrett-jackson')
-  );
-  if (nonBjItems.length > 0) {
-    await supabase.from('import_queue').update({
-      status: 'pending',
-      locked_at: null,
-      locked_by: null,
-    }).in('id', nonBjItems.map((i: any) => i.id));
-  }
-
-  return bjItems;
 }
 
 async function markFailed(queueItemId: string, errorMsg: string) {
-  await supabase.from('import_queue').update({
-    status: 'failed',
-    error_message: errorMsg.slice(0, 500),
-    locked_at: null,
-    locked_by: null,
-  }).eq('id', queueItemId);
+  await pool.query(
+    `UPDATE import_queue SET status='failed', error_message=$1, locked_at=NULL, locked_by=NULL
+     WHERE id=$2`,
+    [errorMsg.slice(0, 500), queueItemId]
+  );
 }
 
 async function runWorker(workerId: number) {
@@ -278,13 +278,31 @@ async function runWorker(workerId: number) {
   let context = await createStealthContext(browser);
   let consecutiveCrashes = 0;
 
+  let emptyBatchCount = 0;
   while (true) {
-    const batch = await claimBatch(wid);
-    if (batch.length === 0) {
-      log(wid, 'No more BJ items in queue');
-      break;
+    let batch: any[];
+    try {
+      batch = await claimBatch(wid);
+    } catch (err: any) {
+      log(wid, `Claim error: ${err.message}`);
+      await new Promise(r => setTimeout(r, 5000));
+      emptyBatchCount++;
+      if (emptyBatchCount >= 5) break;
+      continue;
     }
 
+    if (batch.length === 0) {
+      emptyBatchCount++;
+      if (emptyBatchCount >= 3) {
+        log(wid, 'No more BJ items in queue after 3 retries');
+        break;
+      }
+      log(wid, `Empty batch (${emptyBatchCount}/3), retrying in 10s...`);
+      await new Promise(r => setTimeout(r, 10000));
+      continue;
+    }
+
+    emptyBatchCount = 0;
     log(wid, `Claimed ${batch.length} items`);
 
     for (const item of batch) {
@@ -303,12 +321,26 @@ async function runWorker(workerId: number) {
         consecutiveCrashes = 0;
         log(wid, `OK: ${lot.year || '?'} ${lot.title?.slice(0, 50) || '?'}`);
       } catch (err: any) {
-        stats.failed++;
-        consecutiveCrashes++;
-        await markFailed(item.id, err.message);
-        log(wid, `FAIL: ${item.listing_url} — ${err.message.slice(0, 80)}`);
+        const isBlocked = err.message?.includes('BLOCKED');
 
-        // Restart browser after too many consecutive crashes
+        if (isBlocked) {
+          // Don't mark as failed — reset to pending and wait longer
+          try {
+            await pool.query(
+              `UPDATE import_queue SET status='pending', locked_at=NULL, locked_by=NULL WHERE id=$1`,
+              [item.id]
+            );
+          } catch {}
+          log(wid, `BLOCKED: ${item.listing_url} — waiting 30s before retry`);
+          await new Promise(r => setTimeout(r, 30000));
+          consecutiveCrashes++;
+        } else {
+          stats.failed++;
+          consecutiveCrashes++;
+          try { await markFailed(item.id, err.message); } catch {}
+          log(wid, `FAIL: ${item.listing_url} — ${err.message.slice(0, 80)}`);
+        }
+
         if (consecutiveCrashes >= MAX_CONSECUTIVE_CRASHES) {
           log(wid, `${consecutiveCrashes} consecutive crashes — restarting browser`);
           stats.browserRestarts++;
@@ -324,7 +356,9 @@ async function runWorker(workerId: number) {
       }
 
       stats.total++;
-      await new Promise(r => setTimeout(r, DELAY_MS));
+      // Add random jitter to delay to avoid bot detection
+      const jitter = Math.random() * DELAY_MS * 0.5;
+      await new Promise(r => setTimeout(r, DELAY_MS + jitter));
     }
   }
 
@@ -339,23 +373,21 @@ async function main() {
   console.log(`  Workers: ${NUM_WORKERS} | Batch: ${BATCH_SIZE} | Delay: ${DELAY_MS}ms`);
   console.log('='.repeat(50));
 
-  // Check pending count
-  const { count } = await supabase
-    .from('import_queue')
-    .select('*', { count: 'exact', head: true })
-    .like('listing_url', '%barrett-jackson%')
-    .eq('status', 'pending');
-
-  console.log(`\nPending BJ URLs in queue: ${count || 0}\n`);
-
-  if (!count || count === 0) {
-    console.log('Nothing to process. Exiting.');
-    return;
+  // Test DB connection
+  try {
+    const res = await pool.query("SELECT count(*) FROM import_queue WHERE status='pending' AND source_id='23b5bd94-bbe3-441e-8688-3ab1aec30680'");
+    console.log(`\nPending BJ URLs: ${res.rows[0].count}\n`);
+  } catch (err: any) {
+    console.error(`DB connection failed: ${err.message}`);
+    process.exit(1);
   }
 
-  // Launch workers in parallel
+  console.log('Starting workers...\n');
+
   const workers = Array.from({ length: NUM_WORKERS }, (_, i) => runWorker(i));
   await Promise.all(workers);
+
+  await pool.end();
 
   console.log('\n' + '='.repeat(50));
   console.log('  EXTRACTION COMPLETE');
