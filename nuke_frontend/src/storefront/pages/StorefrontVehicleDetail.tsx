@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { VehicleInquiryModal } from '../../components/organization/VehicleInquiryModal';
 import type { StorefrontOrg } from '../StorefrontApp';
 
 interface Props {
@@ -45,6 +46,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
   const [images, setImages] = useState<VehicleImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
+  const [showInquiry, setShowInquiry] = useState(false);
 
   useEffect(() => {
     if (!vehicleId) return;
@@ -230,10 +232,41 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
                   {organization.email}
                 </a>
               )}
+              <button
+                onClick={() => setShowInquiry(true)}
+                style={{
+                  marginTop: 12,
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 'var(--fs-9, 9px)',
+                  fontFamily: 'Arial, sans-serif',
+                  fontWeight: 600,
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                Inquire About This Vehicle
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Inquiry Modal */}
+      {showInquiry && (
+        <VehicleInquiryModal
+          vehicleId={vehicle.id}
+          vehicleName={title}
+          organizationId={organization.id}
+          organizationName={organization.business_name}
+          onClose={() => setShowInquiry(false)}
+          onSubmitted={() => setShowInquiry(false)}
+        />
+      )}
     </div>
   );
 }
