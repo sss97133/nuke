@@ -288,7 +288,7 @@ Return JSON:
       }
     }
   } catch (error: any) {
-    console.warn('Org extraction failed, using domain as name:', error.message);
+    console.warn('Org extraction failed, using domain as name:', error instanceof Error ? error.message : String(error));
   }
 
   // Fallback: Create org with domain as name
@@ -585,7 +585,7 @@ Return JSON:
       listing_patterns: [],
     };
   } catch (error: any) {
-    console.warn('Structure discovery failed, using fallback:', error.message);
+    console.warn('Structure discovery failed, using fallback:', error instanceof Error ? error.message : String(error));
     return {
       domain,
       site_type: 'unknown',
