@@ -382,10 +382,10 @@ async function saveListing(supabase: any, listing: RennlistListing): Promise<{ v
       status: 'active',
     })
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
-    console.error(`Failed to insert vehicle: ${error.message}`);
+    console.error(`Failed to insert vehicle: ${error?.message || error}`);
     return { vehicle_id: null, action: 'error' };
   }
 

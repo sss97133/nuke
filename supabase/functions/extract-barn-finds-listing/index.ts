@@ -179,8 +179,8 @@ serve(async (req) => {
       await supabase.from("vehicles").update(vehicleRow).eq("id", vehicleId);
       finalVehicleId = vehicleId;
     } else {
-      const { data: inserted, error: insErr } = await supabase.from("vehicles").insert(vehicleRow).select("id").single();
-      if (insErr) throw new Error(insErr.message);
+      const { data: inserted, error: insErr } = await supabase.from("vehicles").insert(vehicleRow).select("id").maybeSingle();
+      if (insErr) throw new Error(insErr?.message || String(insErr));
       if (!inserted) throw new Error("Vehicle insert returned no data");
       finalVehicleId = inserted.id;
     }

@@ -502,7 +502,7 @@ serve(async (req) => {
         .from("businesses")
         .insert(insertRow)
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (orgErr || !org?.id) throw orgErr || new Error("Failed to create organization");
 

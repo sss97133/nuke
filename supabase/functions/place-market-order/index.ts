@@ -231,7 +231,7 @@ serve(async (req) => {
         time_in_force: timeInForce
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (orderError) {
       console.error('Failed to create order:', orderError);

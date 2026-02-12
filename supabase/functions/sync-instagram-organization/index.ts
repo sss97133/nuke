@@ -417,7 +417,7 @@ The function attempted to auto-detect but could not find the account ID.`;
             .from('user_content')
             .insert(contentData)
             .select('id')
-            .single();
+            .maybeSingle();
 
           if (createError) throw createError;
           contentId = created.id;

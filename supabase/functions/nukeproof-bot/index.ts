@@ -57,7 +57,7 @@ async function linkPhone(phone: string, telegramId: number, username?: string) {
 async function getOrCreateVehicle(vin: string, d: any) {
   const { data: ex } = await supabase.from("vehicles").select("id").eq("vin", vin).maybeSingle();
   if (ex) return { id: ex.id, isNew: false };
-  const { data: nv } = await supabase.from("vehicles").insert({ vin, year: d.year, make: d.make, model: d.model, source: "telegram" }).select("id").single();
+  const { data: nv } = await supabase.from("vehicles").insert({ vin, year: d.year, make: d.make, model: d.model, source: "telegram" }).select("id").maybeSingle();
   return { id: nv!.id, isNew: true };
 }
 
