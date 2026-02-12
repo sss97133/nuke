@@ -92,8 +92,8 @@ Deno.serve(async (req) => {
 // LIST CONTRACTS — agent-friendly search with structured filters
 // ═══════════════════════════════════════════════════════════════
 async function listContracts(url: URL, supabase: any, userId: string | null) {
-  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
-  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "20")));
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10)));
   const offset = (page - 1) * limit;
 
   // Structured filters for agent use
@@ -141,8 +141,8 @@ async function listContracts(url: URL, supabase: any, userId: string | null) {
   if (regulatory) query = query.eq("regulatory_status", regulatory);
   if (riskLevel) query = query.eq("risk_level", riskLevel);
   if (curatorId) query = query.eq("curator_id", curatorId);
-  if (minAum) query = query.gte("total_assets_under_management_cents", parseInt(minAum));
-  if (maxMinInvestment) query = query.lte("minimum_investment_cents", parseInt(maxMinInvestment));
+  if (minAum) query = query.gte("total_assets_under_management_cents", parseInt(minAum, 10));
+  if (maxMinInvestment) query = query.lte("minimum_investment_cents", parseInt(maxMinInvestment, 10));
   if (tag) query = query.contains("tags", [tag]);
 
   if (search) {

@@ -37,7 +37,7 @@ async function decodeVIN(vin: string) {
   const r = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`);
   const d = await r.json();
   const get = (id: number) => d.Results?.find((x: any) => x.VariableId === id)?.Value || null;
-  return { valid: get(143) === "0" || !get(143), year: get(29) ? parseInt(get(29)) : null, make: get(26), model: get(28) };
+  return { valid: get(143) === "0" || !get(143), year: get(29) ? parseInt(get(29), 10) : null, make: get(26), model: get(28) };
 }
 
 async function findTech(telegramId: number) {
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     const linked = await linkPhone(text, userId, m.from.username);
     if (linked) {
       await send(chatId, `✅ Linked! Hey ${linked.display_name}!\n\nSend a VIN to start.`);
-      await send(parseInt(OWNER_CHAT_ID), `🔗 ${linked.display_name} linked Telegram`);
+      await send(parseInt(OWNER_CHAT_ID, 10), `🔗 ${linked.display_name} linked Telegram`);
     } else {
       await send(chatId, "❓ Couldn't find that number.");
     }

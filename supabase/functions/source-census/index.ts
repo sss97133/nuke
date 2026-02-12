@@ -40,7 +40,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
         const activeResp = await fetch("https://bringatrailer.com/auctions/", { signal: AbortSignal.timeout(20000) });
         const activeHtml = await activeResp.text();
         const activeMatch = activeHtml.match(/(\d+)\s*Active\s*Auctions/i);
-        const activeCount = activeMatch ? parseInt(activeMatch[1]) : null;
+        const activeCount = activeMatch ? parseInt(activeMatch[1], 10) : null;
 
         return {
           total: estimatedTotal,
@@ -73,7 +73,7 @@ const CENSUS_STRATEGIES: Record<string, CensusStrategy> = {
         const activeResp = await fetch("https://carsandbids.com/", { signal: AbortSignal.timeout(20000) });
         const activeHtml = await activeResp.text();
         const activeMatch = activeHtml.match(/(\d+)\s*(?:live|active)/i);
-        const active = activeMatch ? parseInt(activeMatch[1]) : null;
+        const active = activeMatch ? parseInt(activeMatch[1], 10) : null;
 
         return {
           total,

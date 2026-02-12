@@ -113,7 +113,7 @@ function parseQueryForVehicle(query: string): { year?: number; make?: string; mo
   // Extract year
   const yearMatch = query.match(/\b(19[6-9][0-9]|20[0-2][0-9])\b/);
   if (yearMatch) {
-    result.year = parseInt(yearMatch[1]);
+    result.year = parseInt(yearMatch[1], 10);
   }
 
   // Extract make
@@ -166,7 +166,7 @@ function parseQueryForVehicle(query: string): { year?: number; make?: string; mo
     if (match) {
       let price = match[1].replace(/,/g, '');
       if (pattern.toString().includes('k')) {
-        result.asking_price = parseInt(price) * 1000;
+        result.asking_price = parseInt(price, 10) * 1000;
       } else {
         result.asking_price = parseFloat(price);
       }

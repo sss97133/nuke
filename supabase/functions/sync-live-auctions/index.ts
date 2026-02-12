@@ -126,7 +126,7 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
       .map(item => {
         // Parse year from title (e.g., "1996 Porsche 911 Turbo" -> 1996)
         const yearMatch = item.title.match(/^(\d{4})\s+/);
-        const year = yearMatch ? parseInt(yearMatch[1]) : (item.year ? parseInt(item.year) : null);
+        const year = yearMatch ? parseInt(yearMatch[1], 10) : (item.year ? parseInt(item.year, 10) : null);
 
         // Parse make/model from title
         const titleWithoutYear = item.title.replace(/^\d{4}\s+/, "");
@@ -246,7 +246,7 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
     const auctions: LiveAuction[] = documents
       .filter(doc => doc.lotType === "car") // Only cars, not plates/parts/bikes
       .map(doc => {
-        const year = doc.productYear ? parseInt(doc.productYear) : (doc.features?.modelYear ? parseInt(doc.features.modelYear) : null);
+        const year = doc.productYear ? parseInt(doc.productYear, 10) : (doc.features?.modelYear ? parseInt(doc.features.modelYear, 10) : null);
 
         return {
           url: `https://collectingcars.com/for-sale/${doc.slug}`,
@@ -373,7 +373,7 @@ async function syncViaFirecrawlExtract(
       const url = a.url.replace(/\/$/, "");
       const titleParts = (a.title || "").trim().split(/\s+/);
       const yearMatch = (a.title || "").match(/^(\d{4})\s+/);
-      const year = yearMatch ? parseInt(yearMatch[1]) : null;
+      const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
       const make = titleParts[0] || null;
       const model = titleParts.slice(1).join(" ") || null;
       const externalId = url.split("/").filter(Boolean).pop() || url;
@@ -532,7 +532,7 @@ async function syncCarsAndBids(): Promise<{ auctions: LiveAuction[]; error: stri
       // Parse title from slug (e.g., "2022-porsche-911-gt3" -> "2022 Porsche 911 GT3")
       const titleParts = slug.split("-");
       const yearMatch = titleParts[0]?.match(/^\d{4}$/);
-      const year = yearMatch ? parseInt(titleParts[0]) : null;
+      const year = yearMatch ? parseInt(titleParts[0], 10) : null;
 
       // Title reconstruction from slug
       const title = titleParts

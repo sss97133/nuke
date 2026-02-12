@@ -617,7 +617,7 @@ function parseYearMakeModel(title: string): { year: number | null; make: string 
   // Find year
   const yearMatch = title.match(/\b(19[5-9]\d|20[0-2]\d)\b/);
   if (yearMatch) {
-    result.year = parseInt(yearMatch[1]);
+    result.year = parseInt(yearMatch[1], 10);
   }
 
   // Common makes

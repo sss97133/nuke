@@ -86,7 +86,7 @@ function extractTier1(description: string): Record<string, any> {
   // Acquisition year
   const acqMatch = description.match(TIER1_PATTERNS.acquisition_year);
   if (acqMatch) {
-    result.acquisition_year = parseInt(acqMatch[1]);
+    result.acquisition_year = parseInt(acqMatch[1], 10);
   }
 
   // Previous BaT sale
@@ -96,7 +96,7 @@ function extractTier1(description: string): Record<string, any> {
   result.has_service_records = TIER1_PATTERNS.has_service_records.test(description) || null;
   const svcYearMatch = description.match(TIER1_PATTERNS.service_records_from_year);
   if (svcYearMatch) {
-    result.service_records_from_year = parseInt(svcYearMatch[1]);
+    result.service_records_from_year = parseInt(svcYearMatch[1], 10);
     result.has_service_records = true;
   }
   result.has_window_sticker = TIER1_PATTERNS.has_window_sticker.test(description) || null;
@@ -125,12 +125,12 @@ function extractTier1(description: string): Record<string, any> {
   // Rarity
   const oneOfMatch = description.match(TIER1_PATTERNS.one_of_x);
   if (oneOfMatch) {
-    result.total_production = parseInt(oneOfMatch[1]);
+    result.total_production = parseInt(oneOfMatch[1], 10);
   }
   const numMatch = description.match(TIER1_PATTERNS.number_of_total);
   if (numMatch) {
-    result.production_number = parseInt(numMatch[1]);
-    result.total_production = parseInt(numMatch[2]);
+    result.production_number = parseInt(numMatch[1], 10);
+    result.total_production = parseInt(numMatch[2], 10);
   }
   result.is_limited_edition = TIER1_PATTERNS.limited_edition.test(description) || null;
 

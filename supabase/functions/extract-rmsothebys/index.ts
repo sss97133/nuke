@@ -88,13 +88,13 @@ interface ExtractedVehicle {
 // Parse title like "1997 Ferrari F310 B" into year/make/model
 function parseTitle(title: string): { year: number | null; make: string | null; model: string | null } {
   const yearMatch = title.match(/^(\d{4})\s+/);
-  const year = yearMatch ? parseInt(yearMatch[1]) : null;
+  const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
 
   if (!year) {
     // Try to find year anywhere
     const anyYear = title.match(/\b(19|20)\d{2}\b/);
     if (anyYear) {
-      const y = parseInt(anyYear[0]);
+      const y = parseInt(anyYear[0], 10);
       const afterYear = title.slice(title.indexOf(anyYear[0]) + 4).trim();
       const parts = afterYear.split(/\s+/);
       return {
