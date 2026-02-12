@@ -211,7 +211,7 @@ async function trySaveHtmlSnapshot(args: {
     const { error } = await supabase.from("listing_page_snapshots").insert(payload);
     if (error) {
       if (String((error as any).code || "") === "23505") return; // duplicate snapshot
-      console.warn("listing_page_snapshots insert failed (non-fatal):", error.message);
+      console.warn("listing_page_snapshots insert failed (non-fatal):", error?.message || error);
     }
   } catch (e: any) {
     console.warn("listing_page_snapshots save failed (non-fatal):", e?.message || String(e));
@@ -877,7 +877,8 @@ function extractImages(html: string): string[] {
       const encoded = (m?.[1] || m?.[2] || "").trim();
       if (encoded) {
         const jsonText = encoded.replace(/&quot;/g, '"').replace(/&#038;/g, "&").replace(/&amp;/g, "&");
-        const items = JSON.parse(jsonText);
+        let items: any[];
+        try { items = JSON.parse(jsonText); } catch { items = []; }
         if (Array.isArray(items)) {
           for (const it of items) {
             let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url;
@@ -1266,7 +1267,7 @@ serve(async (req) => {
       };
 
       const { data: inserted, error } = await supabase.from("vehicles").insert(insertPayload).select("id").maybeSingle();
-      if (error) throw new Error(`vehicles insert failed: ${error.message}`);
+      if (error) throw new Error(`vehicles insert failed: ${error?.message || error}`);
       if (!inserted?.id) throw new Error("vehicles insert succeeded but no ID returned");
       vehicleId = String(inserted.id);
       createdIds.push(vehicleId);
@@ -1957,7 +1958,7 @@ serve(async (req) => {
           },
         }, { onConflict: "vehicle_id,source_url" });
 
-      if (error) console.warn(`auction_events upsert failed (non-fatal): ${error.message}`);
+      if (error) console.warn(`auction_events upsert failed (non-fatal): ${error?.message || error}`);
     }
 
     // bat_listings (BaT-specific auction data table)

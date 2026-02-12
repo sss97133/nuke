@@ -834,9 +834,9 @@ serve(async (req) => {
             sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : 'ended'),
           })
           .select()
-          .single();
+          .maybeSingle();
 
-        if (error) throw new Error(`Failed to insert vehicle: ${error.message}`);
+        if (error) throw new Error(`Failed to insert vehicle: ${error?.message || error}`);
         console.log(`[hagerty] Created vehicle: ${data.id}`);
         extracted.vehicle_id = data.id;
         targetVehicleId = data.id;
@@ -871,7 +871,7 @@ serve(async (req) => {
           .delete()
           .eq('vehicle_id', targetVehicleId)
           .in('source', ['hagerty', 'external_import']);
-        if (deleteError) console.error('Failed to delete existing images:', deleteError.message);
+        if (deleteError) console.error('Failed to delete existing images:', deleteError?.message || deleteError);
 
         const { data: insertedImages, error: imgError } = await supabase
           .from('vehicle_images')
@@ -923,7 +923,7 @@ serve(async (req) => {
             },
           }, { onConflict: 'platform,listing_url_key' })
           .select()
-          .single();
+          .maybeSingle();
 
         if (listingError) {
           console.error('[hagerty] External listing save error:', JSON.stringify(listingError));
