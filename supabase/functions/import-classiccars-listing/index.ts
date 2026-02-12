@@ -185,10 +185,10 @@ serve(async (req) => {
         .from('vehicles')
         .insert(vehicleInsert)
         .select('id')
-        .single()
+        .maybeSingle()
 
       if (vehicleError) {
-        throw new Error(`Failed to create vehicle: ${vehicleError.message}`)
+        throw new Error(`Failed to create vehicle: ${vehicleError?.message || vehicleError}`)
       }
 
       vehicleId = newVehicle.id
@@ -383,10 +383,10 @@ serve(async (req) => {
               ai_processing_status: analysis ? 'completed' : 'pending'
             })
             .select('id')
-            .single()
+            .maybeSingle()
 
           if (imageError) {
-            console.error(`Failed to create image record: ${imageError.message}`)
+            console.error(`Failed to create image record: ${imageError?.message || imageError}`)
             continue
           }
 

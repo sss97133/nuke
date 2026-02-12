@@ -167,7 +167,7 @@ serve(async (req) => {
           is_active: true,
         })
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (newSource) {
         sourceId = newSource.id;
@@ -267,7 +267,7 @@ serve(async (req) => {
           is_public: false,
         })
         .select('id')
-        .single();
+        .maybeSingle();
       if (vehicleErr) throw vehicleErr;
       vehicleId = newVehicle.id;
     } else {
@@ -316,7 +316,7 @@ serve(async (req) => {
         { onConflict: 'platform,listing_url_key' },
       )
       .select('id')
-      .single();
+      .maybeSingle();
     if (extErr) throw extErr;
 
     // Persist images into vehicle_images so marketplace/profile cards can show them.

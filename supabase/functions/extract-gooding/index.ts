@@ -480,10 +480,10 @@ async function saveToDatabase(
       .from('vehicles')
       .insert(insertPayload)
       .select('id')
-      .single();
+      .maybeSingle();
 
     if (insertError) {
-      throw new Error(`Failed to insert vehicle: ${insertError.message}`);
+      throw new Error(`Failed to insert vehicle: ${insertError?.message || insertError}`);
     }
 
     vehicleId = newVehicle.id;
@@ -850,7 +850,7 @@ serve(async (req) => {
     if (action === 'stats') {
       const { data: stats } = await supabase.rpc('count_vehicles_by_source', {
         source_name: 'gooding',
-      }).single();
+      }).maybeSingle();
 
       const { count: listingCount } = await supabase
         .from('external_listings')

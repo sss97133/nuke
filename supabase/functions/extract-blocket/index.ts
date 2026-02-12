@@ -545,8 +545,8 @@ async function saveVehicle(
       .from('vehicles')
       .insert(vehicleData)
       .select('id')
-      .single();
-    if (error) throw new Error(`Failed to insert vehicle: ${error.message}`);
+      .maybeSingle();
+    if (error) throw new Error(`Failed to insert vehicle: ${error?.message || error}`);
     return data.id;
   }
 }

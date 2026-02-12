@@ -1003,10 +1003,10 @@ async function saveToDatabase(
         { onConflict: "listing_url" }
       )
       .select()
-      .single();
+      .maybeSingle();
 
     if (queueError) {
-      throw new Error(`Queue insert failed: ${queueError.message}`);
+      throw new Error(`Queue insert failed: ${queueError?.message || queueError}`);
     }
 
     // Create vehicle record
@@ -1054,7 +1054,7 @@ async function saveToDatabase(
         primary_image_url: extracted.image_urls[0] || null,
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (vehicleError) {
       // Mark queue as failed
@@ -1062,7 +1062,7 @@ async function saveToDatabase(
         .from("import_queue")
         .update({
           status: "failed",
-          error_message: vehicleError.message,
+          error_message: vehicleError?.message || String(vehicleError),
         })
         .eq("id", queueItem.id);
 

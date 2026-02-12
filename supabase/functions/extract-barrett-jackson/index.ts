@@ -298,7 +298,7 @@ async function saveVehicle(
       .from("vehicles")
       .insert(vehicleData)
       .select("id")
-      .single();
+      .maybeSingle();
 
     if (insertErr) throw insertErr;
     vehicleId = inserted.id;

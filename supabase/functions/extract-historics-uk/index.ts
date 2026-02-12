@@ -693,10 +693,10 @@ async function saveToDatabase(
       .from('vehicles')
       .insert(vehicleData)
       .select()
-      .single();
+      .maybeSingle();
 
     if (vehicleError) {
-      throw new Error(`Failed to save vehicle: ${vehicleError.message}`);
+      throw new Error(`Failed to save vehicle: ${vehicleError?.message || vehicleError}`);
     }
 
     vehicleId = newVehicle.id;

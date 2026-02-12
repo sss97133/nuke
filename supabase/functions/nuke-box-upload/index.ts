@@ -186,7 +186,7 @@ serve(async (req) => {
           created_at: new Date().toISOString(),
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (!queueError && queueData) {
         result.queue_id = queueData.id;
@@ -214,7 +214,7 @@ serve(async (req) => {
           created_at: new Date().toISOString(),
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (!queueError && queueData) {
         result.queue_id = queueData.id;
