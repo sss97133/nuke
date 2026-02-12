@@ -926,14 +926,14 @@ async function ensureSourceOrganization(sourceUrl: string, siteAnalysis: any, su
       }
     })
     .select('id')
-    .single();
-  
+    .maybeSingle();
+
   if (error) {
     console.warn(`Failed to create organization: ${error.message}`);
     return null;
   }
-  
-  return newOrg.id;
+
+  return newOrg?.id;
 }
 
 async function getOrCreateSourceId(url: string, supabase: any): Promise<string> {
@@ -956,8 +956,8 @@ async function getOrCreateSourceId(url: string, supabase: any): Promise<string> 
       is_active: true
     })
     .select('id')
-    .single();
-  
+    .maybeSingle();
+
   return newSource?.id || '';
 }
 

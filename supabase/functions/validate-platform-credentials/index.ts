@@ -258,7 +258,7 @@ serve(async (req) => {
         method: 'totp', // BaT typically uses TOTP
         expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 min expiry
         status: 'pending',
-      }).select().single();
+      }).select().maybeSingle();
 
       // Send in-app notification
       const platformName = credential.platform === 'bat' ? 'Bring a Trailer' :

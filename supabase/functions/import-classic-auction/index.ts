@@ -313,7 +313,7 @@ serve(async (req) => {
           },
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'platform,listing_url_key' },
+        { onConflict: 'vehicle_id,platform,listing_id' },
       )
       .select('id')
       .maybeSingle();

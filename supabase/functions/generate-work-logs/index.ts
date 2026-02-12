@@ -490,6 +490,8 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
 
     // Call OpenAI Vision API
     let model = 'gpt-4o-mini';
+    const openaiController = new AbortController();
+    const openaiTimeout = setTimeout(() => openaiController.abort(), 30000);
     let response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -504,8 +506,8 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
         }, {
           role: 'user',
           content: [
-            { 
-              type: 'text', 
+            {
+              type: 'text',
               text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${orgName}.
 
 ${participantContext}
@@ -527,14 +529,18 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
         max_tokens: 1500, // Further reduced to speed up response
         temperature: 0.2,
         response_format: { type: 'json_object' }
-      })
+      }),
+      signal: openaiController.signal,
     });
+    clearTimeout(openaiTimeout);
 
     // Fallback to gpt-4o if needed
     if (!response.ok && response.status === 403 && model === 'gpt-4o-mini') {
       console.log('gpt-4o-mini access denied, falling back to gpt-4o...');
       model = 'gpt-4o';
       
+      const fallbackController = new AbortController();
+      const fallbackTimeout = setTimeout(() => fallbackController.abort(), 30000);
       response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -549,8 +555,8 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
           }, {
             role: 'user',
             content: [
-              { 
-                type: 'text', 
+              {
+                type: 'text',
                 text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${orgName}. Extract detailed parts data with brands, part numbers, and prices for customer shopping. Break down labor by task. Generate professional work log.`
               },
               ...images.slice(0, 5).map(img => ({
@@ -562,8 +568,10 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
           max_tokens: 1500, // Reduced to match primary call
           temperature: 0.2,
           response_format: { type: 'json_object' }
-        })
+        }),
+        signal: fallbackController.signal,
       });
+      clearTimeout(fallbackTimeout);
     }
 
     if (!response.ok) {
@@ -622,7 +630,7 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
         concerns_flagged: workLog.concerns || []
       })
       .select('id')
-      .single();
+      .maybeSingle();
 
     if (scanError) {
       console.error('Failed to create scan session:', scanError);
@@ -631,9 +639,9 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
       await supabase
         .from('ai_scan_sessions')
         .update({ scan_duration_seconds: scanDuration })
-        .eq('id', scanSession.id);
-      
-      console.log('Created scan session:', scanSession.id);
+        .eq('id', scanSession?.id);
+
+      console.log('Created scan session:', scanSession?.id);
     }
 
     // Insert/update timeline event in VEHICLE timeline (timeline_events table)
@@ -709,8 +717,8 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
         .from('timeline_events')
         .insert(eventData)
         .select('id')
-        .single();
-      
+        .maybeSingle();
+
       if (insertError || !newEvent) {
         console.error('Failed to create timeline event:', insertError);
         throw new Error(`Failed to create timeline event: ${insertError?.message || 'Unknown error'}`);

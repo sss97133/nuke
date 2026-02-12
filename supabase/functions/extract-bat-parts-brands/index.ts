@@ -253,7 +253,13 @@ Be precise - only extract if you're confident the part/brand is mentioned.`
     jsonStr = jsonStr.replace(/^```json\n?/, '').replace(/```$/, '').trim();
   }
 
-  const extracted = JSON.parse(jsonStr);
+  let extracted;
+  try {
+    extracted = JSON.parse(jsonStr);
+  } catch {
+    console.warn('[bat-parts-brands] Failed to parse JSON from LLM response');
+    return [];
+  }
   return Array.isArray(extracted) ? extracted : [];
 }
 

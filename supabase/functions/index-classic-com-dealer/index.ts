@@ -168,6 +168,8 @@ serve(async (req) => {
 
     if (firecrawlApiKey) {
       console.log('Using Firecrawl structured extraction...');
+      const firecrawlController = new AbortController();
+      const firecrawlTimeout = setTimeout(() => firecrawlController.abort(), 30000);
       const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
         method: 'POST',
         headers: {
@@ -203,8 +205,10 @@ serve(async (req) => {
             }
           },
           waitFor: 3000
-        })
+        }),
+        signal: firecrawlController.signal,
       });
+      clearTimeout(firecrawlTimeout);
 
       if (firecrawlResponse.ok) {
         const firecrawlData = await firecrawlResponse.json();

@@ -126,7 +126,7 @@ serve(async (req) => {
         created_at: new Date().toISOString(),
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (queueError) {
       console.error("Queue insert error:", queueError);

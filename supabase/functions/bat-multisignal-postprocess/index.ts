@@ -260,12 +260,12 @@ async function ensureAuctionEvent(args: {
       { onConflict: "vehicle_id,source_url" },
     )
     .select("id, auction_end_date")
-    .single();
+    .maybeSingle();
 
   if (error) throw new Error(`auction_events stub upsert failed: ${error.message}`);
   return {
-    id: String(inserted.id),
-    auction_end_date: inserted.auction_end_date ? String(inserted.auction_end_date) : null,
+    id: String(inserted?.id),
+    auction_end_date: inserted?.auction_end_date ? String(inserted.auction_end_date) : null,
   };
 }
 
