@@ -29,6 +29,7 @@ interface SourceConfig {
   extractor: string;
   minDelay: number;
   maxDelay: number;
+  sourceIds?: string[]; // UUID source_ids for fast claiming via index
 }
 
 const SOURCE_CONFIGS: Record<string, SourceConfig> = {
@@ -37,36 +38,42 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     extractor: "extract-bat-core",
     minDelay: 2000,
     maxDelay: 5000,
+    sourceIds: ["2bf675bd-4cb4-4e6f-8e14-2abd6d00098a", "db9ff20a-15b6-41f1-ae09-dd31975a77c0"],
   },
   carsandbids: {
     pattern: "%carsandbids.com%",
     extractor: "extract-cars-and-bids-core",
     minDelay: 1500,
     maxDelay: 3000,
+    sourceIds: ["3422b660-3233-47a4-b44e-97e23bf9e9cb"],
   },
   collectingcars: {
     pattern: "%collectingcars.com%",
     extractor: "extract-collecting-cars",
     minDelay: 1500,
     maxDelay: 3000,
+    sourceIds: ["509ec9f8-fd66-4bde-8e07-a0aa198a6506"],
   },
   craigslist: {
     pattern: "%craigslist.org%",
     extractor: "extract-craigslist",
     minDelay: 1000,
     maxDelay: 2000,
+    sourceIds: ["7573f45d-868e-45bb-acd6-ade46126fc45"],
   },
   pcarmarket: {
     pattern: "%pcarmarket.com%",
     extractor: "import-pcarmarket-listing",
     minDelay: 1500,
     maxDelay: 3000,
+    sourceIds: ["7de1f62c-ffcf-42d5-a15a-074abdbeb46e", "d338952e-e559-4a2b-aa84-1aadf6a5bb71"],
   },
   hagerty: {
     pattern: "%hagerty.com%",
     extractor: "extract-hagerty-listing",
     minDelay: 1500,
     maxDelay: 3000,
+    sourceIds: ["3c195228-5553-45fa-a5fe-bc620eb0ebd9"],
   },
   classic: {
     pattern: "%classic.com%",
@@ -85,36 +92,42 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     extractor: "extract-vehicle-data-ai",
     minDelay: 1500,
     maxDelay: 3000,
+    sourceIds: ["5bb6b479-9eaf-4e06-ba35-4d0ff86b9b7c", "aacb688b-41d4-407c-8d5e-348ce7f02a18"],
   },
   barrettjackson: {
     pattern: "%barrett-jackson.com%",
     extractor: "extract-barrett-jackson",
     minDelay: 2000,
     maxDelay: 4000,
+    sourceIds: ["23b5bd94-bbe3-441e-8688-3ab1aec30680", "ce74e304-d190-4041-9cce-cb950652b9c4"],
   },
   broadarrow: {
     pattern: "%broadarrowauctions.com%",
     extractor: "extract-broad-arrow",
     minDelay: 1500,
     maxDelay: 3000,
+    sourceIds: ["b1e0d050-ca10-46b9-abdc-e8fb55e6a439"],
   },
   ksl: {
     pattern: "%ksl.com%",
     extractor: "extract-vehicle-data-ai",
     minDelay: 1000,
     maxDelay: 2000,
+    sourceIds: ["a7c3c539-487d-4af4-8395-9e5bc1d2a795", "b894cdf1-a3f5-4124-b960-898372805ae8", "c466bffc-552b-46b6-baa6-ca3de323b930"],
   },
   bonhams: {
     pattern: "%bonhams.com%",
     extractor: "extract-bonhams",
     minDelay: 2000,
     maxDelay: 4000,
+    sourceIds: ["c1c826d8-6bc1-4a98-b2dc-6e679f00dcfb", "e1b07ace-09c9-4d3f-b572-74f01044c335"],
   },
   rmsothebys: {
     pattern: "%rmsothebys.com%",
     extractor: "extract-rmsothebys",
     minDelay: 2000,
     maxDelay: 4000,
+    sourceIds: ["d3bcf955-d901-4be9-a933-b7cee8a70b8d"],
   },
   gooding: {
     pattern: "%goodingco.com%",
@@ -219,17 +232,64 @@ serve(async (req) => {
         // Check runtime again before each source
         if (Date.now() - startTime > maxRuntimeMs) break;
 
-        // Claim batch for this specific domain
-        const { data: claimed, error: claimError } = await supabase.rpc(
-          "claim_import_queue_batch_by_domain",
-          {
-            p_domain_pattern: config.pattern,
-            p_batch_size: batchSize,
-            p_max_attempts: 5,
-            p_worker_id: workerId,
-            p_lock_ttl_seconds: 600,
+        // Claim batch — use fast source_id path when available, fall back to LIKE pattern
+        let claimed: any[] | null = null;
+        let claimError: any = null;
+
+        if (config.sourceIds && config.sourceIds.length > 0) {
+          // Fast path: use indexed source_id claim (avoids full table LIKE scan)
+          for (const sourceId of config.sourceIds) {
+            const { data, error } = await supabase.rpc(
+              "claim_import_queue_batch_by_source_id",
+              {
+                p_source_id: sourceId,
+                p_batch_size: batchSize,
+                p_max_attempts: 5,
+                p_worker_id: workerId,
+                p_lock_ttl_seconds: 600,
+              }
+            );
+            if (error) {
+              claimError = error;
+              break;
+            }
+            if (data && data.length > 0) {
+              claimed = data;
+              break; // Got items from this source_id
+            }
           }
-        );
+          // Fallback to LIKE if source_id claim found nothing (items may have NULL source_id)
+          if (!claimed || claimed.length === 0) {
+            const result = await supabase.rpc(
+              "claim_import_queue_batch_by_domain",
+              {
+                p_domain_pattern: config.pattern,
+                p_batch_size: batchSize,
+                p_max_attempts: 5,
+                p_worker_id: workerId,
+                p_lock_ttl_seconds: 600,
+              }
+            );
+            if (!claimError) {
+              claimed = result.data;
+              claimError = result.error;
+            }
+          }
+        } else {
+          // No source_ids configured: LIKE pattern matching only
+          const result = await supabase.rpc(
+            "claim_import_queue_batch_by_domain",
+            {
+              p_domain_pattern: config.pattern,
+              p_batch_size: batchSize,
+              p_max_attempts: 5,
+              p_worker_id: workerId,
+              p_lock_ttl_seconds: 600,
+            }
+          );
+          claimed = result.data;
+          claimError = result.error;
+        }
 
         if (claimError) {
           console.error(`Claim error for ${sourceName}: ${claimError.message}`);
