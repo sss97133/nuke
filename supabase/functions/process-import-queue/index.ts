@@ -70,7 +70,7 @@ serve(async (req) => {
         } else if (url.includes('barrett-jackson.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-barrett-jackson';
         } else if (url.includes('broadarrowauctions.com')) {
-          extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-broad-arrow';
         } else if (url.includes('gaaclassiccars.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-gaa-classics';
         } else if (url.includes('bhauction.com')) {
