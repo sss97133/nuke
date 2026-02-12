@@ -131,7 +131,7 @@ async function extractListing(listingId: string): Promise<TheSambaListing | null
     if (title) {
       const yearMatch = title.match(/\b(19[3-9]\d|20[0-2]\d)\b/);
       if (yearMatch) {
-        year = parseInt(yearMatch[1]);
+        year = parseInt(yearMatch[1], 10);
       }
     }
 

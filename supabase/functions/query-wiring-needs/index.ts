@@ -83,7 +83,7 @@ Return JSON:
       const lowerQuery = query.toLowerCase()
       parsed = {
         vehicle: {
-          year: year || (lowerQuery.match(/\b(19|20)\d{2}\b/)?.[0] ? parseInt(lowerQuery.match(/\b(19|20)\d{2}\b/)?.[0] || '1977') : 1977),
+          year: year || (lowerQuery.match(/\b(19|20)\d{2}\b/)?.[0] ? parseInt(lowerQuery.match(/\b(19|20)\d{2}\b/)?.[0] || '1977', 10) : 1977),
           make: make || (lowerQuery.includes('chevy') || lowerQuery.includes('chevrolet') ? 'Chevrolet' : null),
           model: model || (lowerQuery.includes('blazer') ? 'Blazer' : null)
         },

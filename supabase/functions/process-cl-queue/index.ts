@@ -348,7 +348,7 @@ serve(async (req) => {
         
         let make = (data.make || '').toLowerCase()
         let model = (data.model || '').toLowerCase() || ''
-        const yearNum = typeof data.year === 'string' ? parseInt(data.year) : data.year
+        const yearNum = typeof data.year === 'string' ? parseInt(data.year, 10) : data.year
         
         console.log(`[DEBUG] After normalization:`, { make, model, year: yearNum, posted_date: data.posted_date })
 
@@ -1009,7 +1009,7 @@ function extractVehiclePrice(text: string): number | null {
     const euroMatch = cleaned.match(/^(\d+)\.(\d{3})$/);
     if (euroMatch) {
       // This is European format (e.g., "14.500" = 14500)
-      return parseInt(euroMatch[1] + euroMatch[2]);
+      return parseInt(euroMatch[1] + euroMatch[2], 10);
     }
     
     // Handle standard format: $14,500 (comma as thousands separator)
@@ -1023,16 +1023,16 @@ function extractVehiclePrice(text: string): number | null {
     // Handle comma-only (thousands separator)
     if (cleaned.includes(',')) {
       cleaned = cleaned.replace(/,/g, '');
-      return parseInt(cleaned);
+      return parseInt(cleaned, 10);
     }
-    
+
     // Handle period-only - need to determine if it's decimal or thousands separator
     if (cleaned.includes('.')) {
       const parts = cleaned.split('.');
       // If exactly 3 digits after period, likely thousands separator (e.g., "14.500")
       if (parts.length === 2 && parts[1].length === 3 && parts[1].match(/^\d{3}$/)) {
         // Thousands separator
-        return parseInt(parts[0] + parts[1]);
+        return parseInt(parts[0] + parts[1], 10);
       } else {
         // Decimal separator, round to integer
         return Math.round(parseFloat(cleaned));
@@ -1040,7 +1040,7 @@ function extractVehiclePrice(text: string): number | null {
     }
     
     // No separators, just digits
-    return parseInt(cleaned);
+    return parseInt(cleaned, 10);
   };
   
   // First, try to find structured price fields (especially "Asking" which is common on Craigslist)
@@ -1367,7 +1367,7 @@ function parseDescriptionForDetails(description: string): {
         // Handle "125k" or "125.5k" format
         mileage = Math.round(parseFloat(numStr) * 1000)
       } else {
-        mileage = parseInt(numStr)
+        mileage = parseInt(numStr, 10)
       }
       // Sanity check: mileage should be reasonable (0 to 500,000)
       if (mileage >= 0 && mileage <= 500000) {
@@ -1828,7 +1828,7 @@ break
             data.extraction_confidence['condition'] = 0.9
             break
           case 'cylinders':
-            const cylNum = parseInt(value)
+            const cylNum = parseInt(value, 10)
             if (!isNaN(cylNum)) {
               data.cylinders = cylNum
               data.extraction_confidence['cylinders'] = 0.95
@@ -1849,7 +1849,7 @@ break
             if (odoValue.toLowerCase().endsWith('k')) {
               odoValue = String(parseFloat(odoValue) * 1000)
             }
-            const mileage = parseInt(odoValue)
+            const mileage = parseInt(odoValue, 10)
             if (!isNaN(mileage) && mileage >= 0 && mileage <= 999999) {
               data.mileage = mileage
               data.extraction_confidence['mileage'] = 0.95
@@ -1907,7 +1907,7 @@ break
         // Cylinders without label
         const cylMatch = textLower.match(/^(\d+)\s*cylinders?$/)
         if (cylMatch) {
-          data.cylinders = parseInt(cylMatch[1])
+          data.cylinders = parseInt(cylMatch[1], 10)
           data.extraction_confidence['cylinders'] = 0.85
           data.raw_attrgroup['cylinders'] = cylMatch[1]
         }

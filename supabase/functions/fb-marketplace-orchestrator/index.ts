@@ -458,7 +458,7 @@ async function scrapeLocation(locationName: string): Promise<{
 
     if (titleMatch && idMatch) {
       const title = decodeUnicode(titleMatch[1]);
-      const price = priceMatch ? parseInt(priceMatch[1]) / 100 : null;
+      const price = priceMatch ? parseInt(priceMatch[1], 10) / 100 : null;
       const parsed = parseVehicleTitle(title);
 
       listings.push({
@@ -648,7 +648,7 @@ function parseVehicleTitle(title: string): { year: number | null; make: string |
   const yearMatch = title.match(/^(\d{4})\s+/);
   if (!yearMatch) return { year: null, make: null, model: null };
 
-  const year = parseInt(yearMatch[1]);
+  const year = parseInt(yearMatch[1], 10);
   const rest = title.substring(5).trim();
   const words = rest.split(/\s+/);
 

@@ -334,7 +334,7 @@ function parseReceiptText(text: string) {
       items.push({
         description: description.trim(),
         part_number: part_number || null,
-        quantity: parseInt(quantity),
+        quantity: parseInt(quantity, 10),
         unit_price: parseFloat(unit_price),
         line_total: parseFloat(line_total),
         category: categorizeItem(description)

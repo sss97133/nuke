@@ -382,7 +382,7 @@ function parseYearMakeModel(title: string): { year: number | null; make: string 
 
   // Try to extract year from title
   const yearMatch = title.match(/\b(19[0-9]{2}|20[0-2][0-9])\b/);
-  const year = yearMatch ? parseInt(yearMatch[1]) : null;
+  const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
 
   if (!year) return { year: null, make: null, model: null, trim: null };
 
@@ -481,7 +481,7 @@ function extractPrice(html: string): { price: number | null; price_type: 'buy_it
   // Bid count
   const bidCountMatch = html.match(/(\d+)\s*bids?/i);
   if (bidCountMatch) {
-    bid_count = parseInt(bidCountMatch[1]);
+    bid_count = parseInt(bidCountMatch[1], 10);
   }
 
   return { price, price_type, bid_count };
@@ -557,7 +557,7 @@ function extractEndDate(html: string): string | null {
                 html.match(/endTime['":\s]+(\d{13})/i);
 
   if (match) {
-    const timestamp = parseInt(match[1]);
+    const timestamp = parseInt(match[1], 10);
     // Handle both seconds and milliseconds
     const ts = timestamp > 9999999999 ? timestamp : timestamp * 1000;
     return new Date(ts).toISOString();

@@ -167,7 +167,7 @@ Be specific and extract real data. If uncertain about year, give a range. Return
     if (create_vehicle && !vehicleId && structured.vehicle) {
       const v = structured.vehicle
       const yearVal = typeof v.year === 'string' && v.year.includes('-')
-        ? parseInt(v.year.split('-')[0])
+        ? parseInt(v.year.split('-')[0], 10)
         : (typeof v.year === 'number' ? v.year : null)
 
       const { data: newVehicle, error: createError } = await supabase

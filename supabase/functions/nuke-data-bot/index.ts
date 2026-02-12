@@ -106,7 +106,7 @@ async function getOrCreateUser(telegramId: number, firstName: string, username?:
 
   // Notify owner
   await sendMessage(
-    parseInt(OWNER_CHAT_ID),
+    parseInt(OWNER_CHAT_ID, 10),
     `🆕 *New Submitter*\n${firstName} (@${username || "none"})`
   );
 

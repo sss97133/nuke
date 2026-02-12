@@ -130,7 +130,7 @@ function decodePre1981Vin(vin: string): VINDecodeResult {
     // For 1967-1972: 7=1967, 8=1968, 9=1969, 0=1970, 1=1971, 2=1972
     const yearChar = vin.charAt(5);
     if (/\d/.test(yearChar)) {
-      const yearDigit = parseInt(yearChar);
+      const yearDigit = parseInt(yearChar, 10);
       // Decode based on 1960s-1970s pattern
       if (yearDigit === 7) result.year = 1967;
       else if (yearDigit === 8) result.year = 1968;

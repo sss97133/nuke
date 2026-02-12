@@ -262,7 +262,7 @@ function validateVINChecksum(vin: string): boolean {
     let value: number;
 
     if (/\d/.test(char)) {
-      value = parseInt(char);
+      value = parseInt(char, 10);
     } else {
       value = transliteration[char] ?? 0;
     }
