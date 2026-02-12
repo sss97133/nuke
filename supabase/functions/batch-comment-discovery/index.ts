@@ -269,7 +269,12 @@ async function processVehicle(
       return { success: false, error: "No JSON in response" };
     }
 
-    const discovered = JSON.parse(jsonMatch[0]);
+    let discovered;
+    try {
+      discovered = JSON.parse(jsonMatch[0]);
+    } catch {
+      return { success: false, error: "Failed to parse discovery JSON" };
+    }
 
     // Extract top-level fields for quick access
     const sentiment = discovered.sentiment?.overall || null;

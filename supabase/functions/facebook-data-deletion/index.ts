@@ -13,7 +13,12 @@ async function parseSignedRequest(signedRequest: string, appSecret: string): Pro
   const [encodedSig, payload] = signedRequest.split('.');
 
   // Decode the payload
-  const data = JSON.parse(new TextDecoder().decode(base64Decode(payload.replace(/-/g, '+').replace(/_/g, '/'))));
+  let data;
+  try {
+    data = JSON.parse(new TextDecoder().decode(base64Decode(payload.replace(/-/g, '+').replace(/_/g, '/'))));
+  } catch {
+    throw new Error('Failed to parse Facebook signed request payload');
+  }
 
   // Verify signature (optional but recommended)
   const encoder = new TextEncoder();

@@ -39,7 +39,13 @@ Deno.serve(async (req: Request) => {
     }
 
     // STEP 2: Parse event
-    const event = JSON.parse(body)
+    let event;
+    try {
+      event = JSON.parse(body);
+    } catch {
+      console.error('Invalid JSON in clearing house webhook body');
+      return new Response('Invalid JSON', { status: 400 });
+    }
     console.log('Received clearing house event:', event.type)
 
     // STEP 3: Handle event types
