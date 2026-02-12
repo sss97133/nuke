@@ -87,6 +87,8 @@ const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
 const DevelopersPage = React.lazy(() => import('../pages/developers'));
 const ApiLanding = React.lazy(() => import('../pages/ApiLanding'));
+const DeveloperSignup = React.lazy(() => import('../pages/DeveloperSignup'));
+const DeveloperDashboard = React.lazy(() => import('../pages/DeveloperDashboard'));
 export const DomainRoutes = () => {
   return (
     <Suspense fallback={<div className="p-4 text-center">Loading module...</div>}>
@@ -165,6 +167,8 @@ export const DomainRoutes = () => {
         <Route path="/docs/*" element={<DevelopersPage />} />
         <Route path="/api" element={<ApiLanding />} />
         <Route path="/api/landing" element={<ApiLanding />} />
+        <Route path="/developers/signup" element={<DeveloperSignup />} />
+        <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
 
         {/* Investor Offering Portal (Data Room) */}
         <Route path="/offering" element={<InvestorOffering />} />
