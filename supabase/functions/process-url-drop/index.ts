@@ -868,10 +868,10 @@ async function processFacebookURL(
         suggestedType: 'vehicle_listing',
         confidence: 0.9,
         userId,
-        metadata: { item_id: itemId, error: err.message, share_url: url !== resolvedUrl ? url : undefined },
+        metadata: { item_id: itemId, error: err instanceof Error ? err.message : String(err), share_url: url !== resolvedUrl ? url : undefined },
       });
       return {
-        entityData: { item_id: itemId, error: err.message },
+        entityData: { item_id: itemId, error: err instanceof Error ? err.message : String(err) },
         entityId: leadId,
         action: 'extraction_failed',
         message: `FB Marketplace listing detected but extraction failed. Queued for retry.`,
@@ -1306,7 +1306,7 @@ async function processGenericURL(url: string, supabase: any) {
           year: parseInt(year, 10),
           make,
           model: model.split(/[-|]/)[0].trim(),
-          vin: `VIVA-${Date.now()}`,
+          vin: `VIVA-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           listing_url: url,
           discovery_source: 'url_drop'
         })

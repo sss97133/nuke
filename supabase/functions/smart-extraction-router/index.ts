@@ -302,7 +302,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Unknown extraction error',
+        error: error instanceof Error ? error.message : String(error || 'Unknown extraction error'),
         timestamp: new Date().toISOString()
       }),
       {
