@@ -75,7 +75,7 @@ serve(async (req) => {
           is_active: true,
         })
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (createError) {
         console.error('Error creating source:', createError);

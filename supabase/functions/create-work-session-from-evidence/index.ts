@@ -127,7 +127,7 @@ serve(async (req) => {
         .from("timeline_events")
         .insert(insertPayload)
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (createErr || !created?.id) {
         throw createErr || new Error("Failed to create timeline event");

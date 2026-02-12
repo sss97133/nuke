@@ -86,7 +86,7 @@ serve(async (req) => {
         review_status: 'pending',
       })
       .select('id')
-      .single()
+      .maybeSingle()
 
     if (pageErr) {
       // Refund credit on failure

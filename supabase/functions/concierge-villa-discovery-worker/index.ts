@@ -244,11 +244,11 @@ async function saveVilla(supabase: any, villa: Villa, villaTypeId: string): Prom
     return { inserted: false, updated: true };
   }
 
-  const { data: newProp, error } = await supabase.from("properties").insert(property).select().single();
+  const { data: newProp, error } = await supabase.from("properties").insert(property).select().maybeSingle();
   if (error) {
     if (error.message.includes("duplicate")) {
       property.slug = `${property.slug}-${Date.now() % 10000}`;
-      const { data: retry } = await supabase.from("properties").insert(property).select().single();
+      const { data: retry } = await supabase.from("properties").insert(property).select().maybeSingle();
       if (retry && villa.images?.length) {
         await supabase.from("property_images").insert(villa.images.slice(0, 5).map((url, i) => ({
           property_id: retry.id, url, sort_order: i, is_primary: i === 0,

@@ -802,7 +802,7 @@ serve(async (req) => {
               status: 'active',
             })
             .select()
-            .single();
+            .maybeSingle();
 
           if (error) {
             // Handle VIN duplicate race condition - another worker inserted first
@@ -823,9 +823,9 @@ serve(async (req) => {
               throw new Error(`Failed to save vehicle: ${error.message}`);
             }
           } else {
-            console.log(`Created vehicle: ${data.id}`);
-            extracted.vehicle_id = data.id;
-            healthLogger.setVehicleId(data.id);
+            console.log(`Created vehicle: ${data?.id}`);
+            extracted.vehicle_id = data?.id;
+            healthLogger.setVehicleId(data?.id);
           }
         }
       }

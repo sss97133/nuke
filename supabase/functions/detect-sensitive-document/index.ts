@@ -319,8 +319,13 @@ Return JSON:
     };
   }
 
-  const result = JSON.parse(content);
-  
+  let result;
+  try {
+    result = JSON.parse(content);
+  } catch {
+    return { is_sensitive: false, document_type: null, confidence: 0, extracted_data: {}, raw_text: '' };
+  }
+
   return {
     is_sensitive: result.is_sensitive || false,
     document_type: result.document_type || null,
@@ -412,8 +417,13 @@ Return ONLY valid JSON:
 
   // Extract JSON from response (Claude sometimes wraps in markdown)
   const jsonMatch = content.match(/\{[\s\S]*\}/);
-  const result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
-  
+  let result;
+  try {
+    result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
+  } catch {
+    return { is_sensitive: false, document_type: null, confidence: 0, extracted_data: {}, raw_text: '' };
+  }
+
   return {
     is_sensitive: result.is_sensitive || false,
     document_type: result.document_type || null,

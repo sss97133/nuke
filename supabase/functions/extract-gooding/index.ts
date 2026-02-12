@@ -368,9 +368,13 @@ async function fetchGoodingPageData(url: string): Promise<GoodingPageData> {
 async function discoverLotsFromSitemap(): Promise<string[]> {
   console.log('[gooding] Fetching sitemap...');
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch('https://www.goodingco.com/sitemap.xml', {
     headers: BROWSER_HEADERS,
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} fetching sitemap`);

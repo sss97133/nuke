@@ -427,7 +427,7 @@ serve(async (req) => {
         .from("catalog_sources")
         .insert({ name: "Holley", provider: "Holley", base_url: holleyBase })
         .select("id")
-        .single();
+        .maybeSingle();
       catalogSource = created;
     }
 

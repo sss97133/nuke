@@ -105,7 +105,7 @@ async function startSession(techLinkId: string): Promise<{ message: string; vehi
       context: { started_at: new Date().toISOString(), images_count: 0, notes: [] },
     })
     .select()
-    .single();
+    .maybeSingle();
 
   if (vehicles.length === 0) {
     return {

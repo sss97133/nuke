@@ -157,12 +157,12 @@ serve(async (req) => {
               is_public: false,
             })
             .select()
-            .single();
+            .maybeSingle();
 
           if (createError) {
             throw createError;
           }
-          vehicleId = newVehicle.id;
+          vehicleId = newVehicle?.id;
         }
       }
 
@@ -183,14 +183,14 @@ serve(async (req) => {
           },
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         throw error;
       }
 
       // Log API usage
-      await logApiUsage(supabase, userId, "observations", "create", data.id);
+      await logApiUsage(supabase, userId, "observations", "create", data?.id);
 
       return new Response(
         JSON.stringify({ data, message: "Observation recorded successfully" }),
