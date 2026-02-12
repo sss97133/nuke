@@ -639,6 +639,7 @@ function getDedicatedExtractor(url: string): string | null {
       'collectingcars.com': 'extract-collecting-cars-simple',
       'gaaclassiccars.com': 'extract-gaa-classics',
       'facebook.com': 'extract-facebook-marketplace',
+      'broadarrowauctions.com': 'extract-broad-arrow',
     }
     // Also match subdomains (e.g., *.craigslist.org)
     for (const [domain, extractor] of Object.entries(extractorMap)) {
