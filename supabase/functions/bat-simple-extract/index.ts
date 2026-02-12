@@ -313,7 +313,7 @@ function extractAuctionData(html: string): {
   
   // Watchers - "data-stats-item="watchers">982 watchers"
   const watcherMatch = html.match(/data-stats-item="watchers">([0-9,]+)/);
-  const watcher_count = watcherMatch ? parseInt(watcherMatch[1].replace(/,/g, '')) : 0;
+  const watcher_count = watcherMatch ? parseInt(watcherMatch[1].replace(/,/g, ''), 10) : 0;
   
   // Lot number - "<strong>Lot</strong> #225044"
   const lotMatch = html.match(/<strong>Lot<\/strong>\s*#([0-9,]+)/i);
@@ -417,7 +417,7 @@ function extractSpecs(html: string): {
   for (const pattern of mileagePatterns) {
     const match = descText.match(pattern);
     if (match) {
-      let num = parseInt(match[1].replace(/,/g, ''));
+      let num = parseInt(match[1].replace(/,/g, ''), 10);
       // Handle "18k" notation - check if "k" appears after the number
       if (match[0].toLowerCase().match(/[0-9,]+\s*k\s+miles/i) && num < 1000) {
         num = num * 1000;

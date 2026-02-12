@@ -144,7 +144,7 @@ function extractTitle(html: string): { title: string | null; year: number | null
 
   // Clean HTML entities
   title = title
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -153,7 +153,7 @@ function extractTitle(html: string): { title: string | null; year: number | null
 
   // Parse year (4 digits)
   const yearMatch = title.match(/\b(19|20)\d{2}\b/);
-  const year = yearMatch ? parseInt(yearMatch[0]) : null;
+  const year = yearMatch ? parseInt(yearMatch[0], 10) : null;
 
   // Parse make/model after year
   if (year) {
@@ -187,7 +187,7 @@ function parseOfferName(name: string): { year: number | null; make: string | nul
   // Extract year
   const yearMatch = cleanName.match(/^(\d{4})\s+/);
   if (yearMatch) {
-    year = parseInt(yearMatch[1]);
+    year = parseInt(yearMatch[1], 10);
     const afterYear = cleanName.slice(yearMatch[0].length);
 
     // Common makes
@@ -644,6 +644,7 @@ async function extractCatalogFromJsonLd(auctionUrl: string): Promise<CatalogResu
   try {
     let response = await fetch(auctionUrl, {
       redirect: 'follow',
+      signal: AbortSignal.timeout(30000),
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -667,6 +668,7 @@ async function extractCatalogFromJsonLd(auctionUrl: string): Promise<CatalogResu
         console.log(`[Bonhams] Following ${response.status} redirect to: ${redirectUrl}`);
         response = await fetch(redirectUrl, {
           redirect: 'follow',
+          signal: AbortSignal.timeout(30000),
           headers: {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -730,7 +732,13 @@ async function extractCatalogFromJsonLd(auctionUrl: string): Promise<CatalogResu
     }
 
     console.log(`[Bonhams] Parsing JSON-LD, ${jsonLdContent.length} chars`);
-    const jsonLd = JSON.parse(jsonLdContent);
+    let jsonLd: any;
+    try {
+      jsonLd = JSON.parse(jsonLdContent);
+    } catch (parseErr: any) {
+      console.error(`[Bonhams] JSON-LD parse error: ${parseErr?.message || parseErr}`);
+      return null;
+    }
 
     // Extract auction info
     const auctionIdMatch = auctionUrl.match(/\/auction\/(\d+)\//);
@@ -838,6 +846,7 @@ async function extractBonhamsListing(url: string, useFirecrawl: boolean = true):
   // Native fetch fallback
   if (!html) {
     const response = await fetch(url, {
+      signal: AbortSignal.timeout(30000),
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -861,7 +870,7 @@ async function extractBonhamsListing(url: string, useFirecrawl: boolean = true):
   if (mdTitleMatch) {
     const rawTitle = mdTitleMatch[1].trim();
     const yearMatch = rawTitle.match(/^(\d{4})/);
-    const year = yearMatch ? parseInt(yearMatch[1]) : null;
+    const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
     if (year) {
       const afterYear = rawTitle.slice(4).trim();
       const parts = afterYear.split(/\s+/);
@@ -1113,6 +1122,7 @@ serve(async (req) => {
         try {
           const debugResp = await fetch(catalog_url, {
             redirect: 'manual',
+            signal: AbortSignal.timeout(15000),
             headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
           });
           debugInfo = {
