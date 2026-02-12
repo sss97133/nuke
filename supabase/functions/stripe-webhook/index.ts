@@ -46,6 +46,43 @@ Deno.serve(async (req) => {
     }
 
     // Handle the event
+    if (event.type === 'customer.subscription.deleted') {
+      // Downgrade to free when subscription is canceled
+      const subscription = event.data.object
+      const customerId = subscription.customer
+
+      const { createClient: createSB } = await import('jsr:@supabase/supabase-js@2')
+      const sb = createSB(
+        Deno.env.get('PROJECT_URL') || Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      )
+
+      const { data: sub2 } = await sb
+        .from('api_access_subscriptions')
+        .select('user_id')
+        .eq('stripe_customer_id', customerId)
+        .maybeSingle()
+
+      if (sub2) {
+        await sb.from('api_access_subscriptions')
+          .update({ subscription_type: 'free', status: 'canceled', stripe_subscription_id: null })
+          .eq('user_id', sub2.user_id)
+
+        // Reset rate limits to free tier (100/day = ~5/hour)
+        await sb.from('api_keys')
+          .update({ rate_limit_per_hour: 5 })
+          .eq('user_id', sub2.user_id)
+          .eq('is_active', true)
+
+        console.log(`Subscription canceled for user ${sub2.user_id}, downgraded to free`)
+      }
+
+      return new Response(
+        JSON.stringify({ received: true }),
+        { headers: { 'content-type': 'application/json', ...corsHeaders } }
+      )
+    }
+
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object
 
