@@ -160,7 +160,7 @@ serve(async (req) => {
                 continue;
               }
             } catch (intError: any) {
-              console.error('Intelligence evaluation failed:', intError.message);
+              console.error('Intelligence evaluation failed:', intError?.message || intError);
               // Continue without intelligence if it fails
             }
           }

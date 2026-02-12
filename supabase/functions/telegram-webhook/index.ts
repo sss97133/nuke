@@ -100,7 +100,8 @@ async function getFileUrl(fileId: string): Promise<string | null> {
   if (!BOT_TOKEN) return null;
 
   const response = await fetch(
-    `https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`
+    `https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`,
+    { signal: AbortSignal.timeout(10000) }
   );
   const data = await response.json();
 
@@ -276,7 +277,7 @@ async function processPhoto(
     console.log("[Telegram] Analyzing with AI...", fileUrl);
 
     // Download image first and convert to base64
-    const imageResponse = await fetch(fileUrl);
+    const imageResponse = await fetch(fileUrl, { signal: AbortSignal.timeout(30000) });
     const arrayBuffer = await imageResponse.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
@@ -456,7 +457,7 @@ Return ONLY valid JSON:
           extracted_name: parsed.name,
           extracted_vin: parsed.vin,
           status,
-        }).select().single();
+        }).select().maybeSingle();
 
         // 2. If it's a title with a VIN, look up vehicle and check for duplicates
         if (parsed.type === "title" && parsed.vin && confidence >= 0.7) {
