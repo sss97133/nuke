@@ -790,22 +790,24 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!vehicleId) {
-      const { data: existing } = await supabase
+      const { data: existing, error: lookupErr } = await supabase
         .from('vehicles')
         .select('id')
         .eq('discovery_url', listing.url)
         .maybeSingle();
+      if (lookupErr) console.warn(`[pcarmarket] discovery_url lookup error: ${lookupErr.message}`);
       if (existing) vehicleId = existing.id;
     }
 
     // Fallback: slug-based ILIKE lookup to handle URL normalization mismatches
     if (!vehicleId && listing.slug) {
-      const { data: existing } = await supabase
+      const { data: existing, error: slugErr } = await supabase
         .from('vehicles')
         .select('id')
         .ilike('discovery_url', `%pcarmarket.com/auction/${listing.slug}%`)
         .limit(1)
         .maybeSingle();
+      if (slugErr) console.warn(`[pcarmarket] slug lookup error: ${slugErr.message}`);
       if (existing) vehicleId = existing.id;
     }
 
@@ -866,14 +868,20 @@ Deno.serve(async (req: Request) => {
         // Handle unique constraint violation by finding and updating the existing record
         if (vehicleError.code === '23505' && vehicleError.message?.includes('discovery_url')) {
           console.warn(`[pcarmarket] Duplicate discovery_url, looking up existing: ${listing.url}`);
+          // Use exact match first (fast, uses unique index), then fall back to ILIKE
           const { data: dup } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('discovery_url', listing.url)
+            .maybeSingle();
+          const dupId = dup?.id || (listing.slug ? (await supabase
             .from('vehicles')
             .select('id')
             .ilike('discovery_url', `%pcarmarket.com/auction/${listing.slug}%`)
             .limit(1)
-            .maybeSingle();
-          if (dup) {
-            vehicleId = dup.id;
+            .maybeSingle()).data?.id : null);
+          if (dupId) {
+            vehicleId = dupId;
             await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
             console.log(`[pcarmarket] Updated existing vehicle after dedup: ${vehicleId}`);
           } else {
@@ -1103,7 +1111,7 @@ Deno.serve(async (req: Request) => {
   } catch (error: any) {
     console.error('Error importing PCarMarket listing:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error || 'Internal server error') }),
+      JSON.stringify({ error: error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error || 'Internal server error')) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

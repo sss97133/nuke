@@ -1,45 +1,68 @@
-# ACTIVE AGENTS - Updated 2026-02-10 16:45 UTC
+# ACTIVE AGENTS - Updated 2026-02-12 7:35 PM
 
-## AUTONOMOUS SESSION — Coordinator (this session)
+## BACKGROUND JOBS RUNNING
 
-### Focus: Bug fixes, performance optimization, valuation backfill
-### Status: ACTIVE — valuation batch running, performance optimization complete
+### Multi-Domain Queue Drain v3 — ACTIVE
+- **Started**: 2026-02-12 6:28 PM AST (primary), 7:34 PM (boost2)
+- **Workers**: 15 parallel drain processes (3 scripts + 1 standalone)
+- **Scripts**: `/tmp/drain-final.sh` (4), `/tmp/drain-boost.sh` (3), `/tmp/drain-boost2.sh` (7), `/tmp/drain-ebay.sh` (1)
+- **Edge function max runtime**: 60s per call (Supabase timeout ~120s)
 
-### Fixes deployed this session:
-1. **system-health-monitor**: AbortError detection + feed index fix (70,000x speedup: 12s → 0.17ms)
-2. **compute-vehicle-valuation**: self-price fallback when no comps found (reduces 5% failure rate)
-3. **api-v1-vehicles**: JSON parse error handling for POST/PATCH
-4. **extract-vehicle-data-ai**: 15s fetch timeout for URL fetching
-5. **Frontend**: Safe JSON error handling in VehicleCommunityInsights, OrganizationProfile, MergeProposalsPanel, ProxyBidModal
-6. **Database**: Recreated idx_vvf_feed_rank, idx_vvf_deal_score, idx_vvf_heat_score without NULLS LAST
-7. **Materialized view**: Refreshed + ANALYZE on vehicle_valuation_feed
-8. **system-health-monitor**: Fixed thumbnail_url → primary_image_url column name
-9. **get_vehicle_profile_data RPC**: 74x speedup (1.1s → 15ms) by selecting only needed image columns (1.5MB → 301KB payload)
-10. **Database**: Added idx_auction_comments_vehicle_source composite index
-11. **extract-specialty-builder**: Added ICON 4x4, Ring Brothers configs; direct fetch preference
-12. **process-import-queue**: Added routing for Barrett-Jackson, Broad Arrow, GAA, Bonhams, RM Sotheby's, Gooding, specialty builders
-13. **classify-pending-businesses**: Added --use-only-current-db-types safety flag
-14. **vehicle_research_items**: Created missing table with RLS policies
+| Source | Workers | Pending (~) | Rate | Logs |
+|--------|---------|-------------|------|------|
+| Bonhams | 4 | ~73k | ~600/hr | `drain-final-bonhams`, `drain-boost-bonhams-{2,3}`, `drain-boost2-bonhams-{4,5}` |
+| PCarMarket | 4 | ~20k | ~140/hr | `drain-final-pcarmarket`, `drain-boost-pcarmarket-2`, `drain-boost2-pcarmarket-{3,4}` |
+| Broad Arrow | 1 | ~1.1k | ~170/hr | `drain-final-broadarrow` |
+| Barrett-Jackson | 1 | ~1k | ~42/hr (Firecrawl timeouts) | `drain-final-barrettjackson` |
+| BaT | 2 | ~5.4k | ~420/hr | `drain-boost2-bat-{1,2}` |
+| Cars & Bids | 1 | ~40 | finishing | `drain-boost2-carsandbids-1` |
+| eBay | 1 | ~177 | new | `drain-ebay.log` |
 
-### Commits pushed:
-- `f6fb2f1b4` — fix: handle AbortError in health monitor + fix feed index for 70,000x speedup
-- `86ed474f7` — fix: valuation fallback for missing comps, API JSON parsing, frontend error handling
-- `9714502b6` — fix: add 15s fetch timeout to extract-vehicle-data-ai URL fetching
-- `063fad22b` — fix: correct column name in health monitor data quality check
-- `484a85c6d` — feat: add specialty builder configs, import queue routing, classification safety
-- `612c593bc` — perf: optimize vehicle profile RPC — 74x faster (1.1s → 15ms)
+All logs in `/tmp/drain-*.log`
+- **Kill all**: `ps aux | grep drain | grep -v grep | awk '{print $2}' | xargs kill`
+- **Status**: `for f in /tmp/drain-final-*.log /tmp/drain-boost-*.log /tmp/drain-boost2-*.log; do echo "--- $(basename $f) ---"; tail -2 $f; done`
 
-### Valuation backfill progress:
-- Start: 475,421 nuke_estimates
-- Current: ~479,654+ (multiple batches completed, another running)
-- Remaining: ~313,000
-- Success rate: 95-97% per batch
+---
 
-### System health:
-- Status: "degraded" (import queue 34K pending, extraction rate below avg, 96% missing images)
-- Feed performance: 71ms (was timing out at 7s+)
-- Vehicle page RPC: 15ms (was 1.1-1.6s)
-- All critical functions operational
+## COMPLETED THIS SESSION
+
+### Infrastructure Improvements
+- **Created `claim_import_queue_batch_by_source_id`** — indexed claim function using source_id instead of LIKE pattern scan. 10-100x faster claiming on 440k+ row table
+- **Created partial index** `idx_import_queue_source_status` on `(source_id, status, attempts, next_attempt_at, locked_at) WHERE status = 'pending'`
+- **Updated `continuous-queue-processor`** — tries fast source_id claim first, falls back to LIKE pattern for items with NULL source_id
+- **Backfilled source_id** for Barrett-Jackson (3,151 items) and Broad Arrow (1,442 items) that had NULL source_id
+- **Added eBay source config** to continuous-queue-processor + detectSource
+- **Committed & deployed** updated continuous-queue-processor
+
+### PCarMarket Fixes
+- **Fixed `[object Object]` error serialization** in import-pcarmarket-listing/index.ts — Supabase error objects now properly serialized
+- **Improved duplicate discovery_url handler** — uses exact eq match (fast unique index) before ILIKE fallback
+- **Added error logging** to vehicle lookup queries (timeout detection)
+- **Deployed** import-pcarmarket-listing
+
+### Queue Triage
+- Reset 4,313 failed items → pending (BaT 1,190, Bonhams 3,066, other 57)
+- Reset 84,407 pending items with maxed-out attempts back to 0
+- Reset 5,447 stuck processing items → pending
+- Reset 15 PCarMarket `[object Object]` failures for retry with fixed code
+- Reset 177 eBay items with stale attempt counts
+
+### Queue Status (~7:35 PM)
+- Drains running across all major domains
+- Total workers: 15 concurrent
+- Completed this session: ~2,500+
+
+---
+
+## WHAT NEXT AGENT SHOULD DO
+
+1. **Monitor drains**: Check logs, restart if workers die
+2. **Scale assessment**: With 15 workers, watch for edge function timeouts or rate limits
+3. **Barrett-Jackson**: Consider adding direct fetch fallback to avoid Firecrawl timeout dependency
+4. **Fix Playwright failures**: KSL (40), Classic.com (39) — need non-Playwright extractors
+5. **Bonhams 64k skipped**: Investigate why 64k items are skipped — may be recoverable
+6. **Contract station**: Wire curator profile links, test with real data
+7. **Commit all changes**: PCarMarket fix + eBay config not yet committed
 
 ---
 

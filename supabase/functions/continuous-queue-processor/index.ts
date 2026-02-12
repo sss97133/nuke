@@ -141,6 +141,12 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     minDelay: 1500,
     maxDelay: 3000,
   },
+  ebay: {
+    pattern: "%ebay.com%",
+    extractor: "extract-vehicle-data-ai",
+    minDelay: 1500,
+    maxDelay: 3000,
+  },
 };
 
 function randomDelay(minMs: number, maxMs: number): Promise<void> {
@@ -165,6 +171,7 @@ function detectSource(url: string): string | null {
   if (url.includes("rmsothebys.com")) return "rmsothebys";
   if (url.includes("goodingco.com")) return "gooding";
   if (url.includes("gaaclassiccars.com")) return "gaa";
+  if (url.includes("ebay.com")) return "ebay";
   return null;
 }
 
