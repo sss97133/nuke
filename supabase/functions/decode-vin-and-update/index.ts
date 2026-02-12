@@ -43,7 +43,8 @@ Deno.serve(async (req) => {
 
     // Call NHTSA VPIC API
     const nhtsaResponse = await fetch(
-      `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`
+      `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${encodeURIComponent(vin)}?format=json`,
+      { signal: AbortSignal.timeout(15000) }
     )
 
     if (!nhtsaResponse.ok) {

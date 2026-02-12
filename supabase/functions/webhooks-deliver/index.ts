@@ -93,7 +93,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("Webhook delivery error:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error", details: error.message }),
+      JSON.stringify({ error: "Internal server error", details: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -204,7 +204,7 @@ async function attemptDelivery(
     .from("webhook_deliveries")
     .select("attempts, max_attempts, endpoint_id")
     .eq("id", deliveryId)
-    .single();
+    .maybeSingle();
 
   if (!delivery) {
     return {
@@ -227,6 +227,7 @@ async function attemptDelivery(
         'Stripe-Signature': `t=${timestamp},v1=${signature.split(',')[1]?.split('=')[1] || signature}`,
       },
       body: payloadString,
+      signal: AbortSignal.timeout(15000),
     });
 
     const responseTime = Date.now() - startTime;
@@ -479,6 +480,7 @@ export async function triggerWebhook(supabase: any, event: WebhookEvent): Promis
         action: 'deliver',
         event,
       }),
+      signal: AbortSignal.timeout(5000),
     });
   } catch (error) {
     console.error("Failed to trigger webhook:", error);
