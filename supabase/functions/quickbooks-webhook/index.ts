@@ -69,7 +69,16 @@ serve(async (req) => {
         }
       }
 
-      const data = JSON.parse(payload);
+      let data;
+      try {
+        data = JSON.parse(payload);
+      } catch {
+        console.warn('Invalid JSON in QuickBooks webhook payload');
+        return new Response(JSON.stringify({ received: true, error: 'invalid_json' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       // Log webhook event
       console.log('QuickBooks webhook received:', JSON.stringify(data, null, 2));

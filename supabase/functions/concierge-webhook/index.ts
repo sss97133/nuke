@@ -41,7 +41,14 @@ serve(async (req) => {
       }
     } else {
       // For testing without signature verification
-      event = JSON.parse(body)
+      try {
+        event = JSON.parse(body);
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON in webhook body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     console.log('Webhook event:', event.type)
