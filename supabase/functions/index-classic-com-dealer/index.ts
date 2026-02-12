@@ -967,10 +967,10 @@ async function findOrCreateOrganizationWithGeographicLogic(
       }
     })
     .select('id, business_name')
-    .single();
+    .maybeSingle();
 
   if (error) {
-    throw new Error(`Failed to create organization: ${error.message}`);
+    throw new Error(`Failed to create organization: ${error?.message || error}`);
   }
 
   return { id: newOrg.id, name: newOrg.business_name };

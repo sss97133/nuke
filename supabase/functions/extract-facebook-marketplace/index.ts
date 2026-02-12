@@ -670,7 +670,7 @@ serve(async (req) => {
         raw_scrape_data: listing.raw_scrape_data,
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (insertError) throw insertError;
 

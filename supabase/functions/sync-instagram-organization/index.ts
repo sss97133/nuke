@@ -79,7 +79,7 @@ serve(async (req) => {
             }
           })
           .select('id')
-          .single();
+          .maybeSingle();
 
         if (createError) throw createError;
         externalIdentityId = newIdentity.id;

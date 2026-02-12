@@ -1311,7 +1311,7 @@ async function processGenericURL(url: string, supabase: any) {
           discovery_source: 'url_drop'
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (!error && vehicle) {
         return {

@@ -165,7 +165,7 @@ async function getOrCreateTech(telegramUser: TelegramUpdate["message"]["from"]) 
       display_name: `${telegramUser.first_name}${telegramUser.last_name ? " " + telegramUser.last_name : ""}`,
     })
     .select()
-    .single();
+    .maybeSingle();
 
   return newTech;
 }
@@ -268,7 +268,7 @@ async function setActiveVehicle(
             discovered_via: "telegram_technician",
           })
           .select()
-          .single();
+          .maybeSingle();
 
         vehicle = newVehicle;
       }
@@ -492,7 +492,7 @@ Example: /vehicle WBA3A5C51CF123456`;
       processing_status: "processed",
     })
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("[RestBot] submission insert error:", error);

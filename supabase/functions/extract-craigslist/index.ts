@@ -254,11 +254,11 @@ serve(async (req) => {
           onConflict: 'listing_url',
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Database save error:', error);
-        throw new Error(`Failed to save to import_queue: ${error.message}`);
+        throw new Error(`Failed to save to import_queue: ${error?.message || error}`);
       }
 
       console.log(`Saved to import_queue: ${data.id}`);

@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
         .from("scrape_sources")
         .select("id")
         .eq("url", "https://collectingcars.com/search/")
-        .single();
+        .maybeSingle();
 
       if (!source) {
         return okJson({ error: "Collecting Cars source not found in scrape_sources" }, 404);

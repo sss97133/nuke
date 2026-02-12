@@ -443,7 +443,7 @@ serve(async (req) => {
           .from('forum_sources')
           .upsert(insertPayload, { onConflict: 'slug' })
           .select('id')
-          .single();
+          .maybeSingle();
 
         if (insertError) {
           console.error('[inspect-forum] Failed to insert forum_sources:', insertError);

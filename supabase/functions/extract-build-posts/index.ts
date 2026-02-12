@@ -1003,10 +1003,10 @@ serve(async (req) => {
             { onConflict: 'thread_url' }
           )
           .select('id')
-          .single();
+          .maybeSingle();
 
         if (threadInsertErr) {
-          throw new Error(`Failed to create thread: ${threadInsertErr.message}`);
+          throw new Error(`Failed to create thread: ${threadInsertErr?.message || threadInsertErr}`);
         }
         threadRecord = { id: newThread.id };
       }
