@@ -44,7 +44,10 @@ serve(async (req) => {
           await supabase.from('import_queue').update({
             status: 'failed',
             error_message: 'listing_url is required',
+            failure_category: 'bad_data',
             attempts: (item.attempts || 0) + 1,
+            locked_at: null,
+            locked_by: null,
           }).eq('id', item.id);
           results.push({ id: item.id, status: 'failed', url: null, error: 'listing_url is required' });
           continue;
@@ -133,6 +136,8 @@ serve(async (req) => {
                   status: 'rejected',
                   error_message: `Intelligence REJECT: ${(intelligenceDecision.reject_reasons || []).join(', ')}`,
                   attempts: item.attempts + 1,
+                  locked_at: null,
+                  locked_by: null,
                 }).eq('id', item.id);
                 results.push({
                   id: item.id,
@@ -149,6 +154,8 @@ serve(async (req) => {
                   status: 'pending_review',
                   error_message: `Intelligence DOUBT: ${(intelligenceDecision.doubts || []).map((d: any) => d.reason).join(', ')}`,
                   attempts: item.attempts + 1,
+                  locked_at: null,
+                  locked_by: null,
                 }).eq('id', item.id);
                 results.push({
                   id: item.id,
@@ -170,6 +177,8 @@ serve(async (req) => {
             processed_at: new Date().toISOString(),
             attempts: item.attempts + 1,
             vehicle_id: vehicleId,
+            locked_at: null,
+            locked_by: null,
           }).eq('id', item.id);
           results.push({
             id: item.id,
@@ -182,22 +191,55 @@ serve(async (req) => {
           const errorMsg = typeof extractData.error === 'string' ? extractData.error : JSON.stringify(extractData.error) || 'Extraction failed';
           // Detect non-vehicle pages (memorabilia, collectibles, etc.) and skip instead of fail
           const isNonVehicle = errorMsg.includes('No vehicle data found') ||
-            errorMsg.includes('could not find real vehicle data');
+            errorMsg.includes('could not find real vehicle data') ||
+            errorMsg.includes('Missing required fields');
           const status = isNonVehicle ? 'skipped' : 'failed';
+
+          // Auto-categorize failures
+          let failureCategory = null;
+          if (!isNonVehicle) {
+            if (errorMsg.includes('timeout') || errorMsg.includes('Timeout') || errorMsg.includes('504')) {
+              failureCategory = 'timeout';
+            } else if (errorMsg.includes('browser has been closed') || errorMsg.includes('page.goto')) {
+              failureCategory = 'browser_crash';
+            } else if (errorMsg.includes('rate limit') || errorMsg.includes('429')) {
+              failureCategory = 'rate_limited';
+            } else if (errorMsg.includes('403') || errorMsg.includes('blocked') || errorMsg.includes('Forbidden')) {
+              failureCategory = 'blocked';
+            } else if (errorMsg.includes('bad_data') || errorMsg.includes('Invalid')) {
+              failureCategory = 'bad_data';
+            } else {
+              failureCategory = 'extraction_failed';
+            }
+          }
 
           await supabase.from('import_queue').update({
             status,
             error_message: isNonVehicle ? `Non-vehicle page: ${errorMsg.slice(0, 200)}` : errorMsg,
             attempts: item.attempts + 1,
+            failure_category: failureCategory,
+            locked_at: null,
+            locked_by: null,
           }).eq('id', item.id);
           results.push({ id: item.id, status, url, error: errorMsg });
         }
       } catch (error: any) {
         const errMsg = error?.message || String(error);
+        // Auto-categorize catch-level failures
+        let failureCategory = 'extraction_failed';
+        if (errMsg.includes('timeout') || errMsg.includes('Timeout') || errMsg.includes('AbortError')) {
+          failureCategory = 'timeout';
+        } else if (errMsg.includes('browser has been closed')) {
+          failureCategory = 'browser_crash';
+        }
+
         await supabase.from('import_queue').update({
           status: 'failed',
           error_message: errMsg.slice(0, 500),
           attempts: (item.attempts || 0) + 1,
+          failure_category: failureCategory,
+          locked_at: null,
+          locked_by: null,
         }).eq('id', item.id);
         results.push({ id: item.id, status: 'failed', url: item.listing_url, error: errMsg });
       }

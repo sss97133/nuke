@@ -488,7 +488,7 @@ serve(async (req) => {
     console.error('Universal search error:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      error: error?.message || String(error),
       results: [],
       query_type: 'text',
       total_count: 0,

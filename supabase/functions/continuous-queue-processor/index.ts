@@ -361,7 +361,7 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         worker_id: workerId,
-        error: e.message,
+        error: e?.message || String(e),
         ...metrics,
         elapsed_seconds: Math.round((Date.now() - startTime) / 100) / 10,
       }),
