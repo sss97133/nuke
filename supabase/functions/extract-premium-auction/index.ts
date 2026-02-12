@@ -110,7 +110,7 @@ serve(async (req) => {
           });
 
           if (error) {
-            console.error(`Failed to extract ${listingUrl}:`, error.message);
+            console.error(`Failed to extract ${listingUrl}:`, error?.message || error);
             errorCount++;
           } else if (data?.success) {
             successCount++;
@@ -121,7 +121,7 @@ serve(async (req) => {
 
           await new Promise(r => setTimeout(r, 2000));
         } catch (e: any) {
-          console.error(`Exception extracting ${listingUrl}:`, e.message);
+          console.error(`Exception extracting ${listingUrl}:`, e instanceof Error ? e.message : String(e));
           errorCount++;
         }
       }
@@ -146,7 +146,7 @@ serve(async (req) => {
     });
 
     if (error) {
-      throw new Error(`Extractor ${extractorFunction} failed: ${error.message}`);
+      throw new Error(`Extractor ${extractorFunction} failed: ${error?.message || error}`);
     }
 
     return new Response(JSON.stringify({
@@ -200,6 +200,7 @@ async function discoverListingsFromIndex(
         formats: ["html", "links"],
         waitFor: 5000,
       }),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) {
@@ -251,7 +252,7 @@ async function discoverListingsFromIndex(
     return discovered;
 
   } catch (e: any) {
-    console.error(`Failed to discover listings: ${e.message}`);
+    console.error(`Failed to discover listings: ${e instanceof Error ? e.message : String(e)}`);
     return [];
   }
 }

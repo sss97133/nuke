@@ -1,5 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 interface AgentTask {
   agent: string;
   action: string;
@@ -54,9 +59,22 @@ const SCALE_TARGETS = {
 };
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
-    const { action, agents, params = {}, scale_check = true } = await req.json();
-    
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const { action, agents, params = {}, scale_check = true } = body;
+
     switch (action) {
       case 'status':
         return await getAgentStatus();
@@ -80,14 +98,14 @@ Deno.serve(async (req) => {
         return await runDailyPipeline(params);
       
       default:
-        return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400 });
+        return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
   } catch (error: any) {
     console.error('Orchestrator error:', error);
     return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString()
-    }), { status: 500 });
+    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
 
@@ -114,7 +132,7 @@ async function getAgentStatus() {
     agents: status,
     overall_health: Object.values(status).filter((s: any) => s.status === 'healthy').length / Object.keys(status).length,
     timestamp: new Date().toISOString()
-  }));
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
 async function getScaleMetrics(): Promise<Response> {
@@ -148,27 +166,27 @@ async function getScaleMetrics(): Promise<Response> {
         efficiency_score: daily_rate / SCALE_TARGETS.daily_profiles
       },
       recommendations: generateScaleRecommendations(metrics, daily_rate)
-    }));
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), { status: 500 });
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 }
 
 async function invokeAgent(agent: string, action: string, params: any): Promise<Response> {
   const functionName = AVAILABLE_AGENTS[agent];
   if (!functionName) {
-    return new Response(JSON.stringify({ error: `Unknown agent: ${agent}` }), { status: 400 });
+    return new Response(JSON.stringify({ error: `Unknown agent: ${agent}` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-  
+
   try {
     const response = await callAgent(functionName, action, params);
-    return new Response(JSON.stringify(response));
+    return new Response(JSON.stringify(response), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
     return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : String(error),
       agent,
       action
-    }), { status: 500 });
+    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 }
 
@@ -194,7 +212,7 @@ async function invokeMultipleAgents(tasks: AgentTask[]): Promise<Response> {
     successful: responses.filter(r => r.success).length,
     failed: responses.filter(r => !r.success).length,
     results: responses
-  }));
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
 async function optimizeForScale(): Promise<Response> {
@@ -231,7 +249,7 @@ async function optimizeForScale(): Promise<Response> {
     })),
     current_metrics: metrics,
     timestamp: new Date().toISOString()
-  }));
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
 async function emergencyDebug(): Promise<Response> {
@@ -248,12 +266,12 @@ async function emergencyDebug(): Promise<Response> {
       emergency_status: debugResponse.data,
       recommended_actions: debugResponse.recommendations || [],
       timestamp: new Date().toISOString()
-    }));
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
     return new Response(JSON.stringify({
       error: `Emergency debug failed: ${error instanceof Error ? error.message : String(error)}`,
       fallback_diagnostics: await getFallbackDiagnostics()
-    }), { status: 500 });
+    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 }
 
@@ -320,7 +338,7 @@ async function runDailyPipeline(params: any): Promise<Response> {
     successful_steps: results.filter(r => r.success).length,
     final_metrics: await finalMetrics.json(),
     timestamp: new Date().toISOString()
-  }));
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
 async function callAgent(functionName: string, action: string, params: any): Promise<AgentResponse> {

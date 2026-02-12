@@ -906,7 +906,7 @@ serve(async (req) => {
         .from("vehicles")
         .insert(vehicleData)
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (insertError) {
         throw new Error(`Vehicle insert failed: ${insertError.message}`);

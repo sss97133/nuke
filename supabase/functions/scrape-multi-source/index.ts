@@ -1494,7 +1494,7 @@ Return ONLY valid JSON in this format:
           squarebody_count: listings.filter((l: any) => l.is_squarebody).length
         })
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (newSource) {
         sourceId = newSource.id;
@@ -1625,7 +1625,7 @@ Return ONLY valid JSON in this format:
             }
           })
           .select('id, business_name')
-          .single();
+          .maybeSingle();
 
         if (newOrg) {
           organizationId = newOrg.id;
