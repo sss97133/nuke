@@ -880,7 +880,8 @@ serve(async (req) => {
           // analyze-auction-comments is deployed with verify_jwt enabled.
           ...(authToUse ? { 'Authorization': authToUse } : {})
         },
-        body: JSON.stringify({ auction_event_id: eventId })
+        body: JSON.stringify({ auction_event_id: eventId }),
+        signal: AbortSignal.timeout(30000),
       }).then(res => res.text().catch(() => {})).catch(e => console.error('Failed to trigger analysis:', e instanceof Error ? e.message : String(e)))
     }
 

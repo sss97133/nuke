@@ -234,7 +234,7 @@ serve(async (req) => {
         extraction_metadata: input.extraction_metadata
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (insertError) {
       console.error("Insert error:", insertError);

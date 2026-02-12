@@ -943,8 +943,8 @@ serve(async (req) => {
               status: 'active',
             })
             .select()
-            .single();
-          if (error) throw new Error(`Failed to save vehicle: ${error.message}`);
+            .maybeSingle();
+          if (error) throw new Error(`Failed to save vehicle: ${error?.message || error}`);
           console.log(`Saved vehicle: ${data.id}`);
           extracted.vehicle_id = data.id;
           healthLogger.setVehicleId(data.id);
