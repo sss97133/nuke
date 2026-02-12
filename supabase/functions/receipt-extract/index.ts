@@ -614,9 +614,18 @@ serve(async (req: Request) => {
 
       if (openaiResp.ok) {
         const data = await openaiResp.json();
-        const content = data.choices[0].message.content;
-        const parsed = JSON.parse(content);
-        return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(content);
+          } catch (parseError) {
+            console.error('[receipt-extract] Failed to parse OpenAI Vision response:', parseError, 'Raw content:', String(content).substring(0, 500));
+          }
+          if (parsed) {
+            return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          }
+        }
       }
     }
 
