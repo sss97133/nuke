@@ -279,6 +279,10 @@ const SECTIONS = [
   { id: 'quickstart', label: 'Quickstart', group: 'Getting Started' },
   { id: 'authentication', label: 'Authentication', group: 'Getting Started' },
   { id: 'vehicles', label: 'Vehicles', group: 'REST API' },
+  { id: 'vin-lookup', label: 'VIN Lookup', group: 'REST API' },
+  { id: 'vehicle-history', label: 'Vehicle History', group: 'REST API' },
+  { id: 'vehicle-auction', label: 'Vehicle Auction', group: 'REST API' },
+  { id: 'market-trends', label: 'Market Trends', group: 'REST API' },
   { id: 'search', label: 'Search', group: 'REST API' },
   { id: 'batch', label: 'Batch Import', group: 'REST API' },
   { id: 'observations', label: 'Observations', group: 'REST API' },
@@ -300,17 +304,17 @@ function OverviewSection() {
     <div>
       <h1 style={s.h1}>Nuke Developer Documentation</h1>
       <p style={s.p}>
-        Nuke is a vehicle intelligence platform with data on 810K+ collector and enthusiast vehicles.
+        Nuke is a vehicle intelligence platform with data on 938K+ collector and enthusiast vehicles.
         Every data point has provenance tracking and confidence scores. Build apps that search, analyze,
         value, and extract vehicle data from 34+ source platforms.
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
         {[
-          { value: '810K+', label: 'Vehicles' },
+          { value: '938K+', label: 'Vehicles' },
           { value: '625K+', label: 'Observations' },
-          { value: '506K+', label: 'Valuations' },
-          { value: '29.8M', label: 'Images' },
+          { value: '507K+', label: 'Valuations' },
+          { value: '30M+', label: 'Images' },
         ].map((stat) => (
           <div key={stat.label} style={{
             background: 'var(--grey-100)',
@@ -353,7 +357,11 @@ function OverviewSection() {
         </thead>
         <tbody>
           {[
-            { path: '/universal-search', purpose: 'Full-text search across all entities', auth: 'Optional' },
+            { path: '/api-v1-vin-lookup/:vin', purpose: 'One-call vehicle profile by VIN', auth: 'Required' },
+            { path: '/api-v1-vehicle-history/:vin', purpose: 'Observation timeline for a vehicle', auth: 'Required' },
+            { path: '/api-v1-vehicle-auction/:vin', purpose: 'Auction results + sentiment', auth: 'Required' },
+            { path: '/api-v1-market-trends', purpose: 'Price trends by make/model/year', auth: 'Required' },
+            { path: '/api-v1-search', purpose: 'Full-text search (v1 wrapper)', auth: 'Required' },
             { path: '/api-v1-vehicles', purpose: 'CRUD operations on vehicles', auth: 'Required' },
             { path: '/api-v1-batch', purpose: 'Bulk import up to 1,000 vehicles', auth: 'Required' },
             { path: '/api-v1-observations', purpose: 'Query and submit observation events', auth: 'Required' },
@@ -508,47 +516,44 @@ function QuickstartSection() {
         "Extract the listing at bringatrailer.com/listing/..."
       </div>
 
-      <h2 style={s.h2}>Option C: JavaScript / TypeScript SDK</h2>
+      <h2 style={s.h2}>Option C: TypeScript SDK</h2>
       <p style={s.p}>
-        Use the Supabase client library for direct access with real-time subscriptions:
+        The official Nuke SDK follows Stripe/Plaid patterns. Install with npm:
       </p>
       <CodeBlock
         title="Install"
-        code="npm install @supabase/supabase-js"
+        code="npm install @nuke/sdk"
       />
       <CodeBlock
         title="Usage"
-        code={`import { createClient } from '@supabase/supabase-js'
+        code={`import Nuke from '@nuke/sdk';
 
-const supabase = createClient(
-  '${SUPABASE_URL}',
-  'YOUR_ANON_KEY'
-)
+const nuke = new Nuke('nk_live_your_key_here');
 
-// Search vehicles
-const { data } = await supabase.functions.invoke('universal-search', {
-  body: { query: '1967 Mustang', limit: 10 }
-})
+// VIN Lookup — full profile in one call
+const profile = await nuke.vinLookup.get('WP0AB0916KS121279');
+console.log(profile.valuation?.estimated_value);
 
-// Get vehicle details
-const { data: vehicle } = await supabase
-  .from('vehicles')
-  .select('*, vehicle_images(*)')
-  .eq('id', 'some-uuid')
-  .single()
+// Search
+const results = await nuke.search.query({ q: 'porsche 911 turbo' });
 
-// Listen for new observations in real-time
-supabase
-  .channel('observations')
-  .on('postgres_changes', {
-    event: 'INSERT',
-    schema: 'public',
-    table: 'vehicle_observations',
-    filter: 'vehicle_id=eq.some-uuid'
-  }, (payload) => {
-    console.log('New observation:', payload.new)
-  })
-  .subscribe()`}
+// Market Trends
+const trends = await nuke.marketTrends.get({
+  make: 'Porsche', model: '911', period: '1y'
+});
+console.log(trends.summary.trend_direction);
+
+// Vehicle History
+const history = await nuke.vehicleHistory.list('WP0AB0916KS121279');
+
+// Auction Data + Sentiment
+const auction = await nuke.vehicleAuction.get('WP0AB0916KS121279');
+console.log(auction.sentiment?.overall);
+
+// CRUD operations
+const vehicle = await nuke.vehicles.create({
+  year: 1988, make: 'Porsche', model: '911 Turbo'
+});`}
       />
     </div>
   );
@@ -634,7 +639,11 @@ fetch(\`\${API_BASE}/api-v1-vehicles\`, {
         </thead>
         <tbody>
           {[
-            { ep: 'universal-search', anon: 'Read', api: 'Read', jwt: 'Read' },
+            { ep: 'api-v1-vin-lookup', anon: '-', api: 'Read', jwt: 'Read' },
+            { ep: 'api-v1-vehicle-history', anon: '-', api: 'Read', jwt: 'Read' },
+            { ep: 'api-v1-vehicle-auction', anon: '-', api: 'Read', jwt: 'Read' },
+            { ep: 'api-v1-market-trends', anon: '-', api: 'Read', jwt: 'Read' },
+            { ep: 'api-v1-search', anon: '-', api: 'Read', jwt: 'Read' },
             { ep: 'api-v1-vehicles', anon: 'Read', api: 'CRUD', jwt: 'CRUD (own)' },
             { ep: 'api-v1-batch', anon: '-', api: 'Write', jwt: 'Write' },
             { ep: 'api-v1-observations', anon: 'Read', api: 'Read/Write', jwt: 'Read/Write' },
@@ -892,6 +901,402 @@ function SearchSection() {
   "search_time_ms": 38
 }`}
         />
+      </div>
+    </div>
+  );
+}
+
+function VinLookupSection() {
+  return (
+    <div>
+      <h1 style={s.h1}>VIN Lookup</h1>
+      <p style={s.p}>
+        One-call vehicle profile by VIN. Returns the full vehicle record plus embedded valuation,
+        listing/observation/image counts, and the first 5 images. This is the fastest way to get
+        everything about a vehicle in a single request.
+      </p>
+
+      <div style={s.endpoint}>
+        <div style={s.endpointHeader}>
+          <span style={s.methodBadge('GET')}>GET</span>
+          <span>/api-v1-vin-lookup/:vin</span>
+        </div>
+
+        <ParamTable params={[
+          { name: 'vin', type: 'string', required: true, description: 'Vehicle Identification Number (path parameter)' },
+        ]} />
+
+        <CodeBlock
+          title="curl"
+          code={`curl "${API_BASE}/api-v1-vin-lookup/WP0AB0916KS121279" \\
+  -H "X-API-Key: nk_live_xxx"`}
+        />
+
+        <CodeBlock
+          title="SDK"
+          code={`const profile = await nuke.vinLookup.get('WP0AB0916KS121279');
+console.log(profile.year, profile.make, profile.model);
+console.log(profile.valuation?.estimated_value);
+console.log(profile.counts); // { listings: 2, observations: 15, images: 24 }`}
+        />
+
+        <CodeBlock
+          title="Response"
+          code={`{
+  "data": {
+    "id": "uuid-1",
+    "year": 1988,
+    "make": "Porsche",
+    "model": "911 Turbo",
+    "vin": "WP0AB0916KS121279",
+    "mileage": 37000,
+    "sale_price": 165000,
+    "primary_image_url": "https://...",
+    "valuation": {
+      "estimated_value": 172000,
+      "value_low": 155000,
+      "value_high": 189000,
+      "confidence_score": 82,
+      "deal_score_label": "good",
+      "heat_score_label": "hot"
+    },
+    "counts": {
+      "listings": 2,
+      "observations": 15,
+      "images": 24
+    },
+    "images": [
+      { "id": "uuid", "image_url": "https://...", "is_primary": true },
+      ...
+    ]
+  }
+}`}
+        />
+
+        <h3 style={s.h3}>Response Fields</h3>
+        <table style={s.table}>
+          <thead>
+            <tr>
+              <th style={s.th}>Field</th>
+              <th style={s.th}>Type</th>
+              <th style={s.th}>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { field: 'valuation', type: 'object|null', desc: 'Nuke Estimate with confidence, deal score, heat score' },
+              { field: 'counts.listings', type: 'number', desc: 'Number of external auction/marketplace listings' },
+              { field: 'counts.observations', type: 'number', desc: 'Total observations in the timeline' },
+              { field: 'counts.images', type: 'number', desc: 'Number of images returned (max 5)' },
+              { field: 'images', type: 'array', desc: 'First 5 images, sorted by primary flag' },
+            ].map((row) => (
+              <tr key={row.field}>
+                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.field}</td>
+                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.type}</td>
+                <td style={s.td}>{row.desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function VehicleHistorySection() {
+  return (
+    <div>
+      <h1 style={s.h1}>Vehicle History</h1>
+      <p style={s.p}>
+        Paginated observation timeline for a vehicle. Every auction listing, forum post, service record,
+        price signal, and sighting is stored as an observation with source attribution. Filter by kind
+        to see specific event types.
+      </p>
+
+      <div style={s.endpoint}>
+        <div style={s.endpointHeader}>
+          <span style={s.methodBadge('GET')}>GET</span>
+          <span>/api-v1-vehicle-history/:vin</span>
+        </div>
+
+        <ParamTable params={[
+          { name: 'vin', type: 'string', required: true, description: 'Vehicle Identification Number (path parameter)' },
+          { name: 'kind', type: 'string', description: 'Filter by observation kind: listing, comment, sale, service, sighting' },
+          { name: 'page', type: 'number', description: 'Page number (default: 1)' },
+          { name: 'limit', type: 'number', description: 'Results per page, 1-100 (default: 50)' },
+        ]} />
+
+        <CodeBlock
+          title="curl"
+          code={`curl "${API_BASE}/api-v1-vehicle-history/WP0AB0916KS121279?kind=listing&limit=10" \\
+  -H "X-API-Key: nk_live_xxx"`}
+        />
+
+        <CodeBlock
+          title="SDK"
+          code={`const history = await nuke.vehicleHistory.list('WP0AB0916KS121279', {
+  kind: 'listing',
+  limit: 10,
+});
+
+for (const obs of history.data.observations) {
+  console.log(obs.kind, obs.observed_at, obs.structured_data);
+}`}
+        />
+
+        <CodeBlock
+          title="Response"
+          code={`{
+  "data": {
+    "vehicle": {
+      "id": "uuid-1",
+      "year": 1988,
+      "make": "Porsche",
+      "model": "911 Turbo",
+      "vin": "WP0AB0916KS121279"
+    },
+    "observations": [
+      {
+        "id": "obs-uuid",
+        "kind": "listing",
+        "observed_at": "2026-01-15T00:00:00Z",
+        "source_id": "bat-auctions",
+        "structured_data": {
+          "platform": "bringatrailer",
+          "listing_url": "https://...",
+          "final_price": 165000,
+          "bid_count": 42
+        },
+        "confidence": 0.95,
+        "source_url": "https://bringatrailer.com/listing/..."
+      }
+    ]
+  },
+  "pagination": {
+    "page": 1, "limit": 10, "total": 15, "pages": 2
+  }
+}`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function VehicleAuctionSection() {
+  return (
+    <div>
+      <h1 style={s.h1}>Vehicle Auction</h1>
+      <p style={s.p}>
+        Comprehensive auction data for a vehicle: all external listings (BaT, Cars & Bids, RM Sotheby's, etc.),
+        comment counts with the 10 most recent comments, and AI-generated sentiment analysis from auction discussions.
+      </p>
+
+      <div style={s.endpoint}>
+        <div style={s.endpointHeader}>
+          <span style={s.methodBadge('GET')}>GET</span>
+          <span>/api-v1-vehicle-auction/:vin</span>
+        </div>
+
+        <ParamTable params={[
+          { name: 'vin', type: 'string', required: true, description: 'Vehicle Identification Number (path parameter)' },
+        ]} />
+
+        <CodeBlock
+          title="curl"
+          code={`curl "${API_BASE}/api-v1-vehicle-auction/WP0AB0916KS121279" \\
+  -H "X-API-Key: nk_live_xxx"`}
+        />
+
+        <CodeBlock
+          title="SDK"
+          code={`const auction = await nuke.vehicleAuction.get('WP0AB0916KS121279');
+console.log(auction.listings.length, 'auction listings');
+console.log(auction.comments.total_count, 'total comments');
+console.log(auction.sentiment?.overall, auction.sentiment?.score);`}
+        />
+
+        <CodeBlock
+          title="Response"
+          code={`{
+  "data": {
+    "vehicle": {
+      "id": "uuid-1",
+      "year": 1988,
+      "make": "Porsche",
+      "model": "911 Turbo",
+      "vin": "WP0AB0916KS121279",
+      "sale_price": 165000
+    },
+    "listings": [
+      {
+        "id": "listing-uuid",
+        "platform": "bringatrailer",
+        "listing_url": "https://...",
+        "listing_status": "sold",
+        "final_price": 165000,
+        "bid_count": 42,
+        "view_count": 12000,
+        "sold_at": "2026-01-15T20:00:00Z"
+      }
+    ],
+    "comments": {
+      "total_count": 127,
+      "recent": [
+        {
+          "comment_text": "Beautiful example, well maintained...",
+          "author_name": "gt3rs_fan",
+          "posted_at": "2026-01-15T19:45:00Z",
+          "platform": "bringatrailer"
+        }
+      ]
+    },
+    "sentiment": {
+      "overall": "positive",
+      "score": 0.82,
+      "comment_count_analyzed": 127,
+      "fields_extracted": 14,
+      "analyzed_at": "2026-01-16T..."
+    }
+  }
+}`}
+        />
+
+        <h3 style={s.h3}>Sentiment Fields</h3>
+        <table style={s.table}>
+          <thead>
+            <tr>
+              <th style={s.th}>Field</th>
+              <th style={s.th}>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { field: 'overall', desc: 'Sentiment label: positive, negative, mixed, neutral' },
+              { field: 'score', desc: 'Numeric sentiment score (0-1, where 1 = most positive)' },
+              { field: 'comment_count_analyzed', desc: 'How many comments the AI analyzed' },
+              { field: 'fields_extracted', desc: 'Number of structured fields extracted from comments' },
+              { field: 'details', desc: 'Full AI extraction: themes, concerns, price opinions, etc.' },
+            ].map((row) => (
+              <tr key={row.field}>
+                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.field}</td>
+                <td style={s.td}>{row.desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MarketTrendsSection() {
+  return (
+    <div>
+      <h1 style={s.h1}>Market Trends</h1>
+      <p style={s.p}>
+        Price trends by make/model/year range over a configurable time period. Returns time-bucketed
+        statistics including average, median, percentiles (25th/75th), min/max, and volume.
+        Useful for understanding market direction and pricing context.
+      </p>
+
+      <div style={s.endpoint}>
+        <div style={s.endpointHeader}>
+          <span style={s.methodBadge('GET')}>GET</span>
+          <span>/api-v1-market-trends</span>
+        </div>
+
+        <ParamTable params={[
+          { name: 'make', type: 'string', required: true, description: 'Vehicle make (e.g., "Porsche")' },
+          { name: 'model', type: 'string', description: 'Vehicle model (e.g., "911")' },
+          { name: 'year_from', type: 'number', description: 'Minimum model year' },
+          { name: 'year_to', type: 'number', description: 'Maximum model year' },
+          { name: 'period', type: 'string', description: 'Time period: 30d, 90d, 1y, 3y (default: 90d)' },
+        ]} />
+
+        <CodeBlock
+          title="curl"
+          code={`curl "${API_BASE}/api-v1-market-trends?make=Porsche&model=911&period=1y" \\
+  -H "X-API-Key: nk_live_xxx"`}
+        />
+
+        <CodeBlock
+          title="SDK"
+          code={`const trends = await nuke.marketTrends.get({
+  make: 'Porsche',
+  model: '911',
+  year_from: 1985,
+  year_to: 1995,
+  period: '1y',
+});
+
+console.log(trends.summary.trend_direction); // "rising" | "falling" | "stable"
+console.log(trends.summary.price_change_pct); // e.g., 12.5
+
+for (const p of trends.periods) {
+  console.log(p.period_start, p.avg_price, p.median_price, p.sale_count);
+}`}
+        />
+
+        <CodeBlock
+          title="Response"
+          code={`{
+  "data": {
+    "query": {
+      "make": "Porsche",
+      "model": "911",
+      "year_from": null,
+      "year_to": null,
+      "period": "1y"
+    },
+    "summary": {
+      "total_sales": 979,
+      "periods_with_data": 8,
+      "overall_avg_price": 82709,
+      "price_change_pct": -5.2,
+      "trend_direction": "falling"
+    },
+    "periods": [
+      {
+        "period_start": "2025-03-01",
+        "period_end": "2025-04-01",
+        "sale_count": 145,
+        "avg_price": 87500,
+        "median_price": 72000,
+        "p25_price": 45000,
+        "p75_price": 115000,
+        "min_price": 18000,
+        "max_price": 425000,
+        "avg_mileage": 52000
+      }
+    ]
+  }
+}`}
+        />
+
+        <h3 style={s.h3}>Period Buckets</h3>
+        <table style={s.table}>
+          <thead>
+            <tr>
+              <th style={s.th}>Period</th>
+              <th style={s.th}>Bucket Size</th>
+              <th style={s.th}>Use Case</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { period: '30d', bucket: '7 days', use: 'Short-term price movement' },
+              { period: '90d', bucket: '14 days', use: 'Quarterly trends (default)' },
+              { period: '1y', bucket: '1 month', use: 'Annual market analysis' },
+              { period: '3y', bucket: '3 months', use: 'Long-term market cycles' },
+            ].map((row) => (
+              <tr key={row.period}>
+                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.period}</td>
+                <td style={s.td}>{row.bucket}</td>
+                <td style={s.td}>{row.use}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -1718,6 +2123,19 @@ function ErrorsSection() {
 function ChangelogSection() {
   const changelog = [
     {
+      version: '2026.02.12',
+      date: 'February 12, 2026',
+      changes: [
+        { type: 'new', text: 'VIN Lookup: one-call vehicle profile with valuation + counts + images' },
+        { type: 'new', text: 'Vehicle History: paginated observation timeline by VIN' },
+        { type: 'new', text: 'Vehicle Auction: listings + comments + AI sentiment by VIN' },
+        { type: 'new', text: 'Market Trends: price trends with percentiles by make/model/year' },
+        { type: 'new', text: 'Search API: authenticated v1 wrapper for universal-search' },
+        { type: 'new', text: 'TypeScript SDK v1.2.0 with 5 new resource classes' },
+        { type: 'improved', text: 'OpenAPI spec updated with all new endpoints and schemas' },
+      ],
+    },
+    {
       version: '2026.02.10',
       date: 'February 10, 2026',
       changes: [
@@ -1806,6 +2224,10 @@ const sectionComponents: Record<string, () => JSX.Element> = {
   quickstart: QuickstartSection,
   authentication: AuthenticationSection,
   vehicles: VehiclesSection,
+  'vin-lookup': VinLookupSection,
+  'vehicle-history': VehicleHistorySection,
+  'vehicle-auction': VehicleAuctionSection,
+  'market-trends': MarketTrendsSection,
   search: SearchSection,
   batch: BatchSection,
   observations: ObservationsSection,

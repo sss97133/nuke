@@ -40,11 +40,16 @@ import { Batch } from './resources/batch';
 import { Valuations } from './resources/valuations';
 import { Listings } from './resources/listings';
 import { Comps } from './resources/comps';
+import { VinLookup } from './resources/vin-lookup';
+import { VehicleHistory } from './resources/vehicle-history';
+import { VehicleAuction } from './resources/vehicle-auction';
+import { MarketTrends } from './resources/market-trends';
+import { Search } from './resources/search';
 import { NukeError, NukeAPIError, NukeAuthenticationError, NukeRateLimitError } from './errors';
 
 const DEFAULT_BASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '1.1.0';
+const SDK_VERSION = '1.2.0';
 
 export default class Nuke {
   private apiKey: string;
@@ -59,6 +64,11 @@ export default class Nuke {
   public valuations: Valuations;
   public listings: Listings;
   public comps: Comps;
+  public vinLookup: VinLookup;
+  public vehicleHistory: VehicleHistory;
+  public vehicleAuction: VehicleAuction;
+  public marketTrends: MarketTrends;
+  public search: Search;
 
   constructor(apiKey: string, config?: Partial<NukeConfig>) {
     if (!apiKey) {
@@ -77,6 +87,11 @@ export default class Nuke {
     this.valuations = new Valuations(this);
     this.listings = new Listings(this);
     this.comps = new Comps(this);
+    this.vinLookup = new VinLookup(this);
+    this.vehicleHistory = new VehicleHistory(this);
+    this.vehicleAuction = new VehicleAuction(this);
+    this.marketTrends = new MarketTrends(this);
+    this.search = new Search(this);
   }
 
   /**

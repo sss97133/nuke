@@ -54,6 +54,16 @@ tags:
     description: External auction/marketplace listings
   - name: Comparables
     description: Comparable vehicle sales for valuation context
+  - name: VIN Lookup
+    description: One-call vehicle profile by VIN
+  - name: Vehicle History
+    description: Observation timeline for a vehicle
+  - name: Vehicle Auction
+    description: Auction results, comments, and sentiment
+  - name: Market Trends
+    description: Price trends by make/model/year
+  - name: Search
+    description: Full-text search across all entities
 
 paths:
   /api-v1-vehicles:
@@ -677,6 +687,212 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api-v1-vin-lookup/{vin}:
+    get:
+      tags: [VIN Lookup]
+      summary: Look up vehicle by VIN
+      description: |
+        One-call vehicle profile by VIN. Returns core vehicle fields plus
+        embedded valuation, listing/observation/image counts, and first 5 images.
+      operationId: vinLookup
+      parameters:
+        - name: vin
+          in: path
+          required: true
+          description: Vehicle Identification Number
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vehicle profile with enrichment data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VinLookupResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api-v1-vehicle-history/{vin}:
+    get:
+      tags: [Vehicle History]
+      summary: Get vehicle observation timeline
+      description: |
+        Paginated observation timeline for a vehicle by VIN. Each observation
+        includes source attribution, kind, structured data, and confidence.
+      operationId: getVehicleHistory
+      parameters:
+        - name: vin
+          in: path
+          required: true
+          description: Vehicle Identification Number
+          schema:
+            type: string
+        - name: kind
+          in: query
+          description: Filter by observation kind (e.g., listing, comment, sale, service)
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Observation timeline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      vehicle:
+                        $ref: '#/components/schemas/VehicleBrief'
+                      observations:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/HistoryObservation'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api-v1-vehicle-auction/{vin}:
+    get:
+      tags: [Vehicle Auction]
+      summary: Get auction data for a vehicle
+      description: |
+        Auction results, bid counts, recent comments, and AI sentiment analysis
+        for a vehicle by VIN.
+      operationId: getVehicleAuction
+      parameters:
+        - name: vin
+          in: path
+          required: true
+          description: Vehicle Identification Number
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Auction data with sentiment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VehicleAuctionResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api-v1-market-trends:
+    get:
+      tags: [Market Trends]
+      summary: Get market price trends
+      description: |
+        Price trends by make/model/year range over a time period. Returns
+        time-bucketed statistics including median, percentiles, and volume.
+      operationId: getMarketTrends
+      parameters:
+        - name: make
+          in: query
+          required: true
+          description: Vehicle make (e.g., "Porsche")
+          schema:
+            type: string
+        - name: model
+          in: query
+          description: Vehicle model (e.g., "911")
+          schema:
+            type: string
+        - name: year_from
+          in: query
+          schema:
+            type: integer
+        - name: year_to
+          in: query
+          schema:
+            type: integer
+        - name: period
+          in: query
+          description: Time period for trend analysis
+          schema:
+            type: string
+            enum: [30d, 90d, 1y, 3y]
+            default: 90d
+      responses:
+        '200':
+          description: Market trend data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MarketTrendsResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api-v1-search:
+    get:
+      tags: [Search]
+      summary: Search across all entities
+      description: |
+        Full-text search across vehicles, organizations, users, and tags.
+        Auto-detects query type (VIN, URL, year, or free text).
+      operationId: searchV1
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query — VIN, URL, year, make/model, or free text
+          schema:
+            type: string
+        - name: types
+          in: query
+          description: Comma-separated entity types to search
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -1270,6 +1486,349 @@ components:
           type: number
         max_price:
           type: number
+
+    VinLookupResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        year:
+          type: integer
+          nullable: true
+        make:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        trim:
+          type: string
+          nullable: true
+        vin:
+          type: string
+        mileage:
+          type: integer
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        interior_color:
+          type: string
+          nullable: true
+        transmission:
+          type: string
+          nullable: true
+        engine_type:
+          type: string
+          nullable: true
+        drivetrain:
+          type: string
+          nullable: true
+        body_style:
+          type: string
+          nullable: true
+        sale_price:
+          type: number
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        is_public:
+          type: boolean
+        primary_image_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        valuation:
+          $ref: '#/components/schemas/Valuation'
+          nullable: true
+        counts:
+          type: object
+          properties:
+            listings:
+              type: integer
+            observations:
+              type: integer
+            images:
+              type: integer
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              image_url:
+                type: string
+              image_type:
+                type: string
+                nullable: true
+              category:
+                type: string
+                nullable: true
+              is_primary:
+                type: boolean
+                nullable: true
+
+    VehicleBrief:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        year:
+          type: integer
+          nullable: true
+        make:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        vin:
+          type: string
+          nullable: true
+
+    HistoryObservation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vehicle_id:
+          type: string
+          format: uuid
+        source_id:
+          type: string
+          nullable: true
+        kind:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        structured_data:
+          type: object
+          nullable: true
+        confidence:
+          type: number
+          nullable: true
+        content_text:
+          type: string
+          nullable: true
+        source_url:
+          type: string
+          nullable: true
+        ingested_at:
+          type: string
+          format: date-time
+
+    VehicleAuctionResult:
+      type: object
+      properties:
+        vehicle:
+          $ref: '#/components/schemas/VehicleBrief'
+        listings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalListing'
+        comments:
+          type: object
+          properties:
+            total_count:
+              type: integer
+            recent:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuctionComment'
+        sentiment:
+          $ref: '#/components/schemas/AuctionSentiment'
+          nullable: true
+
+    AuctionComment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        comment_text:
+          type: string
+          nullable: true
+        author_name:
+          type: string
+          nullable: true
+        posted_at:
+          type: string
+          format: date-time
+          nullable: true
+        comment_type:
+          type: string
+          nullable: true
+        platform:
+          type: string
+          nullable: true
+        source_url:
+          type: string
+          nullable: true
+
+    AuctionSentiment:
+      type: object
+      nullable: true
+      properties:
+        overall:
+          type: string
+          nullable: true
+        score:
+          type: number
+          nullable: true
+        comment_count_analyzed:
+          type: integer
+          nullable: true
+        fields_extracted:
+          type: integer
+          nullable: true
+        details:
+          type: object
+          nullable: true
+        analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    MarketTrendsResult:
+      type: object
+      properties:
+        query:
+          type: object
+          properties:
+            make:
+              type: string
+            model:
+              type: string
+              nullable: true
+            year_from:
+              type: integer
+              nullable: true
+            year_to:
+              type: integer
+              nullable: true
+            period:
+              type: string
+        summary:
+          $ref: '#/components/schemas/MarketTrendsSummary'
+          nullable: true
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketTrendsPeriod'
+
+    MarketTrendsSummary:
+      type: object
+      nullable: true
+      properties:
+        total_sales:
+          type: integer
+        periods_with_data:
+          type: integer
+        overall_avg_price:
+          type: number
+        price_change_pct:
+          type: number
+        trend_direction:
+          type: string
+          enum: [rising, falling, stable]
+
+    MarketTrendsPeriod:
+      type: object
+      properties:
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        sale_count:
+          type: integer
+        avg_price:
+          type: number
+          nullable: true
+        median_price:
+          type: number
+          nullable: true
+        p25_price:
+          type: number
+          nullable: true
+        p75_price:
+          type: number
+          nullable: true
+        min_price:
+          type: number
+          nullable: true
+        max_price:
+          type: number
+          nullable: true
+        avg_mileage:
+          type: number
+          nullable: true
+
+    SearchResult:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResultItem'
+        query:
+          type: object
+          properties:
+            q:
+              type: string
+            types:
+              type: array
+              items:
+                type: string
+              nullable: true
+            limit:
+              type: integer
+        total_count:
+          type: integer
+        query_type:
+          type: string
+        search_time_ms:
+          type: integer
+          nullable: true
+
+    SearchResultItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: Entity type (vehicle, organization, user, tag)
+        title:
+          type: string
+        subtitle:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          nullable: true
+        relevance_score:
+          type: number
+        metadata:
+          type: object
+          nullable: true
 
     Error:
       type: object
