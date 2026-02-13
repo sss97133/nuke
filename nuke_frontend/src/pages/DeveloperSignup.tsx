@@ -214,9 +214,9 @@ export default function DeveloperSignup() {
 
           <h2 style={{ fontSize: 'var(--fs-10, 10px)', fontWeight: 700, marginBottom: 12 }}>Quick Start</h2>
           <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: 12, fontFamily: 'monospace', fontSize: 'var(--fs-8, 8px)', whiteSpace: 'pre', overflow: 'auto', marginBottom: 24, lineHeight: 1.6 }}>
-{`npm install @nuke/sdk
+{`npm install @nuke1/sdk
 
-import Nuke from '@nuke/sdk';
+import Nuke from '@nuke1/sdk';
 const nuke = new Nuke('${apiKey.slice(0, 12)}...');
 
 const comps = await nuke.comps.get({

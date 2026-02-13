@@ -522,11 +522,11 @@ function QuickstartSection() {
       </p>
       <CodeBlock
         title="Install"
-        code="npm install @nuke/sdk"
+        code="npm install @nuke1/sdk"
       />
       <CodeBlock
         title="Usage"
-        code={`import Nuke from '@nuke/sdk';
+        code={`import Nuke from '@nuke1/sdk';
 
 const nuke = new Nuke('nk_live_your_key_here');
 

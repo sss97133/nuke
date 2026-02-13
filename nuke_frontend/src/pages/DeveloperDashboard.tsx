@@ -231,7 +231,7 @@ export default function DeveloperDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {[
           { label: 'API Documentation', to: '/api', desc: 'Endpoints, examples, schemas' },
-          { label: 'SDK Reference', to: '/api', desc: 'npm install @nuke/sdk' },
+          { label: 'SDK Reference', to: '/api', desc: 'npm install @nuke1/sdk' },
           { label: 'Webhook Settings', to: '/settings/webhooks', desc: 'Event subscriptions' },
           { label: 'Usage Logs', to: '/settings/usage', desc: 'Request history & analytics' },
         ].map(link => (
