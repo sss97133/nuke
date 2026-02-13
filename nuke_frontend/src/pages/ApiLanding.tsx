@@ -641,9 +641,9 @@ observation_            Structured discoveries with confidence scores
             for vehicles, valuations, listings, comps, observations, webhooks, and batch imports.
           </div>
           <CodeBlock
-            code={`npm install @nuke/sdk
+            code={`npm install @nuke1/sdk
 
-import Nuke from '@nuke/sdk';
+import Nuke from '@nuke1/sdk';
 const nuke = new Nuke('nk_live_...');
 
 // Get comparable sales
