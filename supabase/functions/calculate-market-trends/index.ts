@@ -18,23 +18,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface MarketSignals {
-  demand?: 'high' | 'moderate' | 'low';
-  rarity?: 'rare' | 'moderate' | 'common';
-  price_trend?: 'rising' | 'stable' | 'declining';
-}
-
-interface Sentiment {
-  score?: number;
-  overall?: string;
-}
-
-interface RawExtraction {
-  market_signals?: MarketSignals;
-  sentiment?: Sentiment;
-  discussion_themes?: string[];
-  community_concerns?: string[];
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -51,142 +34,50 @@ serve(async (req) => {
     const targetPlatform = body.platform || 'all';
     const targetMake = body.make || null;
 
-    // Use execute_sql to avoid .limit() truncation — get ALL discoveries
-    // Validate make against alphanumeric + spaces/hyphens to prevent SQL injection
-    const safeMake = targetMake ? targetMake.replace(/[^a-zA-Z0-9\s\-\.]/g, '') : null;
-    const makeFilter = safeMake
-      ? `AND COALESCE(cm.canonical_name, v.make) = '${safeMake}'`
-      : '';
+    // Use dedicated RPC with its own 30s statement timeout (execute_sql hits default 8s timeout).
+    // Aggregates 127k+ comment_discoveries by make using only scalar columns (~12s).
+    const { data: makeAggregates, error: aggError } = await supabase.rpc(
+      'compute_market_trend_aggregates',
+      { p_make: targetMake || null }
+    );
 
-    const { data: rows, error: discError } = await supabase.rpc('execute_sql', {
-      query: `
-        SELECT
-          cd.vehicle_id,
-          cd.raw_extraction,
-          cd.sentiment_score AS discovery_sentiment_score,
-          cd.overall_sentiment,
-          v.year,
-          COALESCE(cm.canonical_name, v.make) AS make,
-          v.model,
-          v.sale_price,
-          v.discovery_source
-        FROM comment_discoveries cd
-        JOIN vehicles v ON cd.vehicle_id = v.id AND v.deleted_at IS NULL
-        LEFT JOIN canonical_makes cm ON v.canonical_make_id = cm.id
-        WHERE cd.raw_extraction IS NOT NULL
-        ${makeFilter}
-        ORDER BY cd.discovered_at DESC
-      `
-    });
+    if (aggError) throw aggError;
 
-    if (discError) throw discError;
-
-    const discoveries = rows || [];
-    console.log(`[calculate-market-trends] Processing ${discoveries.length} discoveries`);
-
-    // Aggregate by make
-    const byMake: Record<string, {
-      count: number;
-      demand: Record<string, number>;
-      price_trend: Record<string, number>;
-      rarity: Record<string, number>;
-      sentiment_total: number;
-      sentiment_count: number;
-      prices: number[];
-      themes: Record<string, number>;
-      concerns: Record<string, number>;
-      platforms: Record<string, number>;
-    }> = {};
-
-    discoveries.forEach((d: any) => {
-      const make = d.make?.trim();
-      if (!make) return;
-
-      let raw: RawExtraction;
-      try {
-        raw = typeof d.raw_extraction === 'string'
-          ? JSON.parse(d.raw_extraction)
-          : d.raw_extraction ?? {};
-      } catch {
-        raw = {} as RawExtraction;
-      }
-      const signals = raw.market_signals;
-      const platform = d.discovery_source || 'unknown';
-
-      if (!byMake[make]) {
-        byMake[make] = {
-          count: 0, demand: {}, price_trend: {}, rarity: {},
-          sentiment_total: 0, sentiment_count: 0, prices: [],
-          themes: {}, concerns: {}, platforms: {},
-        };
-      }
-
-      const m = byMake[make];
-      m.count++;
-      m.platforms[platform] = (m.platforms[platform] || 0) + 1;
-
-      if (signals?.demand) m.demand[signals.demand] = (m.demand[signals.demand] || 0) + 1;
-      if (signals?.price_trend) m.price_trend[signals.price_trend] = (m.price_trend[signals.price_trend] || 0) + 1;
-      if (signals?.rarity) m.rarity[signals.rarity] = (m.rarity[signals.rarity] || 0) + 1;
-
-      // Use discovery-level sentiment score (more reliable)
-      const sentScore = d.discovery_sentiment_score ?? raw.sentiment?.score;
-      if (sentScore != null) {
-        m.sentiment_total += Number(sentScore);
-        m.sentiment_count++;
-      }
-
-      if (d.sale_price && d.sale_price > 0) m.prices.push(d.sale_price);
-
-      (raw.discussion_themes || []).forEach((theme: string) => {
-        m.themes[theme] = (m.themes[theme] || 0) + 1;
-      });
-      (raw.community_concerns || []).forEach((concern: string) => {
-        m.concerns[concern] = (m.concerns[concern] || 0) + 1;
-      });
-    });
+    const aggregates = (makeAggregates || []) as any[];
+    console.log(`[calculate-market-trends] Processing ${aggregates.length} makes from server-side aggregation`);
 
     // Set period_start for proper upsert deduplication
     const now = new Date();
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    // Convert to market_trends records
-    const trendRecords = Object.entries(byMake).map(([make, stats]) => {
-      const total = stats.count;
-      const prices = stats.prices.sort((a, b) => a - b);
-
-      const topThemes = Object.entries(stats.themes)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([t]) => t);
-      const topConcerns = Object.entries(stats.concerns)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([c]) => c);
+    // Convert server-side aggregates to market_trends records
+    const trendRecords = aggregates.map((row: any) => {
+      const total = Number(row.total_count);
 
       return {
-        make,
+        make: row.make,
         model: null,
         platform: targetPlatform,
         vehicle_count: total,
         analysis_count: total,
-        demand_high_pct: total > 0 ? Number(((stats.demand['high'] || 0) / total * 100).toFixed(2)) : null,
-        demand_moderate_pct: total > 0 ? Number(((stats.demand['moderate'] || 0) / total * 100).toFixed(2)) : null,
-        demand_low_pct: total > 0 ? Number(((stats.demand['low'] || 0) / total * 100).toFixed(2)) : null,
-        price_rising_pct: total > 0 ? Number(((stats.price_trend['rising'] || 0) / total * 100).toFixed(2)) : null,
-        price_stable_pct: total > 0 ? Number(((stats.price_trend['stable'] || 0) / total * 100).toFixed(2)) : null,
-        price_declining_pct: total > 0 ? Number(((stats.price_trend['declining'] || 0) / total * 100).toFixed(2)) : null,
-        rarity_rare_pct: total > 0 ? Number(((stats.rarity['rare'] || 0) / total * 100).toFixed(2)) : null,
-        rarity_moderate_pct: total > 0 ? Number(((stats.rarity['moderate'] || 0) / total * 100).toFixed(2)) : null,
-        rarity_common_pct: total > 0 ? Number(((stats.rarity['common'] || 0) / total * 100).toFixed(2)) : null,
-        avg_sentiment_score: stats.sentiment_count > 0 ? Number((stats.sentiment_total / stats.sentiment_count).toFixed(2)) : null,
-        sentiment_samples: stats.sentiment_count,
-        avg_sale_price: prices.length > 0 ? Number((prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2)) : null,
-        min_sale_price: prices.length > 0 ? prices[0] : null,
-        max_sale_price: prices.length > 0 ? prices[prices.length - 1] : null,
-        median_sale_price: prices.length > 0 ? prices[Math.floor(prices.length / 2)] : null,
-        top_discussion_themes: topThemes.length > 0 ? topThemes : null,
-        top_community_concerns: topConcerns.length > 0 ? topConcerns : null,
+        // JSONB-based signal percentages skipped (too slow without GIN index on 127k rows)
+        demand_high_pct: null,
+        demand_moderate_pct: null,
+        demand_low_pct: null,
+        price_rising_pct: null,
+        price_stable_pct: null,
+        price_declining_pct: null,
+        rarity_rare_pct: null,
+        rarity_moderate_pct: null,
+        rarity_common_pct: null,
+        avg_sentiment_score: row.avg_sentiment != null ? Number(Number(row.avg_sentiment).toFixed(2)) : null,
+        sentiment_samples: Number(row.sentiment_samples),
+        avg_sale_price: row.avg_price != null ? Number(Number(row.avg_price).toFixed(2)) : null,
+        min_sale_price: row.min_price != null ? Number(row.min_price) : null,
+        max_sale_price: row.max_price != null ? Number(row.max_price) : null,
+        median_sale_price: null, // percentile_cont too expensive at 127k+ rows
+        top_discussion_themes: null,
+        top_community_concerns: null,
         period_start: periodStart,
         calculated_at: now.toISOString(),
       };
@@ -213,8 +104,8 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      makes_analyzed: Object.keys(byMake).length,
-      total_discoveries: discoveries.length,
+      makes_analyzed: aggregates.length,
+      total_discoveries: aggregates.reduce((sum: number, r: any) => sum + Number(r.total_count), 0),
       records_upserted: trendRecords.length,
       period_start: periodStart,
       hot_makes: hotMakes,
@@ -224,7 +115,7 @@ serve(async (req) => {
 
   } catch (e: any) {
     console.error("[calculate-market-trends] Error:", e);
-    return new Response(JSON.stringify({ error: "Market trend calculation failed" }), {
+    return new Response(JSON.stringify({ error: "Market trend calculation failed", detail: e?.message || String(e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
