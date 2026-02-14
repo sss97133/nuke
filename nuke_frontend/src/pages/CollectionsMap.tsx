@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -17,35 +19,16 @@ L.Icon.Default.mergeOptions({
 });
 
 interface Collection {
+  id: string;
   slug: string;
-  url: string;
+  name: string;
   instagram: string | null;
   country: string;
   city: string;
   lat: number;
   lng: number;
-  source?: string;
-}
-
-interface GeoJSONFeature {
-  type: 'Feature';
-  properties: {
-    name: string;
-    url: string;
-    instagram: string | null;
-    country: string;
-    city: string;
-    source?: string;
-  };
-  geometry: {
-    type: 'Point';
-    coordinates: [number, number];
-  };
-}
-
-interface GeoJSONData {
-  type: 'FeatureCollection';
-  features: GeoJSONFeature[];
+  total_inventory: number;
+  logo_url: string | null;
 }
 
 // Custom marker icons by type
@@ -190,36 +173,38 @@ export default function CollectionsMap() {
   const [stats, setStats] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    // Load collections from the GeoJSON file or API
     async function loadCollections() {
       try {
-        // In production, this would be an API call
-        // For now, we'll fetch from a static file or embed the data
-        const response = await fetch('/data/collections-map-enhanced.geojson');
-        if (response.ok) {
-          const data: GeoJSONData = await response.json();
-          const parsed = data.features.map((f) => ({
-            slug: f.properties.name,
-            url: f.properties.url,
-            instagram: f.properties.instagram,
-            country: f.properties.country,
-            city: f.properties.city,
-            source: f.properties.source,
-            lat: f.geometry.coordinates[1],
-            lng: f.geometry.coordinates[0],
-          }));
-          setCollections(parsed);
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('id, business_name, slug, latitude, longitude, city, country, social_links, total_inventory, logo_url')
+          .eq('business_type', 'collection')
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null);
 
-          // Calculate stats
-          const countryStats: Record<string, number> = {};
-          parsed.forEach((c) => {
-            countryStats[c.country] = (countryStats[c.country] || 0) + 1;
-          });
-          setStats(countryStats);
-        }
+        if (error) throw error;
+
+        const parsed: Collection[] = (data || []).map((b: any) => ({
+          id: b.id,
+          slug: b.slug || b.id,
+          name: b.business_name,
+          instagram: b.social_links?.instagram || null,
+          country: b.country || 'Unknown',
+          city: b.city || '',
+          lat: Number(b.latitude),
+          lng: Number(b.longitude),
+          total_inventory: b.total_inventory || 0,
+          logo_url: b.logo_url || null,
+        }));
+        setCollections(parsed);
+
+        const countryStats: Record<string, number> = {};
+        parsed.forEach((c) => {
+          countryStats[c.country] = (countryStats[c.country] || 0) + 1;
+        });
+        setStats(countryStats);
       } catch (error) {
         console.error('Error loading collections:', error);
-        // Fallback: load embedded sample data
         setCollections(SAMPLE_COLLECTIONS);
       } finally {
         setLoading(false);
@@ -231,10 +216,12 @@ export default function CollectionsMap() {
 
   const filteredCollections = collections.filter((c) => {
     const matchesCountry = !selectedCountry || c.country === selectedCountry;
+    const term = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm ||
-      c.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (c.instagram && c.instagram.toLowerCase().includes(searchTerm.toLowerCase()));
+      c.name.toLowerCase().includes(term) ||
+      c.slug.toLowerCase().includes(term) ||
+      c.city.toLowerCase().includes(term) ||
+      (c.instagram && c.instagram.toLowerCase().includes(term));
     return matchesCountry && matchesSearch;
   });
 
@@ -318,15 +305,13 @@ export default function CollectionsMap() {
                 .filter((c) => c.instagram && !c.instagram.includes('exclusivecarregistry'))
                 .slice(0, 10)
                 .map((c) => (
-                  <a
+                  <Link
                     key={c.slug}
-                    href={c.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    to={`/org/${c.slug}`}
                     className="block text-gray-300 hover:text-blue-400 truncate"
                   >
                     @{c.instagram}
-                  </a>
+                  </Link>
                 ))}
             </div>
           </div>
@@ -360,11 +345,17 @@ export default function CollectionsMap() {
                   <Popup className="collection-popup">
                     <div className="min-w-[250px]">
                       <h3 className="font-bold text-lg mb-1">
-                        {collection.slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                        {collection.name}
                       </h3>
                       <p className="text-gray-600 text-sm mb-2">
                         {collection.city}, {collection.country}
                       </p>
+
+                      {collection.total_inventory > 0 && (
+                        <p className="text-sm text-blue-600 font-medium mb-2">
+                          {collection.total_inventory} vehicle{collection.total_inventory !== 1 ? 's' : ''}
+                        </p>
+                      )}
 
                       {collection.instagram && (
                         <a
@@ -380,18 +371,12 @@ export default function CollectionsMap() {
                         </a>
                       )}
 
-                      {collection.source && (
-                        <p className="text-xs text-gray-500 mb-2">{collection.source}</p>
-                      )}
-
-                      <a
-                        href={collection.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <Link
+                        to={`/org/${collection.slug}`}
                         className="inline-block mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
                       >
                         View Collection
-                      </a>
+                      </Link>
                     </div>
                   </Popup>
                 </Marker>
@@ -416,11 +401,9 @@ export default function CollectionsMap() {
           </div>
           <div className="divide-y divide-gray-700">
             {filteredCollections.slice(0, 50).map((collection) => (
-              <a
+              <Link
                 key={collection.slug}
-                href={collection.url}
-                target="_blank"
-                rel="noopener noreferrer"
+                to={`/org/${collection.slug}`}
                 className="block p-3 hover:bg-gray-700/50 transition-colors"
               >
                 <div className="flex items-start gap-3">
@@ -430,17 +413,20 @@ export default function CollectionsMap() {
                   />
                   <div className="min-w-0 flex-1">
                     <h3 className="text-white font-medium text-sm truncate">
-                      {collection.slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                      {collection.name}
                     </h3>
                     <p className="text-gray-400 text-xs truncate">
                       {collection.city}, {collection.country}
                     </p>
+                    {collection.total_inventory > 0 && (
+                      <p className="text-blue-400 text-xs">{collection.total_inventory} vehicles</p>
+                    )}
                     {collection.instagram && (
                       <p className="text-pink-400 text-xs truncate">@{collection.instagram}</p>
                     )}
                   </div>
                 </div>
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -449,9 +435,8 @@ export default function CollectionsMap() {
   );
 }
 
-// Sample data fallback
+// Sample data fallback (shown if DB query fails)
 const SAMPLE_COLLECTIONS: Collection[] = [
-  { slug: 'jay-lenos-car-collection', url: 'https://exclusivecarregistry.com/collection/jay-lenos-car-collection', instagram: 'jaylenosgarage', country: 'USA', city: 'Burbank, CA', lat: 34.1808, lng: -118.309 },
-  { slug: 'george-harrisons-car-collection', url: 'https://exclusivecarregistry.com/collection/george-harrisons-car-collection', instagram: null, country: 'UK', city: 'Henley-on-Thames', lat: 51.5354, lng: -0.9014 },
-  { slug: 'ferrari-museum-maranello', url: 'https://exclusivecarregistry.com/collection/ferrari-museum-maranello', instagram: null, country: 'Italy', city: 'Maranello', lat: 44.5294, lng: 10.8656 },
+  { id: 'sample-1', slug: 'jay-lenos-car-collection', name: "Jay Leno's Car Collection", instagram: 'jaylenosgarage', country: 'USA', city: 'Burbank, CA', lat: 34.1808, lng: -118.309, total_inventory: 0, logo_url: null },
+  { id: 'sample-2', slug: 'ferrari-museum-maranello', name: 'Ferrari Museum Maranello', instagram: null, country: 'Italy', city: 'Maranello', lat: 44.5294, lng: 10.8656, total_inventory: 0, logo_url: null },
 ];
