@@ -326,7 +326,7 @@ serve(async (req) => {
       searches.push((async () => {
         const { data: orgs } = await supabase
           .from('businesses')
-          .select('id, business_name, website, logo_url, profile_image_url, city, state')
+          .select('id, business_name, business_type, slug, website, logo_url, city, state, country')
           .eq('is_public', true)
           .ilike('business_name', searchPattern)
           .limit(Math.ceil(sanitizedLimit / 4));
@@ -339,19 +339,27 @@ serve(async (req) => {
           if (nameLower === queryLower) score = 1.0;
           else if (nameLower.startsWith(queryLower)) score = 0.9;
 
-          const location = [org.city, org.state].filter(Boolean).join(', ');
+          const location = [org.city, org.state || org.country].filter(Boolean).join(', ');
           let websiteHost: string | undefined;
           if (org.website) {
             try { websiteHost = new URL(org.website).hostname; } catch { /* malformed URL */ }
           }
+
+          // Format business type label
+          const typeLabel = org.business_type === 'collection' ? 'Collection'
+            : org.business_type === 'dealership' || org.business_type === 'dealer' ? 'Dealer'
+            : org.business_type === 'auction_house' ? 'Auction House'
+            : org.business_type ? org.business_type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : null;
+
           results.push({
             id: org.id,
             type: 'organization',
             title: org.business_name,
-            subtitle: location || websiteHost,
-            image_url: org.logo_url || org.profile_image_url,
+            subtitle: typeLabel ? `${typeLabel} · ${location || websiteHost || ''}` : (location || websiteHost),
+            image_url: org.logo_url,
             relevance_score: score,
-            metadata: { website: org.website }
+            metadata: { website: org.website, business_type: org.business_type, slug: org.slug }
           });
         }
       })());

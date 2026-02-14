@@ -231,6 +231,19 @@ export class OrganizationIntelligenceService {
             badge: dataSignals.vehicles.service
           });
         }
+      } else if (effectiveType === 'collection') {
+        // Private collection — intelligence + inventory are the core views
+        pushUnique({ id: 'collection-intel', priority: 95, label: 'Intelligence' });
+
+        const invCount = dataSignals?.vehicles?.inventory || dataSignals?.vehicles?.total || 0;
+        if (invCount > 0) {
+          pushUnique({
+            id: 'inventory',
+            priority: 90,
+            label: `Inventory (${invCount})`,
+            badge: invCount,
+          });
+        }
       } else if (effectiveType === 'auction_house') {
         // Explicitly an auction house (BaT, Cars & Bids, etc.)
         // Auctions is the core product; hide irrelevant tabs by default.

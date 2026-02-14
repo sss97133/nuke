@@ -38,6 +38,7 @@ import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessSt
 import { getOrganizationProfileData } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
+import CollectionIntelligenceTab from '../components/organization/CollectionIntelligenceTab';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import '../design-system.css';
 
@@ -3370,6 +3371,11 @@ export default function OrganizationProfile() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Collection Intelligence Tab */}
+        {activeTab === 'collection-intel' && organization && (
+          <CollectionIntelligenceTab organizationId={organizationId!} />
         )}
 
         {/* Inventory Tab */}
