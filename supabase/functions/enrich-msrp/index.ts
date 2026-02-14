@@ -38,42 +38,25 @@ async function tryOemLookup(
   model: string | null,
   trim: string | null,
 ): Promise<number | null> {
-  if (!make) return null;
+  if (!make || !model) return null;
 
-  // Try exact match with trim first
-  if (trim && year) {
-    const { data } = await supabase
-      .from("oem_trim_levels")
-      .select("base_msrp_usd")
-      .ilike("make", make)
-      .ilike("trim_name", `%${trim}%`)
-      .lte("year_start", year)
-      .gte("year_end", year)
-      .not("base_msrp_usd", "is", null)
-      .limit(1)
-      .maybeSingle();
+  // Use the smart lookup RPC that handles messy model names
+  // (e.g. "Boss 302 Mustang Fastback" matches model_family "Mustang")
+  const { data, error } = await supabase.rpc("lookup_oem_msrp", {
+    p_make: make,
+    p_model: model,
+    p_year: year,
+    p_trim: trim,
+  });
 
-    if (data?.base_msrp_usd) return data.base_msrp_usd;
+  if (error) {
+    console.warn(`[enrich-msrp] OEM lookup RPC error: ${error.message}`);
+    return null;
   }
 
-  // Try model family match
-  if (model && year) {
-    const { data } = await supabase
-      .from("oem_trim_levels")
-      .select("base_msrp_usd")
-      .ilike("make", make)
-      .ilike("model_family", `%${model}%`)
-      .lte("year_start", year)
-      .gte("year_end", year)
-      .not("base_msrp_usd", "is", null)
-      .order("base_msrp_usd", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (data?.base_msrp_usd) return data.base_msrp_usd;
-  }
-
-  return null;
+  // RPC returns an array with 0 or 1 rows
+  const row = Array.isArray(data) ? data[0] : data;
+  return row?.base_msrp_usd ?? null;
 }
 
 /**
@@ -254,14 +237,36 @@ Deno.serve(async (req: Request) => {
     if (body.batch) {
       const limit = Math.min(body.limit ?? 50, 200);
 
-      const { data: vehicles, error } = await supabase
-        .from("vehicles")
-        .select("id")
-        .is("msrp", null)
-        .not("make", "is", null)
-        .not("model", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(limit);
+      // Use RPC to find vehicles with clean makes that match our OEM data
+      // This avoids wasting time on garbage "30k-Mile" or "Modified" makes
+      const { data: vehicles, error } = await supabase.rpc("find_vehicles_for_msrp_enrichment", {
+        p_limit: limit,
+      });
+
+      // Fallback to simple query if RPC doesn't exist yet
+      if (error && error.message?.includes("function") && error.message?.includes("does not exist")) {
+        const { data: fallbackVehicles, error: fbErr } = await supabase
+          .from("vehicles")
+          .select("id")
+          .is("msrp", null)
+          .not("make", "is", null)
+          .not("model", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        if (fbErr) return json(500, { ok: false, error: fbErr.message });
+        if (!fallbackVehicles || fallbackVehicles.length === 0) {
+          return json(200, { ok: true, message: "No vehicles to enrich", results: [] });
+        }
+        // Use fallback
+        const fbResults: EnrichResult[] = [];
+        let fbEnriched = 0;
+        for (const v of fallbackVehicles) {
+          const result = await enrichVehicleMsrp(supabase, v.id, true);
+          fbResults.push(result);
+          if (result.msrp) fbEnriched++;
+        }
+        return json(200, { ok: true, processed: fallbackVehicles.length, enriched: fbEnriched, results: fbResults });
+      }
 
       if (error) return json(500, { ok: false, error: error.message });
       if (!vehicles || vehicles.length === 0) {
