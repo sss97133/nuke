@@ -86,6 +86,42 @@ Before building ANY extractor for a new document type or data source:
 
 ---
 
+## ARCHIVE FETCH PRINCIPLE (CRITICAL)
+
+**Never use raw `fetch()` for external URLs. Always use `archiveFetch()` from `_shared/archiveFetch.ts`.**
+
+Every page we visit gets archived to `listing_page_snapshots` automatically. This means:
+- **No re-crawling.** Every future extraction need is a local query against stored HTML/markdown.
+- **No lost data.** Even if we only extract 5 fields today, the full page is preserved for future passes.
+- **No rate limiting on re-extraction.** Re-parse archived content 1000 times without hitting any external API.
+
+```
+❌ Wrong: fetch(url) → extract 5 fields → discard HTML → re-crawl later for 1 more field
+✅ Right: archiveFetch(url) → HTML archived automatically → extract fields → re-extract from archive anytime
+```
+
+### How to use:
+```typescript
+import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
+
+// Fetch + auto-archive (checks cache first, fetches if stale)
+const { html, markdown, cached } = await archiveFetch(url, { platform: "bat" });
+
+// Re-extract from archive without re-fetching
+const { html } = await readArchivedPage(url);
+```
+
+### Rules:
+1. **ALL extractors** must use `archiveFetch()` instead of direct `fetch()` for listing pages
+2. **Firecrawl calls** go through `archiveFetch({ useFirecrawl: true })` — it wraps Firecrawl
+3. **BaT fetches** go through `archiveFetch()` — it uses `batFetcher` internally for BaT URLs
+4. **New extractors** must import from `_shared/archiveFetch.ts`, not `_shared/hybridFetcher.ts` or raw `fetch()`
+5. The only exception is fetching APIs (JSON endpoints), not HTML pages
+
+> "Fetch once, extract forever."
+
+---
+
 ## Available Tools
 
 ### MCP Servers (USE THESE - you have direct access)
