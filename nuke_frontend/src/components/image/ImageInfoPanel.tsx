@@ -316,16 +316,16 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         <>
           <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
           <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt', marginBottom: '4px' }}>AI ANALYSIS</div>
-          
+
           {/* Tier 1 Analysis (new format) */}
           {imageMetadata?.ai_scan_metadata?.tier_1_analysis && (
             <>
               {/* Angle and Category */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
                 {imageMetadata.ai_scan_metadata.tier_1_analysis.angle && (
-                  <span style={{ 
-                    padding: '2px 6px', 
-                    backgroundColor: 'rgba(255,255,255,0.1)', 
+                  <span style={{
+                    padding: '2px 6px',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
                     border: '1px solid rgba(255,255,255,0.2)',
                     fontSize: '8pt'
                   }}>
@@ -333,9 +333,9 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                   </span>
                 )}
                 {imageMetadata.ai_scan_metadata.tier_1_analysis.category && (
-                  <span style={{ 
-                    padding: '2px 6px', 
-                    backgroundColor: 'rgba(255,255,255,0.1)', 
+                  <span style={{
+                    padding: '2px 6px',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
                     border: '1px solid rgba(255,255,255,0.2)',
                     fontSize: '8pt'
                   }}>
@@ -343,8 +343,8 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                   </span>
                 )}
                 {imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance && (
-                  <span style={{ 
-                    padding: '2px 6px', 
+                  <span style={{
+                    padding: '2px 6px',
                     backgroundColor: imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('excellent') ? 'rgba(34,197,94,0.2)' :
                                      imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('good') ? 'rgba(59,130,246,0.2)' :
                                      imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('poor') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)',
@@ -355,7 +355,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                   </span>
                 )}
               </div>
-              
+
               {/* Components visible */}
               {imageMetadata.ai_scan_metadata.tier_1_analysis.components_visible?.length > 0 && (
                 <div style={{ marginBottom: '8px' }}>
@@ -365,14 +365,14 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                   </div>
                 </div>
               )}
-              
+
               {/* Basic observations - the key insight */}
               {imageMetadata.ai_scan_metadata.tier_1_analysis.basic_observations && (
                 <div style={{ color: 'var(--surface-glass)', fontSize: '9pt', lineHeight: '1.4' }}>
                   {imageMetadata.ai_scan_metadata.tier_1_analysis.basic_observations}
                 </div>
               )}
-              
+
               {/* Image quality score */}
               {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality && (
                 <div style={{ marginTop: '8px', display: 'flex', gap: '8px', fontSize: '7pt', color: 'rgba(255,255,255,0.5)' }}>
@@ -383,7 +383,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               )}
             </>
           )}
-          
+
           {/* Legacy appraiser format */}
           {imageMetadata?.ai_scan_metadata?.appraiser && !imageMetadata?.ai_scan_metadata?.tier_1_analysis && (
             <>
@@ -397,6 +397,126 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               )}
             </>
           )}
+        </>
+      )}
+
+      {/* Engine Bay Analysis — deep component breakdown from analyze-engine-bay */}
+      {imageMetadata?.components?.engine_family && (
+        <>
+          <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt', marginBottom: '6px' }}>ENGINE BAY ANALYSIS</div>
+
+          {/* Engine family + displacement */}
+          <div style={{ marginBottom: '6px' }}>
+            <span style={{ fontSize: '10pt', fontWeight: 600 }}>
+              {imageMetadata.components.engine_family}
+              {imageMetadata.components.estimated_displacement ? ` ${imageMetadata.components.estimated_displacement}` : ''}
+            </span>
+            {imageMetadata.components.engine_family_confidence != null && (
+              <span style={{
+                marginLeft: '6px',
+                padding: '1px 5px',
+                fontSize: '7pt',
+                backgroundColor: imageMetadata.components.engine_family_confidence >= 0.8 ? 'rgba(34,197,94,0.25)' :
+                                 imageMetadata.components.engine_family_confidence >= 0.5 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.25)',
+                border: `1px solid ${imageMetadata.components.engine_family_confidence >= 0.8 ? 'rgba(34,197,94,0.5)' :
+                                      imageMetadata.components.engine_family_confidence >= 0.5 ? 'rgba(234,179,8,0.5)' : 'rgba(239,68,68,0.5)'}`,
+              }}>
+                {Math.round(imageMetadata.components.engine_family_confidence * 100)}%
+              </span>
+            )}
+          </div>
+
+          {/* Component rows */}
+          <div style={{ fontSize: '8pt', lineHeight: '1.8', color: 'rgba(255,255,255,0.8)' }}>
+            {imageMetadata.components.fuel_system?.type && (
+              <div>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Fuel: </span>
+                {imageMetadata.components.fuel_system.brand && imageMetadata.components.fuel_system.brand !== 'unknown'
+                  ? `${imageMetadata.components.fuel_system.brand} ${imageMetadata.components.fuel_system.model || imageMetadata.components.fuel_system.type}`
+                  : imageMetadata.components.fuel_system.type.replace(/_/g, ' ')}
+                {imageMetadata.components.fuel_system.barrels ? ` (${imageMetadata.components.fuel_system.barrels}bbl)` : ''}
+                {imageMetadata.components.fuel_system.confidence != null && (
+                  <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: '4px' }}>
+                    {Math.round(imageMetadata.components.fuel_system.confidence * 100)}%
+                  </span>
+                )}
+              </div>
+            )}
+            {imageMetadata.components.ignition_system?.type && (
+              <div>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Ignition: </span>
+                {imageMetadata.components.ignition_system.brand && imageMetadata.components.ignition_system.brand !== 'unknown'
+                  ? imageMetadata.components.ignition_system.brand.replace(/_/g, ' ')
+                  : imageMetadata.components.ignition_system.type.replace(/_/g, ' ')}
+                {imageMetadata.components.ignition_system.aftermarket_ignition ? ' (aftermarket)' : ''}
+              </div>
+            )}
+            {imageMetadata.components.valve_covers?.type && imageMetadata.components.valve_covers.type !== 'unknown' && (
+              <div>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Valve Covers: </span>
+                {imageMetadata.components.valve_covers.type.replace(/_/g, ' ')}
+              </div>
+            )}
+            {imageMetadata.components.exhaust_manifolds?.type && imageMetadata.components.exhaust_manifolds.type !== 'unknown' && (
+              <div>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Exhaust: </span>
+                {imageMetadata.components.exhaust_manifolds.type.replace(/_/g, ' ')}
+              </div>
+            )}
+            {imageMetadata.components.air_cleaner?.type && imageMetadata.components.air_cleaner.type !== 'unknown' && (
+              <div>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Air Cleaner: </span>
+                {imageMetadata.components.air_cleaner.type.replace(/_/g, ' ')}
+                {imageMetadata.components.air_cleaner.aftermarket ? ' (aftermarket)' : ''}
+              </div>
+            )}
+            {imageMetadata.components.condition && imageMetadata.components.condition !== 'unknown' && (
+              <div>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Condition: </span>
+                <span style={{
+                  color: imageMetadata.components.condition === 'show_quality' ? '#22c55e' :
+                         imageMetadata.components.condition === 'well_maintained' ? '#3b82f6' :
+                         imageMetadata.components.condition === 'neglected' ? '#ef4444' :
+                         imageMetadata.components.condition === 'project' ? '#eab308' : 'inherit'
+                }}>
+                  {imageMetadata.components.condition.replace(/_/g, ' ')}
+                </span>
+              </div>
+            )}
+            {imageMetadata.components.estimated_era && imageMetadata.components.estimated_era !== 'mixed' && (
+              <div>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Era: </span>
+                {imageMetadata.components.estimated_era}
+              </div>
+            )}
+          </div>
+
+          {/* Visible modifications */}
+          {imageMetadata.components.visible_modifications?.length > 0 && (
+            <div style={{ marginTop: '6px' }}>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '7pt', marginBottom: '2px' }}>
+                MODS ({imageMetadata.components.visible_modifications.length})
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--surface-glass)' }}>
+                {imageMetadata.components.visible_modifications.join(' / ')}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {imageMetadata.components.notes && (
+            <div style={{ marginTop: '4px', fontSize: '8pt', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
+              {imageMetadata.components.notes}
+            </div>
+          )}
+
+          {/* Analysis metadata */}
+          <div style={{ marginTop: '6px', fontSize: '7pt', color: 'rgba(255,255,255,0.25)' }}>
+            {imageMetadata.components.analyzed_by}
+            {imageMetadata.components.analysis_version > 1 ? ` v${imageMetadata.components.analysis_version}` : ''}
+            {imageMetadata.components.vehicle_context_used ? ' +context' : ''}
+          </div>
         </>
       )}
       </div>

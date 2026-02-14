@@ -3736,6 +3736,104 @@ const VehicleProfile: React.FC = () => {
                 <VehiclePerformanceCard vehicleId={vehicle.id} compact />
               </CollapsibleWidget>
 
+              {/* Engine Bay Analysis — from AI vision analysis of engine photos */}
+              {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
+                <CollapsibleWidget title="Engine Bay Analysis" defaultCollapsed={true} badge={
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {(vehicle as any).origin_metadata.engine_bay_analysis.engine_family}
+                    {(vehicle as any).origin_metadata.engine_bay_analysis.estimated_displacement
+                      ? ` ${(vehicle as any).origin_metadata.engine_bay_analysis.estimated_displacement}`
+                      : ''}
+                  </span>
+                }>
+                  {(() => {
+                    const eba = (vehicle as any).origin_metadata.engine_bay_analysis;
+                    const confPct = eba.engine_family_confidence != null ? Math.round(eba.engine_family_confidence * 100) : null;
+                    return (
+                      <div style={{ fontSize: '10pt', lineHeight: '1.8' }}>
+                        {/* Engine family header */}
+                        <div style={{ fontWeight: 600, fontSize: '11pt', marginBottom: '4px' }}>
+                          {eba.engine_family}
+                          {eba.estimated_displacement ? ` ${eba.estimated_displacement}` : ''}
+                          {confPct != null && (
+                            <span style={{
+                              marginLeft: '8px',
+                              padding: '2px 6px',
+                              fontSize: '8pt',
+                              fontWeight: 400,
+                              borderRadius: '2px',
+                              backgroundColor: confPct >= 80 ? 'rgba(34,197,94,0.15)' : confPct >= 50 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
+                              color: confPct >= 80 ? '#22c55e' : confPct >= 50 ? '#eab308' : '#ef4444',
+                            }}>
+                              {confPct}% confidence
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Component details */}
+                        <div className="text-small" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px' }}>
+                          {eba.fuel_system_type && (
+                            <>
+                              <span className="text-muted">Fuel System</span>
+                              <span>{eba.fuel_system_brand && eba.fuel_system_brand !== 'unknown' ? `${eba.fuel_system_brand} ` : ''}{eba.fuel_system_type.replace(/_/g, ' ')}</span>
+                            </>
+                          )}
+                          {eba.ignition_type && (
+                            <>
+                              <span className="text-muted">Ignition</span>
+                              <span>{eba.ignition_brand && eba.ignition_brand !== 'unknown' ? `${eba.ignition_brand.replace(/_/g, ' ')} ` : ''}{eba.ignition_type.replace(/_/g, ' ')}</span>
+                            </>
+                          )}
+                          {eba.headers && eba.headers !== 'unknown' && (
+                            <>
+                              <span className="text-muted">Exhaust</span>
+                              <span>{eba.headers.replace(/_/g, ' ')}</span>
+                            </>
+                          )}
+                          {eba.condition && eba.condition !== 'unknown' && (
+                            <>
+                              <span className="text-muted">Condition</span>
+                              <span>{eba.condition.replace(/_/g, ' ')}</span>
+                            </>
+                          )}
+                          {eba.modifications?.length > 0 && (
+                            <>
+                              <span className="text-muted">Modifications</span>
+                              <span>{eba.modifications.length} identified</span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Mods list */}
+                        {eba.modifications?.length > 0 && (
+                          <div style={{ marginTop: '8px', fontSize: '9pt' }}>
+                            <div className="text-muted" style={{ fontSize: '8pt', marginBottom: '2px' }}>Visible Modifications</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {eba.modifications.map((mod: string, i: number) => (
+                                <span key={i} style={{
+                                  padding: '2px 6px',
+                                  backgroundColor: 'var(--bg-secondary, rgba(0,0,0,0.05))',
+                                  border: '1px solid var(--border-color, rgba(0,0,0,0.1))',
+                                  fontSize: '8pt',
+                                }}>
+                                  {mod}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Footer: analysis version + link */}
+                        <div className="text-muted" style={{ marginTop: '8px', fontSize: '8pt' }}>
+                          Analyzed {eba.analyzed_at ? new Date(eba.analyzed_at).toLocaleDateString() : ''}
+                          {eba.analysis_version > 1 ? ` (v${eba.analysis_version})` : ''}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CollapsibleWidget>
+              )}
+
               {/* Investment Summary */}
               <CollapsibleWidget title="ROI Summary" defaultCollapsed={true}>
                 <VehicleROISummaryCard vehicleId={vehicle.id} />
