@@ -632,7 +632,7 @@ function extractEssentials(html: string): {
 
     for (const t of items) {
       if (!vin) {
-        const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{4,17})\b/i);
+        const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{11,17})\b/i);
         if (idMatch?.[1]) vin = idMatch[1].toUpperCase().trim();
       }
       if (!mileage) {
@@ -667,7 +667,10 @@ function extractEssentials(html: string): {
               (/\b(\d{1,2}-speed|four-speed|five-speed|six-speed|seven-speed|eight-speed|nine-speed|ten-speed)\b/i.test(t) || /\btransaxle\b/i.test(t))
             )
           );
-        if (looksLikeTransmission) transmission = t;
+        if (looksLikeTransmission) {
+          // Strip redundant trailing "Transmission" word
+          transmission = t.replace(/\s+Transmission\s*$/i, '').trim();
+        }
       }
       if (!drivetrain) {
         const dm = t.match(/\b(AWD|4WD|RWD|FWD|4x4)\b/i);
@@ -709,7 +712,7 @@ function extractEssentials(html: string): {
       }
       if (!exterior_color) {
         const paintMatch = t.match(/^(.+?)\s+Paint\b/i);
-        if (paintMatch?.[1]) exterior_color = paintMatch[1].trim();
+        if (paintMatch?.[1] && paintMatch[1].trim().length <= 60 && paintMatch[1].trim().split(/\s+/).length <= 6) exterior_color = paintMatch[1].trim();
         if (!exterior_color) {
           const repMatch = t.match(/\bRepainted\s+in\s+(.+)\b/i);
           if (repMatch?.[1] && repMatch[1].trim().length <= 60) exterior_color = repMatch[1].trim();
@@ -791,14 +794,15 @@ function inferBodyStyleFromTitle(title: string | null): string | null {
   const t = String(title || "").toLowerCase();
   if (!t) return null;
   if (/\bcoupe\b|\bcoupé\b/.test(t)) return "Coupe";
-  if (/\bconvertible\b|\bcabriolet\b|\bcab\b/.test(t)) return "Convertible";
+  if (/\bconvertible\b|\bcabriolet\b/.test(t)) return "Convertible";
   if (/\broadster\b/.test(t)) return "Roadster";
   if (/\bsedan\b/.test(t)) return "Sedan";
   if (/\bwagon\b|\bestate\b/.test(t)) return "Wagon";
   if (/\bhatchback\b/.test(t)) return "Hatchback";
-  if (/\bpickup\b|\btruck\b/.test(t)) return "Truck";
-  if (/\bsuv\b/.test(t)) return "SUV";
+  if (/\bpickup\b|\btruck\b|\bcrew cab\b|\bregular cab\b|\bextended cab\b/.test(t)) return "Truck";
+  if (/\bsuv\b|\bsuburban\b|\btahoe\b|\byukon\b|\bwagoneer\b|\bblazer\b|\bbronco\b/.test(t)) return "SUV";
   if (/\bvan\b/.test(t)) return "Van";
+  if (/\brv\b|\bmotor\s*home\b|\bmotor\s*coach\b/.test(t)) return "RV";
   return null;
 }
 
@@ -1370,6 +1374,9 @@ serve(async (req) => {
         if (field === "color") {
           if (t === "var") return true;
           if (t.length > 80) return true;
+          // Reject sentence fragments leaking into color fields
+          if (/\b(during|aforementioned|refurbishment|powered by|details include|automatic|headlights)\b/i.test(t)) return true;
+          if (wordCount(t) > 8) return true;
         }
         if (field === "engine_size") {
           if (t === "cycles") return true;
