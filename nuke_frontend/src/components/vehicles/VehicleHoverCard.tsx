@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { formatCurrencyAmount } from '../../utils/currency';
 import { FaviconIcon } from '../common/FaviconIcon';
+import {
+  CompletenessPortal, YearPortal, MakePortal, ModelPortal, PricePortal,
+  MileagePortal, ColorPortal, SourcePortal, TransmissionPortal,
+} from './micro-portals';
+import { useVehicleFollow } from '../../hooks/useVehicleFollow';
 
 interface VehicleHoverCardProps {
   vehicle: {
@@ -43,7 +48,8 @@ interface VehicleHoverCardProps {
   };
   position: { x: number; y: number };
   onClose: () => void;
-  onAction?: (action: 'follow' | 'compare' | 'details') => void;
+  onAction?: (action: 'follow' | 'details') => void;
+  viewerUserId?: string;
 }
 
 const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
@@ -51,9 +57,12 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
   position,
   onClose,
   onAction,
+  viewerUserId,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
+  const [activePortal, setActivePortal] = useState<string | null>(null);
+  const { isFollowing, isLoading: followLoading, toggleFollow } = useVehicleFollow(vehicle.id);
 
   // Adjust position to keep card in viewport
   useEffect(() => {
@@ -127,15 +136,6 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
   const saleDate = formatDate(vehicle.sale_date || vehicle.auction_end_date);
   const lastUpdated = formatDate(vehicle.updated_at);
 
-  // Data completeness score
-  const dataFields = [
-    vehicle.year, vehicle.make, vehicle.model, vehicle.vin,
-    vehicle.mileage, price, vehicle.transmission, vehicle.engine,
-    vehicle.exterior_color, vehicle.location
-  ];
-  const filledFields = dataFields.filter(f => f !== null && f !== undefined).length;
-  const completeness = Math.round((filledFields / dataFields.length) * 100);
-
   return (
     <div
       ref={cardRef}
@@ -161,10 +161,26 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
       }}
       onMouseLeave={onClose}
     >
-      {/* Header: Year Make Model */}
+      {/* Header: Year Make Model — each token is a clickable portal */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
         <div style={{ fontWeight: 600, fontSize: '10pt', lineHeight: 1.2 }}>
-          {vehicle.year} {vehicle.make} {vehicle.model}
+          {vehicle.year ? (
+            <YearPortal year={vehicle.year} activePortal={activePortal} onOpen={setActivePortal} />
+          ) : null}
+          {vehicle.year && vehicle.make ? ' ' : ''}
+          {vehicle.make ? (
+            <MakePortal make={vehicle.make} activePortal={activePortal} onOpen={setActivePortal} />
+          ) : null}
+          {vehicle.make && vehicle.model ? ' ' : ''}
+          {vehicle.model ? (
+            <ModelPortal
+              make={vehicle.make || ''}
+              model={vehicle.model}
+              vehiclePrice={price}
+              activePortal={activePortal}
+              onOpen={setActivePortal}
+            />
+          ) : null}
           {vehicle.series && <span style={{ fontWeight: 400, opacity: 0.7 }}> {vehicle.series}</span>}
         </div>
         {status && (
@@ -182,19 +198,19 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         )}
       </div>
 
-      {/* Price row */}
+      {/* Price row — PricePortal never shows "No price data" */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '10px' }}>
-        {price ? (
-          <>
-            <span style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--text)' }}>
-              {formatCurrencyAmount(price)}
-            </span>
-            <span style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              {priceLabel}
-            </span>
-          </>
-        ) : (
-          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No price data</span>
+        <PricePortal
+          vehicle={vehicle as any}
+          vehicleId={vehicle.id}
+          userId={viewerUserId}
+          activePortal={activePortal}
+          onOpen={setActivePortal}
+        />
+        {priceLabel && price && (
+          <span style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            {priceLabel}
+          </span>
         )}
         {saleDate && (
           <span style={{ marginLeft: 'auto', fontSize: '8pt', color: 'var(--text-muted)' }}>
@@ -203,7 +219,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         )}
       </div>
 
-      {/* Quick stats grid */}
+      {/* Quick stats grid — each stat is a clickable portal */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
@@ -216,19 +232,35 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         <div>
           <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Miles</div>
           <div style={{ fontWeight: 600 }}>
-            {vehicle.mileage ? vehicle.mileage.toLocaleString() : '—'}
+            <MileagePortal
+              vehicleId={vehicle.id}
+              mileage={vehicle.mileage}
+              year={vehicle.year}
+              activePortal={activePortal}
+              onOpen={setActivePortal}
+            />
           </div>
         </div>
         <div>
           <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Trans</div>
           <div style={{ fontWeight: 600 }}>
-            {vehicle.transmission?.slice(0, 6) || '—'}
+            <TransmissionPortal
+              transmission={vehicle.transmission}
+              activePortal={activePortal}
+              onOpen={setActivePortal}
+            />
           </div>
         </div>
         <div>
           <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Color</div>
           <div style={{ fontWeight: 600 }}>
-            {vehicle.exterior_color?.slice(0, 8) || '—'}
+            <ColorPortal
+              make={vehicle.make}
+              color={vehicle.exterior_color}
+              year={vehicle.year}
+              activePortal={activePortal}
+              onOpen={setActivePortal}
+            />
           </div>
         </div>
       </div>
@@ -240,16 +272,15 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             <FaviconIcon url={vehicle.discovery_url} size={14} />
           )}
           {sourceInfo && (
-            <span style={{
-              background: sourceInfo.color + '20',
-              color: sourceInfo.color,
-              padding: '2px 6px',
-              borderRadius: '3px',
-              fontSize: '7pt',
-              fontWeight: 500,
-            }}>
-              {sourceInfo.name}
-            </span>
+            <SourcePortal
+              vehicleId={vehicle.id}
+              platform={vehicle.discovery_source || vehicle.profile_origin || ''}
+              platformDisplayName={sourceInfo.name}
+              platformColor={sourceInfo.color}
+              vehiclePrice={price}
+              activePortal={activePortal}
+              onOpen={setActivePortal}
+            />
           )}
           {vehicle.location && (
             <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
@@ -258,23 +289,12 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           )}
         </div>
 
-        {/* Data completeness indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <div style={{
-            width: '40px',
-            height: '4px',
-            background: 'var(--border)',
-            borderRadius: '2px',
-            overflow: 'hidden',
-          }}>
-            <div style={{
-              width: `${completeness}%`,
-              height: '100%',
-              background: completeness > 70 ? '#22c55e' : completeness > 40 ? '#f59e0b' : '#ef4444',
-            }} />
-          </div>
-          <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{completeness}%</span>
-        </div>
+        {/* Data completeness indicator — click to see field breakdown */}
+        <CompletenessPortal
+          vehicle={vehicle as Record<string, any>}
+          activePortal={activePortal}
+          onOpen={setActivePortal}
+        />
       </div>
 
       {/* Metrics row */}
@@ -412,32 +432,29 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           View Details
         </button>
         <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction?.('follow'); }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (viewerUserId) {
+              toggleFollow();
+            } else {
+              onAction?.('follow');
+            }
+          }}
+          disabled={followLoading}
           style={{
             padding: '6px 10px',
-            background: 'var(--bg-secondary, #f3f4f6)',
-            color: 'var(--text)',
-            border: '1px solid var(--border)',
+            background: isFollowing ? 'var(--primary, #3b82f6)' : 'var(--bg-secondary, #f3f4f6)',
+            color: isFollowing ? 'white' : 'var(--text)',
+            border: isFollowing ? 'none' : '1px solid var(--border)',
             borderRadius: '4px',
             fontSize: '8pt',
-            cursor: 'pointer',
+            cursor: followLoading ? 'wait' : 'pointer',
+            opacity: followLoading ? 0.6 : 1,
+            transition: 'all 0.15s ease',
           }}
         >
-          Follow
-        </button>
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction?.('compare'); }}
-          style={{
-            padding: '6px 10px',
-            background: 'var(--bg-secondary, #f3f4f6)',
-            color: 'var(--text)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '8pt',
-            cursor: 'pointer',
-          }}
-        >
-          Compare
+          {followLoading ? '...' : isFollowing ? 'Following' : 'Follow'}
         </button>
       </div>
 

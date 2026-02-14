@@ -265,12 +265,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     setHoverCard({ visible: false, position: { x: 0, y: 0 } });
   }, []);
 
-  const handleHoverCardAction = useCallback((action: 'follow' | 'compare' | 'details') => {
+  const handleHoverCardAction = useCallback((action: 'follow' | 'details') => {
     setHoverCard({ visible: false, position: { x: 0, y: 0 } });
     if (action === 'details') {
       navigate(`/vehicle/${vehicle.id}`);
     }
-    // TODO: implement follow and compare actions
   }, [navigate, vehicle.id]);
   const listingCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
@@ -3106,6 +3105,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           position={hoverCard.position}
           onClose={handleHoverCardClose}
           onAction={handleHoverCardAction}
+          viewerUserId={viewerUserId}
         />
       )}
     </Link>
