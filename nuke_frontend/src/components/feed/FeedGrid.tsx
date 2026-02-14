@@ -261,6 +261,7 @@ const FeedGrid: React.FC<FeedGridProps> = ({
             position={hoverPosition}
             onClose={handleHoverCardClose}
             onAction={handleHoverCardAction}
+            viewerUserId={session?.user?.id}
           />
         </div>
       )}

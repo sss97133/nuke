@@ -2144,6 +2144,20 @@ serve(async (req) => {
       }
     }
 
+    // Non-blocking MSRP enrichment for newly created vehicles
+    if (vehicleId && createdIds.length > 0) {
+      try {
+        fetch(`${supabaseUrl}/functions/v1/enrich-msrp`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ vehicle_id: vehicleId }),
+        }).catch((e) => console.warn(`[enrich-msrp] fire-and-forget failed: ${e?.message}`));
+      } catch (_) { /* non-blocking */ }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

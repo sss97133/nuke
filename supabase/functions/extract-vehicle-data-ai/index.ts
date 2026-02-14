@@ -495,6 +495,22 @@ serve(async (req) => {
       }
     }
 
+    // Non-blocking MSRP enrichment for newly created vehicles
+    if (vehicleId) {
+      try {
+        const enrichUrl = Deno.env.get('SUPABASE_URL')!
+        const enrichKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        fetch(`${enrichUrl}/functions/v1/enrich-msrp`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${enrichKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ vehicle_id: vehicleId }),
+        }).catch((e) => console.warn(`[enrich-msrp] fire-and-forget failed: ${e?.message}`))
+      } catch (_) { /* non-blocking */ }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
