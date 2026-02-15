@@ -113,12 +113,14 @@ def main():
         w_conn.autocommit = True
         w_cur = w_conn.cursor()
         local_total = local_updated = local_errors = local_vin = local_nohtml = 0
+        consecutive_errors = 0
 
         for vid in chunk:
             local_total += 1
             try:
                 w_cur.execute("SELECT parse_bat_archive_fill(%s)", (str(vid),))
                 result = w_cur.fetchone()[0]
+                consecutive_errors = 0  # reset on success
                 if result is None or result == 0:
                     local_nohtml += 1
                 elif result == -1:
@@ -127,12 +129,31 @@ def main():
                     local_updated += 1
             except Exception as e:
                 local_errors += 1
-                if local_errors <= 3:
+                consecutive_errors += 1
+                if local_errors <= 5:
                     print(f"  W{worker_id} ERROR [{vid}]: {e}", file=sys.stderr)
+                # Reconnect if connection is broken
                 try:
                     w_conn.rollback()
                 except Exception:
                     pass
+                if consecutive_errors >= 3:
+                    # Connection is likely dead — reconnect
+                    try:
+                        w_cur.close()
+                        w_conn.close()
+                    except Exception:
+                        pass
+                    try:
+                        time.sleep(2)
+                        w_conn = psycopg2.connect(DB_URL)
+                        w_conn.autocommit = True
+                        w_cur = w_conn.cursor()
+                        consecutive_errors = 0
+                        print(f"  W{worker_id} reconnected after {local_errors} errors", file=sys.stderr)
+                    except Exception as re:
+                        print(f"  W{worker_id} RECONNECT FAILED: {re}", file=sys.stderr)
+                        break  # give up on this worker
 
             # Update shared counters every 50 vehicles
             if local_total % 50 == 0:
@@ -153,8 +174,11 @@ def main():
             counters['vin_dupes'] += local_vin
             counters['no_html'] += local_nohtml
 
-        w_cur.close()
-        w_conn.close()
+        try:
+            w_cur.close()
+            w_conn.close()
+        except Exception:
+            pass
 
     # Split vehicles into chunks for workers
     chunk_size = (len(vehicles) + n_workers - 1) // n_workers
