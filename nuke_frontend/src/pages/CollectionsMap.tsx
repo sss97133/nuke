@@ -813,6 +813,29 @@ export default function CollectionsMap() {
   const sidebarTitle = drill.level === 'world' ? 'Countries' : drill.level === 'country' && drill.country === 'USA' ? 'States' : drill.level === 'country' ? 'Cities' : drill.level === 'state' ? 'Counties' : 'Collections';
   const levelLabel = drill.level === 'world' ? 'country' : drill.level === 'country' && drill.country === 'USA' ? 'state' : drill.level === 'country' ? 'city' : drill.level === 'state' ? 'county' : 'collection';
 
+  // Export collections as CSV
+  const exportCSV = useCallback(() => {
+    const headers = ['Name', 'City', 'Country', 'Vehicles', 'Instagram', 'Latitude', 'Longitude', 'URL'];
+    const rows = sortedCollections.map(c => [
+      `"${c.name.replace(/"/g, '""')}"`,
+      `"${c.city}"`,
+      `"${c.country}"`,
+      c.total_inventory,
+      c.instagram || '',
+      c.lat,
+      c.lng,
+      `https://nuke.build/org/${c.slug}`,
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `collections-${drill.level}${drill.country ? '-' + drill.country : ''}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [sortedCollections, drill]);
+
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else mapContainerRef.current?.requestFullscreen();
@@ -976,6 +999,11 @@ export default function CollectionsMap() {
               <option value="city">City</option>
               <option value="distance">Nearest</option>
             </select>
+            {/* Export button */}
+            <button onClick={exportCSV} title="Export as CSV"
+              className="w-6 h-6 rounded flex items-center justify-center text-gray-500 hover:text-sky-400 hover:bg-gray-700/60 transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            </button>
             {isCompact && (
               <button onClick={() => setPanelOpen(false)} className="text-gray-500 hover:text-white p-1">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1213,9 +1241,16 @@ export default function CollectionsMap() {
         <div className="flex-1 relative min-h-0 min-w-0">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
-                <div className="text-gray-500 text-sm">Loading collections...</div>
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="w-16 h-16 border-2 border-sky-500/20 rounded-full" />
+                  <div className="absolute inset-0 w-16 h-16 border-2 border-transparent border-t-sky-500 rounded-full animate-spin" />
+                  <svg className="absolute inset-0 m-auto w-6 h-6 text-sky-500/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div className="text-center">
+                  <div className="text-white text-sm font-medium">Loading Collections Map</div>
+                  <div className="text-gray-500 text-xs mt-1">Discovering collections worldwide...</div>
+                </div>
               </div>
             </div>
           ) : (
@@ -1358,10 +1393,24 @@ export default function CollectionsMap() {
             )}
           </div>
 
-          {/* Keyboard hint */}
+          {/* Keyboard hints */}
           {!isMobile && drill.level !== 'world' && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] text-[10px] text-gray-600">
-              Press <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px]">Esc</kbd> to go back
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] text-[10px] text-gray-600 flex items-center gap-3">
+              <span>
+                <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px]">Esc</kbd> Back
+              </span>
+              <span className="opacity-50">|</span>
+              <span>
+                <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px]">1</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px] ml-0.5">2</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px] ml-0.5">3</kbd> Style
+              </span>
+            </div>
+          )}
+          {/* First visit hint */}
+          {!isMobile && drill.level === 'world' && !searchTerm && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] text-[10px] text-gray-500 bg-gray-900/60 backdrop-blur rounded-lg px-3 py-1.5 border border-gray-800/30 fade-in">
+              Click any country to explore its collections
             </div>
           )}
         </div>
