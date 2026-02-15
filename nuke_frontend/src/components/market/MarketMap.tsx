@@ -1,0 +1,528 @@
+/**
+ * Market Map - Nested Treemap Visualization
+ *
+ * Shows vehicle market distribution by Segment, Source, or Brand.
+ * Renders a nested treemap with parent containers and child tiles.
+ * Uses the treemap-vehicles edge function for data.
+ */
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+const API = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/treemap-vehicles';
+const MAX_CHILDREN = 8;
+
+// Format helpers
+const fmtMoney = (n: number) => {
+  if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
+  return '$' + Math.round(n);
+};
+const fmtNum = (n: number) => n.toLocaleString();
+
+type ViewMode = 'segment' | 'source' | 'brand';
+type Metric = 'value' | 'count' | 'avg';
+
+interface TreeNode {
+  name: string;
+  value?: number;
+  count?: number;
+  children?: TreeNode[];
+  isVehicle?: boolean;
+  id?: string;
+  fullName?: string;
+  _isOthers?: boolean;
+  _parentName?: string;
+}
+
+interface Filters {
+  source?: string;
+  segment?: string;
+  make?: string;
+  model?: string;
+  year?: string;
+  _nested?: boolean;
+}
+
+interface Stats {
+  totalValue: number;
+  totalCount: number;
+  level: string;
+  nested?: boolean;
+}
+
+export default function MarketMap() {
+  const [view, setView] = useState<ViewMode>('segment');
+  const [metric, setMetric] = useState<Metric>('value');
+  const [data, setData] = useState<any>(null);
+  const [nestedData, setNestedData] = useState<TreeNode | null>(null);
+  const [filters, setFilters] = useState<Filters>({});
+  const [history, setHistory] = useState<Filters[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tooltip, setTooltip] = useState<{
+    visible: boolean; x: number; y: number;
+    name: string; value: string; rows: { pct: string; label: string }[];
+  }>({ visible: false, x: 0, y: 0, name: '', value: '', rows: [] });
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const d3Ref = useRef<any>(null);
+
+  // Load D3 from CDN
+  useEffect(() => {
+    if ((window as any).d3) {
+      d3Ref.current = (window as any).d3;
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://d3js.org/d3.v7.min.js';
+    script.onload = () => { d3Ref.current = (window as any).d3; };
+    document.head.appendChild(script);
+  }, []);
+
+  const load = useCallback(async (f: Filters = {}, useNested = false) => {
+    setLoading(true);
+    const p = new URLSearchParams();
+    p.set('view', view);
+    if (useNested) p.set('nested', 'true');
+    if (f.source) p.set('source', f.source);
+    if (f.segment) p.set('segment', f.segment);
+    if (f.make) p.set('make', f.make);
+    if (f.model) p.set('model', f.model);
+    if (f.year) p.set('year', f.year);
+
+    try {
+      const r = await fetch(`${API}?${p}`);
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      setData(d);
+      setFilters(f);
+      setNestedData(useNested ? d.hierarchy : null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [view]);
+
+  const nav = useCallback((f: Filters, useNested = false) => {
+    setHistory(h => [...h, { ...filters, _nested: !!nestedData }]);
+    load(f, useNested);
+  }, [filters, nestedData, load]);
+
+  const back = useCallback(() => {
+    setHistory(h => {
+      if (h.length === 0) return h;
+      const prev = { ...h[h.length - 1] };
+      const wasNested = prev._nested;
+      delete prev._nested;
+      load(prev, !!wasNested);
+      return h.slice(0, -1);
+    });
+  }, [load]);
+
+  const switchView = useCallback((v: ViewMode) => {
+    setView(v);
+    setHistory([]);
+    setFilters({});
+  }, []);
+
+  // Re-load when view changes
+  useEffect(() => {
+    load({}, view === 'segment');
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Get metric value
+  const metricVal = useCallback((d: TreeNode) => {
+    if (metric === 'count') return d.count || 0;
+    if (metric === 'avg') return (d.count || 0) > 0 ? (d.value || 0) / (d.count || 1) : 0;
+    return d.value || 0;
+  }, [metric]);
+
+  const displayVal = useCallback((d: TreeNode) => {
+    if (metric === 'count') return fmtNum(d.count || 0);
+    if (metric === 'avg') return fmtMoney((d.count || 0) > 0 ? (d.value || 0) / (d.count || 1) : 0);
+    return fmtMoney(d.value || 0);
+  }, [metric]);
+
+  // Render treemap
+  useEffect(() => {
+    if (!data || !containerRef.current || !d3Ref.current) return;
+    const d3 = d3Ref.current;
+    const container = containerRef.current;
+    container.innerHTML = '';
+
+    const rect = container.getBoundingClientRect();
+    if (rect.width < 50 || rect.height < 50) return;
+    const W = Math.floor(rect.width);
+    const H = Math.floor(rect.height);
+
+    const source = nestedData || data.hierarchy;
+    if (!source?.children?.length) return;
+
+    const isNested = !!nestedData;
+
+    // Group children with "+N others"
+    const groupChildren = (children: TreeNode[], parent: TreeNode): TreeNode[] => {
+      if (!children?.length) return [{ ...parent }];
+      const sorted = [...children].sort((a, b) => metricVal(b) - metricVal(a));
+      const filtered = sorted.filter(c => metricVal(c) > 0);
+      if (filtered.length <= MAX_CHILDREN) return filtered;
+      const top = filtered.slice(0, MAX_CHILDREN - 1);
+      const rest = filtered.slice(MAX_CHILDREN - 1);
+      top.push({
+        name: `+${rest.length} others`,
+        value: rest.reduce((s, c) => s + (c.value || 0), 0),
+        count: rest.reduce((s, c) => s + (c.count || 0), 0),
+        _isOthers: true,
+        _parentName: parent.name,
+      });
+      return top;
+    };
+
+    if (isNested) {
+      // NESTED treemap
+      const children = source.children.filter((c: TreeNode) => metricVal(c) > 0);
+      const grandTotal = children.reduce((s: number, c: TreeNode) => s + metricVal(c), 0);
+
+      const treeData = {
+        name: 'root',
+        children: children.map((g: TreeNode) => ({
+          ...g,
+          children: groupChildren(g.children || [], g),
+        })),
+      };
+
+      const root = d3.hierarchy(treeData)
+        .sum((d: TreeNode) => d.children ? 0 : Math.sqrt(metricVal(d)))
+        .sort((a: any, b: any) => b.value - a.value);
+
+      d3.treemap()
+        .tile(d3.treemapSquarify.ratio(1.2))
+        .size([W, H])
+        .paddingTop(18)
+        .paddingInner(2)
+        .paddingOuter(2)
+        .round(true)(root);
+
+      for (const group of root.children || []) {
+        const gw = group.x1 - group.x0, gh = group.y1 - group.y0;
+        if (gw < 2 || gh < 2) continue;
+
+        const gDiv = document.createElement('div');
+        gDiv.style.cssText = `position:absolute;left:${group.x0}px;top:${group.y0}px;width:${gw}px;height:${gh}px;overflow:hidden;border:1px solid rgba(42,42,42,0.6);border-radius:2px;background:rgba(30,30,30,0.3);cursor:pointer;`;
+
+        const label = document.createElement('div');
+        label.style.cssText = 'position:absolute;top:0;left:0;right:0;padding:3px 5px 2px;font-size:9px;font-weight:700;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2;pointer-events:none;background:linear-gradient(180deg,rgba(30,30,30,0.85) 0%,rgba(30,30,30,0.4) 80%,transparent 100%);';
+        label.innerHTML = `${gw > 60 ? group.data.name : group.data.name.slice(0, Math.floor(gw / 6))}<span style="font-weight:400;font-family:monospace;font-size:8px;color:#858585;margin-left:6px;">${displayVal(group.data)}</span>`;
+        gDiv.appendChild(label);
+
+        for (const leaf of group.children || []) {
+          const lx = leaf.x0 - group.x0, ly = leaf.y0 - group.y0;
+          const lw = leaf.x1 - leaf.x0, lh = leaf.y1 - leaf.y0;
+          if (lw < 2 || lh < 2) continue;
+
+          const lDiv = document.createElement('div');
+          const bg = leaf.data._isOthers ? '#e0d8d0' : '#f0efe8';
+          lDiv.style.cssText = `position:absolute;left:${lx}px;top:${ly}px;width:${lw}px;height:${lh}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:1px;background:${bg};`;
+
+          const inner = document.createElement('div');
+          inner.style.cssText = 'padding:3px 4px;height:100%;display:flex;flex-direction:column;';
+
+          if (lw > 28 && lh > 14) {
+            const nameEl = document.createElement('div');
+            nameEl.style.cssText = 'font-size:8px;font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+            const maxC = Math.floor((lw - 6) / 5);
+            nameEl.textContent = leaf.data.name.length > maxC ? leaf.data.name.slice(0, maxC) + '...' : leaf.data.name;
+            inner.appendChild(nameEl);
+          }
+          if (lw > 35 && lh > 26) {
+            const valEl = document.createElement('div');
+            valEl.style.cssText = 'font-size:8px;font-family:monospace;color:#555;margin-top:1px;';
+            valEl.textContent = displayVal(leaf.data);
+            inner.appendChild(valEl);
+          }
+
+          lDiv.appendChild(inner);
+
+          // Events
+          const leafData = leaf.data;
+          const groupDataName = group.data.name;
+          const parentVal = metricVal(group.data);
+
+          lDiv.onmouseover = (e: MouseEvent) => {
+            const pctTotal = grandTotal > 0 ? ((metricVal(leafData) / grandTotal) * 100).toFixed(1) : '0.0';
+            const pctParent = parentVal > 0 ? ((metricVal(leafData) / parentVal) * 100).toFixed(1) : '0.0';
+            const avg = (leafData.count || 0) > 0 ? (leafData.value || 0) / (leafData.count || 1) : 0;
+            let val: string;
+            if (metric === 'count') val = fmtNum(leafData.count || 0) + ' vehicles';
+            else if (metric === 'avg') val = fmtMoney(avg);
+            else val = fmtMoney(leafData.value || 0);
+
+            setTooltip({
+              visible: true,
+              x: e.clientX + 12,
+              y: e.clientY + 12,
+              name: leafData.name,
+              value: val,
+              rows: [
+                { pct: pctTotal + '%', label: 'of Total' },
+                { pct: pctParent + '%', label: 'of ' + groupDataName },
+                { pct: fmtNum(leafData.count || 0), label: 'vehicles' },
+                { pct: fmtMoney(avg), label: 'avg price' },
+              ],
+            });
+          };
+          lDiv.onmousemove = (e: MouseEvent) => {
+            setTooltip(t => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
+          };
+          lDiv.onmouseout = () => setTooltip(t => ({ ...t, visible: false }));
+          lDiv.onclick = () => {
+            if (leafData._isOthers) {
+              if (view === 'segment') nav({ segment: groupDataName });
+              else if (view === 'brand') nav({ make: groupDataName });
+            } else {
+              if (view === 'segment') nav({ segment: groupDataName, make: leafData.name });
+              else if (view === 'brand') nav({ make: groupDataName, model: leafData.name });
+            }
+          };
+          gDiv.appendChild(lDiv);
+        }
+
+        gDiv.onclick = (e) => {
+          if (e.target === gDiv || e.target === label) {
+            if (view === 'segment') nav({ segment: group.data.name });
+            else if (view === 'brand') nav({ make: group.data.name });
+          }
+        };
+        container.appendChild(gDiv);
+      }
+    } else {
+      // FLAT treemap
+      let children = source.children.filter((c: TreeNode) => metricVal(c) > 0);
+      const totalVal = children.reduce((s: number, c: TreeNode) => s + metricVal(c), 0);
+
+      const sorted = [...children].sort((a: TreeNode, b: TreeNode) => metricVal(b) - metricVal(a));
+      if (sorted.length > MAX_CHILDREN) {
+        const top = sorted.slice(0, MAX_CHILDREN - 1);
+        const rest = sorted.slice(MAX_CHILDREN - 1);
+        top.push({
+          name: `+${rest.length} others`,
+          value: rest.reduce((s, c) => s + (c.value || 0), 0),
+          count: rest.reduce((s, c) => s + (c.count || 0), 0),
+          _isOthers: true,
+        });
+        children = top;
+      }
+
+      const root = d3.hierarchy({ name: 'root', children })
+        .sum((d: TreeNode) => d.children ? 0 : Math.sqrt(metricVal(d)))
+        .sort((a: any, b: any) => b.value - a.value);
+
+      d3.treemap().tile(d3.treemapSquarify.ratio(1)).size([W, H]).paddingOuter(2).paddingInner(2).round(true)(root);
+
+      for (const leaf of root.leaves()) {
+        const w = leaf.x1 - leaf.x0, h = leaf.y1 - leaf.y0;
+        if (w < 2 || h < 2) continue;
+
+        const div = document.createElement('div');
+        const bg = leaf.data._isOthers ? '#e0d8d0' : '#f0efe8';
+        div.style.cssText = `position:absolute;left:${leaf.x0}px;top:${leaf.y0}px;width:${w}px;height:${h}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:1px;background:${bg};`;
+
+        const inner = document.createElement('div');
+        inner.style.cssText = 'padding:3px 4px;height:100%;display:flex;flex-direction:column;';
+
+        if (w > 28 && h > 14) {
+          const nameEl = document.createElement('div');
+          nameEl.style.cssText = 'font-size:8px;font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+          const maxC = Math.floor((w - 6) / 5);
+          nameEl.textContent = leaf.data.name.length > maxC ? leaf.data.name.slice(0, maxC) + '...' : leaf.data.name;
+          inner.appendChild(nameEl);
+        }
+        if (w > 35 && h > 26) {
+          const valEl = document.createElement('div');
+          valEl.style.cssText = 'font-size:8px;font-family:monospace;color:#555;margin-top:1px;';
+          valEl.textContent = displayVal(leaf.data);
+          inner.appendChild(valEl);
+        }
+        if (w > 40 && h > 38) {
+          const countEl = document.createElement('div');
+          countEl.style.cssText = 'font-size:7px;color:#888;margin-top:auto;';
+          countEl.textContent = leaf.data.isVehicle ? fmtMoney(leaf.data.value || 0) : fmtNum(leaf.data.count || 0) + ' vehicles';
+          inner.appendChild(countEl);
+        }
+        div.appendChild(inner);
+
+        const ld = leaf.data;
+        div.onmouseover = (e: MouseEvent) => {
+          const pct = totalVal > 0 ? ((metricVal(ld) / totalVal) * 100).toFixed(1) : '0.0';
+          const avg = (ld.count || 0) > 0 ? (ld.value || 0) / (ld.count || 1) : 0;
+          let val: string;
+          if (metric === 'count') val = fmtNum(ld.count || 0) + ' vehicles';
+          else if (metric === 'avg') val = fmtMoney(avg);
+          else val = fmtMoney(ld.value || 0);
+          setTooltip({
+            visible: true, x: e.clientX + 12, y: e.clientY + 12,
+            name: ld.fullName || ld.name, value: val,
+            rows: [
+              { pct: pct + '%', label: 'of total' },
+              { pct: fmtNum(ld.count || 0), label: 'vehicles' },
+              { pct: fmtMoney(ld.value || 0), label: 'value' },
+              { pct: fmtMoney(avg), label: 'avg price' },
+            ],
+          });
+        };
+        div.onmousemove = (e: MouseEvent) => setTooltip(t => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
+        div.onmouseout = () => setTooltip(t => ({ ...t, visible: false }));
+        div.onclick = () => {
+          if (ld._isOthers) return;
+          if (ld.isVehicle) { window.open('/vehicle/' + ld.id, '_blank'); return; }
+          const lvl = data?.stats?.level;
+          if (view === 'segment') {
+            if (lvl === 'segments') nav({ segment: ld.name }, true);
+            else if (lvl === 'makes') nav({ ...filters, make: ld.name });
+            else if (lvl === 'models') nav({ ...filters, model: ld.name });
+            else if (lvl === 'years') nav({ ...filters, year: ld.name });
+          } else if (view === 'source') {
+            if (lvl === 'sources') nav({ source: ld.name });
+            else if (lvl === 'makes') nav({ ...filters, make: ld.name });
+            else if (lvl === 'models') nav({ ...filters, model: ld.name });
+            else if (lvl === 'years') nav({ ...filters, year: ld.name });
+          } else if (view === 'brand') {
+            if (lvl === 'brands') nav({ make: ld.name });
+            else if (lvl === 'models') nav({ ...filters, model: ld.name });
+            else if (lvl === 'years') nav({ ...filters, year: ld.name });
+          }
+        };
+        container.appendChild(div);
+      }
+    }
+  }, [data, nestedData, metric, view, filters, metricVal, displayVal, nav]);
+
+  // Resize observer
+  useEffect(() => {
+    const el = containerRef.current?.parentElement;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (data && containerRef.current) {
+        // Trigger re-render by setting data again (forces useEffect)
+        setData((d: any) => d ? { ...d } : d);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [data]);
+
+  const stats = data?.stats;
+  const viewLabels: Record<ViewMode, string> = { segment: 'All Segments', source: 'All Sources', brand: 'All Brands' };
+
+  // Build breadcrumb
+  const breadcrumbs: { label: string; onClick?: () => void }[] = [];
+  breadcrumbs.push({ label: viewLabels[view], onClick: () => load({}, view === 'segment') });
+  if (view === 'segment') {
+    if (filters.segment) breadcrumbs.push(filters.make ? { label: filters.segment, onClick: () => nav({ segment: filters.segment! }) } : { label: filters.segment });
+    if (filters.make) breadcrumbs.push(filters.model ? { label: filters.make, onClick: () => nav({ segment: filters.segment!, make: filters.make! }) } : { label: filters.make });
+    if (filters.model) breadcrumbs.push(filters.year ? { label: filters.model, onClick: () => nav({ segment: filters.segment!, make: filters.make!, model: filters.model! }) } : { label: filters.model });
+    if (filters.year) breadcrumbs.push({ label: filters.year });
+  } else if (view === 'source') {
+    if (filters.source) breadcrumbs.push(filters.make ? { label: filters.source, onClick: () => nav({ source: filters.source! }) } : { label: filters.source });
+    if (filters.make) breadcrumbs.push(filters.model ? { label: filters.make, onClick: () => nav({ source: filters.source!, make: filters.make! }) } : { label: filters.make });
+    if (filters.model) breadcrumbs.push(filters.year ? { label: filters.model, onClick: () => nav({ source: filters.source!, make: filters.make!, model: filters.model! }) } : { label: filters.model });
+    if (filters.year) breadcrumbs.push({ label: filters.year });
+  } else if (view === 'brand') {
+    if (filters.make) breadcrumbs.push(filters.model ? { label: filters.make, onClick: () => nav({ make: filters.make! }) } : { label: filters.make });
+    if (filters.model) breadcrumbs.push(filters.year ? { label: filters.model, onClick: () => nav({ make: filters.make!, model: filters.model! }) } : { label: filters.model });
+    if (filters.year) breadcrumbs.push({ label: filters.year });
+  }
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', color: '#ccc', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '10px', padding: '12px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', marginBottom: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Market Map</div>
+          {stats && (
+            <div style={{ display: 'flex', gap: '20px', fontSize: '10px', color: '#858585' }}>
+              <span><b style={{ color: '#ccc', fontFamily: 'monospace' }}>{fmtMoney(stats.totalValue)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Total</small></span>
+              <span><b style={{ color: '#ccc', fontFamily: 'monospace' }}>{fmtNum(stats.totalCount)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Vehicles</small></span>
+              <span><b style={{ color: '#ccc', fontFamily: 'monospace' }}>{fmtMoney(stats.totalCount > 0 ? stats.totalValue / stats.totalCount : 0)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Avg</small></span>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '3px' }}>
+            {(['segment', 'source', 'brand'] as ViewMode[]).map(v => (
+              <button key={v} onClick={() => switchView(v)} style={{
+                border: `1px solid ${view === v ? '#ccc' : '#3e3e42'}`, background: view === v ? '#ccc' : 'transparent',
+                color: view === v ? '#1e1e1e' : '#858585', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
+                cursor: 'pointer', borderRadius: '3px', fontFamily: 'inherit',
+              }}>
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '3px', marginLeft: '12px' }}>
+            {(['value', 'count', 'avg'] as Metric[]).map(m => (
+              <button key={m} onClick={() => setMetric(m)} style={{
+                border: `1px solid ${metric === m ? '#ccc' : '#3e3e42'}`, background: metric === m ? '#ccc' : 'transparent',
+                color: metric === m ? '#1e1e1e' : '#858585', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
+                cursor: 'pointer', borderRadius: '3px', fontFamily: 'inherit',
+              }}>
+                {m === 'avg' ? 'Avg Price' : m === 'count' ? 'Volume' : 'Value'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px', fontSize: '10px', color: '#858585', flexShrink: 0 }}>
+        {history.length > 0 && (
+          <span onClick={back} style={{ cursor: 'pointer', marginRight: '6px', fontSize: '11px' }}>&larr;</span>
+        )}
+        {breadcrumbs.map((bc, i) => (
+          <span key={i}>
+            {i > 0 && <span style={{ color: '#656565', margin: '0 6px', fontSize: '9px' }}>&rsaquo;</span>}
+            {bc.onClick ? (
+              <a onClick={bc.onClick} style={{ color: '#858585', cursor: 'pointer', textDecoration: 'none' }}
+                onMouseOver={e => (e.target as HTMLElement).style.textDecoration = 'underline'}
+                onMouseOut={e => (e.target as HTMLElement).style.textDecoration = 'none'}>
+                {bc.label}
+              </a>
+            ) : (
+              <span style={{ color: '#ccc', fontWeight: 600 }}>{bc.label}</span>
+            )}
+          </span>
+        ))}
+      </div>
+
+      {/* Treemap container */}
+      <div style={{ position: 'relative', border: '1px solid #3e3e42', borderRadius: '3px', overflow: 'hidden', background: '#1e1e1e', flex: 1, minHeight: 0 }}>
+        <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }} />
+        {loading && (
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: '#656565', fontSize: '11px' }}>Loading...</div>
+        )}
+      </div>
+
+      {/* Tooltip */}
+      {tooltip.visible && (
+        <div style={{
+          position: 'fixed', left: tooltip.x, top: tooltip.y,
+          background: '#1a1a1a', border: '1px solid #333', borderRadius: '4px',
+          padding: '10px 14px', pointerEvents: 'none', zIndex: 1000,
+          minWidth: '180px', maxWidth: '280px', fontSize: '10px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        }}>
+          <div style={{ fontWeight: 600, color: '#e0e0e0', marginBottom: '4px', fontSize: '11px' }}>{tooltip.name}</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'monospace', color: '#16825d', marginBottom: '8px' }}>{tooltip.value}</div>
+          <hr style={{ border: 'none', borderTop: '1px solid #333', margin: '6px 0' }} />
+          {tooltip.rows.map((r, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px', color: '#999' }}>
+              <span style={{ fontFamily: 'monospace', color: '#ccc', fontWeight: 600, fontSize: '10px' }}>{r.pct}</span>
+              <span style={{ fontSize: '9px', textAlign: 'right', marginLeft: '12px' }}>{r.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

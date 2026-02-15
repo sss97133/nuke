@@ -67,6 +67,7 @@ import VehicleVideoSection from '../components/vehicle/VehicleVideoSection';
 import { VehicleDataGapsCard } from '../components/vehicle/VehicleDataGapsCard';
 import VehicleResearchItemsCard from '../components/vehicle/VehicleResearchItemsCard';
 import { VehicleLedgerDocumentsCard } from '../components/vehicle/VehicleLedgerDocumentsCard';
+import VehicleDealJacketForensicsCard from '../components/vehicle/VehicleDealJacketForensicsCard';
 import VehicleStreamingCard from '../components/vehicle/VehicleStreamingCard';
 import { CollapsibleWidget } from '../components/ui/CollapsibleWidget';
 
@@ -3694,6 +3695,11 @@ const VehicleProfile: React.FC = () => {
                   <VehicleLedgerDocumentsCard vehicleId={vehicle.id} canManage={Boolean(isVerifiedOwner || hasContributorAccess)} />
                 </CollapsibleWidget>
               )}
+
+              {/* Deal Jacket Forensics — shows when forensic analysis has been done */}
+              <CollapsibleWidget title="Deal Jacket Forensics" defaultCollapsed={false}>
+                <VehicleDealJacketForensicsCard vehicleId={vehicle.id} />
+              </CollapsibleWidget>
 
               {/* Wiring plan + parts quote generator */}
               {(isRowOwner || isVerifiedOwner) && (
