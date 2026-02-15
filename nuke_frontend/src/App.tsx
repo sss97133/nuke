@@ -10,7 +10,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/layout/AppLayout';
 import { DomainRoutes } from './routes/DomainRoutes';
-import CursorHomepage from './pages/CursorHomepage';
+import HomePage from './pages/HomePage';
 
 export default function App() {
   return (
@@ -23,8 +23,8 @@ export default function App() {
 
               <AppLayout>
                 <Routes>
-                  {/* Default entry */}
-                  <Route path="/" element={<CursorHomepage />} />
+                  {/* Hub: tabbed homepage (Garage, Feed, Map, Market) */}
+                  <Route path="/" element={<HomePage />} />
                   {/* Domain modules + legacy shims */}
                   <Route path="/*" element={<DomainRoutes />} />
                 </Routes>

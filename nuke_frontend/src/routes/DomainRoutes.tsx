@@ -210,6 +210,11 @@ export const DomainRoutes = () => {
         <Route path="/review/ai-detections" element={<Navigate to="/curation-queue" replace />} />
         <Route path="/receipts/unlinked" element={<UnlinkedReceipts />} />
 
+        {/* Hub convenience routes → redirect to homepage tabs */}
+        <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
+        <Route path="/map" element={<Navigate to="/?tab=map" replace />} />
+        <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
+
         {/* Collections Map */}
         <Route path="/collections-map" element={<CollectionsMap />} />
         <Route path="/collections/map" element={<Navigate to="/collections-map" replace />} />
