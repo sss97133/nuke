@@ -622,7 +622,7 @@ function MapLayers({
 
 // ── MapInstance (captures map ref for external controls) ─────────────────────
 
-function MapInstance({ onMap, onMoveEnd }: { onMap: (map: L.Map) => void; onMoveEnd?: (center: [number, number]) => void }) {
+function MapInstance({ onMap, onMoveEnd, onZoom }: { onMap: (map: L.Map) => void; onMoveEnd?: (center: [number, number]) => void; onZoom?: (zoom: number) => void }) {
   const map = useMap();
   useEffect(() => { onMap(map); }, [map, onMap]);
   useEffect(() => {
@@ -634,6 +634,13 @@ function MapInstance({ onMap, onMoveEnd }: { onMap: (map: L.Map) => void; onMove
     map.on('moveend', handler);
     return () => { map.off('moveend', handler); };
   }, [map, onMoveEnd]);
+  useEffect(() => {
+    if (!onZoom) return;
+    const handler = () => onZoom(map.getZoom());
+    map.on('zoomend', handler);
+    handler(); // initial
+    return () => { map.off('zoomend', handler); };
+  }, [map, onZoom]);
   return null;
 }
 
@@ -725,10 +732,12 @@ export default function CollectionsMap() {
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [locating, setLocating] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(2);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
   const handleMoveEnd = useCallback((center: [number, number]) => { setMapCenter(center); }, []);
+  const handleZoom = useCallback((zoom: number) => { setZoomLevel(zoom); }, []);
   const [transitioning, setTransitioning] = useState(false);
   const [mapStyle, setMapStyle] = useState<'dark' | 'satellite' | 'light'>('dark');
 
@@ -1144,7 +1153,23 @@ export default function CollectionsMap() {
   const renderSidebar = () => (
     <div className="flex flex-col h-full min-h-0" role="navigation" aria-label={`${sidebarTitle} navigation`}>
       <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-        <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{sidebarTitle}{sidebarItems.length > 0 ? ` (${sidebarItems.length})` : ''}</h2>
+        <div className="flex items-center gap-2">
+          {/* Scope coverage ring */}
+          {drill.level !== 'world' && collections.length > 0 && (
+            <div className="relative w-7 h-7 flex-shrink-0" title={`${Math.round((scopedCollections.length / collections.length) * 100)}% of all collections`}>
+              <svg className="w-7 h-7 -rotate-90" viewBox="0 0 28 28">
+                <circle cx="14" cy="14" r="11" fill="none" stroke="#1e293b" strokeWidth="3" />
+                <circle cx="14" cy="14" r="11" fill="none" stroke="#38bdf8" strokeWidth="3"
+                  strokeDasharray={`${Math.round((scopedCollections.length / collections.length) * 69.12)} 69.12`}
+                  strokeLinecap="round" className="transition-all duration-700" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-sky-400">
+                {Math.round((scopedCollections.length / collections.length) * 100)}
+              </span>
+            </div>
+          )}
+          <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{sidebarTitle}{sidebarItems.length > 0 ? ` (${sidebarItems.length})` : ''}</h2>
+        </div>
         {isCompact && (
           <button onClick={() => setSidebarOpen(false)} className="text-gray-500 hover:text-white p-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1182,6 +1207,18 @@ export default function CollectionsMap() {
               <div className="w-10 text-right text-[10px] text-gray-500 font-medium tabular-nums">{d.pct}%</div>
             </div>
           ))}
+          {/* Concentration indicator */}
+          {topDistribution.length >= 2 && (
+            <div className="mt-2 pt-2 border-t border-gray-800/30 text-[9px] text-gray-600">
+              {topDistribution[0].pct > 60 ? (
+                <span>Highly concentrated in <span className="text-sky-400">{topDistribution[0].label}</span></span>
+              ) : topDistribution[0].pct > 40 ? (
+                <span>Concentrated in <span className="text-sky-400">{topDistribution[0].label}</span> + <span className="text-sky-400">{topDistribution[1].label}</span></span>
+              ) : (
+                <span>Well distributed across {sidebarItems.length} {sidebarTitle.toLowerCase()}</span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1674,7 +1711,7 @@ export default function CollectionsMap() {
             <MapContainer center={[20, 0]} zoom={2} className={`absolute inset-0 ${mapStyle === 'light' ? 'map-light' : ''}`}
               style={{ background: mapStyle === 'light' ? '#f0f0f0' : '#0a0f1a' }}
               zoomControl={false} attributionControl={false}>
-              <MapInstance onMap={handleMap} onMoveEnd={handleMoveEnd} />
+              <MapInstance onMap={handleMap} onMoveEnd={handleMoveEnd} onZoom={handleZoom} />
               <TileLayer key={mapStyle} url={MAP_TILES[mapStyle].url} />
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
                 worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId}
@@ -1806,6 +1843,11 @@ export default function CollectionsMap() {
             <div className="flex justify-between mt-1">
               <span className="text-[9px] text-gray-600 font-medium">0</span>
               <span className="text-[9px] text-gray-500 font-medium tabular-nums">{fmtNum(legendMax)}</span>
+            </div>
+            {/* Zoom and coordinates */}
+            <div className="mt-2 pt-2 border-t border-gray-800/30 flex items-center justify-between text-[9px] text-gray-600 tabular-nums">
+              <span>z{Math.round(zoomLevel)}</span>
+              <span>{mapCenter[0].toFixed(1)}, {mapCenter[1].toFixed(1)}</span>
             </div>
           </div>
 
