@@ -111,7 +111,10 @@ MAX_IMAGE_DIM = 2000
 JPEG_QUALITY = 90
 STORAGE_BUCKET = 'vehicle-data'
 STATE_DB = Path.home() / '.nuke' / 'photo-sync-state.db'
-VERSION = '1.0.0'
+VISION_CLASSIFIER = Path(__file__).parent / 'apple-vision-classifier'  # Compiled Swift binary
+VEHICLE_CONFIDENCE_THRESHOLD = float(os.getenv('PHOTO_SYNC_VEHICLE_THRESHOLD', '0.1'))
+ENABLE_PREFILTER = os.getenv('PHOTO_SYNC_PREFILTER', '1') == '1'
+VERSION = '1.2.0'
 
 HEADERS = {
     'apikey': SUPABASE_KEY or '',
@@ -159,6 +162,14 @@ def init_state_db():
         vehicle_id TEXT,
         file_hash TEXT,
         processed_at TEXT
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS vision_classifications (
+        photos_uuid TEXT PRIMARY KEY,
+        is_vehicle INTEGER,
+        max_core_confidence REAL,
+        total_vehicle_confidence REAL,
+        top_labels TEXT,
+        classified_at TEXT
     )''')
     conn.commit()
     conn.close()
@@ -215,6 +226,174 @@ def mark_processed(photos_uuid: str, status: str, **kwargs):
     )
     conn.commit()
     conn.close()
+
+
+# ============================================================================
+# APPLE VISION PRE-FILTER
+# ============================================================================
+
+# Vehicle-related labels from Apple Vision VNClassifyImageRequest
+CORE_VEHICLE_LABELS = {
+    "automobile", "car", "convertible", "engine_vehicle", "formula_one_car",
+    "jeep", "motorcycle", "motorhome", "motorsport", "nascar",
+    "sportscar", "suv", "truck", "van", "vehicle",
+    "bus", "firetruck", "police_car", "semi_truck", "streetcar", "atv"
+}
+SUPPORTING_VEHICLE_LABELS = {
+    "garage", "parking_lot", "road", "driveway", "dirt_road",
+    "road_other", "road_safety_equipment", "tire", "wheel",
+    "car_seat", "dashboard"
+}
+ALL_VEHICLE_LABELS = CORE_VEHICLE_LABELS | SUPPORTING_VEHICLE_LABELS
+
+
+def _get_cached_classification(photos_uuid: str) -> Optional[Dict]:
+    """Check if we already classified this photo."""
+    try:
+        conn = sqlite3.connect(str(STATE_DB))
+        row = conn.execute(
+            "SELECT is_vehicle, max_core_confidence, total_vehicle_confidence, top_labels FROM vision_classifications WHERE photos_uuid = ?",
+            (photos_uuid,)
+        ).fetchone()
+        conn.close()
+        if row:
+            return {
+                'is_vehicle': bool(row[0]),
+                'max_core_confidence': row[1],
+                'total_vehicle_confidence': row[2],
+                'top_labels': json.loads(row[3]) if row[3] else [],
+            }
+    except Exception:
+        pass
+    return None
+
+
+def _cache_classification(photos_uuid: str, is_vehicle: bool, max_core: float, total_vehicle: float, top_labels: list):
+    """Cache classification result locally."""
+    try:
+        conn = sqlite3.connect(str(STATE_DB))
+        conn.execute(
+            """INSERT OR REPLACE INTO vision_classifications
+               (photos_uuid, is_vehicle, max_core_confidence, total_vehicle_confidence, top_labels, classified_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (photos_uuid, int(is_vehicle), max_core, total_vehicle,
+             json.dumps(top_labels), datetime.now(timezone.utc).isoformat())
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def classify_photos_batch(photos: List) -> Dict[str, Dict]:
+    """Classify a batch of photos using Apple Vision via compiled Swift binary.
+
+    Returns dict mapping photos_uuid -> classification result.
+    Uses local cache to avoid re-classifying.
+    """
+    results = {}
+    uncached = []
+
+    # Check cache first
+    for photo in photos:
+        cached = _get_cached_classification(photo.uuid)
+        if cached is not None:
+            results[photo.uuid] = cached
+        else:
+            uncached.append(photo)
+
+    if not uncached:
+        return results
+
+    # Build file list for Swift classifier
+    paths_by_uuid = {}
+    valid_photos = []
+    for photo in uncached:
+        path = photo.path
+        if path:
+            paths_by_uuid[path] = photo.uuid
+            valid_photos.append((photo.uuid, path))
+
+    if not valid_photos:
+        return results
+
+    # Write paths to temp file
+    list_file = Path(tempfile.mktemp(suffix='.txt', prefix='nuke_classify_'))
+    try:
+        list_file.write_text('\n'.join(p for _, p in valid_photos))
+
+        # Check for compiled binary, fall back to swift interpreter
+        classifier_path = VISION_CLASSIFIER
+        if classifier_path.exists():
+            cmd = [str(classifier_path), '--classify', str(list_file), '--threshold', str(VEHICLE_CONFIDENCE_THRESHOLD), '--json']
+        else:
+            swift_src = Path(__file__).parent / 'apple-vision-classifier.swift'
+            if not swift_src.exists():
+                logger.warning("Apple Vision classifier not found, skipping pre-filter")
+                for photo in uncached:
+                    results[photo.uuid] = {'is_vehicle': True, 'max_core_confidence': 1.0, 'total_vehicle_confidence': 1.0, 'top_labels': []}
+                return results
+            cmd = ['swift', str(swift_src), '--classify', str(list_file), '--threshold', str(VEHICLE_CONFIDENCE_THRESHOLD), '--json']
+
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
+        if proc.returncode != 0:
+            logger.warning(f"Vision classifier failed: {proc.stderr[:200]}")
+            for photo in uncached:
+                results[photo.uuid] = {'is_vehicle': True, 'max_core_confidence': 1.0, 'total_vehicle_confidence': 1.0, 'top_labels': []}
+            return results
+
+        # Parse JSONL output — one JSON object per line per image
+        for line in proc.stdout.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            filename = obj.get('file', '')
+            if obj.get('skip'):
+                continue
+
+            is_vehicle = obj.get('vehicle', False)
+            max_core = obj.get('max_core', 0.0)
+            total_vehicle = obj.get('total_vehicle', 0.0)
+            auto_labels = obj.get('auto_labels', {})
+            top3 = list(obj.get('top3', {}).items())
+
+            # Match filename back to UUID
+            for photo_uuid, photo_path in valid_photos:
+                if Path(photo_path).name == filename:
+                    result = {
+                        'is_vehicle': is_vehicle,
+                        'max_core_confidence': max_core,
+                        'total_vehicle_confidence': total_vehicle,
+                        'top_labels': top3,
+                        'auto_labels': auto_labels,
+                    }
+                    results[photo_uuid] = result
+                    _cache_classification(photo_uuid, is_vehicle, max_core, total_vehicle, top3)
+                    break
+
+        # Any photos not in results (parse failure) — pass through
+        for photo in uncached:
+            if photo.uuid not in results:
+                results[photo.uuid] = {'is_vehicle': True, 'max_core_confidence': 1.0, 'total_vehicle_confidence': 1.0, 'top_labels': []}
+
+    except subprocess.TimeoutExpired:
+        logger.warning("Vision classifier timed out, passing all through")
+        for photo in uncached:
+            results[photo.uuid] = {'is_vehicle': True, 'max_core_confidence': 1.0, 'total_vehicle_confidence': 1.0, 'top_labels': []}
+    except Exception as e:
+        logger.warning(f"Vision classifier error: {e}")
+        for photo in uncached:
+            results[photo.uuid] = {'is_vehicle': True, 'max_core_confidence': 1.0, 'total_vehicle_confidence': 1.0, 'top_labels': []}
+    finally:
+        list_file.unlink(missing_ok=True)
+
+    return results
 
 
 # ============================================================================
@@ -1099,18 +1278,37 @@ def classify_with_ollama(photos_metadata: List[Dict]) -> Optional[Dict]:
 # ============================================================================
 
 def process_batch(photos: List) -> Dict:
-    """Process a batch of photos: export, hash, dedup, upload, match."""
+    """Process a batch of photos: pre-filter, export, hash, dedup, upload, match."""
     export_dir = Path(tempfile.mkdtemp(prefix='nuke_auto_sync_'))
-    results = {'uploaded': 0, 'duplicates': 0, 'matched': 0, 'errors': 0, 'ignored': 0}
+    results = {'uploaded': 0, 'duplicates': 0, 'matched': 0, 'errors': 0, 'ignored': 0, 'filtered': 0}
     image_ids = []
     batch_metadata = []
     matched_vehicles = {}  # vehicle_id -> [photos_uuids]
 
+    # Pre-filter with Apple Vision (skip non-vehicle images before uploading)
+    if ENABLE_PREFILTER:
+        classifications = classify_photos_batch(photos)
+        filtered_photos = []
+        for photo in photos:
+            cls = classifications.get(photo.uuid, {})
+            if cls.get('is_vehicle', True):
+                filtered_photos.append(photo)
+            else:
+                results['filtered'] += 1
+                mark_processed(photo.uuid, 'ignored',
+                             date_added=photo.date_added.isoformat() if photo.date_added else None)
+                core_conf = cls.get('max_core_confidence', 0)
+                total_conf = cls.get('total_vehicle_confidence', 0)
+                logger.info(f"  Filtered (not vehicle): {photo.original_filename} [core={core_conf:.3f} total={total_conf:.3f}]")
+        if results['filtered'] > 0:
+            logger.info(f"Pre-filter: {len(filtered_photos)} vehicle candidates, {results['filtered']} non-vehicle skipped")
+        photos = filtered_photos
+
     for idx, photo in enumerate(photos):
         try:
-            # Throttle: small delay between photos to avoid hammering the DB
-            if idx > 0:
-                time.sleep(1)
+            # Throttle: delay only between actual uploads (not dupes/errors)
+            if idx > 0 and results['uploaded'] > 0:
+                time.sleep(0.5)
 
             # Export
             export_result = export_and_convert(photo, export_dir)
