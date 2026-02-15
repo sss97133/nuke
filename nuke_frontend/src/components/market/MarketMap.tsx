@@ -9,7 +9,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const API = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/treemap-vehicles';
-const MAX_CHILDREN = 8;
+const MAX_CHILDREN_NESTED = 50;  // children within a nested group (treemap handles the rest visually)
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const fetchCache = new Map<string, { data: any; ts: number }>();
 
 // Format helpers
 const fmtMoney = (n: number) => {
@@ -91,9 +93,17 @@ export default function MarketMap() {
     if (f.year) p.set('year', f.year);
 
     try {
-      const r = await fetch(`${API}?${p}`);
-      const d = await r.json();
-      if (d.error) throw new Error(d.error);
+      const cacheKey = p.toString();
+      const cached = fetchCache.get(cacheKey);
+      let d: any;
+      if (cached && Date.now() - cached.ts < CACHE_TTL) {
+        d = cached.data;
+      } else {
+        const r = await fetch(`${API}?${p}`);
+        d = await r.json();
+        if (d.error) throw new Error(d.error);
+        fetchCache.set(cacheKey, { data: d, ts: Date.now() });
+      }
       setData(d);
       setFilters(f);
       setNestedData(useNested ? d.hierarchy : null);
@@ -162,13 +172,13 @@ export default function MarketMap() {
     const isNested = !!nestedData;
 
     // Group children with "+N others"
-    const groupChildren = (children: TreeNode[], parent: TreeNode): TreeNode[] => {
+    const groupChildren = (children: TreeNode[], parent: TreeNode, maxItems: number): TreeNode[] => {
       if (!children?.length) return [{ ...parent }];
       const sorted = [...children].sort((a, b) => metricVal(b) - metricVal(a));
       const filtered = sorted.filter(c => metricVal(c) > 0);
-      if (filtered.length <= MAX_CHILDREN) return filtered;
-      const top = filtered.slice(0, MAX_CHILDREN - 1);
-      const rest = filtered.slice(MAX_CHILDREN - 1);
+      if (filtered.length <= maxItems) return filtered;
+      const top = filtered.slice(0, maxItems - 1);
+      const rest = filtered.slice(maxItems - 1);
       top.push({
         name: `+${rest.length} others`,
         value: rest.reduce((s, c) => s + (c.value || 0), 0),
@@ -188,7 +198,7 @@ export default function MarketMap() {
         name: 'root',
         children: children.map((g: TreeNode) => ({
           ...g,
-          children: groupChildren(g.children || [], g),
+          children: groupChildren(g.children || [], g, MAX_CHILDREN_NESTED),
         })),
       };
 
@@ -223,7 +233,7 @@ export default function MarketMap() {
 
           const lDiv = document.createElement('div');
           const bg = leaf.data._isOthers ? '#e0d8d0' : '#f0efe8';
-          lDiv.style.cssText = `position:absolute;left:${lx}px;top:${ly}px;width:${lw}px;height:${lh}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:1px;background:${bg};`;
+          lDiv.style.cssText = `position:absolute;left:${lx}px;top:${ly}px;width:${lw}px;height:${lh}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:1px;background:${bg};transition:filter 0.1s;`;
 
           const inner = document.createElement('div');
           inner.style.cssText = 'padding:3px 4px;height:100%;display:flex;flex-direction:column;';
@@ -250,6 +260,7 @@ export default function MarketMap() {
           const parentVal = metricVal(group.data);
 
           lDiv.onmouseover = (e: MouseEvent) => {
+            lDiv.style.filter = 'brightness(0.92)';
             const pctTotal = grandTotal > 0 ? ((metricVal(leafData) / grandTotal) * 100).toFixed(1) : '0.0';
             const pctParent = parentVal > 0 ? ((metricVal(leafData) / parentVal) * 100).toFixed(1) : '0.0';
             const avg = (leafData.count || 0) > 0 ? (leafData.value || 0) / (leafData.count || 1) : 0;
@@ -275,7 +286,7 @@ export default function MarketMap() {
           lDiv.onmousemove = (e: MouseEvent) => {
             setTooltip(t => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
           };
-          lDiv.onmouseout = () => setTooltip(t => ({ ...t, visible: false }));
+          lDiv.onmouseout = () => { lDiv.style.filter = ''; setTooltip(t => ({ ...t, visible: false })); };
           lDiv.onclick = () => {
             if (leafData._isOthers) {
               if (view === 'segment') nav({ segment: groupDataName });
@@ -301,18 +312,7 @@ export default function MarketMap() {
       let children = source.children.filter((c: TreeNode) => metricVal(c) > 0);
       const totalVal = children.reduce((s: number, c: TreeNode) => s + metricVal(c), 0);
 
-      const sorted = [...children].sort((a: TreeNode, b: TreeNode) => metricVal(b) - metricVal(a));
-      if (sorted.length > MAX_CHILDREN) {
-        const top = sorted.slice(0, MAX_CHILDREN - 1);
-        const rest = sorted.slice(MAX_CHILDREN - 1);
-        top.push({
-          name: `+${rest.length} others`,
-          value: rest.reduce((s, c) => s + (c.value || 0), 0),
-          count: rest.reduce((s, c) => s + (c.count || 0), 0),
-          _isOthers: true,
-        });
-        children = top;
-      }
+      children = [...children].sort((a: TreeNode, b: TreeNode) => metricVal(b) - metricVal(a));
 
       const root = d3.hierarchy({ name: 'root', children })
         .sum((d: TreeNode) => d.children ? 0 : Math.sqrt(metricVal(d)))
@@ -325,8 +325,8 @@ export default function MarketMap() {
         if (w < 2 || h < 2) continue;
 
         const div = document.createElement('div');
-        const bg = leaf.data._isOthers ? '#e0d8d0' : '#f0efe8';
-        div.style.cssText = `position:absolute;left:${leaf.x0}px;top:${leaf.y0}px;width:${w}px;height:${h}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:1px;background:${bg};`;
+        const bg = leaf.data._isOthers ? '#d8d4cc' : '#f0efe8';
+        div.style.cssText = `position:absolute;left:${leaf.x0}px;top:${leaf.y0}px;width:${w}px;height:${h}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:1px;background:${bg};transition:filter 0.1s;`;
 
         const inner = document.createElement('div');
         inner.style.cssText = 'padding:3px 4px;height:100%;display:flex;flex-direction:column;';
@@ -354,6 +354,7 @@ export default function MarketMap() {
 
         const ld = leaf.data;
         div.onmouseover = (e: MouseEvent) => {
+          div.style.filter = 'brightness(0.92)';
           const pct = totalVal > 0 ? ((metricVal(ld) / totalVal) * 100).toFixed(1) : '0.0';
           const avg = (ld.count || 0) > 0 ? (ld.value || 0) / (ld.count || 1) : 0;
           let val: string;
@@ -372,10 +373,10 @@ export default function MarketMap() {
           });
         };
         div.onmousemove = (e: MouseEvent) => setTooltip(t => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
-        div.onmouseout = () => setTooltip(t => ({ ...t, visible: false }));
+        div.onmouseout = () => { div.style.filter = ''; setTooltip(t => ({ ...t, visible: false })); };
         div.onclick = () => {
-          if (ld._isOthers) return;
           if (ld.isVehicle) { window.open('/vehicle/' + ld.id, '_blank'); return; }
+          if (ld._isOthers) return; // can't drill into aggregated "others"
           const lvl = data?.stats?.level;
           if (view === 'segment') {
             if (lvl === 'segments') nav({ segment: ld.name }, true);
@@ -396,21 +397,21 @@ export default function MarketMap() {
         container.appendChild(div);
       }
     }
-  }, [data, nestedData, metric, view, filters, metricVal, displayVal, nav]);
+  }, [data, nestedData, metric, view, filters, metricVal, displayVal, nav, resizeKey]);
 
-  // Resize observer
+  // Resize observer - use a counter to trigger re-render without cloning data
+  const [resizeKey, setResizeKey] = useState(0);
   useEffect(() => {
     const el = containerRef.current?.parentElement;
     if (!el) return;
+    let raf: number;
     const ro = new ResizeObserver(() => {
-      if (data && containerRef.current) {
-        // Trigger re-render by setting data again (forces useEffect)
-        setData((d: any) => d ? { ...d } : d);
-      }
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setResizeKey(k => k + 1));
     });
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [data]);
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  }, []);
 
   const stats = data?.stats;
   const viewLabels: Record<ViewMode, string> = { segment: 'All Segments', source: 'All Sources', brand: 'All Brands' };
