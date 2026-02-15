@@ -143,6 +143,37 @@ function useWindowWidth() {
   return width;
 }
 
+function useFavorites(): [Set<string>, (id: string) => void] {
+  const [favs, setFavs] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('nuke_map_favorites');
+      return stored ? new Set(JSON.parse(stored)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
+  const toggle = useCallback((id: string) => {
+    setFavs(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem('nuke_map_favorites', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }, []);
+  return [favs, toggle];
+}
+
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query || query.length < 2) return <>{text}</>;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="text-sky-400 font-semibold">{text.slice(idx, idx + query.length)}</span>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function aggregateBy(collections: Collection[], keyFn: (c: Collection) => string | undefined): Map<string, Agg> {
@@ -217,6 +248,7 @@ function fmtNum(n: number): string {
 function MapLayers({
   collections, drill, setDrill, metric, searchTerm,
   worldGeo, statesGeo, countiesGeo, stateAssign, countyAssign, highlightedId,
+  favorites, toggleFavorite,
 }: {
   collections: Collection[];
   drill: DrillState;
@@ -229,6 +261,8 @@ function MapLayers({
   stateAssign: Map<string, string>;
   countyAssign: Map<string, string>;
   highlightedId: string | null;
+  favorites: Set<string>;
+  toggleFavorite: (id: string) => void;
 }) {
   const map = useMap();
 
@@ -339,10 +373,12 @@ function MapLayers({
         const isHighlighted = highlightedId === c.id;
         const size = isHighlighted ? 36 : 28;
         const halfSize = size / 2;
+        const isFav = favorites.has(c.id);
+        const starBadge = isFav ? `<div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;line-height:1;border:1.5px solid #0f172a;z-index:2">★</div>` : '';
         const icon = c.logo_url
           ? L.divIcon({
               className: '',
-              html: `<div style="width:${size}px;height:${size}px;border-radius:50%;border:${isHighlighted ? '3px solid #38bdf8' : '2px solid #fff'};box-shadow:${isHighlighted ? '0 0 20px rgba(56,189,248,0.8),0 0 40px rgba(56,189,248,0.3)' : '0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5)'};overflow:hidden;background:#1e293b;transition:all 200ms ease"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div>`,
+              html: `<div style="position:relative;width:${size}px;height:${size}px;border-radius:50%;border:${isHighlighted ? '3px solid #38bdf8' : isFav ? '2px solid #f59e0b' : '2px solid #fff'};box-shadow:${isHighlighted ? '0 0 20px rgba(56,189,248,0.8),0 0 40px rgba(56,189,248,0.3)' : '0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5)'};overflow:visible;background:#1e293b;transition:all 200ms ease">${starBadge}<div style="width:100%;height:100%;border-radius:50%;overflow:hidden"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div></div>`,
               iconSize: [size, size], iconAnchor: [halfSize, halfSize], popupAnchor: [0, -halfSize],
             })
           : isHighlighted
@@ -580,6 +616,13 @@ const MAP_STYLES = `
   .custom-scroll::-webkit-scrollbar-track { background: transparent; }
   .custom-scroll::-webkit-scrollbar-thumb { background: rgba(56,189,248,.15); border-radius: 4px; }
   .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(56,189,248,.3); }
+  /* Minimap */
+  .minimap-container { border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
+  .minimap-container .leaflet-control-container { display: none; }
+  .minimap-viewport { border: 1.5px solid #38bdf8; background: rgba(56,189,248,.08); pointer-events: none; }
+  /* Favorite star */
+  @keyframes starPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+  .star-pop { animation: starPop 300ms ease; }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -600,6 +643,8 @@ export default function CollectionsMap() {
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [favorites, toggleFavorite] = useFavorites();
+  const [filterFavorites, setFilterFavorites] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -754,6 +799,7 @@ export default function CollectionsMap() {
     let arr = [...scopedCollections];
     if (filterVehicles) arr = arr.filter(c => c.total_inventory > 0);
     if (filterInstagram) arr = arr.filter(c => !!c.instagram);
+    if (filterFavorites) arr = arr.filter(c => favorites.has(c.id));
     switch (sortBy) {
       case 'name': arr.sort((a, b) => a.name.localeCompare(b.name)); break;
       case 'inventory': arr.sort((a, b) => b.total_inventory - a.total_inventory); break;
@@ -766,7 +812,7 @@ export default function CollectionsMap() {
       }
     }
     return arr;
-  }, [scopedCollections, sortBy, filterVehicles, filterInstagram, mapCenter]);
+  }, [scopedCollections, sortBy, filterVehicles, filterInstagram, filterFavorites, favorites, mapCenter]);
 
   // ── Sidebar items ──
 
@@ -1090,15 +1136,21 @@ export default function CollectionsMap() {
             className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${filterInstagram ? 'bg-pink-500/20 border-pink-500/40 text-pink-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}>
             {filterInstagram && <span className="mr-0.5">✓</span>} Has Instagram
           </button>
-          {(filterVehicles || filterInstagram) && (
-            <button onClick={() => { setFilterVehicles(false); setFilterInstagram(false); }}
+          {favorites.size > 0 && (
+            <button onClick={() => setFilterFavorites(!filterFavorites)}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${filterFavorites ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}>
+              {filterFavorites && <span className="mr-0.5">✓</span>} ★ Favorites ({favorites.size})
+            </button>
+          )}
+          {(filterVehicles || filterInstagram || filterFavorites) && (
+            <button onClick={() => { setFilterVehicles(false); setFilterInstagram(false); setFilterFavorites(false); }}
               className="px-1.5 py-0.5 rounded-full text-[10px] text-gray-500 hover:text-gray-300 transition-colors" title="Clear filters">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           )}
         </div>
         {/* Filtered result count */}
-        {(filterVehicles || filterInstagram || searchTerm) && sortedCollections.length !== scopedCollections.length && (
+        {(filterVehicles || filterInstagram || filterFavorites || searchTerm) && sortedCollections.length !== scopedCollections.length && (
           <div className="mt-1.5 text-[10px] text-gray-500">
             Showing {sortedCollections.length} of {scopedCollections.length}
           </div>
@@ -1123,13 +1175,23 @@ export default function CollectionsMap() {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">{c.name}</div>
-                      <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
+                      <div className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">
+                        <HighlightText text={c.name} query={searchTerm} />
+                      </div>
+                      <p className="text-gray-500 text-[10px] truncate">
+                        <HighlightText text={`${c.city}${c.city && c.country ? ', ' : ''}${c.country}`} query={searchTerm} />
+                      </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
                         {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
                       </div>
                     </div>
+                    {/* Favorite star */}
+                    <button onClick={(e) => { e.stopPropagation(); toggleFavorite(c.id); }}
+                      className={`flex-shrink-0 w-5 h-5 flex items-center justify-center transition-colors ${favorites.has(c.id) ? 'text-amber-400 star-pop' : 'text-gray-700 opacity-0 group-hover:opacity-100 hover:text-amber-400'}`}
+                      title={favorites.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}>
+                      <svg className="w-3.5 h-3.5" fill={favorites.has(c.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+                    </button>
                     {/* Expand indicator */}
                     <svg className={`w-3 h-3 text-gray-600 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1184,12 +1246,16 @@ export default function CollectionsMap() {
           // Grid view
           <div className="grid grid-cols-2 gap-1.5 p-2">
             {sortedCollections.slice(0, 80).map(c => (
-              <Link key={c.id} to={`/org/${c.slug}`}
+              <div key={c.id}
                 onMouseEnter={() => setHighlightedId(c.id)} onMouseLeave={() => setHighlightedId(null)}
-                className={`block rounded-xl border transition-all group overflow-hidden ${highlightedId === c.id ? 'bg-sky-500/15 border-sky-500/40 ring-1 ring-sky-500/20' : 'bg-gray-800/30 border-gray-800/50 hover:bg-gray-800/60 hover:border-gray-700/50'}`}>
+                className={`relative rounded-xl border transition-all group overflow-hidden ${highlightedId === c.id ? 'bg-sky-500/15 border-sky-500/40 ring-1 ring-sky-500/20' : 'bg-gray-800/30 border-gray-800/50 hover:bg-gray-800/60 hover:border-gray-700/50'}`}>
+                {/* Favorite indicator */}
+                {favorites.has(c.id) && (
+                  <div className="absolute top-1.5 right-1.5 z-10 text-amber-400 text-[10px]">★</div>
+                )}
                 {/* Gradient header strip */}
                 <div className="h-1 w-full" style={{ background: c.total_inventory > 0 ? 'linear-gradient(90deg, #2563eb, #38bdf8, #34d399)' : 'linear-gradient(90deg, #1e293b, #334155)' }} />
-                <div className="p-2.5">
+                <Link to={`/org/${c.slug}`} className="block p-2.5">
                   <div className="flex items-center gap-2 mb-1.5">
                     {c.logo_url ? (
                       <img src={c.logo_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0 bg-gray-800 ring-1 ring-gray-700/50" />
@@ -1199,7 +1265,9 @@ export default function CollectionsMap() {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-white text-[10px] font-medium truncate group-hover:text-sky-400 transition-colors leading-tight">{c.name}</h3>
+                      <h3 className="text-white text-[10px] font-medium truncate group-hover:text-sky-400 transition-colors leading-tight">
+                        <HighlightText text={c.name} query={searchTerm} />
+                      </h3>
                       <p className="text-gray-500 text-[9px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
                     </div>
                   </div>
@@ -1216,8 +1284,8 @@ export default function CollectionsMap() {
                       </span>
                     )}
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
         )}
@@ -1228,10 +1296,10 @@ export default function CollectionsMap() {
             </div>
             <div className="text-gray-500 text-xs font-medium">No collections found</div>
             <div className="text-gray-600 text-[10px] mt-1">
-              {(filterVehicles || filterInstagram) ? 'Try removing some filters' : searchTerm ? 'Try a different search term' : 'Drill into a region to see collections'}
+              {(filterVehicles || filterInstagram || filterFavorites) ? 'Try removing some filters' : searchTerm ? 'Try a different search term' : 'Drill into a region to see collections'}
             </div>
-            {(filterVehicles || filterInstagram) && (
-              <button onClick={() => { setFilterVehicles(false); setFilterInstagram(false); }}
+            {(filterVehicles || filterInstagram || filterFavorites) && (
+              <button onClick={() => { setFilterVehicles(false); setFilterInstagram(false); setFilterFavorites(false); }}
                 className="mt-3 px-3 py-1 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-[10px] font-medium transition-colors">
                 Clear filters
               </button>
@@ -1378,7 +1446,8 @@ export default function CollectionsMap() {
               <MapInstance onMap={handleMap} onMoveEnd={handleMoveEnd} />
               <TileLayer key={mapStyle} url={MAP_TILES[mapStyle].url} />
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
-                worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId} />
+                worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId}
+                favorites={favorites} toggleFavorite={toggleFavorite} />
             </MapContainer>
           )}
 
@@ -1471,6 +1540,31 @@ export default function CollectionsMap() {
               <span className="text-[9px] text-gray-500 font-medium tabular-nums">{fmtNum(legendMax)}</span>
             </div>
           </div>
+
+          {/* Minimap inset - shows world context when drilled in */}
+          {!isMobile && drill.level !== 'world' && (
+            <div className="absolute bottom-32 left-3 z-[1000] minimap-container border border-gray-700/50"
+              style={{ width: 140, height: 90 }}>
+              <MapContainer center={[20, 0]} zoom={1} zoomControl={false} attributionControl={false}
+                dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false}
+                style={{ width: 140, height: 90, background: '#0a0f1a' }}>
+                <TileLayer url={MAP_TILES.dark.url} />
+                {/* Viewport indicator */}
+                {(() => {
+                  const c = drill.country && COUNTRY_COORDS[drill.country] ? COUNTRY_COORDS[drill.country] : mapCenter;
+                  return (
+                    <CircleMarker center={c} radius={6}
+                      pathOptions={{ color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.3, weight: 2 }} />
+                  );
+                })()}
+              </MapContainer>
+              <button onClick={() => setDrill({ level: 'world' })}
+                className="absolute top-1 right-1 w-4 h-4 rounded bg-gray-900/80 flex items-center justify-center text-gray-500 hover:text-white transition-colors"
+                title="Back to world view">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+              </button>
+            </div>
+          )}
 
           {/* Summary stats */}
           <div className={`absolute bottom-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-xl px-1 py-1 border border-gray-800/50 flex items-stretch ${isMobile ? 'gap-0' : 'gap-0'}`}>
