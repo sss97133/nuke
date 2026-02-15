@@ -449,9 +449,20 @@ function MapLayers({
 
   // ── Render layers ──
 
+  // Density dots - subtle heat dots behind choropleth at world level
+  const densityDots = useMemo(() => {
+    if (drill.level !== 'world') return null;
+    return filtered.map(c => (
+      <CircleMarker key={`d-${c.id}`} center={[c.lat, c.lng]}
+        radius={8} pathOptions={{ color: 'transparent', fillColor: '#38bdf8', fillOpacity: 0.08, weight: 0 }}
+        interactive={false} />
+    ));
+  }, [drill.level, filtered]);
+
   if (drill.level === 'world' && worldGeo) {
     const mx = maxAgg(countryAgg, metric);
     return <>
+      {densityDots}
       <GeoJSON key={`w-${metric}-${searchTerm}`} data={worldGeo}
         style={f => ({ fillColor: choroplethColor((countryAgg.get(f?.properties?.name || '') || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
         onEachFeature={makeOnEach(countryAgg, 'name', n => setDrill({ level: 'country', country: toOurName(n) }))} />
@@ -560,6 +571,15 @@ const MAP_STYLES = `
   .leaflet-popup-tip { box-shadow: none !important; }
   .marker-name-label { background: rgba(15,23,42,.7) !important; border: 1px solid rgba(56,189,248,.1) !important; border-radius: 4px !important; padding: 1px 4px !important; box-shadow: 0 2px 8px rgba(0,0,0,.4) !important; }
   .marker-name-label::before { border-bottom-color: rgba(56,189,248,.1) !important; }
+  /* Light mode adaptations */
+  .map-light .region-count { background: rgba(255,255,255,.85); color: #1e293b; border-color: rgba(37,99,235,.2); text-shadow: none; }
+  .map-light .marker-name-label { background: rgba(255,255,255,.85) !important; color: #1e293b !important; border-color: rgba(37,99,235,.15) !important; }
+  .map-light .marker-name-label span { color: #1e293b !important; text-shadow: none !important; }
+  /* Improved scrollbar for sidebar/panel */
+  .custom-scroll::-webkit-scrollbar { width: 4px; }
+  .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+  .custom-scroll::-webkit-scrollbar-thumb { background: rgba(56,189,248,.15); border-radius: 4px; }
+  .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(56,189,248,.3); }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -945,7 +965,7 @@ export default function CollectionsMap() {
       )}
 
       {/* Region list with percentage bars */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5 mt-1">
+      <div className="flex-1 overflow-y-auto custom-scroll px-2 pb-2 space-y-0.5 mt-1">
         {filteredSidebarItems.map(item => {
           const pct = (item[metric === 'count' ? 'count' : 'inventory'] / sidebarMaxMetric) * 100;
           return (
@@ -1084,7 +1104,7 @@ export default function CollectionsMap() {
           </div>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scroll">
         {viewMode === 'list' ? (
           // List view
           sortedCollections.slice(0, 100).map(c => {
@@ -1352,7 +1372,7 @@ export default function CollectionsMap() {
               </div>
             </div>
           ) : (
-            <MapContainer center={[20, 0]} zoom={2} className="absolute inset-0"
+            <MapContainer center={[20, 0]} zoom={2} className={`absolute inset-0 ${mapStyle === 'light' ? 'map-light' : ''}`}
               style={{ background: mapStyle === 'light' ? '#f0f0f0' : '#0a0f1a' }}
               zoomControl={false} attributionControl={false}>
               <MapInstance onMap={handleMap} onMoveEnd={handleMoveEnd} />
