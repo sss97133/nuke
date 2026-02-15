@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, GeoJSON, CircleMarker, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, CircleMarker, Marker, Popup, Tooltip, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -367,8 +367,29 @@ function MapLayers({
     };
   }, []);
 
+  // Route lines connecting nearby collections
+  const routeLines = useMemo(() => {
+    if (markerCollections.length < 2 || markerCollections.length > 50) return [];
+    const lines: Array<{ from: Collection; to: Collection; dist: number }> = [];
+    const threshold = 0.3; // ~30km at mid latitudes
+    for (let i = 0; i < markerCollections.length; i++) {
+      for (let j = i + 1; j < markerCollections.length; j++) {
+        const a = markerCollections[i], b = markerCollections[j];
+        const d = Math.sqrt(Math.pow(a.lat - b.lat, 2) + Math.pow(a.lng - b.lng, 2));
+        if (d < threshold) lines.push({ from: a, to: b, dist: d });
+      }
+    }
+    return lines;
+  }, [markerCollections]);
+
   const renderMarkers = (colls: Collection[]) => (
     <>
+      {/* Route lines between nearby collections */}
+      {routeLines.map(line => (
+        <Polyline key={`route-${line.from.id}-${line.to.id}`}
+          positions={[[line.from.lat, line.from.lng], [line.to.lat, line.to.lng]]}
+          pathOptions={{ color: '#38bdf8', weight: 1, opacity: 0.2, dashArray: '4 6' }} />
+      ))}
       {colls.map(c => {
         const isHighlighted = highlightedId === c.id;
         const size = isHighlighted ? 36 : 28;
@@ -651,6 +672,8 @@ export default function CollectionsMap() {
   const [touring, setTouring] = useState(false);
   const [tourIndex, setTourIndex] = useState(0);
   const tourTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+  const [compareOpen, setCompareOpen] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -972,6 +995,18 @@ export default function CollectionsMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [touring, tourIndex, collections.length]);
 
+  const toggleCompare = useCallback((id: string) => {
+    setCompareIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else if (next.size < 6) next.add(id);
+      return next;
+    });
+  }, []);
+
+  const compareCollections = useMemo(() =>
+    collections.filter(c => compareIds.has(c.id)),
+  [collections, compareIds]);
+
   const shareUrl = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -1278,6 +1313,10 @@ export default function CollectionsMap() {
                             Instagram
                           </a>
                         )}
+                        <button onClick={(e) => { e.stopPropagation(); toggleCompare(c.id); }}
+                          className={`px-2.5 py-1.5 text-[10px] font-medium rounded-lg border transition-colors ${compareIds.has(c.id) ? 'bg-violet-500/20 text-violet-400 border-violet-500/30' : 'bg-gray-800/60 text-gray-400 border-gray-700/50 hover:text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/30'}`}>
+                          {compareIds.has(c.id) ? '✓ Compare' : 'Compare'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1744,6 +1783,92 @@ export default function CollectionsMap() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
             </svg>
           </button>
+        )}
+
+        {/* Compare bar - appears when collections are selected for comparison */}
+        {compareIds.size >= 2 && (
+          <div className="fixed bottom-0 left-0 right-0 z-[1300] bg-gray-900/95 backdrop-blur border-t border-violet-500/30 transition-all">
+            <div className="flex items-center justify-between px-4 py-2">
+              <div className="flex items-center gap-3 overflow-x-auto custom-scroll">
+                {compareCollections.map(c => (
+                  <div key={c.id} className="flex items-center gap-1.5 flex-shrink-0">
+                    {c.logo_url ? (
+                      <img src={c.logo_url} alt="" className="w-6 h-6 rounded-full object-cover border border-violet-500/30" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-violet-900/40 flex items-center justify-center border border-violet-500/30">
+                        <span className="text-[8px] text-violet-400 font-bold">{c.name.charAt(0)}</span>
+                      </div>
+                    )}
+                    <span className="text-white text-[10px] font-medium whitespace-nowrap">{c.name.length > 15 ? c.name.slice(0, 13) + '…' : c.name}</span>
+                    <button onClick={() => toggleCompare(c.id)} className="text-gray-500 hover:text-white ml-0.5">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                <button onClick={() => setCompareOpen(!compareOpen)}
+                  className="px-3 py-1.5 bg-violet-600/20 text-violet-400 text-[10px] font-medium rounded-lg border border-violet-500/30 hover:bg-violet-600/30 transition-colors">
+                  {compareOpen ? 'Hide' : 'Compare'} ({compareIds.size})
+                </button>
+                <button onClick={() => { setCompareIds(new Set()); setCompareOpen(false); }}
+                  className="px-2 py-1.5 text-gray-500 hover:text-white text-[10px] transition-colors">
+                  Clear
+                </button>
+              </div>
+            </div>
+            {/* Comparison table */}
+            {compareOpen && (
+              <div className="px-4 pb-3 pt-1 border-t border-gray-800/50 overflow-x-auto custom-scroll fade-in">
+                <table className="w-full text-[10px] min-w-[400px]">
+                  <thead>
+                    <tr className="text-gray-500">
+                      <th className="text-left py-1 font-medium w-24">Metric</th>
+                      {compareCollections.map(c => (
+                        <th key={c.id} className="text-center py-1 font-medium">{c.name.length > 12 ? c.name.slice(0, 10) + '…' : c.name}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-gray-800/30">
+                      <td className="py-1.5 text-gray-400">City</td>
+                      {compareCollections.map(c => <td key={c.id} className="text-center text-white py-1.5">{c.city || '-'}</td>)}
+                    </tr>
+                    <tr className="border-t border-gray-800/30">
+                      <td className="py-1.5 text-gray-400">Country</td>
+                      {compareCollections.map(c => <td key={c.id} className="text-center text-white py-1.5">{COUNTRY_FLAGS[c.country] || ''} {c.country}</td>)}
+                    </tr>
+                    <tr className="border-t border-gray-800/30">
+                      <td className="py-1.5 text-gray-400">Vehicles</td>
+                      {compareCollections.map(c => (
+                        <td key={c.id} className="text-center py-1.5">
+                          <span className={c.total_inventory === Math.max(...compareCollections.map(x => x.total_inventory)) && c.total_inventory > 0 ? 'text-sky-400 font-semibold' : 'text-white'}>
+                            {c.total_inventory}
+                          </span>
+                        </td>
+                      ))}
+                    </tr>
+                    <tr className="border-t border-gray-800/30">
+                      <td className="py-1.5 text-gray-400">Instagram</td>
+                      {compareCollections.map(c => (
+                        <td key={c.id} className="text-center text-pink-400 py-1.5">
+                          {c.instagram ? `@${c.instagram}` : <span className="text-gray-600">-</span>}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr className="border-t border-gray-800/30">
+                      <td className="py-1.5 text-gray-400">Link</td>
+                      {compareCollections.map(c => (
+                        <td key={c.id} className="text-center py-1.5">
+                          <Link to={`/org/${c.slug}`} className="text-sky-400 hover:text-sky-300 transition-colors">View →</Link>
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
