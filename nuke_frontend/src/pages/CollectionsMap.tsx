@@ -174,6 +174,29 @@ function HighlightText({ text, query }: { text: string; query: string }) {
   );
 }
 
+function AnimatedCounter({ value, duration = 800 }: { value: number; duration?: number }) {
+  const [display, setDisplay] = useState(0);
+  const prevRef = useRef(0);
+  useEffect(() => {
+    const start = prevRef.current;
+    const diff = value - start;
+    if (diff === 0) return;
+    const startTime = performance.now();
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const current = Math.round(start + diff * eased);
+      setDisplay(current);
+      if (progress < 1) requestAnimationFrame(step);
+      else prevRef.current = value;
+    };
+    requestAnimationFrame(step);
+    prevRef.current = value;
+  }, [value, duration]);
+  return <>{display.toLocaleString()}</>;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function aggregateBy(collections: Collection[], keyFn: (c: Collection) => string | undefined): Map<string, Agg> {
@@ -766,10 +789,26 @@ export default function CollectionsMap() {
       if (e.key === '1') setMapStyle('dark');
       if (e.key === '2') setMapStyle('satellite');
       if (e.key === '3') setMapStyle('light');
+      // Arrow keys to navigate collections
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const colls = sortedCollections;
+        if (!colls.length) return;
+        const currentIdx = highlightedId ? colls.findIndex(c => c.id === highlightedId) : -1;
+        const nextIdx = e.key === 'ArrowDown'
+          ? Math.min(currentIdx + 1, colls.length - 1)
+          : Math.max(currentIdx - 1, 0);
+        const next = colls[nextIdx];
+        if (next) {
+          setHighlightedId(next.id);
+          setExpandedId(next.id);
+          mapRef.current?.flyTo([next.lat, next.lng], mapRef.current.getZoom(), { duration: 0.3 });
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [sidebarOpen, panelOpen, searchExpanded, goBack, touring, stopTour]);
+  }, [sidebarOpen, panelOpen, searchExpanded, goBack, touring, stopTour, sortedCollections, highlightedId]);
 
   // ── Data loading ──
 
@@ -1103,7 +1142,7 @@ export default function CollectionsMap() {
 
   // ── Sidebar content (shared between desktop & mobile) ──
   const renderSidebar = () => (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0" role="navigation" aria-label={`${sidebarTitle} navigation`}>
       <div className="px-3 pt-3 pb-2 flex items-center justify-between">
         <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{sidebarTitle}{sidebarItems.length > 0 ? ` (${sidebarItems.length})` : ''}</h2>
         {isCompact && (
@@ -1212,7 +1251,7 @@ export default function CollectionsMap() {
 
   // ── Right panel content (shared between desktop & mobile) ──
   const renderRightPanel = () => (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0" role="complementary" aria-label="Collections list">
       <div className="px-3 pt-3 pb-2 border-b border-gray-800/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1349,6 +1388,11 @@ export default function CollectionsMap() {
                       <div className="flex items-center gap-2 mt-0.5">
                         {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
                         {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
+                        {sortBy === 'distance' && (
+                          <span className="text-emerald-400/60 text-[10px]">
+                            ~{Math.round(Math.sqrt(Math.pow(c.lat - mapCenter[0], 2) + Math.pow(c.lng - mapCenter[1], 2)) * 111)}km
+                          </span>
+                        )}
                       </div>
                     </div>
                     {/* Favorite star */}
@@ -1480,7 +1524,7 @@ export default function CollectionsMap() {
   );
 
   return (
-    <div ref={mapContainerRef} className="fullscreen-content h-screen flex flex-col bg-gray-950">
+    <div ref={mapContainerRef} className="fullscreen-content h-screen flex flex-col bg-gray-950" role="application" aria-label="Collections World Map">
       <style>{MAP_STYLES}</style>
 
       {/* ── Header ── */}
@@ -1791,9 +1835,10 @@ export default function CollectionsMap() {
           )}
 
           {/* Summary stats */}
-          <div className={`absolute bottom-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-xl px-1 py-1 border border-gray-800/50 flex items-stretch ${isMobile ? 'gap-0' : 'gap-0'}`}>
+          <div className={`absolute bottom-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-xl px-1 py-1 border border-gray-800/50 flex items-stretch ${isMobile ? 'gap-0' : 'gap-0'}`}
+            role="status" aria-label={`${stats.total} collections, ${stats.vehicles} vehicles, ${stats.cities} cities, ${stats.countries} countries`}>
             <div className="stat-card px-3 py-1.5 rounded-lg cursor-default">
-              <div className="text-white text-sm font-bold tabular-nums">{stats.total}</div>
+              <div className="text-white text-sm font-bold tabular-nums"><AnimatedCounter value={stats.total} /></div>
               <div className="text-[9px] text-gray-500 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-white/40 inline-block" />
                 Collections
@@ -1801,7 +1846,7 @@ export default function CollectionsMap() {
             </div>
             <div className="w-px self-stretch my-1.5 bg-gray-700/50" />
             <div className="stat-card px-3 py-1.5 rounded-lg cursor-default">
-              <div className="text-sky-400 text-sm font-bold tabular-nums">{stats.vehicles.toLocaleString()}</div>
+              <div className="text-sky-400 text-sm font-bold tabular-nums"><AnimatedCounter value={stats.vehicles} /></div>
               <div className="text-[9px] text-gray-500 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-sky-400/40 inline-block" />
                 Vehicles
@@ -1811,7 +1856,7 @@ export default function CollectionsMap() {
               <>
                 <div className="w-px self-stretch my-1.5 bg-gray-700/50" />
                 <div className="stat-card px-3 py-1.5 rounded-lg cursor-default">
-                  <div className="text-emerald-400 text-sm font-bold tabular-nums">{stats.cities}</div>
+                  <div className="text-emerald-400 text-sm font-bold tabular-nums"><AnimatedCounter value={stats.cities} /></div>
                   <div className="text-[9px] text-gray-500 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/40 inline-block" />
                     Cities
@@ -1819,7 +1864,7 @@ export default function CollectionsMap() {
                 </div>
                 <div className="w-px self-stretch my-1.5 bg-gray-700/50" />
                 <div className="stat-card px-3 py-1.5 rounded-lg cursor-default">
-                  <div className="text-amber-400 text-sm font-bold tabular-nums">{stats.countries}</div>
+                  <div className="text-amber-400 text-sm font-bold tabular-nums"><AnimatedCounter value={stats.countries} /></div>
                   <div className="text-[9px] text-gray-500 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400/40 inline-block" />
                     Countries
@@ -1840,6 +1885,11 @@ export default function CollectionsMap() {
                 <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px]">1</kbd>
                 <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px] ml-0.5">2</kbd>
                 <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px] ml-0.5">3</kbd> Style
+              </span>
+              <span className="opacity-50">|</span>
+              <span>
+                <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px]">↑</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px] ml-0.5">↓</kbd> Navigate
               </span>
             </div>
           )}
