@@ -315,32 +315,54 @@ function MapLayers({
 
   const renderMarkers = (colls: Collection[]) => (
     <>
-      {colls.map(c => (
-        <Marker key={c.id} position={[c.lat, c.lng]} icon={MARKER_ICON}>
-          <Popup maxWidth={280}>
-            <div className="min-w-[240px]">
-              <div className="flex items-start gap-3">
-                {c.logo_url && <img src={c.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
-                <div>
-                  <h3 className="font-bold text-base leading-tight">{c.name}</h3>
-                  <p className="text-gray-500 text-sm">{c.city}, {c.country}</p>
+      {colls.map(c => {
+        const icon = c.logo_url
+          ? L.divIcon({
+              className: '',
+              html: `<div style="width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5);overflow:hidden;background:#1e293b"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div>`,
+              iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
+            })
+          : MARKER_ICON;
+        return (
+          <Marker key={c.id} position={[c.lat, c.lng]} icon={icon}>
+            <Popup maxWidth={300}>
+              <div className="min-w-[260px]">
+                <div className="flex items-start gap-3">
+                  {c.logo_url ? (
+                    <img src={c.logo_url} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0 ring-1 ring-gray-200" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-sky-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-blue-600 text-lg font-bold">{c.name.charAt(0)}</span>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-base leading-tight text-gray-900">{c.name}</h3>
+                    <p className="text-gray-500 text-sm mt-0.5">{c.city}, {c.country}</p>
+                  </div>
                 </div>
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  {c.total_inventory > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                      {c.total_inventory} vehicles
+                    </span>
+                  )}
+                  {c.instagram && (
+                    <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-pink-50 text-pink-600 text-xs font-medium hover:bg-pink-100 transition-colors">
+                      @{c.instagram}
+                    </a>
+                  )}
+                </div>
+                <Link to={`/org/${c.slug}`}
+                  className="mt-3 block text-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+                  View Collection
+                </Link>
               </div>
-              <div className="mt-2 flex items-center gap-3 text-sm">
-                {c.total_inventory > 0 && <span className="text-blue-600 font-semibold">{c.total_inventory} vehicles</span>}
-                {c.instagram && (
-                  <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
-                    className="text-pink-500 hover:text-pink-600">@{c.instagram}</a>
-                )}
-              </div>
-              <Link to={`/org/${c.slug}`}
-                className="mt-2 block text-center px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors">
-                View Collection
-              </Link>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+            </Popup>
+          </Marker>
+        );
+      })}
     </>
   );
 
@@ -476,6 +498,7 @@ export default function CollectionsMap() {
   const [filterVehicles, setFilterVehicles] = useState(false);
   const [filterInstagram, setFilterInstagram] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -789,6 +812,17 @@ export default function CollectionsMap() {
         <div className="flex items-center justify-between">
           <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Collections ({sortedCollections.length})</h2>
           <div className="flex items-center gap-2">
+            {/* View mode toggle */}
+            <div className="flex rounded overflow-hidden border border-gray-700/50">
+              <button onClick={() => setViewMode('list')} title="List view"
+                className={`px-1.5 py-1 transition-colors ${viewMode === 'list' ? 'bg-gray-700 text-white' : 'bg-gray-800/50 text-gray-500 hover:text-gray-300'}`}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              </button>
+              <button onClick={() => setViewMode('grid')} title="Grid view"
+                className={`px-1.5 py-1 transition-colors ${viewMode === 'grid' ? 'bg-gray-700 text-white' : 'bg-gray-800/50 text-gray-500 hover:text-gray-300'}`}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+              </button>
+            </div>
             <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
               className="text-[10px] bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-400 focus:outline-none">
               <option value="name">Name</option>
@@ -815,27 +849,62 @@ export default function CollectionsMap() {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {sortedCollections.slice(0, 100).map(c => (
-          <Link key={c.id} to={`/org/${c.slug}`} className="block px-3 py-2.5 border-b border-gray-800/30 hover:bg-gray-800/40 transition-colors group">
-            <div className="flex items-start gap-2.5">
-              {c.logo_url ? (
-                <img src={c.logo_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 bg-gray-800" />
-              ) : (
-                <div className="w-8 h-8 rounded-md bg-gradient-to-br from-sky-900/40 to-blue-900/40 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sky-400 text-[10px] font-bold">{c.name.charAt(0)}</span>
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <h3 className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">{c.name}</h3>
-                <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
-                  {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
+        {viewMode === 'list' ? (
+          // List view
+          sortedCollections.slice(0, 100).map(c => (
+            <Link key={c.id} to={`/org/${c.slug}`} className="block px-3 py-2.5 border-b border-gray-800/30 hover:bg-gray-800/40 transition-colors group">
+              <div className="flex items-start gap-2.5">
+                {c.logo_url ? (
+                  <img src={c.logo_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 bg-gray-800" />
+                ) : (
+                  <div className="w-8 h-8 rounded-md bg-gradient-to-br from-sky-900/40 to-blue-900/40 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sky-400 text-[10px] font-bold">{c.name.charAt(0)}</span>
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">{c.name}</h3>
+                  <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
+                    {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          ))
+        ) : (
+          // Grid view
+          <div className="grid grid-cols-2 gap-1.5 p-2">
+            {sortedCollections.slice(0, 80).map(c => (
+              <Link key={c.id} to={`/org/${c.slug}`}
+                className="block p-2.5 rounded-lg bg-gray-800/30 border border-gray-800/50 hover:bg-gray-800/60 hover:border-gray-700/50 transition-colors group">
+                <div className="flex items-center gap-2 mb-1.5">
+                  {c.logo_url ? (
+                    <img src={c.logo_url} alt="" className="w-7 h-7 rounded-md object-cover flex-shrink-0 bg-gray-800" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-md bg-gradient-to-br from-sky-900/50 to-blue-900/50 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sky-400 text-[9px] font-bold">{c.name.charAt(0)}</span>
+                    </div>
+                  )}
+                  <h3 className="text-white text-[10px] font-medium truncate group-hover:text-sky-400 transition-colors leading-tight flex-1">{c.name}</h3>
+                </div>
+                <p className="text-gray-500 text-[9px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  {c.total_inventory > 0 && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 text-[9px] font-medium">
+                      {c.total_inventory}v
+                    </span>
+                  )}
+                  {c.instagram && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-400 text-[9px]">
+                      @
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
         {sortedCollections.length === 0 && (
           <div className="px-3 py-8 text-center text-gray-600 text-xs">No collections found</div>
         )}
