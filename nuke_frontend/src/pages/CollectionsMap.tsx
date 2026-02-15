@@ -623,6 +623,9 @@ const MAP_STYLES = `
   /* Favorite star */
   @keyframes starPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
   .star-pop { animation: starPop 300ms ease; }
+  /* Tour progress bar */
+  @keyframes tourProgress { from { width: 0%; } to { width: 100%; } }
+  .tour-progress { animation: tourProgress 4s linear; }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -645,6 +648,9 @@ export default function CollectionsMap() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [favorites, toggleFavorite] = useFavorites();
   const [filterFavorites, setFilterFavorites] = useState(false);
+  const [touring, setTouring] = useState(false);
+  const [tourIndex, setTourIndex] = useState(0);
+  const tourTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -699,6 +705,7 @@ export default function CollectionsMap() {
       // Ignore when typing in inputs
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
       if (e.key === 'Escape') {
+        if (touring) { stopTour(); return; }
         if (sidebarOpen) { setSidebarOpen(false); return; }
         if (panelOpen) { setPanelOpen(false); return; }
         if (searchExpanded) { setSearchExpanded(false); setSearchTerm(''); return; }
@@ -711,7 +718,7 @@ export default function CollectionsMap() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [sidebarOpen, panelOpen, searchExpanded, goBack]);
+  }, [sidebarOpen, panelOpen, searchExpanded, goBack, touring, stopTour]);
 
   // ── Data loading ──
 
@@ -928,6 +935,42 @@ export default function CollectionsMap() {
       setDrill({ level: 'markers', country: c.country, city: c.city });
     }
   }, [collections, stateAssign, countyAssign, stateNames, countyNames, setDrill]);
+
+  // Auto-tour: fly to each collection in sequence
+  const startTour = useCallback(() => {
+    setTouring(true);
+    setTourIndex(0);
+  }, []);
+
+  const stopTour = useCallback(() => {
+    setTouring(false);
+    if (tourTimerRef.current) clearTimeout(tourTimerRef.current);
+    tourTimerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!touring || !collections.length) return;
+    const tourCollections = sortedCollections.length > 0 ? sortedCollections : collections;
+    const idx = tourIndex % tourCollections.length;
+    const c = tourCollections[idx];
+    setHighlightedId(c.id);
+    setExpandedId(c.id);
+    mapRef.current?.flyTo([c.lat, c.lng], 13, { duration: 1.5 });
+    // Set drill for context
+    if (c.country === 'USA') {
+      const sid = stateAssign.get(c.id);
+      const cid = countyAssign.get(c.id);
+      if (cid) setDrill({ level: 'markers', country: 'USA', stateId: sid, stateName: stateNames.get(sid || '') || sid, countyId: cid, countyName: countyNames.get(cid) || cid });
+      else if (sid) setDrill({ level: 'state', country: 'USA', stateId: sid, stateName: stateNames.get(sid) || sid });
+    } else {
+      setDrill({ level: 'markers', country: c.country, city: c.city });
+    }
+    tourTimerRef.current = setTimeout(() => {
+      setTourIndex(prev => prev + 1);
+    }, 4000);
+    return () => { if (tourTimerRef.current) clearTimeout(tourTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [touring, tourIndex, collections.length]);
 
   const shareUrl = async () => {
     try {
@@ -1369,6 +1412,15 @@ export default function CollectionsMap() {
               className="w-8 h-8 rounded-lg bg-gray-800/60 border border-gray-700/50 flex items-center justify-center text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
             </button>
+            {/* Auto-tour button */}
+            <button onClick={touring ? stopTour : startTour} title={touring ? 'Stop tour' : 'Auto-tour collections'}
+              className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${touring ? 'bg-sky-600/30 border-sky-500/50 text-sky-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-400 hover:text-sky-400 hover:bg-sky-500/10 hover:border-sky-500/30'}`}>
+              {touring ? (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+              ) : (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+              )}
+            </button>
             {/* Metric toggle */}
             <div className="flex rounded-md overflow-hidden border border-gray-700">
               {(['count', 'inventory'] as const).map(m => (
@@ -1454,6 +1506,24 @@ export default function CollectionsMap() {
           {/* Drill transition overlay */}
           {transitioning && (
             <div className="absolute inset-0 z-[999] bg-gray-950/30 pointer-events-none drill-transition" />
+          )}
+
+          {/* Tour overlay */}
+          {touring && (
+            <>
+              <div className="absolute top-0 left-0 right-0 z-[1001] h-1 bg-gray-800/50">
+                <div key={tourIndex} className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 tour-progress" />
+              </div>
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1001] bg-gray-900/90 backdrop-blur rounded-xl px-4 py-2 border border-sky-500/30 flex items-center gap-3 fade-in">
+                <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                <span className="text-white text-xs font-medium">
+                  Touring {tourIndex % (sortedCollections.length || collections.length) + 1} / {sortedCollections.length || collections.length}
+                </span>
+                <button onClick={stopTour} className="text-gray-400 hover:text-white transition-colors ml-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </>
           )}
 
           {/* Back button + drill level indicator */}
