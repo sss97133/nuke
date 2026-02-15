@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nuke — Vehicle Intelligence Platform</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #09090b; --surface: #18181b; --surface2: #1e1e22; --border: #27272a; --border-hi: #3f3f46;
+    --text: #fafafa; --text2: #a1a1aa; --text3: #71717a; --accent: #3b82f6; --accent2: #60a5fa;
+    --green: #22c55e; --red: #ef4444; --amber: #f59e0b; --purple: #a855f7;
+    --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    --radius: 6px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; }
+  a { color: var(--accent2); text-decoration: none; }
+
+  .shell { max-width: 1200px; margin: 0 auto; padding: 16px 20px; }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .logo { font-family: var(--mono); font-weight: 800; font-size: 20px; letter-spacing: -1px; }
+  .header-stats { display: flex; gap: 20px; }
+  .header-stat { text-align: right; }
+  .header-stat-val { font-family: var(--mono); font-weight: 700; font-size: 16px; }
+  .header-stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* Search */
+  .search-wrap { position: relative; margin-bottom: 20px; }
+  .search-wrap input {
+    width: 100%; padding: 12px 16px 12px 40px; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 15px; font-family: var(--sans); outline: none; border-radius: var(--radius);
+    transition: border-color 0.15s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--text3); }
+  .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 16px; }
+  .search-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; color: var(--text3); font-family: var(--mono); }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-btn { padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); font-size: 12px; cursor: pointer; border-radius: 20px; transition: all 0.15s; font-family: var(--sans); }
+  .filter-btn:hover, .filter-btn.active { border-color: var(--accent); color: var(--accent2); background: rgba(59,130,246,0.08); }
+  .filter-select { padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 12px; border-radius: 20px; font-family: var(--sans); }
+
+  /* Layout: sidebar + main */
+  .layout { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .layout.has-detail { grid-template-columns: 380px 1fr; }
+
+  /* Vehicle list */
+  .vlist { display: flex; flex-direction: column; gap: 6px; }
+  .vcard {
+    display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 14px; cursor: pointer; transition: all 0.12s;
+  }
+  .vcard:hover { border-color: var(--border-hi); background: var(--surface2); }
+  .vcard.selected { border-color: var(--accent); background: rgba(59,130,246,0.06); }
+  .vcard-title { font-weight: 600; font-size: 13px; }
+  .vcard-sub { font-size: 11px; color: var(--text3); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .vcard-price { font-family: var(--mono); font-weight: 700; font-size: 14px; text-align: right; }
+  .vcard-source { font-size: 10px; color: var(--text3); text-align: right; }
+
+  /* Density dots */
+  .dots { display: flex; gap: 3px; margin-top: 4px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+  .dot.on { background: var(--green); }
+  .dot.warn { background: var(--amber); }
+
+  /* Detail panel */
+  .detail-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; max-height: calc(100vh - 200px); overflow-y: auto; }
+  .dp-title { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
+  .dp-vin { font-family: var(--mono); font-size: 11px; color: var(--text3); margin-bottom: 16px; }
+  .dp-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .dp-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text3); margin-bottom: 10px; }
+
+  /* Stat grid */
+  .sg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sg-item { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px; }
+  .sg-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .sg-val { font-family: var(--mono); font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .sg-val.green { color: var(--green); }
+  .sg-val.red { color: var(--red); }
+  .sg-val.amber { color: var(--amber); }
+  .sg-val.purple { color: var(--purple); }
+
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+  .badge-red { background: rgba(239,68,68,0.12); color: var(--red); }
+  .badge-blue { background: rgba(59,130,246,0.12); color: var(--accent2); }
+  .badge-amber { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .badge-purple { background: rgba(168,85,247,0.12); color: var(--purple); }
+  .badge-dim { background: rgba(255,255,255,0.04); color: var(--text3); }
+
+  /* Observation timeline */
+  .timeline { position: relative; padding-left: 16px; }
+  .timeline::before { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: var(--border); }
+  .tl-item { position: relative; padding: 8px 0; }
+  .tl-item::before { content: ''; position: absolute; left: -13px; top: 14px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+  .tl-kind { font-size: 11px; font-weight: 600; color: var(--accent2); }
+  .tl-text { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .tl-meta { font-size: 10px; color: var(--text3); margin-top: 2px; font-family: var(--mono); }
+
+  /* Comments */
+  .comment { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .comment:last-child { border-bottom: none; }
+  .comment-text { font-size: 12px; line-height: 1.5; color: var(--text2); }
+  .comment-meta { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+  /* Pagination */
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .page-btn { padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); cursor: pointer; border-radius: 4px; font-size: 12px; font-family: var(--mono); }
+  .page-btn:hover { border-color: var(--border-hi); }
+  .page-btn:disabled { opacity: 0.3; cursor: default; }
+  .page-info { font-size: 12px; color: var(--text3); font-family: var(--mono); }
+
+  /* Loading & empty */
+  .loading { padding: 40px; text-align: center; color: var(--text3); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.5s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 60px 20px; color: var(--text3); }
+
+  /* Market Trends */
+  .trend-controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .trend-controls select, .trend-controls input {
+    padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-size: 13px; border-radius: var(--radius); font-family: var(--sans);
+  }
+  .trend-controls button {
+    padding: 8px 20px; background: var(--accent); color: #fff; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; border-radius: var(--radius);
+  }
+  .bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 160px; padding: 0 4px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar { width: 100%; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.3s; position: relative; }
+  .bar:hover { opacity: 0.8; }
+  .bar-label { font-size: 9px; color: var(--text3); font-family: var(--mono); writing-mode: vertical-rl; text-orientation: mixed; max-height: 50px; overflow: hidden; }
+  .bar-tooltip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-family: var(--mono); white-space: nowrap; z-index: 10; }
+  .bar:hover .bar-tooltip { display: block; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; margin-bottom: 20px; }
+  .tab { padding: 8px 20px; cursor: pointer; color: var(--text3); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab:hover { color: var(--text2); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Data density meter */
+  .density-meter { display: flex; gap: 1px; height: 4px; border-radius: 2px; overflow: hidden; width: 60px; }
+  .density-seg { flex: 1; background: var(--border); }
+  .density-seg.filled { background: var(--green); }
+  .density-seg.partial { background: var(--amber); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="header">
+    <div class="logo">NUKE</div>
+    <div class="header-stats">
+      <div class="header-stat">
+        <div class="header-stat-val">942,778</div>
+        <div class="header-stat-label">Vehicles</div>
+      </div>
+      <div class="header-stat">
+        <div class="header-stat-val">521,406</div>
+        <div class="header-stat-label">Valuations</div>
+      </div>
+      <div class="header-stat">
+        <div class="header-stat-val">11.4M</div>
+        <div class="header-stat-label">Comments</div>
+      </div>
+      <div class="header-stat">
+        <div class="header-stat-val">30.4M</div>
+        <div class="header-stat-label">Images</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="browse">Browse</div>
+    <div class="tab" data-tab="trends">Market Trends</div>
+  </div>
+
+  <!-- Browse Panel -->
+  <div id="browse" class="panel active">
+    <div class="search-wrap">
+      <span class="search-icon">&#9906;</span>
+      <input id="search" type="text" placeholder="Search 942K vehicles — try &quot;porsche 911&quot;, &quot;1967 mustang&quot;, &quot;ferrari 250&quot;..." autofocus>
+    </div>
+
+    <div class="filters" id="filters">
+      <button class="filter-btn active" data-sort="relevance">Relevance</button>
+      <button class="filter-btn" data-sort="price_desc">Price High</button>
+      <button class="filter-btn" data-sort="price_asc">Price Low</button>
+      <button class="filter-btn" data-sort="year_desc">Newest</button>
+      <button class="filter-btn" data-sort="year_asc">Oldest</button>
+      <select class="filter-select" id="filter-make">
+        <option value="">All Makes (60+)</option>
+        <option>Chevrolet</option><option>Ford</option><option>Porsche</option>
+        <option>Mercedes-Benz</option><option>BMW</option><option>Pontiac</option>
+        <option>Dodge</option><option>Cadillac</option><option>Jaguar</option>
+        <option>Toyota</option><option>Volkswagen</option><option>Ferrari</option>
+        <option>Plymouth</option><option>Honda</option><option>Buick</option>
+        <option>Audi</option><option>Oldsmobile</option><option>Jeep</option>
+        <option>Lincoln</option><option>GMC</option><option>Bentley</option>
+        <option>Nissan</option><option>Mercury</option><option>Rolls-Royce</option>
+        <option>Chrysler</option><option>MG</option><option>Land Rover</option>
+        <option>Shelby</option><option>Triumph</option><option>Packard</option>
+        <option>Alfa Romeo</option><option>Lexus</option><option>Aston Martin</option>
+        <option>Maserati</option><option>Fiat</option><option>Mazda</option>
+        <option>Volvo</option><option>Lamborghini</option><option>Lotus</option>
+        <option>Austin-Healey</option><option>Studebaker</option><option>Subaru</option>
+        <option>Willys</option><option>Harley-Davidson</option><option>Mitsubishi</option>
+        <option>Acura</option><option>Lancia</option><option>Mini</option>
+        <option>AMC</option><option>Tesla</option><option>Morgan</option>
+        <option>AM General</option><option>Morris</option><option>Citroen</option>
+      </select>
+    </div>
+
+    <div id="search-meta" class="search-meta" style="display:none;"></div>
+
+    <div class="layout" id="layout">
+      <div>
+        <div id="results" class="vlist">
+          <div class="empty" style="padding:80px 20px;">
+            <div style="font-size:32px;opacity:0.15;margin-bottom:12px;">942,778 vehicles</div>
+            <div>Search to explore the dataset</div>
+          </div>
+        </div>
+        <div id="pagination" class="pagination" style="display:none;"></div>
+      </div>
+      <div id="detail-col" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Trends Panel -->
+  <div id="trends" class="panel">
+    <div class="trend-controls">
+      <select id="t-make">
+        <option>Porsche</option><option>Ferrari</option><option>BMW</option>
+        <option>Mercedes-Benz</option><option>Ford</option><option>Chevrolet</option>
+        <option>Toyota</option><option>Lamborghini</option><option>Jaguar</option>
+        <option>Audi</option><option>Pontiac</option><option>Dodge</option>
+        <option>Cadillac</option><option>Volkswagen</option><option>Honda</option>
+        <option>Bentley</option><option>Rolls-Royce</option><option>Aston Martin</option>
+        <option>Maserati</option><option>Lotus</option><option>Alfa Romeo</option>
+        <option>Shelby</option><option>Lincoln</option><option>Nissan</option>
+        <option>Tesla</option><option>Subaru</option><option>Mazda</option>
+      </select>
+      <input id="t-model" type="text" placeholder="Model (911, Mustang...)" value="911" style="width:130px;">
+      <select id="t-period">
+        <option value="90d">90 days</option>
+        <option value="1y" selected>1 year</option>
+        <option value="3y">3 years</option>
+      </select>
+      <button onclick="loadTrends()">Analyze</button>
+    </div>
+    <div id="trends-out"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const esc = s => { const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML; };
+const num = n => n != null ? Math.round(Number(n)).toLocaleString() : '—';
+const money = n => n != null ? '$' + Math.round(Number(n)).toLocaleString() : '—';
+const trunc = (s,n) => s && s.length > n ? s.slice(0,n)+'...' : (s||'');
+
+async function api(endpoint) {
+  const r = await fetch('/api/' + endpoint);
+  return r.json();
+}
+
+// State
+let currentSort = 'relevance';
+let currentPage = 1;
+let currentQuery = '';
+let currentMake = '';
+let selectedVehicleId = null;
+
+// Tabs
+$$('.tab').forEach(t => t.addEventListener('click', () => {
+  $$('.tab').forEach(x => x.classList.remove('active'));
+  $$('.panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  $(`#${t.dataset.tab}`).classList.add('active');
+}));
+
+// Sort buttons
+$$('.filter-btn[data-sort]').forEach(btn => btn.addEventListener('click', () => {
+  $$('.filter-btn[data-sort]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentSort = btn.dataset.sort;
+  currentPage = 1;
+  doSearch();
+}));
+
+$('#filter-make').addEventListener('change', () => {
+  currentMake = $('#filter-make').value;
+  currentPage = 1;
+  doSearch();
+});
+
+// Search
+let searchTimer;
+$('#search').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { currentPage = 1; doSearch(); }, 300);
+});
+$('#search').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { clearTimeout(searchTimer); currentPage = 1; doSearch(); }
+});
+
+async function doSearch() {
+  const q = $('#search').value.trim();
+  currentQuery = q;
+  if (!q && !currentMake) {
+    $('#results').innerHTML = '<div class="empty" style="padding:80px 20px;"><div style="font-size:32px;opacity:0.15;margin-bottom:12px;">942,778 vehicles</div><div>Search to explore the dataset</div></div>';
+    $('#search-meta').style.display = 'none';
+    $('#pagination').style.display = 'none';
+    return;
+  }
+
+  $('#results').innerHTML = '<div class="loading"><span class="spinner"></span> Searching...</div>';
+
+  let params = `limit=40&page=${currentPage}&sort=${currentSort}`;
+  if (q) params += `&q=${encodeURIComponent(q)}`;
+  if (currentMake) params += `&make=${encodeURIComponent(currentMake)}`;
+
+  try {
+    const data = await api(`api-v1-search?${params}`);
+    const p = data.pagination || {};
+    const items = data.data || [];
+
+    $('#search-meta').style.display = 'flex';
+    $('#search-meta').innerHTML = `
+      <span>${num(p.total_count)} vehicles found &middot; ${data.search_time_ms || '?'}ms</span>
+      <span>page ${p.page} of ${num(p.total_pages)}</span>
+    `;
+
+    if (!items.length) {
+      $('#results').innerHTML = '<div class="empty">No results</div>';
+      $('#pagination').style.display = 'none';
+      return;
+    }
+
+    let html = '';
+    for (const v of items) {
+      const dd = v.data_density || {};
+      const densityScore = (dd.has_vin ? 1 : 0) + (dd.has_valuation ? 1 : 0) + (dd.has_price ? 1 : 0) + (v.mileage ? 1 : 0) + (v.color ? 1 : 0);
+
+      html += `<div class="vcard${v.id === selectedVehicleId ? ' selected' : ''}" onclick="selectVehicle('${v.id}','${esc(v.vin||'')}')">
+        <div>
+          <div class="vcard-title">${esc(v.title)}</div>
+          <div class="vcard-sub">
+            ${v.vin ? `<span title="VIN">${esc(v.vin)}</span>` : '<span style="color:var(--text3)">No VIN</span>'}
+            ${v.mileage ? `<span>${num(v.mileage)} mi</span>` : ''}
+            ${v.color ? `<span>${esc(v.color)}</span>` : ''}
+            ${v.transmission ? `<span>${esc(v.transmission)}</span>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+            <div class="density-meter" title="Data density: ${densityScore}/5">
+              ${[0,1,2,3,4].map(i => `<div class="density-seg ${i < densityScore ? 'filled' : ''}"></div>`).join('')}
+            </div>
+            ${dd.has_valuation ? '<span class="badge badge-green">Valued</span>' : ''}
+            ${v.auction_source ? `<span class="badge badge-dim">${esc(v.auction_source)}</span>` : ''}
+          </div>
+        </div>
+        <div>
+          <div class="vcard-price">${v.sale_price ? money(v.sale_price) : '<span style="color:var(--text3)">—</span>'}</div>
+          ${v.valuation ? `<div style="font-size:10px;color:var(--green);text-align:right;font-family:var(--mono);">Est: ${money(v.valuation.estimated_value)}</div>` : ''}
+        </div>
+      </div>`;
+    }
+    $('#results').innerHTML = html;
+
+    // Pagination
+    const hasPrev = p.page > 1;
+    const hasNext = p.page < p.total_pages;
+    $('#pagination').style.display = 'flex';
+    $('#pagination').innerHTML = `
+      <button class="page-btn" onclick="goPage(${p.page - 1})" ${hasPrev ? '' : 'disabled'}>&larr; Prev</button>
+      <span class="page-info">${p.page} / ${num(p.total_pages)}</span>
+      <button class="page-btn" onclick="goPage(${p.page + 1})" ${hasNext ? '' : 'disabled'}>Next &rarr;</button>
+    `;
+  } catch (e) {
+    $('#results').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function goPage(n) { currentPage = n; doSearch(); }
+
+async function selectVehicle(id, vin) {
+  selectedVehicleId = id;
+  $$('.vcard').forEach(c => c.classList.remove('selected'));
+  event?.currentTarget?.classList.add('selected');
+
+  const layout = $('#layout');
+  const detailCol = $('#detail-col');
+  layout.classList.add('has-detail');
+  detailCol.style.display = 'block';
+  detailCol.innerHTML = '<div class="detail-panel"><div class="loading"><span class="spinner"></span> Loading...</div></div>';
+
+  const lookupId = vin || id;
+
+  try {
+    const [vinData, histData, auctionData] = await Promise.all([
+      api(`api-v1-vin-lookup/${lookupId}`),
+      api(`api-v1-vehicle-history/${lookupId}?limit=15`).catch(() => ({ data: {} })),
+      api(`api-v1-vehicle-auction/${lookupId}`).catch(() => ({ data: {} })),
+    ]);
+
+    const v = vinData.data || {};
+    const val = v.valuation || {};
+    const counts = v.counts || {};
+    const hist = histData.data || {};
+    const obs = hist.observations || [];
+    const auction = auctionData.data || {};
+    const listings = auction.listings || [];
+    const comments = auction.comments?.recent || [];
+    const sentiment = auction.sentiment || {};
+
+    let h = `<div class="detail-panel">`;
+    h += `<div class="dp-title">${v.year||''} ${v.make||''} ${v.model||''} ${v.trim||''}</div>`;
+    h += `<div class="dp-vin">${v.vin ? 'VIN: '+v.vin : 'No VIN on record'}</div>`;
+
+    // Core stats
+    h += `<div class="sg">`;
+    h += sgItem('Sale Price', v.sale_price ? money(v.sale_price) : '—');
+    h += sgItem('Valuation', val.estimated_value ? money(val.estimated_value) : '—', val.estimated_value ? 'green' : '');
+    h += sgItem('Confidence', val.confidence_score ? val.confidence_score + '%' : '—', val.confidence_score >= 70 ? 'green' : val.confidence_score ? 'amber' : '');
+    h += sgItem('Mileage', v.mileage ? num(v.mileage) + ' mi' : '—');
+    h += sgItem('Listings', counts.listings || 0);
+    h += sgItem('Observations', counts.observations || 0);
+    h += sgItem('Images', counts.images || 0, counts.images > 0 ? 'purple' : '');
+    h += sgItem('Color', v.color || '—');
+    h += sgItem('Source', v.auction_source || '—');
+    h += `</div>`;
+
+    // Auction section
+    if (listings.length || comments.length || sentiment.overall) {
+      h += `<div class="dp-section"><div class="dp-section-title">Auction Intelligence</div>`;
+      h += `<div class="sg">`;
+      h += sgItem('Listings', listings.length);
+      h += sgItem('Comments', auction.comments?.total_count || 0);
+      h += sgItem('Sentiment', sentiment.overall || 'none',
+        sentiment.overall === 'positive' ? 'green' : sentiment.overall === 'negative' ? 'red' : '');
+      h += `</div>`;
+
+      if (comments.length) {
+        h += `<div style="margin-top:12px;">`;
+        for (const c of comments.slice(0, 5)) {
+          h += `<div class="comment">
+            <div class="comment-text">${esc(c.comment_text || c.text || '')}</div>
+            <div class="comment-meta">${esc(c.username||'anon')} &middot; ${c.posted_at ? new Date(c.posted_at).toLocaleDateString() : ''}</div>
+          </div>`;
+        }
+        h += `</div>`;
+      }
+      h += `</div>`;
+    }
+
+    // Observation timeline
+    if (obs.length) {
+      h += `<div class="dp-section"><div class="dp-section-title">Observation Timeline (${hist.pagination?.total || obs.length})</div>`;
+      h += `<div class="timeline">`;
+      for (const o of obs.slice(0, 10)) {
+        h += `<div class="tl-item">
+          <div class="tl-kind">${esc(o.kind || 'observation')}</div>
+          <div class="tl-text">${esc(trunc(o.content_text || '', 120))}</div>
+          <div class="tl-meta">${o.ingested_at ? new Date(o.ingested_at).toLocaleDateString() : ''} ${o.source_url ? '&middot; ' + esc(trunc(o.source_url, 40)) : ''}</div>
+        </div>`;
+      }
+      h += `</div></div>`;
+    }
+
+    // Images
+    if (v.images && v.images.length) {
+      h += `<div class="dp-section"><div class="dp-section-title">Images (${counts.images || v.images.length})</div>`;
+      h += `<div style="display:flex;gap:6px;flex-wrap:wrap;">`;
+      for (const img of v.images.slice(0, 8)) {
+        h += `<img src="${esc(img.url||img)}" style="width:80px;height:56px;object-fit:cover;border-radius:4px;border:1px solid var(--border);" onerror="this.style.display='none'">`;
+      }
+      h += `</div></div>`;
+    }
+
+    h += `</div>`;
+    detailCol.innerHTML = h;
+  } catch (e) {
+    detailCol.innerHTML = `<div class="detail-panel"><div class="empty">Error: ${esc(e.message)}</div></div>`;
+  }
+}
+
+function sgItem(label, val, color) {
+  return `<div class="sg-item"><div class="sg-label">${label}</div><div class="sg-val ${color||''}">${val}</div></div>`;
+}
+
+// Market Trends
+async function loadTrends() {
+  const make = $('#t-make').value;
+  const model = $('#t-model').value;
+  const period = $('#t-period').value;
+  $('#trends-out').innerHTML = '<div class="loading"><span class="spinner"></span> Analyzing market data...</div>';
+
+  try {
+    const data = await api(`api-v1-market-trends?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&period=${period}`);
+    const s = data.data?.summary || {};
+    const periods = data.data?.periods || [];
+
+    let h = `<div class="sg" style="margin-bottom:20px;">`;
+    h += sgItem('Total Sales', num(s.total_sales || 0));
+    h += sgItem('Avg Price', money(s.overall_avg_price));
+    h += sgItem('Trend', s.trend_direction || '—', s.trend_direction === 'rising' ? 'green' : s.trend_direction === 'falling' ? 'red' : '');
+    h += sgItem('Price Change', s.price_change_pct != null ? s.price_change_pct + '%' : '—', s.price_change_pct > 0 ? 'green' : s.price_change_pct < 0 ? 'red' : '');
+    h += sgItem('Median', money(s.median_price));
+    h += sgItem('P25 - P75', (s.p25_price ? money(s.p25_price) : '?') + ' - ' + (s.p75_price ? money(s.p75_price) : '?'));
+    h += `</div>`;
+
+    if (periods.length > 1) {
+      const prices = periods.map(p => p.median_price || 0);
+      const maxP = Math.max(...prices.filter(p => p > 0));
+
+      h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">`;
+      h += `<div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2);">${make} ${model} — Median Price by Period</div>`;
+      h += `<div class="bar-chart">`;
+      for (const p of periods) {
+        const price = p.median_price || 0;
+        const pct = maxP > 0 ? (price / maxP) * 100 : 0;
+        const label = p.period_start ? new Date(p.period_start).toLocaleDateString('en',{month:'short',year:'2-digit'}) : '';
+        const color = price > 0 ? `background:var(--accent);` : 'background:var(--border);';
+        h += `<div class="bar-col">
+          <div class="bar" style="height:${Math.max(pct,2)}%;${color}">
+            <div class="bar-tooltip">${money(price)}<br>${p.sale_count} sales</div>
+          </div>
+          <div class="bar-label">${label}</div>
+        </div>`;
+      }
+      h += `</div></div>`;
+
+      // Period table
+      h += `<table style="width:100%;border-collapse:collapse;font-size:12px;">`;
+      h += `<thead><tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left;padding:6px;color:var(--text3);font-size:10px;text-transform:uppercase;">Period</th>
+        <th style="text-align:right;padding:6px;color:var(--text3);font-size:10px;text-transform:uppercase;">Sales</th>
+        <th style="text-align:right;padding:6px;color:var(--text3);font-size:10px;text-transform:uppercase;">Median</th>
+        <th style="text-align:right;padding:6px;color:var(--text3);font-size:10px;text-transform:uppercase;">P25</th>
+        <th style="text-align:right;padding:6px;color:var(--text3);font-size:10px;text-transform:uppercase;">P75</th>
+      </tr></thead><tbody>`;
+      for (const p of periods) {
+        h += `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px;font-family:var(--mono);">${p.period_start ? new Date(p.period_start).toLocaleDateString() : '—'}</td>
+          <td style="padding:6px;text-align:right;font-family:var(--mono);">${p.sale_count||0}</td>
+          <td style="padding:6px;text-align:right;font-family:var(--mono);">${money(p.median_price)}</td>
+          <td style="padding:6px;text-align:right;font-family:var(--mono);color:var(--text3);">${money(p.p25_price)}</td>
+          <td style="padding:6px;text-align:right;font-family:var(--mono);color:var(--text3);">${money(p.p75_price)}</td>
+        </tr>`;
+      }
+      h += `</tbody></table>`;
+    }
+
+    $('#trends-out').innerHTML = h;
+  } catch (e) {
+    $('#trends-out').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+</script>
+</body>
+</html>
