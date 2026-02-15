@@ -77,6 +77,19 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
 
 const DRILL_ORDER: DrillLevel[] = ['world', 'country', 'state', 'county', 'markers'];
 
+const COUNTRY_FLAGS: Record<string, string> = {
+  'USA': '🇺🇸', 'UK': '🇬🇧', 'Italy': '🇮🇹', 'Germany': '🇩🇪', 'France': '🇫🇷',
+  'Monaco': '🇲🇨', 'Switzerland': '🇨🇭', 'Japan': '🇯🇵', 'UAE': '🇦🇪', 'Qatar': '🇶🇦',
+  'South Korea': '🇰🇷', 'Taiwan': '🇹🇼', 'Australia': '🇦🇺', 'Canada': '🇨🇦', 'Singapore': '🇸🇬',
+  'Belgium': '🇧🇪', 'Poland': '🇵🇱', 'Denmark': '🇩🇰', 'Chile': '🇨🇱', 'Turkey': '🇹🇷',
+  'Austria': '🇦🇹', 'Norway': '🇳🇴', 'Netherlands': '🇳🇱', 'New Zealand': '🇳🇿', 'Czechia': '🇨🇿',
+  'Morocco': '🇲🇦', 'China': '🇨🇳', 'Brazil': '🇧🇷', 'Thailand': '🇹🇭', 'Mexico': '🇲🇽',
+  'India': '🇮🇳', 'Hong Kong': '🇭🇰', 'Israel': '🇮🇱', 'Portugal': '🇵🇹', 'Malaysia': '🇲🇾',
+  'Saudi Arabia': '🇸🇦', 'Oman': '🇴🇲', 'Lebanon': '🇱🇧', 'Slovakia': '🇸🇰',
+  'Dominican Republic': '🇩🇴', 'Kazakhstan': '🇰🇿', 'Spain': '🇪🇸', 'Sweden': '🇸🇪',
+  'Ireland': '🇮🇪', 'Greece': '🇬🇷', 'Argentina': '🇦🇷', 'Indonesia': '🇮🇩',
+};
+
 // ── Color scale ──────────────────────────────────────────────────────────────
 
 const COLOR_STOPS = [
@@ -336,37 +349,41 @@ function MapLayers({
         return (
           <Marker key={c.id} position={[c.lat, c.lng]} icon={icon} zIndexOffset={isHighlighted ? 1000 : 0}>
             <Popup maxWidth={300}>
-              <div className="min-w-[260px]">
+              <div className="min-w-[260px] p-3">
                 <div className="flex items-start gap-3">
                   {c.logo_url ? (
-                    <img src={c.logo_url} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0 ring-1 ring-gray-200" />
+                    <img src={c.logo_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0 ring-1 ring-gray-200 shadow-sm" />
                   ) : (
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-sky-100 flex items-center justify-center flex-shrink-0">
-                      <span className="text-blue-600 text-lg font-bold">{c.name.charAt(0)}</span>
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-50 to-sky-100 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <span className="text-blue-600 text-xl font-bold">{c.name.charAt(0)}</span>
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-base leading-tight text-gray-900">{c.name}</h3>
-                    <p className="text-gray-500 text-sm mt-0.5">{c.city}, {c.country}</p>
+                    <p className="text-gray-500 text-sm mt-0.5 flex items-center gap-1">
+                      <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      {c.city}{c.city && c.country ? ', ' : ''}{c.country}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
                   {c.total_inventory > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 text-blue-700 text-xs font-semibold border border-blue-100">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                       {c.total_inventory} vehicles
                     </span>
                   )}
                   {c.instagram && (
                     <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-pink-50 text-pink-600 text-xs font-medium hover:bg-pink-100 transition-colors">
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-pink-50 to-rose-50 text-pink-600 text-xs font-medium border border-pink-100 hover:border-pink-200 transition-colors">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
                       @{c.instagram}
                     </a>
                   )}
                 </div>
                 <Link to={`/org/${c.slug}`}
-                  className="mt-3 block text-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
-                  View Collection
+                  className="mt-3 block text-center px-3 py-2.5 bg-gradient-to-r from-blue-600 to-sky-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-sky-700 transition-all shadow-sm hover:shadow-md">
+                  View Collection →
                 </Link>
               </div>
             </Popup>
@@ -487,12 +504,25 @@ const MAP_STYLES = `
   .city-count-label::before { display: none !important; }
   .region-count { background: rgba(15,23,42,.75); color: #e2e8f0; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 6px; text-align: center; white-space: nowrap; pointer-events: none; border: 1px solid rgba(56,189,248,.15); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
   .leaflet-popup-content-wrapper { border-radius: 12px !important; }
+  .leaflet-popup-content { margin: 0 !important; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4); } 50% { box-shadow: 0 0 16px rgba(56,189,248,0.9),0 2px 8px rgba(0,0,0,.4); } }
   .sidebar-slide { transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1); }
   .panel-slide { transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1); }
   .backdrop-fade { transition: opacity 200ms ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   .fade-in { animation: fadeIn 300ms ease; }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+  .scale-in { animation: scaleIn 400ms cubic-bezier(0.16, 1, 0.3, 1); }
+  .leaflet-marker-icon { transition: transform 150ms ease !important; }
+  .sidebar-item-enter { animation: slideInLeft 250ms cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes slideInLeft { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+  .legend-interactive:hover .legend-bar { filter: brightness(1.3); }
+  .stat-card { transition: all 200ms ease; }
+  .stat-card:hover { background: rgba(30,41,59,0.8); transform: translateY(-1px); }
+  @keyframes drillTransition { 0% { opacity: 0.5; } 100% { opacity: 0; } }
+  .drill-transition { animation: drillTransition 400ms ease-out forwards; }
+  .leaflet-popup-content-wrapper { box-shadow: 0 8px 32px rgba(0,0,0,.25) !important; border: none !important; }
+  .leaflet-popup-tip { box-shadow: none !important; }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -514,6 +544,8 @@ export default function CollectionsMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
+  const [transitioning, setTransitioning] = useState(false);
+  const prevDrillLevel = useRef(drill.level);
 
   // Responsive
   const windowWidth = useWindowWidth();
@@ -544,9 +576,15 @@ export default function CollectionsMap() {
     }
   }, [drill, setDrill]);
 
-  // Close overlays on drill change
+  // Close overlays and trigger transition on drill change
   useEffect(() => {
     if (isCompact) { setSidebarOpen(false); setPanelOpen(false); }
+    if (prevDrillLevel.current !== drill.level) {
+      setTransitioning(true);
+      const t = setTimeout(() => setTransitioning(false), 400);
+      prevDrillLevel.current = drill.level;
+      return () => clearTimeout(t);
+    }
   }, [drill.level, isCompact]);
 
   // Keyboard shortcuts
@@ -747,6 +785,12 @@ export default function CollectionsMap() {
 
   const sidebarMaxMetric = Math.max(...sidebarItems.map(i => i[metric === 'count' ? 'count' : 'inventory']), 1);
 
+  // Legend max value for current drill level
+  const legendMax = useMemo(() => {
+    const metricKey = metric === 'count' ? 'count' : 'inventory';
+    return Math.max(...sidebarItems.map(i => i[metricKey]), 0);
+  }, [sidebarItems, metric]);
+
   // ── Sidebar content (shared between desktop & mobile) ──
   const renderSidebar = () => (
     <div className="flex flex-col h-full min-h-0">
@@ -792,14 +836,18 @@ export default function CollectionsMap() {
           const pct = (item[metric === 'count' ? 'count' : 'inventory'] / sidebarMaxMetric) * 100;
           return (
             <button key={item.key} onClick={item.onClick}
-              className="w-full relative overflow-hidden rounded-md text-xs text-gray-300 hover:text-white transition-colors group">
+              className="w-full relative overflow-hidden rounded-md text-xs text-gray-300 hover:text-white transition-all group sidebar-item-enter">
               {/* Background percentage bar */}
               <div className="absolute inset-y-0 left-0 bg-sky-500/8 rounded-md transition-all duration-300 group-hover:bg-sky-500/15"
                 style={{ width: `${pct}%` }} />
               {/* Content */}
               <div className="relative flex items-center justify-between px-2.5 py-1.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: choroplethColor(item[metric === 'count' ? 'count' : 'inventory'], sidebarMaxMetric) }} />
+                  {drill.level === 'world' && COUNTRY_FLAGS[item.label] ? (
+                    <span className="text-sm flex-shrink-0 leading-none">{COUNTRY_FLAGS[item.label]}</span>
+                  ) : (
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: choroplethColor(item[metric === 'count' ? 'count' : 'inventory'], sidebarMaxMetric) }} />
+                  )}
                   <span className="truncate">{item.label}</span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 ml-1">
@@ -892,7 +940,9 @@ export default function CollectionsMap() {
         {viewMode === 'list' ? (
           // List view
           sortedCollections.slice(0, 100).map(c => (
-            <Link key={c.id} to={`/org/${c.slug}`} className="block px-3 py-2.5 border-b border-gray-800/30 hover:bg-gray-800/40 transition-colors group">
+            <div key={c.id}
+              onMouseEnter={() => setHighlightedId(c.id)} onMouseLeave={() => setHighlightedId(null)}
+              className={`px-3 py-2.5 border-b border-gray-800/30 transition-all group ${highlightedId === c.id ? 'bg-sky-500/10 border-l-2 border-l-sky-500' : 'hover:bg-gray-800/40'}`}>
               <div className="flex items-start gap-2.5">
                 {c.logo_url ? (
                   <img src={c.logo_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 bg-gray-800" />
@@ -902,22 +952,29 @@ export default function CollectionsMap() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">{c.name}</h3>
+                  <Link to={`/org/${c.slug}`} className="text-white text-xs font-medium truncate block group-hover:text-sky-400 transition-colors">{c.name}</Link>
                   <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
                     {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
                   </div>
                 </div>
+                {/* Locate on map button */}
+                <button onClick={() => { mapRef.current?.flyTo([c.lat, c.lng], 14, { duration: 0.8 }); setHighlightedId(c.id); }}
+                  title="Locate on map"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 rounded bg-gray-800/80 flex items-center justify-center text-gray-500 hover:text-sky-400 hover:bg-gray-700/80">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </button>
               </div>
-            </Link>
+            </div>
           ))
         ) : (
           // Grid view
           <div className="grid grid-cols-2 gap-1.5 p-2">
             {sortedCollections.slice(0, 80).map(c => (
               <Link key={c.id} to={`/org/${c.slug}`}
-                className="block p-2.5 rounded-lg bg-gray-800/30 border border-gray-800/50 hover:bg-gray-800/60 hover:border-gray-700/50 transition-colors group">
+                onMouseEnter={() => setHighlightedId(c.id)} onMouseLeave={() => setHighlightedId(null)}
+                className={`block p-2.5 rounded-lg border transition-all group ${highlightedId === c.id ? 'bg-sky-500/15 border-sky-500/40 ring-1 ring-sky-500/20' : 'bg-gray-800/30 border-gray-800/50 hover:bg-gray-800/60 hover:border-gray-700/50'}`}>
                 <div className="flex items-center gap-2 mb-1.5">
                   {c.logo_url ? (
                     <img src={c.logo_url} alt="" className="w-7 h-7 rounded-md object-cover flex-shrink-0 bg-gray-800" />
@@ -978,7 +1035,8 @@ export default function CollectionsMap() {
               <div className="flex items-center gap-1 text-sm ml-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700/50">
                 {breadcrumbs.map((bc, i) => (
                   <span key={i} className="flex items-center gap-1">
-                    {i > 0 && <span className="text-gray-600">/</span>}
+                    {i > 0 && <span className="text-gray-600 text-xs">/</span>}
+                    {i === 1 && COUNTRY_FLAGS[bc.label] && <span className="text-sm">{COUNTRY_FLAGS[bc.label]}</span>}
                     <button onClick={bc.onClick} className={`whitespace-nowrap ${i === breadcrumbs.length - 1 ? 'text-sky-400 font-medium' : 'text-gray-400 hover:text-gray-200'}`}>{bc.label}</button>
                   </span>
                 ))}
@@ -1028,7 +1086,8 @@ export default function CollectionsMap() {
           <div className="flex items-center gap-1 text-xs mt-1.5 overflow-x-auto">
             {breadcrumbs.map((bc, i) => (
               <span key={i} className="flex items-center gap-1 flex-shrink-0">
-                {i > 0 && <span className="text-gray-600">/</span>}
+                {i > 0 && <span className="text-gray-600 text-[10px]">/</span>}
+                {i === 1 && COUNTRY_FLAGS[bc.label] && <span className="text-xs">{COUNTRY_FLAGS[bc.label]}</span>}
                 <button onClick={bc.onClick} className={i === breadcrumbs.length - 1 ? 'text-sky-400 font-medium' : 'text-gray-400'}>{bc.label}</button>
               </span>
             ))}
@@ -1077,13 +1136,30 @@ export default function CollectionsMap() {
             </MapContainer>
           )}
 
-          {/* Back button */}
+          {/* Drill transition overlay */}
+          {transitioning && (
+            <div className="absolute inset-0 z-[999] bg-gray-950/30 pointer-events-none drill-transition" />
+          )}
+
+          {/* Back button + drill level indicator */}
           {drill.level !== 'world' && (
-            <button onClick={goBack} title="Go back (Esc)"
-              className="absolute top-3 left-3 z-[1000] h-8 pl-2 pr-3 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-1.5 text-xs font-medium transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              Back
-            </button>
+            <div className="absolute top-3 left-3 z-[1000] flex items-center gap-2 fade-in">
+              <button onClick={goBack} title="Go back (Esc)"
+                className="h-8 pl-2 pr-3 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-1.5 text-xs font-medium transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                Back
+              </button>
+              {/* Drill depth dots */}
+              <div className="flex items-center gap-1 h-8 px-2 rounded-lg bg-gray-900/60 backdrop-blur border border-gray-800/30">
+                {DRILL_ORDER.map((level, i) => (
+                  <div key={level} className={`rounded-full transition-all duration-300 ${
+                    i <= DRILL_ORDER.indexOf(drill.level)
+                      ? 'w-2 h-2 bg-sky-400'
+                      : 'w-1.5 h-1.5 bg-gray-700'
+                  }`} title={level} />
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Map controls - top right */}
@@ -1122,32 +1198,52 @@ export default function CollectionsMap() {
           </div>
 
           {/* Color legend */}
-          <div className={`absolute z-[1000] bg-gray-900/80 backdrop-blur rounded-lg p-2.5 border border-gray-800/50 ${isMobile ? 'bottom-3 right-3' : 'bottom-14 right-3'}`}>
-            <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-1.5">{metric === 'count' ? 'Collections' : 'Vehicles'} per {levelLabel}</div>
-            <div className="w-24 sm:w-32 h-2 rounded-full" style={{ background: `linear-gradient(to right, ${choroplethGradientCSS()})` }} />
-            <div className="flex justify-between mt-0.5">
-              <span className="text-[9px] text-gray-600">0</span>
-              <span className="text-[9px] text-gray-600">max</span>
+          <div className={`absolute z-[1000] bg-gray-900/80 backdrop-blur rounded-xl p-2.5 border border-gray-800/50 legend-interactive ${isMobile ? 'bottom-3 right-3' : 'bottom-14 right-3'}`}>
+            <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-sky-400/60" />
+              {metric === 'count' ? 'Collections' : 'Vehicles'} per {levelLabel}
+            </div>
+            <div className="w-24 sm:w-32 h-2.5 rounded-full legend-bar" style={{ background: `linear-gradient(to right, ${choroplethGradientCSS()})` }} />
+            <div className="flex justify-between mt-1">
+              <span className="text-[9px] text-gray-600 font-medium">0</span>
+              <span className="text-[9px] text-gray-500 font-medium tabular-nums">{fmtNum(legendMax)}</span>
             </div>
           </div>
 
           {/* Summary stats */}
-          <div className={`absolute bottom-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-lg px-3 py-2 border border-gray-800/50 flex items-center ${isMobile ? 'gap-3' : 'gap-4'}`}>
-            <div>
-              <div className="text-white text-sm font-bold">{stats.total}</div>
-              <div className="text-[9px] text-gray-500">Collections</div>
+          <div className={`absolute bottom-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-xl px-1 py-1 border border-gray-800/50 flex items-stretch ${isMobile ? 'gap-0' : 'gap-0'}`}>
+            <div className="stat-card px-3 py-1.5 rounded-lg cursor-default">
+              <div className="text-white text-sm font-bold tabular-nums">{stats.total}</div>
+              <div className="text-[9px] text-gray-500 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-white/40 inline-block" />
+                Collections
+              </div>
             </div>
-            <div className="w-px h-6 bg-gray-700" />
-            <div>
-              <div className="text-sky-400 text-sm font-bold">{stats.vehicles.toLocaleString()}</div>
-              <div className="text-[9px] text-gray-500">Vehicles</div>
+            <div className="w-px self-stretch my-1.5 bg-gray-700/50" />
+            <div className="stat-card px-3 py-1.5 rounded-lg cursor-default">
+              <div className="text-sky-400 text-sm font-bold tabular-nums">{stats.vehicles.toLocaleString()}</div>
+              <div className="text-[9px] text-gray-500 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400/40 inline-block" />
+                Vehicles
+              </div>
             </div>
             {!isMobile && (
               <>
-                <div className="w-px h-6 bg-gray-700" />
-                <div>
-                  <div className="text-emerald-400 text-sm font-bold">{stats.cities}</div>
-                  <div className="text-[9px] text-gray-500">Cities</div>
+                <div className="w-px self-stretch my-1.5 bg-gray-700/50" />
+                <div className="stat-card px-3 py-1.5 rounded-lg cursor-default">
+                  <div className="text-emerald-400 text-sm font-bold tabular-nums">{stats.cities}</div>
+                  <div className="text-[9px] text-gray-500 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/40 inline-block" />
+                    Cities
+                  </div>
+                </div>
+                <div className="w-px self-stretch my-1.5 bg-gray-700/50" />
+                <div className="stat-card px-3 py-1.5 rounded-lg cursor-default">
+                  <div className="text-amber-400 text-sm font-bold tabular-nums">{stats.countries}</div>
+                  <div className="text-[9px] text-gray-500 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400/40 inline-block" />
+                    Countries
+                  </div>
                 </div>
               </>
             )}
