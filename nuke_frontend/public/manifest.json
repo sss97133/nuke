@@ -2,7 +2,7 @@
   "name": "n-zero",
   "short_name": "n-zero",
   "description": "Vehicle provenance engine",
-  "start_url": "/",
+  "start_url": "/tech",
   "scope": "/",
   "display": "standalone",
   "theme_color": "#000000",
@@ -23,5 +23,22 @@
       "sizes": "180x180",
       "type": "image/png"
     }
-  ]
+  ],
+  "share_target": {
+    "action": "/tech/upload",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "images",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  },
+  "categories": ["auto", "utilities"]
 }
