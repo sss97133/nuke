@@ -78,6 +78,7 @@ interface CabExtractedData {
   dougsTake: string | null;
   highlights: string | null;
   equipment: string | null;
+  bodyStyle: string | null;
   commentCount: number | null;
   bidCount: number | null;
 }
@@ -111,6 +112,7 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
     description: null,
     lotNumber: null,
     // C&B specific
+    bodyStyle: null,
     dougsTake: null,
     highlights: null,
     equipment: null,
@@ -246,6 +248,13 @@ function extractFromCarsAndBidsHtml(html: string, markdown?: string): CabExtract
       if (mdTransMatch && !result.transmission) {
         result.transmission = mdTransMatch[1].trim();
         console.log('✅ C&B: Found transmission in markdown:', result.transmission);
+      }
+
+      // Body Style - "Body StyleCoupe" or "Body StyleConvertible"
+      const mdBodyStyleMatch = md.match(/Body\s*Style([A-Za-z0-9\s/\-]+?)(?:Exterior|Interior|Seller|Engine|Drivetrain|Transmission|Location|\n|$)/i);
+      if (mdBodyStyleMatch && !result.bodyStyle) {
+        result.bodyStyle = mdBodyStyleMatch[1].trim();
+        console.log('✅ C&B: Found body style in markdown:', result.bodyStyle);
       }
 
       // Engine - "Engine6.2L Turbocharged V8" or "ContactEngine2.2L I4" (Contact prefix from seller section)
@@ -818,6 +827,7 @@ serve(async (req) => {
       interior_color: extracted.interiorColor,
       engine_type: extracted.engine,   // vehicles table uses 'engine_type' not 'engine'
       transmission: extracted.transmission,
+      body_style: extracted.bodyStyle,
       // Create rich description from Doug's Take + Highlights
       description: [
         extracted.dougsTake ? `**Doug's Take:**\n${extracted.dougsTake}` : null,
@@ -909,11 +919,39 @@ serve(async (req) => {
         .maybeSingle();
 
       if (insertError) {
-        throw new Error(`Vehicle insert failed: ${insertError.message}`);
+        // Handle duplicate key — vehicle exists but URL lookup missed it
+        if (insertError.message?.includes('duplicate key') || insertError.message?.includes('unique constraint')) {
+          console.log(`⚠️ C&B: Insert hit duplicate key, trying update by discovery_url`);
+          // Try both original and lowercased URLs
+          const urlVariants = [listingUrlCanonical, listingUrlCanonical.toLowerCase()];
+          let dupVehicle: { id: string } | null = null;
+          for (const variant of urlVariants) {
+            const { data } = await supabase
+              .from("vehicles")
+              .select("id")
+              .eq("discovery_url", variant)
+              .limit(1)
+              .maybeSingle();
+            if (data?.id) { dupVehicle = data; break; }
+          }
+          if (dupVehicle?.id) {
+            vehicleId = dupVehicle.id;
+            await supabase
+              .from("vehicles")
+              .update({ ...vehicleData, updated_at: new Date().toISOString() })
+              .eq("id", vehicleId);
+            console.log(`✅ C&B: Updated existing vehicle via fallback: ${vehicleId}`);
+          } else {
+            throw new Error(`Vehicle insert failed: ${insertError.message}`);
+          }
+        } else {
+          throw new Error(`Vehicle insert failed: ${insertError.message}`);
+        }
+      } else {
+        vehicleId = insertedVehicle.id;
+        created = true;
+        console.log(`✅ C&B: Created new vehicle: ${vehicleId}`);
       }
-      vehicleId = insertedVehicle.id;
-      created = true;
-      console.log(`✅ C&B: Created new vehicle: ${vehicleId}`);
     }
 
     // Upsert images - use same attribution pattern as BaT extractor to satisfy vehicle_images_attribution_check

@@ -46,6 +46,7 @@ interface BJVehicle {
   cylinders: number | null;
   exterior_color: string | null;
   interior_color: string | null;
+  mileage: number | null;
   sale_price: number | null;
   description: string | null;
   auction_name: string | null;
@@ -55,9 +56,27 @@ interface BJVehicle {
 }
 
 function titleCase(s: string): string {
+  // Preserve known uppercase abbreviations (BMW, AMG, GT, SS, etc.)
+  const preserveUpper = new Set([
+    'BMW', 'AMG', 'GT', 'SS', 'RS', 'GTS', 'GTO', 'GTI', 'GTR',
+    'SL', 'SLK', 'SLS', 'CLS', 'CLK', 'SUV', 'TDI', 'TSI',
+    'V6', 'V8', 'V10', 'V12', 'I4', 'I6', 'W12', 'HP', 'RPM',
+    'AWD', 'FWD', 'RWD', '4WD', 'CVT', 'DSG', 'PDK',
+    'SC', 'SE', 'LE', 'LT', 'LS', 'LTZ', 'SRT', 'TRD',
+    'XJ', 'XK', 'XF', 'DB', 'DB5', 'DB9', 'DB11',
+    'M3', 'M4', 'M5', 'M6', 'Z3', 'Z4', 'X3', 'X5', 'X6',
+    'F1', 'F40', 'F50', 'II', 'III', 'IV', 'VI',
+  ]);
   return s
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .split(/\s+/)
+    .map(word => {
+      const upper = word.toUpperCase();
+      if (preserveUpper.has(upper)) return upper;
+      // Preserve alphanumeric codes like "F150", "C10", "E30"
+      if (/^[A-Z]\d+$/i.test(word)) return word.toUpperCase();
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
 }
 
 function parseMarkdown(markdown: string, url: string): BJVehicle {
@@ -74,6 +93,7 @@ function parseMarkdown(markdown: string, url: string): BJVehicle {
     cylinders: null,
     exterior_color: null,
     interior_color: null,
+    mileage: null,
     sale_price: null,
     description: null,
     auction_name: null,
@@ -185,6 +205,28 @@ function parseMarkdown(markdown: string, url: string): BJVehicle {
     }
   }
 
+  // Extract mileage from description/summary text (BJ has no structured mileage field)
+  const textForMileage = (vehicle.description || '') + ' ' + markdown;
+  const mileagePatterns = [
+    /(\d[\d,]*)\s*(?:actual|original|documented|indicated)\s*miles/i,
+    /mileage\s*(?:of|:)?\s*(\d[\d,]*)/i,
+    /odometer\s*(?:reads?|shows?|indicates?|:)?\s*(\d[\d,]*)/i,
+    /(\d[\d,]*)\s*miles\s*(?:on\s*(?:the\s*)?(?:odometer|clock))/i,
+    /only\s*(\d[\d,]*)\s*miles/i,
+    /(\d[\d,]*)\s*total\s*miles/i,
+    /(\d[\d,]*)\s*actual\s*miles/i,
+  ];
+  for (const pattern of mileagePatterns) {
+    const mileMatch = textForMileage.match(pattern);
+    if (mileMatch) {
+      const miles = parseInt(mileMatch[1].replace(/,/g, ''), 10);
+      if (miles > 0 && miles < 1_000_000) {
+        vehicle.mileage = miles;
+        break;
+      }
+    }
+  }
+
   return vehicle;
 }
 
@@ -198,6 +240,38 @@ function extractImageUrls(html: string): string[] {
     urls.add(m[0]);
   }
   return [...urls];
+}
+
+// Extract embedded JSON from BJ HTML for sale price and other data
+function extractEmbeddedJson(html: string): Record<string, unknown> | null {
+  // BJ embeds vehicle data as escaped JSON in the page
+  const patterns = [
+    /\{"title":\s*"[^"]*",\s*"full_description"/,
+    /\\?"title\\?":\s*\\?"[^"]*\\?",\s*\\?"full_description\\?"/,
+  ];
+  for (const pattern of patterns) {
+    const idx = html.search(pattern);
+    if (idx === -1) continue;
+    // Find a reasonable end boundary
+    let depth = 0;
+    let end = idx;
+    const isEscaped = html[idx] === '\\';
+    for (let i = idx; i < Math.min(idx + 5000, html.length); i++) {
+      if (isEscaped) {
+        if (html.substring(i, i + 2) === '\\{') depth++;
+        if (html.substring(i, i + 2) === '\\}') { depth--; if (depth <= 0) { end = i + 2; break; } }
+      } else {
+        if (html[i] === '{') depth++;
+        if (html[i] === '}') { depth--; if (depth <= 0) { end = i + 1; break; } }
+      }
+    }
+    try {
+      let raw = html.substring(idx, end);
+      if (isEscaped) raw = raw.replace(/\\"/g, '"').replace(/\\{/g, '{').replace(/\\}/g, '}');
+      return JSON.parse(raw);
+    } catch { continue; }
+  }
+  return null;
 }
 
 // --- Firecrawl helper ---
@@ -268,19 +342,28 @@ async function saveVehicle(
 
   const existingId = queueEntry?.vehicle_id || existing?.id;
 
-  const vehicleData = {
+  const vehicleData: Record<string, unknown> = {
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
     vin: vehicle.vin && vehicle.vin.length >= 5 ? vehicle.vin : null,
     transmission: vehicle.transmission,
-    engine: vehicle.engine,
-    exterior_color: vehicle.exterior_color,
+    engine_type: vehicle.engine,
+    color: vehicle.exterior_color,
     interior_color: vehicle.interior_color,
+    mileage: vehicle.mileage,
     sale_price: vehicle.sale_price,
     description: vehicle.description,
+    discovery_url: vehicle.url,
+    discovery_source: "barrett-jackson",
     ...(vehicle.style ? { body_style: vehicle.style } : {}),
   };
+
+  // Remove null values for updates (don't overwrite existing data with null)
+  const cleanData: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(vehicleData)) {
+    if (v !== null && v !== undefined) cleanData[k] = v;
+  }
 
   let vehicleId: string;
   let isNew = false;
@@ -289,52 +372,67 @@ async function saveVehicle(
     // Update existing
     await supabase
       .from("vehicles")
-      .update(vehicleData)
+      .update(cleanData)
       .eq("id", existingId);
     vehicleId = existingId;
   } else {
     // Insert new
     const { data: inserted, error: insertErr } = await supabase
       .from("vehicles")
-      .insert(vehicleData)
+      .insert({ ...cleanData, status: "active" })
       .select("id")
       .maybeSingle();
 
-    if (insertErr) throw insertErr;
+    if (insertErr) throw new Error(`Vehicle insert failed: ${insertErr.message} (${insertErr.code})`);
     vehicleId = inserted.id;
     isNew = true;
   }
 
   // Save images
   if (vehicle.image_urls.length > 0) {
-    const imageRows = vehicle.image_urls.map((url, idx) => ({
-      vehicle_id: vehicleId,
-      url,
-      position: idx,
-    }));
-
-    // Upsert by (vehicle_id, url) to avoid duplicates
-    for (const row of imageRows) {
-      await supabase
+    for (let idx = 0; idx < Math.min(vehicle.image_urls.length, 50); idx++) {
+      const imgUrl = vehicle.image_urls[idx];
+      const { data: existing } = await supabase
         .from("vehicle_images")
-        .upsert(row, { onConflict: "vehicle_id,url" })
-        .select("id");
+        .select("id")
+        .eq("vehicle_id", vehicleId)
+        .eq("image_url", imgUrl)
+        .limit(1)
+        .maybeSingle();
+      if (!existing) {
+        await supabase
+          .from("vehicle_images")
+          .insert({
+            vehicle_id: vehicleId,
+            image_url: imgUrl,
+            source: "external_import",
+            source_url: imgUrl,
+            is_external: true,
+            position: idx,
+          });
+      }
     }
   }
 
-  // Create auction event
-  await supabase.from("auction_events").upsert(
-    {
+  // Create auction event (check if exists first)
+  const { data: existingEvent } = await supabase
+    .from("auction_events")
+    .select("id")
+    .eq("vehicle_id", vehicleId)
+    .eq("source", "barrett-jackson")
+    .eq("source_url", vehicle.url)
+    .limit(1)
+    .maybeSingle();
+  if (!existingEvent) {
+    await supabase.from("auction_events").insert({
       vehicle_id: vehicleId,
-      platform: "barrett-jackson",
-      auction_url: vehicle.url,
-      status: vehicle.status?.toLowerCase() === "sold" ? "sold" : "listed",
-      ...(vehicle.sale_price ? { sale_price: vehicle.sale_price } : {}),
-      ...(vehicle.auction_name ? { auction_name: vehicle.auction_name } : {}),
-      ...(vehicle.lot_number ? { lot_number: vehicle.lot_number } : {}),
-    },
-    { onConflict: "vehicle_id,platform,auction_url" }
-  );
+      source: "barrett-jackson",
+      source_url: vehicle.url,
+      outcome: vehicle.status?.toLowerCase() === "sold" ? "sold" : "listed",
+      winning_bid: vehicle.sale_price || null,
+      lot_number: vehicle.lot_number || null,
+    });
+  }
 
   return { vehicleId, isNew };
 }
@@ -365,12 +463,38 @@ serve(async (req) => {
 
       console.log(`[BJ] Extracting: ${url}`);
       const { markdown, html } = await scrapeWithFirecrawl(url);
+
+      // Detect removed/unavailable pages
+      if (markdown.includes('no longer available') || markdown.includes('is no longer available')) {
+        return okJson({ success: false, error: 'Page no longer available (removed by Barrett-Jackson)' }, 410);
+      }
+
       const vehicle = parseMarkdown(markdown, url);
       vehicle.image_urls = extractImageUrls(html);
 
+      // Bail if we couldn't parse basic vehicle data
+      if (!vehicle.year && !vehicle.make) {
+        return okJson({ success: false, error: 'Could not parse vehicle data from page' }, 422);
+      }
+
+      // Try embedded JSON for sale price (BJ hides price behind login in UI)
+      const embedded = extractEmbeddedJson(html);
+      if (embedded) {
+        if (!vehicle.sale_price && typeof embedded.price === 'string') {
+          const priceStr = (embedded.price as string).replace(/[$,]/g, '');
+          const price = parseFloat(priceStr);
+          if (Number.isFinite(price) && price >= 1000) {
+            vehicle.sale_price = Math.round(price);
+          }
+        }
+        if (typeof embedded.is_sold === 'boolean' && embedded.is_sold && !vehicle.status) {
+          vehicle.status = 'Sold';
+        }
+      }
+
       console.log(
         `[BJ] Parsed: ${vehicle.year} ${vehicle.make} ${vehicle.model}, ` +
-          `${vehicle.image_urls.length} images`
+          `price=${vehicle.sale_price}, mileage=${vehicle.mileage}, ${vehicle.image_urls.length} images`
       );
 
       const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
@@ -447,8 +571,30 @@ serve(async (req) => {
           const { markdown, html } = await scrapeWithFirecrawl(
             item.listing_url
           );
+
+          // Detect removed/unavailable pages
+          if (markdown.includes('no longer available') || markdown.includes('is no longer available')) {
+            await supabase
+              .from("import_queue")
+              .update({ status: "failed", error_message: "Page no longer available (removed)" })
+              .eq("id", item.id);
+            results.failed++;
+            continue;
+          }
+
           const vehicle = parseMarkdown(markdown, item.listing_url);
           vehicle.image_urls = extractImageUrls(html);
+
+          // Try embedded JSON for sale price
+          const embedded = extractEmbeddedJson(html);
+          if (embedded) {
+            if (!vehicle.sale_price && typeof embedded.price === 'string') {
+              const priceStr = (embedded.price as string).replace(/[$,]/g, '');
+              const price = parseFloat(priceStr);
+              if (Number.isFinite(price) && price >= 1000) vehicle.sale_price = Math.round(price);
+            }
+            if (typeof embedded.is_sold === 'boolean' && embedded.is_sold && !vehicle.status) vehicle.status = 'Sold';
+          }
 
           if (!vehicle.year && !vehicle.make) {
             // Couldn't parse - mark as failed
@@ -501,6 +647,111 @@ serve(async (req) => {
       return okJson({ success: true, ...results });
     }
 
+    // Re-enrich existing vehicles — CONCURRENT processing for speed
+    if (action === "re_enrich") {
+      const rawLimit = Number(body.limit);
+      const limit = Math.min(
+        Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 15,
+        100
+      );
+      const concurrency = Math.min(Number(body.concurrency) || 3, 10);
+
+      const { data: candidates, error: candErr } = await supabase
+        .rpc("get_enrichment_candidates", {
+          p_source: "barrett-jackson",
+          p_limit: limit,
+          p_offset: 0,
+          p_min_missing: 2,
+        });
+
+      if (candErr) throw new Error(`RPC error: ${candErr.message}`);
+      if (!candidates?.length) {
+        return okJson({ success: true, message: "No BJ candidates to enrich", processed: 0 });
+      }
+
+      const results = {
+        total: candidates.length,
+        success: 0,
+        failed: 0,
+        fields_added: 0,
+        field_counts: {} as Record<string, number>,
+        errors: [] as string[],
+      };
+
+      async function processOne(cand: typeof candidates[0]) {
+        await supabase.from("vehicles").update({ last_enrichment_attempt: new Date().toISOString() }).eq("id", cand.id);
+        try {
+          const { markdown, html } = await scrapeWithFirecrawl(cand.discovery_url);
+
+          if (markdown.includes('no longer available') || markdown.includes('is no longer available')) {
+            await supabase.from("vehicles").update({ enrichment_failures: 3 }).eq("id", cand.id);
+            results.failed++;
+            if (results.errors.length < 5) results.errors.push(`${cand.discovery_url}: page removed`);
+            return;
+          }
+
+          const vehicle = parseMarkdown(markdown, cand.discovery_url);
+          vehicle.image_urls = extractImageUrls(html);
+
+          const embedded = extractEmbeddedJson(html);
+          if (embedded) {
+            if (!vehicle.sale_price && typeof embedded.price === 'string') {
+              const priceStr = (embedded.price as string).replace(/[$,]/g, '');
+              const price = parseFloat(priceStr);
+              if (Number.isFinite(price) && price >= 1000) vehicle.sale_price = Math.round(price);
+            }
+            if (typeof embedded.is_sold === 'boolean' && embedded.is_sold && !vehicle.status) vehicle.status = 'Sold';
+          }
+
+          if (!vehicle.year && !vehicle.make) {
+            await supabase.from("vehicles").update({ enrichment_failures: (cand.enrichment_failures || 0) + 1 }).eq("id", cand.id);
+            results.failed++;
+            return;
+          }
+
+          const { vehicleId } = await saveVehicle(supabase, vehicle);
+
+          const { data: updated } = await supabase
+            .from("vehicles")
+            .select("vin,sale_price,color,mileage,description,transmission,body_style")
+            .eq("id", vehicleId)
+            .maybeSingle();
+
+          if (updated) {
+            const fieldsAdded: string[] = [];
+            if (!cand.vin && updated.vin) fieldsAdded.push('vin');
+            if (!cand.sale_price && updated.sale_price) fieldsAdded.push('price');
+            if (!cand.color && updated.color) fieldsAdded.push('color');
+            if (!cand.mileage && updated.mileage) fieldsAdded.push('mileage');
+            if (!cand.description && updated.description) fieldsAdded.push('description');
+            if (!cand.transmission && updated.transmission) fieldsAdded.push('transmission');
+            if (!cand.body_style && updated.body_style) fieldsAdded.push('body_style');
+            results.fields_added += fieldsAdded.length;
+            for (const f of fieldsAdded) {
+              results.field_counts[f] = (results.field_counts[f] || 0) + 1;
+            }
+          }
+
+          results.success++;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+          await supabase.from("vehicles").update({
+            enrichment_failures: (cand.enrichment_failures || 0) + 1,
+          }).eq("id", cand.id);
+          results.failed++;
+          if (results.errors.length < 5) results.errors.push(`${cand.discovery_url}: ${msg.slice(0, 100)}`);
+        }
+      }
+
+      // Process in concurrent chunks
+      for (let i = 0; i < candidates.length; i += concurrency) {
+        const chunk = candidates.slice(i, i + concurrency);
+        await Promise.all(chunk.map(processOne));
+      }
+
+      return okJson({ success: true, ...results });
+    }
+
     // Stats action
     if (action === "stats") {
       const { data: stats } = await supabase.rpc("execute_sql", {
@@ -529,7 +780,7 @@ serve(async (req) => {
       400
     );
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = e instanceof Error ? e.message : (typeof e === 'object' && e !== null ? JSON.stringify(e) : String(e));
     console.error("[BJ] Error:", msg);
     return new Response(JSON.stringify({ success: false, error: msg }), {
       status: 500,

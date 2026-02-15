@@ -158,6 +158,95 @@ async function processQueue(
   return { item: queueItems, extracted };
 }
 
+// --- Firecrawl helper for page scraping ---
+
+async function scrapeWithFirecrawl(url: string): Promise<string> {
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!apiKey) throw new Error("FIRECRAWL_API_KEY not set");
+
+  const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["markdown"],
+      waitFor: 5000,
+      timeout: 45000,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Firecrawl error ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  if (!data.success) {
+    throw new Error(`Firecrawl failed: ${JSON.stringify(data).slice(0, 200)}`);
+  }
+
+  return data.data?.markdown || "";
+}
+
+// --- Parse Collecting Cars markdown page ---
+
+function parseCCMarkdown(markdown: string, url: string): Record<string, unknown> {
+  const vehicle: Record<string, unknown> = { discovery_url: url, discovery_source: "collecting_cars" };
+
+  // Title: "# 1977 Datsun 260Z"
+  const titleMatch = markdown.match(/^# (\d{4})\s+(.+)$/m);
+  if (titleMatch) {
+    vehicle.year = parseInt(titleMatch[1], 10);
+    const rest = titleMatch[2].trim();
+    const parts = rest.split(/\s+/);
+    vehicle.make = parts[0] || null;
+    vehicle.model = parts.slice(1).join(" ") || null;
+  }
+
+  // Specs via icon filenames: "icon-mileage.svg)42,083 km"
+  const mileageMatch = markdown.match(/icon-mileage\.svg\)([^\n]+)/i);
+  if (mileageMatch) {
+    const mStr = mileageMatch[1].trim();
+    const mNum = parseInt(mStr.replace(/,/g, ""), 10);
+    if (mNum > 0 && mNum < 10_000_000) vehicle.mileage = mNum;
+  }
+
+  const transMatch = markdown.match(/icon-transmission\.svg\)([^\n]+)/i);
+  if (transMatch) vehicle.transmission = transMatch[1].trim();
+
+  const paintMatch = markdown.match(/icon-paint\.svg\)([^\n]+)/i);
+  if (paintMatch) vehicle.color = paintMatch[1].trim();
+
+  const interiorMatch = markdown.match(/icon-interior\.svg\)([^\n]+)/i);
+  if (interiorMatch) vehicle.interior_color = interiorMatch[1].trim();
+
+  const engineMatch = markdown.match(/icon-engine\.svg\)([^\n]+)/i);
+  if (engineMatch) vehicle.engine_type = engineMatch[1].trim();
+
+  const bodyMatch = markdown.match(/icon-body(?:style)?\.svg\)([^\n]+)/i);
+  if (bodyMatch) vehicle.body_style = bodyMatch[1].trim();
+
+  // Description: KEY FACTS block (English)
+  const descMatch = markdown.match(/\*\*KEY FACTS\*\*\s*([\s\S]+?)(?:\*\*(?:DATOS CLAVE|POINTS CL[ÉE]S|FAKTEN|FATTI CHIAVE)\*\*|$)/i);
+  if (descMatch) {
+    vehicle.description = (descMatch[1] as string).trim().slice(0, 5000);
+  }
+
+  // Images from collectingcars.com
+  const imageSet = new Set<string>();
+  const imgRegex = /https:\/\/images\.collectingcars\.com\/[^)\s"]+\.(?:jpg|jpeg|png|webp)/gi;
+  let imgM;
+  while ((imgM = imgRegex.exec(markdown)) !== null) {
+    imageSet.add(imgM[0]);
+  }
+  vehicle.image_urls = [...imageSet];
+
+  return vehicle;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -165,16 +254,155 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
+    const action = body.action || "extract";
     const { url, save_to_db = false } = body;
-
-    if (!url) {
-      return okJson({ success: false, error: "URL required" }, 400);
-    }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    // Re-enrich: concurrent enrichment for cron-driven processing
+    if (action === "re_enrich") {
+      const rawLimit = Number(body.limit);
+      const limit = Math.min(
+        Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 15,
+        100
+      );
+      const concurrency = Math.min(Number(body.concurrency) || 3, 10);
+
+      const { data: candidates, error: candErr } = await supabase
+        .rpc("get_enrichment_candidates", {
+          p_source: "collecting_cars",
+          p_limit: limit,
+          p_offset: 0,
+          p_min_missing: 2,
+        });
+
+      if (candErr) throw new Error(`RPC error: ${candErr.message}`);
+      if (!candidates?.length) {
+        return okJson({ success: true, message: "No Collecting Cars candidates to enrich", processed: 0 });
+      }
+
+      const results = {
+        total: candidates.length,
+        success_count: 0,
+        failed: 0,
+        fields_added: 0,
+        field_counts: {} as Record<string, number>,
+        errors: [] as string[],
+      };
+
+      async function processOneEnrich(cand: any) {
+        await supabase.from("vehicles").update({ last_enrichment_attempt: new Date().toISOString() }).eq("id", cand.id);
+        try {
+          const markdown = await scrapeWithFirecrawl(cand.discovery_url);
+
+          // Detect 404/removed pages
+          if (markdown.includes("404") || markdown.includes("page not found") || markdown.length < 200) {
+            await supabase.from("vehicles").update({ enrichment_failures: 3 }).eq("id", cand.id);
+            results.failed++;
+            if (results.errors.length < 5) results.errors.push(`${cand.discovery_url}: page removed/404`);
+            return;
+          }
+
+          const vehicle = parseCCMarkdown(markdown, cand.discovery_url);
+
+          if (!vehicle.year && !vehicle.make) {
+            await supabase.from("vehicles").update({ enrichment_failures: (cand.enrichment_failures || 0) + 1 }).eq("id", cand.id);
+            results.failed++;
+            return;
+          }
+
+          // Build null-safe update
+          const updateData: Record<string, unknown> = {};
+          if (vehicle.year) updateData.year = vehicle.year;
+          if (vehicle.make) updateData.make = vehicle.make;
+          if (vehicle.model) updateData.model = vehicle.model;
+          if (vehicle.mileage) updateData.mileage = vehicle.mileage;
+          if (vehicle.color) updateData.color = vehicle.color;
+          if (vehicle.interior_color) updateData.interior_color = vehicle.interior_color;
+          if (vehicle.transmission) updateData.transmission = vehicle.transmission;
+          if (vehicle.engine_type) updateData.engine_type = vehicle.engine_type;
+          if (vehicle.body_style) updateData.body_style = vehicle.body_style;
+          if (vehicle.description) updateData.description = vehicle.description;
+
+          const fieldsAdded: string[] = [];
+          if (!cand.color && updateData.color) fieldsAdded.push("color");
+          if (!cand.mileage && updateData.mileage) fieldsAdded.push("mileage");
+          if (!cand.description && updateData.description) fieldsAdded.push("description");
+          if (!cand.transmission && updateData.transmission) fieldsAdded.push("transmission");
+          if (!cand.body_style && updateData.body_style) fieldsAdded.push("body_style");
+
+          if (Object.keys(updateData).length > 0) {
+            await supabase.from("vehicles").update(updateData).eq("id", cand.id);
+          }
+
+          // Save images
+          const imgUrls = (vehicle.image_urls as string[]) || [];
+          for (let idx = 0; idx < Math.min(imgUrls.length, 50); idx++) {
+            const imgUrl = imgUrls[idx];
+            const { data: existingImg } = await supabase
+              .from("vehicle_images")
+              .select("id")
+              .eq("vehicle_id", cand.id)
+              .eq("image_url", imgUrl)
+              .limit(1)
+              .maybeSingle();
+            if (!existingImg) {
+              await supabase.from("vehicle_images").insert({
+                vehicle_id: cand.id,
+                image_url: imgUrl,
+                source: "external_import",
+                is_external: true,
+                position: idx,
+              });
+            }
+          }
+
+          // Auction event
+          const { data: existingEvent } = await supabase
+            .from("auction_events")
+            .select("id")
+            .eq("vehicle_id", cand.id)
+            .eq("source", "collecting_cars")
+            .eq("source_url", cand.discovery_url)
+            .limit(1)
+            .maybeSingle();
+          if (!existingEvent) {
+            await supabase.from("auction_events").insert({
+              vehicle_id: cand.id,
+              source: "collecting_cars",
+              source_url: cand.discovery_url,
+              outcome: "listed",
+            });
+          }
+
+          results.success_count++;
+          results.fields_added += fieldsAdded.length;
+          for (const f of fieldsAdded) {
+            results.field_counts[f] = (results.field_counts[f] || 0) + 1;
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : (typeof err === "object" && err !== null ? JSON.stringify(err) : String(err));
+          await supabase.from("vehicles").update({ enrichment_failures: (cand.enrichment_failures || 0) + 1 }).eq("id", cand.id);
+          results.failed++;
+          if (results.errors.length < 5) results.errors.push(`${cand.discovery_url}: ${msg.slice(0, 100)}`);
+        }
+      }
+
+      // Process in concurrent chunks
+      for (let i = 0; i < candidates.length; i += concurrency) {
+        const chunk = candidates.slice(i, i + concurrency);
+        await Promise.all(chunk.map(processOneEnrich));
+      }
+
+      return okJson({ success: true, ...results });
+    }
+
+    if (!url) {
+      return okJson({ success: false, error: "URL required" }, 400);
+    }
 
     const { item, extracted, error } = await processQueue(supabase, url);
 
