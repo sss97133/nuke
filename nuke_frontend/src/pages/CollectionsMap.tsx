@@ -700,6 +700,8 @@ export default function CollectionsMap() {
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [compareOpen, setCompareOpen] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(true);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [locating, setLocating] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -1033,6 +1035,36 @@ export default function CollectionsMap() {
     collections.filter(c => compareIds.has(c.id)),
   [collections, compareIds]);
 
+  const locateMe = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setUserLocation(loc);
+        setLocating(false);
+        mapRef.current?.flyTo(loc, 10, { duration: 1.2 });
+        setSortBy('distance');
+        setMapCenter(loc);
+      },
+      () => { setLocating(false); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
+  // Nearest collection to user
+  const nearestToUser = useMemo(() => {
+    if (!userLocation || !collections.length) return null;
+    const [ulat, ulng] = userLocation;
+    let best: Collection | null = null;
+    let bestDist = Infinity;
+    for (const c of collections) {
+      const d = Math.sqrt(Math.pow(c.lat - ulat, 2) + Math.pow(c.lng - ulng, 2));
+      if (d < bestDist) { bestDist = d; best = c; }
+    }
+    return best;
+  }, [userLocation, collections]);
+
   const shareUrl = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -1261,6 +1293,35 @@ export default function CollectionsMap() {
         )}
       </div>
       <div className="flex-1 overflow-y-auto custom-scroll">
+        {/* Top collections showcase */}
+        {sortedCollections.length > 5 && !filterFavorites && !searchTerm && (
+          <div className="px-3 py-2 border-b border-gray-800/30">
+            <div className="text-[9px] text-gray-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <svg className="w-2.5 h-2.5 text-amber-500/60" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+              Largest collections
+            </div>
+            <div className="flex gap-2 overflow-x-auto custom-scroll pb-1">
+              {[...scopedCollections].sort((a, b) => b.total_inventory - a.total_inventory).slice(0, 5).map(c => (
+                <Link key={`top-${c.id}`} to={`/org/${c.slug}`}
+                  onMouseEnter={() => { setHighlightedId(c.id); mapRef.current?.flyTo([c.lat, c.lng], 10, { duration: 0.5 }); }}
+                  onMouseLeave={() => setHighlightedId(null)}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:border-sky-500/30 hover:bg-sky-500/10 transition-all group">
+                  {c.logo_url ? (
+                    <img src={c.logo_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-sky-900/50 to-blue-900/50 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[7px] text-sky-400 font-bold">{c.name.charAt(0)}</span>
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-[9px] text-gray-300 font-medium truncate max-w-[80px] group-hover:text-sky-400 transition-colors">{c.name}</div>
+                    <div className="text-[8px] text-sky-400/70 font-semibold">{c.total_inventory}v</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         {viewMode === 'list' ? (
           // List view
           sortedCollections.slice(0, 100).map(c => {
@@ -1477,6 +1538,15 @@ export default function CollectionsMap() {
               className="w-8 h-8 rounded-lg bg-gray-800/60 border border-gray-700/50 flex items-center justify-center text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
             </button>
+            {/* Near me / geolocation */}
+            <button onClick={locateMe} title="Find collections near me"
+              className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${userLocation ? 'bg-emerald-600/20 border-emerald-500/40 text-emerald-400' : 'bg-gray-800/60 border-gray-700/50 text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30'}`}>
+              {locating ? (
+                <div className="w-4 h-4 border-2 border-transparent border-t-emerald-400 rounded-full animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              )}
+            </button>
             {/* Auto-tour button */}
             <button onClick={touring ? stopTour : startTour} title={touring ? 'Stop tour' : 'Auto-tour collections'}
               className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${touring ? 'bg-sky-600/30 border-sky-500/50 text-sky-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-400 hover:text-sky-400 hover:bg-sky-500/10 hover:border-sky-500/30'}`}>
@@ -1565,6 +1635,20 @@ export default function CollectionsMap() {
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
                 worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId}
                 favorites={favorites} toggleFavorite={toggleFavorite} showHeatmap={showHeatmap} />
+              {/* User location marker */}
+              {userLocation && (
+                <CircleMarker center={userLocation} radius={8}
+                  pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.3, weight: 2 }}>
+                  <Tooltip permanent direction="top" offset={[0, -8]} className="map-tooltip">
+                    <span style={{ fontSize: 10, fontWeight: 600 }}>You are here</span>
+                    {nearestToUser && (
+                      <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>
+                        Nearest: {nearestToUser.name}
+                      </div>
+                    )}
+                  </Tooltip>
+                </CircleMarker>
+              )}
             </MapContainer>
           )}
 
