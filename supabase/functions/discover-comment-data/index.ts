@@ -117,7 +117,7 @@ Return ONLY valid JSON.`;
 async function discoverComments(
   vehicle: any,
   comments: any[],
-  anthropicKey: string
+  apiKeys: { xai?: string; anthropic?: string }
 ): Promise<any> {
   // Format comments
   const formattedComments = comments
@@ -137,29 +137,94 @@ async function discoverComments(
     .replace("{comment_count}", String(comments.length))
     .replace("{comments}", formattedComments.substring(0, 8000));
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-haiku-20240307",
-      max_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  // Try xAI first, fall back to Anthropic
+  const providers = [];
+  if (apiKeys.xai) providers.push({ name: "xai", key: apiKeys.xai });
+  if (apiKeys.anthropic) providers.push({ name: "anthropic", key: apiKeys.anthropic });
 
-  const result = await response.json();
-  const content = result.content?.[0]?.text || "";
-
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]);
+  if (providers.length === 0) {
+    throw new Error("No AI API keys configured (need XAI_API_KEY or ANTHROPIC_API_KEY)");
   }
 
-  return { raw_response: content, parse_failed: true };
+  let lastError = "";
+  for (const provider of providers) {
+    try {
+      let content = "";
+
+      if (provider.name === "xai") {
+        const response = await fetch("https://api.x.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${provider.key}`,
+          },
+          body: JSON.stringify({
+            model: "grok-3-mini",
+            max_tokens: 4096,
+            reasoning_effort: "low",
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => "");
+          lastError = `xAI ${response.status}: ${errText.slice(0, 200)}`;
+          console.error(lastError);
+          continue;
+        }
+
+        const result = await response.json();
+        content = result.choices?.[0]?.message?.content || "";
+      } else {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": provider.key,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-3-5-haiku-latest",
+            max_tokens: 4096,
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => "");
+          lastError = `Anthropic ${response.status}: ${errText.slice(0, 200)}`;
+          console.error(lastError);
+          continue;
+        }
+
+        const result = await response.json();
+        content = result.content?.[0]?.text || "";
+      }
+
+      if (!content) {
+        lastError = `${provider.name}: empty response`;
+        console.error(lastError);
+        continue;
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        lastError = `${provider.name}: no JSON in response`;
+        console.error(lastError, content.slice(0, 200));
+        continue;
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      parsed._provider = provider.name;
+      return parsed;
+    } catch (e: any) {
+      lastError = `${provider.name}: ${e.message}`;
+      console.error(lastError);
+      continue;
+    }
+  }
+
+  throw new Error(`All AI providers failed. Last error: ${lastError}`);
 }
 
 serve(async (req) => {
@@ -171,15 +236,17 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const incomingAuth = req.headers.get("authorization") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const xaiKey = Deno.env.get("XAI_API_KEY") ?? "";
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
     const tokenForClient = incomingAuth.startsWith("Bearer ")
       ? incomingAuth.substring(7)
       : serviceKey;
     const supabase = createClient(supabaseUrl, tokenForClient);
 
-    if (!anthropicKey) {
-      throw new Error("ANTHROPIC_API_KEY not configured");
+    if (!xaiKey && !anthropicKey) {
+      throw new Error("No AI API keys configured (need XAI_API_KEY or ANTHROPIC_API_KEY)");
     }
+    const apiKeys = { xai: xaiKey || undefined, anthropic: anthropicKey || undefined };
 
     const body = await req.json().catch(() => ({}));
     const vehicleId = body.vehicle_id;
@@ -367,7 +434,7 @@ serve(async (req) => {
 
         console.log(`Discovering comments: ${vehicle.year} ${vehicle.make} ${vehicle.model} (${comments.length} comments)`);
 
-        const discovered = await discoverComments(vehicle, comments, anthropicKey);
+        const discovered = await discoverComments(vehicle, comments, apiKeys);
 
         // Extract sentiment for quick access
         const sentiment = discovered.sentiment?.overall || null;
