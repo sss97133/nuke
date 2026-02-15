@@ -248,7 +248,7 @@ function fmtNum(n: number): string {
 function MapLayers({
   collections, drill, setDrill, metric, searchTerm,
   worldGeo, statesGeo, countiesGeo, stateAssign, countyAssign, highlightedId,
-  favorites, toggleFavorite,
+  favorites, toggleFavorite, showHeatmap,
 }: {
   collections: Collection[];
   drill: DrillState;
@@ -263,6 +263,7 @@ function MapLayers({
   highlightedId: string | null;
   favorites: Set<string>;
   toggleFavorite: (id: string) => void;
+  showHeatmap: boolean;
 }) {
   const map = useMap();
 
@@ -396,10 +397,11 @@ function MapLayers({
         const halfSize = size / 2;
         const isFav = favorites.has(c.id);
         const starBadge = isFav ? `<div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;line-height:1;border:1.5px solid #0f172a;z-index:2">★</div>` : '';
+        const glowClass = isHighlighted ? ' glow-ring' : '';
         const icon = c.logo_url
           ? L.divIcon({
               className: '',
-              html: `<div style="position:relative;width:${size}px;height:${size}px;border-radius:50%;border:${isHighlighted ? '3px solid #38bdf8' : isFav ? '2px solid #f59e0b' : '2px solid #fff'};box-shadow:${isHighlighted ? '0 0 20px rgba(56,189,248,0.8),0 0 40px rgba(56,189,248,0.3)' : '0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5)'};overflow:visible;background:#1e293b;transition:all 200ms ease">${starBadge}<div style="width:100%;height:100%;border-radius:50%;overflow:hidden"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div></div>`,
+              html: `<div class="${glowClass}" style="position:relative;width:${size}px;height:${size}px;border-radius:50%;border:${isHighlighted ? '3px solid #38bdf8' : isFav ? '2px solid #f59e0b' : '2px solid #fff'};box-shadow:${isHighlighted ? '0 0 20px rgba(56,189,248,0.8),0 0 40px rgba(56,189,248,0.3)' : '0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5)'};overflow:visible;background:#1e293b;transition:all 200ms ease">${starBadge}<div style="width:100%;height:100%;border-radius:50%;overflow:hidden"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div></div>`,
               iconSize: [size, size], iconAnchor: [halfSize, halfSize], popupAnchor: [0, -halfSize],
             })
           : isHighlighted
@@ -506,20 +508,32 @@ function MapLayers({
 
   // ── Render layers ──
 
-  // Density dots - subtle heat dots behind choropleth at world level
-  const densityDots = useMemo(() => {
-    if (drill.level !== 'world') return null;
-    return filtered.map(c => (
-      <CircleMarker key={`d-${c.id}`} center={[c.lat, c.lng]}
-        radius={8} pathOptions={{ color: 'transparent', fillColor: '#38bdf8', fillOpacity: 0.08, weight: 0 }}
-        interactive={false} />
-    ));
-  }, [drill.level, filtered]);
+  // Heatmap dots - multi-layer glow effect behind choropleth
+  const heatmapDots = useMemo(() => {
+    if (!showHeatmap || drill.level === 'markers') return null;
+    // At world level, show behind choropleth; at deeper levels, show all scoped collections
+    const colls = drill.level === 'world' ? filtered :
+      drill.level === 'country' ? filtered.filter(c => c.country === drill.country) :
+      drill.level === 'state' ? filtered.filter(c => stateAssign.get(c.id) === drill.stateId) :
+      filtered.filter(c => countyAssign.get(c.id) === drill.countyId);
+    if (colls.length === 0) return null;
+    // Create density clusters for glow rings
+    return colls.map(c => {
+      const inventoryScale = Math.min(c.total_inventory / 50, 1); // 0-1 based on inventory
+      const baseRadius = drill.level === 'world' ? 6 : 12;
+      return (
+        <CircleMarker key={`h-${c.id}`} center={[c.lat, c.lng]}
+          radius={baseRadius + inventoryScale * 8}
+          pathOptions={{ color: 'transparent', fillColor: inventoryScale > 0.5 ? '#34d399' : '#38bdf8', fillOpacity: drill.level === 'world' ? 0.08 : 0.12, weight: 0 }}
+          interactive={false} />
+      );
+    });
+  }, [showHeatmap, drill, filtered, stateAssign, countyAssign]);
 
   if (drill.level === 'world' && worldGeo) {
     const mx = maxAgg(countryAgg, metric);
     return <>
-      {densityDots}
+      {heatmapDots}
       <GeoJSON key={`w-${metric}-${searchTerm}`} data={worldGeo}
         style={f => ({ fillColor: choroplethColor((countryAgg.get(f?.properties?.name || '') || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
         onEachFeature={makeOnEach(countryAgg, 'name', n => setDrill({ level: 'country', country: toOurName(n) }))} />
@@ -530,6 +544,7 @@ function MapLayers({
   if (drill.level === 'country' && drill.country === 'USA' && statesGeo) {
     const mx = maxAgg(stateAgg, metric);
     return <>
+      {heatmapDots}
       <GeoJSON key={`s-${metric}-${searchTerm}`} data={statesGeo}
         style={f => ({ fillColor: choroplethColor((stateAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
         onEachFeature={makeOnEach(stateAgg, 'id', (id, name) => setDrill({ level: 'state', country: 'USA', stateId: id, stateName: name }))} />
@@ -568,6 +583,7 @@ function MapLayers({
   if (drill.level === 'state' && stateCountiesGeo) {
     const mx = maxAgg(countyAgg, metric);
     return <>
+      {heatmapDots}
       <GeoJSON key={`c-${drill.stateId}-${metric}-${searchTerm}`} data={stateCountiesGeo}
         style={f => ({ fillColor: choroplethColor((countyAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
         onEachFeature={makeOnEach(countyAgg, 'id', (id, name) => setDrill({ level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName, countyId: id, countyName: name }))} />
@@ -647,6 +663,15 @@ const MAP_STYLES = `
   /* Tour progress bar */
   @keyframes tourProgress { from { width: 0%; } to { width: 100%; } }
   .tour-progress { animation: tourProgress 4s linear; }
+  /* Minimap entrance */
+  @keyframes minimapIn { from { opacity: 0; transform: scale(0.85) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  .minimap-enter { animation: minimapIn 400ms cubic-bezier(0.16, 1, 0.3, 1); }
+  /* Compare bar slide up */
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .slide-up { animation: slideUp 300ms cubic-bezier(0.16, 1, 0.3, 1); }
+  /* Glowing ring on highlighted marker */
+  @keyframes glowRing { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,0.6); } 100% { box-shadow: 0 0 0 12px rgba(56,189,248,0); } }
+  .glow-ring { animation: glowRing 1.5s ease-out infinite; }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -674,6 +699,7 @@ export default function CollectionsMap() {
   const tourTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [compareOpen, setCompareOpen] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(true);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -1538,7 +1564,7 @@ export default function CollectionsMap() {
               <TileLayer key={mapStyle} url={MAP_TILES[mapStyle].url} />
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
                 worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId}
-                favorites={favorites} toggleFavorite={toggleFavorite} />
+                favorites={favorites} toggleFavorite={toggleFavorite} showHeatmap={showHeatmap} />
             </MapContainer>
           )}
 
@@ -1635,6 +1661,11 @@ export default function CollectionsMap() {
                 ))}
               </div>
             </div>
+            {/* Heatmap toggle */}
+            <button onClick={() => setShowHeatmap(!showHeatmap)} title={showHeatmap ? 'Hide density glow' : 'Show density glow'}
+              className={`w-8 h-8 rounded-lg backdrop-blur border flex items-center justify-center transition-colors ${showHeatmap ? 'bg-cyan-600/20 border-cyan-500/40 text-cyan-400' : 'bg-gray-900/80 border-gray-700/50 text-gray-400 hover:text-cyan-400 hover:bg-gray-800'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" /></svg>
+            </button>
           </div>
 
           {/* Color legend */}
@@ -1652,7 +1683,7 @@ export default function CollectionsMap() {
 
           {/* Minimap inset - shows world context when drilled in */}
           {!isMobile && drill.level !== 'world' && (
-            <div className="absolute bottom-32 left-3 z-[1000] minimap-container border border-gray-700/50"
+            <div className="absolute bottom-32 left-3 z-[1000] minimap-container minimap-enter border border-gray-700/50"
               style={{ width: 140, height: 90 }}>
               <MapContainer center={[20, 0]} zoom={1} zoomControl={false} attributionControl={false}
                 dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false}
@@ -1787,7 +1818,7 @@ export default function CollectionsMap() {
 
         {/* Compare bar - appears when collections are selected for comparison */}
         {compareIds.size >= 2 && (
-          <div className="fixed bottom-0 left-0 right-0 z-[1300] bg-gray-900/95 backdrop-blur border-t border-violet-500/30 transition-all">
+          <div className="fixed bottom-0 left-0 right-0 z-[1300] bg-gray-900/95 backdrop-blur border-t border-violet-500/30 slide-up">
             <div className="flex items-center justify-between px-4 py-2">
               <div className="flex items-center gap-3 overflow-x-auto custom-scroll">
                 {compareCollections.map(c => (
