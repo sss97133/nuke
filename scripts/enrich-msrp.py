@@ -282,7 +282,27 @@ def main():
 
     while stats["total_scanned"] < total_limit:
         batch_limit = min(BATCH_SIZE, int(total_limit - stats["total_scanned"]))
-        vehicles = load_vehicle_batch(conn, offset, batch_limit, args.make)
+        for attempt in range(3):
+            try:
+                vehicles = load_vehicle_batch(conn, offset, batch_limit, args.make)
+                break
+            except Exception as e:
+                print(f"  Batch load error (attempt {attempt+1}/3): {e}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                if attempt < 2:
+                    time.sleep(5 * (attempt + 1))
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    conn = psycopg2.connect(DB_URL)
+                    conn.autocommit = False
+                else:
+                    print("FATAL: Could not load batch after 3 attempts")
+                    vehicles = None
 
         if not vehicles:
             break
