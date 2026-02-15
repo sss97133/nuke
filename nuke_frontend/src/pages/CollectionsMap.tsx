@@ -880,6 +880,17 @@ export default function CollectionsMap() {
   // Reset sidebar search on drill change
   useEffect(() => { setSidebarSearch(''); }, [drill.level]);
 
+  // Update page title based on drill level
+  useEffect(() => {
+    const parts = ['Collections Map'];
+    if (drill.country) parts.push(drill.country);
+    if (drill.stateName) parts.push(drill.stateName);
+    if (drill.countyName) parts.push(drill.countyName);
+    if (drill.city) parts.push(drill.city);
+    document.title = parts.join(' · ') + ' | Nuke';
+    return () => { document.title = 'Nuke'; };
+  }, [drill]);
+
   const sidebarMaxMetric = Math.max(...sidebarItems.map(i => i[metric === 'count' ? 'count' : 'inventory']), 1);
 
   // Legend max value for current drill level
@@ -939,6 +950,7 @@ export default function CollectionsMap() {
           const pct = (item[metric === 'count' ? 'count' : 'inventory'] / sidebarMaxMetric) * 100;
           return (
             <button key={item.key} onClick={item.onClick}
+              title={`${item.label}: ${item.count} collections, ${item.inventory.toLocaleString()} vehicles`}
               className="w-full relative overflow-hidden rounded-md text-xs text-gray-300 hover:text-white transition-all group sidebar-item-enter">
               {/* Background percentage bar */}
               <div className="absolute inset-y-0 left-0 bg-sky-500/8 rounded-md transition-all duration-300 group-hover:bg-sky-500/15"
@@ -1038,6 +1050,16 @@ export default function CollectionsMap() {
             )}
           </div>
         </div>
+        {/* Scope stats */}
+        {drill.level !== 'world' && (
+          <div className="flex items-center gap-3 mt-2 text-[10px]">
+            <span className="text-gray-500"><span className="text-white font-medium">{stats.total}</span> in scope</span>
+            <span className="text-gray-600">|</span>
+            <span className="text-gray-500"><span className="text-sky-400 font-medium">{stats.vehicles.toLocaleString()}</span> vehicles</span>
+            <span className="text-gray-600">|</span>
+            <span className="text-gray-500"><span className="text-emerald-400 font-medium">{stats.cities}</span> cities</span>
+          </div>
+        )}
         {/* Filter chips */}
         <div className="flex items-center gap-1.5 mt-2">
           <button onClick={() => setFilterVehicles(!filterVehicles)}
