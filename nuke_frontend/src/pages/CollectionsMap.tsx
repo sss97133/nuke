@@ -187,6 +187,12 @@ function paramsToDrill(p: URLSearchParams): DrillState {
   };
 }
 
+function fmtNum(n: number): string {
+  if (n >= 10000) return `${(n / 1000).toFixed(0)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
 // ── MapLayers ────────────────────────────────────────────────────────────────
 
 function MapLayers({
@@ -338,20 +344,54 @@ function MapLayers({
     </>
   );
 
+  // ── Count labels on choropleth ──
+  const countLabels = useMemo(() => {
+    const labels: Array<{ key: string; lat: number; lng: number; label: string }> = [];
+    const addFromGeo = (geo: FeatureCollection | null, agg: Map<string, Agg>, idKey: 'name' | 'id', minCount: number) => {
+      if (!geo) return;
+      for (const f of geo.features) {
+        const id = idKey === 'id' ? (f.id as string) : (f.properties?.name || '');
+        const a = agg.get(id);
+        if (!a || a.count < minCount) continue;
+        try {
+          const center = L.geoJSON(f as any).getBounds().getCenter();
+          const val = metric === 'count' ? a.count : a.inventory;
+          labels.push({ key: id, lat: center.lat, lng: center.lng, label: fmtNum(val) });
+        } catch {}
+      }
+    };
+    if (drill.level === 'world') addFromGeo(worldGeo, countryAgg, 'name', 2);
+    else if (drill.level === 'country' && drill.country === 'USA') addFromGeo(statesGeo, stateAgg, 'id', 1);
+    else if (drill.level === 'state') addFromGeo(stateCountiesGeo, countyAgg, 'id', 1);
+    return labels;
+  }, [drill, worldGeo, statesGeo, stateCountiesGeo, countryAgg, stateAgg, countyAgg, metric]);
+
+  const renderCountLabels = () => countLabels.map(l => (
+    <Marker key={`cnt-${l.key}`} position={[l.lat, l.lng]}
+      icon={L.divIcon({ className: '', html: `<div class="region-count">${l.label}</div>`, iconSize: [32, 18], iconAnchor: [16, 9] })}
+      interactive={false} />
+  ));
+
   // ── Render layers ──
 
   if (drill.level === 'world' && worldGeo) {
     const mx = maxAgg(countryAgg, metric);
-    return <GeoJSON key={`w-${metric}-${searchTerm}`} data={worldGeo}
-      style={f => ({ fillColor: choroplethColor((countryAgg.get(f?.properties?.name || '') || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
-      onEachFeature={makeOnEach(countryAgg, 'name', n => setDrill({ level: 'country', country: toOurName(n) }))} />;
+    return <>
+      <GeoJSON key={`w-${metric}-${searchTerm}`} data={worldGeo}
+        style={f => ({ fillColor: choroplethColor((countryAgg.get(f?.properties?.name || '') || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
+        onEachFeature={makeOnEach(countryAgg, 'name', n => setDrill({ level: 'country', country: toOurName(n) }))} />
+      {renderCountLabels()}
+    </>;
   }
 
   if (drill.level === 'country' && drill.country === 'USA' && statesGeo) {
     const mx = maxAgg(stateAgg, metric);
-    return <GeoJSON key={`s-${metric}-${searchTerm}`} data={statesGeo}
-      style={f => ({ fillColor: choroplethColor((stateAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
-      onEachFeature={makeOnEach(stateAgg, 'id', (id, name) => setDrill({ level: 'state', country: 'USA', stateId: id, stateName: name }))} />;
+    return <>
+      <GeoJSON key={`s-${metric}-${searchTerm}`} data={statesGeo}
+        style={f => ({ fillColor: choroplethColor((stateAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
+        onEachFeature={makeOnEach(stateAgg, 'id', (id, name) => setDrill({ level: 'state', country: 'USA', stateId: id, stateName: name }))} />
+      {renderCountLabels()}
+    </>;
   }
 
   if (drill.level === 'country' && drill.country !== 'USA' && cityGroups.length > 0) {
@@ -384,14 +424,25 @@ function MapLayers({
 
   if (drill.level === 'state' && stateCountiesGeo) {
     const mx = maxAgg(countyAgg, metric);
-    return <GeoJSON key={`c-${drill.stateId}-${metric}-${searchTerm}`} data={stateCountiesGeo}
-      style={f => ({ fillColor: choroplethColor((countyAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
-      onEachFeature={makeOnEach(countyAgg, 'id', (id, name) => setDrill({ level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName, countyId: id, countyName: name }))} />;
+    return <>
+      <GeoJSON key={`c-${drill.stateId}-${metric}-${searchTerm}`} data={stateCountiesGeo}
+        style={f => ({ fillColor: choroplethColor((countyAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
+        onEachFeature={makeOnEach(countyAgg, 'id', (id, name) => setDrill({ level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName, countyId: id, countyName: name }))} />
+      {renderCountLabels()}
+    </>;
   }
 
   if ((drill.level === 'county' || drill.level === 'markers') && markerCollections.length > 0)
     return renderMarkers(markerCollections);
 
+  return null;
+}
+
+// ── MapInstance (captures map ref for external controls) ─────────────────────
+
+function MapInstance({ onMap }: { onMap: (map: L.Map) => void }) {
+  const map = useMap();
+  useEffect(() => { onMap(map); }, [map, onMap]);
   return null;
 }
 
@@ -402,11 +453,14 @@ const MAP_STYLES = `
   .map-tooltip::before { border-top-color: rgba(56,189,248,.2) !important; }
   .city-count-label { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
   .city-count-label::before { display: none !important; }
+  .region-count { background: rgba(15,23,42,.75); color: #e2e8f0; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 6px; text-align: center; white-space: nowrap; pointer-events: none; border: 1px solid rgba(56,189,248,.15); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
   .leaflet-popup-content-wrapper { border-radius: 12px !important; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4); } 50% { box-shadow: 0 0 16px rgba(56,189,248,0.9),0 2px 8px rgba(0,0,0,.4); } }
   .sidebar-slide { transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1); }
   .panel-slide { transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1); }
   .backdrop-fade { transition: opacity 200ms ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 300ms ease; }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -419,7 +473,12 @@ export default function CollectionsMap() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'inventory' | 'city'>('name');
   const [searchExpanded, setSearchExpanded] = useState(false);
+  const [filterVehicles, setFilterVehicles] = useState(false);
+  const [filterInstagram, setFilterInstagram] = useState(false);
+  const [copied, setCopied] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
 
   // Responsive
   const windowWidth = useWindowWidth();
@@ -552,14 +611,16 @@ export default function CollectionsMap() {
   }, [collections, searchTerm, drill, stateAssign, countyAssign]);
 
   const sortedCollections = useMemo(() => {
-    const arr = [...scopedCollections];
+    let arr = [...scopedCollections];
+    if (filterVehicles) arr = arr.filter(c => c.total_inventory > 0);
+    if (filterInstagram) arr = arr.filter(c => !!c.instagram);
     switch (sortBy) {
       case 'name': arr.sort((a, b) => a.name.localeCompare(b.name)); break;
       case 'inventory': arr.sort((a, b) => b.total_inventory - a.total_inventory); break;
       case 'city': arr.sort((a, b) => a.city.localeCompare(b.city)); break;
     }
     return arr;
-  }, [scopedCollections, sortBy]);
+  }, [scopedCollections, sortBy, filterVehicles, filterInstagram]);
 
   // ── Sidebar items ──
 
@@ -630,6 +691,14 @@ export default function CollectionsMap() {
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else mapContainerRef.current?.requestFullscreen();
+  };
+
+  const shareUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
   };
 
   const sidebarMaxMetric = Math.max(...sidebarItems.map(i => i[metric === 'count' ? 'count' : 'inventory']), 1);
@@ -716,20 +785,33 @@ export default function CollectionsMap() {
   // ── Right panel content (shared between desktop & mobile) ──
   const renderRightPanel = () => (
     <div className="flex flex-col h-full min-h-0">
-      <div className="px-3 pt-3 pb-2 border-b border-gray-800/50 flex items-center justify-between">
-        <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Collections ({scopedCollections.length})</h2>
-        <div className="flex items-center gap-2">
-          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
-            className="text-[10px] bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-400 focus:outline-none">
-            <option value="name">Name</option>
-            <option value="inventory">Vehicles</option>
-            <option value="city">City</option>
-          </select>
-          {isCompact && (
-            <button onClick={() => setPanelOpen(false)} className="text-gray-500 hover:text-white p-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          )}
+      <div className="px-3 pt-3 pb-2 border-b border-gray-800/50">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Collections ({sortedCollections.length})</h2>
+          <div className="flex items-center gap-2">
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
+              className="text-[10px] bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-400 focus:outline-none">
+              <option value="name">Name</option>
+              <option value="inventory">Vehicles</option>
+              <option value="city">City</option>
+            </select>
+            {isCompact && (
+              <button onClick={() => setPanelOpen(false)} className="text-gray-500 hover:text-white p-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Filter chips */}
+        <div className="flex gap-1.5 mt-2">
+          <button onClick={() => setFilterVehicles(!filterVehicles)}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${filterVehicles ? 'bg-sky-500/20 border-sky-500/40 text-sky-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}>
+            Has vehicles
+          </button>
+          <button onClick={() => setFilterInstagram(!filterInstagram)}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${filterInstagram ? 'bg-pink-500/20 border-pink-500/40 text-pink-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}>
+            Has Instagram
+          </button>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -879,6 +961,7 @@ export default function CollectionsMap() {
           ) : (
             <MapContainer center={[20, 0]} zoom={2} className="absolute inset-0" style={{ background: '#0a0f1a' }}
               zoomControl={false} attributionControl={false}>
+              <MapInstance onMap={handleMap} />
               <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
                 worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} />
@@ -895,7 +978,16 @@ export default function CollectionsMap() {
           )}
 
           {/* Map controls - top right */}
-          <div className={`absolute top-3 z-[1000] flex flex-col gap-1.5 ${isCompact ? 'right-3' : 'right-3'}`}>
+          <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-1.5">
+            <button onClick={() => mapRef.current?.zoomIn()} title="Zoom in"
+              className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center transition-colors text-lg font-light leading-none">
+              +
+            </button>
+            <button onClick={() => mapRef.current?.zoomOut()} title="Zoom out"
+              className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center transition-colors text-lg font-light leading-none">
+              -
+            </button>
+            <div className="w-full h-px bg-gray-700/30 my-0.5" />
             <button onClick={() => setDrill({ level: 'world' })} title="Reset view"
               className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -903,6 +995,20 @@ export default function CollectionsMap() {
             <button onClick={toggleFullscreen} title="Fullscreen"
               className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+            </button>
+            <button onClick={shareUrl} title={copied ? 'Copied!' : 'Copy link'} className="relative">
+              <div className={`w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 flex items-center justify-center transition-colors ${copied ? 'text-emerald-400 border-emerald-500/30' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
+                {copied ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                )}
+              </div>
+              {copied && (
+                <div className="absolute right-10 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-medium whitespace-nowrap fade-in">
+                  Copied!
+                </div>
+              )}
             </button>
           </div>
 
