@@ -994,6 +994,153 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    const action = body.action || 'extract';
+
+    // Re-enrich: concurrent enrichment for cron-driven processing
+    if (action === 're_enrich') {
+      const rawLimit = Number(body.limit);
+      const limit = Math.min(
+        Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 15,
+        100
+      );
+      const concurrency = Math.min(Number(body.concurrency) || 3, 10);
+
+      const { data: candidates, error: candErr } = await supabase
+        .rpc('get_enrichment_candidates', {
+          p_source: 'bonhams',
+          p_limit: limit,
+          p_offset: 0,
+          p_min_missing: 2,
+        });
+
+      if (candErr) throw new Error(`RPC error: ${candErr.message}`);
+      if (!candidates?.length) {
+        return new Response(
+          JSON.stringify({ success: true, message: 'No Bonhams candidates to enrich', processed: 0 }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const results = {
+        total: candidates.length,
+        success_count: 0,
+        failed: 0,
+        fields_added: 0,
+        field_counts: {} as Record<string, number>,
+        errors: [] as string[],
+      };
+
+      async function processOneEnrich(cand: any) {
+        await supabase.from('vehicles').update({ last_enrichment_attempt: new Date().toISOString() }).eq('id', cand.id);
+        try {
+          const extracted = await extractBonhamsListing(cand.discovery_url, true);
+
+          // Detect empty/404 pages
+          if (!extracted.year && !extracted.make && !extracted.title) {
+            await supabase.from('vehicles').update({ enrichment_failures: 3 }).eq('id', cand.id);
+            results.failed++;
+            if (results.errors.length < 5) results.errors.push(`${cand.discovery_url}: page empty/removed`);
+            return;
+          }
+
+          // Build null-safe update (don't overwrite existing data)
+          const updateData: Record<string, unknown> = {};
+          if (extracted.year) updateData.year = extracted.year;
+          if (extracted.make) updateData.make = extracted.make.toLowerCase();
+          if (extracted.model) updateData.model = extracted.model.toLowerCase();
+          const vin = extracted.vin?.toUpperCase() || extracted.chassis_number?.toUpperCase();
+          if (vin && vin.length >= 5) updateData.vin = vin;
+          if (extracted.mileage) updateData.mileage = extracted.mileage;
+          if (extracted.exterior_color) updateData.color = extracted.exterior_color;
+          if (extracted.interior_color) updateData.interior_color = extracted.interior_color;
+          if (extracted.transmission) updateData.transmission = extracted.transmission;
+          if (extracted.engine) updateData.engine_type = extracted.engine;
+          if (extracted.body_style) updateData.body_style = extracted.body_style;
+          if (extracted.description) updateData.description = extracted.description;
+          if (extracted.total_price) updateData.sale_price = extracted.total_price;
+
+          // Track new fields
+          const fieldsAdded: string[] = [];
+          if (!cand.vin && updateData.vin) fieldsAdded.push('vin');
+          if (!cand.color && updateData.color) fieldsAdded.push('color');
+          if (!cand.mileage && updateData.mileage) fieldsAdded.push('mileage');
+          if (!cand.description && updateData.description) fieldsAdded.push('description');
+          if (!cand.transmission && updateData.transmission) fieldsAdded.push('transmission');
+          if (!cand.body_style && updateData.body_style) fieldsAdded.push('body_style');
+          if (!cand.sale_price && updateData.sale_price) fieldsAdded.push('sale_price');
+
+          if (Object.keys(updateData).length > 0) {
+            await supabase.from('vehicles').update(updateData).eq('id', cand.id);
+          }
+
+          // Save images
+          if (extracted.image_urls.length > 0) {
+            for (let idx = 0; idx < Math.min(extracted.image_urls.length, 50); idx++) {
+              const imgUrl = extracted.image_urls[idx];
+              const { data: existingImg } = await supabase
+                .from('vehicle_images')
+                .select('id')
+                .eq('vehicle_id', cand.id)
+                .eq('image_url', imgUrl)
+                .limit(1)
+                .maybeSingle();
+              if (!existingImg) {
+                await supabase.from('vehicle_images').insert({
+                  vehicle_id: cand.id,
+                  image_url: imgUrl,
+                  source: 'bonhams_import',
+                  is_external: true,
+                  position: idx,
+                });
+              }
+            }
+          }
+
+          // Create auction event if not exists
+          const { data: existingEvent } = await supabase
+            .from('auction_events')
+            .select('id')
+            .eq('vehicle_id', cand.id)
+            .eq('source', 'bonhams')
+            .eq('source_url', cand.discovery_url)
+            .limit(1)
+            .maybeSingle();
+          if (!existingEvent) {
+            await supabase.from('auction_events').insert({
+              vehicle_id: cand.id,
+              source: 'bonhams',
+              source_url: cand.discovery_url,
+              outcome: extracted.auction_status === 'sold' ? 'sold' : 'listed',
+              winning_bid: extracted.total_price || null,
+              lot_number: extracted.lot_number || null,
+            });
+          }
+
+          results.success_count++;
+          results.fields_added += fieldsAdded.length;
+          for (const f of fieldsAdded) {
+            results.field_counts[f] = (results.field_counts[f] || 0) + 1;
+          }
+        } catch (err: any) {
+          const msg = err instanceof Error ? err.message : (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+          await supabase.from('vehicles').update({ enrichment_failures: (cand.enrichment_failures || 0) + 1 }).eq('id', cand.id);
+          results.failed++;
+          if (results.errors.length < 5) results.errors.push(`${cand.discovery_url}: ${msg.slice(0, 100)}`);
+        }
+      }
+
+      // Process in concurrent chunks
+      for (let i = 0; i < candidates.length; i += concurrency) {
+        const chunk = candidates.slice(i, i + concurrency);
+        await Promise.all(chunk.map(processOneEnrich));
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, ...results }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Mode 0: Accept pre-scraped JSON-LD data directly
     // This is useful when the caller has already scraped the page (e.g., via browser)
     if (body.catalog_json) {
