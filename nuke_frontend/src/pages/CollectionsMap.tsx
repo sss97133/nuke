@@ -271,7 +271,7 @@ function fmtNum(n: number): string {
 function MapLayers({
   collections, drill, setDrill, metric, searchTerm,
   worldGeo, statesGeo, countiesGeo, stateAssign, countyAssign, highlightedId,
-  favorites, toggleFavorite, showHeatmap,
+  favorites, toggleFavorite, showHeatmap, hoveredRegion,
 }: {
   collections: Collection[];
   drill: DrillState;
@@ -287,6 +287,7 @@ function MapLayers({
   favorites: Set<string>;
   toggleFavorite: (id: string) => void;
   showHeatmap: boolean;
+  hoveredRegion: string | null;
 }) {
   const map = useMap();
 
@@ -553,6 +554,25 @@ function MapLayers({
     });
   }, [showHeatmap, drill, filtered, stateAssign, countyAssign]);
 
+  // Highlighted region overlay
+  const highlightRegionGeo = useMemo((): FeatureCollection | null => {
+    if (!hoveredRegion) return null;
+    if (drill.level === 'world' && worldGeo) {
+      const topoName = toTopoName(hoveredRegion);
+      const f = worldGeo.features.find(ft => ft.properties?.name === topoName);
+      return f ? { type: 'FeatureCollection', features: [f] } : null;
+    }
+    if (drill.level === 'country' && drill.country === 'USA' && statesGeo) {
+      const f = statesGeo.features.find(ft => ft.id === hoveredRegion);
+      return f ? { type: 'FeatureCollection', features: [f] } : null;
+    }
+    if (drill.level === 'state' && stateCountiesGeo) {
+      const f = stateCountiesGeo.features.find(ft => ft.id === hoveredRegion);
+      return f ? { type: 'FeatureCollection', features: [f] } : null;
+    }
+    return null;
+  }, [hoveredRegion, drill, worldGeo, statesGeo, stateCountiesGeo]);
+
   if (drill.level === 'world' && worldGeo) {
     const mx = maxAgg(countryAgg, metric);
     return <>
@@ -560,6 +580,11 @@ function MapLayers({
       <GeoJSON key={`w-${metric}-${searchTerm}`} data={worldGeo}
         style={f => ({ fillColor: choroplethColor((countryAgg.get(f?.properties?.name || '') || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
         onEachFeature={makeOnEach(countryAgg, 'name', n => setDrill({ level: 'country', country: toOurName(n) }))} />
+      {highlightRegionGeo && (
+        <GeoJSON key={`hl-${hoveredRegion}`} data={highlightRegionGeo}
+          style={() => ({ fillColor: '#38bdf8', fillOpacity: 0.3, color: '#38bdf8', weight: 2 })}
+          interactive={false} />
+      )}
       {renderCountLabels()}
     </>;
   }
@@ -571,6 +596,11 @@ function MapLayers({
       <GeoJSON key={`s-${metric}-${searchTerm}`} data={statesGeo}
         style={f => ({ fillColor: choroplethColor((stateAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
         onEachFeature={makeOnEach(stateAgg, 'id', (id, name) => setDrill({ level: 'state', country: 'USA', stateId: id, stateName: name }))} />
+      {highlightRegionGeo && (
+        <GeoJSON key={`hl-${hoveredRegion}`} data={highlightRegionGeo}
+          style={() => ({ fillColor: '#38bdf8', fillOpacity: 0.3, color: '#38bdf8', weight: 2 })}
+          interactive={false} />
+      )}
       {renderCountLabels()}
     </>;
   }
@@ -610,6 +640,11 @@ function MapLayers({
       <GeoJSON key={`c-${drill.stateId}-${metric}-${searchTerm}`} data={stateCountiesGeo}
         style={f => ({ fillColor: choroplethColor((countyAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
         onEachFeature={makeOnEach(countyAgg, 'id', (id, name) => setDrill({ level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName, countyId: id, countyName: name }))} />
+      {highlightRegionGeo && (
+        <GeoJSON key={`hl-${hoveredRegion}`} data={highlightRegionGeo}
+          style={() => ({ fillColor: '#38bdf8', fillOpacity: 0.3, color: '#38bdf8', weight: 2 })}
+          interactive={false} />
+      )}
       {renderCountLabels()}
     </>;
   }
@@ -1724,7 +1759,7 @@ export default function CollectionsMap() {
               <TileLayer key={mapStyle} url={MAP_TILES[mapStyle].url} />
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
                 worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId}
-                favorites={favorites} toggleFavorite={toggleFavorite} showHeatmap={showHeatmap} />
+                favorites={favorites} toggleFavorite={toggleFavorite} showHeatmap={showHeatmap} hoveredRegion={hoveredRegion} />
               {/* User location marker */}
               {userLocation && (
                 <CircleMarker center={userLocation} radius={8}
