@@ -38,7 +38,10 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
     Deno.env.get("SERVICE_ROLE_KEY") ??
     "";
-  const supabase = createClient(supabaseUrl, serviceKey);
+  const supabase = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    db: { schema: "public" },
+  });
 
   try {
     const {
@@ -113,13 +116,16 @@ Deno.serve(async (req) => {
       };
 
       try {
-        // Step 1: Fetch the collection page
+        // Step 1: Fetch the collection page (Firecrawl for JS-rendered content)
         const collectionUrl = col.website || `${ECR_BASE}/collection/${col.slug}`;
         console.log(`\n📦 Processing: ${col.business_name} (${collectionUrl})`);
 
         const { html, markdown, error: fetchError } = await archiveFetch(collectionUrl, {
           platform: "ecr",
-          maxAgeSec: 86400, // 24h cache
+          maxAgeSec: 86400 * 7, // 7 day cache
+          useFirecrawl: true, // ECR loads vehicle listings via JS
+          waitForJs: 3000, // Wait for car cards to render
+          includeMarkdown: true,
           callerName: "scrape-ecr-collection-inventory",
         });
 
@@ -129,51 +135,123 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Step 2: Extract car URLs from collection page
+        // Step 2: Extract car data from collection page
         const content = html || markdown || "";
         const carUrls = extractCarUrls(content);
-        collectionResult.cars_found = carUrls.length;
-        console.log(`   Found ${carUrls.length} car links`);
+        console.log(`   Found ${carUrls.length} car detail links`);
+
+        // Parse make/model from URL patterns: /details/make/model/id
+        const urlVehicles = parseVehiclesFromUrls(carUrls);
+        console.log(`   Parsed ${urlVehicles.length} vehicles from URLs`);
+
+        // Also extract vehicle names directly from page text (skeleton profiles)
+        const textVehicles = extractVehicleNames(content);
+        console.log(`   Found ${textVehicles.length} vehicle names from text`);
+
+        // Merge: URL-parsed vehicles take priority, then add text ones not already found
+        const allVehicles = [...urlVehicles];
+        const seenKeys = new Set(urlVehicles.map(v => `${v.make}-${v.model}`.toLowerCase()));
+        for (const tv of textVehicles) {
+          const key = `${tv.make}-${tv.model}`.toLowerCase();
+          if (!seenKeys.has(key)) {
+            allVehicles.push(tv);
+            seenKeys.add(key);
+          }
+        }
+
+        collectionResult.cars_found = allVehicles.length;
 
         if (dry_run) {
+          console.log(`   Vehicles: ${allVehicles.map(v => v.title).join(', ')}`);
           results.push(collectionResult);
           continue;
         }
 
-        // Step 3: Process each car page
-        for (const carUrl of carUrls) {
+        // Step 3: Create/link skeleton vehicles
+        for (const tv of allVehicles) {
           try {
-            const carData = await scrapeCarPage(carUrl);
-            if (!carData) continue;
+            // Use ECR detail URL if available, otherwise build a synthetic unique URL
+            const vehicleSlug = `${tv.year || "unknown"}-${tv.make}-${tv.model}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+            const uniqueDiscoveryUrl = (tv as any).ecrUrl || `${collectionUrl}/vehicle/${vehicleSlug}`;
 
-            // Step 4: Upsert vehicle into vehicles table
-            const vehicleId = await upsertVehicle(supabase, carData);
-            if (!vehicleId) {
-              collectionResult.errors.push(`Failed to upsert vehicle: ${carUrl}`);
+            // Check if we already created this skeleton vehicle (from a prior run)
+            const { data: existingByDiscovery } = await supabase
+              .from("vehicles")
+              .select("id")
+              .eq("discovery_url", uniqueDiscoveryUrl)
+              .limit(1);
+
+            if (existingByDiscovery?.length) {
+              // Already created — just make sure it's linked
+              await supabase
+                .from("business_vehicle_fleet")
+                .upsert(
+                  { business_id: col.id, vehicle_id: existingByDiscovery[0].id, fleet_role: "inventory", relationship_type: "owned", status: "active" },
+                  { onConflict: "business_id,vehicle_id" },
+                );
+              collectionResult.cars_linked++;
               continue;
             }
 
-            // Step 5: Link vehicle to collection via business_vehicle_fleet
-            const { error: linkError } = await supabase
+            // Check if a matching vehicle already exists by year+make+model
+            if (tv.year && tv.make && tv.model) {
+              const { data: existing } = await supabase
+                .from("vehicles")
+                .select("id")
+                .eq("year", tv.year)
+                .ilike("make", tv.make)
+                .ilike("model", tv.model.split(/\s/)[0]) // Match first word of model
+                .limit(1);
+
+              if (existing?.length) {
+                // Link existing vehicle
+                const { error: linkErr } = await supabase
+                  .from("business_vehicle_fleet")
+                  .upsert(
+                    { business_id: col.id, vehicle_id: existing[0].id, fleet_role: "inventory", relationship_type: "owned", status: "active" },
+                    { onConflict: "business_id,vehicle_id" },
+                  );
+                if (linkErr) {
+                  collectionResult.errors.push(`Fleet link error for ${tv.title}: ${linkErr.message}`);
+                } else {
+                  collectionResult.cars_linked++;
+                }
+                continue;
+              }
+            }
+
+            // Create skeleton vehicle record with unique discovery_url
+            const { data: newVehicle, error: insertErr } = await supabase
+              .from("vehicles")
+              .insert({
+                year: tv.year,
+                make: tv.make,
+                model: tv.model,
+                discovery_source: "ecr_collection_text",
+                discovery_url: uniqueDiscoveryUrl,
+                origin_metadata: { ecr_collection_url: collectionUrl, ecr_title: tv.title, source: "ecr_collection_scrape" },
+              })
+              .select("id")
+              .single();
+
+            if (insertErr || !newVehicle?.id) {
+              collectionResult.errors.push(`Skeleton insert error for ${tv.title}: ${insertErr?.message}`);
+              continue;
+            }
+
+            const { error: linkErr2 } = await supabase
               .from("business_vehicle_fleet")
               .upsert(
-                {
-                  business_id: col.id,
-                  vehicle_id: vehicleId,
-                  fleet_role: "inventory",
-                  relationship_type: "owned",
-                  status: "active",
-                },
+                { business_id: col.id, vehicle_id: newVehicle.id, fleet_role: "inventory", relationship_type: "owned", status: "active" },
                 { onConflict: "business_id,vehicle_id" },
               );
-
-            if (linkError) {
-              collectionResult.errors.push(`Fleet link error: ${linkError.message}`);
+            if (linkErr2) {
+              collectionResult.errors.push(`Fleet link error for new ${tv.title}: ${linkErr2.message}`);
             } else {
               collectionResult.cars_linked++;
             }
-          } catch (carErr: any) {
-            collectionResult.errors.push(`Car ${carUrl}: ${carErr.message}`);
+          } catch (tvErr: any) {
+            collectionResult.errors.push(`Text vehicle ${tv.title}: ${tvErr.message}`);
           }
         }
 
@@ -232,22 +310,35 @@ Deno.serve(async (req) => {
 
 /**
  * Extract car URLs from HTML/markdown content.
- * ECR pattern: <a href="/car/...">
+ * ECR patterns: /details/make/model/id or /car/...
  */
 function extractCarUrls(content: string): string[] {
   const urls = new Set<string>();
 
-  // HTML: <a href="/car/...">
-  const hrefRegex = /href=["']([^"']*\/car\/[^"']+)["']/gi;
+  // HTML: <a href="/details/..."> (current ECR pattern)
+  const detailsRegex = /href=["']([^"']*\/details\/[^"']+)["']/gi;
   let match;
-  while ((match = hrefRegex.exec(content)) !== null) {
+  while ((match = detailsRegex.exec(content)) !== null) {
     const url = match[1];
     urls.add(url.startsWith("http") ? url : `${ECR_BASE}${url}`);
   }
 
-  // Markdown: [text](url) where url contains /car/
-  const mdRegex = /\]\(([^)]*\/car\/[^)]+)\)/gi;
-  while ((match = mdRegex.exec(content)) !== null) {
+  // HTML: <a href="/car/..."> (legacy pattern)
+  const carRegex = /href=["']([^"']*\/car\/[^"']+)["']/gi;
+  while ((match = carRegex.exec(content)) !== null) {
+    const url = match[1];
+    urls.add(url.startsWith("http") ? url : `${ECR_BASE}${url}`);
+  }
+
+  // Markdown: [text](/details/...) or [text](/car/...)
+  const mdDetailsRegex = /\]\(([^)]*\/details\/[^)]+)\)/gi;
+  while ((match = mdDetailsRegex.exec(content)) !== null) {
+    const url = match[1];
+    urls.add(url.startsWith("http") ? url : `${ECR_BASE}${url}`);
+  }
+
+  const mdCarRegex = /\]\(([^)]*\/car\/[^)]+)\)/gi;
+  while ((match = mdCarRegex.exec(content)) !== null) {
     const url = match[1];
     urls.add(url.startsWith("http") ? url : `${ECR_BASE}${url}`);
   }
@@ -256,166 +347,111 @@ function extractCarUrls(content: string): string[] {
 }
 
 /**
- * Scrape a single ECR car page for structured vehicle data.
+ * Parse make/model from ECR detail URLs.
+ * URL pattern: /details/make/model/id → { make: "Ferrari", model: "Daytona SP3" }
  */
-async function scrapeCarPage(url: string): Promise<{
-  url: string;
-  title: string;
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  vin: string | null;
-  chassis: string | null;
-  color: string | null;
-  images: string[];
-} | null> {
-  try {
-    const { html, markdown, error } = await archiveFetch(url, {
-      platform: "ecr",
-      maxAgeSec: 86400 * 7, // 7 day cache for car pages
-      callerName: "scrape-ecr-collection-inventory",
+function parseVehiclesFromUrls(urls: string[]): Array<{ year: number | null; make: string; model: string; title: string; ecrUrl: string }> {
+  const vehicles: Array<{ year: number | null; make: string; model: string; title: string; ecrUrl: string }> = [];
+  const seen = new Set<string>();
+
+  for (const url of urls) {
+    // /details/ferrari/daytona-sp3/73775
+    const match = url.match(/\/details\/([^/]+)\/([^/]+)(?:\/(\d+))?/i);
+    if (!match) continue;
+
+    const rawMake = match[1].replace(/-/g, " ");
+    const rawModel = match[2].replace(/-/g, " ");
+
+    // Title-case the make and model
+    const make = rawMake.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    // Fix common make names
+    const fixedMake = make
+      .replace(/^Mercedes Benz$/i, "Mercedes-Benz")
+      .replace(/^Aston Martin$/i, "Aston Martin")
+      .replace(/^Rolls Royce$/i, "Rolls-Royce")
+      .replace(/^Alfa Romeo$/i, "Alfa Romeo")
+      .replace(/^De Tomaso$/i, "De Tomaso")
+      .replace(/^Gordon Murray$/i, "Gordon Murray");
+
+    const model = rawModel.split(" ").map(w => {
+      // Keep common acronyms uppercase
+      if (/^(gt[a-z]?|gto|gtb|gts|lm|sp|xx|f\d+)$/i.test(w)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join(" ");
+
+    const key = `${fixedMake}-${model}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    vehicles.push({
+      year: null,
+      make: fixedMake,
+      model,
+      title: `${fixedMake} ${model}`,
+      ecrUrl: url,
     });
-
-    if (error || (!html && !markdown)) return null;
-
-    const content = html || markdown || "";
-
-    // Extract title from <h1> or first heading
-    let title = "";
-    const h1Match = content.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-    if (h1Match) {
-      title = h1Match[1].trim();
-    } else {
-      // Markdown heading
-      const mdH1 = content.match(/^#\s+(.+)/m);
-      if (mdH1) title = mdH1[1].trim();
-    }
-
-    if (!title) return null;
-
-    // Parse year/make/model from title: "1967 Ferrari 275 GTB/4"
-    const titleMatch = title.match(/^(\d{4})\s+([A-Za-z-]+)\s+(.+)/);
-    const year = titleMatch ? parseInt(titleMatch[1]) : null;
-    const make = titleMatch ? titleMatch[2] : null;
-    const model = titleMatch ? titleMatch[3] : null;
-
-    // Extract VIN
-    const vinMatch = content.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i);
-    const vin = vinMatch ? vinMatch[1].toUpperCase() : null;
-
-    // Extract chassis/serial number
-    const chassisMatch = content.match(/(?:Chassis|S\/N|Serial)[:\s#]*([A-Z0-9-]+)/i);
-    const chassis = chassisMatch ? chassisMatch[1] : null;
-
-    // Extract color (common patterns)
-    let color: string | null = null;
-    const colorPatterns = [
-      /(?:Color|Colour|Exterior)[:\s]*([A-Za-z\s]+?)(?:\s*[,|<\n])/i,
-      /(?:painted|finished)\s+(?:in\s+)?([A-Za-z\s]+?)(?:\s*[,.|<\n])/i,
-    ];
-    for (const pattern of colorPatterns) {
-      const colorMatch = content.match(pattern);
-      if (colorMatch) {
-        color = colorMatch[1].trim();
-        if (color.length > 30) color = null; // Too long, probably not a color
-        break;
-      }
-    }
-
-    // Extract image URLs
-    const images: string[] = [];
-    const imgRegex = /(?:src|data-src)=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
-    let imgMatch;
-    while ((imgMatch = imgRegex.exec(content)) !== null) {
-      const imgUrl = imgMatch[1];
-      // Filter out tiny icons and logos
-      if (imgUrl.includes("logo") || imgUrl.includes("icon") || imgUrl.includes("favicon")) continue;
-      images.push(imgUrl.startsWith("http") ? imgUrl : `${ECR_BASE}${imgUrl}`);
-    }
-
-    return { url, title, year, make, model, vin, chassis, color, images: images.slice(0, 20) };
-  } catch (err) {
-    console.warn(`  Car page parse error for ${url}:`, err);
-    return null;
   }
+
+  return vehicles;
 }
 
 /**
- * Upsert a vehicle into the vehicles table.
- * Returns the vehicle ID.
+ * Extract vehicle names directly from collection page content.
+ * This catches vehicles listed as text even without detail links.
+ * Returns skeleton vehicle data (year/make/model from text patterns).
  */
-async function upsertVehicle(
-  supabase: any,
-  carData: {
-    url: string;
-    title: string;
-    year: number | null;
-    make: string | null;
-    model: string | null;
-    vin: string | null;
-    chassis: string | null;
-    color: string | null;
-    images: string[];
-  },
-): Promise<string | null> {
-  // Try to find existing vehicle by VIN first
-  if (carData.vin) {
-    const { data: existing } = await supabase
-      .from("vehicles")
-      .select("id")
-      .eq("vin", carData.vin)
-      .limit(1)
-      .single();
+function extractVehicleNames(content: string): Array<{ year: number | null; make: string; model: string; title: string }> {
+  const vehicles: Array<{ year: number | null; make: string; model: string; title: string }> = [];
+  const seen = new Set<string>();
 
-    if (existing?.id) return existing.id;
+  // Known car makes for matching
+  const MAKES = [
+    'Ferrari', 'Porsche', 'Lamborghini', 'McLaren', 'Bugatti', 'Pagani', 'Koenigsegg',
+    'Mercedes-Benz', 'Mercedes', 'BMW', 'Audi', 'Aston Martin', 'Bentley', 'Rolls-Royce',
+    'Jaguar', 'Ford', 'Chevrolet', 'Dodge', 'Shelby', 'Corvette',
+    'Alfa Romeo', 'Maserati', 'Lotus', 'De Tomaso', 'Lancia',
+    'Toyota', 'Nissan', 'Honda', 'Mazda', 'Lexus', 'Acura',
+    'Rimac', 'Gordon Murray', 'Singer', 'RUF', 'Brabus',
+    'Lola', 'March', 'Tyrrell', 'Dallara', 'Cunningham',
+    'AC', 'Allard', 'Horch', 'Hispano-Suiza', 'Delahaye', 'Talbot',
+  ];
+
+  // Pattern: "Year Make Model" (e.g., "1967 Ferrari 275 GTB/4")
+  let match;
+  const yearMakePattern = /\b((?:19|20)\d{2})\s+((?:[A-Z][a-z]+(?:[-\s][A-Z][a-z]+)*))\s+([A-Za-z0-9][\w\s/.-]{1,40}?)(?:\s*[\n|<,;]|$)/gm;
+  while ((match = yearMakePattern.exec(content)) !== null) {
+    const year = parseInt(match[1]);
+    const possibleMake = match[2].trim();
+    const model = match[3].trim();
+
+    // Validate it's a known make
+    if (!MAKES.some(m => possibleMake.toLowerCase().startsWith(m.toLowerCase()))) continue;
+    if (year < 1886 || year > 2027) continue;
+
+    const key = `${year}-${possibleMake}-${model}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    vehicles.push({ year, make: possibleMake, model, title: `${year} ${possibleMake} ${model}` });
   }
 
-  // Try to find by ECR URL in metadata
-  const { data: existingByUrl } = await supabase
-    .from("vehicles")
-    .select("id")
-    .contains("metadata", { ecr_url: carData.url })
-    .limit(1);
+  // Pattern: "Make Model" without year (e.g., "Ferrari SF90 XX Spider")
+  for (const makeName of MAKES) {
+    const regex = new RegExp(`\\b${makeName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\s+([A-Za-z0-9][\\w\\s/.-]{1,40}?)(?:\\s*[\\n|<,;]|$)`, 'gm');
+    while ((match = regex.exec(content)) !== null) {
+      const model = match[1].trim();
+      // Skip generic words
+      if (['Collection', 'Museum', 'Gallery', 'Racing', 'Team', 'Club', 'Owner', 'Motorsport'].includes(model)) continue;
+      if (model.length < 2) continue;
 
-  if (existingByUrl?.[0]?.id) return existingByUrl[0].id;
+      const key = `0-${makeName}-${model}`.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
 
-  // Insert new vehicle
-  const { data: inserted, error } = await supabase
-    .from("vehicles")
-    .insert({
-      year: carData.year,
-      make: carData.make,
-      model: carData.model,
-      vin: carData.vin,
-      exterior_color: carData.color,
-      vehicle_image_url: carData.images[0] || null,
-      metadata: {
-        ecr_url: carData.url,
-        ecr_title: carData.title,
-        chassis_number: carData.chassis,
-        source: "ecr_collection_scrape",
-      },
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    console.warn(`  Vehicle insert error: ${error.message}`);
-    return null;
+      vehicles.push({ year: null, make: makeName, model, title: `${makeName} ${model}` });
+    }
   }
 
-  // Insert additional images
-  if (inserted?.id && carData.images.length > 1) {
-    const imageRows = carData.images.slice(1, 10).map((url, i) => ({
-      vehicle_id: inserted.id,
-      image_url: url,
-      url,
-      sort_order: i + 1,
-      source: "ecr",
-    }));
-
-    await supabase.from("vehicle_images").insert(imageRows).catch(() => {});
-  }
-
-  return inserted?.id || null;
+  return vehicles;
 }
+
