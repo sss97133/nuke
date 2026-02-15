@@ -80,15 +80,48 @@ Deno.serve(async (req) => {
     if (getValue(29)) decoded.year = parseInt(getValue(29) || '', 10) // Model Year
     if (getValue(109)) decoded.trim = getValue(109) // Trim
     
-    // Engine
-    if (getValue(71)) decoded.engine_size = getValue(71) // Engine Configuration
-    if (getValue(72)) decoded.displacement = getValue(72) // Displacement (L)
-    if (getValue(13)) decoded.engine_cylinders = parseInt(getValue(13) || '', 10) // Engine Cylinders
-    if (getValue(69)) decoded.fuel_type = getValue(69)?.toLowerCase() // Fuel Type
-    
+    // Engine — CORRECT NHTSA Variable IDs (verified against actual API)
+    // VarID  9 = Engine Number of Cylinders
+    // VarID 13 = Displacement (L)
+    // VarID 11 = Displacement (CC)
+    // VarID 64 = Engine Configuration ("V-Shaped", "In-Line", etc.)
+    // VarID 24 = Fuel Type - Primary
+    // VarID 37 = Transmission Style
+    // VarID 63 = Transmission Speeds
+    // VarID 15 = Drive Type
+    const engineConfig = getValue(64) // Engine Configuration: "V-Shaped", "In-Line", "Flat"
+    const displacementL = getValue(13) // Displacement (L): "6.7", "3.6"
+    const cylinders = getValue(9) // Engine Number of Cylinders: "8", "6"
+
+    // Map NHTSA config names to common abbreviations
+    const configMap: Record<string, string> = {
+      'V-Shaped': 'V', 'In-Line': 'I', 'Flat': 'Flat-',
+      'Horizontally Opposed': 'Flat-', 'W-Shaped': 'W', 'Rotary': 'Rotary'
+    }
+    const configShort = engineConfig ? (configMap[engineConfig] || engineConfig) : null
+
+    if (displacementL && cylinders && configShort) {
+      const prefix = configShort.endsWith('-') ? configShort : configShort
+      decoded.engine_size = `${parseFloat(displacementL).toFixed(1)}L ${prefix}${cylinders}`
+    } else if (displacementL && cylinders) {
+      decoded.engine_size = `${parseFloat(displacementL).toFixed(1)}L ${cylinders}-cyl`
+    } else if (displacementL) {
+      decoded.engine_size = `${parseFloat(displacementL).toFixed(1)}L`
+    } else if (engineConfig && cylinders) {
+      decoded.engine_size = `${configShort}${cylinders}`
+    }
+
+    if (displacementL) decoded.displacement = displacementL
+    if (cylinders) decoded.engine_cylinders = parseInt(cylinders, 10)
+    if (getValue(24)) decoded.fuel_type = getValue(24)?.toLowerCase() // Fuel Type - Primary
+
     // Drivetrain
-    if (getValue(10)) decoded.transmission = getValue(10)?.toLowerCase() // Transmission Style
-    if (getValue(52)) decoded.drivetrain = getValue(52) // Drive Type
+    if (getValue(37)) decoded.transmission = getValue(37)?.toLowerCase() // Transmission Style
+    const transmissionSpeeds = getValue(63) // Transmission Speeds
+    if (decoded.transmission && transmissionSpeeds) {
+      decoded.transmission = `${transmissionSpeeds}-speed ${decoded.transmission}`
+    }
+    if (getValue(15)) decoded.drivetrain = getValue(15) // Drive Type
     
     // Body
     if (getValue(5)) {
@@ -117,11 +150,11 @@ Deno.serve(async (req) => {
       decoded.body_style = bodyStyle
     }
     if (getValue(14)) decoded.doors = parseInt(getValue(14) || '', 10) // Doors
-    
-    // Other specs
-    if (getValue(25)) decoded.manufacturer = getValue(25) // Manufacturer Name
+
+    // Other specs (correct NHTSA Variable IDs)
+    if (getValue(27)) decoded.manufacturer = getValue(27) // Manufacturer Name
     if (getValue(31)) decoded.plant_city = getValue(31) // Plant City
-    if (getValue(32)) decoded.plant_country = getValue(32) // Plant Country
+    if (getValue(75)) decoded.plant_country = getValue(75) // Plant Country
 
     console.log('Decoded data:', decoded)
 
