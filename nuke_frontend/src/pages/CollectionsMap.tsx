@@ -77,6 +77,12 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
 
 const DRILL_ORDER: DrillLevel[] = ['world', 'country', 'state', 'county', 'markers'];
 
+const MAP_TILES: Record<string, { url: string; attr: string }> = {
+  dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr: 'CartoDB' },
+  satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: 'Esri' },
+  light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attr: 'CartoDB' },
+};
+
 const COUNTRY_FLAGS: Record<string, string> = {
   'USA': '🇺🇸', 'UK': '🇬🇧', 'Italy': '🇮🇹', 'Germany': '🇩🇪', 'France': '🇫🇷',
   'Monaco': '🇲🇨', 'Switzerland': '🇨🇭', 'Japan': '🇯🇵', 'UAE': '🇦🇪', 'Qatar': '🇶🇦',
@@ -348,6 +354,10 @@ function MapLayers({
             : MARKER_ICON;
         return (
           <Marker key={c.id} position={[c.lat, c.lng]} icon={icon} zIndexOffset={isHighlighted ? 1000 : 0}>
+            {/* Name label below marker */}
+            <Tooltip permanent direction="bottom" offset={[0, 8]} className="marker-name-label">
+              <span style={{ fontSize: 9, fontWeight: 600, color: '#e2e8f0', textShadow: '0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.6)' }}>{c.name.length > 20 ? c.name.slice(0, 18) + '…' : c.name}</span>
+            </Tooltip>
             <Popup maxWidth={300}>
               <div className="min-w-[260px] p-3">
                 <div className="flex items-start gap-3">
@@ -523,6 +533,8 @@ const MAP_STYLES = `
   .drill-transition { animation: drillTransition 400ms ease-out forwards; }
   .leaflet-popup-content-wrapper { box-shadow: 0 8px 32px rgba(0,0,0,.25) !important; border: none !important; }
   .leaflet-popup-tip { box-shadow: none !important; }
+  .marker-name-label { background: rgba(15,23,42,.7) !important; border: 1px solid rgba(56,189,248,.1) !important; border-radius: 4px !important; padding: 1px 4px !important; box-shadow: 0 2px 8px rgba(0,0,0,.4) !important; }
+  .marker-name-label::before { border-bottom-color: rgba(56,189,248,.1) !important; }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -545,7 +557,7 @@ export default function CollectionsMap() {
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
   const [transitioning, setTransitioning] = useState(false);
-  const prevDrillLevel = useRef(drill.level);
+  const [mapStyle, setMapStyle] = useState<'dark' | 'satellite' | 'light'>('dark');
 
   // Responsive
   const windowWidth = useWindowWidth();
@@ -556,6 +568,7 @@ export default function CollectionsMap() {
 
   // URL-synced drill state
   const drill = useMemo(() => paramsToDrill(searchParams), [searchParams]);
+  const prevDrillLevel = useRef(drill.level);
   const setDrill = useCallback((d: DrillState) => {
     setSearchParams(drillToParams(d), { replace: false });
   }, [setSearchParams]);
@@ -590,12 +603,18 @@ export default function CollectionsMap() {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ignore when typing in inputs
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
       if (e.key === 'Escape') {
         if (sidebarOpen) { setSidebarOpen(false); return; }
         if (panelOpen) { setPanelOpen(false); return; }
         if (searchExpanded) { setSearchExpanded(false); setSearchTerm(''); return; }
         goBack();
       }
+      // Map style shortcuts
+      if (e.key === '1') setMapStyle('dark');
+      if (e.key === '2') setMapStyle('satellite');
+      if (e.key === '3') setMapStyle('light');
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -1166,10 +1185,11 @@ export default function CollectionsMap() {
               </div>
             </div>
           ) : (
-            <MapContainer center={[20, 0]} zoom={2} className="absolute inset-0" style={{ background: '#0a0f1a' }}
+            <MapContainer center={[20, 0]} zoom={2} className="absolute inset-0"
+              style={{ background: mapStyle === 'light' ? '#f0f0f0' : '#0a0f1a' }}
               zoomControl={false} attributionControl={false}>
               <MapInstance onMap={handleMap} />
-              <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+              <TileLayer key={mapStyle} url={MAP_TILES[mapStyle].url} />
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
                 worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId} />
             </MapContainer>
@@ -1234,6 +1254,22 @@ export default function CollectionsMap() {
                 </div>
               )}
             </button>
+            <div className="w-full h-px bg-gray-700/30 my-0.5" />
+            {/* Map style switcher */}
+            <div className="relative group/style">
+              <button title="Map style"
+                className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+              </button>
+              <div className="absolute right-10 top-0 hidden group-hover/style:flex items-center gap-1 bg-gray-900/90 backdrop-blur rounded-lg p-1 border border-gray-700/50 shadow-xl">
+                {(['dark', 'satellite', 'light'] as const).map(s => (
+                  <button key={s} onClick={() => setMapStyle(s)} title={s.charAt(0).toUpperCase() + s.slice(1)}
+                    className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium whitespace-nowrap transition-colors ${mapStyle === s ? 'bg-sky-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/60'}`}>
+                    {s === 'dark' ? '🌙 Dark' : s === 'satellite' ? '🛰 Satellite' : '☀️ Light'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Color legend */}
