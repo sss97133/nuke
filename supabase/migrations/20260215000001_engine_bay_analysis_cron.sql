@@ -27,10 +27,7 @@ SELECT cron.schedule(
     url := 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/analyze-engine-bay',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || COALESCE(
-        current_setting('app.settings.service_role_key', true),
-        current_setting('app.service_role_key', true)
-      )
+      'Authorization', 'Bearer ' || get_service_role_key_for_cron()
     ),
     body := '{"mode":"process","limit":20}'::jsonb,
     timeout_milliseconds := 150000
@@ -47,10 +44,7 @@ SELECT cron.schedule(
     url := 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/analyze-engine-bay',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || COALESCE(
-        current_setting('app.settings.service_role_key', true),
-        current_setting('app.service_role_key', true)
-      )
+      'Authorization', 'Bearer ' || get_service_role_key_for_cron()
     ),
     body := '{"mode":"reanalyze_low_confidence","limit":20}'::jsonb,
     timeout_milliseconds := 150000
@@ -67,10 +61,7 @@ SELECT cron.schedule(
     url := 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/enrich-bulk',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || COALESCE(
-        current_setting('app.settings.service_role_key', true),
-        current_setting('app.service_role_key', true)
-      )
+      'Authorization', 'Bearer ' || get_service_role_key_for_cron()
     ),
     body := '{"strategy":"all","limit":200,"source":"bat"}'::jsonb,
     timeout_milliseconds := 120000
