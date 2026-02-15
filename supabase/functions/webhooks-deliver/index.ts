@@ -174,7 +174,7 @@ async function deliverToEndpoint(
       attempts: 0,
     })
     .select()
-    .single();
+    .maybeSingle();
 
   if (createError) {
     console.error("Failed to create delivery record:", createError);

@@ -16,11 +16,8 @@ const supabase = createClient(
 );
 
 // Bot tokens - multiple bots share this webhook via ?bot= query param
-const NUKEPROOF_TOKEN = Deno.env.get("NUKEPROOF_BOT_TOKEN") || Deno.env.get("NUKE_TELEGRAM_BOT_TOKEN") || Deno.env.get("TELEGRAM_BOT_TOKEN");
-const NUKURL_TOKEN = Deno.env.get("NUKURL_BOT_TOKEN");
-
-// Active token for current request (set per-request in serve handler)
-let BOT_TOKEN = NUKEPROOF_TOKEN;
+const NUKEPROOF_TOKEN = Deno.env.get("NUKEPROOF_token") || Deno.env.get("NUKE_TELEGRAM_token") || Deno.env.get("TELEGRAM_token");
+const NUKURL_TOKEN = Deno.env.get("NUKURL_token");
 
 function getToken(bot?: string | null): string | undefined {
   if (bot === "nukurl" && NUKURL_TOKEN) return NUKURL_TOKEN;
@@ -55,15 +52,15 @@ interface TelegramUpdate {
   };
 }
 
-// Send message back to Telegram
-async function sendMessage(chatId: number, text: string) {
-  if (!BOT_TOKEN) {
-    console.error("[Telegram] No BOT_TOKEN available");
+// Send message back to Telegram (token passed per-request to avoid race conditions)
+async function sendMessage(chatId: number, text: string, token: string) {
+  if (!token) {
+    console.error("[Telegram] No token available");
     return;
   }
 
   try {
-    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -73,40 +70,40 @@ async function sendMessage(chatId: number, text: string) {
       }),
       signal: AbortSignal.timeout(10000),
     });
-    const result = await response.json();
+    const result = await response.json().catch(() => ({ ok: false, description: `HTTP ${response.status}` }));
     if (!result.ok) {
       console.error("[Telegram] Send failed:", result);
       // Retry without markdown if it failed
       if (result.description?.includes("parse")) {
-        const retry = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const retry = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: chatId, text }),
           signal: AbortSignal.timeout(10000),
         });
-        const retryResult = await retry.json();
+        const retryResult = await retry.json().catch(() => ({ ok: false }));
         console.log("[Telegram] Retry result:", retryResult);
       }
     } else {
-      console.log("[Telegram] Message sent:", result.result.message_id);
+      console.log("[Telegram] Message sent:", result.result?.message_id);
     }
   } catch (e) {
     console.error("[Telegram] sendMessage error:", e);
   }
 }
 
-// Get file URL from Telegram
-async function getFileUrl(fileId: string): Promise<string | null> {
-  if (!BOT_TOKEN) return null;
+// Get file URL from Telegram (token passed per-request to avoid race conditions)
+async function getFileUrl(fileId: string, token: string): Promise<string | null> {
+  if (!token) return null;
 
   const response = await fetch(
-    `https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`,
+    `https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`,
     { signal: AbortSignal.timeout(10000) }
   );
-  const data = await response.json();
+  const data = await response.json().catch(() => ({ ok: false }));
 
-  if (data.ok && data.result.file_path) {
-    return `https://api.telegram.org/file/bot${BOT_TOKEN}/${data.result.file_path}`;
+  if (data.ok && data.result?.file_path) {
+    return `https://api.telegram.org/file/bot${token}/${data.result.file_path}`;
   }
   return null;
 }
@@ -584,10 +581,10 @@ Return ONLY valid JSON:
 serve(async (req) => {
   const url = new URL(req.url);
 
-  // Select bot token based on ?bot= query param (set during webhook registration)
+  // Select bot token based on ?bot= query param (local to this request to avoid race conditions)
   const botParam = url.searchParams.get("bot");
-  BOT_TOKEN = getToken(botParam);
-  console.log(`[Telegram] Bot: ${botParam || "default"}, token: ${BOT_TOKEN ? BOT_TOKEN.slice(0, 10) + "..." : "NONE"}`);
+  const token = getToken(botParam) || "";
+  console.log(`[Telegram] Bot: ${botParam || "default"}, token: ${token ? token.slice(0, 10) + "..." : "NONE"}`);
 
   // Auth check for admin endpoints - require service role key
   const isAdminEndpoint = url.searchParams.has("delete") || url.searchParams.has("setup") ||
@@ -606,18 +603,18 @@ serve(async (req) => {
 
   // Delete message endpoint
   const deleteMessageId = url.searchParams.get("delete");
-  if (deleteMessageId && BOT_TOKEN) {
+  if (deleteMessageId && token) {
     const chatId = url.searchParams.get("chat_id") || Deno.env.get("TELEGRAM_CHANNEL_ID");
     if (chatId) {
       const response = await fetch(
-        `https://api.telegram.org/bot${BOT_TOKEN}/deleteMessage`,
+        `https://api.telegram.org/bot${token}/deleteMessage`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: chatId, message_id: parseInt(deleteMessageId, 10) })
         }
       );
-      const result = await response.json();
+      const result = await response.json().catch(() => ({ ok: false }));
       return new Response(JSON.stringify(result), {
         headers: { "Content-Type": "application/json" }
       });
@@ -626,8 +623,8 @@ serve(async (req) => {
 
   // Setup endpoint - registers webhook with Telegram
   if (url.searchParams.get("setup") === "true") {
-    if (!BOT_TOKEN) {
-      return new Response(JSON.stringify({ error: "BOT_TOKEN not configured" }), {
+    if (!token) {
+      return new Response(JSON.stringify({ error: "token not configured" }), {
         status: 500,
         headers: { "Content-Type": "application/json" }
       });
@@ -635,13 +632,13 @@ serve(async (req) => {
 
     const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/telegram-webhook`;
     const response = await fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`
+      `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}`
     );
-    const result = await response.json();
+    const result = await response.json().catch(() => ({ ok: false }));
 
     // Also get bot info
-    const meResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getMe`);
-    const botInfo = await meResponse.json();
+    const meResponse = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const botInfo = await meResponse.json().catch(() => ({ ok: false }));
 
     return new Response(JSON.stringify({
       webhook_url: webhookUrl,
@@ -655,16 +652,16 @@ serve(async (req) => {
   // Debug endpoint
   if (url.searchParams.get("debug") === "true") {
     return new Response(JSON.stringify({
-      has_nuke_token: !!Deno.env.get("NUKE_TELEGRAM_BOT_TOKEN"),
-      has_fallback_token: !!Deno.env.get("TELEGRAM_BOT_TOKEN"),
-      using_token: BOT_TOKEN ? `${BOT_TOKEN.slice(0, 10)}...` : "none"
+      has_nuke_token: !!Deno.env.get("NUKE_TELEGRAM_token"),
+      has_fallback_token: !!Deno.env.get("TELEGRAM_token"),
+      using_token: token ? `${token.slice(0, 10)}...` : "none"
     }), { headers: { "Content-Type": "application/json" } });
   }
 
   // Test send endpoint - send message to a chat
   const testChatId = url.searchParams.get("test_chat");
-  if (testChatId && BOT_TOKEN) {
-    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  if (testChatId && token) {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -673,7 +670,7 @@ serve(async (req) => {
       }),
       signal: AbortSignal.timeout(10000),
     });
-    const result = await response.json();
+    const result = await response.json().catch(() => ({ ok: false }));
     return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" }
     });
@@ -682,8 +679,8 @@ serve(async (req) => {
   // Test photo processing with a file_id
   const testFileId = url.searchParams.get("test_file");
   const testUserId = url.searchParams.get("user_id") || "0";
-  if (testFileId && BOT_TOKEN) {
-    const fileUrl = await getFileUrl(testFileId);
+  if (testFileId && token) {
+    const fileUrl = await getFileUrl(testFileId, token);
     if (!fileUrl) {
       return new Response(JSON.stringify({ error: "Could not get file URL" }), {
         headers: { "Content-Type": "application/json" }
@@ -748,7 +745,8 @@ serve(async (req) => {
             `• Instagram, YouTube, TikTok\n` +
             `• eBay, Craigslist\n` +
             `• Any auction house or dealer site\n\n` +
-            `Just paste a link!`
+            `Just paste a link!`,
+          token
         );
       } else {
         await sendMessage(
@@ -761,7 +759,8 @@ serve(async (req) => {
             `📋 */verify* - Document verification\n` +
             `   Titles, IDs, registrations\n\n` +
             `First time? Text your phone number to link accounts.\n` +
-            `Example: +17025551234`
+            `Example: +17025551234`,
+          token
         );
       }
       return new Response("OK", { status: 200 });
@@ -777,7 +776,8 @@ serve(async (req) => {
           `/status - Check verification server status\n\n` +
           `Or:\n` +
           `• Send a *photo* to analyze\n` +
-          `• Send a *URL* to extract vehicle data`
+          `• Send a *URL* to extract vehicle data`,
+        token
       );
       return new Response("OK", { status: 200 });
     }
@@ -792,7 +792,8 @@ serve(async (req) => {
           `• Group them by vehicle\n` +
           `• Log to the right shop (Nuke, Viva, etc.)\n` +
           `• Each vehicle will claim its photos\n\n` +
-          `Send 1 or more photos now!`
+          `Send 1 or more photos now!`,
+        token
       );
       return new Response("OK", { status: 200 });
     }
@@ -807,7 +808,8 @@ serve(async (req) => {
           `• Vehicle title\n` +
           `• Registration\n` +
           `• Driver's license\n\n` +
-          `I'll extract and verify the data.`
+          `I'll extract and verify the data.`,
+        token
       );
       return new Response("OK", { status: 200 });
     }
@@ -825,15 +827,17 @@ serve(async (req) => {
               `YOLOv8: ${health.yolo_available ? "✅" : "❌"}\n` +
               `EasyOCR: ${health.easyocr_available ? "✅" : "❌"}\n` +
               `OpenCV: ${health.opencv_available ? "✅" : "❌"}\n` +
-              `Training samples: ${health.training_samples}`
+              `Training samples: ${health.training_samples}`,
+            token
           );
         } else {
-          await sendMessage(chatId, `❌ Local server not responding`);
+          await sendMessage(chatId, `❌ Local server not responding`, token);
         }
       } catch {
         await sendMessage(
           chatId,
-          `❌ Local server offline\n\nAI fallback will be used.`
+          `❌ Local server offline\n\nAI fallback will be used.`,
+          token
         );
       }
       return new Response("OK", { status: 200 });
@@ -850,16 +854,16 @@ serve(async (req) => {
         .gte("created_at", oneHourAgo);
 
       if (count && count >= 20) {
-        await sendMessage(chatId, "⏳ Rate limit reached (20/hour). Try again later.");
+        await sendMessage(chatId, "⏳ Rate limit reached (20/hour). Try again later.", token);
         return new Response("OK", { status: 200 });
       }
 
       // Get the highest resolution photo
       const photo = message.photo[message.photo.length - 1];
-      const fileUrl = await getFileUrl(photo.file_id);
+      const fileUrl = await getFileUrl(photo.file_id, token);
 
       if (!fileUrl) {
-        await sendMessage(chatId, "❌ Could not download photo");
+        await sendMessage(chatId, "❌ Could not download photo", token);
         return new Response("OK", { status: 200 });
       }
 
@@ -867,7 +871,7 @@ serve(async (req) => {
       const userMode = userModes.get(userId) || "verify";
 
       if (userMode === "work") {
-        await sendMessage(chatId, "🔧 Processing work photo...");
+        await sendMessage(chatId, "🔧 Processing work photo...", token);
 
         // Look up technician by telegram user ID
         const { data: techLink } = await supabase
@@ -909,7 +913,8 @@ serve(async (req) => {
             chatId,
             `👋 I don't have your account linked yet.\n\n` +
               `Text your phone number so I can connect your Telegram to your tech profile.\n\n` +
-              `Example: +17025551234`
+              `Example: +17025551234`,
+            token
           );
           return new Response("OK", { status: 200 });
         }
@@ -933,24 +938,24 @@ serve(async (req) => {
             }
           );
 
-          const batchResult = await batchResponse.json();
+          const batchResult = await batchResponse.json().catch(() => ({ ok: false }));
           if (batchResult.success) {
-            await sendMessage(chatId, batchResult.message);
+            await sendMessage(chatId, batchResult.message, token);
           } else {
-            await sendMessage(chatId, `⚠️ ${batchResult.error || "Processing failed"}`);
+            await sendMessage(chatId, `⚠️ ${batchResult.error || "Processing failed"}`, token);
           }
         } catch (e) {
           console.error("Work intake failed:", e);
-          await sendMessage(chatId, "❌ Failed to process work photo. Try again?");
+          await sendMessage(chatId, "❌ Failed to process work photo. Try again?", token);
         }
 
         return new Response("OK", { status: 200 });
       }
 
       // Default: verification mode
-      await sendMessage(chatId, "📷 Analyzing document...");
+      await sendMessage(chatId, "📷 Analyzing document...", token);
       const result = await processPhoto(fileUrl, chatId, userId, message.caption);
-      await sendMessage(chatId, result);
+      await sendMessage(chatId, result, token);
 
       return new Response("OK", { status: 200 });
     }
@@ -958,10 +963,10 @@ serve(async (req) => {
     // Check for URLs in text messages - route to process-url-drop
     const urlRegex = /https?:\/\/[^\s]+/gi;
     const foundUrls = text.match(urlRegex);
-    console.log(`[Telegram] URL check: text="${text.slice(0, 100)}", foundUrls=${JSON.stringify(foundUrls)}, BOT_TOKEN=${BOT_TOKEN ? BOT_TOKEN.slice(0, 10) : "NONE"}`);
+    console.log(`[Telegram] URL check: text="${text.slice(0, 100)}", foundUrls=${JSON.stringify(foundUrls)}, token=${token ? token.slice(0, 10) : "NONE"}`);
     if (foundUrls && foundUrls.length > 0) {
       console.log("[Telegram] Found URLs:", foundUrls);
-      await sendMessage(chatId, `🔗 Processing ${foundUrls.length} URL${foundUrls.length > 1 ? "s" : ""}...`);
+      await sendMessage(chatId, `🔗 Processing ${foundUrls.length} URL${foundUrls.length > 1 ? "s" : ""}...`, token);
 
       const results: string[] = [];
       for (const droppedUrl of foundUrls) {
@@ -993,7 +998,7 @@ serve(async (req) => {
             }
           );
 
-          const dropResult = await dropResponse.json();
+          const dropResult = await dropResponse.json().catch(() => ({ ok: false }));
           console.log("[Telegram] URL drop result:", JSON.stringify(dropResult));
 
           if (dropResult.success) {
@@ -1021,7 +1026,7 @@ serve(async (req) => {
         }
       }
 
-      await sendMessage(chatId, `*URL Processing Results:*\n\n${results.join("\n\n")}`);
+      await sendMessage(chatId, `*URL Processing Results:*\n\n${results.join("\n\n")}`, token);
       return new Response("OK", { status: 200 });
     }
 
@@ -1054,13 +1059,15 @@ serve(async (req) => {
           chatId,
           `✅ Linked! Hey ${techLink.display_name || "there"}!\n\n` +
             `Your Telegram is now connected to your tech profile.\n\n` +
-            `Use /work to start logging photos.`
+            `Use /work to start logging photos.`,
+          token
         );
       } else {
         await sendMessage(
           chatId,
           `❓ Couldn't find a tech profile for that number.\n\n` +
-            `Text the Twilio number first to create your profile, then come back here.`
+            `Text the Twilio number first to create your profile, then come back here.`,
+          token
         );
       }
       return new Response("OK", { status: 200 });
@@ -1075,7 +1082,8 @@ serve(async (req) => {
           `/verify - Document verification\n\n` +
           `Or:\n` +
           `• Send a URL to extract vehicle data\n` +
-          `• Text your phone number to link accounts`
+          `• Text your phone number to link accounts`,
+        token
       );
     }
 
