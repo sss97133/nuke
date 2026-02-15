@@ -646,7 +646,7 @@ export default function CollectionsMap() {
         </div>
       </div>
 
-      <div className="flex-1 flex">
+      <div className="flex-1 flex min-h-0">
         {/* Sidebar */}
         <div className="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto">
           <div className="p-4">
@@ -676,13 +676,13 @@ export default function CollectionsMap() {
         </div>
 
         {/* Map */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-h-0 min-w-0">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
               <div className="text-gray-400">Loading map data...</div>
             </div>
           ) : (
-            <MapContainer center={[20, 0]} zoom={2} className="h-full w-full" style={{ background: '#1a1a2e' }}>
+            <MapContainer center={[20, 0]} zoom={2} className="absolute inset-0" style={{ background: '#1a1a2e' }}>
               <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com">CARTO</a>'
