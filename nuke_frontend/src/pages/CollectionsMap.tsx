@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, GeoJSON, CircleMarker, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import * as topojson from 'topojson-client';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
@@ -38,60 +38,81 @@ interface DrillState {
   city?: string;
 }
 
-interface Agg {
+interface Agg { count: number; inventory: number; }
+
+interface SidebarItem {
+  key: string;
+  label: string;
   count: number;
   inventory: number;
+  onClick: () => void;
+  active?: boolean;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-// Map between our DB country names and Natural Earth TopoJSON names
 const OUR_TO_TOPO: Record<string, string> = {
-  'USA': 'United States of America',
-  'UK': 'United Kingdom',
-  'UAE': 'United Arab Emirates',
+  'USA': 'United States of America', 'UK': 'United Kingdom', 'UAE': 'United Arab Emirates',
 };
 const TOPO_TO_OURS: Record<string, string> = {};
 Object.entries(OUR_TO_TOPO).forEach(([k, v]) => { TOPO_TO_OURS[v] = k; });
-
-function toOurName(topoName: string): string { return TOPO_TO_OURS[topoName] || topoName; }
-function toTopoName(ourName: string): string { return OUR_TO_TOPO[ourName] || ourName; }
+const toOurName = (n: string) => TOPO_TO_OURS[n] || n;
+const toTopoName = (n: string) => OUR_TO_TOPO[n] || n;
 
 const COUNTRY_COORDS: Record<string, [number, number]> = {
-  'USA': [39.8283, -98.5795], 'UK': [55.3781, -3.4360], 'Italy': [41.8719, 12.5674],
+  'USA': [39.8283, -98.5795], 'UK': [55.3781, -3.436], 'Italy': [41.8719, 12.5674],
   'Germany': [51.1657, 10.4515], 'France': [46.2276, 2.2137], 'Monaco': [43.7384, 7.4246],
   'Switzerland': [46.8182, 8.2275], 'Japan': [36.2048, 138.2529], 'UAE': [23.4241, 53.8478],
   'Qatar': [25.3548, 51.1839], 'South Korea': [35.9078, 127.7669], 'Taiwan': [23.6978, 120.9605],
   'Australia': [-25.2744, 133.7751], 'Canada': [56.1304, -106.3468], 'Singapore': [1.3521, 103.8198],
   'Belgium': [50.5039, 4.4699], 'Poland': [51.9194, 19.1451], 'Denmark': [56.2639, 9.5018],
   'Chile': [-35.6751, -71.543], 'Turkey': [38.9637, 35.2433], 'Austria': [47.5162, 14.5501],
-  'Norway': [60.4720, 8.4689], 'Netherlands': [52.1326, 5.2913], 'New Zealand': [-40.9006, 174.886],
-  'Czechia': [49.8175, 15.4730], 'Morocco': [31.7917, -7.0926], 'China': [35.8617, 104.1954],
-  'Brazil': [-14.2350, -51.9253], 'Thailand': [15.8700, 100.9925], 'Mexico': [23.6345, -102.5528],
+  'Norway': [60.472, 8.4689], 'Netherlands': [52.1326, 5.2913], 'New Zealand': [-40.9006, 174.886],
+  'Czechia': [49.8175, 15.473], 'Morocco': [31.7917, -7.0926], 'China': [35.8617, 104.1954],
+  'Brazil': [-14.235, -51.9253], 'Thailand': [15.87, 100.9925], 'Mexico': [23.6345, -102.5528],
   'India': [20.5937, 78.9629], 'Hong Kong': [22.3193, 114.1694], 'Israel': [31.0461, 34.8516],
   'Portugal': [39.3999, -8.2245], 'Malaysia': [4.2105, 101.9758], 'Saudi Arabia': [23.8859, 45.0792],
-  'Oman': [21.4735, 55.9754], 'Lebanon': [33.8547, 35.8623], 'Slovakia': [48.6690, 19.6990],
+  'Oman': [21.4735, 55.9754], 'Lebanon': [33.8547, 35.8623], 'Slovakia': [48.669, 19.699],
   'Dominican Republic': [18.7357, -70.1627], 'Kazakhstan': [48.0196, 66.9237],
 };
 
-// ── Color utilities ──────────────────────────────────────────────────────────
+// ── Color scale ──────────────────────────────────────────────────────────────
+
+const COLOR_STOPS = [
+  [0, 15, 23, 42],      // bg (invisible)
+  [0.01, 30, 58, 138],  // dark blue
+  [0.25, 37, 99, 235],  // blue-600
+  [0.5, 56, 189, 248],  // sky-400
+  [0.75, 45, 212, 191], // teal-400
+  [1.0, 52, 211, 153],  // emerald-400
+] as const;
 
 function choroplethColor(value: number, maxValue: number): string {
-  if (!value || !maxValue) return 'rgba(30, 41, 59, 0.15)';
-  const t = Math.sqrt(Math.min(value / maxValue, 1));
-  const r = Math.round(30 * (1 - t) + 147 * t);
-  const g = Math.round(58 * (1 - t) + 197 * t);
-  const b = Math.round(138 * (1 - t) + 253 * t);
-  return `rgb(${r}, ${g}, ${b})`;
+  if (!value || !maxValue) return 'rgba(15, 23, 42, 0.12)';
+  const t = Math.pow(Math.min(value / maxValue, 1), 0.6); // power curve for spread
+  // Find stops
+  for (let i = 1; i < COLOR_STOPS.length; i++) {
+    if (t <= COLOR_STOPS[i][0]) {
+      const prev = COLOR_STOPS[i - 1], next = COLOR_STOPS[i];
+      const f = (t - prev[0]) / (next[0] - prev[0]);
+      return `rgb(${Math.round(prev[1] + f * (next[1] - prev[1]))},${Math.round(prev[2] + f * (next[2] - prev[2]))},${Math.round(prev[3] + f * (next[3] - prev[3]))})`;
+    }
+  }
+  const last = COLOR_STOPS[COLOR_STOPS.length - 1];
+  return `rgb(${last[1]},${last[2]},${last[3]})`;
+}
+
+function choroplethGradientCSS(): string {
+  return COLOR_STOPS.slice(1).map(s => `rgb(${s[1]},${s[2]},${s[3]}) ${Math.round(s[0] * 100)}%`).join(', ');
 }
 
 const MARKER_ICON = L.divIcon({
   className: '',
-  html: `<div style="background:#3b82f6;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-  iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -7],
+  html: `<div style="background:#38bdf8;width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4);animation:pulse 2s infinite"></div>`,
+  iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -8],
 });
 
-// ── Aggregation helpers ──────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function aggregateBy(collections: Collection[], keyFn: (c: Collection) => string | undefined): Map<string, Agg> {
   const m = new Map<string, Agg>();
@@ -112,218 +133,142 @@ function maxAgg(agg: Map<string, Agg>, metric: 'count' | 'inventory'): number {
   return mx;
 }
 
-// ── MapLayers: renders choropleth / bubbles / markers based on drill level ──
+function assignPIP(collections: Collection[], geo: FeatureCollection, filterFn?: (f: Feature) => boolean): Map<string, string> {
+  const m = new Map<string, string>();
+  const feats = filterFn ? geo.features.filter(filterFn) : geo.features;
+  for (const c of collections) {
+    const pt = point([c.lng, c.lat]);
+    for (const f of feats) {
+      try { if (booleanPointInPolygon(pt, f as any)) { m.set(c.id, f.id as string); break; } } catch {}
+    }
+  }
+  return m;
+}
+
+function nameMap(geo: FeatureCollection | null): Map<string, string> {
+  const m = new Map<string, string>();
+  geo?.features.forEach(f => m.set(f.id as string, f.properties?.name || ''));
+  return m;
+}
+
+function drillToParams(d: DrillState): Record<string, string> {
+  const p: Record<string, string> = { level: d.level };
+  if (d.country) p.country = d.country;
+  if (d.stateId) p.stateId = d.stateId;
+  if (d.stateName) p.stateName = d.stateName;
+  if (d.countyId) p.countyId = d.countyId;
+  if (d.countyName) p.countyName = d.countyName;
+  if (d.city) p.city = d.city;
+  return p;
+}
+
+function paramsToDrill(p: URLSearchParams): DrillState {
+  const level = (p.get('level') || 'world') as DrillLevel;
+  return {
+    level,
+    country: p.get('country') || undefined,
+    stateId: p.get('stateId') || undefined,
+    stateName: p.get('stateName') || undefined,
+    countyId: p.get('countyId') || undefined,
+    countyName: p.get('countyName') || undefined,
+    city: p.get('city') || undefined,
+  };
+}
+
+// ── MapLayers ────────────────────────────────────────────────────────────────
 
 function MapLayers({
   collections, drill, setDrill, metric, searchTerm,
+  worldGeo, statesGeo, countiesGeo, stateAssign, countyAssign,
 }: {
   collections: Collection[];
   drill: DrillState;
   setDrill: (d: DrillState) => void;
   metric: 'count' | 'inventory';
   searchTerm: string;
+  worldGeo: FeatureCollection | null;
+  statesGeo: FeatureCollection | null;
+  countiesGeo: FeatureCollection | null;
+  stateAssign: Map<string, string>;
+  countyAssign: Map<string, string>;
 }) {
   const map = useMap();
 
-  // TopoJSON data (loaded lazily)
-  const [worldTopo, setWorldTopo] = useState<Topology | null>(null);
-  const [statesTopo, setStatesTopo] = useState<Topology | null>(null);
-  const [countiesTopo, setCountiesTopo] = useState<Topology | null>(null);
-
-  // Load world on mount
-  useEffect(() => { fetch('/data/world-110m.json').then(r => r.json()).then(setWorldTopo); }, []);
-
-  // Load US states when first needed
-  useEffect(() => {
-    if (drill.country === 'USA' && !statesTopo)
-      fetch('/data/us-states-10m.json').then(r => r.json()).then(setStatesTopo);
-  }, [drill.country, statesTopo]);
-
-  // Load US counties when first needed
-  useEffect(() => {
-    if (drill.level === 'state' && drill.country === 'USA' && !countiesTopo)
-      fetch('/data/us-counties-10m.json').then(r => r.json()).then(setCountiesTopo);
-  }, [drill.level, drill.country, countiesTopo]);
-
-  // Convert TopoJSON → GeoJSON
-  const worldGeo = useMemo<FeatureCollection | null>(() => {
-    if (!worldTopo) return null;
-    return topojson.feature(worldTopo, worldTopo.objects.countries) as unknown as FeatureCollection;
-  }, [worldTopo]);
-
-  const statesGeo = useMemo<FeatureCollection | null>(() => {
-    if (!statesTopo) return null;
-    return topojson.feature(statesTopo, statesTopo.objects.states) as unknown as FeatureCollection;
-  }, [statesTopo]);
-
-  const countiesGeo = useMemo<FeatureCollection | null>(() => {
-    if (!countiesTopo) return null;
-    return topojson.feature(countiesTopo, countiesTopo.objects.counties) as unknown as FeatureCollection;
-  }, [countiesTopo]);
-
-  // Assign US collections to states via point-in-polygon
-  const stateAssign = useMemo(() => {
-    const m = new Map<string, string>(); // collection.id → state FIPS
-    if (!statesGeo) return m;
-    const usColls = collections.filter(c => c.country === 'USA');
-    for (const c of usColls) {
-      const pt = point([c.lng, c.lat]);
-      for (const feat of statesGeo.features) {
-        try {
-          if (booleanPointInPolygon(pt, feat as any)) {
-            m.set(c.id, feat.id as string);
-            break;
-          }
-        } catch { /* skip malformed geometry */ }
-      }
-    }
-    return m;
-  }, [collections, statesGeo]);
-
-  // Assign US collections to counties
-  const countyAssign = useMemo(() => {
-    const m = new Map<string, string>(); // collection.id → county FIPS
-    if (!countiesGeo || stateAssign.size === 0) return m;
-    const usColls = collections.filter(c => c.country === 'USA');
-    for (const c of usColls) {
-      const sid = stateAssign.get(c.id);
-      if (!sid) continue;
-      const pt = point([c.lng, c.lat]);
-      for (const feat of countiesGeo.features) {
-        if (!(feat.id as string).startsWith(sid)) continue;
-        try {
-          if (booleanPointInPolygon(pt, feat as any)) {
-            m.set(c.id, feat.id as string);
-            break;
-          }
-        } catch { /* skip */ }
-      }
-    }
-    return m;
-  }, [collections, countiesGeo, stateAssign]);
-
-  // State/county name lookups
-  const stateNames = useMemo(() => {
-    const m = new Map<string, string>();
-    statesGeo?.features.forEach(f => m.set(f.id as string, f.properties?.name || ''));
-    return m;
-  }, [statesGeo]);
-
-  const countyNames = useMemo(() => {
-    const m = new Map<string, string>();
-    countiesGeo?.features.forEach(f => m.set(f.id as string, f.properties?.name || ''));
-    return m;
-  }, [countiesGeo]);
-
-  // Apply search filter to collections for aggregation
   const filtered = useMemo(() => {
     if (!searchTerm) return collections;
-    const term = searchTerm.toLowerCase();
+    const t = searchTerm.toLowerCase();
     return collections.filter(c =>
-      c.name.toLowerCase().includes(term) ||
-      c.slug.toLowerCase().includes(term) ||
-      c.city.toLowerCase().includes(term) ||
-      (c.instagram && c.instagram.toLowerCase().includes(term))
+      c.name.toLowerCase().includes(t) || c.slug.toLowerCase().includes(t) ||
+      c.city.toLowerCase().includes(t) || (c.instagram?.toLowerCase().includes(t))
     );
   }, [collections, searchTerm]);
 
-  // ── Fly-to on drill changes ──────────────────────────────────────────────
+  // ── Fly-to ──
   useEffect(() => {
     switch (drill.level) {
-      case 'world':
-        map.flyTo([20, 0], 2, { duration: 0.8 });
-        break;
+      case 'world': map.flyTo([20, 0], 2, { duration: 0.8 }); break;
       case 'country': {
-        const coords = COUNTRY_COORDS[drill.country!];
-        if (coords) map.flyTo(coords, drill.country === 'USA' ? 4 : 5, { duration: 0.8 });
+        const c = COUNTRY_COORDS[drill.country!];
+        if (c) map.flyTo(c, drill.country === 'USA' ? 4 : 5, { duration: 0.8 });
         break;
       }
-      case 'state': {
+      case 'state':
         if (statesGeo && drill.stateId) {
-          const feat = statesGeo.features.find(f => f.id === drill.stateId);
-          if (feat) map.fitBounds(L.geoJSON(feat as any).getBounds(), { padding: [30, 30] });
+          const f = statesGeo.features.find(ft => ft.id === drill.stateId);
+          if (f) map.fitBounds(L.geoJSON(f as any).getBounds(), { padding: [30, 30], animate: true });
         }
         break;
-      }
-      case 'county': {
+      case 'county':
         if (countiesGeo && drill.countyId) {
-          const feat = countiesGeo.features.find(f => f.id === drill.countyId);
-          if (feat) map.fitBounds(L.geoJSON(feat as any).getBounds(), { padding: [40, 40] });
+          const f = countiesGeo.features.find(ft => ft.id === drill.countyId);
+          if (f) map.fitBounds(L.geoJSON(f as any).getBounds(), { padding: [40, 40], animate: true });
         }
         break;
-      }
       case 'markers': {
         const mc = drill.city
           ? filtered.filter(c => c.city === drill.city && c.country === drill.country)
-          : drill.countyId
-            ? filtered.filter(c => countyAssign.get(c.id) === drill.countyId)
-            : [];
-        if (mc.length > 0) {
-          const bounds = L.latLngBounds(mc.map(c => [c.lat, c.lng] as L.LatLngTuple));
-          map.fitBounds(bounds.pad(0.5));
-        }
+          : drill.countyId ? filtered.filter(c => countyAssign.get(c.id) === drill.countyId) : [];
+        if (mc.length) map.fitBounds(L.latLngBounds(mc.map(c => [c.lat, c.lng] as L.LatLngTuple)).pad(0.5), { animate: true });
         break;
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drill]);
 
-  // ── Aggregations ─────────────────────────────────────────────────────────
-
+  // ── Aggregations ──
   const countryAgg = useMemo(() => aggregateBy(filtered, c => toTopoName(c.country)), [filtered]);
-  const stateAgg = useMemo(() => {
-    const usColls = filtered.filter(c => c.country === 'USA');
-    return aggregateBy(usColls, c => stateAssign.get(c.id));
-  }, [filtered, stateAssign]);
+  const stateAgg = useMemo(() => aggregateBy(filtered.filter(c => c.country === 'USA'), c => stateAssign.get(c.id)), [filtered, stateAssign]);
   const countyAgg = useMemo(() => {
     if (!drill.stateId) return new Map<string, Agg>();
-    const stateColls = filtered.filter(c => stateAssign.get(c.id) === drill.stateId);
-    return aggregateBy(stateColls, c => countyAssign.get(c.id));
+    return aggregateBy(filtered.filter(c => stateAssign.get(c.id) === drill.stateId), c => countyAssign.get(c.id));
   }, [filtered, drill.stateId, stateAssign, countyAssign]);
 
-  // Filtered counties GeoJSON for selected state
   const stateCountiesGeo = useMemo<FeatureCollection | null>(() => {
     if (!countiesGeo || !drill.stateId) return null;
-    return {
-      type: 'FeatureCollection',
-      features: countiesGeo.features.filter(f => (f.id as string).startsWith(drill.stateId!)),
-    };
+    return { type: 'FeatureCollection', features: countiesGeo.features.filter(f => (f.id as string).startsWith(drill.stateId!)) };
   }, [countiesGeo, drill.stateId]);
 
-  // City groups for non-US or county-level view
+  // City groups
   const cityGroups = useMemo(() => {
     let scope: Collection[];
-    if (drill.level === 'country' && drill.country && drill.country !== 'USA') {
+    if (drill.level === 'country' && drill.country && drill.country !== 'USA')
       scope = filtered.filter(c => c.country === drill.country);
-    } else if (drill.level === 'county' && drill.countyId) {
+    else if (drill.level === 'county' && drill.countyId)
       scope = filtered.filter(c => countyAssign.get(c.id) === drill.countyId);
-    } else {
-      return [];
-    }
-    const groups = new Map<string, { lat: number; lng: number; count: number; inventory: number; items: Collection[] }>();
+    else return [];
+    const g = new Map<string, { lat: number; lng: number; count: number; inventory: number; items: Collection[] }>();
     for (const c of scope) {
-      const key = c.city || 'Unknown';
-      const g = groups.get(key) || { lat: 0, lng: 0, count: 0, inventory: 0, items: [] };
-      g.items.push(c);
-      g.count++;
-      g.inventory += c.total_inventory;
-      g.lat += c.lat;
-      g.lng += c.lng;
-      groups.set(key, g);
+      const k = c.city || 'Unknown';
+      const v = g.get(k) || { lat: 0, lng: 0, count: 0, inventory: 0, items: [] };
+      v.items.push(c); v.count++; v.inventory += c.total_inventory; v.lat += c.lat; v.lng += c.lng;
+      g.set(k, v);
     }
-    // Average positions
-    for (const g of groups.values()) {
-      g.lat /= g.count;
-      g.lng /= g.count;
-    }
-    return Array.from(groups.entries()).map(([city, g]) => ({ city, ...g }));
+    for (const v of g.values()) { v.lat /= v.count; v.lng /= v.count; }
+    return Array.from(g.entries()).map(([city, v]) => ({ city, ...v }));
   }, [filtered, drill, countyAssign]);
 
-  // Marker-level collections
   const markerCollections = useMemo(() => {
-    if (drill.level === 'county') {
-      return filtered.filter(c => countyAssign.get(c.id) === drill.countyId);
-    }
+    if (drill.level === 'county') return filtered.filter(c => countyAssign.get(c.id) === drill.countyId);
     if (drill.level === 'markers') {
       if (drill.city) return filtered.filter(c => c.city === drill.city && c.country === drill.country);
       if (drill.countyId) return filtered.filter(c => countyAssign.get(c.id) === drill.countyId);
@@ -331,190 +276,141 @@ function MapLayers({
     return [];
   }, [filtered, drill, countyAssign]);
 
-  // ── onEachFeature builders ───────────────────────────────────────────────
+  // ── Feature handlers ──
+  const makeOnEach = useCallback((agg: Map<string, Agg>, idKey: 'name' | 'id', onClick: (id: string, name: string) => void) => {
+    return (feature: Feature<Geometry>, layer: L.Layer) => {
+      const id = idKey === 'id' ? (feature.id as string) : (feature.properties?.name || '');
+      const name = feature.properties?.name || id;
+      const d = agg.get(id) || { count: 0, inventory: 0 };
+      (layer as L.Path).bindTooltip(
+        `<div style="min-width:120px"><strong style="font-size:13px">${name}</strong><div style="margin-top:3px;display:flex;gap:12px"><span>${d.count} <span style="opacity:.7">collections</span></span><span>${d.inventory} <span style="opacity:.7">vehicles</span></span></div>${d.count > 0 ? '<div style="margin-top:4px;font-size:10px;opacity:.6">Click to explore</div>' : ''}</div>`,
+        { sticky: true, direction: 'top', className: 'map-tooltip' }
+      );
+      (layer as L.Path).on({
+        mouseover: (e) => {
+          e.target.setStyle({ weight: 2, fillOpacity: 0.85, color: '#38bdf8' });
+          e.target.bringToFront();
+        },
+        mouseout: (e) => {
+          e.target.setStyle({ weight: 0.5, fillOpacity: 0.55, color: '#334155' });
+        },
+        click: () => onClick(id, name),
+      });
+    };
+  }, []);
 
-  const makeOnEach = useCallback(
-    (agg: Map<string, Agg>, nameKey: 'name', idKey: 'name' | 'id', onClick: (id: string, name: string) => void) => {
-      return (feature: Feature<Geometry>, layer: L.Layer) => {
-        const id = idKey === 'id' ? (feature.id as string) : (feature.properties?.[nameKey] || '');
-        const name = feature.properties?.[nameKey] || id;
-        const data = agg.get(id) || { count: 0, inventory: 0 };
-        (layer as L.Path).bindTooltip(
-          `<strong>${name}</strong><br/>${data.count} collection${data.count !== 1 ? 's' : ''}<br/>${data.inventory} vehicles`,
-          { sticky: true, direction: 'top', className: 'dark-tooltip' }
-        );
-        (layer as L.Path).on({
-          mouseover: (e) => { e.target.setStyle({ weight: 2, fillOpacity: 0.75 }); e.target.bringToFront(); },
-          mouseout: (e) => { e.target.setStyle({ weight: 0.5, fillOpacity: 0.5 }); },
-          click: () => onClick(id, name),
-        });
-      };
-    },
-    []
+  const renderMarkers = (colls: Collection[]) => (
+    <>
+      {colls.map(c => (
+        <Marker key={c.id} position={[c.lat, c.lng]} icon={MARKER_ICON}>
+          <Popup maxWidth={280}>
+            <div className="min-w-[240px]">
+              <div className="flex items-start gap-3">
+                {c.logo_url && <img src={c.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
+                <div>
+                  <h3 className="font-bold text-base leading-tight">{c.name}</h3>
+                  <p className="text-gray-500 text-sm">{c.city}, {c.country}</p>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center gap-3 text-sm">
+                {c.total_inventory > 0 && <span className="text-blue-600 font-semibold">{c.total_inventory} vehicles</span>}
+                {c.instagram && (
+                  <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+                    className="text-pink-500 hover:text-pink-600">@{c.instagram}</a>
+                )}
+              </div>
+              <Link to={`/org/${c.slug}`}
+                className="mt-2 block text-center px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors">
+                View Collection
+              </Link>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
   );
 
-  // ── Render layers ────────────────────────────────────────────────────────
+  // ── Render layers ──
 
-  // World level: country choropleth
   if (drill.level === 'world' && worldGeo) {
     const mx = maxAgg(countryAgg, metric);
-    return (
-      <GeoJSON
-        key={`world-${metric}-${searchTerm}`}
-        data={worldGeo}
-        style={(feature) => {
-          const name = feature?.properties?.name || '';
-          const data = countryAgg.get(name);
-          const val = data ? data[metric] : 0;
-          return { fillColor: choroplethColor(val, mx), fillOpacity: 0.5, color: '#475569', weight: 0.5 };
-        }}
-        onEachFeature={makeOnEach(countryAgg, 'name', 'name', (topoName) => {
-          const country = toOurName(topoName);
-          setDrill({ level: 'country', country });
-        })}
-      />
-    );
+    return <GeoJSON key={`w-${metric}-${searchTerm}`} data={worldGeo}
+      style={f => ({ fillColor: choroplethColor((countryAgg.get(f?.properties?.name || '') || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
+      onEachFeature={makeOnEach(countryAgg, 'name', n => setDrill({ level: 'country', country: toOurName(n) }))} />;
   }
 
-  // Country level (US): state choropleth
   if (drill.level === 'country' && drill.country === 'USA' && statesGeo) {
     const mx = maxAgg(stateAgg, metric);
-    return (
-      <GeoJSON
-        key={`states-${metric}-${searchTerm}`}
-        data={statesGeo}
-        style={(feature) => {
-          const id = feature?.id as string;
-          const data = stateAgg.get(id);
-          const val = data ? data[metric] : 0;
-          return { fillColor: choroplethColor(val, mx), fillOpacity: 0.5, color: '#475569', weight: 0.5 };
-        }}
-        onEachFeature={makeOnEach(stateAgg, 'name', 'id', (stateId, stateName) => {
-          setDrill({ level: 'state', country: 'USA', stateId, stateName });
-        })}
-      />
-    );
+    return <GeoJSON key={`s-${metric}-${searchTerm}`} data={statesGeo}
+      style={f => ({ fillColor: choroplethColor((stateAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
+      onEachFeature={makeOnEach(stateAgg, 'id', (id, name) => setDrill({ level: 'state', country: 'USA', stateId: id, stateName: name }))} />;
   }
 
-  // Country level (non-US): city bubbles
-  if (drill.level === 'country' && drill.country !== 'USA') {
+  if (drill.level === 'country' && drill.country !== 'USA' && cityGroups.length > 0) {
     const mx = Math.max(...cityGroups.map(g => g[metric === 'count' ? 'count' : 'inventory']), 1);
-    return (
-      <>
-        {cityGroups.map(g => (
-          <CircleMarker
-            key={g.city}
-            center={[g.lat, g.lng]}
-            radius={Math.max(8, Math.min(30, 8 + Math.sqrt(g.count) * 8))}
-            pathOptions={{ color: '#3b82f6', fillColor: choroplethColor(g[metric === 'count' ? 'count' : 'inventory'], mx), fillOpacity: 0.7, weight: 2 }}
-            eventHandlers={{ click: () => setDrill({ level: 'markers', country: drill.country, city: g.city }) }}
-          >
-            <Tooltip direction="top">
-              <strong>{g.city}</strong><br />
-              {g.count} collection{g.count !== 1 ? 's' : ''}<br />
-              {g.inventory} vehicles
-            </Tooltip>
-          </CircleMarker>
-        ))}
-      </>
-    );
+    return <>
+      {cityGroups.map(g => (
+        <CircleMarker key={g.city} center={[g.lat, g.lng]}
+          radius={Math.max(10, Math.min(35, 10 + Math.sqrt(g.count) * 10))}
+          pathOptions={{ color: '#38bdf8', fillColor: choroplethColor(g[metric === 'count' ? 'count' : 'inventory'], mx), fillOpacity: 0.75, weight: 2 }}
+          eventHandlers={{ click: () => setDrill({ level: 'markers', country: drill.country, city: g.city }) }}>
+          <Tooltip direction="top" className="map-tooltip">
+            <strong>{g.city}</strong><br />{g.count} collections / {g.inventory} vehicles
+          </Tooltip>
+        </CircleMarker>
+      ))}
+    </>;
   }
 
-  // State level: county choropleth
   if (drill.level === 'state' && stateCountiesGeo) {
     const mx = maxAgg(countyAgg, metric);
-    return (
-      <GeoJSON
-        key={`counties-${drill.stateId}-${metric}-${searchTerm}`}
-        data={stateCountiesGeo}
-        style={(feature) => {
-          const id = feature?.id as string;
-          const data = countyAgg.get(id);
-          const val = data ? data[metric] : 0;
-          return { fillColor: choroplethColor(val, mx), fillOpacity: 0.5, color: '#475569', weight: 0.5 };
-        }}
-        onEachFeature={makeOnEach(countyAgg, 'name', 'id', (countyId, countyName) => {
-          setDrill({ level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName, countyId, countyName });
-        })}
-      />
-    );
+    return <GeoJSON key={`c-${drill.stateId}-${metric}-${searchTerm}`} data={stateCountiesGeo}
+      style={f => ({ fillColor: choroplethColor((countyAgg.get(f?.id as string) || { count: 0, inventory: 0 })[metric], mx), fillOpacity: 0.55, color: '#334155', weight: 0.5 })}
+      onEachFeature={makeOnEach(countyAgg, 'id', (id, name) => setDrill({ level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName, countyId: id, countyName: name }))} />;
   }
 
-  // County level: show individual markers within county
-  if (drill.level === 'county' && markerCollections.length > 0) {
-    return (
-      <>
-        {markerCollections.map(c => (
-          <Marker key={c.id} position={[c.lat, c.lng]} icon={MARKER_ICON}>
-            <Popup>
-              <div className="min-w-[220px]">
-                <h3 className="font-bold text-base mb-1">{c.name}</h3>
-                <p className="text-gray-600 text-sm mb-1">{c.city}, {c.country}</p>
-                {c.total_inventory > 0 && <p className="text-sm text-blue-600 font-medium mb-1">{c.total_inventory} vehicles</p>}
-                {c.instagram && (
-                  <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
-                    className="text-pink-500 text-sm">@{c.instagram}</a>
-                )}
-                <br />
-                <Link to={`/org/${c.slug}`} className="inline-block mt-1 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                  View Collection
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </>
-    );
-  }
-
-  // Markers level (final): individual markers for a city group (non-US path)
-  if (drill.level === 'markers' && markerCollections.length > 0) {
-    return (
-      <>
-        {markerCollections.map(c => (
-          <Marker key={c.id} position={[c.lat, c.lng]} icon={MARKER_ICON}>
-            <Popup>
-              <div className="min-w-[220px]">
-                <h3 className="font-bold text-base mb-1">{c.name}</h3>
-                <p className="text-gray-600 text-sm mb-1">{c.city}, {c.country}</p>
-                {c.total_inventory > 0 && <p className="text-sm text-blue-600 font-medium mb-1">{c.total_inventory} vehicles</p>}
-                {c.instagram && (
-                  <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
-                    className="text-pink-500 text-sm">@{c.instagram}</a>
-                )}
-                <br />
-                <Link to={`/org/${c.slug}`} className="inline-block mt-1 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                  View Collection
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </>
-    );
-  }
+  if ((drill.level === 'county' || drill.level === 'markers') && markerCollections.length > 0)
+    return renderMarkers(markerCollections);
 
   return null;
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
+// ── CSS ──────────────────────────────────────────────────────────────────────
+
+const MAP_STYLES = `
+  .map-tooltip { background: #0f172a !important; color: #e2e8f0 !important; border: 1px solid #1e3a5f !important; border-radius: 8px !important; padding: 8px 12px !important; font-size: 12px !important; box-shadow: 0 4px 20px rgba(0,0,0,.5) !important; backdrop-filter: blur(8px); }
+  .map-tooltip::before { border-top-color: #1e3a5f !important; }
+  .leaflet-popup-content-wrapper { border-radius: 12px !important; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4); } 50% { box-shadow: 0 0 16px rgba(56,189,248,0.9),0 2px 8px rgba(0,0,0,.4); } }
+`;
+
+// ── Main Component ───────────────────────────────────────────────────────────
 
 export default function CollectionsMap() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
-  const [drill, setDrill] = useState<DrillState>({ level: 'world' });
   const [metric, setMetric] = useState<'count' | 'inventory'>('count');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'inventory' | 'city'>('name');
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // URL-synced drill state
+  const drill = useMemo(() => paramsToDrill(searchParams), [searchParams]);
+  const setDrill = useCallback((d: DrillState) => {
+    setSearchParams(drillToParams(d), { replace: false });
+  }, [setSearchParams]);
+
+  // ── Data loading ──
 
   useEffect(() => {
-    async function load() {
+    (async () => {
       try {
         const { data, error } = await supabase
           .from('businesses')
           .select('id, business_name, slug, latitude, longitude, city, state, country, social_links, total_inventory, logo_url')
           .eq('business_type', 'collection')
-          .not('latitude', 'is', null)
-          .not('longitude', 'is', null);
+          .not('latitude', 'is', null).not('longitude', 'is', null);
         if (error) throw error;
         setCollections((data || []).map((b: any) => ({
           id: b.id, slug: b.slug || b.id, name: b.business_name,
@@ -523,124 +419,179 @@ export default function CollectionsMap() {
           lat: Number(b.latitude), lng: Number(b.longitude),
           total_inventory: b.total_inventory || 0, logo_url: b.logo_url || null,
         })));
-      } catch {
-        setCollections(SAMPLE_COLLECTIONS);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+      } catch { setCollections(SAMPLE); }
+      finally { setLoading(false); }
+    })();
   }, []);
 
-  // Scope collections to current drill level
-  const scopedCollections = useMemo(() => {
-    let result = collections;
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(c =>
-        c.name.toLowerCase().includes(term) || c.slug.toLowerCase().includes(term) ||
-        c.city.toLowerCase().includes(term) || (c.instagram && c.instagram.toLowerCase().includes(term))
-      );
-    }
-    if (drill.level !== 'world' && drill.country) {
-      result = result.filter(c => c.country === drill.country);
-    }
-    return result;
-  }, [collections, searchTerm, drill]);
+  // ── TopoJSON loading (lifted to main) ──
 
-  // Sidebar items based on drill level
-  const sidebarItems = useMemo(() => {
+  const [worldTopo, setWorldTopo] = useState<Topology | null>(null);
+  const [statesTopo, setStatesTopo] = useState<Topology | null>(null);
+  const [countiesTopo, setCountiesTopo] = useState<Topology | null>(null);
+
+  useEffect(() => { fetch('/data/world-110m.json').then(r => r.json()).then(setWorldTopo); }, []);
+  useEffect(() => { if (drill.country === 'USA' && !statesTopo) fetch('/data/us-states-10m.json').then(r => r.json()).then(setStatesTopo); }, [drill.country, statesTopo]);
+  useEffect(() => { if (drill.level === 'state' && !countiesTopo) fetch('/data/us-counties-10m.json').then(r => r.json()).then(setCountiesTopo); }, [drill.level, countiesTopo]);
+
+  const worldGeo = useMemo<FeatureCollection | null>(() => worldTopo ? topojson.feature(worldTopo, worldTopo.objects.countries) as any : null, [worldTopo]);
+  const statesGeo = useMemo<FeatureCollection | null>(() => statesTopo ? topojson.feature(statesTopo, statesTopo.objects.states) as any : null, [statesTopo]);
+  const countiesGeo = useMemo<FeatureCollection | null>(() => countiesTopo ? topojson.feature(countiesTopo, countiesTopo.objects.counties) as any : null, [countiesTopo]);
+
+  // ── Point-in-polygon assignments ──
+
+  const stateAssign = useMemo(() => {
+    if (!statesGeo) return new Map<string, string>();
+    return assignPIP(collections.filter(c => c.country === 'USA'), statesGeo);
+  }, [collections, statesGeo]);
+
+  const countyAssign = useMemo(() => {
+    if (!countiesGeo || !stateAssign.size) return new Map<string, string>();
+    const usColls = collections.filter(c => c.country === 'USA');
+    const m = new Map<string, string>();
+    for (const c of usColls) {
+      const sid = stateAssign.get(c.id);
+      if (!sid) continue;
+      const pt = point([c.lng, c.lat]);
+      for (const f of countiesGeo.features) {
+        if (!(f.id as string).startsWith(sid)) continue;
+        try { if (booleanPointInPolygon(pt, f as any)) { m.set(c.id, f.id as string); break; } } catch {}
+      }
+    }
+    return m;
+  }, [collections, countiesGeo, stateAssign]);
+
+  const stateNames = useMemo(() => nameMap(statesGeo), [statesGeo]);
+  const countyNames = useMemo(() => nameMap(countiesGeo), [countiesGeo]);
+
+  // ── Scoped collections ──
+
+  const scopedCollections = useMemo(() => {
+    let r = collections;
+    if (searchTerm) {
+      const t = searchTerm.toLowerCase();
+      r = r.filter(c => c.name.toLowerCase().includes(t) || c.city.toLowerCase().includes(t) || c.slug.toLowerCase().includes(t) || c.instagram?.toLowerCase().includes(t));
+    }
+    switch (drill.level) {
+      case 'country': r = r.filter(c => c.country === drill.country); break;
+      case 'state': r = r.filter(c => stateAssign.get(c.id) === drill.stateId); break;
+      case 'county': case 'markers':
+        if (drill.countyId) r = r.filter(c => countyAssign.get(c.id) === drill.countyId);
+        else if (drill.city) r = r.filter(c => c.city === drill.city && c.country === drill.country);
+        break;
+    }
+    return r;
+  }, [collections, searchTerm, drill, stateAssign, countyAssign]);
+
+  // ── Sorted collections for right panel ──
+  const sortedCollections = useMemo(() => {
+    const arr = [...scopedCollections];
+    switch (sortBy) {
+      case 'name': arr.sort((a, b) => a.name.localeCompare(b.name)); break;
+      case 'inventory': arr.sort((a, b) => b.total_inventory - a.total_inventory); break;
+      case 'city': arr.sort((a, b) => a.city.localeCompare(b.city)); break;
+    }
+    return arr;
+  }, [scopedCollections, sortBy]);
+
+  // ── Sidebar items (now has access to state/county assignments!) ──
+
+  const sidebarItems = useMemo((): SidebarItem[] => {
     if (drill.level === 'world') {
       const agg = aggregateBy(scopedCollections, c => c.country);
-      return Array.from(agg.entries())
-        .sort((a, b) => b[1].count - a[1].count)
-        .map(([country, data]) => ({
-          key: country, label: country, ...data,
-          onClick: () => setDrill({ level: 'country', country }),
+      return Array.from(agg.entries()).sort((a, b) => b[1].count - a[1].count)
+        .map(([k, v]) => ({ key: k, label: k, ...v, onClick: () => setDrill({ level: 'country', country: k }) }));
+    }
+    if (drill.level === 'country' && drill.country === 'USA') {
+      const usColls = scopedCollections.filter(c => c.country === 'USA');
+      const agg = aggregateBy(usColls, c => stateAssign.get(c.id));
+      return Array.from(agg.entries()).sort((a, b) => b[1].count - a[1].count)
+        .map(([id, v]) => ({
+          key: id, label: stateNames.get(id) || id, ...v,
+          onClick: () => setDrill({ level: 'state', country: 'USA', stateId: id, stateName: stateNames.get(id) || id }),
         }));
     }
-    if (drill.level === 'country' && drill.country !== 'USA') {
+    if (drill.level === 'country') {
       const agg = aggregateBy(scopedCollections, c => c.city || 'Unknown');
-      return Array.from(agg.entries())
-        .sort((a, b) => b[1].count - a[1].count)
-        .map(([city, data]) => ({
-          key: city, label: city, ...data,
-          onClick: () => setDrill({ level: 'markers', country: drill.country, city }),
+      return Array.from(agg.entries()).sort((a, b) => b[1].count - a[1].count)
+        .map(([k, v]) => ({ key: k, label: k, ...v, onClick: () => setDrill({ level: 'markers', country: drill.country, city: k }) }));
+    }
+    if (drill.level === 'state') {
+      const stateColls = scopedCollections.filter(c => stateAssign.get(c.id) === drill.stateId);
+      const agg = aggregateBy(stateColls, c => countyAssign.get(c.id));
+      return Array.from(agg.entries()).sort((a, b) => b[1].count - a[1].count)
+        .map(([id, v]) => ({
+          key: id, label: countyNames.get(id) || id, ...v,
+          onClick: () => setDrill({ level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName, countyId: id, countyName: countyNames.get(id) || id }),
         }));
     }
-    // For US state/county levels, items are built from the GeoJSON names
-    // We show simple collection count for now
     return [];
-  }, [drill, scopedCollections]);
+  }, [drill, scopedCollections, stateAssign, countyAssign, stateNames, countyNames, setDrill]);
 
-  // Breadcrumb segments
+  // ── Summary stats ──
+  const stats = useMemo(() => {
+    const total = scopedCollections.length;
+    const vehicles = scopedCollections.reduce((s, c) => s + c.total_inventory, 0);
+    const cities = new Set(scopedCollections.map(c => c.city)).size;
+    const countries = new Set(scopedCollections.map(c => c.country)).size;
+    return { total, vehicles, cities, countries };
+  }, [scopedCollections]);
+
+  // Breadcrumbs
   const breadcrumbs = useMemo(() => {
-    const parts: { label: string; onClick: () => void }[] = [
-      { label: 'World', onClick: () => setDrill({ level: 'world' }) },
-    ];
-    if (drill.country) {
-      parts.push({ label: drill.country, onClick: () => setDrill({ level: 'country', country: drill.country }) });
-    }
-    if (drill.stateName) {
-      parts.push({
-        label: drill.stateName,
-        onClick: () => setDrill({ level: 'state', country: 'USA', stateId: drill.stateId, stateName: drill.stateName }),
-      });
-    }
-    if (drill.countyName) {
-      parts.push({
-        label: drill.countyName,
-        onClick: () => setDrill({
-          level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName,
-          countyId: drill.countyId, countyName: drill.countyName,
-        }),
-      });
-    }
-    if (drill.city) {
-      parts.push({ label: drill.city, onClick: () => {} });
-    }
-    return parts;
-  }, [drill]);
+    const p: { label: string; onClick: () => void }[] = [{ label: 'World', onClick: () => setDrill({ level: 'world' }) }];
+    if (drill.country) p.push({ label: drill.country, onClick: () => setDrill({ level: 'country', country: drill.country }) });
+    if (drill.stateName) p.push({ label: drill.stateName, onClick: () => setDrill({ level: 'state', country: 'USA', stateId: drill.stateId, stateName: drill.stateName }) });
+    if (drill.countyName) p.push({ label: drill.countyName, onClick: () => setDrill({ level: 'county', country: 'USA', stateId: drill.stateId, stateName: drill.stateName, countyId: drill.countyId, countyName: drill.countyName }) });
+    if (drill.city) p.push({ label: drill.city, onClick: () => {} });
+    return p;
+  }, [drill, setDrill]);
 
-  const sidebarTitle = drill.level === 'world' ? 'Countries'
-    : drill.level === 'country' && drill.country === 'USA' ? 'States'
-    : drill.level === 'country' ? 'Cities'
-    : drill.level === 'state' ? 'Counties'
-    : 'Collections';
+  const sidebarTitle = drill.level === 'world' ? 'Countries' : drill.level === 'country' && drill.country === 'USA' ? 'States' : drill.level === 'country' ? 'Cities' : drill.level === 'state' ? 'Counties' : 'Collections';
+  const levelLabel = drill.level === 'world' ? 'country' : drill.level === 'country' && drill.country === 'USA' ? 'state' : drill.level === 'country' ? 'city' : drill.level === 'state' ? 'county' : 'collection';
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else mapContainerRef.current?.requestFullscreen();
+  };
 
   return (
-    <div className="fullscreen-content h-screen flex flex-col bg-gray-900">
-      {/* Tooltip styles */}
-      <style>{`
-        .dark-tooltip { background: #1e293b !important; color: #e2e8f0 !important; border: 1px solid #475569 !important; border-radius: 6px !important; padding: 6px 10px !important; font-size: 12px !important; }
-        .dark-tooltip::before { border-top-color: #475569 !important; }
-      `}</style>
+    <div ref={mapContainerRef} className="fullscreen-content h-screen flex flex-col bg-gray-950">
+      <style>{MAP_STYLES}</style>
 
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Collections World Map</h1>
-            <p className="text-gray-400 text-sm">
-              {collections.length} collections across {new Set(collections.map(c => c.country)).size} countries
-            </p>
-          </div>
+      <div className="bg-gray-900/80 backdrop-blur border-b border-gray-800 px-4 py-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <input
-              type="text" placeholder="Search collections..." value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-            />
-            {/* Metric toggle */}
-            <div className="flex rounded-lg overflow-hidden border border-gray-600">
-              <button
-                onClick={() => setMetric('count')}
-                className={`px-3 py-2 text-xs font-medium ${metric === 'count' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
-              >Count</button>
-              <button
-                onClick={() => setMetric('inventory')}
-                className={`px-3 py-2 text-xs font-medium ${metric === 'inventory' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
-              >Vehicles</button>
+            <div>
+              <h1 className="text-xl font-bold text-white tracking-tight">Collections Map</h1>
+              <p className="text-gray-500 text-xs">{stats.total} collections / {stats.vehicles.toLocaleString()} vehicles / {stats.countries} countries</p>
+            </div>
+            {/* Breadcrumbs inline */}
+            {drill.level !== 'world' && (
+              <div className="flex items-center gap-1 text-sm ml-4 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700/50">
+                {breadcrumbs.map((bc, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    {i > 0 && <span className="text-gray-600">/</span>}
+                    <button onClick={bc.onClick} className={i === breadcrumbs.length - 1 ? 'text-sky-400 font-medium' : 'text-gray-400 hover:text-gray-200'}>{bc.label}</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                className="pl-8 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 w-52" />
+              <svg className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            </div>
+            <div className="flex rounded-md overflow-hidden border border-gray-700">
+              {(['count', 'inventory'] as const).map(m => (
+                <button key={m} onClick={() => setMetric(m)}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${metric === m ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                  {m === 'count' ? 'Count' : 'Vehicles'}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -648,99 +599,128 @@ export default function CollectionsMap() {
 
       <div className="flex-1 flex min-h-0">
         {/* Sidebar */}
-        <div className="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto">
-          <div className="p-4">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{sidebarTitle}</h2>
-            <div className="space-y-1">
-              {sidebarItems.map(item => (
-                <button
-                  key={item.key}
-                  onClick={item.onClick}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                >
+        <div className="w-60 bg-gray-900/50 border-r border-gray-800 flex flex-col min-h-0">
+          <div className="px-3 pt-3 pb-2">
+            <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{sidebarTitle}</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
+            {sidebarItems.map(item => (
+              <button key={item.key} onClick={item.onClick}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs text-gray-300 hover:bg-gray-800/80 hover:text-white transition-colors group">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: choroplethColor(item[metric === 'count' ? 'count' : 'inventory'], Math.max(...sidebarItems.map(i => i[metric === 'count' ? 'count' : 'inventory']), 1)) }} />
                   <span className="truncate">{item.label}</span>
-                  <span className="text-xs bg-gray-700 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">
-                    {metric === 'count' ? item.count : item.inventory}
-                  </span>
-                </button>
-              ))}
-              {sidebarItems.length === 0 && (
-                <p className="text-gray-500 text-xs italic">
-                  {drill.level === 'county' || drill.level === 'markers'
-                    ? 'Viewing individual collections'
-                    : 'Loading...'}
-                </p>
-              )}
-            </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+                  <span className="text-[10px] text-gray-500">{item.count}c</span>
+                  <span className="text-[10px] text-gray-600">{item.inventory}v</span>
+                </div>
+              </button>
+            ))}
+            {sidebarItems.length === 0 && drill.level !== 'county' && drill.level !== 'markers' && (
+              <div className="px-2 py-8 text-center">
+                <div className="text-gray-600 text-xs">Loading {sidebarTitle.toLowerCase()}...</div>
+              </div>
+            )}
+            {(drill.level === 'county' || drill.level === 'markers') && (
+              <div className="px-2 py-4 space-y-1">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Collections here</div>
+                {scopedCollections.slice(0, 20).map(c => (
+                  <Link key={c.id} to={`/org/${c.slug}`} className="block px-2 py-1 rounded text-xs text-gray-400 hover:text-white hover:bg-gray-800/60 truncate">
+                    {c.name}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Map */}
+        {/* Map area */}
         <div className="flex-1 relative min-h-0 min-w-0">
           {loading ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-              <div className="text-gray-400">Loading map data...</div>
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
+                <div className="text-gray-500 text-sm">Loading collections...</div>
+              </div>
             </div>
           ) : (
-            <MapContainer center={[20, 0]} zoom={2} className="absolute inset-0" style={{ background: '#1a1a2e' }}>
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com">CARTO</a>'
-              />
-              <MapLayers
-                collections={collections}
-                drill={drill}
-                setDrill={setDrill}
-                metric={metric}
-                searchTerm={searchTerm}
-              />
+            <MapContainer center={[20, 0]} zoom={2} className="absolute inset-0" style={{ background: '#0a0f1a' }}
+              zoomControl={false} attributionControl={false}>
+              <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+              <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
+                worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} />
             </MapContainer>
           )}
 
-          {/* Breadcrumbs overlay */}
-          {drill.level !== 'world' && (
-            <div className="absolute top-4 left-4 z-[1000] bg-gray-800/90 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-1 text-sm">
-              {breadcrumbs.map((bc, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  {i > 0 && <span className="text-gray-500">/</span>}
-                  <button
-                    onClick={bc.onClick}
-                    className={`${i === breadcrumbs.length - 1 ? 'text-white' : 'text-blue-400 hover:text-blue-300'}`}
-                  >{bc.label}</button>
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Map controls */}
+          <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-1.5">
+            <button onClick={() => setDrill({ level: 'world' })} title="Reset view"
+              className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center text-sm transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </button>
+            <button onClick={toggleFullscreen} title="Fullscreen"
+              className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center text-sm transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+            </button>
+          </div>
 
-          {/* Stats overlay */}
-          <div className="absolute bottom-4 left-4 z-[1000] bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 text-sm">
-            <div className="text-gray-400">
-              Showing <span className="text-white font-semibold">{scopedCollections.length}</span> collections
+          {/* Color legend */}
+          <div className="absolute bottom-14 right-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-lg p-2.5 border border-gray-800/50">
+            <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-1.5">{metric === 'count' ? 'Collections' : 'Vehicles'} per {levelLabel}</div>
+            <div className="w-32 h-2 rounded-full" style={{ background: `linear-gradient(to right, ${choroplethGradientCSS()})` }} />
+            <div className="flex justify-between mt-0.5">
+              <span className="text-[9px] text-gray-600">0</span>
+              <span className="text-[9px] text-gray-600">max</span>
             </div>
+          </div>
+
+          {/* Summary stats */}
+          <div className="absolute bottom-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-lg px-3 py-2 border border-gray-800/50 flex items-center gap-4">
+            <div><div className="text-white text-sm font-bold">{stats.total}</div><div className="text-[9px] text-gray-500">Collections</div></div>
+            <div className="w-px h-6 bg-gray-700" />
+            <div><div className="text-sky-400 text-sm font-bold">{stats.vehicles.toLocaleString()}</div><div className="text-[9px] text-gray-500">Vehicles</div></div>
+            <div className="w-px h-6 bg-gray-700" />
+            <div><div className="text-emerald-400 text-sm font-bold">{stats.cities}</div><div className="text-[9px] text-gray-500">Cities</div></div>
           </div>
         </div>
 
-        {/* Collection List Panel */}
-        <div className="w-80 bg-gray-800 border-l border-gray-700 overflow-y-auto">
-          <div className="p-4 border-b border-gray-700">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-              Collections ({scopedCollections.length})
-            </h2>
+        {/* Right panel */}
+        <div className="w-72 bg-gray-900/50 border-l border-gray-800 flex flex-col min-h-0">
+          <div className="px-3 pt-3 pb-2 border-b border-gray-800/50 flex items-center justify-between">
+            <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Collections ({scopedCollections.length})</h2>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
+              className="text-[10px] bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-400 focus:outline-none">
+              <option value="name">Name</option>
+              <option value="inventory">Vehicles</option>
+              <option value="city">City</option>
+            </select>
           </div>
-          <div className="divide-y divide-gray-700">
-            {scopedCollections.slice(0, 50).map(c => (
-              <Link key={c.slug} to={`/org/${c.slug}`} className="block p-3 hover:bg-gray-700/50 transition-colors">
-                <div className="flex items-start gap-3">
-                  <div className="w-3 h-3 rounded-full mt-1 flex-shrink-0 bg-blue-500" />
+          <div className="flex-1 overflow-y-auto">
+            {sortedCollections.slice(0, 80).map(c => (
+              <Link key={c.id} to={`/org/${c.slug}`} className="block px-3 py-2.5 border-b border-gray-800/30 hover:bg-gray-800/40 transition-colors group">
+                <div className="flex items-start gap-2.5">
+                  {c.logo_url ? (
+                    <img src={c.logo_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 bg-gray-800" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-md bg-gradient-to-br from-sky-900/40 to-blue-900/40 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sky-400 text-[10px] font-bold">{c.name.charAt(0)}</span>
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-white font-medium text-sm truncate">{c.name}</h3>
-                    <p className="text-gray-400 text-xs truncate">{c.city}, {c.country}</p>
-                    {c.total_inventory > 0 && <p className="text-blue-400 text-xs">{c.total_inventory} vehicles</p>}
-                    {c.instagram && <p className="text-pink-400 text-xs truncate">@{c.instagram}</p>}
+                    <h3 className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">{c.name}</h3>
+                    <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
+                      {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
+                    </div>
                   </div>
                 </div>
               </Link>
             ))}
+            {sortedCollections.length === 0 && (
+              <div className="px-3 py-8 text-center text-gray-600 text-xs">No collections found</div>
+            )}
           </div>
         </div>
       </div>
@@ -748,7 +728,7 @@ export default function CollectionsMap() {
   );
 }
 
-const SAMPLE_COLLECTIONS: Collection[] = [
-  { id: 'sample-1', slug: 'jay-lenos-car-collection', name: "Jay Leno's Car Collection", instagram: 'jaylenosgarage', country: 'USA', city: 'Burbank, CA', state: 'California', lat: 34.1808, lng: -118.309, total_inventory: 0, logo_url: null },
-  { id: 'sample-2', slug: 'ferrari-museum-maranello', name: 'Ferrari Museum Maranello', instagram: null, country: 'Italy', city: 'Maranello', state: null, lat: 44.5294, lng: 10.8656, total_inventory: 0, logo_url: null },
+const SAMPLE: Collection[] = [
+  { id: 's1', slug: 'jay-lenos-car-collection', name: "Jay Leno's Car Collection", instagram: 'jaylenosgarage', country: 'USA', city: 'Burbank, CA', state: 'California', lat: 34.1808, lng: -118.309, total_inventory: 0, logo_url: null },
+  { id: 's2', slug: 'ferrari-museum-maranello', name: 'Ferrari Museum Maranello', instagram: null, country: 'Italy', city: 'Maranello', state: null, lat: 44.5294, lng: 10.8656, total_inventory: 0, logo_url: null },
 ];
