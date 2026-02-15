@@ -817,14 +817,20 @@ export default function CollectionsMap() {
       {/* Analytics distribution */}
       {topDistribution.length > 0 && !sidebarSearch && (
         <div className="px-3 pb-3 border-b border-gray-800/50">
-          <div className="text-[9px] text-gray-600 uppercase tracking-wider mb-2">Top {metric === 'count' ? 'by count' : 'by vehicles'}</div>
-          {topDistribution.map(d => (
-            <div key={d.label} className="flex items-center gap-2 mb-1.5">
-              <div className="w-16 truncate text-[10px] text-gray-400">{d.label}</div>
-              <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${d.pct}%`, background: `linear-gradient(90deg, #2563eb, #38bdf8)` }} />
+          <div className="text-[9px] text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <svg className="w-3 h-3 text-sky-500/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+            Top {metric === 'count' ? 'by count' : 'by vehicles'}
+          </div>
+          {topDistribution.map((d, i) => (
+            <div key={d.label} className="flex items-center gap-2 mb-1.5" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="w-16 truncate text-[10px] text-gray-400 flex items-center gap-1">
+                {drill.level === 'world' && COUNTRY_FLAGS[d.label] && <span className="text-xs">{COUNTRY_FLAGS[d.label]}</span>}
+                <span className="truncate">{d.label}</span>
               </div>
-              <div className="w-8 text-right text-[10px] text-gray-500 font-medium">{d.pct}%</div>
+              <div className="flex-1 h-2 bg-gray-800/80 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${d.pct}%`, background: `linear-gradient(90deg, #1e40af, #38bdf8)` }} />
+              </div>
+              <div className="w-10 text-right text-[10px] text-gray-500 font-medium tabular-nums">{d.pct}%</div>
             </div>
           ))}
         </div>
@@ -925,16 +931,28 @@ export default function CollectionsMap() {
           </div>
         </div>
         {/* Filter chips */}
-        <div className="flex gap-1.5 mt-2">
+        <div className="flex items-center gap-1.5 mt-2">
           <button onClick={() => setFilterVehicles(!filterVehicles)}
             className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${filterVehicles ? 'bg-sky-500/20 border-sky-500/40 text-sky-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}>
-            Has vehicles
+            {filterVehicles && <span className="mr-0.5">✓</span>} Has vehicles
           </button>
           <button onClick={() => setFilterInstagram(!filterInstagram)}
             className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${filterInstagram ? 'bg-pink-500/20 border-pink-500/40 text-pink-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}>
-            Has Instagram
+            {filterInstagram && <span className="mr-0.5">✓</span>} Has Instagram
           </button>
+          {(filterVehicles || filterInstagram) && (
+            <button onClick={() => { setFilterVehicles(false); setFilterInstagram(false); }}
+              className="px-1.5 py-0.5 rounded-full text-[10px] text-gray-500 hover:text-gray-300 transition-colors" title="Clear filters">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
         </div>
+        {/* Filtered result count */}
+        {(filterVehicles || filterInstagram || searchTerm) && sortedCollections.length !== scopedCollections.length && (
+          <div className="mt-1.5 text-[10px] text-gray-500">
+            Showing {sortedCollections.length} of {scopedCollections.length}
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {viewMode === 'list' ? (
@@ -974,36 +992,57 @@ export default function CollectionsMap() {
             {sortedCollections.slice(0, 80).map(c => (
               <Link key={c.id} to={`/org/${c.slug}`}
                 onMouseEnter={() => setHighlightedId(c.id)} onMouseLeave={() => setHighlightedId(null)}
-                className={`block p-2.5 rounded-lg border transition-all group ${highlightedId === c.id ? 'bg-sky-500/15 border-sky-500/40 ring-1 ring-sky-500/20' : 'bg-gray-800/30 border-gray-800/50 hover:bg-gray-800/60 hover:border-gray-700/50'}`}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  {c.logo_url ? (
-                    <img src={c.logo_url} alt="" className="w-7 h-7 rounded-md object-cover flex-shrink-0 bg-gray-800" />
-                  ) : (
-                    <div className="w-7 h-7 rounded-md bg-gradient-to-br from-sky-900/50 to-blue-900/50 flex items-center justify-center flex-shrink-0">
-                      <span className="text-sky-400 text-[9px] font-bold">{c.name.charAt(0)}</span>
+                className={`block rounded-xl border transition-all group overflow-hidden ${highlightedId === c.id ? 'bg-sky-500/15 border-sky-500/40 ring-1 ring-sky-500/20' : 'bg-gray-800/30 border-gray-800/50 hover:bg-gray-800/60 hover:border-gray-700/50'}`}>
+                {/* Gradient header strip */}
+                <div className="h-1 w-full" style={{ background: c.total_inventory > 0 ? 'linear-gradient(90deg, #2563eb, #38bdf8, #34d399)' : 'linear-gradient(90deg, #1e293b, #334155)' }} />
+                <div className="p-2.5">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    {c.logo_url ? (
+                      <img src={c.logo_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0 bg-gray-800 ring-1 ring-gray-700/50" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-900/50 to-blue-900/50 flex items-center justify-center flex-shrink-0 ring-1 ring-sky-500/10">
+                        <span className="text-sky-400 text-xs font-bold">{c.name.charAt(0)}</span>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-white text-[10px] font-medium truncate group-hover:text-sky-400 transition-colors leading-tight">{c.name}</h3>
+                      <p className="text-gray-500 text-[9px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
                     </div>
-                  )}
-                  <h3 className="text-white text-[10px] font-medium truncate group-hover:text-sky-400 transition-colors leading-tight flex-1">{c.name}</h3>
-                </div>
-                <p className="text-gray-500 text-[9px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  {c.total_inventory > 0 && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 text-[9px] font-medium">
-                      {c.total_inventory}v
-                    </span>
-                  )}
-                  {c.instagram && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-400 text-[9px]">
-                      @
-                    </span>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {c.total_inventory > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 text-[9px] font-semibold border border-sky-500/10">
+                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        {c.total_inventory}
+                      </span>
+                    )}
+                    {c.instagram && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-pink-500/10 text-pink-400 text-[9px] border border-pink-500/10">
+                        @{c.instagram.length > 12 ? c.instagram.slice(0, 12) + '…' : c.instagram}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Link>
             ))}
           </div>
         )}
         {sortedCollections.length === 0 && (
-          <div className="px-3 py-8 text-center text-gray-600 text-xs">No collections found</div>
+          <div className="px-4 py-12 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-800/50 flex items-center justify-center">
+              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            </div>
+            <div className="text-gray-500 text-xs font-medium">No collections found</div>
+            <div className="text-gray-600 text-[10px] mt-1">
+              {(filterVehicles || filterInstagram) ? 'Try removing some filters' : searchTerm ? 'Try a different search term' : 'Drill into a region to see collections'}
+            </div>
+            {(filterVehicles || filterInstagram) && (
+              <button onClick={() => { setFilterVehicles(false); setFilterInstagram(false); }}
+                className="mt-3 px-3 py-1 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-[10px] font-medium transition-colors">
+                Clear filters
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
