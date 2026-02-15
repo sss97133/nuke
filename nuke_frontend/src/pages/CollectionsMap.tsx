@@ -737,6 +737,9 @@ const MAP_STYLES = `
   /* Glowing ring on highlighted marker */
   @keyframes glowRing { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,0.6); } 100% { box-shadow: 0 0 0 12px rgba(56,189,248,0); } }
   .glow-ring { animation: glowRing 1.5s ease-out infinite; }
+  /* Range slider styling */
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 2px solid #0f172a; }
+  input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 2px solid #0f172a; }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -753,12 +756,15 @@ export default function CollectionsMap() {
   const [filterVehicles, setFilterVehicles] = useState(false);
   const [filterInstagram, setFilterInstagram] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'gallery'>('list');
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [favorites, toggleFavorite] = useFavorites();
   const [filterFavorites, setFilterFavorites] = useState(false);
+  const [filterCountry, setFilterCountry] = useState<string>('');
+  const [filterMinInventory, setFilterMinInventory] = useState(0);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [touring, setTouring] = useState(false);
   const [tourIndex, setTourIndex] = useState(0);
   const tourTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -942,6 +948,8 @@ export default function CollectionsMap() {
     if (filterVehicles) arr = arr.filter(c => c.total_inventory > 0);
     if (filterInstagram) arr = arr.filter(c => !!c.instagram);
     if (filterFavorites) arr = arr.filter(c => favorites.has(c.id));
+    if (filterCountry) arr = arr.filter(c => c.country === filterCountry);
+    if (filterMinInventory > 0) arr = arr.filter(c => c.total_inventory >= filterMinInventory);
     switch (sortBy) {
       case 'name': arr.sort((a, b) => a.name.localeCompare(b.name)); break;
       case 'inventory': arr.sort((a, b) => b.total_inventory - a.total_inventory); break;
@@ -954,7 +962,7 @@ export default function CollectionsMap() {
       }
     }
     return arr;
-  }, [scopedCollections, sortBy, filterVehicles, filterInstagram, filterFavorites, favorites, mapCenter]);
+  }, [scopedCollections, sortBy, filterVehicles, filterInstagram, filterFavorites, favorites, filterCountry, filterMinInventory, mapCenter]);
 
   // ── Sidebar items ──
 
@@ -1177,6 +1185,12 @@ export default function CollectionsMap() {
     return () => { document.title = 'Nuke'; };
   }, [drill]);
 
+  // All unique countries for filter dropdown
+  const allCountries = useMemo(() => {
+    const set = new Set(collections.map(c => c.country));
+    return Array.from(set).sort();
+  }, [collections]);
+
   const sidebarMaxMetric = Math.max(...sidebarItems.map(i => i[metric === 'count' ? 'count' : 'inventory']), 1);
 
   // Legend max value for current drill level
@@ -1346,6 +1360,10 @@ export default function CollectionsMap() {
                 className={`px-1.5 py-1 transition-colors ${viewMode === 'grid' ? 'bg-gray-700 text-white' : 'bg-gray-800/50 text-gray-500 hover:text-gray-300'}`}>
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
               </button>
+              <button onClick={() => setViewMode('gallery')} title="Gallery view"
+                className={`px-1.5 py-1 transition-colors ${viewMode === 'gallery' ? 'bg-gray-700 text-white' : 'bg-gray-800/50 text-gray-500 hover:text-gray-300'}`}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              </button>
             </div>
             <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
               className="text-[10px] bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-400 focus:outline-none">
@@ -1392,15 +1410,66 @@ export default function CollectionsMap() {
               {filterFavorites && <span className="mr-0.5">✓</span>} ★ Favorites ({favorites.size})
             </button>
           )}
-          {(filterVehicles || filterInstagram || filterFavorites) && (
-            <button onClick={() => { setFilterVehicles(false); setFilterInstagram(false); setFilterFavorites(false); }}
-              className="px-1.5 py-0.5 rounded-full text-[10px] text-gray-500 hover:text-gray-300 transition-colors" title="Clear filters">
+          {(filterVehicles || filterInstagram || filterFavorites || filterCountry || filterMinInventory > 0) && (
+            <button onClick={() => { setFilterVehicles(false); setFilterInstagram(false); setFilterFavorites(false); setFilterCountry(''); setFilterMinInventory(0); setShowAdvancedFilters(false); }}
+              className="px-1.5 py-0.5 rounded-full text-[10px] text-gray-500 hover:text-gray-300 transition-colors" title="Clear all filters">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           )}
+          {/* Advanced filters toggle */}
+          <button onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${showAdvancedFilters ? 'bg-blue-500/20 border-blue-500/40 text-blue-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}>
+            {showAdvancedFilters ? 'Less' : 'More'}
+            <svg className={`w-2.5 h-2.5 inline ml-0.5 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
         </div>
+        {/* Advanced filters panel */}
+        {showAdvancedFilters && (
+          <div className="mt-2 pt-2 border-t border-gray-800/30 space-y-2 fade-in">
+            {/* Country filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-gray-500 w-14 flex-shrink-0">Country</label>
+              <select value={filterCountry} onChange={e => setFilterCountry(e.target.value)}
+                className="flex-1 text-[10px] bg-gray-800/80 border border-gray-700/50 rounded-md px-2 py-1 text-gray-300 focus:outline-none focus:ring-1 focus:ring-sky-500/50">
+                <option value="">All countries</option>
+                {allCountries.map(c => (
+                  <option key={c} value={c}>{COUNTRY_FLAGS[c] ? COUNTRY_FLAGS[c] + ' ' : ''}{c}</option>
+                ))}
+              </select>
+            </div>
+            {/* Min inventory */}
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-gray-500 w-14 flex-shrink-0">Min cars</label>
+              <input type="range" min={0} max={100} step={5} value={filterMinInventory}
+                onChange={e => setFilterMinInventory(Number(e.target.value))}
+                className="flex-1 h-1 bg-gray-700 rounded-full appearance-none cursor-pointer accent-sky-500" />
+              <span className="text-[10px] text-sky-400 font-medium w-6 text-right tabular-nums">{filterMinInventory}</span>
+            </div>
+            {/* Active filter summary */}
+            {(filterCountry || filterMinInventory > 0) && (
+              <div className="flex flex-wrap gap-1">
+                {filterCountry && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] border border-blue-500/20">
+                    {COUNTRY_FLAGS[filterCountry] || ''} {filterCountry}
+                    <button onClick={() => setFilterCountry('')} className="hover:text-white">
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                )}
+                {filterMinInventory > 0 && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 text-[9px] border border-sky-500/20">
+                    {filterMinInventory}+ vehicles
+                    <button onClick={() => setFilterMinInventory(0)} className="hover:text-white">
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {/* Filtered result count */}
-        {(filterVehicles || filterInstagram || filterFavorites || searchTerm) && sortedCollections.length !== scopedCollections.length && (
+        {(filterVehicles || filterInstagram || filterFavorites || filterCountry || filterMinInventory > 0 || searchTerm) && sortedCollections.length !== scopedCollections.length && (
           <div className="mt-1.5 text-[10px] text-gray-500">
             Showing {sortedCollections.length} of {scopedCollections.length}
           </div>
@@ -1436,7 +1505,73 @@ export default function CollectionsMap() {
             </div>
           </div>
         )}
-        {viewMode === 'list' ? (
+        {viewMode === 'gallery' ? (
+          // Gallery view - large logo cards
+          <div className="grid grid-cols-2 gap-2 p-2">
+            {sortedCollections.slice(0, 60).map(c => (
+              <div key={c.id}
+                onMouseEnter={() => { setHighlightedId(c.id); mapRef.current?.flyTo([c.lat, c.lng], mapRef.current.getZoom(), { duration: 0.3 }); }}
+                onMouseLeave={() => setHighlightedId(null)}
+                className={`relative rounded-xl overflow-hidden transition-all group ${highlightedId === c.id ? 'ring-2 ring-sky-500/50 scale-[1.02]' : 'ring-1 ring-gray-800/50 hover:ring-gray-700/80'}`}>
+                {/* Logo / hero area */}
+                <div className="relative aspect-square bg-gradient-to-br from-gray-800 to-gray-900 overflow-hidden">
+                  {c.logo_url ? (
+                    <img src={c.logo_url} alt={c.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-sky-950 to-blue-950">
+                      <span className="text-3xl font-black text-sky-500/30">{c.name.charAt(0)}</span>
+                    </div>
+                  )}
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/40 to-transparent" />
+                  {/* Favorite star */}
+                  <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleFavorite(c.id); }}
+                    className={`absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center transition-all ${favorites.has(c.id) ? 'bg-amber-500/30 text-amber-400 star-pop' : 'bg-gray-900/50 text-gray-500 opacity-0 group-hover:opacity-100 hover:text-amber-400'}`}>
+                    <svg className="w-3 h-3" fill={favorites.has(c.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+                  </button>
+                  {/* Country flag badge */}
+                  {COUNTRY_FLAGS[c.country] && (
+                    <span className="absolute top-1.5 left-1.5 text-sm drop-shadow-lg">{COUNTRY_FLAGS[c.country]}</span>
+                  )}
+                  {/* Vehicle count badge */}
+                  {c.total_inventory > 0 && (
+                    <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-sky-500/20 backdrop-blur-sm border border-sky-500/20 text-sky-300 text-[9px] font-bold tabular-nums">
+                      {c.total_inventory} cars
+                    </div>
+                  )}
+                  {/* Name overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 p-2">
+                    <h3 className="text-white text-[11px] font-semibold leading-tight truncate drop-shadow-lg group-hover:text-sky-300 transition-colors">
+                      <HighlightText text={c.name} query={searchTerm} />
+                    </h3>
+                    <p className="text-gray-400 text-[9px] truncate mt-0.5">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
+                  </div>
+                </div>
+                {/* Quick actions row */}
+                <div className="flex items-center bg-gray-900/80 border-t border-gray-800/50">
+                  <Link to={`/org/${c.slug}`}
+                    className="flex-1 text-center py-1.5 text-[9px] font-medium text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 transition-colors">
+                    View
+                  </Link>
+                  <div className="w-px h-4 bg-gray-800/50" />
+                  <button onClick={() => { mapRef.current?.flyTo([c.lat, c.lng], 14, { duration: 0.8 }); setHighlightedId(c.id); }}
+                    className="flex-1 text-center py-1.5 text-[9px] font-medium text-gray-500 hover:text-white hover:bg-gray-800/50 transition-colors">
+                    Locate
+                  </button>
+                  {c.instagram && (
+                    <>
+                      <div className="w-px h-4 bg-gray-800/50" />
+                      <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+                        className="flex-1 text-center py-1.5 text-[9px] font-medium text-pink-400/70 hover:text-pink-400 hover:bg-pink-500/10 transition-colors">
+                        IG
+                      </a>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : viewMode === 'list' ? (
           // List view
           sortedCollections.slice(0, 100).map(c => {
             const isExpanded = expandedId === c.id;
