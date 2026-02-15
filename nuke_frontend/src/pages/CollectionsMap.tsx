@@ -579,6 +579,7 @@ export default function CollectionsMap() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -1038,35 +1039,79 @@ export default function CollectionsMap() {
       <div className="flex-1 overflow-y-auto">
         {viewMode === 'list' ? (
           // List view
-          sortedCollections.slice(0, 100).map(c => (
-            <div key={c.id}
-              onMouseEnter={() => setHighlightedId(c.id)} onMouseLeave={() => setHighlightedId(null)}
-              className={`px-3 py-2.5 border-b border-gray-800/30 transition-all group ${highlightedId === c.id ? 'bg-sky-500/10 border-l-2 border-l-sky-500' : 'hover:bg-gray-800/40'}`}>
-              <div className="flex items-start gap-2.5">
-                {c.logo_url ? (
-                  <img src={c.logo_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 bg-gray-800" />
-                ) : (
-                  <div className="w-8 h-8 rounded-md bg-gradient-to-br from-sky-900/40 to-blue-900/40 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sky-400 text-[10px] font-bold">{c.name.charAt(0)}</span>
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <Link to={`/org/${c.slug}`} className="text-white text-xs font-medium truncate block group-hover:text-sky-400 transition-colors">{c.name}</Link>
-                  <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
-                    {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
+          sortedCollections.slice(0, 100).map(c => {
+            const isExpanded = expandedId === c.id;
+            return (
+              <div key={c.id}
+                onMouseEnter={() => setHighlightedId(c.id)} onMouseLeave={() => setHighlightedId(null)}
+                className={`border-b border-gray-800/30 transition-all group ${highlightedId === c.id ? 'bg-sky-500/10 border-l-2 border-l-sky-500' : 'hover:bg-gray-800/40'}`}>
+                <div className="px-3 py-2.5 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : c.id)}>
+                  <div className="flex items-start gap-2.5">
+                    {c.logo_url ? (
+                      <img src={c.logo_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 bg-gray-800" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-md bg-gradient-to-br from-sky-900/40 to-blue-900/40 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sky-400 text-[10px] font-bold">{c.name.charAt(0)}</span>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">{c.name}</div>
+                      <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
+                        {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
+                      </div>
+                    </div>
+                    {/* Expand indicator */}
+                    <svg className={`w-3 h-3 text-gray-600 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </div>
                 </div>
-                {/* Locate on map button */}
-                <button onClick={() => { mapRef.current?.flyTo([c.lat, c.lng], 14, { duration: 0.8 }); setHighlightedId(c.id); }}
-                  title="Locate on map"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 rounded bg-gray-800/80 flex items-center justify-center text-gray-500 hover:text-sky-400 hover:bg-gray-700/80">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                </button>
+                {/* Expanded detail */}
+                {isExpanded && (
+                  <div className="px-3 pb-3 pt-0 fade-in">
+                    <div className="ml-[42px] space-y-2">
+                      {/* Quick info badges */}
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800/80 text-gray-400 text-[10px]">
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+                          {c.lat.toFixed(3)}, {c.lng.toFixed(3)}
+                        </span>
+                        {c.state && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-800/80 text-gray-400 text-[10px]">
+                            {c.state}
+                          </span>
+                        )}
+                        {drill.level === 'world' && COUNTRY_FLAGS[c.country] && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800/80 text-gray-400 text-[10px]">
+                            {COUNTRY_FLAGS[c.country]} {c.country}
+                          </span>
+                        )}
+                      </div>
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        <Link to={`/org/${c.slug}`}
+                          className="flex-1 text-center px-2.5 py-1.5 bg-sky-600/20 text-sky-400 text-[10px] font-medium rounded-lg border border-sky-500/20 hover:bg-sky-600/30 transition-colors">
+                          View Collection
+                        </Link>
+                        <button onClick={(e) => { e.stopPropagation(); mapRef.current?.flyTo([c.lat, c.lng], 14, { duration: 0.8 }); setHighlightedId(c.id); }}
+                          className="px-2.5 py-1.5 bg-gray-800/60 text-gray-400 text-[10px] font-medium rounded-lg border border-gray-700/50 hover:text-white hover:bg-gray-700/60 transition-colors">
+                          Locate
+                        </button>
+                        {c.instagram && (
+                          <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+                            className="px-2.5 py-1.5 bg-pink-500/10 text-pink-400 text-[10px] font-medium rounded-lg border border-pink-500/20 hover:bg-pink-500/20 transition-colors">
+                            Instagram
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           // Grid view
           <div className="grid grid-cols-2 gap-1.5 p-2">
