@@ -46,7 +46,6 @@ interface SidebarItem {
   count: number;
   inventory: number;
   onClick: () => void;
-  active?: boolean;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -76,21 +75,22 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
   'Dominican Republic': [18.7357, -70.1627], 'Kazakhstan': [48.0196, 66.9237],
 };
 
+const DRILL_ORDER: DrillLevel[] = ['world', 'country', 'state', 'county', 'markers'];
+
 // ── Color scale ──────────────────────────────────────────────────────────────
 
 const COLOR_STOPS = [
-  [0, 15, 23, 42],      // bg (invisible)
-  [0.01, 30, 58, 138],  // dark blue
-  [0.25, 37, 99, 235],  // blue-600
-  [0.5, 56, 189, 248],  // sky-400
-  [0.75, 45, 212, 191], // teal-400
-  [1.0, 52, 211, 153],  // emerald-400
+  [0, 15, 23, 42],
+  [0.01, 30, 58, 138],
+  [0.25, 37, 99, 235],
+  [0.5, 56, 189, 248],
+  [0.75, 45, 212, 191],
+  [1.0, 52, 211, 153],
 ] as const;
 
 function choroplethColor(value: number, maxValue: number): string {
   if (!value || !maxValue) return 'rgba(15, 23, 42, 0.12)';
-  const t = Math.pow(Math.min(value / maxValue, 1), 0.6); // power curve for spread
-  // Find stops
+  const t = Math.pow(Math.min(value / maxValue, 1), 0.6);
   for (let i = 1; i < COLOR_STOPS.length; i++) {
     if (t <= COLOR_STOPS[i][0]) {
       const prev = COLOR_STOPS[i - 1], next = COLOR_STOPS[i];
@@ -111,6 +111,18 @@ const MARKER_ICON = L.divIcon({
   html: `<div style="background:#38bdf8;width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4);animation:pulse 2s infinite"></div>`,
   iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -8],
 });
+
+// ── Hooks ────────────────────────────────────────────────────────────────────
+
+function useWindowWidth() {
+  const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  useEffect(() => {
+    const handler = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return width;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -203,7 +215,6 @@ function MapLayers({
     );
   }, [collections, searchTerm]);
 
-  // ── Fly-to ──
   useEffect(() => {
     switch (drill.level) {
       case 'world': map.flyTo([20, 0], 2, { duration: 0.8 }); break;
@@ -235,7 +246,6 @@ function MapLayers({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drill]);
 
-  // ── Aggregations ──
   const countryAgg = useMemo(() => aggregateBy(filtered, c => toTopoName(c.country)), [filtered]);
   const stateAgg = useMemo(() => aggregateBy(filtered.filter(c => c.country === 'USA'), c => stateAssign.get(c.id)), [filtered, stateAssign]);
   const countyAgg = useMemo(() => {
@@ -248,7 +258,6 @@ function MapLayers({
     return { type: 'FeatureCollection', features: countiesGeo.features.filter(f => (f.id as string).startsWith(drill.stateId!)) };
   }, [countiesGeo, drill.stateId]);
 
-  // City groups
   const cityGroups = useMemo(() => {
     let scope: Collection[];
     if (drill.level === 'country' && drill.country && drill.country !== 'USA')
@@ -276,14 +285,13 @@ function MapLayers({
     return [];
   }, [filtered, drill, countyAssign]);
 
-  // ── Feature handlers ──
   const makeOnEach = useCallback((agg: Map<string, Agg>, idKey: 'name' | 'id', onClick: (id: string, name: string) => void) => {
     return (feature: Feature<Geometry>, layer: L.Layer) => {
       const id = idKey === 'id' ? (feature.id as string) : (feature.properties?.name || '');
       const name = feature.properties?.name || id;
       const d = agg.get(id) || { count: 0, inventory: 0 };
       (layer as L.Path).bindTooltip(
-        `<div style="min-width:120px"><strong style="font-size:13px">${name}</strong><div style="margin-top:3px;display:flex;gap:12px"><span>${d.count} <span style="opacity:.7">collections</span></span><span>${d.inventory} <span style="opacity:.7">vehicles</span></span></div>${d.count > 0 ? '<div style="margin-top:4px;font-size:10px;opacity:.6">Click to explore</div>' : ''}</div>`,
+        `<div style="min-width:140px"><strong style="font-size:13px;letter-spacing:0.01em">${name}</strong><div style="margin-top:4px;display:flex;gap:14px"><span style="font-weight:600;color:#38bdf8">${d.count}</span><span style="opacity:.5">collections</span></div><div style="display:flex;gap:14px"><span style="font-weight:600;color:#34d399">${d.inventory.toLocaleString()}</span><span style="opacity:.5">vehicles</span></div>${d.count > 0 ? '<div style="margin-top:6px;font-size:10px;opacity:.5;border-top:1px solid rgba(255,255,255,.1);padding-top:4px">Click to explore</div>' : ''}</div>`,
         { sticky: true, direction: 'top', className: 'map-tooltip' }
       );
       (layer as L.Path).on({
@@ -351,12 +359,24 @@ function MapLayers({
     return <>
       {cityGroups.map(g => (
         <CircleMarker key={g.city} center={[g.lat, g.lng]}
-          radius={Math.max(10, Math.min(35, 10 + Math.sqrt(g.count) * 10))}
+          radius={Math.max(12, Math.min(40, 12 + Math.sqrt(g.count) * 10))}
           pathOptions={{ color: '#38bdf8', fillColor: choroplethColor(g[metric === 'count' ? 'count' : 'inventory'], mx), fillOpacity: 0.75, weight: 2 }}
           eventHandlers={{ click: () => setDrill({ level: 'markers', country: drill.country, city: g.city }) }}>
           <Tooltip direction="top" className="map-tooltip">
-            <strong>{g.city}</strong><br />{g.count} collections / {g.inventory} vehicles
+            <div style={{ minWidth: 100 }}>
+              <strong>{g.city}</strong>
+              <div style={{ marginTop: 3, fontSize: 11 }}>
+                <span style={{ color: '#38bdf8', fontWeight: 600 }}>{g.count}</span> collections
+                <span style={{ margin: '0 6px', opacity: 0.3 }}>|</span>
+                <span style={{ color: '#34d399', fontWeight: 600 }}>{g.inventory}</span> vehicles
+              </div>
+            </div>
           </Tooltip>
+          {g.count >= 2 && (
+            <Tooltip permanent direction="center" className="city-count-label">
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.8)' }}>{g.count}</span>
+            </Tooltip>
+          )}
         </CircleMarker>
       ))}
     </>;
@@ -378,10 +398,15 @@ function MapLayers({
 // ── CSS ──────────────────────────────────────────────────────────────────────
 
 const MAP_STYLES = `
-  .map-tooltip { background: #0f172a !important; color: #e2e8f0 !important; border: 1px solid #1e3a5f !important; border-radius: 8px !important; padding: 8px 12px !important; font-size: 12px !important; box-shadow: 0 4px 20px rgba(0,0,0,.5) !important; backdrop-filter: blur(8px); }
-  .map-tooltip::before { border-top-color: #1e3a5f !important; }
+  .map-tooltip { background: rgba(15,23,42,.95) !important; color: #e2e8f0 !important; border: 1px solid rgba(56,189,248,.2) !important; border-radius: 10px !important; padding: 10px 14px !important; font-size: 12px !important; box-shadow: 0 8px 32px rgba(0,0,0,.6) !important; backdrop-filter: blur(12px); }
+  .map-tooltip::before { border-top-color: rgba(56,189,248,.2) !important; }
+  .city-count-label { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
+  .city-count-label::before { display: none !important; }
   .leaflet-popup-content-wrapper { border-radius: 12px !important; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4); } 50% { box-shadow: 0 0 16px rgba(56,189,248,0.9),0 2px 8px rgba(0,0,0,.4); } }
+  .sidebar-slide { transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1); }
+  .panel-slide { transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1); }
+  .backdrop-fade { transition: opacity 200ms ease; }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -393,13 +418,56 @@ export default function CollectionsMap() {
   const [metric, setMetric] = useState<'count' | 'inventory'>('count');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'inventory' | 'city'>('name');
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Responsive
+  const windowWidth = useWindowWidth();
+  const isCompact = windowWidth < 1024;
+  const isMobile = windowWidth < 640;
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // URL-synced drill state
   const drill = useMemo(() => paramsToDrill(searchParams), [searchParams]);
   const setDrill = useCallback((d: DrillState) => {
     setSearchParams(drillToParams(d), { replace: false });
   }, [setSearchParams]);
+
+  // Go back one drill level
+  const goBack = useCallback(() => {
+    const idx = DRILL_ORDER.indexOf(drill.level);
+    if (idx <= 0) return;
+    switch (drill.level) {
+      case 'country': setDrill({ level: 'world' }); break;
+      case 'state': setDrill({ level: 'country', country: drill.country }); break;
+      case 'county': setDrill({ level: 'state', country: drill.country, stateId: drill.stateId, stateName: drill.stateName }); break;
+      case 'markers':
+        if (drill.countyId) setDrill({ level: 'county', country: drill.country, stateId: drill.stateId, stateName: drill.stateName, countyId: drill.countyId, countyName: drill.countyName });
+        else if (drill.city) setDrill({ level: 'country', country: drill.country });
+        else setDrill({ level: 'world' });
+        break;
+    }
+  }, [drill, setDrill]);
+
+  // Close overlays on drill change
+  useEffect(() => {
+    if (isCompact) { setSidebarOpen(false); setPanelOpen(false); }
+  }, [drill.level, isCompact]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (sidebarOpen) { setSidebarOpen(false); return; }
+        if (panelOpen) { setPanelOpen(false); return; }
+        if (searchExpanded) { setSearchExpanded(false); setSearchTerm(''); return; }
+        goBack();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [sidebarOpen, panelOpen, searchExpanded, goBack]);
 
   // ── Data loading ──
 
@@ -424,7 +492,7 @@ export default function CollectionsMap() {
     })();
   }, []);
 
-  // ── TopoJSON loading (lifted to main) ──
+  // ── TopoJSON loading ──
 
   const [worldTopo, setWorldTopo] = useState<Topology | null>(null);
   const [statesTopo, setStatesTopo] = useState<Topology | null>(null);
@@ -483,7 +551,6 @@ export default function CollectionsMap() {
     return r;
   }, [collections, searchTerm, drill, stateAssign, countyAssign]);
 
-  // ── Sorted collections for right panel ──
   const sortedCollections = useMemo(() => {
     const arr = [...scopedCollections];
     switch (sortBy) {
@@ -494,7 +561,7 @@ export default function CollectionsMap() {
     return arr;
   }, [scopedCollections, sortBy]);
 
-  // ── Sidebar items (now has access to state/county assignments!) ──
+  // ── Sidebar items ──
 
   const sidebarItems = useMemo((): SidebarItem[] => {
     if (drill.level === 'world') {
@@ -528,7 +595,18 @@ export default function CollectionsMap() {
     return [];
   }, [drill, scopedCollections, stateAssign, countyAssign, stateNames, countyNames, setDrill]);
 
-  // ── Summary stats ──
+  // ── Analytics: top distribution ──
+  const topDistribution = useMemo(() => {
+    if (!sidebarItems.length) return [];
+    const total = sidebarItems.reduce((s, i) => s + i[metric === 'count' ? 'count' : 'inventory'], 0);
+    return sidebarItems.slice(0, 5).map(i => ({
+      label: i.label,
+      value: i[metric === 'count' ? 'count' : 'inventory'],
+      pct: total > 0 ? Math.round((i[metric === 'count' ? 'count' : 'inventory'] / total) * 100) : 0,
+    }));
+  }, [sidebarItems, metric]);
+
+  // ── Stats & breadcrumbs ──
   const stats = useMemo(() => {
     const total = scopedCollections.length;
     const vehicles = scopedCollections.reduce((s, c) => s + c.total_inventory, 0);
@@ -537,7 +615,6 @@ export default function CollectionsMap() {
     return { total, vehicles, cities, countries };
   }, [scopedCollections]);
 
-  // Breadcrumbs
   const breadcrumbs = useMemo(() => {
     const p: { label: string; onClick: () => void }[] = [{ label: 'World', onClick: () => setDrill({ level: 'world' }) }];
     if (drill.country) p.push({ label: drill.country, onClick: () => setDrill({ level: 'country', country: drill.country }) });
@@ -555,87 +632,242 @@ export default function CollectionsMap() {
     else mapContainerRef.current?.requestFullscreen();
   };
 
+  const sidebarMaxMetric = Math.max(...sidebarItems.map(i => i[metric === 'count' ? 'count' : 'inventory']), 1);
+
+  // ── Sidebar content (shared between desktop & mobile) ──
+  const renderSidebar = () => (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="px-3 pt-3 pb-2 flex items-center justify-between">
+        <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{sidebarTitle}</h2>
+        {isCompact && (
+          <button onClick={() => setSidebarOpen(false)} className="text-gray-500 hover:text-white p-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        )}
+      </div>
+
+      {/* Analytics distribution */}
+      {topDistribution.length > 0 && (
+        <div className="px-3 pb-3 border-b border-gray-800/50">
+          <div className="text-[9px] text-gray-600 uppercase tracking-wider mb-2">Top {metric === 'count' ? 'by count' : 'by vehicles'}</div>
+          {topDistribution.map(d => (
+            <div key={d.label} className="flex items-center gap-2 mb-1.5">
+              <div className="w-16 truncate text-[10px] text-gray-400">{d.label}</div>
+              <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${d.pct}%`, background: `linear-gradient(90deg, #2563eb, #38bdf8)` }} />
+              </div>
+              <div className="w-8 text-right text-[10px] text-gray-500 font-medium">{d.pct}%</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Region list with percentage bars */}
+      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5 mt-1">
+        {sidebarItems.map(item => {
+          const pct = (item[metric === 'count' ? 'count' : 'inventory'] / sidebarMaxMetric) * 100;
+          return (
+            <button key={item.key} onClick={item.onClick}
+              className="w-full relative overflow-hidden rounded-md text-xs text-gray-300 hover:text-white transition-colors group">
+              {/* Background percentage bar */}
+              <div className="absolute inset-y-0 left-0 bg-sky-500/8 rounded-md transition-all duration-300 group-hover:bg-sky-500/15"
+                style={{ width: `${pct}%` }} />
+              {/* Content */}
+              <div className="relative flex items-center justify-between px-2.5 py-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: choroplethColor(item[metric === 'count' ? 'count' : 'inventory'], sidebarMaxMetric) }} />
+                  <span className="truncate">{item.label}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-1">
+                  <span className="text-[10px] font-medium text-sky-400/80">{item.count}</span>
+                  <span className="text-[10px] text-gray-600">{item.inventory}v</span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+        {sidebarItems.length === 0 && drill.level !== 'county' && drill.level !== 'markers' && (
+          <div className="px-2 py-8 text-center">
+            <div className="text-gray-600 text-xs">Loading {sidebarTitle.toLowerCase()}...</div>
+          </div>
+        )}
+        {(drill.level === 'county' || drill.level === 'markers') && (
+          <div className="px-2 py-3 space-y-1">
+            <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Collections</div>
+            {scopedCollections.slice(0, 30).map(c => (
+              <Link key={c.id} to={`/org/${c.slug}`}
+                className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-gray-400 hover:text-white hover:bg-gray-800/60 group">
+                {c.logo_url ? (
+                  <img src={c.logo_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-5 h-5 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[8px] text-sky-400 font-bold">{c.name.charAt(0)}</span>
+                  </div>
+                )}
+                <span className="truncate">{c.name}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── Right panel content (shared between desktop & mobile) ──
+  const renderRightPanel = () => (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="px-3 pt-3 pb-2 border-b border-gray-800/50 flex items-center justify-between">
+        <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Collections ({scopedCollections.length})</h2>
+        <div className="flex items-center gap-2">
+          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
+            className="text-[10px] bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-400 focus:outline-none">
+            <option value="name">Name</option>
+            <option value="inventory">Vehicles</option>
+            <option value="city">City</option>
+          </select>
+          {isCompact && (
+            <button onClick={() => setPanelOpen(false)} className="text-gray-500 hover:text-white p-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {sortedCollections.slice(0, 100).map(c => (
+          <Link key={c.id} to={`/org/${c.slug}`} className="block px-3 py-2.5 border-b border-gray-800/30 hover:bg-gray-800/40 transition-colors group">
+            <div className="flex items-start gap-2.5">
+              {c.logo_url ? (
+                <img src={c.logo_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 bg-gray-800" />
+              ) : (
+                <div className="w-8 h-8 rounded-md bg-gradient-to-br from-sky-900/40 to-blue-900/40 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sky-400 text-[10px] font-bold">{c.name.charAt(0)}</span>
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <h3 className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">{c.name}</h3>
+                <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
+                  {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
+                </div>
+              </div>
+            </div>
+          </Link>
+        ))}
+        {sortedCollections.length === 0 && (
+          <div className="px-3 py-8 text-center text-gray-600 text-xs">No collections found</div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div ref={mapContainerRef} className="fullscreen-content h-screen flex flex-col bg-gray-950">
       <style>{MAP_STYLES}</style>
 
-      {/* Header */}
-      <div className="bg-gray-900/80 backdrop-blur border-b border-gray-800 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">Collections Map</h1>
-              <p className="text-gray-500 text-xs">{stats.total} collections / {stats.vehicles.toLocaleString()} vehicles / {stats.countries} countries</p>
+      {/* ── Header ── */}
+      <div className="bg-gray-900/80 backdrop-blur border-b border-gray-800 px-3 sm:px-4 py-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            {/* Mobile hamburger */}
+            {isCompact && (
+              <button onClick={() => setSidebarOpen(true)}
+                className="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-800/60 border border-gray-700/50 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/60 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              </button>
+            )}
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">Collections Map</h1>
+              {!isMobile && (
+                <p className="text-gray-500 text-[10px] sm:text-xs">{stats.total} collections / {stats.vehicles.toLocaleString()} vehicles / {stats.countries} countries</p>
+              )}
             </div>
-            {/* Breadcrumbs inline */}
-            {drill.level !== 'world' && (
-              <div className="flex items-center gap-1 text-sm ml-4 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700/50">
+            {/* Breadcrumbs - desktop */}
+            {!isMobile && drill.level !== 'world' && (
+              <div className="flex items-center gap-1 text-sm ml-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700/50">
                 {breadcrumbs.map((bc, i) => (
                   <span key={i} className="flex items-center gap-1">
                     {i > 0 && <span className="text-gray-600">/</span>}
-                    <button onClick={bc.onClick} className={i === breadcrumbs.length - 1 ? 'text-sky-400 font-medium' : 'text-gray-400 hover:text-gray-200'}>{bc.label}</button>
+                    <button onClick={bc.onClick} className={`whitespace-nowrap ${i === breadcrumbs.length - 1 ? 'text-sky-400 font-medium' : 'text-gray-400 hover:text-gray-200'}`}>{bc.label}</button>
                   </span>
                 ))}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                className="pl-8 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 w-52" />
-              <svg className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            </div>
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Search */}
+            {!isMobile || searchExpanded ? (
+              <div className="relative">
+                <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                  autoFocus={isMobile && searchExpanded}
+                  className={`pl-7 sm:pl-8 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 ${isMobile ? 'w-40' : 'w-44 sm:w-52'}`} />
+                <svg className="absolute left-2 sm:left-2.5 top-2 w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                {isMobile && (
+                  <button onClick={() => { setSearchExpanded(false); setSearchTerm(''); }} className="absolute right-2 top-1.5 text-gray-500 hover:text-white">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button onClick={() => setSearchExpanded(true)}
+                className="w-8 h-8 rounded-lg bg-gray-800/60 border border-gray-700/50 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              </button>
+            )}
+            {/* Metric toggle */}
             <div className="flex rounded-md overflow-hidden border border-gray-700">
               {(['count', 'inventory'] as const).map(m => (
                 <button key={m} onClick={() => setMetric(m)}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${metric === m ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                  className={`px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium transition-colors ${metric === m ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
                   {m === 'count' ? 'Count' : 'Vehicles'}
                 </button>
               ))}
             </div>
+            {/* Mobile panel toggle */}
+            {isCompact && (
+              <button onClick={() => setPanelOpen(true)}
+                className="w-8 h-8 rounded-lg bg-gray-800/60 border border-gray-700/50 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+              </button>
+            )}
           </div>
         </div>
+        {/* Mobile breadcrumbs */}
+        {isMobile && drill.level !== 'world' && (
+          <div className="flex items-center gap-1 text-xs mt-1.5 overflow-x-auto">
+            {breadcrumbs.map((bc, i) => (
+              <span key={i} className="flex items-center gap-1 flex-shrink-0">
+                {i > 0 && <span className="text-gray-600">/</span>}
+                <button onClick={bc.onClick} className={i === breadcrumbs.length - 1 ? 'text-sky-400 font-medium' : 'text-gray-400'}>{bc.label}</button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="flex-1 flex min-h-0">
-        {/* Sidebar */}
-        <div className="w-60 bg-gray-900/50 border-r border-gray-800 flex flex-col min-h-0">
-          <div className="px-3 pt-3 pb-2">
-            <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{sidebarTitle}</h2>
-          </div>
-          <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
-            {sidebarItems.map(item => (
-              <button key={item.key} onClick={item.onClick}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs text-gray-300 hover:bg-gray-800/80 hover:text-white transition-colors group">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: choroplethColor(item[metric === 'count' ? 'count' : 'inventory'], Math.max(...sidebarItems.map(i => i[metric === 'count' ? 'count' : 'inventory']), 1)) }} />
-                  <span className="truncate">{item.label}</span>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
-                  <span className="text-[10px] text-gray-500">{item.count}c</span>
-                  <span className="text-[10px] text-gray-600">{item.inventory}v</span>
-                </div>
-              </button>
-            ))}
-            {sidebarItems.length === 0 && drill.level !== 'county' && drill.level !== 'markers' && (
-              <div className="px-2 py-8 text-center">
-                <div className="text-gray-600 text-xs">Loading {sidebarTitle.toLowerCase()}...</div>
-              </div>
-            )}
-            {(drill.level === 'county' || drill.level === 'markers') && (
-              <div className="px-2 py-4 space-y-1">
-                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Collections here</div>
-                {scopedCollections.slice(0, 20).map(c => (
-                  <Link key={c.id} to={`/org/${c.slug}`} className="block px-2 py-1 rounded text-xs text-gray-400 hover:text-white hover:bg-gray-800/60 truncate">
-                    {c.name}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* ── Body ── */}
+      <div className="flex-1 flex min-h-0 relative">
 
-        {/* Map area */}
+        {/* Sidebar - desktop: static column */}
+        {!isCompact && (
+          <div className="w-60 bg-gray-900/50 border-r border-gray-800 flex flex-col min-h-0">
+            {renderSidebar()}
+          </div>
+        )}
+
+        {/* Sidebar - mobile/tablet: slide-in overlay */}
+        {isCompact && (
+          <>
+            {sidebarOpen && (
+              <div className="fixed inset-0 bg-black/50 z-[1100] backdrop-fade" onClick={() => setSidebarOpen(false)} />
+            )}
+            <div className={`fixed top-0 left-0 bottom-0 w-72 bg-gray-900 border-r border-gray-800 z-[1200] sidebar-slide ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+              {renderSidebar()}
+            </div>
+          </>
+        )}
+
+        {/* ── Map area ── */}
         <div className="flex-1 relative min-h-0 min-w-0">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
@@ -653,22 +885,31 @@ export default function CollectionsMap() {
             </MapContainer>
           )}
 
-          {/* Map controls */}
-          <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-1.5">
+          {/* Back button */}
+          {drill.level !== 'world' && (
+            <button onClick={goBack} title="Go back (Esc)"
+              className="absolute top-3 left-3 z-[1000] h-8 pl-2 pr-3 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-1.5 text-xs font-medium transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              Back
+            </button>
+          )}
+
+          {/* Map controls - top right */}
+          <div className={`absolute top-3 z-[1000] flex flex-col gap-1.5 ${isCompact ? 'right-3' : 'right-3'}`}>
             <button onClick={() => setDrill({ level: 'world' })} title="Reset view"
-              className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center text-sm transition-colors">
+              className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </button>
             <button onClick={toggleFullscreen} title="Fullscreen"
-              className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center text-sm transition-colors">
+              className="w-8 h-8 rounded-lg bg-gray-900/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800 flex items-center justify-center transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
             </button>
           </div>
 
           {/* Color legend */}
-          <div className="absolute bottom-14 right-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-lg p-2.5 border border-gray-800/50">
+          <div className={`absolute z-[1000] bg-gray-900/80 backdrop-blur rounded-lg p-2.5 border border-gray-800/50 ${isMobile ? 'bottom-3 right-3' : 'bottom-14 right-3'}`}>
             <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-1.5">{metric === 'count' ? 'Collections' : 'Vehicles'} per {levelLabel}</div>
-            <div className="w-32 h-2 rounded-full" style={{ background: `linear-gradient(to right, ${choroplethGradientCSS()})` }} />
+            <div className="w-24 sm:w-32 h-2 rounded-full" style={{ background: `linear-gradient(to right, ${choroplethGradientCSS()})` }} />
             <div className="flex justify-between mt-0.5">
               <span className="text-[9px] text-gray-600">0</span>
               <span className="text-[9px] text-gray-600">max</span>
@@ -676,53 +917,58 @@ export default function CollectionsMap() {
           </div>
 
           {/* Summary stats */}
-          <div className="absolute bottom-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-lg px-3 py-2 border border-gray-800/50 flex items-center gap-4">
-            <div><div className="text-white text-sm font-bold">{stats.total}</div><div className="text-[9px] text-gray-500">Collections</div></div>
+          <div className={`absolute bottom-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur rounded-lg px-3 py-2 border border-gray-800/50 flex items-center ${isMobile ? 'gap-3' : 'gap-4'}`}>
+            <div>
+              <div className="text-white text-sm font-bold">{stats.total}</div>
+              <div className="text-[9px] text-gray-500">Collections</div>
+            </div>
             <div className="w-px h-6 bg-gray-700" />
-            <div><div className="text-sky-400 text-sm font-bold">{stats.vehicles.toLocaleString()}</div><div className="text-[9px] text-gray-500">Vehicles</div></div>
-            <div className="w-px h-6 bg-gray-700" />
-            <div><div className="text-emerald-400 text-sm font-bold">{stats.cities}</div><div className="text-[9px] text-gray-500">Cities</div></div>
-          </div>
-        </div>
-
-        {/* Right panel */}
-        <div className="w-72 bg-gray-900/50 border-l border-gray-800 flex flex-col min-h-0">
-          <div className="px-3 pt-3 pb-2 border-b border-gray-800/50 flex items-center justify-between">
-            <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Collections ({scopedCollections.length})</h2>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
-              className="text-[10px] bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-400 focus:outline-none">
-              <option value="name">Name</option>
-              <option value="inventory">Vehicles</option>
-              <option value="city">City</option>
-            </select>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {sortedCollections.slice(0, 80).map(c => (
-              <Link key={c.id} to={`/org/${c.slug}`} className="block px-3 py-2.5 border-b border-gray-800/30 hover:bg-gray-800/40 transition-colors group">
-                <div className="flex items-start gap-2.5">
-                  {c.logo_url ? (
-                    <img src={c.logo_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 bg-gray-800" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-md bg-gradient-to-br from-sky-900/40 to-blue-900/40 flex items-center justify-center flex-shrink-0">
-                      <span className="text-sky-400 text-[10px] font-bold">{c.name.charAt(0)}</span>
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-white text-xs font-medium truncate group-hover:text-sky-400 transition-colors">{c.name}</h3>
-                    <p className="text-gray-500 text-[10px] truncate">{c.city}{c.city && c.country ? ', ' : ''}{c.country}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {c.total_inventory > 0 && <span className="text-sky-400/80 text-[10px] font-medium">{c.total_inventory} vehicles</span>}
-                      {c.instagram && <span className="text-pink-400/60 text-[10px] truncate">@{c.instagram}</span>}
-                    </div>
-                  </div>
+            <div>
+              <div className="text-sky-400 text-sm font-bold">{stats.vehicles.toLocaleString()}</div>
+              <div className="text-[9px] text-gray-500">Vehicles</div>
+            </div>
+            {!isMobile && (
+              <>
+                <div className="w-px h-6 bg-gray-700" />
+                <div>
+                  <div className="text-emerald-400 text-sm font-bold">{stats.cities}</div>
+                  <div className="text-[9px] text-gray-500">Cities</div>
                 </div>
-              </Link>
-            ))}
-            {sortedCollections.length === 0 && (
-              <div className="px-3 py-8 text-center text-gray-600 text-xs">No collections found</div>
+              </>
             )}
           </div>
+
+          {/* Keyboard hint */}
+          {!isMobile && drill.level !== 'world' && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] text-[10px] text-gray-600">
+              Press <kbd className="px-1 py-0.5 rounded bg-gray-800/60 border border-gray-700/40 text-gray-500 font-mono text-[9px]">Esc</kbd> to go back
+            </div>
+          )}
         </div>
+
+        {/* Right panel - desktop: static column */}
+        {!isCompact && (
+          <div className="w-72 bg-gray-900/50 border-l border-gray-800 flex flex-col min-h-0">
+            {renderRightPanel()}
+          </div>
+        )}
+
+        {/* Right panel - mobile/tablet: bottom sheet */}
+        {isCompact && (
+          <>
+            {panelOpen && (
+              <div className="fixed inset-0 bg-black/50 z-[1100] backdrop-fade" onClick={() => setPanelOpen(false)} />
+            )}
+            <div className={`fixed left-0 right-0 bottom-0 bg-gray-900 border-t border-gray-800 z-[1200] rounded-t-2xl panel-slide ${panelOpen ? 'translate-y-0' : 'translate-y-full'}`}
+              style={{ height: isMobile ? '65vh' : '50vh' }}>
+              {/* Drag handle */}
+              <div className="flex justify-center pt-2 pb-1">
+                <div className="w-8 h-1 rounded-full bg-gray-700" />
+              </div>
+              {renderRightPanel()}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
