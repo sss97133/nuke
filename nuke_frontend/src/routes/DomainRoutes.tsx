@@ -28,6 +28,10 @@ const DropboxCallback = React.lazy(() => import('../pages/DropboxCallback'));
 // ASCII samples (dev / preview)
 const LivingAsciiSamplesPage = React.lazy(() => import('../pages/LivingAsciiSamplesPage'));
 
+// Tech capture (photo pipeline)
+const TechCapture = React.lazy(() => import('../pages/TechCapture'));
+const TechShareUpload = React.lazy(() => import('../pages/TechCapture'));
+
 // Curation and receipts
 const CurationQueue = React.lazy(() => import('../pages/CurationQueue'));
 const UnlinkedReceipts = React.lazy(() => import('../pages/UnlinkedReceipts'));
@@ -196,6 +200,10 @@ export const DomainRoutes = () => {
         {/* Business Management */}
         <Route path="/business/settings" element={<BusinessSettings />} />
         <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
+
+        {/* Tech Capture - "Techs Take Photos, We Do the Rest" */}
+        <Route path="/tech" element={<TechCapture />} />
+        <Route path="/tech/upload" element={<TechShareUpload />} />
 
         {/* Restoration Intake - Telegram photo intake for shops */}
         <Route path="/restoration" element={<RestorationIntake />} />

@@ -640,12 +640,20 @@ export class ImageUploadService {
         });
       }
 
-      // Trigger AI analysis automatically on upload
-      // This MUST trigger for every image upload - no exceptions
+      // Trigger photo-pipeline-orchestrator directly (fire-and-forget).
+      // DB trigger via pg_net is a backup but has reliability issues with timeouts.
       if (isImage && dbResult?.id && !duplicateOf) {
-        console.log('🚀 Triggering AI analysis for uploaded image:', dbResult.id);
-        
-        // Emit event for UI to track
+        console.log('📸 Triggering photo pipeline for:', dbResult.id);
+        supabase.functions.invoke('photo-pipeline-orchestrator', {
+          body: {
+            image_id: dbResult.id,
+            image_url: urlData.publicUrl,
+            vehicle_id: vehicleId || null,
+            user_id: (await supabase.auth.getUser()).data.user?.id || null,
+          },
+        }).catch((err: any) => {
+          console.warn('📸 Photo pipeline invoke failed (DB trigger is backup):', err.message);
+        });
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('image_processing_started', {
             detail: {
@@ -655,89 +663,6 @@ export class ImageUploadService {
             }
           }));
         }
-
-        // Get user for API key
-        const { data: { user } } = await supabase.auth.getUser();
-
-        // PRIMARY: Vision analysis (replaces deprecated analyze-image-tier1)
-        supabase.functions.invoke('analyze-image', {
-          body: {
-            image_url: urlData.publicUrl,
-            image_id: dbResult.id,
-            vehicle_id: vehicleId,
-            timeline_event_id: null,
-            user_id: user?.id || null
-          }
-        }).then(({ data, error }) => {
-          if (error) {
-            console.error('❌ Vision AI analysis failed:', error);
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('image_processing_failed', {
-                detail: { imageId: dbResult.id, error: error.message }
-              }));
-            }
-          } else {
-            console.log('✅ Vision AI analysis succeeded:', data);
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('image_processing_complete', {
-                detail: { imageId: dbResult.id, result: data }
-              }));
-            }
-          }
-        }).catch(err => {
-          console.error('❌ Vision AI analysis error:', err);
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('image_processing_failed', {
-              detail: { imageId: dbResult.id, error: err.message || 'Unknown error' }
-            }));
-          }
-        });
-
-        // SECONDARY: Sensitive document detection (titles, registrations)
-        // This runs in parallel and doesn't block the main analysis
-        supabase.functions.invoke('detect-sensitive-document', {
-          body: {
-            image_url: urlData.publicUrl,
-            vehicle_id: vehicleId,
-            image_id: dbResult.id
-          }
-        }).then(({ data, error }) => {
-          if (error) {
-            console.warn('⚠️ Sensitive document detection failed:', error);
-          } else if (data?.is_sensitive) {
-            console.log(`🔒 Sensitive ${data.document_type} detected - access restricted`);
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('sensitive_document_detected', {
-                detail: {
-                  imageId: dbResult.id,
-                  vehicleId,
-                  documentType: data.document_type,
-                  extractedFields: data.extracted_fields || [],
-                  isPrivatized: true
-                }
-              }));
-            }
-          }
-        }).catch(err => {
-          console.warn('⚠️ Sensitive document detection error:', err);
-        });
-
-        // NOTE: analyze-image already covers tags + VIN/SPID OCR + metadata, so no separate tertiary call.
-      } else if (isImage && !dbResult?.id) {
-        // Fallback: If database insert failed but image was uploaded, still try analysis
-        console.warn('⚠️ Database insert failed but image uploaded, attempting analysis anyway');
-        const { data: { user } } = await supabase.auth.getUser();
-        supabase.functions.invoke('analyze-image', {
-          body: {
-            image_url: urlData.publicUrl,
-            vehicle_id: vehicleId,
-            image_id: null, // No image_id available
-            timeline_event_id: null,
-            user_id: user?.id || null
-          }
-        }).catch(err => {
-          console.error('❌ Fallback analysis failed:', err);
-        });
       } else if (isImage && dbResult?.id && duplicateOf) {
         console.log('⏩ Skipping AI analysis for duplicate image; linked to existing asset', { imageId: dbResult.id, duplicateOf });
       }
