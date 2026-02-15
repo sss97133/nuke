@@ -93,9 +93,21 @@ Deno.serve(async (req) => {
       }
 
       const results = [];
+      // Process junk URLs inline (fast), real images via self-call
+      const JUNK_RE = [
+        /facebook\.com\/tr/i, /googleads/i, /doubleclick/i,
+        /google-analytics/i, /googlesyndication/i, /adservice/i,
+        /\.gif\?/, /pixel\./, /beacon\./,
+      ];
+      const junkIds: string[] = [];
+
       for (const img of pendingImages) {
+        if (JUNK_RE.some(p => p.test(img.image_url))) {
+          junkIds.push(img.id);
+          results.push({ image_id: img.id, success: true, classification: "junk_url" });
+          continue;
+        }
         try {
-          // Call self for each image
           const resp = await fetch(
             `${SUPABASE_URL}/functions/v1/photo-pipeline-orchestrator`,
             {
@@ -119,6 +131,14 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Bulk update junk URLs in one query
+      if (junkIds.length > 0) {
+        await supabase.from("vehicle_images").update({
+          ai_processing_status: "completed",
+          ai_scan_metadata: { pipeline_version: "v2", skipped: "junk_url_batch" },
+        }).in("id", junkIds);
+      }
+
       return new Response(
         JSON.stringify({ success: true, processed: results.length, results }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -131,6 +151,23 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "image_id and image_url required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Skip garbage URLs (tracking pixels, ads, non-image URLs)
+    const JUNK_PATTERNS = [
+      /facebook\.com\/tr/i, /googleads/i, /doubleclick/i,
+      /google-analytics/i, /googlesyndication/i, /adservice/i,
+      /\.gif\?/, /pixel\./, /beacon\./,
+    ];
+    if (JUNK_PATTERNS.some(p => p.test(image_url))) {
+      await supabase.from("vehicle_images").update({
+        ai_processing_status: "completed",
+        ai_scan_metadata: { pipeline_version: "v2", skipped: "junk_url", url_pattern: image_url.substring(0, 80) },
+      }).eq("id", image_id);
+      return new Response(
+        JSON.stringify({ success: true, image_id, classification: "junk_url", skipped: true, duration_ms: Date.now() - startedAt }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -182,29 +219,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 7: Mark as completed
+    // Step 7: Mark as completed (single update)
     const durationMs = Date.now() - startedAt;
+    const updatePayload: Record<string, any> = {
+      ai_processing_status: "completed",
+      ai_scan_metadata: {
+        pipeline_version: "v2",
+        classification,
+        route_result: routeResult.summary,
+        duration_ms: durationMs,
+        processed_at: new Date().toISOString(),
+      },
+    };
+    if (resolvedVehicleId && !vehicle_id) {
+      updatePayload.vehicle_id = resolvedVehicleId;
+    }
     await supabase
       .from("vehicle_images")
-      .update({
-        ai_processing_status: "completed",
-        ai_scan_metadata: {
-          pipeline_version: "v1",
-          classification,
-          route_result: routeResult.summary,
-          duration_ms: durationMs,
-          processed_at: new Date().toISOString(),
-        },
-      })
+      .update(updatePayload)
       .eq("id", image_id);
-
-    // Update vehicle_id if resolved
-    if (resolvedVehicleId && !vehicle_id) {
-      await supabase
-        .from("vehicle_images")
-        .update({ vehicle_id: resolvedVehicleId })
-        .eq("id", image_id);
-    }
 
     console.log(`[photo-pipeline] Completed in ${durationMs}ms`);
 
@@ -434,8 +467,21 @@ async function routeByType(
     case "detail_closeup":
     case "undercarriage":
     case "other": {
-      // Standard vision analysis
-      return await callAnalyzeImage(imageId, imageUrl, vehicleId, userId);
+      // Only call expensive analyze-image if we have a vehicle to enrich
+      if (vehicleId) {
+        return await callAnalyzeImage(imageId, imageUrl, vehicleId, userId);
+      }
+      // No vehicle context — Gemini classification is sufficient
+      const extracted: Record<string, any> = {};
+      if (classification.vehicle_hints?.make) extracted.make = classification.vehicle_hints.make;
+      if (classification.vehicle_hints?.model) extracted.model = classification.vehicle_hints.model;
+      if (classification.vehicle_hints?.color) extracted.exterior_color = classification.vehicle_hints.color;
+      if (classification.vin_detected) extracted.vin = classification.vin_detected;
+      return {
+        summary: `gemini-only: ${classification.image_type}`,
+        handler: "gemini-flash",
+        extracted_fields: Object.keys(extracted).length > 0 ? extracted : undefined,
+      };
     }
 
     case "engine_bay": {
