@@ -24,7 +24,8 @@ except ImportError:
     import psycopg2
     from psycopg2.extras import execute_batch
 
-DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+# Use port 5432 (session pooler) - port 6543 (transaction pooler) is often saturated
+DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 
 # Two-word makes that get split
 TWO_WORD_MAKES = {
@@ -112,11 +113,17 @@ def main():
     # Close read connection, open fresh write connection with autocommit
     cur.close()
     conn.close()
+    print(f"  Connecting for writes on port 5432...", flush=True)
     conn = psycopg2.connect(DB_URL)
     conn.autocommit = True
     cur = conn.cursor()
+    # Short lock timeout: skip locked rows instead of waiting
+    cur.execute("SET lock_timeout = '2s'")
+    cur.execute("SET statement_timeout = '10s'")
+    print(f"  Connected. Starting writes...", flush=True)
 
     written = 0
+    skipped = 0
     errors = 0
     for new_make, new_model, vid in updates:
         try:
@@ -125,10 +132,16 @@ def main():
                 (new_make, new_model, vid)
             )
             written += 1
+        except psycopg2.errors.LockNotAvailable:
+            skipped += 1
+            conn.rollback()  # reset transaction state in autocommit
+        except psycopg2.errors.QueryCanceled:
+            skipped += 1
+            conn.rollback()
         except Exception as e:
             errors += 1
             if errors <= 5:
-                print(f"  Error: {e}")
+                print(f"  Error ({type(e).__name__}): {e}")
             try:
                 conn.close()
             except Exception:
@@ -137,33 +150,57 @@ def main():
             conn = psycopg2.connect(DB_URL)
             conn.autocommit = True
             cur = conn.cursor()
-        if written % 2000 == 0:
-            print(f"  ... {written}/{len(updates)} written ({errors} errors)")
-    print(f"  ... {written}/{len(updates)} written ({errors} errors)")
+            cur.execute("SET lock_timeout = '2s'")
+            cur.execute("SET statement_timeout = '10s'")
+        if (written + skipped) % 500 == 0 and (written + skipped) > 0:
+            print(f"  ... {written}/{len(updates)} written, {skipped} skipped, {errors} errors", flush=True)
+    print(f"  ... {written}/{len(updates)} written, {skipped} skipped, {errors} errors", flush=True)
 
-    print(f"[{time.strftime('%H:%M:%S')}] Phase 1 done: {written} makes fixed")
+    print(f"[{time.strftime('%H:%M:%S')}] Phase 1 done: {written} makes fixed, {skipped} skipped (locked)")
 
-    # Phase 2: Direct renames (case + split names)
+    # Phase 2: Direct renames in small batches to avoid timeouts
     print(f"\n[{time.strftime('%H:%M:%S')}] Phase 2: Direct make renames...")
+    cur.execute("SET statement_timeout = '30s'")
+    cur.execute("SET lock_timeout = '5s'")
     for old_make, new_make in MAKE_RENAMES.items():
-        # For split names like "Land", also need to prepend "Rover" to model
-        if old_make == 'Land':
-            cur.execute("""
-                UPDATE vehicles SET make = %s, model = 'Rover ' || COALESCE(model, ''), updated_at = now()
-                WHERE make = %s
-            """, (new_make, old_make))
-        elif old_make == 'Alfa':
-            cur.execute("""
-                UPDATE vehicles SET make = %s, model = 'Romeo ' || COALESCE(model, ''), updated_at = now()
-                WHERE make = %s
-            """, (new_make, old_make))
-        else:
-            cur.execute("""
-                UPDATE vehicles SET make = %s, updated_at = now()
-                WHERE make = %s
-            """, (new_make, old_make))
-        count = cur.rowcount
-        print(f"  '{old_make}' → '{new_make}': {count} vehicles")
+        total_renamed = 0
+        while True:
+            try:
+                if old_make == 'Land':
+                    cur.execute("""
+                        WITH batch AS (SELECT id FROM vehicles WHERE make = %s LIMIT 200)
+                        UPDATE vehicles v SET make = %s, model = 'Rover ' || COALESCE(model, ''), updated_at = now()
+                        FROM batch b WHERE v.id = b.id
+                    """, (old_make, new_make))
+                elif old_make == 'Alfa':
+                    cur.execute("""
+                        WITH batch AS (SELECT id FROM vehicles WHERE make = %s LIMIT 200)
+                        UPDATE vehicles v SET make = %s, model = 'Romeo ' || COALESCE(model, ''), updated_at = now()
+                        FROM batch b WHERE v.id = b.id
+                    """, (old_make, new_make))
+                else:
+                    cur.execute("""
+                        WITH batch AS (SELECT id FROM vehicles WHERE make = %s LIMIT 200)
+                        UPDATE vehicles v SET make = %s, updated_at = now()
+                        FROM batch b WHERE v.id = b.id
+                    """, (old_make, new_make))
+                count = cur.rowcount
+                if count == 0:
+                    break
+                total_renamed += count
+            except Exception as e:
+                print(f"  Error renaming '{old_make}': {e}")
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                time.sleep(2)
+                conn = psycopg2.connect(DB_URL)
+                conn.autocommit = True
+                cur = conn.cursor()
+                cur.execute("SET statement_timeout = '30s'")
+                cur.execute("SET lock_timeout = '5s'")
+        print(f"  '{old_make}' → '{new_make}': {total_renamed} vehicles")
 
     print(f"\n[{time.strftime('%H:%M:%S')}] All done!")
     cur.close()
