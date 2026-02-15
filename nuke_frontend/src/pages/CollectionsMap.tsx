@@ -395,6 +395,22 @@ function MapLayers({
                   className="mt-3 block text-center px-3 py-2.5 bg-gradient-to-r from-blue-600 to-sky-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-sky-700 transition-all shadow-sm hover:shadow-md">
                   View Collection →
                 </Link>
+                {/* Nearby collections */}
+                {(() => {
+                  const nearby = colls.filter(n => n.id !== c.id && Math.abs(n.lat - c.lat) < 0.5 && Math.abs(n.lng - c.lng) < 0.5).slice(0, 3);
+                  if (!nearby.length) return null;
+                  return (
+                    <div className="mt-3 pt-2.5 border-t border-gray-100">
+                      <div className="text-[10px] text-gray-400 font-medium mb-1.5">Nearby collections</div>
+                      {nearby.map(n => (
+                        <Link key={n.id} to={`/org/${n.slug}`} className="flex items-center gap-1.5 py-1 text-[11px] text-gray-600 hover:text-blue-600 transition-colors">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-300 flex-shrink-0" />
+                          {n.name}
+                        </Link>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </Popup>
           </Marker>
@@ -499,9 +515,18 @@ function MapLayers({
 
 // ── MapInstance (captures map ref for external controls) ─────────────────────
 
-function MapInstance({ onMap }: { onMap: (map: L.Map) => void }) {
+function MapInstance({ onMap, onMoveEnd }: { onMap: (map: L.Map) => void; onMoveEnd?: (center: [number, number]) => void }) {
   const map = useMap();
   useEffect(() => { onMap(map); }, [map, onMap]);
+  useEffect(() => {
+    if (!onMoveEnd) return;
+    const handler = () => {
+      const c = map.getCenter();
+      onMoveEnd([c.lat, c.lng]);
+    };
+    map.on('moveend', handler);
+    return () => { map.off('moveend', handler); };
+  }, [map, onMoveEnd]);
   return null;
 }
 
@@ -545,7 +570,8 @@ export default function CollectionsMap() {
   const [loading, setLoading] = useState(true);
   const [metric, setMetric] = useState<'count' | 'inventory'>('count');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'inventory' | 'city'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'inventory' | 'city' | 'distance'>('name');
+  const [mapCenter, setMapCenter] = useState<[number, number]>([20, 0]);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterVehicles, setFilterVehicles] = useState(false);
   const [filterInstagram, setFilterInstagram] = useState(false);
@@ -556,6 +582,7 @@ export default function CollectionsMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
+  const handleMoveEnd = useCallback((center: [number, number]) => { setMapCenter(center); }, []);
   const [transitioning, setTransitioning] = useState(false);
   const [mapStyle, setMapStyle] = useState<'dark' | 'satellite' | 'light'>('dark');
 
@@ -710,9 +737,15 @@ export default function CollectionsMap() {
       case 'name': arr.sort((a, b) => a.name.localeCompare(b.name)); break;
       case 'inventory': arr.sort((a, b) => b.total_inventory - a.total_inventory); break;
       case 'city': arr.sort((a, b) => a.city.localeCompare(b.city)); break;
+      case 'distance': {
+        const [clat, clng] = mapCenter;
+        const dist = (c: Collection) => Math.sqrt(Math.pow(c.lat - clat, 2) + Math.pow(c.lng - clng, 2));
+        arr.sort((a, b) => dist(a) - dist(b));
+        break;
+      }
     }
     return arr;
-  }, [scopedCollections, sortBy, filterVehicles, filterInstagram]);
+  }, [scopedCollections, sortBy, filterVehicles, filterInstagram, mapCenter]);
 
   // ── Sidebar items ──
 
@@ -941,6 +974,7 @@ export default function CollectionsMap() {
               <option value="name">Name</option>
               <option value="inventory">Vehicles</option>
               <option value="city">City</option>
+              <option value="distance">Nearest</option>
             </select>
             {isCompact && (
               <button onClick={() => setPanelOpen(false)} className="text-gray-500 hover:text-white p-1">
@@ -1188,7 +1222,7 @@ export default function CollectionsMap() {
             <MapContainer center={[20, 0]} zoom={2} className="absolute inset-0"
               style={{ background: mapStyle === 'light' ? '#f0f0f0' : '#0a0f1a' }}
               zoomControl={false} attributionControl={false}>
-              <MapInstance onMap={handleMap} />
+              <MapInstance onMap={handleMap} onMoveEnd={handleMoveEnd} />
               <TileLayer key={mapStyle} url={MAP_TILES[mapStyle].url} />
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
                 worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId} />
