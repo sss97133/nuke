@@ -211,10 +211,36 @@ def parse_bat_html(h):
 
     return f
 
+def build_update(fields, vehicle_id, text_cols, date_cols, coalesce_cols, exclude_vin=False):
+    """Build UPDATE SQL + values from parsed fields. Returns (sql, values) or (None, None)."""
+    set_parts = []
+    values = []
+    for col in text_cols:
+        if exclude_vin and col == 'vin':
+            continue
+        if col in fields and fields[col]:
+            set_parts.append(f"{col} = COALESCE(NULLIF({col}, ''), %s)")
+            values.append(str(fields[col]))
+    for col in date_cols:
+        if col in fields and fields[col]:
+            set_parts.append(f"{col} = COALESCE({col}, %s)")
+            values.append(str(fields[col]))
+    for col in coalesce_cols:
+        if col in fields and fields[col]:
+            v = fields[col]
+            if isinstance(v, int) and v > 0:
+                set_parts.append(f"{col} = COALESCE({col}, %s)")
+                values.append(v)
+    if not set_parts:
+        return None, None
+    values.append(vehicle_id)
+    return f"UPDATE vehicles SET {', '.join(set_parts)} WHERE id = %s", values
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--limit', type=int, default=200000)
-    parser.add_argument('--batch-size', type=int, default=100)
+    parser.add_argument('--batch-size', type=int, default=20)
     parser.add_argument('--page-size', type=int, default=5000)
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
@@ -226,19 +252,19 @@ def main():
                  'reserve_status', 'vin', 'transmission',
                  'drivetrain', 'engine_size', 'color', 'interior_color', 'body_style',
                  'primary_image_url'}
-    # These use COALESCE(col, val) — no NULLIF because they're non-text or date types
     coalesce_cols = {'mileage', 'sale_price', 'bat_bids', 'bat_comments', 'bat_views', 'bat_watchers'}
-    # Date/text cols that should use COALESCE without NULLIF
     date_cols = {'auction_end_date', 'sale_date'}
 
     total = 0
     updated = 0
     skipped = 0
     errors = 0
+    vin_dupes = 0
+    no_html = 0
     start = time.time()
     cur = conn.cursor()
 
-    # Step 1: Get vehicle IDs + listing URLs using paginated queries to avoid timeout
+    # Step 1: Load vehicle IDs + listing URLs (paginated to avoid timeout)
     print(f"[{time.strftime('%H:%M:%S')}] Finding sparse BaT vehicles (paginated)...", file=sys.stderr)
     vehicles = []
     offset = 0
@@ -264,114 +290,105 @@ def main():
     vehicles = vehicles[:args.limit]
     print(f"[{time.strftime('%H:%M:%S')}] Found {len(vehicles)} sparse vehicles", file=sys.stderr)
 
-    # Step 2: Process each vehicle
-    for vid, listing_url in vehicles:
-        vehicle_id = str(vid)
-        total += 1
+    # Step 2: Process in batches — batch-read HTML, parse locally, batch-write updates
+    bs = args.batch_size
+    for batch_start in range(0, len(vehicles), bs):
+        batch = vehicles[batch_start:batch_start + bs]
 
+        # Build URL lookup: url -> vehicle_id (include trailing-slash variants)
+        url_to_vid = {}
+        all_urls = []
+        for vid, url in batch:
+            vid_str = str(vid)
+            url_to_vid[url] = vid_str
+            url_to_vid[url + '/'] = vid_str
+            all_urls.append(url)
+            all_urls.append(url + '/')
+
+        # Batch-fetch HTML from listing_page_snapshots using DISTINCT ON
         try:
-            # Fetch archived HTML for this URL (with trailing slash normalization)
             cur.execute("""
-                SELECT html FROM listing_page_snapshots
+                SELECT DISTINCT ON (listing_url) listing_url, html
+                FROM listing_page_snapshots
                 WHERE platform = 'bat' AND success = true AND html IS NOT NULL
-                  AND (listing_url = %s OR listing_url = %s)
-                ORDER BY fetched_at DESC LIMIT 1
-            """, (listing_url, listing_url + '/'))
+                  AND listing_url = ANY(%s)
+                ORDER BY listing_url, fetched_at DESC
+            """, (all_urls,))
+            html_rows = cur.fetchall()
+        except Exception as e:
+            print(f"  Batch HTML fetch error at {batch_start}: {e}", file=sys.stderr)
+            errors += len(batch)
+            total += len(batch)
+            continue
 
-            row = cur.fetchone()
-            if not row or not row[0]:
+        # Map URL -> HTML (prefer exact match, fallback to slash variant)
+        url_html = {}
+        for row_url, row_html in html_rows:
+            if row_html:
+                url_html[row_url] = row_html
+
+        # Parse each vehicle in this batch
+        for vid, listing_url in batch:
+            vehicle_id = str(vid)
+            total += 1
+
+            html_content = url_html.get(listing_url) or url_html.get(listing_url + '/')
+            if not html_content:
                 skipped += 1
+                no_html += 1
                 continue
 
-            html_content = row[0]
             fields = parse_bat_html(html_content)
             if not fields:
                 skipped += 1
                 continue
 
-            # Build UPDATE with COALESCE
-            set_parts = []
-            values = []
-            for col in text_cols:
-                if col in fields and fields[col]:
-                    set_parts.append(f"{col} = COALESCE(NULLIF({col}, ''), %s)")
-                    values.append(str(fields[col]))
-            for col in date_cols:
-                if col in fields and fields[col]:
-                    set_parts.append(f"{col} = COALESCE({col}, %s)")
-                    values.append(str(fields[col]))
-            for col in coalesce_cols:
-                if col in fields and fields[col]:
-                    v = fields[col]
-                    if isinstance(v, int) and v > 0:
-                        set_parts.append(f"{col} = COALESCE({col}, %s)")
-                        values.append(v)
-
-            if not set_parts:
+            sql, values = build_update(fields, vehicle_id, text_cols, date_cols, coalesce_cols)
+            if not sql:
                 skipped += 1
                 continue
-
-            values.append(vehicle_id)
-            sql = f"UPDATE vehicles SET {', '.join(set_parts)} WHERE id = %s"
 
             if args.dry_run:
                 field_names = [k for k in list(text_cols) + list(date_cols) + list(coalesce_cols) if k in fields and fields[k]]
                 print(f"DRY RUN: {vehicle_id} -> {field_names}", file=sys.stderr)
                 updated += 1
-            else:
+                continue
+
+            try:
                 cur.execute(sql, values)
                 updated += 1
-
-        except Exception as e:
-            err_str = str(e)
-            if 'vehicles_vin_unique_index' in err_str or 'duplicate key value' in err_str:
-                # VIN already exists on another vehicle — retry without VIN
-                try:
-                    fields.pop('vin', None)
-                    set_parts2 = []
-                    values2 = []
-                    for col in text_cols:
-                        if col == 'vin': continue
-                        if col in fields and fields[col]:
-                            set_parts2.append(f"{col} = COALESCE(NULLIF({col}, ''), %s)")
-                            values2.append(str(fields[col]))
-                    for col in date_cols:
-                        if col in fields and fields[col]:
-                            set_parts2.append(f"{col} = COALESCE({col}, %s)")
-                            values2.append(str(fields[col]))
-                    for col in coalesce_cols:
-                        if col in fields and fields[col]:
-                            v2 = fields[col]
-                            if isinstance(v2, int) and v2 > 0:
-                                set_parts2.append(f"{col} = COALESCE({col}, %s)")
-                                values2.append(v2)
-                    if set_parts2:
-                        values2.append(vehicle_id)
-                        cur.execute(f"UPDATE vehicles SET {', '.join(set_parts2)} WHERE id = %s", values2)
-                        updated += 1
-                    else:
-                        skipped += 1
-                except Exception as e2:
+            except Exception as e:
+                err_str = str(e)
+                if 'vehicles_vin_unique_index' in err_str or 'duplicate key value' in err_str:
+                    vin_dupes += 1
+                    try:
+                        sql2, values2 = build_update(fields, vehicle_id, text_cols, date_cols, coalesce_cols, exclude_vin=True)
+                        if sql2:
+                            cur.execute(sql2, values2)
+                            updated += 1
+                        else:
+                            skipped += 1
+                    except Exception as e2:
+                        errors += 1
+                        if errors <= 10:
+                            print(f"Error (vin retry) {vehicle_id}: {e2}", file=sys.stderr)
+                else:
                     errors += 1
                     if errors <= 10:
-                        print(f"Error (retry) on {vehicle_id}: {e2}", file=sys.stderr)
-            else:
-                errors += 1
-                if errors <= 10:
-                    print(f"Error on {vehicle_id}: {e}", file=sys.stderr)
+                        print(f"Error {vehicle_id}: {e}", file=sys.stderr)
 
-        if total % 500 == 0:
+        if total % 500 < bs:
             elapsed = time.time() - start
             rate = total / max(elapsed, 1)
-            remaining = (len(vehicles) - total) / max(rate, 0.1)
-            print(f"[{time.strftime('%H:%M:%S')}] {total}/{len(vehicles)} | Updated: {updated} | Skipped: {skipped} | Errors: {errors} | {rate:.0f}/sec | ~{int(remaining//60)}m left", file=sys.stderr)
+            remaining = (len(vehicles) - total) / max(rate, 0.01)
+            print(f"[{time.strftime('%H:%M:%S')}] {total}/{len(vehicles)} | Updated: {updated} | Skipped: {skipped} (no_html:{no_html}) | VIN dupes: {vin_dupes} | Errors: {errors} | {rate:.1f}/sec | ~{int(remaining//60)}m left", file=sys.stderr)
 
     cur.close()
 
     elapsed = time.time() - start
     print(f"\n[{time.strftime('%H:%M:%S')}] ===== COMPLETE =====", file=sys.stderr)
-    print(f"Total: {total} | Updated: {updated} | Skipped: {skipped} | Errors: {errors}", file=sys.stderr)
-    print(f"Duration: {int(elapsed//60)}m {int(elapsed%60)}s | Rate: {total/max(elapsed,1):.0f}/sec", file=sys.stderr)
+    print(f"Total: {total} | Updated: {updated} | Skipped: {skipped} (no_html:{no_html}) | VIN dupes: {vin_dupes} | Errors: {errors}", file=sys.stderr)
+    print(f"Duration: {int(elapsed//60)}m {int(elapsed%60)}s | Rate: {total/max(elapsed,1):.1f}/sec", file=sys.stderr)
 
     conn.close()
 
