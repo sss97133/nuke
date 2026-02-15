@@ -499,6 +499,7 @@ export default function CollectionsMap() {
   const [filterInstagram, setFilterInstagram] = useState(false);
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [sidebarSearch, setSidebarSearch] = useState('');
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -724,13 +725,22 @@ export default function CollectionsMap() {
     } catch {}
   };
 
+  const filteredSidebarItems = useMemo(() => {
+    if (!sidebarSearch) return sidebarItems;
+    const t = sidebarSearch.toLowerCase();
+    return sidebarItems.filter(i => i.label.toLowerCase().includes(t));
+  }, [sidebarItems, sidebarSearch]);
+
+  // Reset sidebar search on drill change
+  useEffect(() => { setSidebarSearch(''); }, [drill.level]);
+
   const sidebarMaxMetric = Math.max(...sidebarItems.map(i => i[metric === 'count' ? 'count' : 'inventory']), 1);
 
   // ── Sidebar content (shared between desktop & mobile) ──
   const renderSidebar = () => (
     <div className="flex flex-col h-full min-h-0">
       <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-        <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{sidebarTitle}</h2>
+        <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{sidebarTitle}{sidebarItems.length > 0 ? ` (${sidebarItems.length})` : ''}</h2>
         {isCompact && (
           <button onClick={() => setSidebarOpen(false)} className="text-gray-500 hover:text-white p-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -738,8 +748,19 @@ export default function CollectionsMap() {
         )}
       </div>
 
+      {/* Sidebar search */}
+      {sidebarItems.length > 5 && (
+        <div className="px-3 pb-2">
+          <div className="relative">
+            <input type="text" placeholder={`Filter ${sidebarTitle.toLowerCase()}...`} value={sidebarSearch} onChange={e => setSidebarSearch(e.target.value)}
+              className="w-full pl-7 pr-3 py-1 bg-gray-800/60 border border-gray-700/40 rounded-md text-[11px] text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-sky-500/50 focus:border-sky-500/50" />
+            <svg className="absolute left-2 top-1.5 w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          </div>
+        </div>
+      )}
+
       {/* Analytics distribution */}
-      {topDistribution.length > 0 && (
+      {topDistribution.length > 0 && !sidebarSearch && (
         <div className="px-3 pb-3 border-b border-gray-800/50">
           <div className="text-[9px] text-gray-600 uppercase tracking-wider mb-2">Top {metric === 'count' ? 'by count' : 'by vehicles'}</div>
           {topDistribution.map(d => (
@@ -756,7 +777,7 @@ export default function CollectionsMap() {
 
       {/* Region list with percentage bars */}
       <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5 mt-1">
-        {sidebarItems.map(item => {
+        {filteredSidebarItems.map(item => {
           const pct = (item[metric === 'count' ? 'count' : 'inventory'] / sidebarMaxMetric) * 100;
           return (
             <button key={item.key} onClick={item.onClick}
@@ -778,8 +799,16 @@ export default function CollectionsMap() {
             </button>
           );
         })}
-        {sidebarItems.length === 0 && drill.level !== 'county' && drill.level !== 'markers' && (
+        {filteredSidebarItems.length === 0 && sidebarSearch && (
+          <div className="px-2 py-6 text-center">
+            <div className="text-gray-600 text-xs">No {sidebarTitle.toLowerCase()} match "{sidebarSearch}"</div>
+          </div>
+        )}
+        {sidebarItems.length === 0 && !sidebarSearch && drill.level !== 'county' && drill.level !== 'markers' && (
           <div className="px-2 py-8 text-center">
+            <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-gray-800/50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
             <div className="text-gray-600 text-xs">Loading {sidebarTitle.toLowerCase()}...</div>
           </div>
         )}
