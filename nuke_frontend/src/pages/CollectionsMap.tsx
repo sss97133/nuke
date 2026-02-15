@@ -197,7 +197,7 @@ function fmtNum(n: number): string {
 
 function MapLayers({
   collections, drill, setDrill, metric, searchTerm,
-  worldGeo, statesGeo, countiesGeo, stateAssign, countyAssign,
+  worldGeo, statesGeo, countiesGeo, stateAssign, countyAssign, highlightedId,
 }: {
   collections: Collection[];
   drill: DrillState;
@@ -209,6 +209,7 @@ function MapLayers({
   countiesGeo: FeatureCollection | null;
   stateAssign: Map<string, string>;
   countyAssign: Map<string, string>;
+  highlightedId: string | null;
 }) {
   const map = useMap();
 
@@ -316,15 +317,24 @@ function MapLayers({
   const renderMarkers = (colls: Collection[]) => (
     <>
       {colls.map(c => {
+        const isHighlighted = highlightedId === c.id;
+        const size = isHighlighted ? 36 : 28;
+        const halfSize = size / 2;
         const icon = c.logo_url
           ? L.divIcon({
               className: '',
-              html: `<div style="width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5);overflow:hidden;background:#1e293b"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div>`,
-              iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
+              html: `<div style="width:${size}px;height:${size}px;border-radius:50%;border:${isHighlighted ? '3px solid #38bdf8' : '2px solid #fff'};box-shadow:${isHighlighted ? '0 0 20px rgba(56,189,248,0.8),0 0 40px rgba(56,189,248,0.3)' : '0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5)'};overflow:hidden;background:#1e293b;transition:all 200ms ease"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div>`,
+              iconSize: [size, size], iconAnchor: [halfSize, halfSize], popupAnchor: [0, -halfSize],
             })
-          : MARKER_ICON;
+          : isHighlighted
+            ? L.divIcon({
+                className: '',
+                html: `<div style="background:#38bdf8;width:24px;height:24px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px rgba(56,189,248,0.9),0 0 40px rgba(56,189,248,0.4),0 2px 8px rgba(0,0,0,.4);animation:pulse 1s infinite"></div>`,
+                iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12],
+              })
+            : MARKER_ICON;
         return (
-          <Marker key={c.id} position={[c.lat, c.lng]} icon={icon}>
+          <Marker key={c.id} position={[c.lat, c.lng]} icon={icon} zIndexOffset={isHighlighted ? 1000 : 0}>
             <Popup maxWidth={300}>
               <div className="min-w-[260px]">
                 <div className="flex items-start gap-3">
@@ -500,6 +510,7 @@ export default function CollectionsMap() {
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -1062,7 +1073,7 @@ export default function CollectionsMap() {
               <MapInstance onMap={handleMap} />
               <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
               <MapLayers collections={collections} drill={drill} setDrill={setDrill} metric={metric} searchTerm={searchTerm}
-                worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} />
+                worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId} />
             </MapContainer>
           )}
 
