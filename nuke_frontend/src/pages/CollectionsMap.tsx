@@ -1514,6 +1514,31 @@ export default function CollectionsMap() {
             </div>
           </>
         )}
+
+        {/* Mobile: peek bar - shows top collections when panel is closed */}
+        {isMobile && !panelOpen && sortedCollections.length > 0 && (
+          <button onClick={() => setPanelOpen(true)}
+            className="fixed bottom-0 left-0 right-0 z-[1050] bg-gray-900/90 backdrop-blur border-t border-gray-800/50 px-3 py-2 flex items-center gap-3">
+            <div className="flex -space-x-2">
+              {sortedCollections.slice(0, 5).map(c => (
+                c.logo_url ? (
+                  <img key={c.id} src={c.logo_url} alt="" className="w-7 h-7 rounded-full border-2 border-gray-900 object-cover bg-gray-800" />
+                ) : (
+                  <div key={c.id} className="w-7 h-7 rounded-full border-2 border-gray-900 bg-gradient-to-br from-sky-900 to-blue-900 flex items-center justify-center">
+                    <span className="text-[8px] text-sky-400 font-bold">{c.name.charAt(0)}</span>
+                  </div>
+                )
+              ))}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-white text-[11px] font-medium">{sortedCollections.length} collections</div>
+              <div className="text-gray-500 text-[9px]">Tap to browse</div>
+            </div>
+            <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );
