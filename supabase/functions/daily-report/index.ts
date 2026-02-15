@@ -90,7 +90,8 @@ async function gatherReport(hours: number) {
     queueHealth,
     photoTotals,
     vehicleTotals,
-    errors,
+    portfolioStats,
+    dealJacketFindings,
   ] = await Promise.all([
     // Photos processed in time window
     supabase
@@ -189,8 +190,82 @@ async function gatherReport(hours: number) {
       .is("deleted_at", null)
       .then(({ count }) => ({ total: count || 0 })),
 
-    // Recent errors from edge function logs (if available)
-    Promise.resolve({ note: "Check Supabase dashboard for function errors" }),
+    // User's personal portfolio stats (via owned + image-linked vehicles)
+    (async () => {
+      const userId = "0b9f107a-d124-49de-9ded-94698f63c1c4";
+      // Get vehicles directly owned
+      const { data: owned } = await supabase
+        .from("vehicles")
+        .select("id, year, make, model, sale_price, vin, origin_metadata")
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .limit(200);
+      // Get vehicle IDs from user's images
+      const { data: imageLinks } = await supabase
+        .from("vehicle_images")
+        .select("vehicle_id")
+        .eq("user_id", userId)
+        .not("vehicle_id", "is", null)
+        .limit(500);
+      const imageVehicleIds = [...new Set((imageLinks || []).map(i => i.vehicle_id))];
+      const ownedIds = new Set((owned || []).map(v => v.id));
+      const extraIds = imageVehicleIds.filter(id => !ownedIds.has(id));
+      let extraVehicles: any[] = [];
+      if (extraIds.length > 0) {
+        const { data } = await supabase
+          .from("vehicles")
+          .select("id, year, make, model, sale_price, vin, origin_metadata")
+          .in("id", extraIds.slice(0, 100))
+          .is("deleted_at", null);
+        extraVehicles = data || [];
+      }
+      const allVehicles = [...(owned || []), ...extraVehicles];
+      const withPrice = allVehicles.filter(v => v.sale_price > 0);
+      const totalValue = withPrice.reduce((sum: number, v: any) => sum + (v.sale_price || 0), 0);
+      const withVin = allVehicles.filter(v => v.vin);
+      const withDealJacket = allVehicles.filter(v => v.origin_metadata?.deal_jacket_data);
+      return {
+        total_vehicles: allVehicles.length,
+        with_price: withPrice.length,
+        total_value: totalValue,
+        avg_value: withPrice.length > 0 ? Math.round(totalValue / withPrice.length) : 0,
+        with_vin: withVin.length,
+        with_deal_jacket: withDealJacket.length,
+        vehicles: allVehicles.slice(0, 20).map(v => ({
+          id: v.id,
+          name: [v.year, v.make, v.model].filter(Boolean).join(" "),
+          price: v.sale_price,
+          has_vin: !!v.vin,
+          has_deal_jacket: !!v.origin_metadata?.deal_jacket_data,
+        })),
+      };
+    })(),
+
+    // Deal jacket extraction details (what was found)
+    supabase
+      .from("vehicle_images")
+      .select("id, vehicle_id, ai_extractions, components")
+      .eq("category", "documentation")
+      .not("ai_extractions", "is", null)
+      .gte("updated_at", since)
+      .limit(50)
+      .then(({ data }) => {
+        const results = (data || []).map((d: any) => {
+          const forensic = (d.ai_extractions || []).find((e: any) => e.type === "forensic_deal_jacket");
+          if (!forensic?.result) return null;
+          const r = forensic.result;
+          return {
+            image_id: d.id,
+            vehicle_id: d.vehicle_id,
+            vehicle_desc: [r.vehicle?.year, r.vehicle?.make, r.vehicle?.model].filter(Boolean).join(" ") || "unknown",
+            sale_price: r.sale?.sale_price || 0,
+            profit: r.profit?.reported_profit || 0,
+            recon_total: r.reconditioning?.total || 0,
+            vin: r.vehicle?.vin || null,
+          };
+        }).filter(Boolean);
+        return { count: results.length, extractions: results };
+      }),
   ]);
 
   return {
@@ -199,6 +274,8 @@ async function gatherReport(hours: number) {
       processed_today: photosProcessed,
       totals: photoTotals,
     },
+    portfolio: portfolioStats,
+    deal_jacket_findings: dealJacketFindings,
     vehicles: {
       created_today: vehiclesCreated,
       enriched_today: vehiclesEnriched,
@@ -207,7 +284,6 @@ async function gatherReport(hours: number) {
     deal_jackets: dealJackets,
     engine_bay: engineBay,
     extraction_queue: queueHealth,
-    errors,
   };
 }
 
@@ -251,6 +327,48 @@ function formatTelegramMessage(report: any, hours: number): string {
   lines.push(
     `  Enriched: ${enriched.total}`,
     `  Total active: ${report.vehicles.total.total?.toLocaleString()}`,
+  );
+
+  // Portfolio section
+  const portfolio = report.portfolio;
+  if (portfolio) {
+    lines.push(
+      ``,
+      `*Your Portfolio*`,
+      `  Vehicles: ${portfolio.total_vehicles}`,
+      `  With price: ${portfolio.with_price}`,
+      `  Total value: $${(portfolio.total_value || 0).toLocaleString()}`,
+      `  Avg value: $${(portfolio.avg_value || 0).toLocaleString()}`,
+      `  With VIN: ${portfolio.with_vin}`,
+      `  With deal jacket: ${portfolio.with_deal_jacket}`,
+    );
+    if (portfolio.vehicles?.length > 0) {
+      lines.push(`  Inventory:`);
+      for (const v of portfolio.vehicles.slice(0, 10)) {
+        const price = v.price ? `$${v.price.toLocaleString()}` : "no price";
+        const badges = [v.has_vin ? "VIN" : "", v.has_deal_jacket ? "DJ" : ""].filter(Boolean).join(",");
+        lines.push(`    ${v.name || "Unknown"} — ${price}${badges ? ` [${badges}]` : ""}`);
+      }
+    }
+  }
+
+  // Deal jacket findings
+  const djf = report.deal_jacket_findings;
+  if (djf?.count > 0) {
+    lines.push(
+      ``,
+      `*Deal Jacket Extractions (${djf.count} today)*`,
+    );
+    for (const ext of (djf.extractions || []).slice(0, 5)) {
+      const parts = [`  ${ext.vehicle_desc}`];
+      if (ext.sale_price) parts.push(`sale: $${ext.sale_price.toLocaleString()}`);
+      if (ext.profit) parts.push(`profit: $${ext.profit.toLocaleString()}`);
+      if (ext.vin) parts.push(`VIN: ${ext.vin.substring(0, 11)}...`);
+      lines.push(parts.join(" | "));
+    }
+  }
+
+  lines.push(
     ``,
     `*Deal Jackets*`,
     `  Updated: ${dj.updated}`,
