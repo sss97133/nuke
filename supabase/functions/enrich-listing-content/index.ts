@@ -385,29 +385,32 @@ serve(async (req) => {
     vehicleIds = [...new Set(vehicleIds)];
     console.log(`[enrich-listing-content] Processing ${vehicleIds.length} vehicles (dry_run=${dryRun}, force=${force})`);
 
-    const results = [];
+    // Process vehicles concurrently (up to 10 at a time)
+    const CONCURRENCY = 10;
+    const results: any[] = [];
     let enriched = 0;
     let skipped = 0;
     let errors = 0;
 
-    for (const vid of vehicleIds) {
-      try {
-        const result = await enrichVehicle(supabase, vid, dryRun, force);
+    for (let i = 0; i < vehicleIds.length; i += CONCURRENCY) {
+      const chunk = vehicleIds.slice(i, i + CONCURRENCY);
+      const chunkResults = await Promise.all(
+        chunk.map(async (vid) => {
+          try {
+            const result = await enrichVehicle(supabase, vid, dryRun, force);
+            console.log(`[listing-content] ${vid.slice(0, 8)}: ${result.status} (${result.fields_updated.length} fields)`);
+            return result;
+          } catch (e: any) {
+            console.error(`[listing-content] ${vid.slice(0, 8)}: error: ${e?.message || e}`);
+            return { vehicle_id: vid, status: `error: ${e?.message || e}`, fields_updated: [], before: null, after: null };
+          }
+        })
+      );
+      for (const result of chunkResults) {
         results.push(result);
-
         if (result.status === "enriched" || result.status === "dry_run") enriched++;
         else if (result.status === "already_enriched" || result.status === "all_columns_filled" || result.status === "no_snapshot" || result.status === "no_valid_content") skipped++;
         else errors++;
-
-        console.log(`[listing-content] ${vid.slice(0, 8)}: ${result.status} (${result.fields_updated.length} fields)`);
-      } catch (e: any) {
-        console.error(`[listing-content] ${vid.slice(0, 8)}: error: ${e?.message || e}`);
-        results.push({ vehicle_id: vid, status: `error: ${e?.message || e}`, fields_updated: [], before: null, after: null });
-        errors++;
-      }
-
-      if (vehicleIds.length > 1) {
-        await new Promise(r => setTimeout(r, 500));
       }
     }
 
