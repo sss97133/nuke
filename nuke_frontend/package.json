@@ -36,6 +36,7 @@
     "@stripe/react-stripe-js": "^5.4.1",
     "@stripe/stripe-js": "^8.5.3",
     "@supabase/supabase-js": "^2.75.0",
+    "@tanstack/react-query": "^5.90.21",
     "@turf/boolean-point-in-polygon": "^7.3.4",
     "@turf/helpers": "^7.3.4",
     "@types/leaflet": "^1.9.21",
