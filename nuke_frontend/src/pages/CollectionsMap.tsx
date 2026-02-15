@@ -842,6 +842,27 @@ export default function CollectionsMap() {
     else mapContainerRef.current?.requestFullscreen();
   };
 
+  // Random collection discovery
+  const discoverRandom = useCallback(() => {
+    if (!collections.length) return;
+    const c = collections[Math.floor(Math.random() * collections.length)];
+    setHighlightedId(c.id);
+    setExpandedId(c.id);
+    mapRef.current?.flyTo([c.lat, c.lng], 12, { duration: 1.2 });
+    // Set drill to appropriate level
+    if (c.country === 'USA') {
+      const sid = stateAssign.get(c.id);
+      const cid = countyAssign.get(c.id);
+      if (cid) {
+        setDrill({ level: 'markers', country: 'USA', stateId: sid, stateName: stateNames.get(sid || '') || sid, countyId: cid, countyName: countyNames.get(cid) || cid });
+      } else if (sid) {
+        setDrill({ level: 'state', country: 'USA', stateId: sid, stateName: stateNames.get(sid) || sid });
+      }
+    } else {
+      setDrill({ level: 'markers', country: c.country, city: c.city });
+    }
+  }, [collections, stateAssign, countyAssign, stateNames, countyNames, setDrill]);
+
   const shareUrl = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -980,7 +1001,12 @@ export default function CollectionsMap() {
     <div className="flex flex-col h-full min-h-0">
       <div className="px-3 pt-3 pb-2 border-b border-gray-800/50">
         <div className="flex items-center justify-between">
-          <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Collections ({sortedCollections.length})</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Collections ({sortedCollections.length})</h2>
+            {drill.level !== 'world' && collections.length > 0 && (
+              <span className="text-[9px] text-gray-600 tabular-nums">{Math.round((scopedCollections.length / collections.length) * 100)}%</span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {/* View mode toggle */}
             <div className="flex rounded overflow-hidden border border-gray-700/50">
@@ -1228,6 +1254,11 @@ export default function CollectionsMap() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </button>
             )}
+            {/* Discover random collection */}
+            <button onClick={discoverRandom} title="Discover a random collection"
+              className="w-8 h-8 rounded-lg bg-gray-800/60 border border-gray-700/50 flex items-center justify-center text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+            </button>
             {/* Metric toggle */}
             <div className="flex rounded-md overflow-hidden border border-gray-700">
               {(['count', 'inventory'] as const).map(m => (
