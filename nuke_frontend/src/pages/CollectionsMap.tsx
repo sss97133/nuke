@@ -733,6 +733,7 @@ export default function CollectionsMap() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [locating, setLocating] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(2);
+  const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const handleMap = useCallback((map: L.Map) => { mapRef.current = map; }, []);
@@ -1228,8 +1229,10 @@ export default function CollectionsMap() {
           const pct = (item[metric === 'count' ? 'count' : 'inventory'] / sidebarMaxMetric) * 100;
           return (
             <button key={item.key} onClick={item.onClick}
+              onMouseEnter={() => setHoveredRegion(item.key)}
+              onMouseLeave={() => setHoveredRegion(null)}
               title={`${item.label}: ${item.count} collections, ${item.inventory.toLocaleString()} vehicles`}
-              className="w-full relative overflow-hidden rounded-md text-xs text-gray-300 hover:text-white transition-all group sidebar-item-enter">
+              className={`w-full relative overflow-hidden rounded-md text-xs transition-all group sidebar-item-enter ${hoveredRegion === item.key ? 'text-white bg-sky-500/10 ring-1 ring-sky-500/20' : 'text-gray-300 hover:text-white'}`}>
               {/* Background percentage bar */}
               <div className="absolute inset-y-0 left-0 bg-sky-500/8 rounded-md transition-all duration-300 group-hover:bg-sky-500/15"
                 style={{ width: `${pct}%` }} />
@@ -1565,7 +1568,13 @@ export default function CollectionsMap() {
       <style>{MAP_STYLES}</style>
 
       {/* ── Header ── */}
-      <div className="bg-gray-900/80 backdrop-blur border-b border-gray-800 px-3 sm:px-4 py-2.5">
+      <div className="bg-gray-900/80 backdrop-blur border-b border-gray-800 px-3 sm:px-4 py-2.5 relative">
+        {/* Drill depth gradient bar */}
+        {drill.level !== 'world' && (
+          <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{
+            background: `linear-gradient(90deg, #1e40af 0%, #38bdf8 ${DRILL_ORDER.indexOf(drill.level) * 25}%, transparent ${DRILL_ORDER.indexOf(drill.level) * 25 + 10}%)`
+          }} />
+        )}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             {/* Mobile hamburger */}
