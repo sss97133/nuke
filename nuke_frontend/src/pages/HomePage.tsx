@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const CursorHomepage = lazy(() => import('./CursorHomepage'));
@@ -87,7 +87,30 @@ export default function HomePage() {
             </button>
           );
         })}
-        {/* Right-fill so bar extends full width — already handled by background */}
+        {/* Right-aligned external links */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', paddingRight: '8px' }}>
+          <Link to="/api" style={{
+            padding: '0 12px', fontSize: '10px', fontFamily: 'Arial, sans-serif', fontWeight: 600,
+            letterSpacing: '0.5px', textTransform: 'uppercase', textDecoration: 'none',
+            color: '#7eb8da', cursor: 'pointer', display: 'flex', alignItems: 'center', height: '100%',
+          }}>API</Link>
+          <Link to="/developers" style={{
+            padding: '0 12px', fontSize: '10px', fontFamily: 'Arial, sans-serif', fontWeight: 600,
+            letterSpacing: '0.5px', textTransform: 'uppercase', textDecoration: 'none',
+            color: '#7eb8da', cursor: 'pointer', display: 'flex', alignItems: 'center', height: '100%',
+          }}>SDK</Link>
+          <a href="https://www.npmjs.com/package/@nuke1/sdk" target="_blank" rel="noopener noreferrer" style={{
+            padding: '0 12px', fontSize: '10px', fontFamily: 'Arial, sans-serif', fontWeight: 600,
+            letterSpacing: '0.5px', textTransform: 'uppercase', textDecoration: 'none',
+            color: '#7eb8da', cursor: 'pointer', display: 'flex', alignItems: 'center', height: '100%',
+          }}>NPM</a>
+          <span style={{ width: '1px', height: '14px', background: '#444', margin: '0 4px' }} />
+          <Link to="/offering" style={{
+            padding: '0 12px', fontSize: '10px', fontFamily: 'Arial, sans-serif', fontWeight: 600,
+            letterSpacing: '0.5px', textTransform: 'uppercase', textDecoration: 'none',
+            color: '#e8c547', cursor: 'pointer', display: 'flex', alignItems: 'center', height: '100%',
+          }}>Deck</Link>
+        </div>
       </div>
 
       {/* Tab content */}
