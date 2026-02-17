@@ -21,9 +21,13 @@ const fmtMoney = (n: number) => {
   return '$' + Math.round(n);
 };
 const fmtNum = (n: number) => n.toLocaleString();
+const fmtMiles = (n: number) => {
+  if (n >= 1000) return fmtNum(n) + ' mi';
+  return n + ' mi';
+};
 
 type ViewMode = 'segment' | 'source' | 'brand';
-type Metric = 'value' | 'count' | 'avg';
+type Metric = 'value' | 'count';
 
 interface TreeNode {
   name: string;
@@ -33,8 +37,22 @@ interface TreeNode {
   isVehicle?: boolean;
   id?: string;
   fullName?: string;
-  _isOthers?: boolean;
   _parentName?: string;
+  // Rich metrics
+  medianPrice?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  soldCount?: number;
+  auctionCount?: number;
+  avgBids?: number;
+  avgWatchers?: number;
+  // Vehicle-level
+  bids?: number;
+  comments?: number;
+  watchers?: number;
+  mileage?: number;
+  reserveStatus?: string;
+  auctionOutcome?: string;
 }
 
 interface Filters {
@@ -51,6 +69,11 @@ interface Stats {
   totalCount: number;
   level: string;
   nested?: boolean;
+}
+
+function sellThrough(d: TreeNode): string | null {
+  if (!d.auctionCount || d.auctionCount === 0) return null;
+  return Math.round(((d.soldCount || 0) / d.auctionCount) * 100) + '%';
 }
 
 export default function MarketMap() {
@@ -144,15 +167,53 @@ export default function MarketMap() {
   // Get metric value
   const metricVal = useCallback((d: TreeNode) => {
     if (metric === 'count') return d.count || 0;
-    if (metric === 'avg') return (d.count || 0) > 0 ? (d.value || 0) / (d.count || 1) : 0;
     return d.value || 0;
   }, [metric]);
 
   const displayVal = useCallback((d: TreeNode) => {
     if (metric === 'count') return fmtNum(d.count || 0);
-    if (metric === 'avg') return fmtMoney((d.count || 0) > 0 ? (d.value || 0) / (d.count || 1) : 0);
     return fmtMoney(d.value || 0);
   }, [metric]);
+
+  // Build tooltip rows for aggregate nodes (non-vehicle)
+  function buildTooltipRows(leafData: TreeNode, pctTotal: string, pctParent?: string, parentName?: string): { pct: string; label: string }[] {
+    const rows: { pct: string; label: string }[] = [];
+    rows.push({ pct: pctTotal + '%', label: 'of total' });
+    if (pctParent && parentName) {
+      rows.push({ pct: pctParent + '%', label: 'of ' + parentName });
+    }
+    rows.push({ pct: fmtNum(leafData.count || 0), label: 'vehicles' });
+    if (leafData.medianPrice) {
+      rows.push({ pct: fmtMoney(leafData.medianPrice), label: 'median price' });
+    }
+    const st = sellThrough(leafData);
+    if (st) {
+      rows.push({ pct: st, label: 'sell-through' });
+    }
+    if (leafData.avgBids && leafData.avgBids > 0) {
+      rows.push({ pct: String(leafData.avgBids), label: 'avg bids' });
+    }
+    return rows;
+  }
+
+  // Build tooltip rows for individual vehicles
+  function buildVehicleTooltipRows(d: TreeNode): { pct: string; label: string }[] {
+    const rows: { pct: string; label: string }[] = [];
+    rows.push({ pct: fmtMoney(d.value || 0), label: 'sale price' });
+    if (d.mileage) {
+      rows.push({ pct: fmtMiles(d.mileage), label: 'mileage' });
+    }
+    if (d.bids && d.bids > 0) {
+      rows.push({ pct: String(d.bids), label: 'bids' });
+    }
+    if (d.reserveStatus) {
+      rows.push({ pct: d.reserveStatus.replace(/_/g, ' '), label: 'reserve' });
+    }
+    if (d.auctionOutcome) {
+      rows.push({ pct: d.auctionOutcome, label: 'outcome' });
+    }
+    return rows;
+  }
 
   // Render treemap
   useEffect(() => {
@@ -245,10 +306,8 @@ export default function MarketMap() {
             lDiv.style.filter = 'brightness(0.92)';
             const pctTotal = grandTotal > 0 ? ((metricVal(leafData) / grandTotal) * 100).toFixed(1) : '0.0';
             const pctParent = parentVal > 0 ? ((metricVal(leafData) / parentVal) * 100).toFixed(1) : '0.0';
-            const avg = (leafData.count || 0) > 0 ? (leafData.value || 0) / (leafData.count || 1) : 0;
             let val: string;
             if (metric === 'count') val = fmtNum(leafData.count || 0) + ' vehicles';
-            else if (metric === 'avg') val = fmtMoney(avg);
             else val = fmtMoney(leafData.value || 0);
 
             setTooltip({
@@ -257,12 +316,7 @@ export default function MarketMap() {
               y: e.clientY + 12,
               name: leafData.name,
               value: val,
-              rows: [
-                { pct: pctTotal + '%', label: 'of Total' },
-                { pct: pctParent + '%', label: 'of ' + groupDataName },
-                { pct: fmtNum(leafData.count || 0), label: 'vehicles' },
-                { pct: fmtMoney(avg), label: 'avg price' },
-              ],
+              rows: buildTooltipRows(leafData, pctTotal, pctParent, groupDataName),
             });
           };
           lDiv.onmousemove = (e: MouseEvent) => {
@@ -332,20 +386,18 @@ export default function MarketMap() {
         div.onmouseover = (e: MouseEvent) => {
           div.style.filter = 'brightness(0.92)';
           const pct = totalVal > 0 ? ((metricVal(ld) / totalVal) * 100).toFixed(1) : '0.0';
-          const avg = (ld.count || 0) > 0 ? (ld.value || 0) / (ld.count || 1) : 0;
           let val: string;
           if (metric === 'count') val = fmtNum(ld.count || 0) + ' vehicles';
-          else if (metric === 'avg') val = fmtMoney(avg);
           else val = fmtMoney(ld.value || 0);
+
+          const rows = ld.isVehicle
+            ? buildVehicleTooltipRows(ld)
+            : buildTooltipRows(ld, pct);
+
           setTooltip({
             visible: true, x: e.clientX + 12, y: e.clientY + 12,
             name: ld.fullName || ld.name, value: val,
-            rows: [
-              { pct: pct + '%', label: 'of total' },
-              { pct: fmtNum(ld.count || 0), label: 'vehicles' },
-              { pct: fmtMoney(ld.value || 0), label: 'value' },
-              { pct: fmtMoney(avg), label: 'avg price' },
-            ],
+            rows,
           });
         };
         div.onmousemove = (e: MouseEvent) => setTooltip(t => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
@@ -420,7 +472,6 @@ export default function MarketMap() {
             <div style={{ display: 'flex', gap: '20px', fontSize: '10px', color: '#858585' }}>
               <span><b style={{ color: '#ccc', fontFamily: 'monospace' }}>{fmtMoney(stats.totalValue)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Total</small></span>
               <span><b style={{ color: '#ccc', fontFamily: 'monospace' }}>{fmtNum(stats.totalCount)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Vehicles</small></span>
-              <span><b style={{ color: '#ccc', fontFamily: 'monospace' }}>{fmtMoney(stats.totalCount > 0 ? stats.totalValue / stats.totalCount : 0)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Avg</small></span>
             </div>
           )}
         </div>
@@ -437,13 +488,13 @@ export default function MarketMap() {
             ))}
           </div>
           <div style={{ display: 'flex', gap: '3px', marginLeft: '12px' }}>
-            {(['value', 'count', 'avg'] as Metric[]).map(m => (
+            {(['value', 'count'] as Metric[]).map(m => (
               <button key={m} onClick={() => setMetric(m)} style={{
                 border: `1px solid ${metric === m ? '#ccc' : '#3e3e42'}`, background: metric === m ? '#ccc' : 'transparent',
                 color: metric === m ? '#1e1e1e' : '#858585', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
                 cursor: 'pointer', borderRadius: '3px', fontFamily: 'inherit',
               }}>
-                {m === 'avg' ? 'Avg Price' : m === 'count' ? 'Volume' : 'Value'}
+                {m === 'count' ? 'Volume' : 'Value'}
               </button>
             ))}
           </div>

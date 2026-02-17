@@ -21,6 +21,50 @@ function normalizeSource(raw: string | null): string {
   return map[lower] || (raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, ' '));
 }
 
+// Map RPC row to child object with rich metrics
+function mapChild(r: any) {
+  return {
+    name: r.name,
+    value: Number(r.value || 0),
+    count: Number(r.count || 0),
+    medianPrice: Number(r.median_price || 0),
+    minPrice: Number(r.min_price || 0),
+    maxPrice: Number(r.max_price || 0),
+    soldCount: Number(r.sold_count || 0),
+    auctionCount: Number(r.auction_count || 0),
+    avgBids: Number(r.avg_bids || 0),
+    avgWatchers: Number(r.avg_watchers || 0),
+  };
+}
+
+// Map vehicle row to child object
+function mapVehicle(v: any) {
+  const price = v.sale_price || v.sold_price || 0;
+  const title = v.listing_title || v.bat_listing_title || `${v.year} ${v.make} ${v.model}`;
+  return {
+    id: v.id,
+    name: title.length > 40 ? title.slice(0, 40) + '...' : title,
+    fullName: title,
+    value: price,
+    count: 1,
+    isVehicle: true,
+    bids: v.bat_bids || 0,
+    comments: v.bat_comments || 0,
+    watchers: v.bat_watchers || 0,
+    mileage: v.mileage || null,
+    reserveStatus: v.reserve_status || null,
+    auctionOutcome: v.auction_outcome || null,
+  };
+}
+
+function sumChildren(children: any[]) {
+  const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
+  const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
+  return { totalValue, totalCount };
+}
+
+const VEHICLE_SELECT = "id, listing_title, bat_listing_title, year, make, model, sale_price, sold_price, bat_bids, bat_comments, bat_watchers, mileage, reserve_status, auction_outcome";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -50,7 +94,6 @@ Deno.serve(async (req) => {
       if (error) throw error;
 
       hierarchy = data;
-      // Compute stats from nested data
       const children = hierarchy?.children || [];
       const totalValue = children.reduce((s: number, c: any) => s + (c.value || 0), 0);
       const totalCount = children.reduce((s: number, c: any) => s + (c.count || 0), 0);
@@ -65,83 +108,42 @@ Deno.serve(async (req) => {
     // SEGMENT VIEW: Segment → Make → Model → Year
     if (viewMode === "segment") {
       if (!segment) {
-        // Top level: all segments
         const { data, error } = await supabase.rpc("treemap_by_segment");
         if (error) throw error;
-
-        const children = (data || []).map((r: any) => ({
-          name: r.name,
-          value: Number(r.value),
-          count: Number(r.count)
-        }));
-
-        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+        const children = (data || []).map(mapChild);
+        const { totalValue, totalCount } = sumChildren(children);
         hierarchy = { name: "All Segments", value: totalValue, count: totalCount, children };
         stats = { totalValue, totalCount, level: "segments" };
 
       } else if (!make) {
-        // Makes within a segment
         const { data, error } = await supabase.rpc("treemap_makes_by_segment", { p_segment: segment });
         if (error) throw error;
-
-        const children = (data || []).map((r: any) => ({
-          name: r.name,
-          value: Number(r.value),
-          count: Number(r.count)
-        }));
-
-        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+        const children = (data || []).map(mapChild);
+        const { totalValue, totalCount } = sumChildren(children);
         hierarchy = { name: segment, value: totalValue, count: totalCount, children };
         stats = { totalValue, totalCount, level: "makes", segment };
 
       } else if (!model) {
-        // Models for segment + make (reuse brand model function)
         const { data, error } = await supabase.rpc("treemap_models_by_brand", { p_make: make });
         if (error) throw error;
-
-        const children = (data || []).map((r: any) => ({
-          name: r.name,
-          value: Number(r.value),
-          count: Number(r.count)
-        }));
-
-        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+        const children = (data || []).map(mapChild);
+        const { totalValue, totalCount } = sumChildren(children);
         hierarchy = { name: `${segment} › ${make}`, value: totalValue, count: totalCount, children };
         stats = { totalValue, totalCount, level: "models", segment, make };
 
       } else if (!year) {
-        // Years for segment + make + model
-        const { data, error } = await supabase.rpc("treemap_years", {
-          p_source: null,
-          p_make: make,
-          p_model: model
-        });
+        const { data, error } = await supabase.rpc("treemap_years", { p_source: null, p_make: make, p_model: model });
         if (error) throw error;
-
-        const children = (data || []).map((r: any) => ({
-          name: r.name,
-          value: Number(r.value),
-          count: Number(r.count)
-        }));
-
-        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+        const children = (data || []).map(mapChild);
+        const { totalValue, totalCount } = sumChildren(children);
         hierarchy = { name: `${segment} › ${make} › ${model}`, value: totalValue, count: totalCount, children };
         stats = { totalValue, totalCount, level: "years", segment, make, model };
 
       } else {
-        // Individual vehicles
         const yearNum = parseInt(year, 10);
         const { data: vehicles, error } = await supabase
           .from("vehicles")
-          .select("id, listing_title, bat_listing_title, year, make, model, sale_price, sold_price")
+          .select(VEHICLE_SELECT)
           .or("sale_price.gt.0,sold_price.gt.0")
           .is("deleted_at", null)
           .eq("year", yearNum)
@@ -149,24 +151,9 @@ Deno.serve(async (req) => {
           .ilike("model", model)
           .order("sale_price", { ascending: false })
           .limit(200);
-
         if (error) throw error;
-
-        let totalValue = 0;
-        const children = (vehicles || []).map((v: any) => {
-          const price = v.sale_price || v.sold_price || 0;
-          totalValue += price;
-          const title = v.listing_title || v.bat_listing_title || `${v.year} ${v.make} ${v.model}`;
-          return {
-            id: v.id,
-            name: title.length > 40 ? title.slice(0, 40) + '...' : title,
-            fullName: title,
-            value: price,
-            count: 1,
-            isVehicle: true
-          };
-        });
-
+        const children = (vehicles || []).map(mapVehicle);
+        const totalValue = children.reduce((s, c) => s + c.value, 0);
         hierarchy = { name: `${segment} › ${make} › ${model} › ${year}`, value: totalValue, count: children.length, children };
         stats = { totalValue, totalCount: children.length, level: "vehicles", segment, make, model, year };
       }
@@ -174,66 +161,34 @@ Deno.serve(async (req) => {
     // BRAND VIEW: Brand → Model → Year
     } else if (viewMode === "brand") {
       if (!make) {
-        // Top level: all brands
         const { data, error } = await supabase.rpc("treemap_by_brand");
         if (error) throw error;
-
-        const children = (data || []).map((r: any) => ({
-          name: r.name,
-          value: Number(r.value),
-          count: Number(r.count)
-        }));
-
-        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+        const children = (data || []).map(mapChild);
+        const { totalValue, totalCount } = sumChildren(children);
         hierarchy = { name: "All Brands", value: totalValue, count: totalCount, children };
         stats = { totalValue, totalCount, level: "brands" };
 
       } else if (!model) {
-        // Models for a brand
         const { data, error } = await supabase.rpc("treemap_models_by_brand", { p_make: make });
         if (error) throw error;
-
-        const children = (data || []).map((r: any) => ({
-          name: r.name,
-          value: Number(r.value),
-          count: Number(r.count)
-        }));
-
-        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+        const children = (data || []).map(mapChild);
+        const { totalValue, totalCount } = sumChildren(children);
         hierarchy = { name: make, value: totalValue, count: totalCount, children };
         stats = { totalValue, totalCount, level: "models", make };
 
       } else if (!year) {
-        // Years for a brand + model
-        const { data, error } = await supabase.rpc("treemap_years", {
-          p_source: null,
-          p_make: make,
-          p_model: model
-        });
+        const { data, error } = await supabase.rpc("treemap_years", { p_source: null, p_make: make, p_model: model });
         if (error) throw error;
-
-        const children = (data || []).map((r: any) => ({
-          name: r.name,
-          value: Number(r.value),
-          count: Number(r.count)
-        }));
-
-        const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-        const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+        const children = (data || []).map(mapChild);
+        const { totalValue, totalCount } = sumChildren(children);
         hierarchy = { name: `${make} › ${model}`, value: totalValue, count: totalCount, children };
         stats = { totalValue, totalCount, level: "years", make, model };
 
       } else {
-        // Individual vehicles
         const yearNum = parseInt(year, 10);
         const { data: vehicles, error } = await supabase
           .from("vehicles")
-          .select("id, listing_title, bat_listing_title, year, make, model, sale_price, sold_price")
+          .select(VEHICLE_SELECT)
           .or("sale_price.gt.0,sold_price.gt.0")
           .is("deleted_at", null)
           .eq("year", yearNum)
@@ -241,146 +196,73 @@ Deno.serve(async (req) => {
           .ilike("model", model)
           .order("sale_price", { ascending: false })
           .limit(200);
-
         if (error) throw error;
-
-        let totalValue = 0;
-        const children = (vehicles || []).map((v: any) => {
-          const price = v.sale_price || v.sold_price || 0;
-          totalValue += price;
-          const title = v.listing_title || v.bat_listing_title || `${v.year} ${v.make} ${v.model}`;
-          return {
-            id: v.id,
-            name: title.length > 40 ? title.slice(0, 40) + '...' : title,
-            fullName: title,
-            value: price,
-            count: 1,
-            isVehicle: true
-          };
-        });
-
+        const children = (vehicles || []).map(mapVehicle);
+        const totalValue = children.reduce((s, c) => s + c.value, 0);
         hierarchy = { name: `${make} › ${model} › ${year}`, value: totalValue, count: children.length, children };
         stats = { totalValue, totalCount: children.length, level: "vehicles", make, model, year };
       }
 
     // SOURCE VIEW (default): Source → Make → Model → Year
     } else if (!source) {
-      // Top level: all sources
       const { data, error } = await supabase.rpc("treemap_by_source");
       if (error) throw error;
-
-      const children = (data || []).map((r: any) => ({
-        name: r.name,
-        value: Number(r.value),
-        count: Number(r.count)
-      }));
-
-      const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-      const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+      const children = (data || []).map(mapChild);
+      const { totalValue, totalCount } = sumChildren(children);
       hierarchy = { name: "All Vehicles", value: totalValue, count: totalCount, children };
       stats = { totalValue, totalCount, level: "sources" };
 
     } else if (!make) {
-      // Makes for a source
       const { data, error } = await supabase.rpc("treemap_makes_by_source", { p_source: source });
       if (error) throw error;
-
-      const children = (data || []).map((r: any) => ({
-        name: r.name,
-        value: Number(r.value),
-        count: Number(r.count)
-      }));
-
-      const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-      const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+      const children = (data || []).map(mapChild);
+      const { totalValue, totalCount } = sumChildren(children);
       hierarchy = { name: normalizeSource(source), value: totalValue, count: totalCount, children };
       stats = { totalValue, totalCount, level: "makes", source: normalizeSource(source) };
 
     } else if (!model) {
-      // Models for a source + make
       const { data, error } = await supabase.rpc("treemap_models", { p_source: source, p_make: make });
       if (error) throw error;
-
-      const children = (data || []).map((r: any) => ({
-        name: r.name,
-        value: Number(r.value),
-        count: Number(r.count)
-      }));
-
-      const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-      const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+      const children = (data || []).map(mapChild);
+      const { totalValue, totalCount } = sumChildren(children);
       hierarchy = { name: `${normalizeSource(source)} › ${make}`, value: totalValue, count: totalCount, children };
       stats = { totalValue, totalCount, level: "models", source: normalizeSource(source), make };
 
     } else if (!year) {
-      // Years for source + make + model
-      const { data, error } = await supabase.rpc("treemap_years", {
-        p_source: source,
-        p_make: make,
-        p_model: model
-      });
+      const { data, error } = await supabase.rpc("treemap_years", { p_source: source, p_make: make, p_model: model });
       if (error) throw error;
-
-      const children = (data || []).map((r: any) => ({
-        name: r.name,
-        value: Number(r.value),
-        count: Number(r.count)
-      }));
-
-      const totalValue = children.reduce((s: number, c: any) => s + c.value, 0);
-      const totalCount = children.reduce((s: number, c: any) => s + c.count, 0);
-
+      const children = (data || []).map(mapChild);
+      const { totalValue, totalCount } = sumChildren(children);
       hierarchy = { name: `${normalizeSource(source)} › ${make} › ${model}`, value: totalValue, count: totalCount, children };
       stats = { totalValue, totalCount, level: "years", source: normalizeSource(source), make, model };
 
     } else {
-      // Individual vehicles
       const yearNum = parseInt(year, 10);
       const sourceVariations = getSourceVariations(source);
-
       const { data: vehicles, error } = await supabase
         .from("vehicles")
-        .select("id, listing_title, bat_listing_title, year, make, model, sale_price, sold_price, auction_source")
+        .select(VEHICLE_SELECT + ", auction_source")
         .or("sale_price.gt.0,sold_price.gt.0")
         .is("deleted_at", null)
         .eq("year", yearNum)
         .ilike("make", make)
         .ilike("model", model)
+        .in("auction_source", sourceVariations)
         .order("sale_price", { ascending: false })
-        .limit(500);
-
+        .limit(200);
       if (error) throw error;
-
-      const filtered = (vehicles || []).filter((v: any) => {
-        const vSrc = (v.auction_source || "").toLowerCase();
-        return sourceVariations.includes(vSrc);
-      });
-
-      let totalValue = 0;
-      const children = filtered.slice(0, 200).map((v: any) => {
-        const price = v.sale_price || v.sold_price || 0;
-        totalValue += price;
-        const title = v.listing_title || v.bat_listing_title || `${v.year} ${v.make} ${v.model}`;
-        return {
-          id: v.id,
-          name: title.length > 40 ? title.slice(0, 40) + '...' : title,
-          fullName: title,
-          value: price,
-          count: 1,
-          isVehicle: true
-        };
-      });
-
+      const children = (vehicles || []).map(mapVehicle);
+      const totalValue = children.reduce((s, c) => s + c.value, 0);
       hierarchy = { name: `${normalizeSource(source)} › ${make} › ${model} › ${year}`, value: totalValue, count: children.length, children };
       stats = { totalValue, totalCount: children.length, level: "vehicles", source: normalizeSource(source), make, model, year };
     }
 
+    const isTopLevel = !source && !segment && !make && !model && !year;
+    const cacheMaxAge = isTopLevel ? 300 : 60;
+
     return new Response(
       JSON.stringify({ hierarchy, stats, filters: { source, segment, make, model, year }, generated_at: new Date().toISOString() }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": `public, max-age=${cacheMaxAge}, s-maxage=${cacheMaxAge}` } }
     );
   } catch (error) {
     console.error("Error:", error);
