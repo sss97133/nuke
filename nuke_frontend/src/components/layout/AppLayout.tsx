@@ -468,6 +468,11 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                     {session && (
                     <Link to="/market/contracts" className={`nav-link ${isActivePage('/market/contracts') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Contract Station</Link>
                     )}
+                    <div style={{ borderTop: '2px solid var(--border)', marginTop: '2px' }} />
+                    <Link to="/api" className={`nav-link ${isActivePage('/api') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>API</Link>
+                    <Link to="/developers" className={`nav-link ${isActivePage('/developers') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>SDK Docs</Link>
+                    <a href="https://www.npmjs.com/package/@nuke1/sdk" target="_blank" rel="noopener noreferrer" className="nav-link" style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>NPM Package</a>
+                    <Link to="/offering" className={`nav-link ${isActivePage('/offering') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', color: '#e8c547' }} onClick={() => setNZeroMenuOpen(false)}>Deck</Link>
                   </div>
 
                   {/* Vehicles panel - pops out to the RIGHT */}
