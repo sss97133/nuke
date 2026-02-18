@@ -14,6 +14,8 @@ import FeedTableView from '../components/feed/FeedTableView';
 import ScrollToTopButton from '../components/feed/ScrollToTopButton';
 import FeedFilterPanel from '../components/feed/FeedFilterPanel';
 import { filterAndSortVehicles } from '../lib/feedFilterSort';
+import { computeVehicleStats, EMPTY_STATS } from '../lib/feedStatsCalculator';
+import { isPoorQualityImage, dedupeVehicles, getDedupeKey } from '../lib/feedDataProcessing';
 import type { HypeVehicle, TimePeriod, SalesTimePeriod, ViewMode, SortBy, SortDirection, FilterState } from '../types/feedTypes';
 import { SALES_PERIODS } from '../types/feedTypes';
 import { resolveVehicleImageUrl, getOriginImages, cleanDisplayMake, cleanDisplayModel } from '../lib/feedImageUtils';
@@ -1089,24 +1091,7 @@ const CursorHomepage: React.FC = () => {
   }, [filters, debouncedSearchText]);
 
   // State for filtered stats from database
-  const [filteredStatsFromDb, setFilteredStatsFromDb] = useState({
-    totalVehicles: 0,
-    totalValue: 0,
-    salesVolume: 0,
-    salesCountToday: 0,
-    forSaleCount: 0,
-    activeAuctions: 0,
-    totalBids: 0,
-    avgValue: 0,
-    vehiclesAddedToday: 0,
-    valueMarkTotal: 0,
-    valueAskTotal: 0,
-    valueRealizedTotal: 0,
-    valueCostTotal: 0,
-    valueImportedToday: 0,
-    valueImported24h: 0,
-    valueImported7d: 0,
-  });
+  const [filteredStatsFromDb, setFilteredStatsFromDb] = useState(EMPTY_STATS);
   const [filteredStatsLoading, setFilteredStatsLoading] = useState(false);
 
   // Load filtered stats directly from database when filters are active
@@ -1293,126 +1278,8 @@ const CursorHomepage: React.FC = () => {
       }
 
       // Calculate stats from filtered vehicles
-      let totalValue = 0;
-      let vehiclesWithValue = 0;
-      let forSaleCount = 0;
-      let activeAuctions = 0;
-      let totalBids = 0;
-      let salesCountToday = 0;
-      let valueMarkTotal = 0;
-      let valueAskTotal = 0;
-      let valueRealizedTotal = 0;
-      let valueCostTotal = 0;
-      let valueImportedToday = 0;
-      let valueImported24h = 0;
-      let valueImported7d = 0;
-
-      const nowMs = Date.now();
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 1);
-      const startMs = start.getTime();
-      const endMs = end.getTime();
-      const todayISO = start.toISOString().split('T')[0];
-      const last24hMs = nowMs - 24 * 60 * 60 * 1000;
-      const last7dMs = nowMs - 7 * 24 * 60 * 60 * 1000;
-
-      filtered.forEach((v: any) => {
-        // Count for sale: is_for_sale=true OR (asking_price > 0 AND not sold)
-        const hasAskingPrice = Number(v.asking_price || 0) > 0;
-        const isSold = v.sale_status === 'sold' || v.auction_outcome === 'sold';
-        if (v.is_for_sale === true || (hasAskingPrice && !isSold)) {
-          forSaleCount++;
-        }
-
-        // Count active auctions: sale_status='auction_live' (currently live auctions)
-        if (v.sale_status === 'auction_live') {
-          activeAuctions++;
-        }
-
-        // Sum total bids
-        if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
-          totalBids += Number(v.bid_count);
-        }
-
-        const currentValue = Number(v.current_value || 0) || 0;
-        if (Number.isFinite(currentValue) && currentValue > 0) valueMarkTotal += currentValue;
-
-        const purchase = Number(v.purchase_price || 0) || 0;
-        if (Number.isFinite(purchase) && purchase > 0) valueCostTotal += purchase;
-
-        const asking = Number(v.asking_price || 0) || 0;
-        if (v.is_for_sale === true && Number.isFinite(asking) && asking > 0) valueAskTotal += asking;
-
-        const salePrice = Number(v.sale_price || 0) || 0;
-        if (Number.isFinite(salePrice) && salePrice > 0) valueRealizedTotal += salePrice;
-
-        // Sold today count (sale_date is a date-ish string in many cases)
-        if (salePrice > 0 && v?.sale_date && String(v.sale_date) >= todayISO) {
-          salesCountToday += 1;
-        }
-
-        // Calculate value
-        const winning = Number(v.winning_bid || 0) || 0;
-        const high = Number(v.high_bid || 0) || 0;
-        const msrp = Number(v.msrp || 0) || 0;
-        const vehiclePrice =
-          (salePrice > 0 ? salePrice : 0) ||
-          (Number.isFinite(winning) && winning > 0 ? winning : 0) ||
-          (Number.isFinite(high) && high > 0 ? high : 0) ||
-          (Number.isFinite(asking) && asking > 0 ? asking : 0) ||
-          (Number.isFinite(currentValue) && currentValue > 0 ? currentValue : 0) ||
-          (Number.isFinite(purchase) && purchase > 0 ? purchase : 0) ||
-          (Number.isFinite(msrp) && msrp > 0 ? msrp : 0) ||
-          0;
-
-        if (vehiclePrice > 0) {
-          totalValue += vehiclePrice;
-          vehiclesWithValue++;
-
-          const createdMs = new Date(v?.created_at || 0).getTime();
-          if (Number.isFinite(createdMs)) {
-            if (createdMs >= startMs && createdMs < endMs) valueImportedToday += vehiclePrice;
-            if (createdMs >= last24hMs) valueImported24h += vehiclePrice;
-            if (createdMs >= last7dMs) valueImported7d += vehiclePrice;
-          }
-        }
-      });
-
-      const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
-
-      const vehiclesAddedToday = filtered.filter((v: any) => {
-        const t = new Date(v?.created_at || 0).getTime();
-        return Number.isFinite(t) && t >= startMs && t < endMs;
-      }).length;
-
-      // Sales volume (sold today by sale_date)
-      const salesVolume = filtered
-        .filter((v: any) => Boolean(v?.sale_price) && Boolean(v?.sale_date) && String(v.sale_date) >= todayISO)
-        .reduce((sum, v: any) => {
-          const price = Number(v.sale_price || 0) || 0;
-          return sum + (Number.isFinite(price) ? price : 0);
-        }, 0);
-
-      setFilteredStatsFromDb({
-        totalVehicles: accurateTotalVehicles,
-        totalValue,
-        salesVolume,
-        salesCountToday,
-        forSaleCount,
-        activeAuctions,
-        totalBids,
-        avgValue,
-        vehiclesAddedToday,
-        valueMarkTotal,
-        valueAskTotal,
-        valueRealizedTotal,
-        valueCostTotal,
-        valueImportedToday,
-        valueImported24h,
-        valueImported7d,
-      });
+      const stats = computeVehicleStats(filtered, accurateTotalVehicles);
+      setFilteredStatsFromDb(stats);
     } catch (error) {
       // Error loading filtered stats - silent
     } finally {
@@ -1429,25 +1296,7 @@ const CursorHomepage: React.FC = () => {
       }, 500);
       return () => clearTimeout(timer);
     } else {
-      // Clear filtered stats when no filters
-      setFilteredStatsFromDb({
-        totalVehicles: 0,
-        totalValue: 0,
-        salesVolume: 0,
-        salesCountToday: 0,
-        forSaleCount: 0,
-        activeAuctions: 0,
-        totalBids: 0,
-        avgValue: 0,
-        vehiclesAddedToday: 0,
-        valueMarkTotal: 0,
-        valueAskTotal: 0,
-        valueRealizedTotal: 0,
-        valueCostTotal: 0,
-        valueImportedToday: 0,
-        valueImported24h: 0,
-        valueImported7d: 0,
-      });
+      setFilteredStatsFromDb(EMPTY_STATS);
     }
   }, [hasActiveFilters, debouncedSearchText, filters, loadFilteredStats]);
 
@@ -1461,157 +1310,12 @@ const CursorHomepage: React.FC = () => {
     }
 
     // Otherwise compute from filteredVehicles (used while DB stats are loading, or as fallback)
-    // Use the exact count from the database if available (accurate when filters are pushed server-side)
-    const totalVehicles = (hasActiveFilters && serverFilteredCount !== null) ? serverFilteredCount : filteredVehicles.length;
-    let totalValue = 0;
-    let vehiclesWithValue = 0;
-    let forSaleCount = 0;
-    let activeAuctions = 0;
-    let totalBids = 0;
-    let salesCountToday = 0;
-    let valueMarkTotal = 0;
-    let valueAskTotal = 0;
-    let valueRealizedTotal = 0;
-    let valueCostTotal = 0;
-    let valueImportedToday = 0;
-    let valueImported24h = 0;
-    let valueImported7d = 0;
-
-    const nowMs = Date.now();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-    const todayStartMs = todayStart.getTime();
-    const tomorrowStartMs = tomorrowStart.getTime();
-    const last24hMs = nowMs - 24 * 60 * 60 * 1000;
-    const last7dMs = nowMs - 7 * 24 * 60 * 60 * 1000;
-    const todayISO = todayStart.toISOString().split('T')[0]; // YYYY-MM-DD
-    
-    filteredVehicles.forEach((v) => {
-      // Count for sale: is_for_sale=true OR (asking_price > 0 AND not sold)
-      const hasAskingPrice = Number((v as any).asking_price || 0) > 0;
-      const isSold = (v as any).sale_status === 'sold' || (v as any).auction_outcome === 'sold';
-      if (v.is_for_sale === true || (hasAskingPrice && !isSold)) {
-        forSaleCount++;
-      }
-
-      // Count active auctions: sale_status='auction_live' (currently live auctions)
-      if ((v as any).sale_status === 'auction_live') {
-        activeAuctions++;
-      }
-
-      // Sum total bids
-      if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
-        totalBids += Number(v.bid_count);
-      }
-
-      const currentValue = Number(v.current_value || 0) || 0;
-      if (Number.isFinite(currentValue) && currentValue > 0) valueMarkTotal += currentValue;
-
-      const purchase = Number(v.purchase_price || 0) || 0;
-      if (Number.isFinite(purchase) && purchase > 0) valueCostTotal += purchase;
-
-      const asking = Number(v.asking_price || 0) || 0;
-      if (v.is_for_sale === true && Number.isFinite(asking) && asking > 0) valueAskTotal += asking;
-
-      const salePrice = Number(v.sale_price || 0) || 0;
-      if (Number.isFinite(salePrice) && salePrice > 0) valueRealizedTotal += salePrice;
-
-      // Sold today count (sale_date is a date-ish string in many cases)
-      if (salePrice > 0 && (v as any)?.sale_date && String((v as any).sale_date) >= todayISO) {
-        salesCountToday += 1;
-      }
-      
-      // Calculate value - use the best/actual price per vehicle
-      // Priority: sale_price > winning_bid > high_bid > asking_price > current_value > purchase_price > msrp > display_price
-      const winning = Number((v as any).winning_bid || 0) || 0;
-      const high = Number((v as any).high_bid || 0) || 0;
-      const msrp = Number((v as any).msrp || 0) || 0;
-      const display = Number((v as any).display_price || 0) || 0;
-      const vehiclePrice =
-        (salePrice > 0 ? salePrice : 0) ||
-        (Number.isFinite(winning) && winning > 0 ? winning : 0) ||
-        (Number.isFinite(high) && high > 0 ? high : 0) ||
-        (Number.isFinite(asking) && asking > 0 ? asking : 0) ||
-        (Number.isFinite(currentValue) && currentValue > 0 ? currentValue : 0) ||
-        (Number.isFinite(purchase) && purchase > 0 ? purchase : 0) ||
-        (Number.isFinite(msrp) && msrp > 0 ? msrp : 0) ||
-        (Number.isFinite(display) && display > 0 ? display : 0) ||
-        0;
-      
-      if (vehiclePrice > 0) {
-        totalValue += vehiclePrice;
-        vehiclesWithValue++;
-
-        const createdMs = new Date((v as any)?.created_at || 0).getTime();
-        if (Number.isFinite(createdMs)) {
-          if (createdMs >= todayStartMs && createdMs < tomorrowStartMs) valueImportedToday += vehiclePrice;
-          if (createdMs >= last24hMs) valueImported24h += vehiclePrice;
-          if (createdMs >= last7dMs) valueImported7d += vehiclePrice;
-        }
-      }
-    });
-    
-    const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
-    
-    // Sales volume: align semantics with dbStats (sold today), but scoped to the filtered set.
-    const salesVolume = filteredVehicles
-      .filter((v: any) => Boolean(v?.sale_price) && Boolean(v?.sale_date) && String(v.sale_date) >= todayISO)
-      .reduce((sum, v: any) => {
-        const price = Number(v.sale_price || 0) || 0;
-        return sum + (Number.isFinite(price) ? price : 0);
-      }, 0);
-    const vehiclesAddedToday = filteredVehicles.filter((v: any) => {
-      const t = new Date((v as any)?.created_at || 0).getTime();
-      return Number.isFinite(t) && t >= todayStartMs && t < tomorrowStartMs;
-    }).length;
-
-    return {
-      totalVehicles,
-      totalValue,
-      salesVolume,
-      salesCountToday,
-      forSaleCount,
-      activeAuctions,
-      totalBids,
-      avgValue,
-      vehiclesAddedToday,
-      valueMarkTotal,
-      valueAskTotal,
-      valueRealizedTotal,
-      valueCostTotal,
-      valueImportedToday,
-      valueImported24h,
-      valueImported7d,
-      // Market interest not computed locally - only available from global cache
-      marketInterestValue: 0,
-      rnmVehicleCount: 0,
-    };
+    const overrideTotal = (hasActiveFilters && serverFilteredCount !== null) ? serverFilteredCount : undefined;
+    return computeVehicleStats(filteredVehicles, overrideTotal, true);
   }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredStatsFromDb, serverFilteredCount]);
 
   // Add state for database-wide stats (around line 370, after existing stats state)
-  const [dbStats, setDbStats] = useState({
-    totalVehicles: 0,
-    totalValue: 0,
-    salesVolume: 0,
-    salesCountToday: 0,
-    forSaleCount: 0,
-    activeAuctions: 0,
-    totalBids: 0,
-    avgValue: 0,
-    vehiclesAddedToday: 0,
-    valueMarkTotal: 0,
-    valueAskTotal: 0,
-    valueRealizedTotal: 0,
-    valueCostTotal: 0,
-    valueImportedToday: 0,
-    valueImported24h: 0,
-    valueImported7d: 0,
-    // Market interest from reserve-not-met auctions
-    marketInterestValue: 0,
-    rnmVehicleCount: 0,
-  });
+  const [dbStats, setDbStats] = useState(EMPTY_STATS);
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
   const hasLoggedCachedStatsRef = useRef(false);
 
@@ -1753,133 +1457,10 @@ const CursorHomepage: React.FC = () => {
         return;
       }
 
-      // Helper to safely parse numeric values
-      const safeNum = (val: any): number => {
-        if (val == null) return 0;
-        const n = typeof val === 'number' ? val : parseFloat(String(val));
-        return Number.isFinite(n) ? n : 0;
-      };
-
-      const nowMs = Date.now();
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const tomorrowStart = new Date(todayStart);
-      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-      const todayStartMs = todayStart.getTime();
-      const tomorrowStartMs = tomorrowStart.getTime();
-      const last24hMs = nowMs - 24 * 60 * 60 * 1000;
-      const last7dMs = nowMs - 7 * 24 * 60 * 60 * 1000;
-      const todayISO = todayStart.toISOString().split('T')[0];
-
-      let totalValue = 0;
-      let vehiclesWithValue = 0;
-      let forSaleCount = 0;
-      let activeAuctions = 0;
-      let totalBids = 0;
-      let valueMarkTotal = 0;
-      let valueAskTotal = 0;
-      let valueRealizedTotal = 0;
-      let valueCostTotal = 0;
-      let valueImportedToday = 0;
-      let valueImported24h = 0;
-      let valueImported7d = 0;
-      
-      (allVehicles || []).forEach((v) => {
-        // Count for sale: is_for_sale=true OR (asking_price > 0 AND not sold)
-        const hasAskingPrice = safeNum((v as any).asking_price) > 0;
-        const isSold = v.sale_status === 'sold' || (v as any).auction_outcome === 'sold';
-        if (v.is_for_sale === true || (hasAskingPrice && !isSold)) {
-          forSaleCount++;
-        }
-
-        // Count active auctions: sale_status='auction_live' (currently live auctions)
-        // NOT bid_count > 0 which includes historical auctions
-        if (v.sale_status === 'auction_live') {
-          activeAuctions++;
-        }
-
-        // Sum total bids
-        if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
-          totalBids += Number(v.bid_count);
-        }
-
-        const currentValue = safeNum((v as any).current_value);
-        if (currentValue > 0) valueMarkTotal += currentValue;
-
-        const purchase = safeNum((v as any).purchase_price);
-        if (purchase > 0) valueCostTotal += purchase;
-
-        const asking = safeNum((v as any).asking_price);
-        if (v.is_for_sale === true && asking > 0) valueAskTotal += asking;
-
-        const salePrice = safeNum((v as any).sale_price);
-        if (salePrice > 0) valueRealizedTotal += salePrice;
-
-        // Calculate value - use the best/actual price per vehicle
-        const winning = safeNum((v as any).winning_bid);
-        const high = safeNum((v as any).high_bid);
-        const msrp = safeNum((v as any).msrp);
-        const vehiclePrice =
-          (salePrice > 0 ? salePrice : 0) ||
-          (winning > 0 ? winning : 0) ||
-          (high > 0 ? high : 0) ||
-          (asking > 0 ? asking : 0) ||
-          (currentValue > 0 ? currentValue : 0) ||
-          (purchase > 0 ? purchase : 0) ||
-          (msrp > 0 ? msrp : 0) ||
-          0;
-
-        if (vehiclePrice > 0) {
-          totalValue += vehiclePrice;
-          vehiclesWithValue++;
-
-          const createdMs = new Date((v as any)?.created_at || 0).getTime();
-          if (Number.isFinite(createdMs)) {
-            if (createdMs >= todayStartMs && createdMs < tomorrowStartMs) valueImportedToday += vehiclePrice;
-            if (createdMs >= last24hMs) valueImported24h += vehiclePrice;
-            if (createdMs >= last7dMs) valueImported7d += vehiclePrice;
-          }
-        }
-      });
-      
-      const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
-      
-      const { count: createdTodayCount, error: createdTodayErr } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
-        let q = supabase
-          .from('vehicles')
-          .select('*', { count: 'estimated', head: true })
-          .eq('is_public', true)
-          .neq('status', 'pending');
-        if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
-        return q
-          .gte('created_at', todayStart.toISOString())
-          .lt('created_at', tomorrowStart.toISOString());
-      });
-      if (createdTodayErr) {
-        // Error loading vehicles added today - silent
-      }
-
-      const { data: recentSales } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
-        let q = supabase
-          .from('vehicles')
-          .select('sale_price, sale_date')
-          .eq('is_public', true)
-          .neq('status', 'pending');
-        if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
-        return q
-          .not('sale_price', 'is', null)
-          .gte('sale_date', todayISO);
-      });
-      
-      const salesVolume = (recentSales || []).reduce((sum, v) => {
-        const price = v.sale_price || 0;
-        return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
-      }, 0);
-      const salesCountToday = Array.isArray(recentSales) ? recentSales.length : 0;
+      const baseStats = computeVehicleStats(allVehicles || [], totalCount || (allVehicles || []).length);
 
       // Prefer external_listings for a true "live auctions" count (end_date in the future).
-      // If RLS blocks the table, fall back to the heuristic computed from vehicles rows.
-      let activeAuctionsLive = activeAuctions;
+      let activeAuctionsLive = baseStats.activeAuctions;
       try {
         const { data: liveListings, error: liveErr } = await supabase
           .from('external_listings')
@@ -1893,33 +1474,8 @@ const CursorHomepage: React.FC = () => {
       } catch {
         // ignore; keep heuristic
       }
-      
-      // Use totalCount if available, otherwise fallback to processed vehicles count
-      // This ensures we show SOMETHING even if the count query fails
-      const vehicleCountFallback = (allVehicles || []).length;
-      const stats = {
-        totalVehicles: totalCount || vehicleCountFallback || 0,
-        totalValue,
-        salesVolume,
-        salesCountToday,
-        forSaleCount,
-        activeAuctions: activeAuctionsLive,
-        totalBids,
-        avgValue,
-        vehiclesAddedToday: createdTodayCount || 0,
-        valueMarkTotal,
-        valueAskTotal,
-        valueRealizedTotal,
-        valueCostTotal,
-        valueImportedToday,
-        valueImported24h,
-        valueImported7d,
-      };
-      
-      // Database stats loaded
-      
-      
-      setDbStats(stats);
+
+      setDbStats({ ...baseStats, activeAuctions: activeAuctionsLive });
     } catch (error) {
       // Error loading database stats - silent
     } finally {
@@ -2472,57 +2028,6 @@ const CursorHomepage: React.FC = () => {
         // ignore
       }
 
-      // Helper function to check if an image URL indicates poor quality or wrong image
-      const isPoorQualityImage = (url: string | null, fileSize: number | null = null): boolean => {
-        if (!url) return true;
-        // Reject URLs that aren't valid HTTP(S)
-        if (!url.startsWith('http://') && !url.startsWith('https://')) return true;
-        const urlLower = String(url).toLowerCase();
-        
-        // Check for dealer logos and placeholder images
-        if (
-          urlLower.includes('/dealer/') ||
-          urlLower.includes('/logo') ||
-          urlLower.includes('logo-') ||
-          urlLower.includes('.svg') ||
-          urlLower.includes('placeholder') ||
-          urlLower.includes('no-image') ||
-          urlLower.includes('default') ||
-          urlLower.includes('missing')
-        ) {
-          return true;
-        }
-        
-        // Check for very small file sizes (< 10KB typically indicates low quality or placeholder)
-        if (fileSize !== null && fileSize < 10000) {
-          return true;
-        }
-        
-        // Check for known bad URL patterns (dealer logos from classic.com, etc.)
-        // These are always logos, not actual car photos
-        if (
-          urlLower.includes('images.classic.com/uploads/dealer/') ||
-          urlLower.includes('images.classic.com/uploads/dealer') ||
-          (urlLower.includes('cdn.dealeraccelerate.com') && urlLower.includes('logo'))
-        ) {
-          return true;
-        }
-        
-        // Check for PNG files with small dimensions in query params (like ?h=150&w=150)
-        // These are typically dealer logos or thumbnails, not full car photos
-        if (urlLower.includes('.png') && (urlLower.includes('?h=150') || urlLower.includes('&h=150') || urlLower.includes('?w=150') || urlLower.includes('&w=150'))) {
-          // But allow if it's from a known good source (like BaT or our own storage)
-          if (!urlLower.includes('images.classic.com') && !urlLower.includes('/dealer/')) {
-            // Might be a legitimate thumbnail, so don't filter it out
-            return false;
-          }
-          // If it's from classic.com or has /dealer/, it's definitely a logo
-          return true;
-        }
-        
-        return false;
-      };
-
       // Batch-load thumbnail/medium image variants for optimal grid performance
       const thumbnailByVehicleId = new Map<string, string | null>();
       const mediumByVehicleId = new Map<string, string | null>();
@@ -2722,78 +2227,6 @@ const CursorHomepage: React.FC = () => {
         if (!imageUrl) return true; // No image → still show (card handles placeholder)
         return !isPoorQualityImage(imageUrl); // Has image but it's junk → remove
       });
-
-      // Dedupe by canonical listing URL to reduce "same car, multiple rows" spam in the feed.
-      // Keep the first-seen ordering (newest-first) but swap-in the "best" record for that listing.
-      const normalizeListingKey = (raw: unknown): string | null => {
-        const s = String(raw ?? '').trim();
-        if (!s) return null;
-        if (!/^https?:\/\//i.test(s)) return null;
-        try {
-          const u = new URL(s);
-          u.hash = '';
-          u.search = '';
-          return u.toString().toLowerCase();
-        } catch {
-          // Fall back to a naive strip (still useful for most listing URLs)
-          return s.split('#')[0].split('?')[0].toLowerCase();
-        }
-      };
-
-      const getDedupeKey = (row: any): string | null => {
-        if (!row) return null;
-        const direct = normalizeListingKey(row.discovery_url);
-        if (direct) return direct;
-        const fromListing = normalizeListingKey(row?.external_listings?.[0]?.listing_url);
-        if (fromListing) return fromListing;
-        return null;
-      };
-
-      const scoreForDedupe = (row: any): number => {
-        if (!row) return 0;
-        let score = 0;
-        if (row.vin) score += 10;
-        if (row.make) score += 2;
-        if (row.model) score += 2;
-        if (row.title) score += 1;
-        if (row.sale_price || row.winning_bid || row.high_bid || row.asking_price || row.display_price) score += 3;
-        if (Array.isArray(row.external_listings) && row.external_listings.length > 0) score += 2;
-        if (row.primary_image_url || row.image_url) score += 1;
-        try {
-          const ts = row.updated_at ? new Date(row.updated_at).getTime() : 0;
-          if (Number.isFinite(ts) && ts > 0) score += Math.min(1, ts / 1e13);
-        } catch {
-          // ignore
-        }
-        return score;
-      };
-
-      const dedupeVehicles = (items: any[]) => {
-        const byKey = new Map<string, { idx: number; best: any; score: number }>();
-        const order: string[] = [];
-        const passthrough: any[] = [];
-
-        for (let i = 0; i < (items || []).length; i++) {
-          const it = items[i];
-          const key = getDedupeKey(it);
-          if (!key) {
-            passthrough.push(it);
-            continue;
-          }
-          const s = scoreForDedupe(it);
-          const existing = byKey.get(key);
-          if (!existing) {
-            byKey.set(key, { idx: i, best: it, score: s });
-            order.push(key);
-          } else if (s > existing.score) {
-            byKey.set(key, { ...existing, best: it, score: s });
-          }
-        }
-
-        // Merge: preserve listing order, then append non-dedupable items (rare; usually user uploads).
-        const deduped = order.map((k) => byKey.get(k)!.best);
-        return [...deduped, ...passthrough];
-      };
 
       const dedupedSorted = dedupeVehicles(sorted);
 
