@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { normalizeMake } from '../_shared/normalizeVehicle.ts';
+import { normalizeMake, normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -813,11 +813,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // Step 4: Create or update vehicle
+    const norm = normalizeVehicleFields({ make: listing.make!, model: listing.model!, year: listing.year });
     const vehicleData = {
-      year: listing.year,
-      make: listing.make!.toLowerCase(),
-      model: listing.model!.toLowerCase(),
-      trim: listing.trim?.toLowerCase() || null,
+      year: norm.year ?? listing.year,
+      make: norm.make ?? listing.make!,
+      model: norm.model ?? listing.model!,
+      trim: listing.trim || null,
       vin: listing.vin ? listing.vin.toUpperCase() : null,
       mileage: listing.mileage || null,
       sale_price: listing.salePrice || null,

@@ -6,7 +6,7 @@
 
 import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import Tesseract from 'tesseract.js';
+const loadTesseract = () => import('tesseract.js').then(m => m.default);
 import vinDecoderService from '../../services/vinDecoder';
 
 interface MobileVINScannerProps {
@@ -57,6 +57,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
     try {
       // OCR the VIN plate image
       console.log('OCR: Extracting text from VIN plate...');
+      const Tesseract = await loadTesseract();
       const { data: { text } } = await Tesseract.recognize(file, 'eng', {
         logger: m => console.log(m)
       });

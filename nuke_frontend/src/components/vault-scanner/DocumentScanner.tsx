@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import Tesseract from 'tesseract.js';
+// Dynamic import — only loads Tesseract WASM when OCR is triggered
+const loadTesseract = () => import('tesseract.js').then(m => m.default);
 
 interface ExtractedData {
   vin: string | null;
@@ -222,6 +223,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
     const startTime = Date.now();
 
     try {
+      const Tesseract = await loadTesseract();
       const result = await Tesseract.recognize(imageData, 'eng', {
         logger: (m) => {
           if (m.status === 'recognizing text') {

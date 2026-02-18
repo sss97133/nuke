@@ -186,8 +186,8 @@ export function extractListingJSON(html: string): PCarMarketListingJSON | null {
 export const FIELD_MAPPINGS = {
   // Core vehicle identity
   year: (json: PCarMarketListingJSON) => json.vehicle?.year ?? null,
-  make: (json: PCarMarketListingJSON) => json.vehicle?.make?.toLowerCase() ?? null,
-  model: (json: PCarMarketListingJSON) => json.vehicle?.model?.toLowerCase() ?? null,
+  make: (json: PCarMarketListingJSON) => json.vehicle?.make ?? null,
+  model: (json: PCarMarketListingJSON) => json.vehicle?.model ?? null,
   vin: (json: PCarMarketListingJSON) => json.vin?.toUpperCase() || null,
 
   // Mileage
