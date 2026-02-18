@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { normalizeMake } from '../_shared/normalizeVehicle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -490,8 +491,8 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
       // Vehicle data
       if (jsonData.vehicle) {
         listing.year = jsonData.vehicle.year;
-        listing.make = jsonData.vehicle.make?.toLowerCase();
-        listing.model = jsonData.vehicle.model?.toLowerCase();
+        listing.make = normalizeMake(jsonData.vehicle.make) ?? jsonData.vehicle.make;
+        listing.model = jsonData.vehicle.model?.trim();
       }
 
       // VIN (accept 6-17 chars for classic cars, validate to avoid placeholders)
