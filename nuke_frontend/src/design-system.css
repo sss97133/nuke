@@ -153,9 +153,9 @@
   --grey-900: #ffffff;
 
   --text: #cccccc;
-  --text-muted: #858585;
-  --text-secondary: #858585;
-  --text-disabled: #656565;
+  --text-muted: #999999;
+  --text-secondary: #999999;
+  --text-disabled: #808080;
 
   --border-light: #3e3e42;
   --border-medium: #3e3e42;
