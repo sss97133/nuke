@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import EXIF from 'exif-js';
+import exifr from 'exifr';
 import type { TitleExtractionResult } from '../api/visionAPI';
 import { secureDocumentService } from '../services/secureDocumentService';
 import LiveDocumentCapture from './LiveDocumentCapture';
@@ -62,42 +62,36 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
     extractImageMetadata(f);
   };
 
-  const extractImageMetadata = (file: File) => {
-    const img = new Image();
-    img.onload = () => {
-      // @ts-expect-error - EXIF library expects image element
-      EXIF.getData(img, function(this: any) {
-        const allTags = EXIF.getAllTags(this);
-        const dateTime = EXIF.getTag(this, 'DateTime') || EXIF.getTag(this, 'DateTimeOriginal') || EXIF.getTag(this, 'DateTimeDigitized');
-        const gpsLat = EXIF.getTag(this, 'GPSLatitude');
-        const gpsLon = EXIF.getTag(this, 'GPSLongitude');
-        const gpsLatRef = EXIF.getTag(this, 'GPSLatitudeRef');
-        const gpsLonRef = EXIF.getTag(this, 'GPSLongitudeRef');
-        
-        const metadata = {
-          dateTime,
-          gpsLat,
-          gpsLon,
-          gpsLatRef,
-          gpsLonRef,
-          allTags
-        };
-        
-        setImageMetadata(metadata);
-        
-        // Check if image is older than 1 month
-        if (dateTime) {
-          const imageDate = new Date(dateTime.replace(/:/g, '-').replace(' ', 'T'));
-          const oneMonthAgo = new Date();
-          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-          
-          if (imageDate < oneMonthAgo) {
-            setShowOldImageWarning(true);
-          }
+  const extractImageMetadata = async (file: File) => {
+    try {
+      const tags = await exifr.parse(file, { gps: true, exif: true });
+      if (!tags) return;
+
+      const dateTime = tags.DateTimeOriginal || tags.DateTime || tags.DateTimeDigitized;
+      const metadata = {
+        dateTime: dateTime instanceof Date ? dateTime.toISOString() : dateTime,
+        gpsLat: tags.latitude,
+        gpsLon: tags.longitude,
+        gpsLatRef: tags.GPSLatitudeRef,
+        gpsLonRef: tags.GPSLongitudeRef,
+        allTags: tags
+      };
+
+      setImageMetadata(metadata);
+
+      // Check if image is older than 1 month
+      if (dateTime) {
+        const imageDate = dateTime instanceof Date ? dateTime : new Date(String(dateTime).replace(/:/g, '-').replace(' ', 'T'));
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+        if (imageDate < oneMonthAgo) {
+          setShowOldImageWarning(true);
         }
-      });
-    };
-    img.src = URL.createObjectURL(file);
+      }
+    } catch (err) {
+      console.error('EXIF extraction failed:', err);
+    }
   };
 
   const handleSendPrompt = async () => {
