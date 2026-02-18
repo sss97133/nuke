@@ -392,7 +392,7 @@ function QuickstartSection() {
 
       <h3 style={s.h3}>1. Get an API Key</h3>
       <p style={s.p}>
-        Sign up at <Link to="/" style={{ color: 'var(--text)', fontWeight: 'bold' }}>n-zero.dev</Link> and
+        Sign up at <Link to="/" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Marque</Link> and
         generate a key from <Link to="/settings/api-keys" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Settings &gt; API Keys</Link>.
         Keys are prefixed <code style={s.inlineCode}>nk_live_</code>.
       </p>

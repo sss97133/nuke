@@ -14,7 +14,7 @@ const EULA: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to load EULA:', err);
-        setContent('# End-User License Agreement\n\nFailed to load EULA. Please contact legal@n-zero.dev');
+        setContent('# End-User License Agreement\n\nFailed to load EULA. Please contact legal@marque.com');
         setLoading(false);
       });
   }, []);

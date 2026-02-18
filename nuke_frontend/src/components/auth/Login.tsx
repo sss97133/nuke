@@ -221,8 +221,8 @@ const Login = () => {
         <div className="main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           <div style={{ width: '320px' }}>
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <h1 className="heading-1" style={{ marginBottom: '8px' }}>n-zero</h1>
-              <p className="text text-muted">Provenance Engine</p>
+              <h1 className="heading-1" style={{ marginBottom: '8px' }}>Marque</h1>
+              <p className="text text-muted">Vehicle Provenance Engine</p>
             </div>
             
             

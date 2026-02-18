@@ -15,7 +15,7 @@ export function usePageTitle(title: string | (() => string)) {
   useEffect(() => {
     const resolvedTitle = typeof title === 'function' ? title() : title;
     if (resolvedTitle) {
-      document.title = `${resolvedTitle} | n-zero`;
+      document.title = `${resolvedTitle} | Marque`;
     }
     // Keep canonical URL in sync with current route
     let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
@@ -89,14 +89,14 @@ export function getTitleFromRoute(pathname: string): string {
   const segments = pathname.split('/').filter(Boolean);
   
   if (segments.length === 0) {
-    return 'n-zero';
+    return 'Marque';
   }
 
   const [first, second, third] = segments;
 
   // Homepage
   if (first === '' || first === undefined) {
-    return 'n-zero';
+    return 'Marque';
   }
 
   // Vehicle routes

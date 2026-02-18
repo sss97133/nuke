@@ -14,7 +14,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
   const navigate = useNavigate();
 
   const platformNames: Record<string, string> = {
-    nzero: 'n-zero',
+    nzero: 'Marque',
     bat: 'Bring a Trailer',
     ebay_motors: 'eBay Motors',
     cars_and_bids: 'Cars & Bids',

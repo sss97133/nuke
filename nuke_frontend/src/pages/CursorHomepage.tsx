@@ -451,7 +451,7 @@ const classifySource = (v: any): SourceKind => {
 };
 
 const CursorHomepage: React.FC = () => {
-  usePageTitle('n-zero');
+  usePageTitle('Marque');
   const [feedVehicles, setFeedVehicles] = useState<HypeVehicle[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<HypeVehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -6634,7 +6634,7 @@ const CursorHomepage: React.FC = () => {
                             alignItems: 'center',
                             justifyContent: 'center'
                           }}>
-                            <img src="/n-zero.png" alt="N-Zero" style={{ width: '60%', opacity: 0.3, objectFit: 'contain' }} />
+                            <img src="/n-zero.png" alt="Marque" style={{ width: '60%', opacity: 0.3, objectFit: 'contain' }} />
                           </div>
                         )}
                       </td>

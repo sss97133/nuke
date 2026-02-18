@@ -14,7 +14,7 @@ const DataDeletion: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to load data deletion instructions:', err);
-        setContent('# Data Deletion\n\nFailed to load instructions. Please contact privacy@n-zero.dev');
+        setContent('# Data Deletion\n\nFailed to load instructions. Please contact privacy@marque.com');
         setLoading(false);
       });
   }, []);
