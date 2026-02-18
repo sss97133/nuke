@@ -18,11 +18,11 @@ import FeedTableView from '../components/feed/FeedTableView';
 import ScrollToTopButton from '../components/feed/ScrollToTopButton';
 import FeedFilterPanel from '../components/feed/FeedFilterPanel';
 import { filterAndSortVehicles } from '../lib/feedFilterSort';
-import { computeVehicleStats, EMPTY_STATS } from '../lib/feedStatsCalculator';
+import { computeVehicleStats } from '../lib/feedStatsCalculator';
 import { isPoorQualityImage, dedupeVehicles, getDedupeKey } from '../lib/feedDataProcessing';
 import type { HypeVehicle, TimePeriod, SalesTimePeriod, ViewMode, SortBy, SortDirection, FilterState } from '../types/feedTypes';
 import { SALES_PERIODS } from '../types/feedTypes';
-import { resolveVehicleImageUrl, getOriginImages, cleanDisplayMake, cleanDisplayModel } from '../lib/feedImageUtils';
+import { normalizeSupabaseStorageUrl, cleanDisplayMake, cleanDisplayModel } from '../lib/feedImageUtils';
 import { DEFAULT_FILTERS, getRememberFilters, loadSavedFilters, saveFiltersToStorage, clearPersistedFiltersAndSort, STORAGE_KEY, REMEMBER_FILTERS_KEY, LOCATION_FAVORITES_KEY } from '../lib/filterPersistence';
 
 const CursorHomepage: React.FC = () => {
@@ -698,7 +698,7 @@ const CursorHomepage: React.FC = () => {
   }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredStatsFromDb, serverFilteredCount]);
 
   // Database-wide stats (cached table → RPCs → client fallback) with periodic refresh + realtime
-  const { dbStats, dbStatsLoading } = useDbStats({ runVehiclesQueryWithListingKindFallback });
+  const { dbStats } = useDbStats({ runVehiclesQueryWithListingKindFallback });
 
   // Update filteredStats to show DB stats when no filters, filtered stats when filters active
   const displayStats = useMemo(() => {
