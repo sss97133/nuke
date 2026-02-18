@@ -45,7 +45,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [orgNavPath, setOrgNavPath] = useState<string>('/org');
-  const [nZeroMenuOpen, setNZeroMenuOpen] = useState(false);
+  const [marqueMenuOpen, setMarqueMenuOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -197,26 +197,26 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
     // Close menu when clicking outside
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('[data-n-zero-menu]')) {
-        setNZeroMenuOpen(false);
+      if (!target.closest('[data-marque-menu]')) {
+        setMarqueMenuOpen(false);
         setVehiclesSubMenuOpen(false);
         setVehicleSearch('');
       }
     };
 
-    if (nZeroMenuOpen) {
+    if (marqueMenuOpen) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [nZeroMenuOpen]);
+  }, [marqueMenuOpen]);
 
   // Reset vehicle submenu when main menu closes
   useEffect(() => {
-    if (!nZeroMenuOpen) {
+    if (!marqueMenuOpen) {
       setVehiclesSubMenuOpen(false);
       setVehicleSearch('');
     }
-  }, [nZeroMenuOpen]);
+  }, [marqueMenuOpen]);
 
   useEffect(() => {
     // Get initial session
@@ -385,16 +385,16 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       {/* Main Navigation Header */}
       <div className="header-wrapper" ref={headerWrapperRef}>
         <div className="header-content">
-          {/* 8%: n-zero button (dropdown is popup so doesn't affect layout) */}
+          {/* Marque button (dropdown is popup so doesn't affect layout) */}
           <div className="header-slot-left">
             <div className="header-left">
-              {/* n-zero Expandable Menu */}
-              <div style={{ position: 'relative' }} data-n-zero-menu>
+              {/* Marque Expandable Menu */}
+              <div style={{ position: 'relative' }} data-marque-menu>
                 <button
-                  onClick={() => setNZeroMenuOpen(!nZeroMenuOpen)}
-                  aria-expanded={nZeroMenuOpen}
+                  onClick={() => setMarqueMenuOpen(!marqueMenuOpen)}
+                  aria-expanded={marqueMenuOpen}
                   aria-haspopup="true"
-                  className={`nav-link ${nZeroMenuOpen ? 'active' : ''}`}
+                  className={`nav-link ${marqueMenuOpen ? 'active' : ''}`}
                   style={{
                     border: 'none',
                     background: 'transparent',
@@ -406,10 +406,10 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                   }}
                 >
                   <span>Marque</span>
-                  <span style={{ fontSize: '7pt' }}>{nZeroMenuOpen ? '▼' : '▶'}</span>
+                  <span style={{ fontSize: '7pt' }}>{marqueMenuOpen ? '▼' : '▶'}</span>
                 </button>
 
-                {nZeroMenuOpen && (
+                {marqueMenuOpen && (
                   <div
                     style={{
                       position: 'absolute',
@@ -458,21 +458,21 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       <span style={{ fontSize: '7pt', marginLeft: '8px' }}>▶</span>
                     </button>
                     )}
-                    <Link to="/search" className={`nav-link ${isActivePage('/search') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Search</Link>
-                    <Link to="/auctions" className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Auctions</Link>
-                    <Link to={orgNavPath} className={`nav-link ${isActivePage('/org') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Organizations</Link>
+                    <Link to="/search" className={`nav-link ${isActivePage('/search') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Search</Link>
+                    <Link to="/auctions" className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Auctions</Link>
+                    <Link to={orgNavPath} className={`nav-link ${isActivePage('/org') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Organizations</Link>
                     {session && (
                     <>
-                    <Link to="/invoices" className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Invoices</Link>
-                    <Link to="/restoration" className={`nav-link ${isActivePage('/restoration') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Restoration Intake</Link>
+                    <Link to="/invoices" className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Invoices</Link>
+                    <Link to="/restoration" className={`nav-link ${isActivePage('/restoration') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Restoration Intake</Link>
                     </>
                     )}
-                    <Link to="/market" className={`nav-link ${isActivePage('/market') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>Market</Link>
+                    <Link to="/market" className={`nav-link ${isActivePage('/market') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Market</Link>
                     <div style={{ borderTop: '2px solid var(--border)', marginTop: '2px' }} />
-                    <Link to="/api" className={`nav-link ${isActivePage('/api') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>API</Link>
-                    <Link to="/developers" className={`nav-link ${isActivePage('/developers') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>SDK Docs</Link>
-                    <a href="https://www.npmjs.com/package/@nuke1/sdk" target="_blank" rel="noopener noreferrer" className="nav-link" style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNZeroMenuOpen(false)}>NPM Package</a>
-                    <Link to="/offering" className={`nav-link ${isActivePage('/offering') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', color: '#e8c547' }} onClick={() => setNZeroMenuOpen(false)}>Deck</Link>
+                    <Link to="/api" className={`nav-link ${isActivePage('/api') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>API</Link>
+                    <Link to="/developers" className={`nav-link ${isActivePage('/developers') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>SDK Docs</Link>
+                    <a href="https://www.npmjs.com/package/@nuke1/sdk" target="_blank" rel="noopener noreferrer" className="nav-link" style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>NPM Package</a>
+                    <Link to="/offering" className={`nav-link ${isActivePage('/offering') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', color: '#e8c547' }} onClick={() => setMarqueMenuOpen(false)}>Deck</Link>
                   </div>
 
                   {/* Vehicles panel - pops out to the RIGHT */}
@@ -541,7 +541,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                               <button
                                 key={v.id}
                                 onClick={() => {
-                                  setNZeroMenuOpen(false);
+                                  setMarqueMenuOpen(false);
                                   setVehiclesSubMenuOpen(false);
                                   setVehicleSearch('');
                                   navigate(`/vehicle/${v.id}`, { state: { vehicleTitle: v.title } });
@@ -585,7 +585,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       <Link
                         to="/vehicles"
                         onClick={() => {
-                          setNZeroMenuOpen(false);
+                          setMarqueMenuOpen(false);
                           setVehiclesSubMenuOpen(false);
                           setVehicleSearch('');
                         }}
@@ -818,14 +818,14 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         <Link
           to="/"
           className={`mobile-bottom-nav-item ${location.pathname === '/' ? 'active' : ''}`}
-          onClick={() => setNZeroMenuOpen(false)}
+          onClick={() => setMarqueMenuOpen(false)}
         >
           Home
         </Link>
         <Link
           to="/capture"
           className={`mobile-bottom-nav-item ${location.pathname === '/capture' ? 'active' : ''}`}
-          onClick={() => setNZeroMenuOpen(false)}
+          onClick={() => setMarqueMenuOpen(false)}
           aria-label="Add vehicle"
         >
           +
@@ -833,7 +833,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         <Link
           to="/profile"
           className={`mobile-bottom-nav-item ${location.pathname.startsWith('/profile') ? 'active' : ''}`}
-          onClick={() => setNZeroMenuOpen(false)}
+          onClick={() => setMarqueMenuOpen(false)}
         >
           Profile
         </Link>

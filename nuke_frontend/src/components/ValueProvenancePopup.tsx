@@ -430,7 +430,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               ?? (typeof selectedListing?.watcher_count === 'number' ? selectedListing.watcher_count : null)
           };
           
-          // Check if buyer has linked N-Zero profile (only for sold events)
+          // Check if buyer has linked Marque profile (only for sold events)
           if (auctionMetrics.buyer_name && field === 'sale_price' && platform === 'bat') {
             const { data: buyerIdentity } = await supabase
               .from('external_identities')
@@ -452,7 +452,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             setBuyerProfileLink(null);
           }
           
-          // Check if seller has linked N-Zero profile
+          // Check if seller has linked Marque profile
           if (auctionMetrics.seller_username && platform === 'bat') {
             const { data: sellerIdentity } = await supabase
               .from('external_identities')

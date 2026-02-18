@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabase';
 interface AsciiAvatarProps {
   seed: string; // Username, user ID, or any string to generate unique avatar
   platform?: 'bat' | 'nzero'; // Platform for identity lookup
-  userId?: string; // User ID for N-Zero profiles
+  userId?: string; // User ID for Marque profiles
   size?: number; // Size in pixels
   style?: React.CSSProperties;
   onError?: () => void;
