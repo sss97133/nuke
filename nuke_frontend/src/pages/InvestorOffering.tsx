@@ -59,8 +59,12 @@ const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; content: stri
   },
 };
 
-// Simple hash for access code verification (not security-critical - this is a draft portal)
-const ACCESS_CODE_HASH = 'nzero2026';
+// SHA-256 of access code - prevents casual extraction from JS bundle
+const ACCESS_CODE_SHA256 = '008e140c0a9b5d96d458d8a4563094610aeded3573772e5ed6c500b9b411b5bc';
+const sha256 = async (s: string): Promise<string> => {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
 const PORTAL_PROFILE_KEY = 'nzero_investor_portal_profile';
 
 export default function InvestorOffering() {
@@ -145,8 +149,9 @@ export default function InvestorOffering() {
     }
   }, [activeDoc, phase, logAccess]);
 
-  const handleAccessCode = () => {
-    if (accessCode.toLowerCase().trim() === ACCESS_CODE_HASH) {
+  const handleAccessCode = async () => {
+    const hash = await sha256(accessCode.toLowerCase().trim());
+    if (hash === ACCESS_CODE_SHA256) {
       setPhase('acknowledge');
       logAccess({ action: 'access_code_accepted' });
       setCodeError('');

@@ -155,8 +155,7 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error("API error:", error);
-    const details = error instanceof Error ? error.message : (typeof error === "object" ? JSON.stringify(error) : String(error));
-    return jsonResponse({ error: "Internal server error", details }, 500);
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 });
 
