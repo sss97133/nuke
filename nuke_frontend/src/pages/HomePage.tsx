@@ -3,17 +3,15 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const CursorHomepage = lazy(() => import('./CursorHomepage'));
-const MarketMap = lazy(() => import('../components/market/MarketMap'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
 const UnifiedMap = lazy(() => import('../components/map/UnifiedMap'));
 
-type TabId = 'garage' | 'feed' | 'map' | 'market';
+type TabId = 'garage' | 'feed' | 'map';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'garage', label: 'Garage' },
   { id: 'feed', label: 'Feed' },
   { id: 'map', label: 'Map' },
-  { id: 'market', label: 'Market' },
 ];
 
 const LS_KEY = 'nuke_hub_tab';
@@ -104,12 +102,6 @@ export default function HomePage() {
             letterSpacing: '0.5px', textTransform: 'uppercase', textDecoration: 'none',
             color: '#7eb8da', cursor: 'pointer', display: 'flex', alignItems: 'center', height: '100%',
           }}>NPM</a>
-          <span style={{ width: '1px', height: '14px', background: '#444', margin: '0 4px' }} />
-          <Link to="/offering" style={{
-            padding: '0 12px', fontSize: '10px', fontFamily: 'Arial, sans-serif', fontWeight: 600,
-            letterSpacing: '0.5px', textTransform: 'uppercase', textDecoration: 'none',
-            color: '#e8c547', cursor: 'pointer', display: 'flex', alignItems: 'center', height: '100%',
-          }}>Deck</Link>
         </div>
       </div>
 
@@ -119,7 +111,6 @@ export default function HomePage() {
           {activeTab === 'garage' && <GarageTab />}
           {activeTab === 'feed' && <CursorHomepage />}
           {activeTab === 'map' && <UnifiedMap />}
-          {activeTab === 'market' && <MarketMap />}
         </Suspense>
       </div>
     </div>

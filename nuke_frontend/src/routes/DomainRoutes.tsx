@@ -25,9 +25,6 @@ const OAuthCallback = React.lazy(() => import('../components/auth/OAuthCallback'
 const ResetPassword = React.lazy(() => import('../pages/ResetPassword'));
 const DropboxCallback = React.lazy(() => import('../pages/DropboxCallback'));
 
-// ASCII samples (dev / preview)
-const LivingAsciiSamplesPage = React.lazy(() => import('../pages/LivingAsciiSamplesPage'));
-
 // Tech capture (photo pipeline)
 const TechCapture = React.lazy(() => import('../pages/TechCapture'));
 const TechShareUpload = React.lazy(() => import('../pages/TechCapture'));
@@ -36,40 +33,13 @@ const TechShareUpload = React.lazy(() => import('../pages/TechCapture'));
 const CurationQueue = React.lazy(() => import('../pages/CurationQueue'));
 const UnlinkedReceipts = React.lazy(() => import('../pages/UnlinkedReceipts'));
 
-// Portfolio (legacy root paths)
-const Portfolio = React.lazy(() => import('../pages/Portfolio'));
-const CreditsSuccess = React.lazy(() => import('../pages/CreditsSuccess'));
-const PortfolioWithdraw = React.lazy(() => import('../pages/PortfolioWithdraw'));
-
-// Investor Offering Portal (Data Room)
+// Investor Offering Portal (Data Room) — kept for business/fundraising
 const InvestorOffering = React.lazy(() => import('../pages/InvestorOffering'));
-
-// Investment platform
-const Invest = React.lazy(() => import('../pages/Invest'));
-const MarketIntelligence = React.lazy(() => import('../pages/MarketIntelligence'));
-const OfferingDetail = React.lazy(() => import('../pages/OfferingDetail'));
-const SubscriptionFlow = React.lazy(() => import('../components/compliance/SubscriptionFlow'));
-const SubscriptionSuccess = React.lazy(() => import('../pages/SubscriptionSuccess'));
-
-// Trading
-const TradingPage = React.lazy(() => import('../pages/TradingPage'));
-
-// Betting / Predictions
-const BettingPage = React.lazy(() => import('../pages/betting'));
-const MarketDetail = React.lazy(() => import('../pages/betting/MarketDetail'));
-const LiveAuctionView = React.lazy(() => import('../components/betting/LiveAuctionView').then(m => ({ default: m.LiveAuctionView })));
-
-// Vault / Storage
-const VaultPage = React.lazy(() => import('../pages/VaultPage'));
-const VaultScanPage = React.lazy(() => import('../pages/VaultScanPage'));
 
 // Business management
 const BusinessSettings = React.lazy(() => import('../pages/BusinessSettings'));
 const QuickBooksCallback = React.lazy(() => import('../pages/QuickBooksCallback'));
 const RestorationIntake = React.lazy(() => import('../pages/RestorationIntake'));
-
-// Collections Map
-const CollectionsMap = React.lazy(() => import('../pages/CollectionsMap'));
 
 // Legacy pages (still used by navigation components)
 const Profile = React.lazy(() => import('../pages/Profile'));
@@ -83,7 +53,6 @@ const Notifications = React.lazy(() => import('../pages/Notifications'));
 const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIdentity'));
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
-const SocialWorkspace = React.lazy(() => import('../pages/SocialWorkspace'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
@@ -153,9 +122,6 @@ export const DomainRoutes = () => {
         <Route path="/members" element={<BaTMembers />} />
         <Route path="/search" element={<Search />} />
 
-        {/* Social Media Workspace */}
-        <Route path="/social" element={<SocialWorkspace />} />
-
         {/* Import Data */}
         <Route path="/import" element={<ImportDataPage />} />
 
@@ -177,25 +143,6 @@ export const DomainRoutes = () => {
         {/* Investor Offering Portal (Data Room) */}
         <Route path="/offering" element={<InvestorOffering />} />
 
-        {/* Investment Platform */}
-        <Route path="/invest" element={<Invest />} />
-        <Route path="/invest/offering/:offeringId" element={<OfferingDetail />} />
-        <Route path="/invest/subscribe/:offeringId" element={<SubscriptionFlow />} />
-        <Route path="/invest/subscription/:subscriptionId/success" element={<SubscriptionSuccess />} />
-        <Route path="/market-intelligence" element={<MarketIntelligence />} />
-
-        {/* Trading Terminal */}
-        <Route path="/trading" element={<TradingPage />} />
-        <Route path="/trading/:offeringId" element={<TradingPage />} />
-
-        {/* Betting / Predictions */}
-        <Route path="/betting" element={<BettingPage />} />
-        <Route path="/betting/live" element={<LiveAuctionView />} />
-        <Route path="/betting/:id" element={<MarketDetail />} />
-
-        {/* Vehicle Storage Vault */}
-        <Route path="/vault" element={<VaultPage />} />
-        <Route path="/vault/scan" element={<VaultScanPage />} />
 
         {/* Business Management */}
         <Route path="/business/settings" element={<BusinessSettings />} />
@@ -209,9 +156,6 @@ export const DomainRoutes = () => {
         <Route path="/restoration" element={<RestorationIntake />} />
         <Route path="/intake" element={<RestorationIntake />} />
 
-        {/* ASCII samples (preview shape / identity / pulse) */}
-        <Route path="/ascii-samples" element={<LivingAsciiSamplesPage />} />
-
         {/* Curation & receipts */}
         <Route path="/curation-queue" element={<CurationQueue />} />
         <Route path="/curation/queue" element={<Navigate to="/curation-queue" replace />} />
@@ -223,14 +167,6 @@ export const DomainRoutes = () => {
         <Route path="/map" element={<Navigate to="/?tab=map" replace />} />
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
-        {/* Collections Map */}
-        <Route path="/collections-map" element={<CollectionsMap />} />
-        <Route path="/collections/map" element={<Navigate to="/collections-map" replace />} />
-
-        {/* Portfolio legacy routes */}
-        <Route path="/portfolio" element={<Portfolio />} />
-        <Route path="/portfolio/success" element={<CreditsSuccess />} />
-        <Route path="/portfolio/withdraw" element={<PortfolioWithdraw />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
