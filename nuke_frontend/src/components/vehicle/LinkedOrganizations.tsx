@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { FiMapPin, FiTool, FiDollarSign, FiTruck, FiShoppingCart } from 'react-icons/fi';
+import { MapPin, Wrench, DollarSign, Truck, ShoppingCart } from 'lucide-react';
 
 interface LinkedOrganizationsProps {
   vehicleId: string;
@@ -26,19 +26,19 @@ export interface LinkedOrg {
 }
 
 const RELATIONSHIP_ICONS: Record<string, React.ComponentType> = {
-  owner: FiDollarSign,
-  service_provider: FiTool,
-  work_location: FiMapPin,
-  seller: FiShoppingCart,
-  buyer: FiShoppingCart,
-  parts_supplier: FiTruck,
-  fabricator: FiTool,
-  painter: FiTool,
-  upholstery: FiTool,
-  transport: FiTruck,
-  storage: FiMapPin,
-  inspector: FiTool,
-  collaborator: FiTool
+  owner: DollarSign,
+  service_provider: Wrench,
+  work_location: MapPin,
+  seller: ShoppingCart,
+  buyer: ShoppingCart,
+  parts_supplier: Truck,
+  fabricator: Wrench,
+  painter: Wrench,
+  upholstery: Wrench,
+  transport: Truck,
+  storage: MapPin,
+  inspector: Wrench,
+  collaborator: Wrench
 };
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
@@ -187,7 +187,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
       <div className="card-body">
         <div className="space-y-3">
           {organizations.map((org) => {
-            const Icon = RELATIONSHIP_ICONS[org.relationship_type || 'service_provider'] || FiMapPin;
+            const Icon = RELATIONSHIP_ICONS[org.relationship_type || 'service_provider'] || MapPin;
             const relationshipLabel = RELATIONSHIP_LABELS[org.relationship_type || 'service_provider'] || org.relationship_type || 'Unknown';
 
             return (
@@ -232,7 +232,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
                       </span>
                       {(org.city || org.state) && (
                         <span className="flex items-center gap-1">
-                          <FiMapPin className="w-4 h-4" />
+                          <MapPin className="w-4 h-4" />
                           {org.city}{org.city && org.state && ', '}{org.state}
                         </span>
                       )}
