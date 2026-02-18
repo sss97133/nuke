@@ -1714,11 +1714,10 @@ const CursorHomepage: React.FC = () => {
       // PostgREST 400 errors if included in the `select()` list.
       // Simple query: most recent vehicles first, no filters.
       // Try to include canonical taxonomy columns if present; fallback gracefully if migration not applied yet.
-      const locationFields = 'zip_code, gps_latitude, gps_longitude';
-      const selectV1 = `
-          id, year, make, model, normalized_model, series, trim,
-          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
-          title, vin, created_at, updated_at,
+      // V2 includes canonical taxonomy columns; V1 omits them (fallback if migration not applied)
+      const baseFields = `id, year, make, model, normalized_model, series, trim,
+          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type`;
+      const sharedFields = `title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
           auction_outcome, high_bid, winning_bid, bid_count,
@@ -1727,52 +1726,9 @@ const CursorHomepage: React.FC = () => {
           discovery_url, discovery_source, profile_origin,
           listing_url, bat_auction_url, platform_source,
           nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
-          ${locationFields}
-        `;
-      const selectV1EngineSize = `
-          id, year, make, model, normalized_model, series, trim,
-          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
-          title, vin, created_at, updated_at,
-          sale_price, current_value, purchase_price, asking_price,
-          sale_date, sale_status,
-          auction_outcome, high_bid, winning_bid, bid_count,
-          auction_end_date,
-          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
-          discovery_url, discovery_source, profile_origin,
-          listing_url, bat_auction_url, platform_source,
-          nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
-          ${locationFields}
-        `;
-      const selectV2 = `
-          id, year, make, model, normalized_model, series, trim,
-          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
-          canonical_vehicle_type, canonical_body_style,
-          title, vin, created_at, updated_at,
-          sale_price, current_value, purchase_price, asking_price,
-          sale_date, sale_status,
-          auction_outcome, high_bid, winning_bid, bid_count,
-          auction_end_date,
-          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
-          discovery_url, discovery_source, profile_origin,
-          listing_url, bat_auction_url, platform_source,
-          nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
-          ${locationFields}
-        `;
-      const selectV2EngineSize = `
-          id, year, make, model, normalized_model, series, trim,
-          engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
-          canonical_vehicle_type, canonical_body_style,
-          title, vin, created_at, updated_at,
-          sale_price, current_value, purchase_price, asking_price,
-          sale_date, sale_status,
-          auction_outcome, high_bid, winning_bid, bid_count,
-          auction_end_date,
-          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
-          discovery_url, discovery_source, profile_origin,
-          listing_url, bat_auction_url, platform_source,
-          nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
-          ${locationFields}
-        `;
+          zip_code, gps_latitude, gps_longitude`;
+      const selectV1 = `${baseFields}, ${sharedFields}`;
+      const selectV2 = `${baseFields}, canonical_vehicle_type, canonical_body_style, ${sharedFields}`;
 
       const getMissingColumn = (err: any): string | null => {
         const message = String(err?.message || '');
@@ -1943,20 +1899,9 @@ const CursorHomepage: React.FC = () => {
 
       if (error) {
         const missingColumn = getMissingColumn(error);
-        if (missingColumn?.startsWith('canonical_')) {
+        if (missingColumn?.startsWith('canonical_') || missingColumn === 'engine') {
           result = await runVehicleQuery(selectV1);
           applyResult(result);
-          if (error && getMissingColumn(error) === 'engine') {
-            result = await runVehicleQuery(selectV1EngineSize);
-            applyResult(result);
-          }
-        } else if (missingColumn === 'engine') {
-          result = await runVehicleQuery(selectV2EngineSize);
-          applyResult(result);
-          if (error && getMissingColumn(error)?.startsWith('canonical_')) {
-            result = await runVehicleQuery(selectV1EngineSize);
-            applyResult(result);
-          }
         }
       }
 
