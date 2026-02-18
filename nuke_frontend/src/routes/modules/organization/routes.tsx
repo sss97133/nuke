@@ -1,21 +1,29 @@
 // src/routes/modules/organization/routes.tsx
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import Organizations from '../../../pages/Organizations';
-import OrganizationProfile from '../../../pages/OrganizationProfile';
-import CreateOrganization from '../../../pages/CreateOrganization';
-import Dashboard from '../../../pages/Dashboard';
+
+const Organizations = React.lazy(() => import('../../../pages/Organizations'));
+const OrganizationProfile = React.lazy(() => import('../../../pages/OrganizationProfile'));
+const CreateOrganization = React.lazy(() => import('../../../pages/CreateOrganization'));
+const Dashboard = React.lazy(() => import('../../../pages/Dashboard'));
+
+const LazyFallback = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '9pt' }}>
+    loading...
+  </div>
+);
 
 const OrganizationModuleRoutes = () => {
   return (
-    <Routes>
-      <Route path="/" element={<Organizations />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/create" element={<CreateOrganization />} />
-      <Route path="/:orgId" element={<OrganizationProfile />} />
-    </Routes>
+    <Suspense fallback={<LazyFallback />}>
+      <Routes>
+        <Route path="/" element={<Organizations />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/create" element={<CreateOrganization />} />
+        <Route path="/:orgId" element={<OrganizationProfile />} />
+      </Routes>
+    </Suspense>
   );
 };
 
 export default OrganizationModuleRoutes;
-
