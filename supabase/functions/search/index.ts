@@ -326,8 +326,8 @@ serve(async (req: Request) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-      } catch {
-        // ignore and fall through to normal search
+      } catch (err: any) {
+        console.error('[search] UUID fast-path failed:', err?.message || err);
       }
     }
 
@@ -408,8 +408,8 @@ serve(async (req: Request) => {
           usedFts = true;
         }
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      console.error('[search] FTS search failed, falling back to ilike:', err?.message || err);
     }
 
     // Fallback to ilike search if FTS isn't available.
@@ -493,8 +493,8 @@ serve(async (req: Request) => {
           usedFuzzyProfiles = true;
         }
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      console.error('[search] Fuzzy search fallback failed:', err?.message || err);
     }
 
     const [imagesRes, sourcesRes] = await Promise.all([

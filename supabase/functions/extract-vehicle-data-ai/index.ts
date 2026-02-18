@@ -182,19 +182,24 @@ serve(async (req) => {
         llmConfig = await getLLMConfig(supabase, null, provider, model);
         console.log(`[extract-vehicle-data-ai] Trying provider: ${llmConfig.provider}/${llmConfig.model}`);
 
-        llmResponse = await callLLM(llmConfig, [
-          {
-            role: 'system',
-            content: `You are an expert vehicle data extraction specialist. Extract structured vehicle information from listing pages with maximum accuracy. Always return valid JSON.`
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ], {
-          temperature: 0.1,
-          maxTokens: 2000
-        });
+        llmResponse = await Promise.race([
+          callLLM(llmConfig, [
+            {
+              role: 'system',
+              content: `You are an expert vehicle data extraction specialist. Extract structured vehicle information from listing pages with maximum accuracy. Always return valid JSON.`
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ], {
+            temperature: 0.1,
+            maxTokens: 2000
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`LLM timeout after 30s (${provider}/${model})`)), 30_000)
+          ),
+        ]);
 
         // Success - break out of retry loop
         console.log(`[extract-vehicle-data-ai] ✅ Success with ${llmConfig.provider}`);

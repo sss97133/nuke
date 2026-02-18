@@ -574,7 +574,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         cursor: 'pointer'
       }} onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Expand' : 'Collapse'}>
         <span style={{ fontSize: '8pt', fontWeight: 'bold' }}>
-          {collapsed ? `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.vin ? ' • ' + String(vehicle.vin).slice(0,8) + '…' : ''}` : 'Basic Information'}
+          {collapsed ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}${vehicle.vin ? ' • ' + String(vehicle.vin).slice(0,8) + '…' : ''}`.trim() || 'Vehicle' : 'Basic Information'}
         </span>
         {canEdit && (
           <button

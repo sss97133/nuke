@@ -165,7 +165,7 @@ const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
               <BuyVehicleButton
                 vehicleId={vehicle.id}
                 salePrice={vehicle.asking_price}
-                vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                vehicleName={`${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() || 'Vehicle'}
               />
             </div>
           )}
