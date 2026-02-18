@@ -287,9 +287,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
     const batUrlRegex = /https?:\/\/(?:www\.)?bringatrailer\.com\/listing\/[^\s\)]+/gi;
     const match = text.match(batUrlRegex);
     const url = match ? match[0] : null;
-    if (url) {
-      console.log('[VehicleComments] BAT URL detected:', url);
-    }
     return url;
   };
 
@@ -302,21 +299,12 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         .select('*', { count: 'exact', head: true })
         .eq('vehicle_id', vehicleId);
 
-      if (imageCount && imageCount > 0) {
-        console.log('[VehicleComments] Vehicle already has images, skipping BAT URL processing');
-        return;
-      }
+      if (imageCount && imageCount > 0) return;
 
       // Find most recent comment with BAT URL from trusted user
       for (const comment of comments) {
         const batUrl = detectBATUrl(comment.comment_text);
         if (!batUrl) continue;
-
-        console.log('[VehicleComments] Found BAT URL in existing comment:', {
-          commentId: comment.id,
-          userId: comment.user_id,
-          batUrl
-        });
 
         // Check if user is trusted (has contributor access or is owner)
         const { data: userProfile } = await supabase
@@ -338,15 +326,12 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           (orgLinks && orgLinks.length > 0);
 
         if (isTrustedUser) {
-          console.log('[VehicleComments] Trusted user detected, processing BAT URL');
           // Process the BAT URL (async, don't block)
           processBATUrl(batUrl, comment.user_id).catch(err => {
             console.error('[VehicleComments] Error processing existing BAT URL:', err);
           });
           // Only process the first trusted BAT URL found
           break;
-        } else {
-          console.log('[VehicleComments] User not trusted, skipping BAT URL processing');
         }
       }
     } catch (error) {
@@ -356,7 +341,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
 
   // Scrape BAT listing and save images/data
   const processBATUrl = async (batUrl: string, userId: string) => {
-    console.log('[VehicleComments] processBATUrl called with:', { batUrl, userId, vehicleId });
     setScrapingStatus('Scraping BAT listing...');
     try {
       // Get vehicle data for VIN matching
@@ -371,16 +355,12 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         throw new Error(`Failed to fetch vehicle: ${vehicleError.message}`);
       }
 
-      console.log('[VehicleComments] Calling simple-scraper edge function with URL:', batUrl);
       // Scrape the BAT listing
       const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('simple-scraper', {
         body: { url: batUrl }
       });
 
-      console.log('[VehicleComments] Scrape result:', { scrapeResult, scrapeError });
-
       if (scrapeError) {
-        console.error('[VehicleComments] Scrape error:', scrapeError);
         throw new Error(`Scrape error: ${scrapeError.message || JSON.stringify(scrapeError)}`);
       }
 
@@ -636,8 +616,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           if (eventError) {
             console.warn('[VehicleComments] Failed to create timeline event:', eventError);
           } else {
-            console.log('[VehicleComments] Created timeline event for BAT auction');
-            
             // Create ownership transfer record if buyer is available
             if (scrapedData.buyer && timelineEvent?.id) {
               // Try to find existing profile by username/name matching buyer
@@ -694,7 +672,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
               if (transferError) {
                 console.warn('[VehicleComments] Failed to create ownership transfer:', transferError);
               } else {
-                console.log('[VehicleComments] Created ownership transfer for BaT buyer:', scrapedData.buyer);
                 // Note: We do NOT create vehicle_ownerships records here because:
                 // 1. Ownership must be verified through the ownership_verification system
                 // 2. Only approved, up-to-date title verifications create vehicle_ownerships records
@@ -831,7 +808,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
             urlLower.includes('avatar') ||
             urlLower.includes('gravatar') ||
             urlLower.match(/-(\d+)x\d+\./)) { // Skip thumbnails like -150x150
-          console.log(`Skipping non-vehicle image: ${imageUrl}`);
           continue;
         }
 
@@ -925,7 +901,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
             validatedCount++;
             if (!validationResult.validation.matches) {
               mismatchCount++;
-              console.log(`  ⚠️  Image ${i + 1} MISMATCH: ${validationResult.validation.mismatch_reason || 'Does not match vehicle'}`);
+              // Image mismatch detected — tracked via mismatchCount
             }
           }
         } catch (validationErr: any) {
@@ -952,7 +928,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       }
     }
 
-    console.log(`[VehicleComments] Saved ${savedCount} images, validated ${validatedCount}, ${mismatchCount} mismatches detected`);
   };
 
   const submitGeneralComment = async () => {
@@ -986,7 +961,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       loadAllComments();
 
       // NEW: Intelligent content detection
-      console.log('[VehicleComments] Analyzing comment for extractable content...');
       setScrapingStatus('Analyzing content...');
 
       try {
@@ -999,7 +973,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         );
 
         if (detected.length > 0) {
-          console.log(`[VehicleComments] Detected ${detected.length} extractable items:`, detected);
           setScrapingStatus(`Found ${detected.length} extractable item(s) - processing...`);
 
           // Queue content for extraction
@@ -1039,7 +1012,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           // Clear status after 5 seconds
           setTimeout(() => setScrapingStatus(null), 5000);
       } else {
-          console.log('[VehicleComments] No extractable content detected');
           setScrapingStatus(null);
       }
       } catch (detectionError) {
