@@ -366,7 +366,7 @@ const BaTBulkImporter: React.FC<Props> = ({
             <div>
               Once your profiles are complete, you'll be able to submit vehicles TO BaT with one click.
               We'll pre-fill their forms with your data, handle the submission, and take a commission on successful sales.
-              N-Zero becomes your central inventory hub with two-way BaT integration.
+              Marque becomes your central inventory hub with two-way BaT integration.
             </div>
           </div>
         </div>

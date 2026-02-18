@@ -392,7 +392,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
           color: 'var(--text-secondary)'
         }}>
           <div style={{ fontWeight: 600, marginBottom: '4px' }}>Fair Play Policy:</div>
-          N-Zero displays external listings for transparency and doesn't compete with other platforms.
+          Marque displays external listings for transparency and doesn't compete with other platforms.
           We provide affiliate links and track attribution to ensure proper credit and commission distribution.
         </div>
       </div>

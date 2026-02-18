@@ -600,7 +600,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   style={{ marginTop: '2px' }}
                 />
                 <span style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
-                  I authorize N-Zero to hold a refundable deposit of ${depositAmount.toLocaleString()} (10% of max bid).
+                  I authorize Marque to hold a refundable deposit of ${depositAmount.toLocaleString()} (10% of max bid).
                   This will be refunded if I don't win, or applied toward my commission if I do win.
                 </span>
               </label>
@@ -684,7 +684,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
               </div>
 
               <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                By confirming, you authorize N-Zero to bid up to ${maxBidAmount.toLocaleString()} on
+                By confirming, you authorize Marque to bid up to ${maxBidAmount.toLocaleString()} on
                 this vehicle. A deposit hold of ${depositAmount.toLocaleString()} will be placed on your
                 payment method.
               </p>

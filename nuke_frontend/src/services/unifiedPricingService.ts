@@ -76,7 +76,7 @@ export class UnifiedPricingService {
     }
 
     try {
-      // 3) native vehicle_listings (N-Zero) - cents column
+      // 3) native vehicle_listings (Marque) - cents column
       const { data: native } = await supabase
         .from('vehicle_listings')
         .select('listing_url, status, current_high_bid_cents, updated_at')

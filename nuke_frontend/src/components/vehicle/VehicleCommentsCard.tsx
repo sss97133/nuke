@@ -59,7 +59,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   useEffect(() => {
     loadComments();
     
-    // Subscribe to new comments (both N-Zero and BaT auction comments)
+    // Subscribe to new comments (both Marque and BaT auction comments)
     const channel = supabase
       .channel(`vehicle-comments-${vehicleId}`)
       .on('postgres_changes', {
@@ -97,7 +97,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     try {
       setLoading(true);
       
-      // Load ALL comment sources: N-Zero, auction_comments, AND bat_comments
+      // Load ALL comment sources: Marque, auction_comments, AND bat_comments
       // Use pagination to fetch all comments (Supabase default limit is 1000, so we fetch in batches)
       const fetchAllComments = async (table: string, select: string, orderBy: string, orderDir: 'asc' | 'desc' = 'desc') => {
         const allResults: any[] = [];
@@ -133,7 +133,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       };
 
       const [nzeroCommentsResult, auctionCommentsResult, batCommentsResult] = await Promise.all([
-        // N-Zero vehicle comments
+        // Marque vehicle comments
         fetchAllComments('vehicle_comments', 'id, user_id, comment_text, created_at, updated_at', 'created_at', 'desc'),
         
         // Auction comments (from auction_comments table) - supports: BaT, Cars & Bids, PCar Market, SBX Cars, etc.
@@ -173,7 +173,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         }
       }
 
-      // Process N-Zero comments
+      // Process Marque comments
       if (nzeroCommentsResult.data && nzeroCommentsResult.data.length > 0) {
         const userIds = [...new Set(nzeroCommentsResult.data.map(c => c.user_id).filter(Boolean))];
         const { data: profilesData } = await supabase
@@ -513,7 +513,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   };
 
   const handleUsernameClick = async (comment: Comment) => {
-    // If user_id exists (N-Zero user or claimed BaT user), go to their profile
+    // If user_id exists (Marque user or claimed BaT user), go to their profile
     if (comment.user_id) {
       navigate(`/profile/${comment.user_id}`);
       return;
@@ -548,7 +548,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       }
       
       if (identity?.claimed_by_user_id) {
-        // They have a claimed N-Zero profile, navigate there
+        // They have a claimed Marque profile, navigate there
         navigate(`/profile/${identity.claimed_by_user_id}`);
       } else if (identity?.id) {
         // No claimed profile but we have external identity - show public profile
@@ -766,7 +766,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             <span style={{ marginLeft: '4px', fontStyle: 'italic' }}>(edited)</span>
                           )}
                         </span>
-                        {/* Edit button - only for user's own N-Zero comments */}
+                        {/* Edit button - only for user's own Marque comments */}
                         {comment.source === 'nzero' && comment.user_id === session?.user?.id && !editingCommentId && (
                           <button
                             onClick={() => handleStartEdit(comment)}
