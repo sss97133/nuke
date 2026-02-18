@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { UserInteractionService } from '../services/userInteractionService';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { getCanonicalBodyStyle, getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
 import { parseMoneyNumber } from '../lib/auctionUtils';
@@ -15,7 +14,7 @@ import { FeedStatsBar, FeedGrid, StatsPanelOverlay } from '../components/feed';
 import FeedTableView from '../components/feed/FeedTableView';
 import ScrollToTopButton from '../components/feed/ScrollToTopButton';
 import FeedFilterPanel from '../components/feed/FeedFilterPanel';
-import type { HypeVehicle, TimePeriod, SalesTimePeriod, ViewMode, SortBy, SortDirection, FilterState, RalphHomepagePreset } from '../types/feedTypes';
+import type { HypeVehicle, TimePeriod, SalesTimePeriod, ViewMode, SortBy, SortDirection, FilterState } from '../types/feedTypes';
 import { SALES_PERIODS } from '../types/feedTypes';
 import { resolveVehicleImageUrl, getOriginImages, cleanDisplayMake, cleanDisplayModel } from '../lib/feedImageUtils';
 import { classifySource, normalizeHost, normalizeAlias, stripTld, looksLikeHttpError, SOURCE_META, type SourceKind } from '../lib/sourceClassification';
@@ -25,10 +24,6 @@ const getDisplayPriceValue = (vehicle: HypeVehicle | null | undefined): number |
   if (!vehicle) return null;
   return parseMoneyNumber((vehicle as any).display_price);
 };
-
-const StaticVerbText = React.memo(function StaticVerbText() {
-  return <>Building</>;
-});
 
 const CursorHomepage: React.FC = () => {
   usePageTitle('Marque');
@@ -64,7 +59,6 @@ const CursorHomepage: React.FC = () => {
     }
   });
   const [showFilters, setShowFilters] = useState<boolean>(true); // Filter bar visible, individual sections start collapsed
-  const [generativeFilters, setGenerativeFilters] = useState<string[]>([]); // Track active generative filters
   const [filters, setFilters] = useState<FilterState>(() => {
     if (!getRememberFilters()) return DEFAULT_FILTERS;
     const saved = loadSavedFilters();
@@ -153,29 +147,10 @@ const CursorHomepage: React.FC = () => {
   });
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [gridWidth, setGridWidth] = useState<number>(0);
-  // ARCHIVED: Thermal pricing - disabled until we're more capable of handling it
-  // const [thermalPricing, setThermalPricing] = useState<boolean>(() => {
-  //   try {
-  //     const saved = localStorage.getItem('nuke_homepage_thermalPricing');
-  //     return saved === 'true';
-  //   } catch {
-  //     return false;
-  //   }
-  // });
-  const thermalPricing = false; // Always disabled
-  const [stats, setStats] = useState({
-    totalBuilds: 0,
-    totalValue: 0,
-    activeToday: 0
-  });
-  const [statsLoading, setStatsLoading] = useState(true);
+  const thermalPricing = false;
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [filterBarMinimized, setFilterBarMinimized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [ralphPresets, setRalphPresets] = useState<RalphHomepagePreset[]>([]);
-  const [ralphLoading, setRalphLoading] = useState(false);
-  const [ralphError, setRalphError] = useState<string | null>(null);
   type StatsPanelKind = 'vehicles' | 'value' | 'for_sale' | 'sold_today' | 'auctions';
   const [statsPanel, setStatsPanel] = useState<StatsPanelKind | null>(null);
   const [statsPanelLoading, setStatsPanelLoading] = useState(false);
@@ -784,15 +759,6 @@ const CursorHomepage: React.FC = () => {
       // ignore
     }
   }, [showFilters]);
-
-  // ARCHIVED: Thermal pricing localStorage
-  // useEffect(() => {
-  //   try {
-  //     localStorage.setItem('nuke_homepage_thermalPricing', String(thermalPricing));
-  //   } catch (err) {
-  //     console.warn('Failed to save thermalPricing:', err);
-  //   }
-  // }, [thermalPricing]);
 
   // Debounce search to avoid clanky re-filtering on every keystroke.
   // Also parse intelligent patterns like year ranges (1970-1975), single years (1970), etc.
@@ -2374,92 +2340,7 @@ const CursorHomepage: React.FC = () => {
 
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
-    setSession(currentSession ?? null); // null for anon, session object for logged-in
-    
-    // Load user preference
-    if (currentSession?.user) {
-      try {
-        const { data: prefs, error: prefsError } = await supabase
-          .from('user_preferences')
-          .select('preferred_view_mode, preferred_device, enable_gestures, enable_haptic_feedback, preferred_vendors, hidden_tags, favorite_makes, interaction_style')
-          .eq('user_id', currentSession.user.id)
-          .maybeSingle();
-        
-        // Handle table not existing or query errors gracefully
-        if (prefsError) {
-          // PGRST301 = table doesn't exist, PGRST116 = relation not found, 400 = bad request (might be missing column or RLS issue)
-          if (prefsError.code === 'PGRST116' || prefsError.code === 'PGRST301' || prefsError.code === 'PGRST202' || prefsError.code === '42P01' || prefsError.code === '42703') {
-            // Table/column doesn't exist or RLS blocking - silently ignore
-            return;
-          }
-          // For other errors, log as warning but don't break the app
-          // Error loading user preferences - silent
-          return;
-        }
-        
-        // Note: user_preferences doesn't have a 'settings' column
-        // If we need preferred_time_period, we'd need to add it as a column
-        // For now, just use defaults
-      } catch (err) {
-        // Table might not exist or other error - silently ignore
-        // Don't log to avoid console noise
-      }
-    }
-  };
-
-  // Load accurate stats from database (not filtered feed)
-  const loadAccurateStats = async () => {
-    try {
-      // Cache to avoid hammering a sometimes-slow RPC on every homepage visit.
-      // If the RPC times out, we keep the UI responsive and fall back to cached stats.
-      const CACHE_KEY = 'nuke_feed_stats_cache_v1';
-      const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-      try {
-        const cachedRaw = localStorage.getItem(CACHE_KEY);
-        if (cachedRaw) {
-          const cached = JSON.parse(cachedRaw);
-          if (cached?.ts && (Date.now() - cached.ts) < CACHE_TTL_MS && cached?.stats) {
-            setStats(cached.stats);
-            setStatsLoading(false);
-            // Continue in background to refresh cache (best-effort).
-          }
-        }
-      } catch {
-        // ignore cache parse errors
-      }
-
-      const timeoutMs = 4000;
-      const rpcPromise = supabase.rpc('get_vehicle_feed_stats');
-      const timeoutPromise = new Promise<{ data: any; error: any }>((resolve) =>
-        setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), timeoutMs)
-      );
-
-      const { data: statsData, error: statsError } = await Promise.race([rpcPromise, timeoutPromise]);
-
-      if (!statsError && statsData) {
-        const next = {
-          totalBuilds: statsData.active_builds || 0,
-          totalValue: statsData.total_value || 0,
-          activeToday: statsData.updated_today || 0
-        };
-        setStats(next);
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stats: next }));
-        } catch {
-          // ignore
-        }
-      } else {
-        // Don't spam console with repeated timeouts; cache should cover most sessions.
-        if (statsError?.message !== 'timeout') {
-          // Failed to load accurate stats - silent
-        }
-      }
-    } catch (err) {
-      // Error loading accurate stats - silent
-    } finally {
-      setStatsLoading(false);
-    }
+    setSession(currentSession ?? null);
   };
 
   const getTimePeriodFilter = () => {
@@ -2493,7 +2374,6 @@ const CursorHomepage: React.FC = () => {
         setLoading(true);
       }
       setError(null);
-      setDebugInfo(null);
 
       const offset = pageNum * PAGE_SIZE;
 
@@ -2788,15 +2668,7 @@ const CursorHomepage: React.FC = () => {
 
       if (error) {
         // Error loading vehicles - set error state for UI
-        setDebugInfo({
-          when: 'CursorHomepage.loadHypeFeed',
-          message: error.message,
-          code: (error as any).code,
-          details: (error as any).details,
-          hint: (error as any).hint,
-          // Snapshot of the intended query shape (helps debug schema drift)
-          filters: { is_public: true, showPending: filters.showPending, timePeriod },
-        });
+        console.error('CursorHomepage.loadHypeFeed error:', error.message, (error as any).code);
         setError('Unable to load vehicles. Please try refreshing the page.');
         setFeedVehicles([]);
         return;
@@ -3312,156 +3184,6 @@ const CursorHomepage: React.FC = () => {
     }).format(value);
   };
 
-  const applyRalphPreset = useCallback((preset: RalphHomepagePreset) => {
-    const next = { ...DEFAULT_FILTERS, ...(preset?.filters || {}) } as FilterState;
-    setFilters(next);
-    setSearchText('');
-    setGenerativeFilters([]);
-    setShowFilters(true);
-    setFilterBarMinimized(false);
-  }, []);
-
-  const loadRalphPresets = useCallback(async () => {
-    if (ralphLoading) return;
-    setRalphLoading(true);
-    setRalphError(null);
-    try {
-      const { data, error: invokeError } = await supabase.functions.invoke('ralph-wiggum-rlm-homepage', {
-        body: {
-          action: 'generate_presets',
-          max_vehicles: 260,
-          max_presets: 10,
-        }
-      });
-
-      if (invokeError) throw invokeError;
-
-      const presets = data?.output?.presets;
-      if (!Array.isArray(presets)) {
-        throw new Error('Ralph returned an unexpected payload');
-      }
-      setRalphPresets(presets as RalphHomepagePreset[]);
-    } catch (e: any) {
-      setRalphError(e?.message || 'Failed to load Ralph presets');
-    } finally {
-      setRalphLoading(false);
-    }
-  }, [ralphLoading]);
-
-  // Generative filters - create 10 random filters
-  const generateRandomFilters = () => {
-    const allVehicles = feedVehicles;
-    if (allVehicles.length === 0) {
-      return; // No vehicles loaded yet
-      return;
-    }
-
-    // Collect available data for randomization
-    const makes = Array.from(new Set(allVehicles.map(v => v.make).filter(Boolean))) as string[];
-    const colors = ['red', 'blue', 'black', 'white', 'green', 'yellow', 'orange', 'silver', 'gray', 'brown'];
-    const conditions = ['excellent', 'good', 'fair', 'creampuff', 'mint', 'pristine', 'survivor'];
-    const areas = ['California', 'Texas', 'Florida', 'New York', 'Arizona', 'Nevada', 'Oregon'];
-    const priceRanges = [
-      { min: 5000, max: 15000, label: '$5k-$15k' },
-      { min: 15000, max: 30000, label: '$15k-$30k' },
-      { min: 30000, max: 50000, label: '$30k-$50k' },
-      { min: 50000, max: 100000, label: '$50k-$100k' },
-    ];
-
-    const randomFilters: string[] = [];
-    const newFilters: FilterState = { ...DEFAULT_FILTERS };
-
-    // Generate 10 random filters (pick 2-3 to apply)
-    const filterTypes: Array<() => void> = [
-      // Make filter
-      () => {
-        if (makes.length > 0) {
-          const make = makes[Math.floor(Math.random() * makes.length)];
-          randomFilters.push(`Only ${make}`);
-          newFilters.makes = [make];
-        }
-      },
-      // Price range
-      () => {
-        const range = priceRanges[Math.floor(Math.random() * priceRanges.length)];
-        randomFilters.push(`Only ${range.label}`);
-        newFilters.priceMin = range.min;
-        newFilters.priceMax = range.max;
-      },
-      // Year range
-      () => {
-        const yearMin = 1960 + Math.floor(Math.random() * 40);
-        const yearMax = Math.min(yearMin + Math.floor(Math.random() * 15) + 5, new Date().getFullYear());
-        randomFilters.push(`Only ${yearMin}-${yearMax}`);
-        newFilters.yearMin = yearMin;
-        newFilters.yearMax = yearMax;
-      },
-      // Color + make combo
-      () => {
-        if (makes.length > 0) {
-          const color = colors[Math.floor(Math.random() * colors.length)];
-          const make = makes[Math.floor(Math.random() * makes.length)];
-          randomFilters.push(`Only ${color} ${make}`);
-          newFilters.makes = [make];
-        }
-      },
-      // Condition/quality
-      () => {
-        const condition = conditions[Math.floor(Math.random() * conditions.length)];
-        randomFilters.push(`Only ${condition} condition`);
-        newFilters.hasImages = true; // Assume creampuffs have images
-      },
-      // Location-based (would need location data)
-      () => {
-        const area = areas[Math.floor(Math.random() * areas.length)];
-        randomFilters.push(`Only ${area}`);
-        // Note: Would need location data in vehicles table
-      },
-      // Price floor
-      () => {
-        const minPrice = [5000, 10000, 20000, 30000, 50000][Math.floor(Math.random() * 5)];
-        randomFilters.push(`Only $${(minPrice / 1000)}k+`);
-        newFilters.priceMin = minPrice;
-      },
-      // For sale only
-      () => {
-        randomFilters.push(`Only for sale`);
-        newFilters.forSale = true;
-      },
-      // Has images
-      () => {
-        randomFilters.push(`Only with images`);
-        newFilters.hasImages = true;
-      },
-      // Specific decade
-      () => {
-        const decades = [
-          { label: '60s', min: 1960, max: 1969 },
-          { label: '70s', min: 1970, max: 1979 },
-          { label: '80s', min: 1980, max: 1989 },
-          { label: '90s', min: 1990, max: 1999 },
-          { label: '2000s', min: 2000, max: 2009 },
-        ];
-        const decade = decades[Math.floor(Math.random() * decades.length)];
-        randomFilters.push(`Only ${decade.label}`);
-        newFilters.yearMin = decade.min;
-        newFilters.yearMax = decade.max;
-      },
-    ];
-
-    // Pick 2-3 random filters to apply
-    const numFilters = 2 + Math.floor(Math.random() * 2); // 2 or 3 filters
-    const selected = new Set<number>();
-    while (selected.size < numFilters && selected.size < filterTypes.length) {
-      selected.add(Math.floor(Math.random() * filterTypes.length));
-    }
-
-    selected.forEach(idx => filterTypes[idx]());
-
-    setGenerativeFilters(randomFilters);
-    setFilters(newFilters);
-    setShowFilters(true); // Show filters when generative filters are applied
-  };
 
   const toggleCollapsedSection = (section: string) => {
     setCollapsedSections(prev => ({
@@ -3613,32 +3335,6 @@ const CursorHomepage: React.FC = () => {
     
     return badges;
   }, [filters]);
-
-  const handleTimePeriodChange = async (period: TimePeriod) => {
-    setTimePeriod(period);
-    
-    if (session?.user) {
-      try {
-        await UserInteractionService.logInteraction(
-          session.user.id,
-          'view',
-          'vehicle',
-          'time-period-filter',
-          {
-            source_page: '/homepage'
-          } as any
-        );
-
-        // Note: user_preferences table doesn't have a 'settings' column
-        // It has individual columns. For now, we'll skip this update
-        // TODO: Add preferred_time_period column to user_preferences table if needed
-        // Silently skip - table structure doesn't support this yet
-      } catch (error: any) {
-        // For other errors, log as warning but don't break the app
-        // Error saving user preferences - silent
-      }
-    }
-  };
 
   // Source pogs are "include chips": if it's in your set, you see those vehicles.
   // We keep legacy `hide*` flags for now, but treat them as derived from "included chips".
