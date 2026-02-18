@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { getCanonicalBodyStyle, getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
+import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
 import { parseMoneyNumber } from '../lib/auctionUtils';
-import { VehicleSearchService } from '../services/vehicleSearchService';
 import { preloadImageBatch } from '../lib/imageOptimizer';
 import ActiveAuctionsPanel from '../components/dashboard/ActiveAuctionsPanel';
 import FBMarketplacePanel from '../components/dashboard/FBMarketplacePanel';
@@ -14,16 +13,12 @@ import { FeedStatsBar, FeedGrid, StatsPanelOverlay } from '../components/feed';
 import FeedTableView from '../components/feed/FeedTableView';
 import ScrollToTopButton from '../components/feed/ScrollToTopButton';
 import FeedFilterPanel from '../components/feed/FeedFilterPanel';
+import { filterAndSortVehicles } from '../lib/feedFilterSort';
 import type { HypeVehicle, TimePeriod, SalesTimePeriod, ViewMode, SortBy, SortDirection, FilterState } from '../types/feedTypes';
 import { SALES_PERIODS } from '../types/feedTypes';
 import { resolveVehicleImageUrl, getOriginImages, cleanDisplayMake, cleanDisplayModel } from '../lib/feedImageUtils';
 import { classifySource, normalizeHost, normalizeAlias, stripTld, looksLikeHttpError, SOURCE_META, type SourceKind } from '../lib/sourceClassification';
 import { DEFAULT_FILTERS, getRememberFilters, loadSavedFilters, saveFiltersToStorage, clearPersistedFiltersAndSort, STORAGE_KEY, REMEMBER_FILTERS_KEY, LOCATION_FAVORITES_KEY } from '../lib/filterPersistence';
-
-const getDisplayPriceValue = (vehicle: HypeVehicle | null | undefined): number | null => {
-  if (!vehicle) return null;
-  return parseMoneyNumber((vehicle as any).display_price);
-};
 
 const CursorHomepage: React.FC = () => {
   usePageTitle('Marque');
@@ -1043,277 +1038,20 @@ const CursorHomepage: React.FC = () => {
     return domainCounts;
   }, [activeSources, domainToFilterKey, getSourceFilterKey]);
 
-  // Apply filters and sorting function - defined before useEffect
   const applyFiltersAndSort = useCallback(() => {
-    let result = [...feedVehicles];
-    
-    // Global search (year/make/model/title/vin). Space-separated terms must all match.
-    if (debouncedSearchText) {
-      const terms = debouncedSearchText
-        .toLowerCase()
-        .split(/\s+/)
-        .map(t => t.trim())
-        .filter(Boolean);
-
-      result = result.filter((v: any) => {
-        const hay = [
-          v.year,
-          v.make,
-          v.model,
-          v.title,
-          v.vin,
-        ].filter(Boolean).join(' ').toLowerCase();
-
-        return terms.every((t) => hay.includes(t));
-      });
-    }
-
-    // Apply filters
-    if (filters.addedTodayOnly) {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 1);
-      const startMs = start.getTime();
-      const endMs = end.getTime();
-
-      result = result.filter((v: any) => {
-        const t = new Date(v.created_at || 0).getTime();
-        return Number.isFinite(t) && t >= startMs && t < endMs;
-      });
-    }
-
-    if (filters.yearMin) {
-      result = result.filter(v => (v.year || 0) >= filters.yearMin!);
-    }
-    if (filters.yearMax) {
-      result = result.filter(v => (v.year || 0) <= filters.yearMax!);
-    }
-    if (filters.makes.length > 0) {
-      result = result.filter(v => filters.makes.some(m =>
-        v.make?.toLowerCase().includes(m.toLowerCase())
-      ));
-    }
-    // Model filter (requires make to be selected)
-    if (filters.models && filters.models.length > 0) {
-      // Use fuzzy matching: strip dashes/slashes/spaces for comparison
-      const normalize = (s: string) => s.toLowerCase().replace(/[-\/\s]/g, '');
-      result = result.filter(v => filters.models!.some(m => {
-        const modelLower = (v.model || '').toLowerCase();
-        const modelNorm = normalize(modelLower);
-        const filterLower = m.toLowerCase();
-        const filterNorm = normalize(m);
-        // Direct match, contains match, or normalized match
-        return modelLower.includes(filterLower) || modelNorm.includes(filterNorm);
-      }));
-    }
-    // Body style filter (car type)
-    if (filters.bodyStyles.length > 0) {
-      const selectedCanon = filters.bodyStyles
-        .map((bs) => getCanonicalBodyStyle(bs))
-        .filter(Boolean) as any[];
-      result = result.filter(v => {
-        const canon = getCanonicalBodyStyle((v as any).canonical_body_style || (v as any).body_style);
-        return canon ? selectedCanon.includes(canon) : false;
-      });
-    } else {
-      // Default: keep motorcycles out of the main vehicle feed unless explicitly selected.
-      result = result.filter((v: any) => {
-        const canon = getCanonicalBodyStyle((v as any).canonical_body_style || (v as any).body_style);
-        return canon !== 'MOTORCYCLE';
-      });
-    }
-    // 4x4/4WD/AWD filter
-    if (filters.is4x4) {
-      result = result.filter(v => {
-        const drivetrain = ((v as any).drivetrain || '').toLowerCase();
-        return drivetrain.includes('4wd') || drivetrain.includes('4x4') || drivetrain.includes('awd');
-      });
-    }
-    if (filters.priceMin) {
-      result = result.filter(v => (getDisplayPriceValue(v) ?? 0) >= filters.priceMin!);
-    }
-    if (filters.priceMax) {
-      result = result.filter(v => (getDisplayPriceValue(v) ?? 0) <= filters.priceMax!);
-    }
-    if (filters.hasImages) {
-      result = result.filter(v => (v.image_count || 0) > 0);
-    }
-    if (filters.forSale) {
-      result = result.filter(v => v.is_for_sale);
-    }
-    if (filters.hideSold) {
-      result = result.filter(v => {
-        const salePrice = Number((v as any).sale_price || 0) || 0;
-        const saleDate = (v as any).sale_date;
-        const saleStatus = String((v as any).sale_status || '').toLowerCase();
-        const outcome = String((v as any).auction_outcome || '').toLowerCase();
-        const isAuctionResult =
-          ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) ||
-          ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
-        const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold' || isAuctionResult;
-        return !isSold;
-      });
-    }
-
-    // Show ONLY sold vehicles (for sold stats view)
-    if (filters.showSoldOnly) {
-      const period = SALES_PERIODS.find(p => p.value === salesPeriod);
-      const cutoffDate = period && period.days !== null
-        ? new Date(Date.now() - period.days * 24 * 60 * 60 * 1000)
-        : null;
-
-      result = result.filter(v => {
-        const salePrice = Number((v as any).sale_price || 0) || 0;
-        if (salePrice < 500) return false; // Must have real sale price
-
-        const saleDateStr = (v as any).sale_date;
-        if (!saleDateStr) return false;
-
-        // Check if within time period
-        if (cutoffDate) {
-          const saleDate = new Date(saleDateStr);
-          if (isNaN(saleDate.getTime()) || saleDate < cutoffDate) return false;
-        }
-
-        return true;
-      });
-
-      // Sort by sale date (newest first) when showing sold
-      result.sort((a, b) => {
-        const aDate = new Date((a as any).sale_date || 0).getTime();
-        const bDate = new Date((b as any).sale_date || 0).getTime();
-        return bDate - aDate;
-      });
-    }
-
-    // Private party filter - vehicles without organization_id or from private party sources
-    if (filters.privateParty) {
-      result = result.filter(v => {
-        const orgId = (v as any).origin_organization_id;
-        const source = classifySource(v);
-        // Private party: no org ID, or from Craigslist (typically private)
-        return !orgId || source === 'craigslist';
-      });
-    }
-    
-    // Dealer filter - vehicles with organization_id or from dealer sources
-    if (filters.dealer) {
-      result = result.filter(v => {
-        const orgId = (v as any).origin_organization_id;
-        const source = classifySource(v);
-        // Dealer: has org ID, or from dealer sites, or BaT (often dealers)
-        return !!orgId || source === 'dealer_site' || source === 'bat';
-      });
-    }
-
-    // Source / dealer-ish filtering - use inclusion-based logic
-    // Check if any sources are explicitly excluded (indicating user has made selections)
-    const hasSourceSelections = 
-      filters.hideDealerListings ||
-      filters.hideCraigslist ||
-      filters.hideDealerSites ||
-      filters.hideKsl ||
-      filters.hideBat ||
-      filters.hideClassic ||
-      (filters.hiddenSources && filters.hiddenSources.length > 0);
-
-    if (hasSourceSelections) {
-      result = result.filter((v: any) => {
-        const src = getSourceFilterKey(v);
-        return includedSources[src] === true;
-      });
-    }
-    
-    // Location filtering - support multiple locations with radius (distance) or exact zip
-    const activeLocations: Array<{ zipCode: string; radiusMiles: number }> =
-      filters.locations && filters.locations.length > 0
-        ? filters.locations
-        : filters.zipCode && filters.zipCode.length === 5 && filters.radiusMiles > 0
-          ? [{ zipCode: filters.zipCode, radiusMiles: filters.radiusMiles }]
-          : [];
-    if (activeLocations.length > 0) {
-      result = result.filter(v => {
-        const vehicleLat = (v as any).gps_latitude != null ? Number((v as any).gps_latitude) : null;
-        const vehicleLng = (v as any).gps_longitude != null ? Number((v as any).gps_longitude) : null;
-        const vehicleZip = (v as any).zip_code || (v as any).location_zip || null;
-        return activeLocations.some(loc => {
-          const coords = locationZipCoords[loc.zipCode];
-          if (vehicleLat != null && vehicleLng != null && coords) {
-            const distance = VehicleSearchService.calculateDistance(coords.lat, coords.lng, vehicleLat, vehicleLng);
-            return distance <= loc.radiusMiles;
-          }
-          // Fallback: exact zip match when no coords or vehicle has no lat/lng
-          if (vehicleZip) return vehicleZip === loc.zipCode;
-          return false;
-        });
-      });
-    }
-    
-    const compareDisplayPrice = (a: HypeVehicle, b: HypeVehicle) => {
-      const aPrice = getDisplayPriceValue(a);
-      const bPrice = getDisplayPriceValue(b);
-      if (aPrice === null && bPrice === null) return 0;
-      if (aPrice === null) return 1;
-      if (bPrice === null) return -1;
-      return sortDirection === 'desc' ? bPrice - aPrice : aPrice - bPrice;
-    };
-
-    // Apply sorting with direction - default to newest (created_at DESC)
-    const dir = sortDirection === 'desc' ? 1 : -1;
-    switch (sortBy) {
-      case 'year':
-        result.sort((a, b) => dir * ((b.year || 0) - (a.year || 0)));
-        break;
-      case 'make':
-        result.sort((a, b) => dir * (a.make || '').localeCompare(b.make || ''));
-        break;
-      case 'model':
-        result.sort((a, b) => dir * (a.model || '').localeCompare(b.model || ''));
-        break;
-      case 'mileage':
-        result.sort((a, b) => dir * ((b.mileage || 0) - (a.mileage || 0)));
-        break;
-      case 'newest':
-        result.sort((a, b) => {
-          const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
-          const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
-          return dir * (bTime - aTime);
-        });
-        break;
-      case 'oldest':
-        result.sort((a, b) => 
-          dir * (new Date(a.updated_at || a.created_at || 0).getTime() - 
-          new Date(b.updated_at || b.created_at || 0).getTime())
-        );
-        break;
-      case 'price_high':
-      case 'price_low':
-        result.sort(compareDisplayPrice);
-        break;
-      case 'volume':
-        result.sort((a, b) => 0);
-        break;
-      case 'images':
-        result.sort((a, b) => dir * ((b.image_count || 0) - (a.image_count || 0)));
-        break;
-      case 'events':
-        result.sort((a, b) => dir * ((b.event_count || 0) - (a.event_count || 0)));
-        break;
-      case 'views':
-        result.sort((a, b) => dir * ((b.view_count || 0) - (a.view_count || 0)));
-        break;
-      default:
-        // Default: newest first (created_at DESC)
-        result.sort((a, b) => {
-          const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
-          const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
-          return bTime - aTime;
-        });
-    }
-    
+    const result = filterAndSortVehicles({
+      vehicles: feedVehicles,
+      filters,
+      searchText: debouncedSearchText,
+      sortBy,
+      sortDirection,
+      includedSources,
+      getSourceFilterKey,
+      salesPeriod,
+      locationZipCoords,
+    });
     setFilteredVehicles(result);
-  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, activeSources, domainToFilterKey, getDisplayPriceValue, salesPeriod, locationZipCoords]);
+  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, getSourceFilterKey, salesPeriod, locationZipCoords]);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
