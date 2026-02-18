@@ -24,6 +24,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -282,13 +283,16 @@ async function upsertVehicle(
     return { vehicleId: null, created: false, error: `Find error: ${findError.message}` };
   }
 
+  // Normalize make/model/transmission/drivetrain
+  const norm = normalizeVehicleFields(extracted);
+
   const vehicleData = {
-    year: extracted.year,
-    make: extracted.make,
-    model: extracted.model,
+    year: norm.year ?? extracted.year,
+    make: norm.make ?? extracted.make,
+    model: norm.model ?? extracted.model,
     trim: extracted.trim,
     mileage: extracted.mileage,
-    transmission: extracted.transmission,
+    transmission: norm.transmission ?? extracted.transmission,
     fuel_type: extracted.fuel_type,
     drivetrain: extracted.drivetrain,
     listing_url: extracted.listing_url,
