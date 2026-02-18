@@ -20,6 +20,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -641,10 +642,11 @@ async function saveToDatabase(
   });
   let vehicleId: string | null = resolvedId;
 
+  const norm = normalizeVehicleFields({ make: extracted.make, model: extracted.model, year: extracted.year });
   const vehicleData = {
-    year: extracted.year,
-    make: extracted.make?.toLowerCase(),
-    model: extracted.model?.toLowerCase(),
+    year: norm.year ?? extracted.year,
+    make: norm.make ?? extracted.make,
+    model: norm.model ?? extracted.model,
     vin: extracted.chassis_number?.toUpperCase() || null,
     mileage: extracted.mileage,
     description: extracted.description,

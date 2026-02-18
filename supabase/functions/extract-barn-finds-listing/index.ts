@@ -13,6 +13,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
@@ -160,12 +161,13 @@ serve(async (req) => {
     });
 
     const listingUrlKey = normalizeListingUrlKey(url);
+    const norm = normalizeVehicleFields({ make, model, year });
     const vehicleRow = {
       discovery_url: url,
       discovery_source: platform,
-      year: year || undefined,
-      make: make?.toLowerCase(),
-      model: model?.toLowerCase(),
+      year: norm.year ?? year ?? undefined,
+      make: norm.make ?? make,
+      model: norm.model ?? model,
       vin: vin || undefined,
       sale_price: salePrice ?? undefined,
       title: title || undefined,

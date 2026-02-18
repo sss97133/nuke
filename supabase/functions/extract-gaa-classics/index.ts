@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 /**
  * GAA Classic Cars Extractor
  *
@@ -467,10 +468,11 @@ async function upsertVehicle(
     }
   }
 
+  const norm = normalizeVehicleFields({ make: extracted.make, model: extracted.model, year: extracted.year });
   const vehicleData = {
-    year: extracted.year,
-    make: extracted.make?.toLowerCase(),
-    model: extracted.model?.toLowerCase(),
+    year: norm.year ?? extracted.year,
+    make: norm.make ?? extracted.make,
+    model: norm.model ?? extracted.model,
     trim: extracted.sub_model,
     vin: extracted.vin?.toUpperCase(),
     mileage: extracted.mileage,
@@ -600,10 +602,11 @@ async function upsertVehiclesFromGrid(
       }
     }
 
+    const itemNorm = normalizeVehicleFields({ make: item.make, model: item.model, year: item.year });
     const vehicleData = {
-      year: item.year,
-      make: item.make?.toLowerCase(),
-      model: item.model?.toLowerCase(),
+      year: itemNorm.year ?? item.year,
+      make: itemNorm.make ?? item.make,
+      model: itemNorm.model ?? item.model,
       vin: item.vin?.toUpperCase(),
       listing_url: item.url,
       discovery_url: item.url,
