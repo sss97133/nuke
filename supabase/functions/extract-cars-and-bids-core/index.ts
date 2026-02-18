@@ -13,6 +13,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -815,6 +816,12 @@ serve(async (req) => {
 
     // Canonical organization ID for Cars & Bids (from organizations table)
     const CARS_AND_BIDS_ORG_ID = "4dac1878-b3fc-424c-9e92-3cf552f1e053";
+
+    // Normalize make/model/transmission before insert
+    const norm = normalizeVehicleFields(extracted);
+    if (norm.make) extracted.make = norm.make;
+    if (norm.model) extracted.model = norm.model;
+    if (norm.transmission) extracted.transmission = norm.transmission;
 
     // Prepare vehicle data (use actual column names from vehicles table)
     const vehicleData: Record<string, any> = {

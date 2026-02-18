@@ -17,6 +17,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 // ============================================================================
 // TYPES
@@ -751,6 +752,13 @@ serve(async (req) => {
 
     console.log(`[hagerty] Extracting: ${url}`);
     const { extracted, fetchSource } = await extractHagertyListing(url);
+
+    // Normalize make/model/transmission/drivetrain
+    const norm = normalizeVehicleFields(extracted);
+    if (norm.make) extracted.make = norm.make;
+    if (norm.model) extracted.model = norm.model;
+    if (norm.transmission) extracted.transmission = norm.transmission;
+    if (norm.drivetrain) extracted.drivetrain = norm.drivetrain;
 
     // Log results
     console.log(`=== HAGERTY EXTRACTION RESULTS ===`);

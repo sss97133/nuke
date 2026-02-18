@@ -9,6 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { fetchBatPage, logFetchCost, type FetchResult } from '../_shared/batFetcher.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts';
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -747,6 +748,13 @@ serve(async (req) => {
       console.log(`=== FETCH SOURCE: ${lastFetchResult.source.toUpperCase()} (cost: ${lastFetchResult.costCents} cents) ===`);
     }
     
+    // Normalize make/model/year/transmission/drivetrain
+    const norm = normalizeVehicleFields(extracted);
+    if (norm.make) extracted.make = norm.make;
+    if (norm.model) extracted.model = norm.model;
+    if (norm.transmission) extracted.transmission = norm.transmission;
+    if (norm.drivetrain) extracted.drivetrain = norm.drivetrain;
+
     console.log(`=== EXTRACTION RESULTS ===`);
     console.log(`Title: ${extracted.title}`);
     console.log(`Year/Make/Model: ${extracted.year} ${extracted.make} ${extracted.model}`);

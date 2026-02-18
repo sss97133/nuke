@@ -21,6 +21,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -288,13 +289,16 @@ async function saveVehicle(
     return { vehicleId: resolvedId, isNew: false };
   }
 
+  // Normalize before insert
+  const normalized = normalizeVehicleFields({ make: vehicle.make, model: vehicle.model, year: vehicle.year });
+
   // Create new vehicle
   const { data: newVehicle, error: vehicleError } = await supabase
     .from('vehicles')
     .insert({
-      year: vehicle.year,
-      make: vehicle.make,
-      model: vehicle.model,
+      year: normalized.year ?? vehicle.year,
+      make: normalized.make ?? vehicle.make,
+      model: normalized.model ?? vehicle.model,
       sale_price: vehicle.sold_price,
       sale_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'available' : 'ended'),
       listing_url: vehicle.url,
