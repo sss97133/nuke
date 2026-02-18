@@ -9,6 +9,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 import { getLLMConfig, callLLM, type LLMProvider } from '../_shared/llmProvider.ts'
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -403,6 +404,9 @@ serve(async (req) => {
         let domainSlug = 'ai_extraction'
         try { domainSlug = new URL(url).hostname.replace(/^www\./, '').replace(/\.com$|\.org$|\.net$|\.co\.uk$/,''); } catch {}
 
+        // Normalize make/model/transmission/drivetrain/VIN via shared canonical layer
+        normalizeVehicleFields(normalized);
+
         const vehiclePayload: Record<string, any> = {
           year: normalized.year,
           make: normalized.make,
@@ -423,7 +427,7 @@ serve(async (req) => {
           discovery_url: url,
           discovery_source: source || domainSlug,
           profile_origin: source || 'ai_extraction',
-          extractor_version: 'extract-vehicle-data-ai:1.0',
+          extractor_version: 'extract-vehicle-data-ai:1.1',
           status: 'active',
         }
 
