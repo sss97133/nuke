@@ -2,12 +2,12 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Static pages (footer/legal)
-import About from '../pages/About';
-import PrivacyPolicy from '../pages/PrivacyPolicy';
-import TermsOfService from '../pages/TermsOfService';
-import DataDeletion from '../pages/DataDeletion';
-import EULA from '../pages/EULA';
+// Static pages (footer/legal) — lazy-loaded since rarely visited
+const About = React.lazy(() => import('../pages/About'));
+const PrivacyPolicy = React.lazy(() => import('../pages/PrivacyPolicy'));
+const TermsOfService = React.lazy(() => import('../pages/TermsOfService'));
+const DataDeletion = React.lazy(() => import('../pages/DataDeletion'));
+const EULA = React.lazy(() => import('../pages/EULA'));
 
 // Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
 const Search = React.lazy(() => import('../pages/Search'));
