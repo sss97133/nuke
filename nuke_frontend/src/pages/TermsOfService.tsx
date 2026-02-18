@@ -14,7 +14,7 @@ const TermsOfService: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to load terms of service:', err);
-        setContent('# Terms of Service\n\nFailed to load terms. Please contact legal@n-zero.dev');
+        setContent('# Terms of Service\n\nFailed to load terms. Please contact legal@marque.com');
         setLoading(false);
       });
   }, []);

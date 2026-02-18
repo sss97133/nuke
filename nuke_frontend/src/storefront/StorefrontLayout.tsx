@@ -137,7 +137,7 @@ export default function StorefrontLayout({ organization, children }: Props) {
               </a>
             )}
             <span style={{ color: 'var(--text-disabled)' }}>
-              Powered by <a href="https://n-zero.app" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>n-zero</a>
+              Powered by <a href="https://n-zero.dev" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Marque</a>
             </span>
           </div>
         </div>

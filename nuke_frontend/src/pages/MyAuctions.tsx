@@ -314,7 +314,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, type, listings
       case 'total_views': {
         const viewsByPlatform = Object.entries(stats.by_platform).map(([platform, data]) => ({
           platform,
-          label: platform === 'nzero' ? 'n-zero' : platform.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          label: platform === 'nzero' ? 'Marque' : platform.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
           value: listings
             .filter(l => l.platform === platform)
             .reduce((sum, l) => sum + (l.view_count || 0), 0),
@@ -368,7 +368,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, type, listings
       case 'total_bids': {
         const bidsByPlatform = Object.entries(stats.by_platform).map(([platform, data]) => ({
           platform,
-          label: platform === 'nzero' ? 'n-zero' : platform.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          label: platform === 'nzero' ? 'Marque' : platform.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
           value: listings
             .filter(l => l.platform === platform)
             .reduce((sum, l) => sum + (l.bid_count || 0), 0),
@@ -629,7 +629,7 @@ const SoldVehicleCard: React.FC<{
         )}
 
         <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--font-size-small)', color: 'var(--text-muted)' }}>
-          Platform: {listing.platform === 'nzero' ? 'n-zero' : listing.platform.replace(/_/g, ' ')}
+          Platform: {listing.platform === 'nzero' ? 'Marque' : listing.platform.replace(/_/g, ' ')}
           {listing.sold_at && ` • Sold: ${new Date(listing.sold_at).toLocaleDateString()}`}
         </div>
       </div>
@@ -925,7 +925,7 @@ const MyAuctions: React.FC = () => {
           }}
         >
           <option value="all">All Platforms</option>
-          <option value="nzero">n-zero</option>
+          <option value="nzero">Marque</option>
           <option value="bat">Bring a Trailer</option>
           <option value="ebay_motors">eBay Motors</option>
           <option value="cars_and_bids">Cars & Bids</option>

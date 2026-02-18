@@ -17,7 +17,7 @@ const About: React.FC = () => {
               Executive Summary
             </h2>
             <p style={{ fontSize: '10pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
-              <strong>NUKE (N-Zero)</strong> is a vehicle identity platform that treats every Vehicle Identification Number (VIN) as a persistent digital entity. Our mission is to create canonical, verifiable records of vehicle history, condition, and value that transcend ownership changes—building the definitive digital identity for every vehicle.
+              <strong>Marque</strong> is a vehicle identity platform that treats every Vehicle Identification Number (VIN) as a persistent digital entity. Our mission is to create canonical, verifiable records of vehicle history, condition, and value that transcend ownership changes—building the definitive digital identity for every vehicle.
             </p>
             <p style={{ fontSize: '10pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
               The platform serves three primary stakeholders:

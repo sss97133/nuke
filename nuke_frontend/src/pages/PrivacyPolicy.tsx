@@ -14,7 +14,7 @@ const PrivacyPolicy: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to load privacy policy:', err);
-        setContent('# Privacy Policy\n\nFailed to load privacy policy. Please contact privacy@n-zero.dev');
+        setContent('# Privacy Policy\n\nFailed to load privacy policy. Please contact privacy@marque.com');
         setLoading(false);
       });
   }, []);
