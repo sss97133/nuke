@@ -308,43 +308,54 @@ const Login = () => {
               {authMethod === 'email' ? (
                 <>
                   <div style={{ marginBottom: '16px' }}>
+                    <label htmlFor="login-email" className="sr-only">Email</label>
                     <input
+                      id="login-email"
                       type="email"
                       className="input"
                       placeholder="Email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      autoComplete="email"
                     />
                   </div>
 
                   <div style={{ marginBottom: '24px' }}>
+                    <label htmlFor="login-password" className="sr-only">Password</label>
                     <input
+                      id="login-password"
                       type="password"
                       className="input"
                       placeholder="Password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      autoComplete="current-password"
                     />
                   </div>
                 </>
               ) : (
                 <>
                   <div style={{ marginBottom: '16px' }}>
+                    <label htmlFor="login-phone" className="sr-only">Phone number</label>
                     <input
+                      id="login-phone"
                       type="tel"
                       className="input"
                       placeholder="Phone number (e.g., +1234567890)"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       required
+                      autoComplete="tel"
                     />
                   </div>
 
                   {showOtpInput && (
                     <div style={{ marginBottom: '16px' }}>
+                      <label htmlFor="login-otp" className="sr-only">OTP code</label>
                       <input
+                        id="login-otp"
                         type="text"
                         className="input"
                         placeholder="Enter OTP code"
@@ -352,6 +363,7 @@ const Login = () => {
                         onChange={(e) => setOtpCode(e.target.value)}
                         maxLength={6}
                         required
+                        autoComplete="one-time-code"
                       />
                     </div>
                   )}

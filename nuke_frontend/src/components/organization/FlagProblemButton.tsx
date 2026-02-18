@@ -98,6 +98,8 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
       <button
         onClick={() => setShowMenu(!showMenu)}
         className="button button-secondary"
+        aria-haspopup="menu"
+        aria-expanded={showMenu}
         style={{
           fontSize: '8pt',
           padding: '4px 8px',
@@ -110,7 +112,7 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
 
       {showMenu && (
         <>
-          <div 
+          <div
             style={{
               position: 'fixed',
               top: 0,
@@ -122,6 +124,7 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
             onClick={() => setShowMenu(false)}
           />
           <div
+            role="menu"
             style={{
               position: 'absolute',
               top: '100%',
@@ -138,7 +141,10 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
             {PROBLEM_FLAGS.map(flag => (
               <div
                 key={flag.value}
+                role="menuitem"
+                tabIndex={0}
                 onClick={() => handleFlag(flag.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleFlag(flag.value); } }}
                 style={{
                   padding: '10px 12px',
                   fontSize: '8pt',

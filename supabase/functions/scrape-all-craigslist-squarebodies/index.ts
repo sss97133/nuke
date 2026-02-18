@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -649,10 +650,11 @@ serve(async (req) => {
                   const normalizedPrice = normalizeVehiclePrice(rawPrice);
                   
                   // Build insert - service role should bypass RLS, but include user_id if provided
+                  const norm = normalizeVehicleFields({ make: finalMake, model: finalModel, year: yearInt });
                   const vehicleInsert: any = {
-                    year: yearInt,
-                    make: finalMake.charAt(0).toUpperCase() + finalMake.slice(1),
-                    model: finalModel,
+                    year: norm.year ?? yearInt,
+                    make: norm.make ?? finalMake,
+                    model: norm.model ?? finalModel,
                     vin: scrapeData.data.vin || null,
                     color: scrapeData.data.color || scrapeData.data.exterior_color || null,
                     mileage: scrapeData.data.mileage || null,

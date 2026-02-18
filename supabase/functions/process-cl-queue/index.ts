@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { extractAndCacheFavicon } from '../_shared/extractFavicon.ts'
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts'
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts'
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -478,12 +479,13 @@ serve(async (req) => {
         // Create new vehicle if not found (REFITTED - minimal insert)
         if (!vehicleId) {
           const loc = normalizeListingLocation((data as any)?.location || null)
+          const norm = normalizeVehicleFields({ make: finalMake, model: finalModel, year: yearNum });
           const { data: newVehicle, error: vehicleError } = await supabase
             .from('vehicles')
             .insert({
-              year: yearNum,
-              make: finalMake ? (finalMake.charAt(0).toUpperCase() + finalMake.slice(1)) : null,
-              model: finalModel || null,
+              year: norm.year ?? yearNum,
+              make: norm.make ?? finalMake,
+              model: norm.model ?? finalModel,
               asking_price: (data as any)?.asking_price || (data as any)?.price || null,
               description: rawDesc || null,
               discovery_source: 'craigslist_scrape',
