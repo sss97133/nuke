@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import {
-  PhotoIcon,
-  WrenchScrewdriverIcon,
-} from '@heroicons/react/24/outline';
+import { ImageIcon, Wrench } from 'lucide-react';
 
 interface EnhancedTimelineEventData {
   // Basic event data
@@ -395,7 +392,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
         <label className="block text-xs font-medium mb-2">Photos</label>
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
           <div className="text-center">
-            <PhotoIcon className="mx-auto h-8 w-8 text-gray-400" />
+            <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
             <div className="mt-2">
               <label htmlFor="image-upload" className="cursor-pointer">
                 <span className="text-xs text-blue-600 hover:text-blue-500">
@@ -616,7 +613,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
         </div>
       ) : (
         <div className="text-center py-4 text-gray-500">
-          <WrenchScrewdriverIcon className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+          <Wrench className="w-6 h-6 mx-auto mb-2 text-gray-400" />
           <p className="text-xs">No parts added yet</p>
           <p className="text-xs">Click "Add Part" to track materials used</p>
         </div>

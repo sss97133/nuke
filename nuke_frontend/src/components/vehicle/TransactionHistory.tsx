@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { FiDollarSign, FiTrendingUp, FiTrendingDown, FiCalendar, FiUser } from 'react-icons/fi';
+import { DollarSign, TrendingUp, TrendingDown, Calendar, User } from 'lucide-react';
 
 interface TransactionHistoryProps {
   vehicleId: string;
@@ -22,8 +22,8 @@ interface Transaction {
 const TRANSACTION_TYPES: Record<string, { label: string; icon: React.ComponentType; color: string }> = {
   purchase: { label: 'Purchase', icon: FiDollarSign, color: 'blue' },
   sale: { label: 'Sale', icon: FiDollarSign, color: 'green' },
-  appraisal: { label: 'Appraisal', icon: FiTrendingUp, color: 'purple' },
-  market_value_update: { label: 'Market Value', icon: FiTrendingUp, color: 'indigo' },
+  appraisal: { label: 'Appraisal', icon: TrendingUp, color: 'purple' },
+  market_value_update: { label: 'Market Value', icon: TrendingUp, color: 'indigo' },
   insurance_valuation: { label: 'Insurance', icon: FiDollarSign, color: 'yellow' },
   trade: { label: 'Trade', icon: FiDollarSign, color: 'orange' },
   auction: { label: 'Auction', icon: FiDollarSign, color: 'red' }
@@ -93,9 +93,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
             <div className="text-right">
               <div className="flex items-center gap-2">
                 {valueChange >= 0 ? (
-                  <FiTrendingUp className="w-5 h-5 text-green-600" />
+                  <TrendingUp className="w-5 h-5 text-green-600" />
                 ) : (
-                  <FiTrendingDown className="w-5 h-5 text-red-600" />
+                  <TrendingDown className="w-5 h-5 text-red-600" />
                 )}
                 <div>
                   <div className={`text-lg font-bold ${valueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -172,12 +172,12 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
 
                           <div className="flex items-center gap-3 text-xs text-gray-600">
                             <span className="flex items-center gap-1">
-                              <FiCalendar className="w-3 h-3" />
+                              <Calendar className="w-3 h-3" />
                               {new Date(transaction.transaction_date || transaction.created_at).toLocaleDateString()}
                             </span>
                             {transaction.logged_by && (
                               <span className="flex items-center gap-1">
-                                <FiUser className="w-3 h-3" />
+                                <User className="w-3 h-3" />
                                 Logged by user
                               </span>
                             )}

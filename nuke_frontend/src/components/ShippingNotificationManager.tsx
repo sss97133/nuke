@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  BellIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-  UserPlusIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
+import { Bell, Phone, Mail, UserPlus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface NotificationRecipient {
@@ -92,7 +86,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Add Notification Recipient</h3>
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-              <XMarkIcon className="w-5 h-5" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -250,7 +244,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
     <div className="bg-gray-50 rounded-lg p-4 mt-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
-          <BellIcon className="w-5 h-5 text-blue-600" />
+          <Bell className="w-5 h-5 text-blue-600" />
           <h4 className="font-medium">Shipping Notifications</h4>
         </div>
         {isOwner && (
@@ -258,7 +252,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
             onClick={() => setShowAddForm(true)}
             className="button button-small"
           >
-            <UserPlusIcon className="w-4 h-4 mr-1" />
+            <UserPlus className="w-4 h-4 mr-1" />
             Add Recipient
           </button>
         )}
@@ -279,9 +273,9 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
               <div className="flex items-center space-x-3">
                 <div className={`p-1 rounded ${recipient.is_buyer ? 'bg-blue-100' : 'bg-gray-100'}`}>
                   {recipient.notification_method === 'sms' || recipient.notification_method === 'both' ? (
-                    <PhoneIcon className="w-4 h-4 text-gray-600" />
+                    <Phone className="w-4 h-4 text-gray-600" />
                   ) : (
-                    <EnvelopeIcon className="w-4 h-4 text-gray-600" />
+                    <Mail className="w-4 h-4 text-gray-600" />
                   )}
                 </div>
                 <div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { FiFileText, FiImage, FiDollarSign, FiClock, FiUser, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
+import { FileText, ImageIcon, DollarSign, Clock, User, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ValuationCitationsProps {
   vehicleId: string;
@@ -24,15 +24,15 @@ interface Citation {
 }
 
 const EVIDENCE_ICONS: Record<string, React.ComponentType> = {
-  receipt: FiFileText,
-  invoice: FiFileText,
-  title: FiFileText,
-  image_tag: FiImage,
-  market_listing: FiDollarSign,
-  appraisal_doc: FiFileText,
-  user_input: FiUser,
-  ai_extraction: FiClock,
-  system_calculation: FiClock
+  receipt: FileText,
+  invoice: FileText,
+  title: FileText,
+  image_tag: ImageIcon,
+  market_listing: DollarSign,
+  appraisal_doc: FileText,
+  user_input: User,
+  ai_extraction: Clock,
+  system_calculation: Clock
 };
 
 const COMPONENT_LABELS: Record<string, string> = {
@@ -122,7 +122,7 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
         </div>
         <div className="card-body">
           <div className="text-center text-gray-500">
-            <FiDollarSign className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <DollarSign className="w-12 h-12 mx-auto mb-2 text-gray-300" />
             <p>No valuation data recorded yet</p>
             <p className="text-sm mt-1">Upload receipts and documents to build a transparent valuation.</p>
           </div>
@@ -170,7 +170,7 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
                 {/* Citations in Group */}
                 <div className="divide-y divide-gray-200">
                   {citationGroup.map((citation) => {
-                    const EvidenceIcon = EVIDENCE_ICONS[citation.evidence_type || 'user_input'] || FiFileText;
+                    const EvidenceIcon = EVIDENCE_ICONS[citation.evidence_type || 'user_input'] || FileText;
                     const isVerified = ['user_verified', 'peer_verified', 'professional_verified', 'receipt_confirmed'].includes(citation.verification_status);
                     
                     return (
@@ -183,19 +183,19 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
                                 {citation.component_name || COMPONENT_LABELS[citation.component_type]}
                               </span>
                               {isVerified && (
-                                <FiCheckCircle className="w-4 h-4 text-green-500" title="Verified" />
+                                <CheckCircle className="w-4 h-4 text-green-500" title="Verified" />
                               )}
                             </div>
 
                             <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-600">
                               {citation.submitter_name && (
                                 <span className="flex items-center gap-1">
-                                  <FiUser className="w-3 h-3" />
+                                  <User className="w-3 h-3" />
                                   {citation.submitter_name}
                                 </span>
                               )}
                               <span className="flex items-center gap-1">
-                                <FiClock className="w-3 h-3" />
+                                <Clock className="w-3 h-3" />
                                 {new Date(citation.submitted_at).toLocaleDateString()}
                               </span>
                               <span className="capitalize">{citation.evidence_type.replace('_', ' ')}</span>
@@ -227,7 +227,7 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
         {/* Info Footer */}
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
           <div className="font-medium flex items-center gap-2">
-            <FiCheckCircle className="w-4 h-4" />
+            <CheckCircle className="w-4 h-4" />
             Transparent Valuation
           </div>
           <div className="mt-1 text-blue-700">

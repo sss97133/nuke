@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { FiCheck, FiX, FiEdit2, FiSkipForward, FiArrowLeft } from 'react-icons/fi';
+import { Check, X, Pencil, SkipForward, ArrowLeft, CheckCircle } from 'lucide-react';
 
 interface QueueItem {
   id: string;
@@ -173,7 +173,7 @@ export default function CurationQueue() {
       <div className="section">
         <div className="card">
           <div className="card-body text-center">
-            <FiCheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
+            <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
             <h2 className="text-2xl font-bold mb-2">All Caught Up!</h2>
             <p className="text-gray-600 mb-4">
               No items need your review right now.
@@ -203,7 +203,7 @@ export default function CurationQueue() {
               onClick={() => navigate('/dashboard')}
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
             >
-              <FiArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4" />
               Back
             </button>
             <div className="text-sm font-medium">
@@ -284,7 +284,7 @@ export default function CurationQueue() {
               onClick={handleApprove}
               className="bg-green-500 hover:bg-green-600 text-white p-6 rounded-lg flex flex-col items-center gap-2 transition-colors"
             >
-              <FiCheck className="w-8 h-8" />
+              <Check className="w-8 h-8" />
               <span className="font-bold">Approve</span>
               <span className="text-xs opacity-80">(Y)</span>
             </button>
@@ -293,7 +293,7 @@ export default function CurationQueue() {
               onClick={handleReject}
               className="bg-red-500 hover:bg-red-600 text-white p-6 rounded-lg flex flex-col items-center gap-2 transition-colors"
             >
-              <FiX className="w-8 h-8" />
+              <X className="w-8 h-8" />
               <span className="font-bold">Reject</span>
               <span className="text-xs opacity-80">(N)</span>
             </button>
@@ -302,7 +302,7 @@ export default function CurationQueue() {
               onClick={handleEdit}
               className="bg-blue-500 hover:bg-blue-600 text-white p-6 rounded-lg flex flex-col items-center gap-2 transition-colors"
             >
-              <FiEdit2 className="w-8 h-8" />
+              <Pencil className="w-8 h-8" />
               <span className="font-bold">Correct</span>
               <span className="text-xs opacity-80">(E)</span>
             </button>
@@ -311,7 +311,7 @@ export default function CurationQueue() {
               onClick={handleSkip}
               className="bg-gray-400 hover:bg-gray-500 text-white p-6 rounded-lg flex flex-col items-center gap-2 transition-colors"
             >
-              <FiSkipForward className="w-8 h-8" />
+              <SkipForward className="w-8 h-8" />
               <span className="font-bold">Skip</span>
               <span className="text-xs opacity-80">(S)</span>
             </button>
