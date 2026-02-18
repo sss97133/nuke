@@ -227,13 +227,13 @@ const Login = () => {
             
             
             {error && (
-              <div className="alert alert-error" style={{ marginBottom: '24px' }}>
+              <div className="alert alert-error" role="alert" style={{ marginBottom: '24px' }}>
                 {error}
               </div>
             )}
             
             {message && (
-              <div className="alert alert-success" style={{ marginBottom: '24px' }}>
+              <div className="alert alert-success" role="status" style={{ marginBottom: '24px' }}>
                 {message}
               </div>
             )}

@@ -378,6 +378,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
 
   return (
     <div className="app-layout compact win95">
+      <a href="#main-content" className="sr-only focus:not-sr-only" style={{ position: 'absolute', left: '-9999px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden', zIndex: 9999 }} onFocus={(e) => { e.currentTarget.style.position = 'fixed'; e.currentTarget.style.top = '0'; e.currentTarget.style.left = '0'; e.currentTarget.style.width = 'auto'; e.currentTarget.style.height = 'auto'; e.currentTarget.style.padding = '8px 16px'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000'; e.currentTarget.style.border = '2px solid #0ea5e9'; }} onBlur={(e) => { e.currentTarget.style.position = 'absolute'; e.currentTarget.style.left = '-9999px'; e.currentTarget.style.width = '1px'; e.currentTarget.style.height = '1px'; }}>Skip to content</a>
       {/* Upload Status Bar */}
       <UploadStatusBar />
       
@@ -391,6 +392,8 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
               <div style={{ position: 'relative' }} data-n-zero-menu>
                 <button
                   onClick={() => setNZeroMenuOpen(!nZeroMenuOpen)}
+                  aria-expanded={nZeroMenuOpen}
+                  aria-haspopup="true"
                   className={`nav-link ${nZeroMenuOpen ? 'active' : ''}`}
                   style={{
                     border: 'none',
@@ -775,7 +778,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
               
               <div className="page-title-section">
                 {breadcrumbs && (
-                  <nav className="breadcrumbs">
+                  <nav className="breadcrumbs" aria-label="Breadcrumb">
                     {breadcrumbs.map((crumb, index) => (
                       <span key={index} className="breadcrumb">
                         {crumb.path ? (
@@ -808,7 +811,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       )}
 
       {/* Main Content Area */}
-      <main className="main-content">
+      <main id="main-content" className="main-content">
         <div className="content-container">
           {children}
         </div>
@@ -826,6 +829,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
           to="/capture"
           className={`mobile-bottom-nav-item ${location.pathname === '/capture' ? 'active' : ''}`}
           onClick={() => setNZeroMenuOpen(false)}
+          aria-label="Add vehicle"
         >
           +
         </Link>
