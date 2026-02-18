@@ -23,8 +23,6 @@ const getDisplayPriceValue = (vehicle: HypeVehicle | null | undefined): number |
   return parseMoneyNumber((vehicle as any).display_price);
 };
 
-const DEBUG_CURSOR_HOMEPAGE = false;
-
 const StaticVerbText = React.memo(function StaticVerbText() {
   return <>Building</>;
 });
@@ -224,17 +222,6 @@ const CursorHomepage: React.FC = () => {
   const [modelSuggestionIndex, setModelSuggestionIndex] = useState(-1);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
-  const homepageDebugEnabled =
-    DEBUG_CURSOR_HOMEPAGE &&
-    typeof window !== 'undefined' &&
-    (() => {
-      try {
-        return window.localStorage.getItem('nuke_debug_homepage') === '1';
-      } catch {
-        return false;
-      }
-    })();
-
   const hasActiveFilters = useMemo(() => {
     const result = 
       (filters.yearMin || filters.yearMax) ||
@@ -258,24 +245,6 @@ const CursorHomepage: React.FC = () => {
       filters.hideBat ||
       filters.hideClassic ||
       ((filters.hiddenSources?.length || 0) > 0);
-    
-    // #region agent log
-    if (homepageDebugEnabled) {
-      console.log('[DEBUG] hasActiveFilters computed', {
-        result,
-        filterFlags: {
-          hideBat: filters.hideBat,
-          hideCraigslist: filters.hideCraigslist,
-          hideKsl: filters.hideKsl,
-          hideDealerSites: filters.hideDealerSites,
-          hideClassic: filters.hideClassic,
-          hideDealerListings: filters.hideDealerListings,
-          hiddenSources: filters.hiddenSources
-        }
-      });
-      // Debug telemetry disabled in production
-    }
-    // #endregion
     
     return result;
   }, [filters]);
@@ -1040,22 +1009,6 @@ const CursorHomepage: React.FC = () => {
       // as they're controlled by hide* flags
     });
 
-    // #region agent log
-    if (homepageDebugEnabled) {
-      console.log('[DEBUG] includedSources computed', { 
-        includedSources: base, 
-        activeSourcesCount: activeSources.length, 
-        activeSources: activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})), 
-        filters: {
-          hideBat: filters.hideBat, 
-          hideCraigslist: filters.hideCraigslist, 
-          hiddenSources: filters.hiddenSources
-        }
-      });
-      // Debug telemetry disabled in production
-    }
-    // #endregion
-
     return base;
   }, [
     activeSources,
@@ -1297,38 +1250,10 @@ const CursorHomepage: React.FC = () => {
       (filters.hiddenSources && filters.hiddenSources.length > 0);
 
     if (hasSourceSelections) {
-      // #region agent log
-      const beforeCount = result.length;
-      const sourceBreakdown: Record<string, number> = {};
-      result.forEach((v: any) => {
-        const src = getSourceFilterKey(v);
-        sourceBreakdown[src] = (sourceBreakdown[src] || 0) + 1;
-      });
-      // #endregion
-
-      // Use inclusion-based filtering: only show vehicles from included sources
       result = result.filter((v: any) => {
         const src = getSourceFilterKey(v);
-        // Check if this source is included based on includedSources
-        // If hasSourceSelections is true, only include sources that are explicitly set to true
-        // If a source isn't in includedSources, exclude it (don't default to included)
-        const isIncluded = includedSources[src] === true;
-        
-        
-        return isIncluded;
+        return includedSources[src] === true;
       });
-
-      // #region agent log
-      const afterCount = result.length;
-      const afterSourceBreakdown: Record<string, number> = {};
-      result.forEach((v: any) => {
-        const src = getSourceFilterKey(v);
-        afterSourceBreakdown[src] = (afterSourceBreakdown[src] || 0) + 1;
-      });
-      // #endregion
-    } else {
-      // #region agent log
-      // #endregion
     }
     
     // Location filtering - support multiple locations with radius (distance) or exact zip
@@ -2286,14 +2211,10 @@ const CursorHomepage: React.FC = () => {
       
       // Database stats loaded
       
-      // #region agent log
-      // #endregion
       
       setDbStats(stats);
     } catch (error) {
       // Error loading database stats - silent
-      // #region agent log
-      // #endregion
     } finally {
       setDbStatsLoading(false);
     }
@@ -2352,21 +2273,6 @@ const CursorHomepage: React.FC = () => {
 
   // Update filteredStats to show DB stats when no filters, filtered stats when filters active
   const displayStats = useMemo(() => {
-    // #region agent log
-    if (homepageDebugEnabled) {
-      console.log('[DEBUG] displayStats computed', {
-        hasActiveFilters,
-        debouncedSearchText,
-        dbStatsTotalVehicles: dbStats.totalVehicles,
-        dbStatsTotalValue: dbStats.totalValue,
-        filteredStatsTotalVehicles: filteredStats.totalVehicles,
-        filteredStatsTotalValue: filteredStats.totalValue,
-        willUseDbStats: !hasActiveFilters && !debouncedSearchText,
-        dbStatsHasData: dbStats.totalVehicles > 0
-      });
-    }
-    // #endregion
-    
     // Priority 1: If no filters and dbStats has loaded (has data), always use dbStats
     // This ensures we show correct stats even if hasActiveFilters check has issues
     if (!hasActiveFilters && !debouncedSearchText && dbStats.totalVehicles > 0) {
@@ -3735,8 +3641,6 @@ const CursorHomepage: React.FC = () => {
   // We keep legacy `hide*` flags for now, but treat them as derived from "included chips".
   // For new dynamic sources, we use a hiddenSources set in filters.
   const setSourceIncluded = useCallback((kind: string, included: boolean) => {
-    // #region agent log
-    // #endregion
 
     setFilters((prev) => {
       // This legacy flag conflicts with per-source toggles (it hides CL + dealer sites + KSL).
@@ -3909,10 +3813,6 @@ const CursorHomepage: React.FC = () => {
       if (titleCompare !== 0) return titleCompare;
       return a.domain.localeCompare(b.domain, undefined, { sensitivity: 'base', numeric: true });
     });
-
-    // #region agent log
-    const batSources = deduplicated.filter(s => s.key === 'bat' || s.domain.toLowerCase().includes('bringatrailer') || s.domain.toLowerCase().includes('bat'));
-    // #endregion
 
     return {
       all: deduplicated,
@@ -4870,9 +4770,6 @@ const CursorHomepage: React.FC = () => {
                         const text = e.target.value;
                         setSourceSearchText(text);
                         
-                        // #region agent log
-                        // #endregion
-                        
                         // Auto-apply filters when searching for specific sources
                         const searchLower = text.toLowerCase().trim();
                         if (searchLower.includes('bring') || searchLower.includes('bat')) {
@@ -5014,9 +4911,6 @@ const CursorHomepage: React.FC = () => {
                           p.title.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
                           p.domain.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
                           p.key.toLowerCase().includes(sourceSearchText.toLowerCase());
-                        
-                        // #region agent log
-                        // #endregion
                         
                         return matches;
                       })
