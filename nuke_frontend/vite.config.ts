@@ -20,18 +20,20 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        // Temporarily disable manualChunks to test if it causes TDZ
-        // manualChunks: {
-        //   vendor: ['react', 'react-dom'],
-        //   supabase: ['@supabase/supabase-js'],
-        //   ui: ['@headlessui/react', '@heroicons/react', 'lucide-react'],
-        //   forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-        //   pdf: ['pdfjs-dist'],
-        //   exif: ['exifr', 'piexifjs', 'exif-js', 'exifreader'],
-        // }
+        manualChunks(id) {
+          // Function-based manualChunks avoids TDZ issues from static config
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('/react/')) return 'vendor';
+            if (id.includes('@supabase/')) return 'supabase';
+            if (id.includes('recharts') || id.includes('d3-')) return 'charts';
+            if (id.includes('pdfjs-dist')) return 'pdf';
+            if (id.includes('three') || id.includes('@react-three')) return 'three';
+            if (id.includes('exceljs')) return 'exceljs';
+            if (id.includes('tesseract')) return 'tesseract';
+            if (id.includes('leaflet')) return 'maps';
+          }
+        },
       },
-      // Preserve module order to avoid TDZ issues
-      preserveEntrySignatures: 'strict',
     },
     // Ensure production builds don't use eval
     target: 'esnext',

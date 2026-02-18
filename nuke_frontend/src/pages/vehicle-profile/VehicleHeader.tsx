@@ -5641,7 +5641,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           <div onClick={(e) => e.stopPropagation()} style={{ width: '520px', maxWidth: '95vw' }}>
             <TradePanel
               vehicleId={vehicle?.id || ''}
-              vehicleName={vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : 'Vehicle'}
+              vehicleName={vehicle ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() || 'Vehicle' : 'Vehicle'}
               currentSharePrice={(valuation && typeof valuation.sharePrice === 'number') ? valuation.sharePrice : 1.00}
               totalShares={1000}
             />
