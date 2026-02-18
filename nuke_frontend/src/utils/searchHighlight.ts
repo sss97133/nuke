@@ -1,13 +1,18 @@
+/** Escape HTML special characters to prevent XSS */
+const escapeHtml = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 /**
- * Highlights matching search terms in text
+ * Highlights matching search terms in text (HTML-safe)
  */
 export const highlightSearchTerm = (text: string, searchTerm: string): string => {
-  if (!text || !searchTerm) return text;
-  
+  if (!text || !searchTerm) return escapeHtml(text);
+
   const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(`(${escapedTerm})`, 'gi');
-  
-  return text.replace(regex, '<mark>$1</mark>');
+
+  // Escape HTML first, then wrap matches in <mark> tags
+  return escapeHtml(text).replace(regex, '<mark>$1</mark>');
 };
 
 /**

@@ -95,6 +95,10 @@ private_key*
 .env.vercel
 .env.x
 .env.remote-backup
+*.backup
+*.bak
+.env.local.backup
+.env.local.fixed
 
 # Bot state
 .bot_state.json
