@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useStatsPanelData } from '../hooks/useStatsPanelData';
-import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
+import { useFeedFilterOptions } from '../hooks/useFeedFilterOptions';
 import { parseMoneyNumber } from '../lib/auctionUtils';
 import { preloadImageBatch } from '../lib/imageOptimizer';
 import ActiveAuctionsPanel from '../components/dashboard/ActiveAuctionsPanel';
@@ -188,15 +188,16 @@ const CursorHomepage: React.FC = () => {
   const makeInputRef = useRef<HTMLInputElement>(null);
   const modelInputRef = useRef<HTMLInputElement>(null);
 
-  // Available makes from database for autocomplete
-  const [availableMakes, setAvailableMakes] = useState<string[]>([]);
-  const [availableBodyStyles, setAvailableBodyStyles] = useState<string[]>([]);
+  // Filter options (makes, models, body styles) loaded via hook
+  const { availableMakes, availableModels, availableBodyStyles } = useFeedFilterOptions({
+    selectedMakes: filters.makes,
+    runVehiclesQueryWithListingKindFallback,
+  });
 
   // Model filter state (shown after make is selected)
   const [modelSearchText, setModelSearchText] = useState('');
   const [showModelSuggestions, setShowModelSuggestions] = useState(false);
   const [modelSuggestionIndex, setModelSuggestionIndex] = useState(-1);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   const hasActiveFilters = useMemo(() => {
     const result = 
@@ -387,174 +388,7 @@ const CursorHomepage: React.FC = () => {
     };
   }, [showFilters, filterBarMinimized]);
 
-  // Load available makes and body styles for autocomplete
-  useEffect(() => {
-    const loadFilterOptions = async () => {
-      try {
-        const normalizeMake = (raw: unknown): string | null => {
-          let s = String(raw ?? '').trim();
-          if (!s) return null;
-
-          // Reject extreme lengths (garbage blobs / truncated scrape junk)
-          if (s.length < 2 || s.length > 30) return null;
-
-          // If digits exist, the make field is often polluted with model/trim (e.g., "GMC K10", "AM General M35A2").
-          // Salvage the leading alphabetic portion up to (but not including) the first token containing digits.
-          if (/\d/.test(s)) {
-            const parts = s.split(/\s+/).filter(Boolean);
-            const keep: string[] = [];
-            for (const p of parts) {
-              if (/\d/.test(p)) break;
-              keep.push(p);
-            }
-            const candidate = keep.join(' ').trim();
-            if (!candidate) return null; // Pure numeric / model-only junk
-            s = candidate;
-          }
-
-          // Reject emoji / special unicode ranges commonly seen in corrupted fields
-          if (/[\u{1F300}-\u{1F9FF}]/u.test(s)) return null;
-
-          // Reject common scraped phrase patterns that indicate this isn't a make
-          if (/\b(for|with|powered|swap|engine|manual|auto|awd|4x4|parts|project)\b/i.test(s)) return null;
-
-          // Only allow simple make tokens: letters, spaces, hyphen, apostrophe, period
-          // Examples: "Aston Martin", "Mercedes-Benz", "Rolls-Royce", "AM General"
-          if (!/^[A-Za-z][A-Za-z .'-]*$/.test(s)) return null;
-
-          const cleaned = s.replace(/\s+/g, ' ').trim();
-          const words = cleaned.split(' ').filter(Boolean);
-          if (words.length > 3) return null;
-
-          return cleaned;
-        };
-
-        // Prefer canonical makes if the nomenclature system is present.
-        // This prevents UI from being polluted by scraper-corrupted `vehicles.make` values.
-        const canonicalMakes: string[] = [];
-        try {
-          const { data: canonicalData, error: canonicalError } = await supabase
-            .from('canonical_makes')
-            .select('display_name, canonical_name, is_active')
-            .eq('is_active', true)
-            .limit(5000);
-
-          if (!canonicalError && canonicalData) {
-            for (const row of canonicalData as any[]) {
-              const display = String(row?.display_name || '').trim();
-              const canon = String(row?.canonical_name || '').trim();
-              const name = display || canon;
-              if (name) canonicalMakes.push(name);
-            }
-          }
-        } catch {
-          // ignore: canonical tables may not exist in some environments
-        }
-
-        // Also load distinct makes from vehicles as a fallback / augmentation.
-        // We only keep "clean-looking" makes that appear more than once to reduce junk.
-        const { data: makeData } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
-          let q = supabase
-            .from('vehicles')
-            .select('make')
-            .eq('is_public', true);
-          if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
-          return q
-            .not('make', 'is', null)
-            .limit(5000);
-        });
-
-        const makeCounts = new Map<string, number>();
-        for (const row of (makeData || []) as any[]) {
-          const cleaned = normalizeMake(row?.make);
-          if (!cleaned) continue;
-          makeCounts.set(cleaned, (makeCounts.get(cleaned) || 0) + 1);
-        }
-
-        const frequentVehicleMakes = Array.from(makeCounts.entries())
-          .filter(([, count]) => count >= 2)
-          .map(([make]) => make);
-
-        // Merge canonical + frequent vehicle makes, case-insensitive.
-        const merged = [...canonicalMakes, ...frequentVehicleMakes];
-        const seenLower = new Set<string>();
-        const uniqueMakes: string[] = [];
-        for (const m of merged) {
-          const cleaned = String(m || '').trim();
-          if (!cleaned) continue;
-          const key = cleaned.toLowerCase();
-          if (seenLower.has(key)) continue;
-          seenLower.add(key);
-          uniqueMakes.push(cleaned);
-        }
-        uniqueMakes.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-        setAvailableMakes(uniqueMakes);
-
-        // Prefer canonical body styles if the taxonomy tables are present.
-        // This keeps filter UI stable even when `vehicles.body_style` is polluted.
-        const canonicalBodyStyles: string[] = [];
-        try {
-          const { data: canonBody, error: canonBodyErr } = await supabase
-            .from('canonical_body_styles')
-            .select('display_name, canonical_name, is_active')
-            .eq('is_active', true)
-            .limit(5000);
-          if (!canonBodyErr && Array.isArray(canonBody)) {
-            for (const row of canonBody as any[]) {
-              const display = String(row?.display_name || '').trim();
-              const canon = String(row?.canonical_name || '').trim();
-              const name = display || canon;
-              if (name) canonicalBodyStyles.push(name);
-            }
-          }
-        } catch {
-          // ignore: canonical tables may not exist in some environments
-        }
-
-        // Fallback: load raw body_style values from vehicles and normalize to display buckets.
-        const { data: bodyData } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
-          let q = supabase
-            .from('vehicles')
-            .select('body_style')
-            .eq('is_public', true);
-          if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
-          return q
-            .not('body_style', 'is', null)
-            .limit(5000);
-        });
-
-        const counts = new Map<string, number>();
-        for (const row of (bodyData || []) as any[]) {
-          const raw = row?.body_style;
-          const display = getBodyStyleDisplay(raw) || String(raw || '').trim();
-          if (!display) continue;
-          counts.set(display, (counts.get(display) || 0) + 1);
-        }
-        const frequentVehicleBodyStyles = Array.from(counts.entries())
-          .filter(([, ct]) => ct >= 2)
-          .map(([name]) => name);
-
-        // Merge canonical + frequent, case-insensitive.
-        const mergedBody = [...canonicalBodyStyles, ...frequentVehicleBodyStyles];
-        const seenBody = new Set<string>();
-        const uniqueBody: string[] = [];
-        for (const s of mergedBody) {
-          const cleaned = String(s || '').trim();
-          if (!cleaned) continue;
-          const key = cleaned.toLowerCase();
-          if (seenBody.has(key)) continue;
-          seenBody.add(key);
-          uniqueBody.push(cleaned);
-        }
-        uniqueBody.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-        setAvailableBodyStyles(uniqueBody);
-      } catch (err) {
-        // Error loading filter options - silent
-      }
-    };
-
-    loadFilterOptions();
-  }, []);
+  // Filter options (makes, body styles) loaded by useFeedFilterOptions hook above
 
   // On visit: when "remember filters" is off, clear any persisted filters/sort so next load stays clean
   useEffect(() => {
@@ -565,105 +399,6 @@ const CursorHomepage: React.FC = () => {
   useEffect(() => {
     if (rememberFilters) saveFiltersToStorage(filters);
   }, [rememberFilters, filters]);
-
-  // Load available models when makes are selected
-  // Uses case-insensitive make matching and normalizes model names to base models
-  useEffect(() => {
-    const loadModelsForMakes = async () => {
-      if (!filters.makes || filters.makes.length === 0) {
-        setAvailableModels([]);
-        return;
-      }
-      try {
-        // Build case-insensitive OR filter for makes (handles "Chevrolet" vs "chevrolet")
-        const makeClauses = filters.makes.map(m => `make.ilike.${m}`).join(',');
-        
-        // Query distinct models with counts using RPC-style approach
-        // Fetch more rows (2000) to get better coverage of model variants (with listing_kind fallback)
-        const { data: modelData } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
-          let q = supabase
-            .from('vehicles')
-            .select('model')
-            .eq('is_public', true)
-            .neq('status', 'pending')
-            .or(makeClauses)
-            .not('model', 'is', null)
-            .order('model', { ascending: true })
-            .limit(2000);
-          if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
-          return q;
-        });
-
-        if (modelData && Array.isArray(modelData)) {
-          // Normalize models to base names:
-          // "C10 Pickup" -> "C10"
-          // "c10 custom pickup" -> "C10"
-          // "911 Carrera S" -> "911"
-          // Keep the most common full form for display
-          const baseModelMap = new Map<string, { display: string; count: number; variants: Set<string> }>();
-          
-          const extractBaseModel = (model: string): string => {
-            const trimmed = model.trim();
-            if (!trimmed) return '';
-            
-            // Split on spaces, take the first meaningful part as the base model
-            // Handle alphanumeric model names: "C10", "911", "Camaro", "F-150"
-            const parts = trimmed.split(/\s+/);
-            let base = parts[0];
-            
-            // If the first part is very short and next part looks like a model continuation, combine
-            // e.g. "GS 455" -> "GS", "GT 350" -> "GT"  
-            // But "Land Cruiser" -> "Land Cruiser", "Grand Cherokee" -> "Grand Cherokee"
-            if (parts.length > 1) {
-              const second = parts[1];
-              // Check if second part is a known sub-model qualifier (keep both parts)
-              const multiWordModels = ['cruiser', 'cherokee', 'wrangler', 'bronco', 'blazer', 'suburban',
-                'camaro', 'corvette', 'mustang', 'challenger', 'charger', 'firebird', 'barracuda',
-                'romeo', 'martin', 'rover'];
-              if (multiWordModels.some(mw => second.toLowerCase() === mw)) {
-                base = `${parts[0]} ${parts[1]}`;
-              }
-            }
-            
-            // Title case the base
-            return base.charAt(0).toUpperCase() + base.slice(1);
-          };
-          
-          for (const row of modelData as any[]) {
-            const rawModel = String(row?.model || '').trim();
-            if (!rawModel || rawModel.length < 1 || rawModel.length > 100) continue;
-            if (rawModel === 'Unknown') continue;
-            
-            const baseModel = extractBaseModel(rawModel);
-            if (!baseModel || baseModel.length < 1) continue;
-            
-            const key = baseModel.toLowerCase();
-            const existing = baseModelMap.get(key);
-            if (existing) {
-              existing.count++;
-              existing.variants.add(rawModel);
-              // Keep the most "canonical" looking display name (shortest, title case)
-              if (rawModel.length <= existing.display.length && rawModel === rawModel.charAt(0).toUpperCase() + rawModel.slice(1)) {
-                existing.display = rawModel.length < existing.display.length ? baseModel : existing.display;
-              }
-            } else {
-              baseModelMap.set(key, { display: baseModel, count: 1, variants: new Set([rawModel]) });
-            }
-          }
-          
-          // Sort by frequency (highest first), then alphabetically
-          const sortedModels = Array.from(baseModelMap.entries())
-            .sort((a, b) => b[1].count - a[1].count || a[1].display.localeCompare(b[1].display))
-            .map(([, v]) => v.display);
-          
-          setAvailableModels(sortedModels);
-        }
-      } catch (err) {
-        // Error loading models - silent
-      }
-    };
-    loadModelsForMakes();
-  }, [filters.makes]);
 
   // Save other filter-related state
   useEffect(() => {
