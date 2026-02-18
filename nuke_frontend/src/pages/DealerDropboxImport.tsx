@@ -67,20 +67,8 @@ const DealerDropboxImport: React.FC = () => {
         accessToken 
       });
 
-      console.log(`📁 Scanning ${INVENTORY_PATH}...`);
-
-      // First, try to list root folders to help debug
-      try {
-        const rootFolders = await dropboxService.listFolders('');
-        console.log('📂 Root folders found:', rootFolders.map(f => f.name));
-      } catch (rootError) {
-        console.warn('Could not list root folders:', rootError);
-      }
-
       // Scan for vehicle folders
       const folders = await dropboxService.scanVehicleInventory(INVENTORY_PATH);
-      
-      console.log(`✅ Found ${folders.length} vehicle folders`);
       setVehicleFolders(folders);
 
       // Auto-sync: Check which vehicles need images and trigger import

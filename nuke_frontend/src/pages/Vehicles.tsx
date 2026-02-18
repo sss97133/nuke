@@ -183,7 +183,6 @@ const VehiclesInner: React.FC = () => {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         loadVehicleRelationships(); // Reload vehicle relationships when auth state changes
       }
@@ -268,44 +267,23 @@ const VehiclesInner: React.FC = () => {
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    console.log('Initial session check:', session?.user?.id);
     setSession(session);
   };
 
   const loadVehicleRelationships = async () => {
     if (!session?.user?.id) {
-      console.log('No session, skipping vehicle load');
       setLoading(false);
       return;
     }
 
     try {
-      console.log('Loading vehicle relationships for user:', session.user.id);
-      
       // Use optimized RPC function for single-query performance
       // Falls back to separate queries if RPC doesn't exist
-      console.log('[Vehicles] Attempting to call RPC function: get_user_vehicle_relationships');
       const { data: rpcData, error: rpcError } = await supabase
         .rpc('get_user_vehicle_relationships', { p_user_id: session.user.id });
-      
+
       if (rpcError) {
-        console.error('[Vehicles] ❌ RPC function error:', rpcError);
-        console.error('[Vehicles] RPC error code:', rpcError.code);
-        console.error('[Vehicles] RPC error message:', rpcError.message);
-        console.error('[Vehicles] RPC error details:', rpcError.details);
-        console.error('[Vehicles] RPC error hint:', rpcError.hint);
-        console.error('[Vehicles] Full RPC error object:', JSON.stringify(rpcError, null, 2));
-        console.warn('[Vehicles] Falling back to separate queries');
-      } else if (rpcData) {
-        console.log('[Vehicles] ✅ RPC function succeeded, using optimized path');
-        console.log('[Vehicles] RPC data keys:', Object.keys(rpcData || {}));
-        console.log('[Vehicles] RPC data summary:', {
-          user_added: rpcData.user_added_vehicles?.length || 0,
-          discovered: rpcData.discovered_vehicles?.length || 0,
-          verified: rpcData.verified_ownerships?.length || 0
-        });
-      } else {
-        console.warn('[Vehicles] ⚠️ RPC function returned no data (null/undefined), using fallback');
+        console.error('[Vehicles] RPC fallback:', rpcError.message);
       }
       
       if (!rpcError && rpcData) {
@@ -525,8 +503,6 @@ const VehiclesInner: React.FC = () => {
           consigned: dedupedConsigned,
           previously_owned: dedupedPreviouslyOwned
         });
-        console.log(`[Vehicles] RPC: ${owned.length} owned, ${dedupedContributing.length} contributing, ${dedupedInterested.length} interested`);
-
         // UX: If we defaulted to Owned but the user has none, fall back to All.
         setActiveTab((prev) => {
           if (prev !== 'owned') return prev;
@@ -744,46 +720,10 @@ const VehiclesInner: React.FC = () => {
         }));
       }
       
-      console.log('[Vehicles] Verified ownerships:', verifiedOwnerships?.length || 0);
-      console.log('[Vehicles] Permission ownerships:', permissionOwnerships?.length || 0);
-      console.log('[Vehicles] Uploaded vehicles:', userAddedVehicles?.length || 0);
-      console.log('[Vehicles] Discovered vehicles:', discoveredVehicles?.length || 0);
-
-      if (addedError) {
-        console.error('[Vehicles] Error loading added vehicles:', addedError);
-        console.error('[Vehicles] Error details:', JSON.stringify(addedError, null, 2));
-        console.error('[Vehicles] Error message:', addedError.message);
-        console.error('[Vehicles] Error code:', addedError.code);
-        console.error('[Vehicles] Error details:', addedError.details);
-        console.error('[Vehicles] Error hint:', addedError.hint);
-      }
-      if (discoveredError) {
-        console.error('[Vehicles] Error loading discovered vehicles:', discoveredError);
-        console.error('[Vehicles] Error details:', JSON.stringify(discoveredError, null, 2));
-        console.error('[Vehicles] Error message:', discoveredError.message);
-        console.error('[Vehicles] Error code:', discoveredError.code);
-        console.error('[Vehicles] Error details:', discoveredError.details);
-        console.error('[Vehicles] Error hint:', discoveredError.hint);
-      }
-      if (verifiedError) {
-        console.error('[Vehicles] Error loading verified ownerships:', verifiedError);
-        console.error('[Vehicles] Error details:', JSON.stringify(verifiedError, null, 2));
-        console.error('[Vehicles] Error message:', verifiedError.message);
-        console.error('[Vehicles] Error code:', verifiedError.code);
-        console.error('[Vehicles] Error details:', verifiedError.details);
-        console.error('[Vehicles] Error hint:', verifiedError.hint);
-      }
-      if (permissionOwnershipsError) {
-        console.error('[Vehicles] Error loading permission ownerships:', permissionOwnershipsError);
-        console.error('[Vehicles] Error details:', JSON.stringify(permissionOwnershipsError, null, 2));
-      }
-
-      // Only log full data in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Vehicles] User added vehicles:', userAddedVehicles);
-        console.log('[Vehicles] Discovered vehicles:', discoveredVehicles);
-        console.log('[Vehicles] Verified ownerships:', verifiedOwnerships);
-      }
+      if (addedError) console.error('[Vehicles] added:', addedError.message);
+      if (discoveredError) console.error('[Vehicles] discovered:', discoveredError.message);
+      if (verifiedError) console.error('[Vehicles] verified:', verifiedError.message);
+      if (permissionOwnershipsError) console.error('[Vehicles] permissions:', permissionOwnershipsError.message);
       // Process relationships by type
       const owned: VehicleRelationship[] = [];
       const contributing: VehicleRelationship[] = [];
@@ -931,7 +871,6 @@ const VehiclesInner: React.FC = () => {
 
         // If it's a URL find, skip it - it should already be in discovered_vehicles
         if (isUrlFound) {
-          console.log('[Vehicles] Skipping URL-found vehicle from contributing:', vehicle.id, vehicle.discovery_url);
           return;
         }
 
@@ -1007,8 +946,6 @@ const VehiclesInner: React.FC = () => {
         previously_owned: filteredPreviouslyOwned
       });
       
-      console.log(`Categorized vehicles: ${filteredOwned.length} owned, ${filteredContributing.length} contributing, ${filteredInterested.length} interested`);
-
       // UX: If we defaulted to Owned but the user has none, fall back to All.
       setActiveTab((prev) => {
         if (prev !== 'owned') return prev;
@@ -1073,7 +1010,6 @@ const VehiclesInner: React.FC = () => {
       
       if (session?.user?.id) {
         try {
-          console.log('Fetching vehicles for user:', session.user.id);
           const { data, error } = await supabase
             .from('vehicles')
             .select('*')
@@ -1083,19 +1019,16 @@ const VehiclesInner: React.FC = () => {
           if (error) {
             console.error('Supabase error loading vehicles:', error);
           } else if (data) {
-            console.log('Found vehicles in database:', data.length);
             authenticatedVehicles = data.map(v => ({
               ...v,
               isAnonymous: false
             }));
-          } else {
-            console.log('No vehicles found in database');
           }
         } catch (error) {
           console.error('Error loading authenticated vehicles:', error);
         }
       } else {
-        console.log('No session - skipping database vehicle fetch');
+        // No session — skip
       }
 
       // Combine both types of vehicles, prioritizing Supabase vehicles
@@ -1103,7 +1036,7 @@ const VehiclesInner: React.FC = () => {
       // Legacy code - vehicles now handled by relationships
       // setVehicles(allVehicles);
       
-      console.log(`Loaded ${authenticatedVehicles.length} Supabase vehicles and ${localVehicles.length} local vehicles`);
+      // Merge complete
     } catch (error) {
       console.error('Error loading vehicles:', error);
     } finally {
