@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -388,8 +389,9 @@ async function processNewListing(
     };
 
     if (year) vehicleData.year = year;
-    if (make) vehicleData.make = make.toLowerCase();
-    if (model) vehicleData.model = model.toLowerCase();
+    const norm = normalizeVehicleFields({ make, model, year });
+    if (make) vehicleData.make = norm.make ?? make;
+    if (model) vehicleData.model = norm.model ?? model;
 
     const { data: newVehicle, error: vehicleError } = await supabase
       .from('vehicles')
