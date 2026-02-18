@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
-import { computePrimaryPrice, formatCurrency as formatUsdCurrency } from '../../services/priceSignalService';
+import { formatCurrency as formatUsdCurrency } from '../../services/priceSignalService';
 import { formatCurrencyAmount, resolveCurrencyCode } from '../../utils/currency';
 import { supabase } from '../../lib/supabase';
 // Deprecated modals (history/analysis/tag review) intentionally removed from UI
@@ -13,7 +13,6 @@ import { ValueProvenancePopup } from '../../components/ValueProvenancePopup';
 import DataValidationPopup from '../../components/vehicle/DataValidationPopup';
 import { useVINProofs } from '../../hooks/useVINProofs';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
-import { AuctionPlatformBadge } from '../../components/auction/AuctionBadges';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 import MemeDropBadge from '../../components/vehicle/MemeDropBadge';
 import vinDecoderService from '../../services/vinDecoder';
@@ -23,9 +22,6 @@ import OrganizationInvestmentCard from '../../components/organization/Organizati
 import { CircularAvatar } from '../../components/common/CircularAvatar';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { MiniLineChart } from '../../components/charts/MiniLineChart';
-import type { DataSeries } from '../../components/charts/MiniLineChart';
-
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
   consigner: 'Consignment',
