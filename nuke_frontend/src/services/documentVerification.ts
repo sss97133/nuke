@@ -12,7 +12,7 @@
  * This builds our moat - custom verification that's hard to replicate
  */
 
-import Tesseract from 'tesseract.js';
+const loadTesseract = () => import('tesseract.js').then(m => m.default);
 
 // Document types we can verify
 export type DocumentType = 'title' | 'drivers_license' | 'id_card' | 'passport' | 'registration' | 'unknown';
@@ -229,6 +229,7 @@ export async function verifyDocument(
   try {
     // Step 1: OCR with Tesseract (local, free)
     console.log('[DocVerify] Starting local OCR...');
+    const Tesseract = await loadTesseract();
     const { data: { text, confidence: ocrConfidence } } = await Tesseract.recognize(
       imageSource,
       'eng',
@@ -332,6 +333,7 @@ export async function verifyVINPlate(imageSource: File | Blob | string): Promise
   valid: boolean;
   errors: string[];
 }> {
+  const Tesseract = await loadTesseract();
   const { data: { text } } = await Tesseract.recognize(imageSource, 'eng');
   const vin = extractVIN(text);
 

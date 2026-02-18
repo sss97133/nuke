@@ -1,93 +1,102 @@
 // src/routes/modules/admin/routes.tsx
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import AdminShell from '../../../components/admin/AdminShell';
-import AdminHome from '../../../pages/admin/AdminHome';
-import AdminDashboard from '../../../pages/AdminDashboard';
-import AdminVerifications from '../../../pages/AdminVerifications';
-import AdminMissionControl from '../../../pages/AdminMissionControl';
-import BusinessIntelligence from '../../../pages/BusinessIntelligence';
-import OwnershipVerificationDashboard from '../../../components/admin/OwnershipVerificationDashboard';
-import MergeProposalsDashboard from '../../../pages/MergeProposalsDashboard';
-import BulkPriceEditor from '../../../pages/admin/BulkPriceEditor';
-import PriceCsvImport from '../../../pages/admin/PriceCsvImport';
-import ShippingSettings from '../../../pages/admin/ShippingSettings';
-import X402Settings from '../../../pages/admin/X402Settings';
-import KSLScraper from '../../../pages/admin/KSLScraper';
-import ScraperDashboard from '../../../pages/admin/ScraperDashboard';
-import MemeLibraryAdmin from '../../../pages/admin/MemeLibraryAdmin';
-import ScriptControlCenter from '../../../pages/ScriptControlCenter';
-import ImageProcessingDashboard from '../../../pages/ImageProcessingDashboard';
-import LiveImageAnalysisMonitor from '../../../components/admin/LiveImageAnalysisMonitor';
-import BatchImageAnalysis from '../../../pages/admin/BatchImageAnalysis';
-import ExtractionMonitor from '../../../pages/admin/ExtractionMonitor';
-import ExtractionReview from '../../../pages/ExtractionReview';
-import SystemStatus from '../../../pages/SystemStatus';
-import CatalogBrowser from '../../../pages/CatalogBrowser';
-import DatabaseAudit from '../../../pages/DatabaseAudit';
-import DataDiagnostic from '../../../pages/DataDiagnostic';
-import TestContributions from '../../../pages/TestContributions';
-import AdminPendingVehicles from '../../../pages/AdminPendingVehicles';
-import HoverCardDemo from '../../../pages/admin/HoverCardDemo';
-import VehicleMakeLogosCatalog from '../../../pages/admin/VehicleMakeLogosCatalog';
-import MarketDataTools from '../../../pages/MarketDataTools';
-import BotTestDashboard from '../../../pages/admin/BotTestDashboard';
-import AdminRalphBrief from '../../../pages/admin/AdminRalphBrief';
-import NLQueryConsole from '../../../pages/admin/NLQueryConsole';
-import AdminIdentityClaims from '../../../pages/admin/AdminIdentityClaims';
-import InventoryAnalytics from '../../../pages/admin/InventoryAnalytics';
+
+// Lazy-load every admin page — only the visited page gets downloaded
+const AdminHome = React.lazy(() => import('../../../pages/admin/AdminHome'));
+const AdminDashboard = React.lazy(() => import('../../../pages/AdminDashboard'));
+const AdminVerifications = React.lazy(() => import('../../../pages/AdminVerifications'));
+const AdminMissionControl = React.lazy(() => import('../../../pages/AdminMissionControl'));
+const BusinessIntelligence = React.lazy(() => import('../../../pages/BusinessIntelligence'));
+const OwnershipVerificationDashboard = React.lazy(() => import('../../../components/admin/OwnershipVerificationDashboard'));
+const MergeProposalsDashboard = React.lazy(() => import('../../../pages/MergeProposalsDashboard'));
+const BulkPriceEditor = React.lazy(() => import('../../../pages/admin/BulkPriceEditor'));
+const PriceCsvImport = React.lazy(() => import('../../../pages/admin/PriceCsvImport'));
+const ShippingSettings = React.lazy(() => import('../../../pages/admin/ShippingSettings'));
+const X402Settings = React.lazy(() => import('../../../pages/admin/X402Settings'));
+const KSLScraper = React.lazy(() => import('../../../pages/admin/KSLScraper'));
+const ScraperDashboard = React.lazy(() => import('../../../pages/admin/ScraperDashboard'));
+const MemeLibraryAdmin = React.lazy(() => import('../../../pages/admin/MemeLibraryAdmin'));
+const ScriptControlCenter = React.lazy(() => import('../../../pages/ScriptControlCenter'));
+const ImageProcessingDashboard = React.lazy(() => import('../../../pages/ImageProcessingDashboard'));
+const LiveImageAnalysisMonitor = React.lazy(() => import('../../../components/admin/LiveImageAnalysisMonitor'));
+const BatchImageAnalysis = React.lazy(() => import('../../../pages/admin/BatchImageAnalysis'));
+const ExtractionMonitor = React.lazy(() => import('../../../pages/admin/ExtractionMonitor'));
+const ExtractionReview = React.lazy(() => import('../../../pages/ExtractionReview'));
+const SystemStatus = React.lazy(() => import('../../../pages/SystemStatus'));
+const CatalogBrowser = React.lazy(() => import('../../../pages/CatalogBrowser'));
+const DatabaseAudit = React.lazy(() => import('../../../pages/DatabaseAudit'));
+const DataDiagnostic = React.lazy(() => import('../../../pages/DataDiagnostic'));
+const TestContributions = React.lazy(() => import('../../../pages/TestContributions'));
+const AdminPendingVehicles = React.lazy(() => import('../../../pages/AdminPendingVehicles'));
+const HoverCardDemo = React.lazy(() => import('../../../pages/admin/HoverCardDemo'));
+const VehicleMakeLogosCatalog = React.lazy(() => import('../../../pages/admin/VehicleMakeLogosCatalog'));
+const MarketDataTools = React.lazy(() => import('../../../pages/MarketDataTools'));
+const BotTestDashboard = React.lazy(() => import('../../../pages/admin/BotTestDashboard'));
+const AdminRalphBrief = React.lazy(() => import('../../../pages/admin/AdminRalphBrief'));
+const NLQueryConsole = React.lazy(() => import('../../../pages/admin/NLQueryConsole'));
+const AdminIdentityClaims = React.lazy(() => import('../../../pages/admin/AdminIdentityClaims'));
+const InventoryAnalytics = React.lazy(() => import('../../../pages/admin/InventoryAnalytics'));
+
+const LazyFallback = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '9pt' }}>
+    loading...
+  </div>
+);
 
 const AdminModuleRoutes = () => {
   return (
-    <Routes>
-      <Route element={<AdminShell />}>
-        <Route index element={<AdminHome />} />
+    <Suspense fallback={<LazyFallback />}>
+      <Routes>
+        <Route element={<AdminShell />}>
+          <Route index element={<AdminHome />} />
 
-        {/* Core */}
-        <Route path="reviews" element={<AdminDashboard />} />
-        <Route path="legacy-dashboard" element={<AdminDashboard />} />
-        <Route path="verifications" element={<AdminVerifications />} />
-        <Route path="ownership-verifications" element={<OwnershipVerificationDashboard />} />
-        <Route path="merge-proposals" element={<MergeProposalsDashboard />} />
-        <Route path="pending-vehicles" element={<AdminPendingVehicles />} />
-        <Route path="identity-claims" element={<AdminIdentityClaims />} />
+          {/* Core */}
+          <Route path="reviews" element={<AdminDashboard />} />
+          <Route path="legacy-dashboard" element={<AdminDashboard />} />
+          <Route path="verifications" element={<AdminVerifications />} />
+          <Route path="ownership-verifications" element={<OwnershipVerificationDashboard />} />
+          <Route path="merge-proposals" element={<MergeProposalsDashboard />} />
+          <Route path="pending-vehicles" element={<AdminPendingVehicles />} />
+          <Route path="identity-claims" element={<AdminIdentityClaims />} />
 
-        {/* Ops */}
-        <Route path="ralph" element={<AdminRalphBrief />} />
-        <Route path="mission-control" element={<AdminMissionControl />} />
-        <Route path="scripts" element={<ScriptControlCenter />} />
-        <Route path="image-processing" element={<ImageProcessingDashboard />} />
-        <Route path="live-analysis" element={<LiveImageAnalysisMonitor />} />
-        <Route path="batch-analysis" element={<BatchImageAnalysis />} />
-        <Route path="extraction-monitor" element={<ExtractionMonitor />} />
-        <Route path="extraction-review" element={<ExtractionReview />} />
-        <Route path="status" element={<SystemStatus />} />
+          {/* Ops */}
+          <Route path="ralph" element={<AdminRalphBrief />} />
+          <Route path="mission-control" element={<AdminMissionControl />} />
+          <Route path="scripts" element={<ScriptControlCenter />} />
+          <Route path="image-processing" element={<ImageProcessingDashboard />} />
+          <Route path="live-analysis" element={<LiveImageAnalysisMonitor />} />
+          <Route path="batch-analysis" element={<BatchImageAnalysis />} />
+          <Route path="extraction-monitor" element={<ExtractionMonitor />} />
+          <Route path="extraction-review" element={<ExtractionReview />} />
+          <Route path="status" element={<SystemStatus />} />
 
-        {/* Tools */}
-        <Route path="inventory-analytics" element={<InventoryAnalytics />} />
-        <Route path="analytics" element={<InventoryAnalytics />} />
-        <Route path="business-intelligence" element={<BusinessIntelligence />} />
-        <Route path="bi" element={<BusinessIntelligence />} />
-        <Route path="price-editor" element={<BulkPriceEditor />} />
-        <Route path="price-import" element={<PriceCsvImport />} />
-        <Route path="shipping-settings" element={<ShippingSettings />} />
-        <Route path="x402-settings" element={<X402Settings />} />
-        <Route path="ksl-scraper" element={<KSLScraper />} />
-        <Route path="scrapers" element={<ScraperDashboard />} />
-        <Route path="meme-library" element={<MemeLibraryAdmin />} />
-        <Route path="catalog" element={<CatalogBrowser />} />
-        <Route path="make-logos-catalog" element={<VehicleMakeLogosCatalog />} />
-        <Route path="market-data-tools" element={<MarketDataTools />} />
-        <Route path="database-audit" element={<DatabaseAudit />} />
-        <Route path="data-diagnostic" element={<DataDiagnostic />} />
-        <Route path="test-contributions" element={<TestContributions />} />
-        <Route path="query-console" element={<NLQueryConsole />} />
-        <Route path="hover-demo" element={<HoverCardDemo />} />
-        <Route path="bot-testing" element={<BotTestDashboard />} />
-      </Route>
-    </Routes>
+          {/* Tools */}
+          <Route path="inventory-analytics" element={<InventoryAnalytics />} />
+          <Route path="analytics" element={<InventoryAnalytics />} />
+          <Route path="business-intelligence" element={<BusinessIntelligence />} />
+          <Route path="bi" element={<BusinessIntelligence />} />
+          <Route path="price-editor" element={<BulkPriceEditor />} />
+          <Route path="price-import" element={<PriceCsvImport />} />
+          <Route path="shipping-settings" element={<ShippingSettings />} />
+          <Route path="x402-settings" element={<X402Settings />} />
+          <Route path="ksl-scraper" element={<KSLScraper />} />
+          <Route path="scrapers" element={<ScraperDashboard />} />
+          <Route path="meme-library" element={<MemeLibraryAdmin />} />
+          <Route path="catalog" element={<CatalogBrowser />} />
+          <Route path="make-logos-catalog" element={<VehicleMakeLogosCatalog />} />
+          <Route path="market-data-tools" element={<MarketDataTools />} />
+          <Route path="database-audit" element={<DatabaseAudit />} />
+          <Route path="data-diagnostic" element={<DataDiagnostic />} />
+          <Route path="test-contributions" element={<TestContributions />} />
+          <Route path="query-console" element={<NLQueryConsole />} />
+          <Route path="hover-demo" element={<HoverCardDemo />} />
+          <Route path="bot-testing" element={<BotTestDashboard />} />
+        </Route>
+      </Routes>
+    </Suspense>
   );
 };
 
 export default AdminModuleRoutes;
-

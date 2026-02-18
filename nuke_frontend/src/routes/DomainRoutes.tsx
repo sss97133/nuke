@@ -9,8 +9,8 @@ import TermsOfService from '../pages/TermsOfService';
 import DataDeletion from '../pages/DataDeletion';
 import EULA from '../pages/EULA';
 
-// Search: eager import so /search always works (no lazy-chunk failure)
-import Search from '../pages/Search';
+// Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
+const Search = React.lazy(() => import('../pages/Search'));
 
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
