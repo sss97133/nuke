@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { useAcquisitionPipeline, PipelineEntry } from '../hooks/useAcquisitionPipeline';
+import { useAcquisitionPipeline } from '../hooks/useAcquisitionPipeline';
+import type { PipelineEntry } from '../hooks/useAcquisitionPipeline';
 import '../design-system.css';
 
 type ViewFilter = 'targets' | 'active' | 'all';
