@@ -6,251 +6,188 @@ import '../design-system.css';
 
 type ViewFilter = 'targets' | 'active' | 'all';
 
-function formatPrice(n: number | null | undefined): string {
+function fmt(n: number | null | undefined): string {
   if (n == null) return '—';
   return '$' + n.toLocaleString();
 }
 
-function scoreBadge(score: number | null): { label: string; color: string } {
-  if (!score) return { label: '—', color: '#999' };
-  if (score >= 80) return { label: 'STRONG BUY', color: '#16a34a' };
-  if (score >= 70) return { label: 'BUY', color: '#2563eb' };
-  if (score >= 50) return { label: 'FAIR', color: '#ca8a04' };
-  return { label: 'PASS', color: '#dc2626' };
+function scoreTxt(score: number | null): string {
+  if (!score) return '—';
+  if (score >= 80) return 'STRONG BUY';
+  if (score >= 70) return 'BUY';
+  if (score >= 50) return 'FAIR';
+  return 'PASS';
 }
 
-function conditionLabel(tier: string | undefined): string {
-  if (!tier) return '—';
-  return tier.charAt(0).toUpperCase() + tier.slice(1);
-}
-
-function StageTag({ stage }: { stage: string }) {
-  const colors: Record<string, string> = {
-    target: '#2563eb',
-    contacted: '#7c3aed',
-    inspecting: '#ca8a04',
-    offer_made: '#ea580c',
-    under_contract: '#16a34a',
-    acquired: '#059669',
-    at_shop: '#0891b2',
-    validated: '#4f46e5',
-    listed: '#c026d3',
-    sold: '#16a34a',
-  };
-  const bg = colors[stage] || '#6b7280';
-  return (
-    <span style={{
-      display: 'inline-block',
-      padding: '1px 6px',
-      borderRadius: 3,
-      fontSize: 10,
-      fontWeight: 600,
-      color: '#fff',
-      background: bg,
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-    }}>
-      {stage.replace(/_/g, ' ')}
-    </span>
-  );
-}
-
-function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
-  return (
-    <div style={{
-      background: 'var(--surface, #fff)',
-      border: '1px solid var(--border, #e5e7eb)',
-      padding: '12px 16px',
-      flex: 1,
-      minWidth: 140,
-    }}>
-      <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text, #111)', marginTop: 2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function DealCard({ entry, onAction }: { entry: PipelineEntry; onAction: (id: string, action: string) => void }) {
-  const [expanded, setExpanded] = useState(false);
+function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: string, action: string) => void }) {
+  const [open, setOpen] = useState(false);
   const proof = entry.market_proof_data;
-  const badge = scoreBadge(entry.deal_score);
   const hasUrl = entry.discovery_url?.startsWith('http');
   const profit = entry.estimated_profit || proof?.net_profit || 0;
   const roi = proof?.roi_pct || 0;
+  const location = [entry.location_city, entry.location_state].filter(Boolean).join(', ');
+
+  const nextAction: Record<string, { action: string; label: string }> = {
+    target: { action: 'contact', label: 'Contact' },
+    contacted: { action: 'schedule_inspection', label: 'Inspect' },
+    inspecting: { action: 'make_offer', label: 'Offer' },
+    offer_made: { action: 'accept_deal', label: 'Accept' },
+  };
+  const act = nextAction[entry.stage];
 
   return (
-    <div style={{
-      background: 'var(--surface, #fff)',
-      border: '1px solid var(--border, #e5e7eb)',
-      marginBottom: 6,
-      fontSize: 12,
-    }}>
-      {/* Header row */}
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer' }}
-        onClick={() => setExpanded(!expanded)}
+    <>
+      <tr
+        onClick={() => setOpen(!open)}
+        style={{ cursor: 'pointer' }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'var(--grey-100)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = ''; }}
       >
-        <div style={{ flex: '0 0 auto' }}>
-          <StageTag stage={entry.stage} />
-        </div>
-        <div style={{ flex: 1, fontWeight: 600 }}>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', whiteSpace: 'nowrap' }}>
+          <span className="badge" style={{
+            fontSize: '8px',
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            letterSpacing: '0.3px',
+          }}>
+            {entry.stage.replace(/_/g, ' ')}
+          </span>
+        </td>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', fontWeight: 700 }}>
           {entry.year || '?'} {entry.make} {entry.model || ''}
-        </div>
-        <div style={{ flex: '0 0 auto', textAlign: 'right' }}>
-          <span style={{ color: badge.color, fontWeight: 700, fontSize: 10 }}>{badge.label}</span>
-          {entry.deal_score && <span style={{ color: '#999', marginLeft: 4, fontSize: 10 }}>({entry.deal_score})</span>}
-        </div>
-        <div style={{ flex: '0 0 80px', textAlign: 'right', fontWeight: 600 }}>
-          {formatPrice(entry.asking_price)}
-        </div>
-        <div style={{
-          flex: '0 0 80px', textAlign: 'right', fontWeight: 700,
-          color: profit > 0 ? '#16a34a' : profit < 0 ? '#dc2626' : '#999',
+          {location && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>{location}</span>}
+        </td>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>
+          {scoreTxt(entry.deal_score)}
+          {entry.deal_score != null && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>{entry.deal_score}</span>}
+        </td>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontFamily: 'monospace' }}>
+          {fmt(entry.asking_price)}
+        </td>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontFamily: 'monospace' }}>
+          {fmt(entry.comp_median)}
+        </td>
+        <td style={{
+          padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right',
+          fontFamily: 'monospace', fontWeight: 700,
         }}>
-          {profit > 0 ? '+' : ''}{formatPrice(profit)}
-        </div>
-        <div style={{ flex: '0 0 50px', textAlign: 'right', color: '#6b7280', fontSize: 10 }}>
+          {profit > 0 ? '+' : ''}{fmt(profit)}
+        </td>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right' }}>
           {roi > 0 ? `${roi}%` : '—'}
-        </div>
-        <div style={{ flex: '0 0 16px', textAlign: 'center', color: '#999' }}>
-          {expanded ? '\u25B2' : '\u25BC'}
-        </div>
-      </div>
+        </td>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'center', color: 'var(--text-muted)', width: 16 }}>
+          {open ? '\u25B4' : '\u25BE'}
+        </td>
+      </tr>
 
-      {/* Expanded detail */}
-      {expanded && (
-        <div style={{ padding: '0 12px 10px', borderTop: '1px solid var(--border, #e5e7eb)' }}>
-          <div style={{ display: 'flex', gap: 24, paddingTop: 8, flexWrap: 'wrap' }}>
-            {/* Left: Market data */}
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 4 }}>MARKET DATA</div>
-              <table style={{ fontSize: 11, borderCollapse: 'collapse', width: '100%' }}>
-                <tbody>
-                  <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Comp Median</td><td style={{ textAlign: 'right' }}>{formatPrice(entry.comp_median)}</td></tr>
-                  <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Condition</td><td style={{ textAlign: 'right' }}>{conditionLabel(proof?.condition_tier)}</td></tr>
-                  <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Cost to Ready</td><td style={{ textAlign: 'right' }}>{formatPrice(proof?.cost_to_ready)}</td></tr>
-                  <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Target Sale</td><td style={{ textAlign: 'right' }}>{formatPrice(proof?.target_sale_price)}</td></tr>
-                  <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Total Investment</td><td style={{ textAlign: 'right' }}>{formatPrice(proof?.total_investment)}</td></tr>
-                  <tr style={{ fontWeight: 700 }}>
-                    <td style={{ padding: '2px 0', borderTop: '1px solid #e5e7eb' }}>Net Profit</td>
-                    <td style={{ textAlign: 'right', borderTop: '1px solid #e5e7eb', color: profit > 0 ? '#16a34a' : '#dc2626' }}>
-                      {formatPrice(profit)} ({roi}% ROI)
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              {proof?.match_strategy && (
-                <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>Comps: {proof.match_strategy}</div>
-              )}
-            </div>
+      {open && (
+        <tr>
+          <td colSpan={8} style={{ padding: 0, border: '1px solid var(--border-light)', background: 'var(--grey-50)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-5)', padding: 'var(--space-3) var(--space-4)', flexWrap: 'wrap' }}>
 
-            {/* Middle: Cost breakdown */}
-            {proof?.cost_breakdown && (
+              {/* Economics */}
               <div style={{ flex: 1, minWidth: 180 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 4 }}>COST BREAKDOWN</div>
-                <table style={{ fontSize: 11, borderCollapse: 'collapse', width: '100%' }}>
+                <div style={{ fontWeight: 700, marginBottom: 'var(--space-1)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Economics</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
-                    <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Parts</td><td style={{ textAlign: 'right' }}>{formatPrice(proof.cost_breakdown.parts)}</td></tr>
-                    <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Labor ({proof.cost_breakdown.labor_hours}h)</td><td style={{ textAlign: 'right' }}>{formatPrice(proof.cost_breakdown.labor)}</td></tr>
-                    <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Transport</td><td style={{ textAlign: 'right' }}>{formatPrice(proof.cost_breakdown.transport)}</td></tr>
-                    <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Inspection</td><td style={{ textAlign: 'right' }}>{formatPrice(proof.cost_breakdown.inspection)}</td></tr>
-                    <tr><td style={{ padding: '2px 0', color: '#6b7280' }}>Listing Fees</td><td style={{ textAlign: 'right' }}>{proof.cost_breakdown.listing_fees_pct}%</td></tr>
+                    {[
+                      ['Asking', fmt(entry.asking_price)],
+                      ['Comp Median', fmt(entry.comp_median)],
+                      ['Condition', proof?.condition_tier ? proof.condition_tier.charAt(0).toUpperCase() + proof.condition_tier.slice(1) : '—'],
+                      ['Cost to Ready', fmt(proof?.cost_to_ready)],
+                      ['Total Investment', fmt(proof?.total_investment)],
+                      ['Target Sale', fmt(proof?.target_sale_price)],
+                    ].map(([k, v]) => (
+                      <tr key={k}>
+                        <td style={{ padding: '1px 0', color: 'var(--text-muted)' }}>{k}</td>
+                        <td style={{ padding: '1px 0', textAlign: 'right', fontFamily: 'monospace' }}>{v}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ fontWeight: 700 }}>
+                      <td style={{ padding: '2px 0', borderTop: '1px solid var(--border)' }}>Net Profit</td>
+                      <td style={{ padding: '2px 0', borderTop: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace' }}>
+                        {profit > 0 ? '+' : ''}{fmt(profit)} ({roi}%)
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
+                {proof?.match_strategy && (
+                  <div style={{ color: 'var(--text-disabled)', marginTop: 'var(--space-1)' }}>Comps: {proof.match_strategy}</div>
+                )}
+              </div>
+
+              {/* Cost Breakdown */}
+              {proof?.cost_breakdown && (
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 'var(--space-1)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Costs</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {[
+                        ['Parts', fmt(proof.cost_breakdown.parts)],
+                        [`Labor (${proof.cost_breakdown.labor_hours || 0}h)`, fmt(proof.cost_breakdown.labor)],
+                        ['Transport', fmt(proof.cost_breakdown.transport)],
+                        ['Inspection', fmt(proof.cost_breakdown.inspection)],
+                        ['Listing Fees', `${proof.cost_breakdown.listing_fees_pct || 0}%`],
+                      ].map(([k, v]) => (
+                        <tr key={k}>
+                          <td style={{ padding: '1px 0', color: 'var(--text-muted)' }}>{k}</td>
+                          <td style={{ padding: '1px 0', textAlign: 'right', fontFamily: 'monospace' }}>{v}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Actions + Notes */}
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <div style={{ fontWeight: 700, marginBottom: 'var(--space-1)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Details</div>
+                {hasUrl && (
+                  <a
+                    href={entry.discovery_url!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'block', marginBottom: 'var(--space-1)', textDecoration: 'underline' }}
+                  >
+                    View Listing →
+                  </a>
+                )}
+                {entry.discovery_source && (
+                  <div style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-1)' }}>Source: {entry.discovery_source}</div>
+                )}
+                {proof?.risk_factors && proof.risk_factors.length > 0 && (
+                  <div style={{ marginTop: 'var(--space-2)' }}>
+                    <span style={{ fontWeight: 700 }}>Risks: </span>
+                    {proof.risk_factors.join(' · ')}
+                  </div>
+                )}
+                {proof?.cost_notes && proof.cost_notes.length > 0 && (
+                  <div style={{ color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
+                    {proof.cost_notes.join(' · ')}
+                  </div>
+                )}
+                {act && (
+                  <button
+                    className="button button-primary"
+                    style={{ marginTop: 'var(--space-3)', fontSize: '8pt' }}
+                    onClick={e => { e.stopPropagation(); onAction(entry.id, act.action); }}
+                  >
+                    {act.label} →
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {entry.notes && (
+              <div style={{ padding: '0 var(--space-4) var(--space-3)', color: 'var(--text-muted)', borderTop: '1px solid var(--border-light)', paddingTop: 'var(--space-2)' }}>
+                {entry.notes}
               </div>
             )}
-
-            {/* Right: Location + Actions */}
-            <div style={{ flex: 1, minWidth: 180 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 4 }}>DETAILS</div>
-              <div style={{ fontSize: 11, marginBottom: 2 }}>
-                {[entry.location_city, entry.location_state].filter(Boolean).join(', ') || 'Unknown location'}
-              </div>
-              {hasUrl && (
-                <a
-                  href={entry.discovery_url!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 11, color: '#2563eb', display: 'block', marginBottom: 4 }}
-                >
-                  View Listing &rarr;
-                </a>
-              )}
-              {proof?.risk_factors && proof.risk_factors.length > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>Risks:</div>
-                  {proof.risk_factors.map((r, i) => (
-                    <div key={i} style={{ fontSize: 10, color: '#6b7280', paddingLeft: 8 }}>- {r}</div>
-                  ))}
-                </div>
-              )}
-              {proof?.cost_notes && proof.cost_notes.length > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  {proof.cost_notes.map((n, i) => (
-                    <div key={i} style={{ fontSize: 10, color: '#9ca3af', paddingLeft: 8 }}>{n}</div>
-                  ))}
-                </div>
-              )}
-
-              {/* Action buttons */}
-              <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-                {entry.stage === 'target' && (
-                  <button
-                    onClick={() => onAction(entry.id, 'contact')}
-                    style={{
-                      padding: '3px 8px', fontSize: 10, fontWeight: 600,
-                      background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer',
-                    }}
-                  >
-                    Contact Seller
-                  </button>
-                )}
-                {entry.stage === 'contacted' && (
-                  <button
-                    onClick={() => onAction(entry.id, 'schedule_inspection')}
-                    style={{
-                      padding: '3px 8px', fontSize: 10, fontWeight: 600,
-                      background: '#ca8a04', color: '#fff', border: 'none', cursor: 'pointer',
-                    }}
-                  >
-                    Schedule Inspection
-                  </button>
-                )}
-                {entry.stage === 'inspecting' && (
-                  <button
-                    onClick={() => onAction(entry.id, 'make_offer')}
-                    style={{
-                      padding: '3px 8px', fontSize: 10, fontWeight: 600,
-                      background: '#ea580c', color: '#fff', border: 'none', cursor: 'pointer',
-                    }}
-                  >
-                    Make Offer
-                  </button>
-                )}
-                {entry.stage === 'offer_made' && (
-                  <button
-                    onClick={() => onAction(entry.id, 'accept_deal')}
-                    style={{
-                      padding: '3px 8px', fontSize: 10, fontWeight: 600,
-                      background: '#16a34a', color: '#fff', border: 'none', cursor: 'pointer',
-                    }}
-                  >
-                    Accept Deal
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {entry.notes && (
-            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 8, padding: '4px 0', borderTop: '1px solid #f3f4f6' }}>
-              {entry.notes}
-            </div>
-          )}
-        </div>
+          </td>
+        </tr>
       )}
-    </div>
+    </>
   );
 }
 
@@ -267,13 +204,19 @@ export default function AcquisitionPipeline() {
     return true;
   });
 
+  const counts = {
+    targets: entries.filter(e => e.stage === 'target').length,
+    active: entries.filter(e => activeDealStages.includes(e.stage)).length,
+    all: entries.length,
+  };
+
   const handleAction = async (id: string, action: string) => {
     setActionError(null);
     try {
       const params: Record<string, unknown> = {};
       if (action === 'contact') {
         params.contact_method = 'CL email reply';
-        params.contact_notes = 'Initial contact from pipeline dashboard';
+        params.contact_notes = 'Initial contact from pipeline';
       }
       if (action === 'schedule_inspection') {
         params.shop_name = prompt('Shop name:') || 'TBD';
@@ -294,103 +237,100 @@ export default function AcquisitionPipeline() {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: 24, fontSize: 12, color: '#6b7280' }}>
-        Loading pipeline...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: 24, fontSize: 12, color: '#dc2626' }}>
-        Error: {error}
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: '16px 24px', maxWidth: 1200 }}>
+    <div style={{ padding: '0 var(--space-2)', maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h1 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Acquisition Pipeline</h1>
-        <button
-          onClick={refresh}
-          style={{
-            padding: '4px 12px', fontSize: 10, fontWeight: 600,
-            background: 'var(--surface, #fff)', border: '1px solid var(--border, #e5e7eb)',
-            cursor: 'pointer',
-          }}
-        >
-          Refresh
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) 0' }}>
+        <div style={{ fontWeight: 700 }}>Acquisition Pipeline</div>
+        <button className="button button-small" onClick={refresh}>Refresh</button>
       </div>
 
-      {/* Stats bar */}
+      {/* Stats */}
       {stats && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          <StatCard label="Total Scanned" value={stats.total} />
-          <StatCard label="Targets" value={stats.targets} sub={`${stats.strong_buys} strong, ${stats.buys} buy`} />
-          <StatCard label="Active Deals" value={stats.active_deals} />
-          <StatCard
-            label="Target Profit"
-            value={formatPrice(stats.total_target_profit)}
-            sub={`${stats.avg_target_roi}% avg ROI`}
-          />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: 'var(--space-2)',
+          marginBottom: 'var(--space-3)',
+        }}>
+          {[
+            { label: 'Scanned', value: stats.total.toLocaleString() },
+            { label: 'Targets', value: String(stats.targets), sub: `${stats.strong_buys} strong · ${stats.buys} buy` },
+            { label: 'Active Deals', value: String(stats.active_deals) },
+            { label: 'Target Profit', value: fmt(stats.total_target_profit), sub: `${stats.avg_target_roi}% avg ROI` },
+          ].map(s => (
+            <div key={s.label} className="card" style={{ padding: 'var(--space-3)' }}>
+              <div style={{ textTransform: 'uppercase', letterSpacing: '0.3px', color: 'var(--text-muted)', marginBottom: 2 }}>{s.label}</div>
+              <div style={{ fontWeight: 700, fontSize: '11pt' }}>{s.value}</div>
+              {s.sub && <div style={{ color: 'var(--text-muted)', marginTop: 1 }}>{s.sub}</div>}
+            </div>
+          ))}
         </div>
       )}
 
       {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: 0, marginBottom: 12, borderBottom: '1px solid var(--border, #e5e7eb)' }}>
-        {(['targets', 'active', 'all'] as ViewFilter[]).map(f => (
+      <div style={{ display: 'flex', gap: 0, marginBottom: 'var(--space-2)' }}>
+        {([
+          { key: 'targets' as ViewFilter, label: 'Targets', count: counts.targets },
+          { key: 'active' as ViewFilter, label: 'Active', count: counts.active },
+          { key: 'all' as ViewFilter, label: 'All', count: counts.all },
+        ]).map(f => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
+            key={f.key}
+            onClick={() => setFilter(f.key)}
             style={{
-              padding: '6px 16px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-              background: filter === f ? 'var(--surface, #fff)' : 'transparent',
-              border: 'none', borderBottom: filter === f ? '2px solid #2563eb' : '2px solid transparent',
-              cursor: 'pointer', color: filter === f ? '#2563eb' : '#6b7280',
-              letterSpacing: '0.5px',
+              padding: '4px var(--space-3)',
+              border: '2px solid var(--border)',
+              borderRight: 'none',
+              background: filter === f.key ? 'var(--text)' : 'var(--surface)',
+              color: filter === f.key ? 'var(--surface)' : 'var(--text)',
+              fontWeight: 700,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px',
+              fontFamily: 'Arial, sans-serif',
+              fontSize: 'var(--font-size)',
             }}
           >
-            {f === 'targets' ? `Targets (${entries.filter(e => e.stage === 'target').length})` :
-             f === 'active' ? `Active Deals (${entries.filter(e => activeDealStages.includes(e.stage)).length})` :
-             `All (${entries.length})`}
+            {f.label} ({f.count})
           </button>
         ))}
+        <div style={{ borderRight: '2px solid var(--border)' }} />
       </div>
 
-      {actionError && (
-        <div style={{ padding: '6px 12px', fontSize: 11, color: '#dc2626', background: '#fef2f2', marginBottom: 8, border: '1px solid #fecaca' }}>
-          {actionError}
-        </div>
-      )}
+      {loading && <div style={{ padding: 'var(--space-4)', color: 'var(--text-muted)' }}>Loading...</div>}
+      {error && <div style={{ padding: 'var(--space-3)', border: '1px solid var(--border-dark)', background: 'var(--grey-200)', marginBottom: 'var(--space-2)' }}>Error: {error}</div>}
+      {actionError && <div style={{ padding: 'var(--space-3)', border: '1px solid var(--border-dark)', background: 'var(--grey-200)', marginBottom: 'var(--space-2)' }}>{actionError}</div>}
 
-      {/* Column headers */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px',
-        fontSize: 10, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px',
-      }}>
-        <div style={{ flex: '0 0 auto', width: 70 }}>Stage</div>
-        <div style={{ flex: 1 }}>Vehicle</div>
-        <div style={{ flex: '0 0 auto', width: 80, textAlign: 'right' }}>Score</div>
-        <div style={{ flex: '0 0 80px', textAlign: 'right' }}>Ask</div>
-        <div style={{ flex: '0 0 80px', textAlign: 'right' }}>Net Profit</div>
-        <div style={{ flex: '0 0 50px', textAlign: 'right' }}>ROI</div>
-        <div style={{ flex: '0 0 16px' }} />
-      </div>
-
-      {/* Entries */}
-      {filtered.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: '#9ca3af' }}>
-          No entries in this view
-        </div>
-      ) : (
-        filtered.map(entry => (
-          <DealCard key={entry.id} entry={entry} onAction={handleAction} />
-        ))
+      {/* Table */}
+      {!loading && (
+        <table className="table" style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ width: 80 }}>Stage</th>
+              <th>Vehicle</th>
+              <th style={{ width: 90, textAlign: 'right' }}>Score</th>
+              <th style={{ width: 80, textAlign: 'right' }}>Ask</th>
+              <th style={{ width: 80, textAlign: 'right' }}>Median</th>
+              <th style={{ width: 90, textAlign: 'right' }}>Net Profit</th>
+              <th style={{ width: 50, textAlign: 'right' }}>ROI</th>
+              <th style={{ width: 16 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ padding: 'var(--space-5)', textAlign: 'center', color: 'var(--text-disabled)', border: '1px solid var(--border-light)' }}>
+                  No entries
+                </td>
+              </tr>
+            ) : (
+              filtered.map(entry => (
+                <DealRow key={entry.id} entry={entry} onAction={handleAction} />
+              ))
+            )}
+          </tbody>
+        </table>
       )}
     </div>
   );
