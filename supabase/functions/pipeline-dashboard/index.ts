@@ -26,19 +26,23 @@ serve(async (req) => {
     );
 
     // Stage breakdown
-    const { data: stageCounts } = await supabase.rpc('exec_sql', {
-      query: `
-        SELECT stage, count(*) as count,
-          count(*) FILTER (WHERE asking_price IS NOT NULL) as priced,
-          round(avg(deal_score)) as avg_score,
-          round(avg(asking_price)) as avg_ask,
-          round(avg(comp_median)) as avg_median,
-          sum(CASE WHEN asking_price IS NOT NULL AND comp_median IS NOT NULL
-              THEN comp_median - asking_price ELSE 0 END) as total_upside
-        FROM acquisition_pipeline GROUP BY stage
-        ORDER BY CASE stage WHEN 'target' THEN 1 WHEN 'market_proofed' THEN 2 WHEN 'discovered' THEN 3 ELSE 4 END
-      `,
-    }).catch(() => ({ data: null }));
+    let stageCounts = null;
+    try {
+      const res = await supabase.rpc('exec_sql', {
+        query: `
+          SELECT stage, count(*) as count,
+            count(*) FILTER (WHERE asking_price IS NOT NULL) as priced,
+            round(avg(deal_score)) as avg_score,
+            round(avg(asking_price)) as avg_ask,
+            round(avg(comp_median)) as avg_median,
+            sum(CASE WHEN asking_price IS NOT NULL AND comp_median IS NOT NULL
+                THEN comp_median - asking_price ELSE 0 END) as total_upside
+          FROM acquisition_pipeline GROUP BY stage
+          ORDER BY CASE stage WHEN 'target' THEN 1 WHEN 'market_proofed' THEN 2 WHEN 'discovered' THEN 3 ELSE 4 END
+        `,
+      });
+      stageCounts = res.data;
+    } catch { /* ignore */ }
 
     // Top targets (up to 20)
     const { data: targets } = await supabase
