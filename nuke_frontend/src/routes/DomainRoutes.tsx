@@ -55,6 +55,14 @@ const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
+
+// Acquisition Pipeline
+const AcquisitionPipeline = React.lazy(() => import('../pages/AcquisitionPipeline'));
+
+// Predictions (betting)
+const BettingPage = React.lazy(() => import('../pages/betting/index'));
+const MarketDetail = React.lazy(() => import('../pages/betting/MarketDetail'));
+const LiveAuctionView = React.lazy(() => import('../components/betting/LiveAuctionView').then(m => ({ default: m.LiveAuctionView })));
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
 const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
@@ -161,6 +169,15 @@ export const DomainRoutes = () => {
         <Route path="/curation/queue" element={<Navigate to="/curation-queue" replace />} />
         <Route path="/review/ai-detections" element={<Navigate to="/curation-queue" replace />} />
         <Route path="/receipts/unlinked" element={<UnlinkedReceipts />} />
+
+        {/* Acquisition Pipeline */}
+        <Route path="/pipeline" element={<AcquisitionPipeline />} />
+        <Route path="/acquisitions" element={<AcquisitionPipeline />} />
+
+        {/* Predictions (betting) */}
+        <Route path="/predictions" element={<BettingPage />} />
+        <Route path="/predictions/:id" element={<MarketDetail />} />
+        <Route path="/predictions/live" element={<LiveAuctionView />} />
 
         {/* Hub convenience routes → redirect to homepage tabs */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
