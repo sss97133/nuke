@@ -463,11 +463,13 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                     <Link to={orgNavPath} className={`nav-link ${isActivePage('/org') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Organizations</Link>
                     {session && (
                     <>
+                    <Link to="/pipeline" className={`nav-link ${isActivePage('/pipeline') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Acquisitions</Link>
                     <Link to="/invoices" className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Invoices</Link>
                     <Link to="/restoration" className={`nav-link ${isActivePage('/restoration') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Restoration Intake</Link>
                     </>
                     )}
                     <Link to="/market" className={`nav-link ${isActivePage('/market') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Market</Link>
+                    <Link to="/predictions" className={`nav-link ${isActivePage('/predictions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Predictions</Link>
                     <div style={{ borderTop: '2px solid var(--border)', marginTop: '2px' }} />
                     <Link to="/api" className={`nav-link ${isActivePage('/api') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>API</Link>
                     <Link to="/developers" className={`nav-link ${isActivePage('/developers') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>SDK Docs</Link>
