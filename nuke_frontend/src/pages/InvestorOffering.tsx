@@ -5,9 +5,9 @@ import { supabase } from '../lib/supabase';
 import '../design-system.css';
 
 // Import markdown files as raw strings via Vite
-import teaserMd from '@docs/investor/N-ZERO_TEASER.md?raw';
-import businessPlanMd from '@docs/investor/N-ZERO_BUSINESS_PLAN.md?raw';
-import informationMemorandumMd from '@docs/investor/N-ZERO_INFORMATION_MEMORANDUM.md?raw';
+import teaserMd from '@docs/investor/NUKE_TEASER.md?raw';
+import businessPlanMd from '@docs/investor/NUKE_BUSINESS_PLAN.md?raw';
+import informationMemorandumMd from '@docs/investor/NUKE_INFORMATION_MEMORANDUM.md?raw';
 import revenueModelMd from '@docs/investor/REVENUE_MODEL.md?raw';
 import dataInventoryMd from '@docs/investor/DATA_INVENTORY.md?raw';
 import technicalExhibitsMd from '@docs/investor/TECHNICAL_EXHIBITS.md?raw';
