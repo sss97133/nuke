@@ -43,7 +43,7 @@ const MCP_TOOLS: McpTool[] = [
   {
     name: 'api-v1-vehicles',
     description: 'Query vehicle profiles with full provenance. Filter by year, make, model, VIN, price range, body style, and more.',
-    example: `curl "https://api.nuke.build/functions/v1/api-v1-vehicles?make=Porsche&year_min=1970&year_max=1975" \\
+    example: `curl "https://api.nuke.ag/functions/v1/api-v1-vehicles?make=Porsche&year_min=1970&year_max=1975" \\
   -H "X-API-Key: nk_live_xxx"
 // => { data: [{ year: 1973, make: "Porsche", model: "911", sale_price: 185000, ... }] }`,
   },
@@ -70,7 +70,7 @@ const MCP_TOOLS: McpTool[] = [
   {
     name: 'api-v1-observations',
     description: 'Query the unified observation timeline for any vehicle. Every auction, forum post, social mention, and price signal in one feed.',
-    example: `curl "https://api.nuke.build/functions/v1/api-v1-observations?vehicle_id=abc-123&limit=50" \\
+    example: `curl "https://api.nuke.ag/functions/v1/api-v1-observations?vehicle_id=abc-123&limit=50" \\
   -H "X-API-Key: nk_live_xxx"
 // => { data: [{ kind: "comment", source: "bat-auctions", payload: {...}, created_at: "..." }] }`,
   },
@@ -85,21 +85,21 @@ const MCP_TOOLS: McpTool[] = [
   {
     name: 'api-v1-valuations',
     description: 'Get Nuke Estimates for any vehicle. Returns valuation with confidence scoring, deal score, heat score, and price range.',
-    example: `curl "https://api.nuke.build/functions/v1/api-v1-valuations?vin=WP0AB0916KS121279" \\
+    example: `curl "https://api.nuke.ag/functions/v1/api-v1-valuations?vin=WP0AB0916KS121279" \\
   -H "X-API-Key: nk_live_xxx"
 // => { data: { estimated_value: 185000, confidence_score: 0.87, deal_score_label: "great" } }`,
   },
   {
     name: 'api-v1-listings',
     description: 'Query external auction and marketplace listings. Filter by platform (BaT, C&B, Hagerty), status, and vehicle.',
-    example: `curl "https://api.nuke.build/functions/v1/api-v1-listings?platform=bat&status=sold&limit=10" \\
+    example: `curl "https://api.nuke.ag/functions/v1/api-v1-listings?platform=bat&status=sold&limit=10" \\
   -H "X-API-Key: nk_live_xxx"
 // => { data: [{ platform: "bat", final_price: 56000, bid_count: 42, ... }], pagination: {...} }`,
   },
   {
     name: 'api-v1-comps',
     description: 'Find comparable vehicle sales. Returns similar sold vehicles with summary stats (avg, median, min, max prices).',
-    example: `curl "https://api.nuke.build/functions/v1/api-v1-comps?make=Porsche&model=911&year=1973" \\
+    example: `curl "https://api.nuke.ag/functions/v1/api-v1-comps?make=Porsche&model=911&year=1973" \\
   -H "X-API-Key: nk_live_xxx"
 // => { summary: { avg_price: 185000, median_price: 172000 }, data: [...] }`,
   },
@@ -771,7 +771,7 @@ curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/universal-search" \\
 
       {/* ---- Footer ---- */}
       <div style={s.footer}>
-        <span>Questions? support@nuke.dev</span>
+        <span>Questions? support@nuke.ag</span>
         <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
           <Link to="/developers" style={s.link}>API Docs</Link>
           <Link to="/settings/api-keys" style={s.link}>API Keys</Link>

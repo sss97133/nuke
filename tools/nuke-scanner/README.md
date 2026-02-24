@@ -202,13 +202,13 @@ Upload extracted vehicles to your Nuke account:
 nuke-scan extract ~/Documents/cars -o vehicles.json
 
 # Use the Nuke API to upload
-curl -X POST "https://api.nuke.com/v1/batch" \
+curl -X POST "https://api.nuke.ag/v1/batch" \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d @vehicles.json
 ```
 
-Or use the [Nuke Desktop App](https://nuke.com/desktop) for a GUI experience.
+Or use the [Nuke Desktop App](https://nuke.ag/desktop) for a GUI experience.
 
 ## Development
 
@@ -237,7 +237,7 @@ MIT - See [LICENSE](LICENSE) for details.
 
 ## Links
 
-- [Nuke Platform](https://nuke.com)
-- [API Documentation](https://nuke.com/docs/api)
-- [Desktop App](https://nuke.com/desktop)
+- [Nuke Platform](https://nuke.ag)
+- [API Documentation](https://nuke.ag/docs/api)
+- [Desktop App](https://nuke.ag/desktop)
 - [GitHub Issues](https://github.com/nukeplatform/nuke-scanner/issues)

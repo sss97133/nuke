@@ -9,7 +9,7 @@
 ## 📦 **Bundle Verification:**
 
 ```
-curl https://n-zero.dev | grep index:  index-BJvHmMy1.js ✅ NEW
+curl https://nuke.ag | grep index:  index-BJvHmMy1.js ✅ NEW
 Playwright first check:                 index-C85QmFI6.js ❌ OLD (cached)
 After reload:                           index-BJvHmMy1.js ✅ NEW
 ```

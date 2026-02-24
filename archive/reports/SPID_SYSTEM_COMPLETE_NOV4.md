@@ -2,7 +2,7 @@
 
 **Date:** November 4, 2025  
 **Status:** ✅ PRODUCTION DEPLOYED & VERIFIED  
-**Live Example:** https://n-zero.dev/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06
+**Live Example:** https://nuke.ag/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06
 
 ---
 
@@ -298,7 +298,7 @@ PAINT_CODE | 01U
 ✅ **RPO Decoding:** 20+ codes mapped, expandable  
 ✅ **Auto-Fill Logic:** 10+ fields populated instantly  
 ✅ **Data Validation:** 100% confidence scores  
-✅ **Production Proof:** Live on n-zero.dev  
+✅ **Production Proof:** Live on nuke.ag  
 ✅ **Zero Manual Entry:** Entire profile from one photo  
 
 ---
@@ -323,7 +323,7 @@ PAINT_CODE | 01U
 |-----------|---------|--------|-----|
 | `detect-spid-sheet` | v1 | ✅ LIVE | `https://qkgaybvrernstplzjaam.supabase.co/functions/v1/detect-spid-sheet` |
 | `auto-fill-from-spid` | v1 | ✅ LIVE | `https://qkgaybvrernstplzjaam.supabase.co/functions/v1/auto-fill-from-spid` |
-| C10 Example Vehicle | - | ✅ VERIFIED | `https://n-zero.dev/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06` |
+| C10 Example Vehicle | - | ✅ VERIFIED | `https://nuke.ag/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06` |
 
 **Next:** Add UI button for one-click application from image viewer.
 

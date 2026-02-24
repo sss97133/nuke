@@ -170,8 +170,8 @@ vercel --prod --force --yes
 
 **Result:**
 - ✅ Deployment successful
-- Production URL: https://nuke-nzhvstrff-nzero.vercel.app
-- Inspect URL: https://vercel.com/nzero/nuke/9gTxLE9RbRgQEMHCqmz3wbHKYerR
+- Production URL: https://nuke-nzhvstrff-nuke.vercel.app
+- Inspect URL: https://vercel.com/nuke/nuke/9gTxLE9RbRgQEMHCqmz3wbHKYerR
 
 ## Next Steps for User
 

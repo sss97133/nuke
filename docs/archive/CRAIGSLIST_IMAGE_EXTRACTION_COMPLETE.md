@@ -116,7 +116,7 @@ curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/scrape-vehicle" \
 
 ### Test the Frontend
 
-1. **Navigate to:** https://n-zero.dev/add-vehicle
+1. **Navigate to:** https://nuke.ag/add-vehicle
 2. **Paste URL:** `https://sandiego.craigslist.org/esd/cto/d/el-centro-1972-gmc-suburban/7888155474.html`
 3. **Observe:**
    - Form fields auto-fill (Year: 1972, Make: GMC, Model: Suburban, etc.)
@@ -183,7 +183,7 @@ git push origin main
 ```
 
 ### Step 3: Verify
-- Visit https://n-zero.dev/add-vehicle
+- Visit https://nuke.ag/add-vehicle
 - Test with the 1972 GMC Suburban listing
 - Check browser console for download progress
 - Verify images appear in vehicle profile after creation
@@ -243,7 +243,7 @@ git push origin main
 
 ```typescript
 // User workflow
-1. Open https://n-zero.dev/add-vehicle
+1. Open https://nuke.ag/add-vehicle
 2. Find vehicle on Craigslist (e.g., 1972 GMC Suburban)
 3. Copy listing URL
 4. Paste into "Import URL" field

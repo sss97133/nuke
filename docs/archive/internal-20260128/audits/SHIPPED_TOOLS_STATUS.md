@@ -84,7 +84,7 @@
 
 When deployed, users will:
 
-1. Go to any vehicle page: `https://n-zero.dev/vehicle/[ID]`
+1. Go to any vehicle page: `https://nuke.ag/vehicle/[ID]`
 2. Scroll to "Trading Interface" section
 3. See 4 tabs: 📊 Price Ticker | 📈 Order Book | 💼 Portfolio | 🏆 Leaderboard
 4. Click tabs to explore live market data
@@ -273,14 +273,14 @@ Vercel Status:
   ETA: 5-15 minutes
 
 Production URL:
-  https://n-zero.dev (will auto-update)
+  https://nuke.ag (will auto-update)
 ```
 
 ### Verification Steps
 
 Once deployment completes:
 
-1. **Visit**: https://n-zero.dev/vehicle/[any-vehicle-id]
+1. **Visit**: https://nuke.ag/vehicle/[any-vehicle-id]
 2. **Look for**: New "Trading Interface" section
 3. **See**: 4 tabs with trading tools
 4. **Click**: Each tab to verify functionality
@@ -433,5 +433,5 @@ If you see errors:
 
 **Status**: 🟢 READY FOR PRODUCTION
 
-**Next Action**: Wait for Vercel build, then verify on https://n-zero.dev
+**Next Action**: Wait for Vercel build, then verify on https://nuke.ag
 

@@ -10,7 +10,7 @@
 🎯 FINAL STATUS: COMPLETE & OPERATIONAL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✅ PRODUCTION URL: https://n-zero.dev
+✅ PRODUCTION URL: https://nuke.ag
 ✅ VEHICLES LIVE: 17 listed, 4 trading today
 ✅ TRADING TABS: Deployed to all vehicle pages
 ✅ DATABASE: 14 tables, 3 views, RLS active
@@ -51,7 +51,7 @@ REAL-TIME FEATURES SHIPPED:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Frontend Layer:
-  https://n-zero.dev (React/TypeScript)
+  https://nuke.ag (React/TypeScript)
   ├─ MarketTicker component
   ├─ OrderBook component
   ├─ Portfolio component
@@ -121,7 +121,7 @@ STEP 5: Seller Outcome
 📈 LIVE TRADING EXAMPLE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-User visits: https://n-zero.dev/vehicles/1974-blazer-mint
+User visits: https://nuke.ag/vehicles/1974-blazer-mint
 
 STEP 1: Clicks 📊 "PRICE TICKER" tab
   Sees: $108.50 (↑ +8.5% from open)
@@ -213,7 +213,7 @@ Security:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Live Now:
-  📍 URL: https://n-zero.dev
+  📍 URL: https://nuke.ag
   📍 Vehicles Listed: 17
   📍 Active Trading: 4 vehicles today
   📍 Components Deployed: 5 React components
@@ -255,7 +255,7 @@ Every vehicle page now displays:
 🚀 HOW TO ACCESS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. Visit: https://n-zero.dev
+1. Visit: https://nuke.ag
 2. Browse 17 vehicles
 3. Click any vehicle
 4. Scroll to "TRADING TABS" section
@@ -297,7 +297,7 @@ Complete reference available:
 
 The Fractional Auction Market Engine is now LIVE and OPERATIONAL.
 
-Every vehicle on https://n-zero.dev has:
+Every vehicle on https://nuke.ag has:
   ✅ Live price ticker (updates < 200ms)
   ✅ Real-time order book
   ✅ Portfolio tracking
@@ -334,7 +334,7 @@ Platform earns:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Access the market NOW: https://n-zero.dev
+Access the market NOW: https://nuke.ag
 
 🎊 Welcome to the Fractional Auction Market! 🎊
 

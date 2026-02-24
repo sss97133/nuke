@@ -31,7 +31,7 @@ serve(async (req) => {
     const token = url.searchParams.get('hub.verify_token');
     const challenge = url.searchParams.get('hub.challenge');
 
-    const verifyToken = Deno.env.get('INSTAGRAM_WEBHOOK_VERIFY_TOKEN') || 'n-zero-webhook-token';
+    const verifyToken = Deno.env.get('INSTAGRAM_WEBHOOK_VERIFY_TOKEN') || 'nuke-webhook-token';
 
     if (mode === 'subscribe' && token === verifyToken) {
       console.log('[process-instagram-webhook] Webhook verified');

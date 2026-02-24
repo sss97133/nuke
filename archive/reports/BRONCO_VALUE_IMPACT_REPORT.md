@@ -2,7 +2,7 @@
 
 ## 🚗 Vehicle: 1974 Ford Bronco
 **VIN**: U15GLU84208  
-**Profile**: `https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e`
+**Profile**: `https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e`
 
 ---
 

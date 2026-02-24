@@ -20,7 +20,7 @@ The system will automatically:
 
 ### Step 2: Review Parsed Data (Bulk Editor)
 
-Go to: https://n-zero.dev/org/[YOUR_ORG_ID]/bulk-editor
+Go to: https://nuke.ag/org/[YOUR_ORG_ID]/bulk-editor
 
 You'll see a list of all parsed deal jackets with:
 - **Confidence Score** (0-100%): How confident the AI is
@@ -92,7 +92,7 @@ From each deal jacket, the system extracts:
 
 ## For Investors (Laura) - Financial Dashboard
 
-Go to: https://n-zero.dev/investor/dashboard
+Go to: https://nuke.ag/investor/dashboard
 
 You'll see:
 - **Total Invested**: Sum of all investments across all vehicles/organizations
@@ -200,7 +200,7 @@ If the system detects a vehicle that might already exist (by VIN):
 ### Missing Attribution
 If contractor names aren't recognized:
 - Add them to the system first:
-  - Go to https://n-zero.dev/create-profile
+  - Go to https://nuke.ag/create-profile
   - Enter name, role, organization
   - System will auto-link future occurrences
 
@@ -223,7 +223,7 @@ For automated workflows:
 ## Support
 
 Questions? Issues?
-- Check the system logs at https://n-zero.dev/admin/logs
+- Check the system logs at https://nuke.ag/admin/logs
 - Review this guide
 - Contact Skylar (system admin)
 

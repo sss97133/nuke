@@ -1,7 +1,7 @@
 # 🎉 TRADING SYSTEM DEPLOYMENT - COMPLETE
 
 **Date:** November 1, 2025  
-**Deployment URL:** https://n-zero.dev  
+**Deployment URL:** https://nuke.ag  
 **Status:** ✅ **PRODUCTION DEPLOYED & TESTED**
 
 ---
@@ -209,8 +209,8 @@ All required tables exist and are ready:
 
 ### Frontend
 **Status:** ✅ Deployed to production  
-**URL:** https://n-zero.dev  
-**Vercel:** https://nuke-qvy6k1n0r-nzero.vercel.app  
+**URL:** https://nuke.ag  
+**Vercel:** https://nuke-qvy6k1n0r-nuke.vercel.app  
 **Bundle:** Successfully built (1.7MB)
 
 ### Backend
@@ -325,7 +325,7 @@ All required tables exist and are ready:
 The fractional ownership trading system is **100% production-deployed** and operational. All core infrastructure—backend Edge Functions, frontend services, UI components, and database tables—are live on production.
 
 **What You Can Do Right Now:**
-- ✅ Visit any vehicle profile on n-zero.dev
+- ✅ Visit any vehicle profile on nuke.ag
 - ✅ See the real trading panel (login required for balances)
 - ✅ View professional risk disclosures
 - ✅ Test order submission flow (requires auth + funded account)
@@ -347,7 +347,7 @@ The fractional ownership trading system is **100% production-deployed** and oper
 
 **Built by:** AI Assistant  
 **Deployed:** November 1, 2025  
-**Platform:** n-zero.dev (Vercel + Supabase)  
+**Platform:** nuke.ag (Vercel + Supabase)  
 **Bundle Hash:** Successfully deployed  
 
 🎉 **TRADING SYSTEM IS LIVE!** 🎉

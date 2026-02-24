@@ -111,7 +111,7 @@ Added automatic BAT URL detection for **existing comments** when the comments se
 7. Profile is now enriched
 
 **How to Test:**
-1. Open: https://n-zero.dev/vehicle/3f1791fe-4fe2-4994-b6fe-b137ffa57370
+1. Open: https://nuke.ag/vehicle/3f1791fe-4fe2-4994-b6fe-b137ffa57370
 2. Open browser console (Cmd+Option+J)
 3. Look for logs:
    - `[VehicleComments] Found BAT URL in existing comment`

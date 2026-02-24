@@ -123,7 +123,7 @@ git commit -m "AWS Rekognition integration"
 git push origin main
 ```
 
-Vercel will auto-deploy to https://n-zero.dev
+Vercel will auto-deploy to https://nuke.ag
 
 ## 🧪 Testing
 
@@ -140,7 +140,7 @@ Expected: 200 response with `processed_images` array containing S3 URLs and Reko
 
 ### Test Frontend
 
-1. Go to https://n-zero.dev/add-vehicle
+1. Go to https://nuke.ag/add-vehicle
 2. Paste Craigslist URL: `https://sandiego.craigslist.org/esd/cto/d/el-centro-1972-gmc-suburban/7888155474.html`
 3. Watch console for:
    - "Found X processed images with Rekognition analysis"

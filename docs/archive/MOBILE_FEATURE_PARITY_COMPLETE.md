@@ -2,7 +2,7 @@
 
 **Date:** October 28, 2025  
 **Status:** 🟢 **PRODUCTION DEPLOYED**  
-**URL:** https://nuke-9m3xcjca9-nzero.vercel.app
+**URL:** https://nuke-9m3xcjca9-nuke.vercel.app
 
 ---
 
@@ -368,5 +368,5 @@ All new components match existing mobile aesthetic:
 **Routes:** Mobile org routes added  
 **Integration:** Seamless with existing mobile UI
 
-**Ready to test:** Visit https://n-zero.dev on mobile! 📲
+**Ready to test:** Visit https://nuke.ag on mobile! 📲
 

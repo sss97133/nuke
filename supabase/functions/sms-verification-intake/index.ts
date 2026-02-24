@@ -339,7 +339,7 @@ serve(async (req) => {
       return twiml(
         `Claim started for ${claim.handle} on ${claim.platform.toUpperCase()}.\n\n` +
         `To boost confidence:\n` +
-        `- Add "NZERO-${submission.id.slice(0, 8).toUpperCase()}" to your profile bio\n` +
+        `- Add "NUKE-${submission.id.slice(0, 8).toUpperCase()}" to your profile bio\n` +
         `- Or text a screenshot of your logged-in profile`
       );
     }

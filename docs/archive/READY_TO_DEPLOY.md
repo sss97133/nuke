@@ -56,7 +56,7 @@ git commit -m "Add Craigslist image extraction to vehicle import"
 git push origin main
 ```
 
-Vercel will automatically deploy to: **https://n-zero.dev**
+Vercel will automatically deploy to: **https://nuke.ag**
 
 ## 🧪 Testing
 
@@ -69,7 +69,7 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-vehic
 ```
 
 ### Test on Production Site
-1. Navigate to https://n-zero.dev/add-vehicle
+1. Navigate to https://nuke.ag/add-vehicle
 2. Paste Craigslist URL: `https://sandiego.craigslist.org/esd/cto/d/el-centro-1972-gmc-suburban/7888155474.html`
 3. Verify:
    - ✅ Form auto-fills (Year: 1972, Make: GMC, Model: Suburban)
@@ -81,7 +81,7 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-vehic
    - ✅ Images upload in background
 
 ### Test on Mobile
-1. Open https://n-zero.dev/add-vehicle on mobile device
+1. Open https://nuke.ag/add-vehicle on mobile device
 2. Paste same Craigslist URL
 3. Verify same behavior (mobile-optimized version)
 
@@ -91,7 +91,7 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-vehic
 ```
 1. User finds vehicle on Craigslist
 2. Copies listing URL
-3. Pastes into "Import URL" field on n-zero.dev
+3. Pastes into "Import URL" field on nuke.ag
 4. System scrapes listing (~2 seconds)
 5. Form auto-fills with vehicle data
 6. Images download in background (~15-30 seconds for 13 images)
@@ -220,7 +220,7 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-vehic
 **Just need to:**
 1. Deploy the edge function: `./deploy-functions.sh`
 2. Push frontend changes: `git push origin main`
-3. Test on production: https://n-zero.dev/add-vehicle
+3. Test on production: https://nuke.ag/add-vehicle
 
 ---
 

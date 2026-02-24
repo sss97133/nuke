@@ -254,7 +254,7 @@ git push origin main
 ```
 
 ### After Deploy:
-1. Visit https://n-zero.dev
+1. Visit https://nuke.ag
 2. Test Dashboard - should show 17 vehicles
 3. Test vehicle profile - should load without errors
 4. Check browser console - 400 errors should be gone

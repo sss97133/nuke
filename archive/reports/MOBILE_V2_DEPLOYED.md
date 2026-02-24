@@ -2,7 +2,7 @@
 
 **Date:** November 4, 2025  
 **Status:** PRODUCTION  
-**URL:** https://n-zero.dev
+**URL:** https://nuke.ag
 
 ---
 
@@ -130,7 +130,7 @@ event_date: new Date(eventDate).toISOString().split('T')[0],
 
 **After cache clears (5-10 mins) or hard refresh:**
 
-1. Go to https://n-zero.dev
+1. Go to https://nuke.ag
 2. Open any vehicle (Bronco, K5, etc.)
 3. **Should see:**
    - No tabs at top

@@ -40,7 +40,7 @@ git commit -m "feat: your feature description"
 git push origin main
 
 # 2. Vercel auto-deploys from GitHub
-# Check: https://vercel.com/nzero/nuke_frontend/deployments
+# Check: https://vercel.com/nuke/nuke_frontend/deployments
 ```
 
 ### **Method 2: Manual Deployment (Emergency)**
@@ -54,7 +54,7 @@ vercel --prod
 
 ### **Production URLs**
 - **Main**: https://nukefrontend.vercel.app (stable, never changes)
-- **Latest**: https://nukefrontend-[hash]-nzero.vercel.app (changes each deploy)
+- **Latest**: https://nukefrontend-[hash]-nuke.vercel.app (changes each deploy)
 
 ### **Development**
 - **Local**: http://localhost:5174 (for debugging)
@@ -140,7 +140,7 @@ git push origin main
 
 ### **Check Deployment Status**
 ```bash
-vercel ls --scope nzero
+vercel ls --scope nuke
 ```
 
 ### **Check Production Health**

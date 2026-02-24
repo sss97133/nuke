@@ -397,7 +397,7 @@ Consider:
 
 **What we did:**
 ```bash
-curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
+curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1
 # Result: (empty)
 ```
 
@@ -405,7 +405,7 @@ curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
 
 **Should check:**
 ```bash
-curl -s https://n-zero.dev | grep -o 'assets/index-.*\.js'
+curl -s https://nuke.ag | grep -o 'assets/index-.*\.js'
 ```
 
 **We didn't verify the deploy actually updated.**

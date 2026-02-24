@@ -5,7 +5,7 @@
 Based on your codebase, here's what you need for production:
 
 ### Frontend (Vite/React)
-- **Deployed at**: `https://n-zero.dev` (via Vercel)
+- **Deployed at**: `https://nuke.ag` (via Vercel)
 - **Framework**: Vite
 - **Environment Variables Needed**: Set in Vercel Dashboard
 
@@ -63,9 +63,9 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
 
 ```bash
 # Check if nuke_api is deployed somewhere
-curl -I https://n-zero.dev/api/health
+curl -I https://nuke.ag/api/health
 # or
-curl -I https://api.n-zero.dev/api/health
+curl -I https://api.nuke.ag/api/health
 # or
 curl -I https://nuke-api.fly.dev/api/health
 ```
@@ -102,7 +102,7 @@ This will show all environment variables set in Vercel.
 
 **Option B: Phoenix API is deployed somewhere**
 - Set `VITE_API_URL` to the production API URL
-- Example: `https://n-zero.dev/api` or `https://api.n-zero.dev/api`
+- Example: `https://nuke.ag/api` or `https://api.nuke.ag/api`
 
 ### Step 3: Redeploy After Adding Variables
 
@@ -122,7 +122,7 @@ The build logs in Vercel should show your environment variables are loaded (valu
 
 ### 2. Test Production Site
 
-1. Visit `https://n-zero.dev`
+1. Visit `https://nuke.ag`
 2. Open browser console (F12)
 3. Check for any errors related to missing API URLs
 4. Try using features that require the Phoenix API (like receipt parsing)

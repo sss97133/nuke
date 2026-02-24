@@ -37,7 +37,7 @@ npm install twilio @twilio/conversations
 
 #### 2. Twilio Phone Number Configuration
 - Purchase Twilio phone number
-- Configure webhook for incoming SMS: `https://n-zero.dev/api/sms/incoming`
+- Configure webhook for incoming SMS: `https://nuke.ag/api/sms/incoming`
 - Enable two-way SMS conversations
 
 #### 3. Supabase Edge Function: `sms-work-order-handler`
@@ -230,7 +230,7 @@ This is cheaper but less automated.
 - 🚧 Phase 3 ready for implementation (requires Twilio account setup)
 
 **Test the current system:**
-- Visit Ernie's Upholstery: `https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41`
+- Visit Ernie's Upholstery: `https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41`
 - Click "Request Work" to submit a work order
 - Shop owner can set labor rate via "Set Labor Rate" button
 

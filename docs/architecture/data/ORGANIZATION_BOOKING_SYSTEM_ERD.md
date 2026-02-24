@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The N-Zero booking system transforms organizations from passive listings into active service providers by:
+The Nuke booking system transforms organizations from passive listings into active service providers by:
 1. **Service Catalog** - Organizations define what they offer (consignments, detailing, restoration)
 2. **Capacity Management** - Track physical resources (lifts, paint booths, storage)
 3. **Labor Coordination** - Match skilled users with facilities that have capacity

@@ -37,34 +37,55 @@ export function LiveAuctionView() {
   const [userPredictions, setUserPredictions] = useState<Record<string, 'over' | 'under'>>({});
   const bidFeedRef = useRef<HTMLDivElement>(null);
 
-  // Simulated live feed - in production this would connect to real-time source
+  // Subscribe to real-time bid events from monitored_auctions
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (currentLot && currentLot.status === 'active') {
-        // Simulate bid increases
-        const newBid = currentLot.currentBid + Math.floor(Math.random() * 5000) + 1000;
-        setCurrentLot(prev => prev ? { ...prev, currentBid: newBid } : null);
+    if (!currentLot?.vehicleId) return;
 
-        // Add to bid feed
-        setRecentBids(prev => [{
-          lotNumber: currentLot.lotNumber,
-          amount: newBid,
-          timestamp: new Date(),
-        }, ...prev.slice(0, 9)]);
+    // Subscribe to bid_events INSERT for real-time bid updates
+    const channel = supabase
+      .channel('live-bid-events')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bid_events',
+        },
+        (payload: any) => {
+          const event = payload.new;
+          if (!event) return;
 
-        // Update odds based on bid proximity to line
-        const ratio = newBid / currentLot.lineValue;
-        const yesChance = Math.min(95, Math.max(5, 50 + (ratio - 1) * 100));
-        setCurrentLot(prev => prev ? {
-          ...prev,
-          yesPercent: yesChance,
-          noPercent: 100 - yesChance,
-        } : null);
-      }
-    }, 2000 + Math.random() * 3000); // Random 2-5 second intervals
+          const bidAmount = event.bid_amount_cents / 100;
 
-    return () => clearInterval(interval);
-  }, [currentLot]);
+          // Update current lot if this bid is for the active lot
+          setCurrentLot(prev => {
+            if (!prev) return null;
+            // Update bid data
+            const newBid = bidAmount;
+            const ratio = newBid / prev.lineValue;
+            const yesChance = Math.min(95, Math.max(5, 50 + (ratio - 1) * 100));
+            return {
+              ...prev,
+              currentBid: newBid,
+              yesPercent: yesChance,
+              noPercent: 100 - yesChance,
+            };
+          });
+
+          // Add to bid feed
+          setRecentBids(prev => [{
+            lotNumber: event.bidder_username || 'Bid',
+            amount: bidAmount,
+            timestamp: new Date(event.bid_time || Date.now()),
+          }, ...prev.slice(0, 9)]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentLot?.vehicleId]);
 
   // Load initial data
   useEffect(() => {

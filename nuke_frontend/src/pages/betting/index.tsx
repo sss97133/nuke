@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { useBettingWallet } from '@/hooks/useBettingWallet';
 import { PredictionBadge } from '@/components/betting/PredictionBadge';
 import { PredictionPopup } from '@/components/betting/PredictionPopup';
 import { cn } from '@/lib/utils';
@@ -40,16 +41,16 @@ type FilterType = 'all' | 'auction_over_under' | 'auction_will_sell' | 'make_vs_
 
 export default function BettingPage() {
   const { user } = useAuth();
+  const { balance, loading: walletLoading, refetch: refetchWallet } = useBettingWallet();
   const [markets, setMarkets] = useState<Market[]>([]);
   const [userBets, setUserBets] = useState<Record<string, UserBet>>({});
-  const [balance, setBalance] = useState(0);
   const [filter, setFilter] = useState<FilterType>('all');
   const [expandedMarket, setExpandedMarket] = useState<Market | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadMarkets();
-    if (user) loadUserData();
+    if (user) loadUserBets();
   }, [user, filter]);
 
   async function loadMarkets() {
@@ -72,15 +73,7 @@ export default function BettingPage() {
     setLoading(false);
   }
 
-  async function loadUserData() {
-    // Wallet
-    const { data: wallet } = await supabase
-      .from('betting_wallets')
-      .select('balance')
-      .eq('user_id', user?.id)
-      .single();
-    setBalance(wallet?.balance || 0);
-
+  async function loadUserBets() {
     // User bets
     const { data: bets } = await supabase
       .from('bets')
@@ -114,7 +107,8 @@ export default function BettingPage() {
 
     if (!error) {
       loadMarkets();
-      loadUserData();
+      loadUserBets();
+      refetchWallet();
     }
   }
 
@@ -130,7 +124,8 @@ export default function BettingPage() {
 
     if (!error) {
       loadMarkets();
-      loadUserData();
+      loadUserBets();
+      refetchWallet();
       setExpandedMarket(null);
     }
   }
@@ -161,7 +156,7 @@ export default function BettingPage() {
               <h1 className="text-xl font-bold">Predictions</h1>
               <span className="text-sm text-gray-500">Mecum Kissimmee 2026</span>
               <Link
-                to="/betting/live"
+                to="/predictions/live"
                 className="text-xs bg-red-600 hover:bg-red-500 px-2 py-1 rounded flex items-center gap-1"
               >
                 <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />

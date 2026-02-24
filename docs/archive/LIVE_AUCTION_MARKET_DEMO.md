@@ -6,12 +6,12 @@
 
 ## 🌍 WHERE TO FIND IT
 
-**Main Site:** https://nuke.dev
+**Main Site:** https://nuke.ag
 
-**Each Vehicle Page:** https://nuke.dev/vehicles/[vehicle-id]
+**Each Vehicle Page:** https://nuke.ag/vehicles/[vehicle-id]
 
 **Example Vehicle:** 1974 Blazer
-- URL: https://nuke.dev/vehicles/1974-blazer-mint
+- URL: https://nuke.ag/vehicles/1974-blazer-mint
 - Trading Status: LIVE ✓
 - Current Price: $100/share (updating in real-time)
 
@@ -330,13 +330,13 @@ TRADER SEES: ✨ INSTANT CONFIRMATION ✨
 **Trading Is Live At:**
 
 ```
-https://nuke.dev/vehicles/[vehicle-id]
+https://nuke.ag/vehicles/[vehicle-id]
 
 EXAMPLE VEHICLES LIVE NOW:
-• https://nuke.dev/vehicles/1974-blazer-mint
-• https://nuke.dev/vehicles/1963-corvette-stingray
-• https://nuke.dev/vehicles/1967-mustang-fastback
-• https://nuke.dev/vehicles/1953-mercedes-300sl
+• https://nuke.ag/vehicles/1974-blazer-mint
+• https://nuke.ag/vehicles/1963-corvette-stingray
+• https://nuke.ag/vehicles/1967-mustang-fastback
+• https://nuke.ag/vehicles/1953-mercedes-300sl
 
 Each has:
   ✅ Live trading tabs visible
@@ -384,7 +384,7 @@ Each has:
 **The Auction Market Engine is LIVE on Nuke.dev!**
 
 Visit any vehicle page to start trading:
-→ https://nuke.dev/vehicles/1974-blazer-mint
+→ https://nuke.ag/vehicles/1974-blazer-mint
 
 Watch the live price ticker, place orders, build your portfolio, and compete on the leaderboard!
 

@@ -15,7 +15,7 @@ import ImageProcessingDashboard from './pages/ImageProcessingDashboard';
 <Route path="/admin/image-processing" element={<ImageProcessingDashboard />} />
 ```
 
-Then visit: **https://n-zero.dev/admin/image-processing**
+Then visit: **https://nuke.ag/admin/image-processing**
 
 **Shows:**
 - ✅ Real-time progress bars for each tier

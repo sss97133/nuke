@@ -138,7 +138,7 @@ Click to select • Double-click to order
 ## 🚀 **DEPLOYMENT:**
 
 - **Bundle:** `index-BmRfDkjv.js`
-- **URL:** `https://n-zero.dev/`
+- **URL:** `https://nuke.ag/`
 - **Test Vehicle:** `a90c008a-3379-41d8-9eb2-b4eda365d74c`
 - **Test Image:** `59fec501-534d-4420-8c31-fb277c839959`
 - **Status:** **LIVE IN PRODUCTION** ✅

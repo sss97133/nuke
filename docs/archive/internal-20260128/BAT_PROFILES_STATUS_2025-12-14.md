@@ -59,7 +59,7 @@ This doc captures what we shipped to make **Bring a Trailer (BaT) source vehicle
   - `nuke_frontend/src/pages/VehicleProfile.tsx`
 
 ## Current production status (as of this doc)
-- `n-zero.dev/vehicle/b4892ba2-c650-45aa-818a-43e3e458ba0b`:
+- `nuke.ag/vehicle/b4892ba2-c650-45aa-818a-43e3e458ba0b`:
   - renders without crashes
   - shows BaT auction header pulse (BaT + bids + timer badges)
   - shows BaT images immediately and allows import

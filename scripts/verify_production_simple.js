@@ -9,7 +9,7 @@ async function verifyProduction() {
     // 1. Check Homepage Load
     console.log('Checking Homepage...');
     const start = Date.now();
-    await page.goto('https://n-zero.dev', { waitUntil: 'networkidle' });
+    await page.goto('https://nuke.ag', { waitUntil: 'networkidle' });
     const duration = Date.now() - start;
     console.log(`Homepage loaded in ${duration}ms`);
     

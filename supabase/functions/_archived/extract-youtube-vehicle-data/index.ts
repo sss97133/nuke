@@ -490,7 +490,7 @@ async function fetchTranscript(videoId: string): Promise<string | null> {
       `https://youtubetranscript.com/?server_vid2=${videoId}`,
       {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; nzero-bot/1.0)'
+          'User-Agent': 'Mozilla/5.0 (compatible; nuke-bot/1.0)'
         }
       }
     );

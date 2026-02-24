@@ -19,7 +19,7 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
 
     if (!ErrorBoundary.CHUNK_LOAD_ERROR_RE.test(msg)) return;
 
-    const key = '__nzero_chunk_reload__';
+    const key = '__nuke_chunk_reload__';
     try {
       if (sessionStorage.getItem(key) === '1') return;
       sessionStorage.setItem(key, '1');

@@ -12,7 +12,7 @@ I'm processing all your images directly using the Supabase MCP integration which
 
 ## Progress
 
-Check the dashboard at: **https://n-zero.dev/admin/image-processing**
+Check the dashboard at: **https://nuke.ag/admin/image-processing**
 
 Or query the database:
 

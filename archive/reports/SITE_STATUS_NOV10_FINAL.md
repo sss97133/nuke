@@ -1,6 +1,6 @@
 # 🎯 Site Status - November 10, 2025 (Final)
 
-## Current State: https://n-zero.dev
+## Current State: https://nuke.ag
 
 ### ✅ WORKING (Just Fixed!)
 
@@ -55,7 +55,7 @@ Result:  Site functional again ✅
 
 ### Current Behavior: ✅ CORRECT
 
-**Route:** https://n-zero.dev/profile  
+**Route:** https://nuke.ag/profile  
 **Behavior:** Redirects to login page  
 **Why:** Profile requires authentication (by design)  
 **This is expected:** ✓
@@ -68,7 +68,7 @@ node test_authenticated_e2e.js --setup
 ```
 
 **Public Profile Routes:**
-- https://n-zero.dev/profile/{username} (if public profile exists)
+- https://nuke.ag/profile/{username} (if public profile exists)
 - These should work without authentication
 
 ### Why "No Contributions" Showing
@@ -127,7 +127,7 @@ node test_authenticated_e2e.js --setup
 ## 🎯 What's Actually Working in Production
 
 ### Vehicle Pages ✅
-**URL:** https://n-zero.dev/vehicle/{id}
+**URL:** https://nuke.ag/vehicle/{id}
 
 **Working Features:**
 - Vehicle info displays
@@ -142,7 +142,7 @@ node test_authenticated_e2e.js --setup
 - TransactionHistory (will show when transactions recorded)
 
 ### Organization Pages ✅
-**URL:** https://n-zero.dev/org/{id}
+**URL:** https://nuke.ag/org/{id}
 
 **Working:**
 - Organization profiles load
@@ -152,7 +152,7 @@ node test_authenticated_e2e.js --setup
 - Trading system ready
 
 **Test URLs:**
-- https://n-zero.dev/org/{org-id} (find IDs from database)
+- https://nuke.ag/org/{org-id} (find IDs from database)
 
 ---
 
@@ -177,7 +177,7 @@ Updated imports in VehicleProfile
 ### How to Verify Deployment Completed:
 ```bash
 # Check if bundle hash changed
-curl -s https://n-zero.dev | grep -o 'index-[^"]*\.js'
+curl -s https://nuke.ag | grep -o 'index-[^"]*\.js'
 
 # If shows D3C8Nwbc (instead of DKy1-bLE), deployment done!
 
@@ -189,7 +189,7 @@ node verify_deployment.js
 
 ## 💡 Summary: What You're Seeing
 
-**Current State of https://n-zero.dev:**
+**Current State of https://nuke.ag:**
 
 | Feature | Status | Notes |
 |---------|--------|-------|

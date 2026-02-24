@@ -184,7 +184,7 @@ POST /functions/v1/identify-part-at-click
 
 ### **Test It Right Now:**
 
-1. **Open:** https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+1. **Open:** https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 2. **Hard refresh** (to clear old CORS cache)
 3. Tap engine bay photo
 4. Tap on:

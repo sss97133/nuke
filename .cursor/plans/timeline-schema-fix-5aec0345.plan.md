@@ -36,7 +36,7 @@
 
 ```
 ┌────────────────────────────────────────────┐
-│ [Logo] n-zero        [Login] [Dark/Light] │  ← Minimal header, 32px height
+│ [Logo] nuke        [Login] [Dark/Light] │  ← Minimal header, 32px height
 ├────────────────────────────────────────────┤
 │                                            │
 │  Vehicle marketplace & project tracker    │  ← One line tagline, 11px text

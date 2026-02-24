@@ -74,7 +74,7 @@ async function checkVehicle() {
   }
 
   console.log(`\n🔗 View vehicle profile:`);
-  console.log(`   https://n-zero.dev/vehicles/${vehicle.id}`);
+  console.log(`   https://nuke.ag/vehicles/${vehicle.id}`);
   console.log(`\n✅ Done!`);
 }
 

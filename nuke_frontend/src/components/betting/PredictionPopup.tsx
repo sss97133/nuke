@@ -1,15 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/lib/supabase';
 import { WatchMomentButton, MomentThumbnail, MomentPlayer } from './WatchMomentButton';
-
-interface BetHistory {
-  timestamp: Date;
-  yesPercent: number;
-  noPercent: number;
-  totalPool: number;
-}
 
 interface PredictionPopupProps {
   marketId: string;
@@ -55,110 +47,13 @@ export function PredictionPopup({
   onPredict,
 }: PredictionPopupProps) {
   const [showVideo, setShowVideo] = useState(false);
-  const [history, setHistory] = useState<BetHistory[]>([]);
   const [selectedSide, setSelectedSide] = useState<'over' | 'under'>(userPrediction || 'over');
   const [amount, setAmount] = useState(userAmount ? userAmount / 100 : 10);
   const [confirming, setConfirming] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const pool = yesAmount + noAmount;
   const yesPercent = pool > 0 ? (yesAmount / pool) * 100 : 50;
   const noPercent = 100 - yesPercent;
-
-  // Generate mock history for visualization (in production, fetch from DB)
-  useEffect(() => {
-    const mockHistory: BetHistory[] = [];
-    const now = Date.now();
-    const hourMs = 3600000;
-
-    // Generate 24 hours of history
-    for (let i = 24; i >= 0; i--) {
-      const variance = Math.random() * 20 - 10;
-      mockHistory.push({
-        timestamp: new Date(now - i * hourMs),
-        yesPercent: Math.max(10, Math.min(90, yesPercent + variance)),
-        noPercent: Math.max(10, Math.min(90, noPercent - variance)),
-        totalPool: pool * (0.5 + (24 - i) / 48),
-      });
-    }
-    setHistory(mockHistory);
-  }, [yesPercent, noPercent, pool]);
-
-  // Draw chart
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || history.length === 0) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-    const padding = 20;
-
-    // Clear
-    ctx.fillStyle = '#111';
-    ctx.fillRect(0, 0, width, height);
-
-    // Draw grid
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const y = padding + (height - padding * 2) * (i / 4);
-      ctx.beginPath();
-      ctx.moveTo(padding, y);
-      ctx.lineTo(width - padding, y);
-      ctx.stroke();
-    }
-
-    // Draw 50% line
-    ctx.strokeStyle = '#666';
-    ctx.setLineDash([5, 5]);
-    const midY = padding + (height - padding * 2) / 2;
-    ctx.beginPath();
-    ctx.moveTo(padding, midY);
-    ctx.lineTo(width - padding, midY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw Over line (green)
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    history.forEach((h, i) => {
-      const x = padding + (width - padding * 2) * (i / (history.length - 1));
-      const y = padding + (height - padding * 2) * (1 - h.yesPercent / 100);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    // Draw Under line (red)
-    ctx.strokeStyle = '#ef4444';
-    ctx.beginPath();
-    history.forEach((h, i) => {
-      const x = padding + (width - padding * 2) * (i / (history.length - 1));
-      const y = padding + (height - padding * 2) * (1 - h.noPercent / 100);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    // Current dots
-    const lastH = history[history.length - 1];
-    const lastX = width - padding;
-
-    ctx.fillStyle = '#22c55e';
-    ctx.beginPath();
-    ctx.arc(lastX, padding + (height - padding * 2) * (1 - lastH.yesPercent / 100), 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.arc(lastX, padding + (height - padding * 2) * (1 - lastH.noPercent / 100), 5, 0, Math.PI * 2);
-    ctx.fill();
-
-  }, [history]);
 
   const formatLine = (value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
@@ -236,21 +131,11 @@ export function PredictionPopup({
           </div>
         )}
 
-        {/* Chart */}
+        {/* Chart - Coming Soon */}
         <div className="p-4 border-b border-gray-700">
-          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
-            <span>24h Odds Movement</span>
-            <div className="flex gap-4">
-              <span className="text-green-500">● Over</span>
-              <span className="text-red-500">● Under</span>
-            </div>
+          <div className="flex items-center justify-center py-4 text-sm text-gray-500">
+            Odds history chart coming soon
           </div>
-          <canvas
-            ref={canvasRef}
-            width={360}
-            height={120}
-            className="w-full rounded bg-gray-950"
-          />
         </div>
 
         {/* Current Odds */}

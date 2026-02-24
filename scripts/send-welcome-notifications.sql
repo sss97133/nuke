@@ -1,7 +1,7 @@
 -- ==========================================================================
 -- SEND WELCOME NOTIFICATIONS TO ALL ORGANIZATIONS
 -- ==========================================================================
--- Purpose: Send "Welcome to N-Zero" test notifications to all org members
+-- Purpose: Send "Welcome to Nuke" test notifications to all org members
 -- ==========================================================================
 
 DO $$
@@ -56,8 +56,8 @@ BEGIN
       ) VALUES (
         v_user.user_id,
         'welcome',
-        'Welcome to N-Zero!',
-        format('Welcome to N-Zero, %s! We''re excited to have %s as part of our platform. Get started by exploring your organization dashboard and connecting with other members.', 
+        'Welcome to Nuke!',
+        format('Welcome to Nuke, %s! We''re excited to have %s as part of our platform. Get started by exploring your organization dashboard and connecting with other members.', 
           v_org.business_name,
           v_org.business_name
         ),

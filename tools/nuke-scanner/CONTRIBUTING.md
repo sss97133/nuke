@@ -186,7 +186,7 @@ describe('CsvParser', () => {
 
 - Open an issue for questions
 - Join our Discord (coming soon)
-- Email: contributors@nuke.com
+- Email: contributors@nuke.ag
 
 ## License
 

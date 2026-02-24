@@ -348,7 +348,7 @@ const createVehicleToken = async (vehicle) => {
 
 ### Month 2: Launch
 
-- Live on https://n-zero.dev
+- Live on https://nuke.ag
 - Users can buy credits (Stripe)
 - Users can buy tokens (Solana wallet)
 - You make 1% on all activity

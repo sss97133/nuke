@@ -7,7 +7,7 @@
 
 ## Access It
 
-**URL:** https://n-zero.dev/admin
+**URL:** https://nuke.ag/admin
 
 **Click:** "Analytics" tab
 
@@ -66,7 +66,7 @@ Normal professional dashboards show exactly this:
 - Recent activity (what just happened)
 - Auto-refresh (stay current)
 
-**Visit https://n-zero.dev/admin → Click "Analytics" tab**
+**Visit https://nuke.ag/admin → Click "Analytics" tab**
 
 You'll see live data updating every 3 seconds! 🎯
 

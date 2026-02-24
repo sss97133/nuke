@@ -6,7 +6,7 @@
 
 ---
 
-## What's Now Live on n-zero.dev
+## What's Now Live on nuke.ag
 
 ### ✅ Homepage Fixed
 - **Before**: Generic activity feed with repetitive "Photo Added" cards
@@ -56,7 +56,7 @@
 
 ## Expected Results
 
-### Homepage (https://n-zero.dev):
+### Homepage (https://nuke.ag):
 - ✅ Shows vehicle marketplace instead of activity feed
 - ✅ Vehicle cards with images, pricing, stats
 - ✅ "Discover Amazing Vehicles" welcome section
@@ -82,7 +82,7 @@
 
 ## Verification Steps
 
-1. **Visit https://n-zero.dev**
+1. **Visit https://nuke.ag**
    - Should show vehicle marketplace homepage
    - Not generic activity feed
 
@@ -179,6 +179,6 @@ The site is now production-ready with:
 - ✅ Hardened security and optimized performance
 - ✅ Complete documentation and audit trail
 
-**Live at**: https://n-zero.dev  
+**Live at**: https://nuke.ag  
 **Status**: ✅ OPERATIONAL
 

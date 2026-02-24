@@ -13,7 +13,7 @@
   - **`imported_by`** = person who ran automation (tracked separately)
   - **`user_id`** = actual human contributor (if directly uploaded)
 
-**Impact**: Vehicle https://n-zero.dev/vehicle/24f38dc3-b970-45b5-8063-27dd7a59445f now correctly shows ghost user as contributor, Skylar is invisible.
+**Impact**: Vehicle https://nuke.ag/vehicle/24f38dc3-b970-45b5-8063-27dd7a59445f now correctly shows ghost user as contributor, Skylar is invisible.
 
 ---
 
@@ -26,7 +26,7 @@
 - Granted contractor/moderator low-level edit permissions
 - Creator badge now hidden if you're only a contractor (not owner/manager)
 
-**Impact**: FBM profile https://n-zero.dev/org/f26e26f9-78d6-4f73-820b-fa9015d9242b no longer shows "Created by Skylar" badge.
+**Impact**: FBM profile https://nuke.ag/org/f26e26f9-78d6-4f73-820b-fa9015d9242b no longer shows "Created by Skylar" badge.
 
 ---
 
@@ -39,7 +39,7 @@
 - Auto-created 3 contractor contribution records for Skylar
 - Integrated contractor work into ProfileService so it appears on timeline
 
-**Impact**: FBM work now shows on Skylar's profile timeline at https://n-zero.dev/profile/skylar
+**Impact**: FBM work now shows on Skylar's profile timeline at https://nuke.ag/profile/skylar
 
 ---
 
@@ -71,7 +71,7 @@
   - Business details
 - Accessible by owners, moderators, AND contractors
 
-**Impact**: Can now edit FBM details at https://n-zero.dev/org/f26e26f9-78d6-4f73-820b-fa9015d9242b - click "✏️ Edit Organization Details"
+**Impact**: Can now edit FBM details at https://nuke.ag/org/f26e26f9-78d6-4f73-820b-fa9015d9242b - click "✏️ Edit Organization Details"
 
 ---
 
@@ -241,7 +241,7 @@ Shows on Skylar's profile:
    - Investor returns
 
 ### For Laura (Investor)
-1. Create profile at https://n-zero.dev
+1. Create profile at https://nuke.ag
 2. Link to Skylar or Doug
 3. Go to `/investor/dashboard` (route needs adding)
 4. See all investments, returns, ROI

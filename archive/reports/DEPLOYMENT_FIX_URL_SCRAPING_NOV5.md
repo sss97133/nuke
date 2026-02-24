@@ -41,7 +41,7 @@ Status: ✅ Built successfully (2.47 MB)
 ### ✅ **Production Deployed**
 ```bash
 vercel --prod --force --yes
-Status: ✅ Deployed to https://n-zero.dev
+Status: ✅ Deployed to https://nuke.ag
 Bundle: _next/static/[new hash]
 ```
 
@@ -119,7 +119,7 @@ Result: ✅ Returns 200 with scraped data
 
 3. **Check Frontend:**
 ```bash
-curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
+curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1
 ```
 Result: ✅ New bundle hash (code deployed)
 

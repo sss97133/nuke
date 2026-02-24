@@ -7,6 +7,8 @@ import VehicleMediaTab from './VehicleMediaTab';
 import VehicleSpecsTab from './VehicleSpecsTab';
 import VehicleComparablesTab from './VehicleComparablesTab';
 import VehicleTaxonomyTab from './VehicleTaxonomyTab';
+import VehicleBidCard from '../../components/vehicle/VehicleBidCard';
+import BidderProfileCard from '../../components/bidder/BidderProfileCard';
 
 interface VehicleProfileTabsProps {
   vehicle: Vehicle;
@@ -22,14 +24,15 @@ interface VehicleProfileTabsProps {
   onReferenceLibraryRefresh: () => void;
 }
 
-type TabId = 'description' | 'media' | 'specs' | 'comps' | 'taxonomy';
+type TabId = 'description' | 'media' | 'specs' | 'comps' | 'taxonomy' | 'bids';
 
 const TABS: Array<{ id: TabId; label: string; count?: number }> = [
   { id: 'description', label: 'DESCRIPTION' },
   { id: 'media', label: 'MEDIA' },
   { id: 'specs', label: 'SPECS' },
   { id: 'comps', label: 'COMPS' },
-  { id: 'taxonomy', label: 'TAXONOMY' }
+  { id: 'taxonomy', label: 'TAXONOMY' },
+  { id: 'bids', label: 'BIDS' }
 ];
 
 export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
@@ -47,6 +50,7 @@ export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabId>('description');
   const [compsCount, setCompsCount] = useState<number | null>(null);
+  const [selectedBidder, setSelectedBidder] = useState<string | null>(null);
 
   useEffect(() => {
     loadComparablesCount();
@@ -187,7 +191,24 @@ export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
             canEdit={canEdit}
           />
         )}
+
+        {activeTab === 'bids' && (
+          <VehicleBidCard
+            vehicleId={vehicle.id}
+            make={(vehicle as any).make}
+            model={(vehicle as any).model}
+            onBidderClick={(username) => setSelectedBidder(username)}
+          />
+        )}
       </div>
+
+      {selectedBidder && (
+        <BidderProfileCard
+          username={selectedBidder}
+          isOpen={true}
+          onClose={() => setSelectedBidder(null)}
+        />
+      )}
     </div>
   );
 };

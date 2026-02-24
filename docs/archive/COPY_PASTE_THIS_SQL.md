@@ -95,7 +95,7 @@ WHERE tablename = 'vehicle_documents';
 
 ## Step 5: Test on Mobile
 
-1. **Add Vehicle:** Open https://n-zero.dev on phone → Tap + → Enter "1977 Chevrolet K5 Blazer" → Save
+1. **Add Vehicle:** Open https://nuke.ag on phone → Tap + → Enter "1977 Chevrolet K5 Blazer" → Save
 2. **Edit Price:** Open your vehicle → Price tab → Change to $15,000 → Save
 3. **Upload Doc:** Open your vehicle → Docs tab → Upload receipt
 

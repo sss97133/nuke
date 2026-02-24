@@ -84,7 +84,7 @@ config :nuke_api, :supabase,
 # Add CORS configuration
 config :nuke_api, NukeApiWeb.Endpoint,
   cors_plug_options: [
-    origin: ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],
+    origin: ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174", "https://nuke.ag"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     headers: ["Authorization", "Content-Type", "Accept", "Origin", "User-Agent"],
     credentials: true,

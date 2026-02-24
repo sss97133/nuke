@@ -13,15 +13,15 @@
 - Files: 32 files changed, 12,500+ insertions
 
 ### **Vercel: BUILDING**
-- Project: `nzero/nuke`
+- Project: `nuke/nuke`
 - Status: ✅ QUEUED (in build queue)
 - Age: ~11 minutes
-- URL: `https://n-zero.dev/`
+- URL: `https://nuke.ag/`
 
 ### **Previous Build (Live Now)**
 - Age: 2 hours
 - Status: ✅ READY
-- URL: `https://nuke-kgfijurwu-nzero.vercel.app`
+- URL: `https://nuke-kgfijurwu-nuke.vercel.app`
 
 ---
 
@@ -34,7 +34,7 @@ When Vercel finishes building (expected in 5-10 minutes):
 2. Vercel pulls from: github.com/sss97133/nuke
 3. Build command: cd nuke_frontend && npm run build
 4. Output: nuke_frontend/dist/
-5. Deploy to: https://n-zero.dev/
+5. Deploy to: https://nuke.ag/
 6. New build goes live (replaces 2h old build)
 ```
 
@@ -71,7 +71,7 @@ When Vercel finishes building (expected in 5-10 minutes):
 
 ## 🎯 WHAT YOU'LL SEE AFTER DEPLOYMENT
 
-Visit any vehicle page on https://n-zero.dev and scroll down:
+Visit any vehicle page on https://nuke.ag and scroll down:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -139,7 +139,7 @@ Visit any vehicle page on https://n-zero.dev and scroll down:
 | +1-2 min | ⏳ Build starts on Vercel |
 | +3-5 min | 🔨 Build in progress |
 | +5-10 min | ✅ Build completes |
-| +10-15 min | 🚀 Live on https://n-zero.dev |
+| +10-15 min | 🚀 Live on https://nuke.ag |
 
 ---
 
@@ -151,8 +151,8 @@ Visit any vehicle page on https://n-zero.dev and scroll down:
 - Vercel Dashboard: https://vercel.com/dashboard
 
 **Live Site:**
-- Main: https://n-zero.dev/
-- Test Vehicle: https://n-zero.dev/vehicles/[any-id]
+- Main: https://nuke.ag/
+- Test Vehicle: https://nuke.ag/vehicles/[any-id]
 
 ---
 
@@ -160,7 +160,7 @@ Visit any vehicle page on https://n-zero.dev and scroll down:
 
 Once deployment completes:
 
-1. **Visit https://n-zero.dev**
+1. **Visit https://nuke.ag**
 2. **Click any vehicle page**
 3. **Scroll down**
 4. **Should see 4 NEW TABS:**
@@ -205,7 +205,7 @@ When deployed:
 ## 🚀 NEXT STEPS
 
 1. **Wait for Vercel build to complete** (~5-10 min)
-2. **Refresh https://n-zero.dev**
+2. **Refresh https://nuke.ag**
 3. **Click any vehicle**
 4. **Scroll to TRADING TABS section**
 5. **See 4 new trading tabs with live market**

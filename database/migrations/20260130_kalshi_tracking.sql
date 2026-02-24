@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS kalshi_fills (
   synced_at timestamptz DEFAULT now()
 );
 
--- n-zero allocation decisions (what the user chose to do with earnings)
+-- nuke allocation decisions (what the user chose to do with earnings)
 CREATE TABLE IF NOT EXISTS bet_allocations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES auth.users ON DELETE CASCADE,

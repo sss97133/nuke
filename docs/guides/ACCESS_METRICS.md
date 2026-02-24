@@ -4,7 +4,7 @@
 
 ### 1. **Admin Dashboard** (Primary - For You/Staff)
 
-**URL:** https://n-zero.dev/admin/image-processing
+**URL:** https://nuke.ag/admin/image-processing
 
 **Who can access:**
 - Admin users (you)
@@ -50,7 +50,7 @@ Or add as tab:
 
 ### 2. **Vehicle Profile Page** (For Vehicle Owners)
 
-**URL:** https://n-zero.dev/vehicle/[vehicle-id]
+**URL:** https://nuke.ag/vehicle/[vehicle-id]
 
 **Who can access:**
 - Vehicle owner
@@ -114,7 +114,7 @@ import ProcessingMonitor from '../pages/ProcessingMonitor';
 ```
 Login → Dashboard → Admin Section → "Image Processing" tab
 
-Direct URL: https://n-zero.dev/admin/image-processing
+Direct URL: https://nuke.ag/admin/image-processing
 ```
 
 ### For Users (Vehicle Owners):
@@ -250,7 +250,7 @@ USING (
 ### Scenario 1: Admin Monitoring Batch Process
 
 1. Start batch: `node scripts/tiered-batch-processor.js`
-2. Open browser: https://n-zero.dev/admin/image-processing
+2. Open browser: https://nuke.ag/admin/image-processing
 3. Watch real-time:
    - Progress bars update every 5s
    - Cost counter ticks up
@@ -288,7 +288,7 @@ USING (
 
 **Admin Access:**
 ```
-You → https://n-zero.dev/admin/image-processing
+You → https://nuke.ag/admin/image-processing
 See: Everything (costs, models, quality, errors)
 ```
 

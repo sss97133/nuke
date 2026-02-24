@@ -115,10 +115,10 @@ git push origin main
 ### **Test Production Deployment:**
 ```bash
 # Check deployment status
-cd nuke_frontend && vercel inspect nukefrontend.vercel.app --scope=nzero
+cd nuke_frontend && vercel inspect nukefrontend.vercel.app --scope=nuke
 
 # View production logs
-vercel logs nukefrontend.vercel.app --scope=nzero
+vercel logs nukefrontend.vercel.app --scope=nuke
 ```
 
 ---

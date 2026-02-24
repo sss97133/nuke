@@ -14,7 +14,7 @@ function maybeReloadForChunkError(reason: unknown) {
   const msg = typeof reason === 'string' ? reason : (reason as any)?.message ?? String(reason);
   if (!CHUNK_LOAD_ERROR_RE.test(msg)) return;
 
-  const key = '__nzero_chunk_reload__';
+  const key = '__nuke_chunk_reload__';
   try {
     if (sessionStorage.getItem(key) === '1') return;
     sessionStorage.setItem(key, '1');

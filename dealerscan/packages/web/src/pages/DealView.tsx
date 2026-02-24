@@ -5,7 +5,7 @@ import type { Deal, DocumentPage, DealExternalImage } from '@dealerscan/shared'
 import { FileText, Download, AlertCircle, CheckCircle, Clock, Loader2, Eye, Archive, RefreshCw, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const PROFILE_APP_URL = (import.meta.env.VITE_NZERO_APP_URL || import.meta.env.VITE_PROFILE_APP_URL) as string | undefined
+const PROFILE_APP_URL = (import.meta.env.VITE_NUKE_APP_URL || import.meta.env.VITE_PROFILE_APP_URL) as string | undefined
 
 export default function DealView() {
   const { id } = useParams<{ id: string }>()

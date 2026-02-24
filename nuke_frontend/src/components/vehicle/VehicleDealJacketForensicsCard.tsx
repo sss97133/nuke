@@ -97,7 +97,7 @@ interface ValidationItem {
 }
 
 const formatUSD = (v: number | null | undefined) => {
-  if (v === null || v === undefined) return '--';
+  if (v === null || v === undefined || (typeof v === 'number' && !Number.isFinite(v))) return '--';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(v);
 };
 
@@ -195,7 +195,9 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
     ? Math.round((summary.total_recon / summary.purchase_cost) * 100)
     : 0;
 
-  const profitDelta = summary.true_profit_estimate - summary.reported_profit;
+  const rawReported = Number(summary.reported_profit);
+  const rawTrue = Number(summary.true_profit_estimate);
+  const profitDelta = (Number.isFinite(rawTrue) && Number.isFinite(rawReported)) ? rawTrue - rawReported : NaN;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -231,8 +233,8 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         </div>
         <div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 2 }}>HIDDEN PROFIT</div>
-          <div style={{ fontSize: '10pt', fontWeight: 700, color: profitDelta > 0 ? '#ef4444' : '#22c55e' }}>
-            +{formatUSD(profitDelta)}
+          <div style={{ fontSize: '10pt', fontWeight: 700, color: Number.isFinite(profitDelta) && profitDelta > 0 ? '#ef4444' : Number.isFinite(profitDelta) && profitDelta < 0 ? '#22c55e' : 'inherit' }}>
+            {Number.isFinite(profitDelta) ? (profitDelta >= 0 ? '+' : '') + formatUSD(profitDelta) : formatUSD(profitDelta)}
           </div>
         </div>
       </div>
@@ -244,10 +246,12 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
           <span>Recon: {formatUSD(summary.total_recon)} ({reconPct}%)</span>
           <span>Sale: {formatUSD(summary.sale_price)}</span>
         </div>
-        <div style={{ height: 6, background: 'var(--grey-200)', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
-          <div style={{ width: `${(summary.purchase_cost / summary.sale_price) * 100}%`, background: '#3b82f6' }} />
-          <div style={{ width: `${(summary.total_recon / summary.sale_price) * 100}%`, background: reconPct > 80 ? '#ef4444' : '#f97316' }} />
-        </div>
+        {Number(summary.sale_price) > 0 && (
+          <div style={{ height: 6, background: 'var(--grey-200)', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
+            <div style={{ width: `${Math.min(100, (Number(summary.purchase_cost) / Number(summary.sale_price)) * 100)}%`, background: '#3b82f6' }} />
+            <div style={{ width: `${Math.min(100, (Number(summary.total_recon) / Number(summary.sale_price)) * 100)}%`, background: reconPct > 80 ? '#ef4444' : '#f97316' }} />
+          </div>
+        )}
       </div>
 
       {/* Deal Info */}

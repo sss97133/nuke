@@ -21,13 +21,13 @@
 ### 1.1 Sticky Header (Top Bar)
 ```
 ┌─────────────────────────────────────────┐
-│ [MENU] n-zero        [NOTIFY][USER] │
+│ [MENU] nuke        [NOTIFY][USER] │
 └─────────────────────────────────────────┘
 ```
 
 **Clickable Elements:**
 - `[MENU]` → Opens full navigation drawer (see 1.2)
-- `n-zero` (logo) → Navigate to `/` (Homepage/Discovery)
+- `nuke` (logo) → Navigate to `/` (Homepage/Discovery)
 - `[NOTIFY]` → Opens notifications panel
 - `[USER]` → Navigate to `/profile`
 

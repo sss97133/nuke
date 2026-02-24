@@ -104,7 +104,7 @@ Value Impact: +$1,800
 ## 🎨 Frontend Status
 
 **Latest Deploy:** Bundle `SozPPLVo`  
-**URL:** `https://n-zero.dev`
+**URL:** `https://nuke.ag`
 
 **Key Pages Working:**
 - `/organizations` - Directory listing

@@ -4,18 +4,18 @@ This doc answers: **where do the extracted fields (chassis, estimate, coachwork,
 
 ---
 
-## On the website (n-zero.dev)
+## On the website (nuke.ag)
 
 ### 1. **Homepage feed** (`/`)
 
-- **URL:** `https://n-zero.dev/` (or your deployed domain root).
+- **URL:** `https://nuke.ag/` (or your deployed domain root).
 - **What you see:** Cards for vehicles that have `status != 'pending'` and `is_public = true`. Each card shows thumbnail, year/make/model, price signals, etc.
 - **Gooding (and other auction) vehicles** appear here **only after** their `vehicles.status` is set to `'active'` (we fixed that so new/backfilled auction imports use `active`).
 
 ### 2. **Vehicle profile page** (`/vehicle/:id`) — **main place for full data**
 
-- **URL:** `https://n-zero.dev/vehicle/<vehicle-id>`  
-  Example: `https://n-zero.dev/vehicle/550e8400-e29b-41d4-a716-446655440000`
+- **URL:** `https://nuke.ag/vehicle/<vehicle-id>`  
+  Example: `https://nuke.ag/vehicle/550e8400-e29b-41d4-a716-446655440000`
 - **What you see:** Full listing data:
   - **Chassis / VIN** (e.g. Gooding chassis `16407` stored as `vin` when no 17-char VIN)
   - **Estimate** (from auction metadata)
@@ -27,12 +27,12 @@ This doc answers: **where do the extracted fields (chassis, estimate, coachwork,
 
 ### 3. **Auctions page** (`/auctions`)
 
-- **URL:** `https://n-zero.dev/auctions`
+- **URL:** `https://nuke.ag/auctions`
 - **What you see:** Auction marketplace view; listings that have an `external_listings` row (and linked `vehicle_id`) can appear here. Clicking a listing goes to the **vehicle profile** at `/vehicle/<vehicle_id>` (or to `/auction/:listingId` for internal listing detail, depending on UX).
 
 ### 4. **Search**
 
-- **URL:** `https://n-zero.dev/search`
+- **URL:** `https://nuke.ag/search`
 - **What you see:** Search results can include vehicles by year, make, model, etc. Clicking a result goes to `/vehicle/<id>`.
 
 ---

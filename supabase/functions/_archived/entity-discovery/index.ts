@@ -37,7 +37,7 @@ async function urlExists(url: string): Promise<boolean> {
       redirect: 'follow',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; nzero-bot/1.0)'
+        'User-Agent': 'Mozilla/5.0 (compatible; nuke-bot/1.0)'
       }
     });
     
@@ -58,7 +58,7 @@ async function fetchPage(url: string): Promise<string | null> {
       redirect: 'follow',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; nzero-bot/1.0)'
+        'User-Agent': 'Mozilla/5.0 (compatible; nuke-bot/1.0)'
       }
     });
     

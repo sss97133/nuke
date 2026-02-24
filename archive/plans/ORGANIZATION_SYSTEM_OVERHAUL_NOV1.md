@@ -199,7 +199,7 @@ receipt_match_count: increments each time vendor name matches
 - [x] Database migration applied without errors
 - [x] Frontend builds without linter errors
 - [x] Production deployment verified
-- [ ] Test org profile load: https://n-zero.dev/org/10e77f53-c8d3-445e-b0dd-c518e6637e31
+- [ ] Test org profile load: https://nuke.ag/org/10e77f53-c8d3-445e-b0dd-c518e6637e31
 - [ ] Test ownership claim flow
 - [ ] Test GPS auto-tagging (upload image with GPS near org location)
 - [ ] Test receipt auto-tagging (upload receipt with vendor name matching org)

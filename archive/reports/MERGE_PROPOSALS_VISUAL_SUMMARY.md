@@ -200,9 +200,9 @@ Vehicle A (Consolidated)
 
 ### For You (Vehicle Owner)
 
-1. **Open browser:** https://n-zero.dev
+1. **Open browser:** https://nuke.ag
 2. **Log in** with your account
-3. **Navigate to:** https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+3. **Navigate to:** https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 4. **Look for:** Yellow warning panel below header
 5. **Read the proposal:** Shows the duplicate with 1 photo
 6. **Click:** "Merge Profiles"
@@ -214,7 +214,7 @@ Vehicle A (Consolidated)
 
 ### For Testing Admin Dashboard
 
-1. **Navigate to:** https://n-zero.dev/admin/merge-proposals
+1. **Navigate to:** https://nuke.ag/admin/merge-proposals
 2. **See:** All 6 proposals listed with stats
 3. **Review:** Each proposal shows both profiles
 4. **Click:** "View Profile" buttons to inspect
@@ -270,7 +270,7 @@ Total: 6 | Needs Review: 6 | High Confidence: 0 | Merged: 0
 
 The system is **deployed and ready**. When you log in, you'll immediately see the merge proposal for your '74 Blazer.
 
-Test URL: **https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d**
+Test URL: **https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d**
 
 ---
 

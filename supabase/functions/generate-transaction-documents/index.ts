@@ -115,7 +115,7 @@ function generatePurchaseAgreement(data: any): string {
   </div>
   
   <div style="clear: both; margin-top: 60px; font-size: 10pt; text-align: center; color: #666;">
-    Document facilitated by n-zero.dev | Transaction ID: ${transaction.id}
+    Document facilitated by nuke.ag | Transaction ID: ${transaction.id}
   </div>
 </body>
 </html>
@@ -191,7 +191,7 @@ function generateBillOfSale(data: any): string {
   </div>
   
   <div style="margin-top: 60px; font-size: 10pt; text-align: center; color: #666;">
-    Document facilitated by n-zero.dev | Transaction ID: ${transaction.id}
+    Document facilitated by nuke.ag | Transaction ID: ${transaction.id}
   </div>
 </body>
 </html>

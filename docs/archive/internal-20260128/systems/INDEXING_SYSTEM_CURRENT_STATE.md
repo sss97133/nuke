@@ -11,7 +11,7 @@ This document explains what the indexing system **actually does** when you use i
 ### 1. **Parts Catalog System** (FULLY OPERATIONAL)
 
 **Status:** ✅ Production Ready  
-**URL:** https://n-zero.dev/admin/catalog
+**URL:** https://nuke.ag/admin/catalog
 
 **What's Indexed:**
 - **4,951 parts** from LMC Truck catalog

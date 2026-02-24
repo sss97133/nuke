@@ -11,7 +11,7 @@
 ## Monitor the Scan
 
 ### Option 1: Admin Dashboard (Recommended)
-**URL:** https://n-zero.dev/admin
+**URL:** https://nuke.ag/admin
 
 The AdminMissionControl page now shows:
 - Real-time progress bar
@@ -156,7 +156,7 @@ This enables:
 
 ## Monitoring Dashboard
 
-**Live URL:** https://n-zero.dev/admin
+**Live URL:** https://nuke.ag/admin
 
 The AI Scanning Status card shows:
 - Overall scan percentage

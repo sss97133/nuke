@@ -115,7 +115,7 @@ const ClaimExternalIdentity: React.FC = () => {
 
       const claimIdStr = String(data);
       setClaimId(claimIdStr);
-      setVerificationCode(`NZERO-${claimIdStr.slice(0, 8).toUpperCase()}`);
+      setVerificationCode(`NUKE-${claimIdStr.slice(0, 8).toUpperCase()}`);
       setMessage('Claim started. Add the code below to your profile to verify.');
     } catch (e: any) {
       console.error('Claim failed:', e);

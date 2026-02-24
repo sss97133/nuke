@@ -229,7 +229,7 @@ Just paste URL → Everything auto-fills → Click submit
 
 ### Step-by-Step:
 
-1. **Go to:** https://n-zero.dev/vehicles/new
+1. **Go to:** https://nuke.ag/vehicles/new
 2. **Paste URL:** https://lasvegas.craigslist.org/cto/d/pahrump-gmc-squarebody-short-bed/7893296003.html
 3. **Wait 2-3 seconds** for scraping
 4. **Watch form auto-fill:**

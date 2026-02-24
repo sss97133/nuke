@@ -3,7 +3,7 @@
 ## 🎯 ALL ISSUES RESOLVED
 
 **Latest Commit:** `732ffd82`  
-**Production:** https://nukefrontend-ldevclary-nzero.vercel.app  
+**Production:** https://nukefrontend-ldevclary-nuke.vercel.app  
 **Status:** 🟢 **100% OPERATIONAL**
 
 ---
@@ -267,7 +267,7 @@ INSERT INTO vehicle_user_permissions (
 
 **Latest Commit:** `732ffd82`  
 **Date:** October 27, 2025  
-**Production URL:** https://nukefrontend-ldevclary-nzero.vercel.app
+**Production URL:** https://nukefrontend-ldevclary-nuke.vercel.app
 
 **Ready for real users!** 🚀
 

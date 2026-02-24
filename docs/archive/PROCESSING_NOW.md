@@ -21,7 +21,7 @@ FROM vehicle_images;
 Run every minute to see progress!
 
 ### Option 2: Web Dashboard
-Visit: **https://n-zero.dev/admin/image-processing**
+Visit: **https://nuke.ag/admin/image-processing**
 
 Should start showing results within 1-2 minutes
 

@@ -2,7 +2,7 @@
 
 **Date:** November 5, 2025  
 **Status:** Deployed to Production  
-**URL:** https://n-zero.dev/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf
+**URL:** https://nuke.ag/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf
 
 ---
 
@@ -241,7 +241,7 @@ vehicle_images (image_url, thumbnail_url, is_primary)
 
 **Build:** ✅ Successful (4.01s, no errors)  
 **Deploy:** ✅ Production via Vercel  
-**Status:** ✅ Live on n-zero.dev  
+**Status:** ✅ Live on nuke.ag  
 
 **Verification:**
 - Component compiles without TypeScript errors
@@ -307,6 +307,6 @@ If you want to expand this further:
 ---
 
 **Status:** ✅ Complete and ready to use  
-**URL:** https://n-zero.dev/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf  
+**URL:** https://nuke.ag/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf  
 **Impact:** High value for dealers, buyers, researchers, and enthusiasts
 

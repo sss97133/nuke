@@ -4,7 +4,7 @@
 
 ### 1. Global App Header (AppLayout)
 **Location**: `components/layout/AppLayout.tsx`
-**Shows**: "n-zero $0.00"
+**Shows**: "nuke $0.00"
 **Purpose**: Global navigation, appears on all pages
 **Status**: ✅ Working (shows balance from ProfileBalancePill)
 
@@ -97,7 +97,7 @@ vercel --prod --force
 
 **Global Header**:
 - ✅ Working correctly
-- Shows "n-zero $0.00" (balance from ProfileBalancePill)
+- Shows "nuke $0.00" (balance from ProfileBalancePill)
 
 **Next Steps**:
 1. Check Vercel dashboard for latest deployment

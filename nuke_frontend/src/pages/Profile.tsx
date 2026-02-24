@@ -494,11 +494,101 @@ const Profile: React.FC = () => {
               </div>
             </div>
             
-              {/* Username */}
-              <div style={{ flex: 1 }}>
-                <h2 className="text font-bold" style={{ margin: 0, fontSize: '8pt' }}>
-                  @{profile.username || 'username'}
-                </h2>
+              {/* Username + Meta */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  <h2 className="text font-bold" style={{ margin: 0, fontSize: '8pt' }}>
+                    @{profile.username || 'username'}
+                  </h2>
+                  {profile.is_verified && (
+                    <span style={{
+                      fontSize: '7pt',
+                      fontWeight: 700,
+                      padding: '1px 6px',
+                      background: 'var(--success, #28a745)',
+                      color: '#fff',
+                      borderRadius: '3px',
+                      lineHeight: '1.4'
+                    }}>Verified</span>
+                  )}
+                  {profile.user_type && profile.user_type !== 'user' && (
+                    <span style={{
+                      fontSize: '7pt',
+                      fontWeight: 700,
+                      padding: '1px 6px',
+                      background: 'var(--text-muted)',
+                      color: 'var(--surface)',
+                      borderRadius: '3px',
+                      lineHeight: '1.4',
+                      textTransform: 'capitalize'
+                    }}>{profile.user_type}</span>
+                  )}
+                </div>
+
+                {/* Meta line: location + member since */}
+                {(profile.location || profile.created_at) && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-3)',
+                    marginTop: '2px',
+                    fontSize: '7.5pt',
+                    color: 'var(--text-muted)'
+                  }}>
+                    {profile.location && (
+                      <span>{profile.location}</span>
+                    )}
+                    {profile.created_at && (
+                      <span>Member since {new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Bio */}
+                {profile.bio && (
+                  <p style={{
+                    margin: '4px 0 0',
+                    fontSize: '7.5pt',
+                    color: 'var(--text-muted)',
+                    lineHeight: '1.4',
+                    maxWidth: '480px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical'
+                  }}>{profile.bio}</p>
+                )}
+
+                {/* Links row */}
+                {(profile.website_url || profile.github_url || profile.linkedin_url) && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-3)',
+                    marginTop: '4px',
+                    fontSize: '7.5pt'
+                  }}>
+                    {profile.website_url && (
+                      <a href={profile.website_url} target="_blank" rel="noopener noreferrer"
+                        style={{ color: 'var(--link, var(--text))', textDecoration: 'underline' }}>
+                        Website
+                      </a>
+                    )}
+                    {profile.github_url && (
+                      <a href={profile.github_url} target="_blank" rel="noopener noreferrer"
+                        style={{ color: 'var(--link, var(--text))', textDecoration: 'underline' }}>
+                        GitHub
+                      </a>
+                    )}
+                    {profile.linkedin_url && (
+                      <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer"
+                        style={{ color: 'var(--link, var(--text))', textDecoration: 'underline' }}>
+                        LinkedIn
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -578,7 +668,65 @@ const Profile: React.FC = () => {
                   placeholder="City, State/Country"
                   onSave={(v) => saveProfileField('location', v)}
                 />
-                
+
+                <EditableField
+                  label="Website URL"
+                  name="website_url"
+                  type="text"
+                  value={profile.website_url || ''}
+                  placeholder="https://yoursite.com"
+                  onSave={(v) => saveProfileField('website_url', v)}
+                />
+
+                <EditableField
+                  label="GitHub URL"
+                  name="github_url"
+                  type="text"
+                  value={profile.github_url || ''}
+                  placeholder="https://github.com/username"
+                  onSave={(v) => saveProfileField('github_url', v)}
+                />
+
+                <EditableField
+                  label="LinkedIn URL"
+                  name="linkedin_url"
+                  type="text"
+                  value={profile.linkedin_url || ''}
+                  placeholder="https://linkedin.com/in/username"
+                  onSave={(v) => saveProfileField('linkedin_url', v)}
+                />
+
+                <EditableField
+                  label="Public profile"
+                  name="is_public"
+                  type="toggle"
+                  value={profile.is_public ?? true}
+                  onSave={(v) => saveProfileField('is_public', v)}
+                />
+
+                {/* Account type selector */}
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <label className="text-small font-bold" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>
+                    Account Type
+                  </label>
+                  <select
+                    className="form-input text-small"
+                    value={profile.user_type || 'user'}
+                    onChange={async (e) => {
+                      try {
+                        await saveProfileField('user_type', e.target.value);
+                      } catch (err) {
+                        console.error('Failed to update user_type:', err);
+                      }
+                    }}
+                    style={{ padding: '4px 8px', fontSize: '8pt' }}
+                  >
+                    <option value="user">User</option>
+                    <option value="professional">Professional</option>
+                    <option value="dealer">Dealer</option>
+                  </select>
+                </div>
+
                 <div style={{ marginTop: 'var(--space-3)' }}>
                   <button
                     onClick={handleSignOut}
@@ -799,51 +947,10 @@ const Profile: React.FC = () => {
 
             {activeTab === 'settings' && isOwnProfile && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <div className="card">
-                  <div className="card-header">
-                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>History</h3>
-                  </div>
-                  <div className="card-body">
-                    <ActivityTimeline scope="user" id={profile.id} limit={200} />
-                  </div>
-                </div>
 
-                {/* Verification Section */}
-                <div className="card">
-                  <div className="card-header">
-                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Identity Verification</h3>
-                  </div>
-                  <div className="card-body">
-                    <ProfileVerification />
-                  </div>
-                </div>
+                {/* ── ACCOUNT ── */}
+                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Account</h3>
 
-                {/* Connected Auction Platforms */}
-                <ConnectedPlatforms />
-
-                {/* Social Connections (OAuth) */}
-                <SocialConnections userId={profile.id} />
-
-                {/* Password Change */}
-                <div className="card">
-                  <div className="card-header">
-                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Change Password</h3>
-                  </div>
-                  <div className="card-body">
-                    <div className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
-                      Update your account password for security.
-                    </div>
-                    <ChangePasswordForm 
-                      onSuccess={() => { 
-                        console.log('Password changed successfully'); 
-                      }}
-                      onError={(error) => { 
-                        console.error('Password change error:', error); 
-                      }}
-                    />
-                  </div>
-                </div>
-                
                 {/* Email Management */}
                 <div className="card">
                   <div className="card-header">
@@ -853,7 +960,7 @@ const Profile: React.FC = () => {
                     <div className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
                       Current email: {profile.email}
                     </div>
-                    
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--space-3)', alignItems: 'end', marginBottom: 'var(--space-2)' }}>
                       <div>
                         <label className="text-small font-bold" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>
@@ -876,23 +983,75 @@ const Profile: React.FC = () => {
                         {emailUpdating ? 'Updating...' : 'Update Email'}
                       </button>
                     </div>
-                    
+
                     {emailChangeMessage && (
-                      <div className="text-small" style={{ 
-                        color: emailChangeMessage.includes('sent') ? 'var(--success)' : 'var(--danger)', 
-                        marginTop: 'var(--space-1)' 
+                      <div className="text-small" style={{
+                        color: emailChangeMessage.includes('sent') ? 'var(--success)' : 'var(--danger)',
+                        marginTop: 'var(--space-1)'
                       }}>
                         {emailChangeMessage}
                       </div>
                     )}
-                    
+
                     <div className="text-small" style={{ color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
                       Changing your email will require verification.
                     </div>
                   </div>
                 </div>
-                
-                {/* Database Diagnostic */}
+
+                {/* Password Change */}
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Change Password</h3>
+                  </div>
+                  <div className="card-body">
+                    <div className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
+                      Update your account password for security.
+                    </div>
+                    <ChangePasswordForm
+                      onSuccess={() => {
+                        console.log('Password changed successfully');
+                      }}
+                      onError={(error) => {
+                        console.error('Password change error:', error);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* ── CONNECTIONS ── */}
+                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Connections</h3>
+
+                <ConnectedPlatforms />
+                <SocialConnections userId={profile.id} />
+
+                {/* ── VERIFICATION ── */}
+                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification</h3>
+
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Identity Verification</h3>
+                  </div>
+                  <div className="card-body">
+                    <ProfileVerification />
+                  </div>
+                </div>
+
+                {/* ── ACTIVITY ── */}
+                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Activity</h3>
+
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>History</h3>
+                  </div>
+                  <div className="card-body">
+                    <ActivityTimeline scope="user" id={profile.id} limit={200} />
+                  </div>
+                </div>
+
+                {/* ── ADVANCED ── */}
+                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Advanced</h3>
+
                 <DatabaseDiagnostic />
               </div>
             )}

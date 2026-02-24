@@ -2089,8 +2089,36 @@ serve(async (req) => {
       }
     }
 
-    // Persist an auction timeline event so timelines aren't empty for auction-origin vehicles.
+    // Persist auction timeline events so the 7-day BaT window is visible: listed (start) + sold/ended (end).
     if (vehicleId && essentials.auction_end_date) {
+      const endYmd = String(essentials.auction_end_date).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(endYmd)) {
+        // Standard BaT auctions run 7 days: list date = end - 7 days
+        const endDate = new Date(endYmd + "T12:00:00Z");
+        const listDate = new Date(endDate);
+        listDate.setUTCDate(listDate.getUTCDate() - 7);
+        const listDateYmd = listDate.toISOString().slice(0, 10);
+
+        await tryUpsertAuctionTimelineEvent({
+          supabase,
+          vehicleId,
+          eventType: "auction_listed",
+          eventDateYmd: listDateYmd,
+          title: `Listed on Bring a Trailer${essentials.lot_number ? ` (Lot #${essentials.lot_number})` : ""}`,
+          description: essentials.seller_username
+            ? `Listed by @${essentials.seller_username}. ${essentials.reserve_status === "no_reserve" ? "No Reserve." : ""}`
+            : "Auction started.",
+          source: "bat",
+          sourceUrl: listingUrlCanonical,
+          costAmount: null,
+          metadata: {
+            lot_number: essentials.lot_number,
+            seller_username: essentials.seller_username,
+            reserve_status: essentials.reserve_status,
+            auction_end_date: endYmd,
+          },
+        });
+      }
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
       const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
       const eventType =

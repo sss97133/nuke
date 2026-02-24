@@ -1,13 +1,13 @@
-# Extraction Plan: n-zero.dev Organization Inventory
+# Extraction Plan: nuke.ag Organization Inventory
 
 **Organization ID**: `1152029f-316d-4379-80b6-e74706700490`  
-**URL**: `https://n-zero.dev/org/1152029f-316d-4379-80b6-e74706700490`
+**URL**: `https://nuke.ag/org/1152029f-316d-4379-80b6-e74706700490`
 
 ---
 
 ## Option 1: Direct Database Query (RECOMMENDED - Fastest)
 
-Since this is your own platform (n-zero.dev), the most efficient approach is direct database access:
+Since this is your own platform (nuke.ag), the most efficient approach is direct database access:
 
 ### Query Strategy:
 ```sql
@@ -59,7 +59,7 @@ curl -X POST "${SUPABASE_URL}/functions/v1/scrape-multi-source" \
   -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
-    "source_url": "https://n-zero.dev/org/1152029f-316d-4379-80b6-e74706700490",
+    "source_url": "https://nuke.ag/org/1152029f-316d-4379-80b6-e74706700490",
     "source_type": "dealer_website",
     "extract_listings": true,
     "extract_dealer_info": true,
@@ -72,7 +72,7 @@ curl -X POST "${SUPABASE_URL}/functions/v1/scrape-multi-source" \
 
 ### Parameters Explained:
 - **`source_type: "dealer_website"`** - Treats it as a dealer/organization website
-- **`cheap_mode: false`** - REQUIRED for JavaScript-rendered pages (n-zero.dev is React)
+- **`cheap_mode: false`** - REQUIRED for JavaScript-rendered pages (nuke.ag is React)
 - **`use_llm_extraction: true`** - Better data extraction quality
 - **`max_listings: 500`** - Adjust based on actual inventory size
 - **`organization_id`** - Links extracted listings directly to the organization
@@ -127,7 +127,7 @@ curl -X POST "${SUPABASE_URL}/functions/v1/process-import-queue" \
 
 ## Notes
 
-- n-zero.dev is JavaScript-rendered (React), so `cheap_mode: false` is required
+- nuke.ag is JavaScript-rendered (React), so `cheap_mode: false` is required
 - Firecrawl will handle the JS rendering automatically
 - The extraction schema will automatically extract:
   - Vehicle listings (title, year, make, model, price, etc.)

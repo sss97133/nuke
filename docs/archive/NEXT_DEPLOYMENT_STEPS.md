@@ -200,7 +200,7 @@ vercel deploy --prod
 # (or your deployment command)
 ```
 
-**After deployment:** Visit https://n-zero.dev, click any vehicle, scroll down, and see the trading tabs!
+**After deployment:** Visit https://nuke.ag, click any vehicle, scroll down, and see the trading tabs!
 
 ---
 

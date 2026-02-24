@@ -567,7 +567,7 @@ BEGIN
     CASE m.method
       WHEN 'profile_link' THEN 'Add this code to your profile bio: ' || COALESCE(m.verification_code, '')
       WHEN 'comment_code' THEN 'Post a comment containing this code: ' || COALESCE(m.verification_code, '')
-      WHEN 'email_forward' THEN 'Forward any email from the platform to verify@nuke.app with subject: ' || COALESCE(m.verification_code, '')
+      WHEN 'email_forward' THEN 'Forward any email from the platform to verify@nuke.ag with subject: ' || COALESCE(m.verification_code, '')
       WHEN 'screenshot' THEN 'Upload a screenshot showing you logged in to this account'
       WHEN 'proxy_credentials' THEN 'Provide your login credentials for proxy bidding (highest verification)'
       WHEN 'self_attestation' THEN 'Self-claimed (lowest confidence)'

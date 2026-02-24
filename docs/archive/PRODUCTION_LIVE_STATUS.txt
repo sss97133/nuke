@@ -12,29 +12,29 @@
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  MAIN PLATFORM: https://nuke.dev
+  MAIN PLATFORM: https://nuke.ag
   
   TRADING VEHICLES (Live Now):
   
-    📍 https://nuke.dev/vehicles/1974-blazer-mint
+    📍 https://nuke.ag/vehicles/1974-blazer-mint
        ├─ Status: TRADING LIVE ✓
        ├─ Current Price: $108.50 (↑ +8.5%)
        ├─ Volume Today: 450 shares traded
        ├─ Bid/Ask Spread: $107-$109 (1.8% wide)
        └─ Tabs: Ticker | OrderBook | Portfolio | Leaderboard
     
-    📍 https://nuke.dev/vehicles/1963-corvette-stingray
+    📍 https://nuke.ag/vehicles/1963-corvette-stingray
        ├─ Status: TRADING LIVE ✓
        ├─ Current Price: $156.25 (↑ +3.2%)
        ├─ Volume Today: 312 shares traded
        └─ Tabs: All 4 active
     
-    📍 https://nuke.dev/vehicles/1967-mustang-fastback
+    📍 https://nuke.ag/vehicles/1967-mustang-fastback
        ├─ Status: TRADING LIVE ✓
        ├─ Current Price: $245.00 (↑ +1.8%)
        └─ Tabs: All 4 active
     
-    📍 https://nuke.dev/vehicles/1953-mercedes-300sl
+    📍 https://nuke.ag/vehicles/1953-mercedes-300sl
        ├─ Status: TRADING LIVE ✓
        ├─ Current Price: $189.50 (↓ -2.1%)
        └─ Tabs: All 4 active
@@ -69,7 +69,7 @@ SECTION 2: Trading Tabs (NEW - LIVE NOW) ⭐
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1️⃣  VISIT: https://nuke.dev/vehicles/1974-blazer-mint
+1️⃣  VISIT: https://nuke.ag/vehicles/1974-blazer-mint
 
 2️⃣  SCROLL DOWN: You'll see the NEW Trading tabs section
 
@@ -282,7 +282,7 @@ Platform earns:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. VISIT: https://nuke.dev/vehicles/1974-blazer-mint
+1. VISIT: https://nuke.ag/vehicles/1974-blazer-mint
 
 2. EXPLORE: Click through all 4 trading tabs
 

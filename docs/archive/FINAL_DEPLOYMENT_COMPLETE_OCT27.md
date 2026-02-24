@@ -2,8 +2,8 @@
 
 **Status:** ✅ **PRODUCTION LIVE**  
 **Commit:** `88c7ddeb`  
-**Deployment:** https://nuke-88rmaq3md-nzero.vercel.app  
-**Production URL:** https://n-zero.dev  
+**Deployment:** https://nuke-88rmaq3md-nuke.vercel.app  
+**Production URL:** https://nuke.ag  
 **Bundle:** `index-DxRhw2im.js`
 
 ---
@@ -85,7 +85,7 @@ Pushed: ✅ Yes
 
 ### **Vercel Deployment:**
 ```
-URL: https://nuke-88rmaq3md-nzero.vercel.app
+URL: https://nuke-88rmaq3md-nuke.vercel.app
 Status: ● Ready (Production)
 Build Time: 37 seconds
 Bundle: index-DxRhw2im.js (NEW)
@@ -94,7 +94,7 @@ Build Stats: 2,392 modules, 1,654 KB main bundle
 
 ### **Production Verification:**
 ```
-n-zero.dev → Serving new bundle ✅
+nuke.ag → Serving new bundle ✅
 Homepage: 19 vehicles loading ✅
 Vehicle pages: Working ✅
 Authentication: Functional ✅
@@ -109,7 +109,7 @@ Console: No critical errors ✅
 ### **Test Environment:**
 - **Browser:** Chromium (Playwright MCP v1.56.1)
 - **Viewports Tested:** Desktop (1920x1080), Mobile (375x667)
-- **Production URL:** https://n-zero.dev
+- **Production URL:** https://nuke.ag
 - **Bundle:** index-DxRhw2im.js
 
 ### **Tests Performed:**
@@ -489,7 +489,7 @@ supabase functions deploy centraldispatch-oauth-callback
 supabase functions deploy get-centraldispatch-auth-url
 
 # Connect via UI
-# 1. Visit: https://n-zero.dev/admin/shipping-settings
+# 1. Visit: https://nuke.ag/admin/shipping-settings
 # 2. Click: "Connect Central Dispatch"
 # 3. Authorize on Central Dispatch
 # 4. Done!

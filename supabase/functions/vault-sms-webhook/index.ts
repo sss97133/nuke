@@ -23,7 +23,7 @@ const supabase = createClient(
 );
 
 // Configuration
-const PWA_BASE_URL = Deno.env.get("VAULT_PWA_URL") || "https://n-zero.dev/vault";
+const PWA_BASE_URL = Deno.env.get("VAULT_PWA_URL") || "https://nuke.ag/vault";
 const APP_STORE_URL = "https://apps.apple.com/app/nuke-vault/id000000000";
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=app.nuke.vault";
 const SESSION_EXPIRY_HOURS = 1;

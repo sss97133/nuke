@@ -5,7 +5,7 @@
 
 ## Overview
 
-This document outlines the standard workflow for implementing, testing, and deploying changes to the n-zero platform. This process ensures all changes are properly tested, committed, and deployed to production.
+This document outlines the standard workflow for implementing, testing, and deploying changes to the nuke platform. This process ensures all changes are properly tested, committed, and deployed to production.
 
 ## Standard Workflow
 

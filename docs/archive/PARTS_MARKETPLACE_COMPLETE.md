@@ -135,7 +135,7 @@ I added **3 demo tags** to the GMC truck's primary image:
 
 ### **Once Vercel Deploys (check bundle hash changes):**
 
-1. **Visit:** https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+1. **Visit:** https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 
 2. **Scroll to images**
 
@@ -203,7 +203,7 @@ I added **3 demo tags** to the GMC truck's primary image:
 # Visit: https://vercel.com/sss97133/nuke/deployments
 
 # Or wait 5 more minutes and hard refresh:
-# https://n-zero.dev/?t=12345
+# https://nuke.ag/?t=12345
 ```
 
 The bundle hash should change from `BB5HYU31` to something new (e.g. `C3XYZ123`).

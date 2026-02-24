@@ -11,7 +11,7 @@
 ## Immediate Next Steps
 
 ### Option 1: Test via UI (Recommended - Fastest)
-1. Go to any vehicle profile: https://n-zero.dev/vehicle/[vehicle-id]
+1. Go to any vehicle profile: https://nuke.ag/vehicle/[vehicle-id]
 2. Open an image in the Lightbox
 3. Click the **"AI"** button
 4. Check if "Appraiser Notes" appear in the Details tab

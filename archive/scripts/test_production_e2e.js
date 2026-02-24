@@ -7,7 +7,7 @@
 const { chromium } = require('playwright');
 const { Client } = require('pg');
 
-const PRODUCTION_URL = 'https://n-zero.dev';
+const PRODUCTION_URL = 'https://nuke.ag';
 const DB_CONFIG = {
   host: 'aws-0-us-west-1.pooler.supabase.com',
   port: 5432,

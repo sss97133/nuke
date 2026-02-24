@@ -38,7 +38,7 @@ const { data } = await supabase
 **What it is:**
 - A separate Elixir/Phoenix server running on port 4000
 - Handles operations that need **server-side processing**
-- Located at: `http://localhost:4000/api` (or `https://n-zero.dev/api` in production)
+- Located at: `http://localhost:4000/api` (or `https://nuke.ag/api` in production)
 
 **What it's used for:**
 - ✅ **Receipt parsing** - Complex AI processing of receipt images
@@ -82,7 +82,7 @@ const response = await fetch(`${API_BASE_URL}/receipts/parse`, {
 **What you actually need:**
 - `VITE_API_URL` - This is what your Vite frontend uses to call the Phoenix API
 - Currently set to: `http://localhost:4000/api` (for development)
-- In production, it should be: `https://n-zero.dev/api`
+- In production, it should be: `https://nuke.ag/api`
 
 ---
 
@@ -103,7 +103,7 @@ Based on your codebase:
    - Can also call Supabase internally
 
 3. **Your Frontend** (Vite/React):
-   - Deployed at `https://n-zero.dev` (based on vercel.json)
+   - Deployed at `https://nuke.ag` (based on vercel.json)
    - Uses `VITE_API_URL` to call the Phoenix API
    - This is your ONLY frontend - there's no Next.js app
 

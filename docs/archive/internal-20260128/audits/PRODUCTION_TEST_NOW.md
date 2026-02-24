@@ -40,7 +40,7 @@
 
 ### **Step 1: Open Production**
 ```
-URL: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+URL: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 ```
 
 ### **Step 2: Open Browser Console**

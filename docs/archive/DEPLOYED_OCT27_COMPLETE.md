@@ -2,7 +2,7 @@
 
 ## ✅ ALL FEATURES LIVE IN PRODUCTION
 
-**Production URL:** https://nukefrontend-j2pp2qdlr-nzero.vercel.app  
+**Production URL:** https://nukefrontend-j2pp2qdlr-nuke.vercel.app  
 **Latest Commit:** `cfcc3f1f`  
 **Status:** 🟢 **FULLY OPERATIONAL**
 
@@ -183,10 +183,10 @@ Market
 ## ✅ VERIFICATION
 
 **Test Market Page:**
-https://nukefrontend-j2pp2qdlr-nzero.vercel.app/market
+https://nukefrontend-j2pp2qdlr-nuke.vercel.app/market
 
 **Test Vehicles Page:**
-https://nukefrontend-j2pp2qdlr-nzero.vercel.app/vehicles
+https://nukefrontend-j2pp2qdlr-nuke.vercel.app/vehicles
 
 **Test Mobile Upload:**
 - Open vehicle on phone
@@ -212,6 +212,6 @@ https://nukefrontend-j2pp2qdlr-nzero.vercel.app/vehicles
 7. ✅ Invoice parser works
 8. ✅ Permissions documented
 
-**Production:** https://nukefrontend-j2pp2qdlr-nzero.vercel.app  
+**Production:** https://nukefrontend-j2pp2qdlr-nuke.vercel.app  
 **All systems operational!** 🚀
 

@@ -2,11 +2,11 @@
 /**
  * Generate Bet Suggestions from Vehicle Data
  *
- * Analyzes n-zero's vehicle/auction data to propose betting markets.
+ * Analyzes nuke's vehicle/auction data to propose betting markets.
  * These could be:
  * 1. Matched to existing Kalshi markets
  * 2. Proposed as new Kalshi markets
- * 3. Used for internal n-zero prediction markets
+ * 3. Used for internal nuke prediction markets
  *
  * Usage:
  *   dotenvx run -- npx tsx scripts/generate-bet-suggestions.ts

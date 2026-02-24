@@ -128,7 +128,7 @@ curl -X POST 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-vehic
 
 ### 2. Test Frontend
 
-1. Go to https://n-zero.dev/add-vehicle
+1. Go to https://nuke.ag/add-vehicle
 2. Paste URL: `https://sandiego.craigslist.org/esd/cto/d/el-centro-1972-gmc-suburban/7888155474.html`
 3. Open browser console (F12)
 4. Look for:

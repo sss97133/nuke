@@ -1,7 +1,7 @@
 # Search Page QA Report
 
 **Date**: 2026-01-31
-**Test URL**: https://n-zero.dev/search?q=mecum
+**Test URL**: https://nuke.ag/search?q=mecum
 
 ## Executive Summary
 
@@ -112,5 +112,5 @@ npx tsx scripts/test-input-routing.ts
 
 ## Deployment
 
-- Frontend: Deployed to Vercel (https://n-zero.dev)
+- Frontend: Deployed to Vercel (https://nuke.ag)
 - Search function: Deployed to Supabase Edge Functions

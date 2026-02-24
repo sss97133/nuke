@@ -136,7 +136,7 @@ export default function MarketDetail() {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <Link to="/betting" className="text-blue-600 hover:underline mb-4 block">
+      <Link to="/predictions" className="text-blue-600 hover:underline mb-4 block">
         ← Back to markets
       </Link>
 

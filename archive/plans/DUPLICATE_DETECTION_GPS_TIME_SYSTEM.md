@@ -9,7 +9,7 @@
 
 ### The Two Profiles
 
-**Profile #1** ([https://n-zero.dev/vehicle/7b07531f-e73a-4adb-b52c-d45922063edf](https://n-zero.dev/vehicle/7b07531f-e73a-4adb-b52c-d45922063edf))
+**Profile #1** ([https://nuke.ag/vehicle/7b07531f-e73a-4adb-b52c-d45922063edf](https://nuke.ag/vehicle/7b07531f-e73a-4adb-b52c-d45922063edf))
 ```
 Year: 1964
 Make: CHEVROLET
@@ -22,7 +22,7 @@ Created: Sept 11, 2025
 Source: Manual entry
 ```
 
-**Profile #2** ([https://n-zero.dev/vehicle/0d45e7a8-48da-48b3-8c6d-dd29ab9a80f5](https://n-zero.dev/vehicle/0d45e7a8-48da-48b3-8c6d-dd29ab9a80f5))
+**Profile #2** ([https://nuke.ag/vehicle/0d45e7a8-48da-48b3-8c6d-dd29ab9a80f5](https://nuke.ag/vehicle/0d45e7a8-48da-48b3-8c6d-dd29ab9a80f5))
 ```
 Year: 1964
 Make: Chev

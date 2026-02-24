@@ -1,8 +1,8 @@
-# 🔍 USER POV FUNCTIONALITY AUDIT - n-zero.dev
+# 🔍 USER POV FUNCTIONALITY AUDIT - nuke.ag
 
 **Date:** October 25, 2025  
 **Bundle:** `index-BB5HYU31.js` (OLD - new code not deployed yet)  
-**Test URL:** https://n-zero.dev
+**Test URL:** https://nuke.ag
 
 ---
 

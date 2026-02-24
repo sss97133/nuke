@@ -167,7 +167,7 @@ async function printNextSteps(orgId) {
   console.log('🎉 Fantasy Junction organization created successfully!\n');
   console.log('📋 Next Steps:\n');
   console.log('1. View the organization:');
-  console.log(`   https://n-zero.dev/org/${orgId}\n`);
+  console.log(`   https://nuke.ag/org/${orgId}\n`);
   console.log('2. Import BaT listings (477 listings available):');
   console.log('   - Use the BaT Bulk Importer component on the org profile');
   console.log('   - Or use: entity-discovery edge function with username "fantasyjunction"\n');

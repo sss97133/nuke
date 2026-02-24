@@ -7,7 +7,7 @@
 ## ✅ PRODUCTION STATUS
 
 ```
-🌐 LIVE PRODUCTION URL: https://n-zero.dev
+🌐 LIVE PRODUCTION URL: https://nuke.ag
 ✅ Site Status: OPERATIONAL
 ✅ Frontend: React/TypeScript deployed
 ✅ Database: Supabase connected
@@ -70,13 +70,13 @@ EACH VEHICLE PAGE INCLUDES:
 ### **Visit the live site:**
 
 ```
-https://n-zero.dev
+https://nuke.ag
 ```
 
 ### **To see a vehicle with trading enabled:**
 
 ```
-1. Go to https://n-zero.dev
+1. Go to https://nuke.ag
 2. Browse vehicles (17 listed, 4 active)
 3. Click on any vehicle
 4. Scroll down to see TRADING TABS section
@@ -97,7 +97,7 @@ https://n-zero.dev
 ├─────────────────────────────────────────────┤
 │                                             │
 │  Frontend Layer (React/TypeScript)          │
-│  ├─ https://n-zero.dev/                    │
+│  ├─ https://nuke.ag/                    │
 │  ├─ Deployed to Vercel/Production server   │
 │  └─ Real-time WebSocket enabled            │
 │                                             │
@@ -138,7 +138,7 @@ CURRENT MARKET STATE:
   Volume Today: 450 shares
 
 USER FLOW:
-1. User visits https://n-zero.dev/vehicles/blazer-id
+1. User visits https://nuke.ag/vehicles/blazer-id
 2. Scrolls to trading tabs
 3. Clicks 📊 "PRICE TICKER"
 4. Sees: $108.50 with [BUY SHARES] button
@@ -239,7 +239,7 @@ BEHIND THE SCENES:
 
 ```
 STEP 1: SELLER LISTS VEHICLE
-  User logs into https://n-zero.dev
+  User logs into https://nuke.ag
   └─ Goes to their vehicle profile
   └─ Clicks "Start Trading" button
   └─ System creates vehicle_offerings record
@@ -394,7 +394,7 @@ Complete technical guides available:
 ### **What's Live Right Now:**
 
 ```
-🌐 URL: https://n-zero.dev
+🌐 URL: https://nuke.ag
 ✅ 17 vehicles listed
 ✅ 4 vehicles actively trading
 ✅ Real-time price ticker working
@@ -425,7 +425,7 @@ Complete technical guides available:
 
 **Access the Fractional Auction Market NOW:**
 
-👉 **https://n-zero.dev**
+👉 **https://nuke.ag**
 
 Browse 17 vehicles, click any one, scroll down to see the 4 trading tabs, and place your first order!
 

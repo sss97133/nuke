@@ -441,8 +441,8 @@ Prevent same receipt from being uploaded multiple times.
 ### Frontend
 ✅ Deployed: `TimelineEventReceipt.tsx` updated
 
-**Deployment URL**: https://nuke-h9i08qovl-nzero.vercel.app  
-**Production URL**: https://n-zero.dev
+**Deployment URL**: https://nuke-h9i08qovl-nuke.vercel.app  
+**Production URL**: https://nuke.ag
 
 ---
 

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'https://n-zero.dev';
+const BASE_URL = 'https://nuke.ag';
 
 test.describe('Full Platform Simulation', () => {
   test.setTimeout(120000); // 2 minute timeout

@@ -5,7 +5,7 @@ import { test, expect, Page } from 'playwright/test';
 // If the env var is not set, it uses a default development vehicle URL
 const VEHICLE_URL =
   process.env.PLAYWRIGHT_TIMELINE_VEHICLE_URL ||
-  'https://n-zero.dev/vehicle/05b2cc98-cd4f-4fb6-a17e-038d6664905e';
+  'https://nuke.ag/vehicle/05b2cc98-cd4f-4fb6-a17e-038d6664905e';
 
 async function openTimelineDossier(page: Page) {
   await page.goto(VEHICLE_URL, { waitUntil: 'networkidle' });

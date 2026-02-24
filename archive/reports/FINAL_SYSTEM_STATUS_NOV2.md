@@ -242,7 +242,7 @@ Adjusted Value = $25,000 + $20,543 = $45,543
 ## 🚀 What's Live Right Now
 
 **Visit Ernie's Upholstery:**  
-`https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41`
+`https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41`
 
 **You'll see:**
 - ✅ 273 work orders on green heatmap
@@ -256,7 +256,7 @@ Adjusted Value = $25,000 + $20,543 = $45,543
 - ✅ Quality ratings and value estimates
 
 **Visit 1974 Ford Bronco:**  
-`https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e`
+`https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e`
 
 **You'll see:**
 - ✅ 260 work orders linked to Ernie's

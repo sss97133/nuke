@@ -390,7 +390,7 @@ In the same session, we also shipped:
 - TypeScript: Clean (no type errors)
 - Tests: All passing
 - Deployment: Vercel production
-- URL: https://n-zero.dev
+- URL: https://nuke.ag
 - Status: **LIVE**
 
 ---

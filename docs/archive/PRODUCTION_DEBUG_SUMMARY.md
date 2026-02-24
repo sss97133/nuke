@@ -1,7 +1,7 @@
 # 🚨 PRODUCTION AUDIT & DEBUG - COMPLETE ANALYSIS
 
 **Date:** October 25, 2025  
-**Environment:** n-zero.dev  
+**Environment:** nuke.ag  
 **Commits:** 19 total pushed
 
 ---
@@ -274,7 +274,7 @@ Wait 2 minutes for deployment
 
 ### **Step 2: Test Production with Debug Logs**
 ```
-1. Open n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+1. Open nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 2. Click on blue truck image
 3. Open browser console
 4. Look for "🔍 TAG DEBUG:" output

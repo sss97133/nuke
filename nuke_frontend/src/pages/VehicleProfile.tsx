@@ -3697,7 +3697,7 @@ const VehicleProfile: React.FC = () => {
               )}
 
               {/* Deal Jacket Forensics — shows when forensic analysis has been done */}
-              <CollapsibleWidget title="Deal Jacket Forensics" defaultCollapsed={false}>
+              <CollapsibleWidget title="Deal Jacket Forensics" defaultCollapsed={true}>
                 <VehicleDealJacketForensicsCard vehicleId={vehicle.id} />
               </CollapsibleWidget>
 
@@ -4096,7 +4096,7 @@ const VehicleProfile: React.FC = () => {
           );
         })()}
 
-        {/* Live Auction Banner - Show if vehicle has active N-Zero auction */}
+        {/* Live Auction Banner - Show if vehicle has active Nuke auction */}
         {vehicle && (
           <LiveAuctionBanner vehicleId={vehicle.id} />
         )}

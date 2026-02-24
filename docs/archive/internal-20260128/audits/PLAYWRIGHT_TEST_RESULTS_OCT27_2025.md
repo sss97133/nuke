@@ -11,7 +11,7 @@
 
 ### Bundle Check:
 ```bash
-$ curl -s https://nuke-5jwweth5n-nzero.vercel.app | grep -o "index-[^\"']*\.js"
+$ curl -s https://nuke-5jwweth5n-nuke.vercel.app | grep -o "index-[^\"']*\.js"
 index-DaJD1E_Y.js  ✅ NEW BUNDLE DEPLOYED
 ```
 
@@ -28,11 +28,11 @@ index-DaJD1E_Y.js  ✅ NEW BUNDLE DEPLOYED
 
 **Verification:**
 - Page loads successfully
-- Title: "n-zero" ✅
-- URL: https://nuke-5jwweth5n-nzero.vercel.app/ ✅
+- Title: "nuke" ✅
+- URL: https://nuke-5jwweth5n-nuke.vercel.app/ ✅
 
 **UI Elements Verified:**
-- ✅ Navigation bar (n-zero logo, menu button, Login link)
+- ✅ Navigation bar (nuke logo, menu button, Login link)
 - ✅ Search bar with placeholder "Search..."
 - ✅ Vehicle stats: "19 vehicles · 4 active today"
 - ✅ Filter buttons: Recent, For Sale, Projects, Near Me
@@ -92,7 +92,7 @@ index-DaJD1E_Y.js  ✅ NEW BUNDLE DEPLOYED
 **Status:** ✅ PASS
 
 **Links Tested:**
-- ✅ n-zero logo → / (homepage)
+- ✅ nuke logo → / (homepage)
 - ✅ Home → /dashboard
 - ✅ Vehicles → /vehicles
 - ✅ Market → /market

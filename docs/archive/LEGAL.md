@@ -1,7 +1,7 @@
 # Legal Disclaimers & Terms
 
 **Effective Date:** October 24, 2025  
-**Platform:** Nuke (n-zero)
+**Platform:** Nuke (nuke)
 
 ---
 
@@ -322,9 +322,9 @@ If we are found liable, our maximum obligation is the lesser of:
 ## Contact & Legal Entity
 
 **Platform Operator:**  
-Nuke Platform (n-zero.dev)  
+Nuke Platform (nuke.ag)  
 Operating in Beta  
-[Email: legal@n-zero.dev]
+[Email: legal@nuke.ag]
 
 **Governing Law:**  
 These terms are governed by California law, excluding conflict of law provisions.

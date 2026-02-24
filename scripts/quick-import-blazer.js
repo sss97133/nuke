@@ -110,7 +110,7 @@ async function quickImport() {
     if (vehicle.condition_rating) console.log(`  Condition: ${vehicle.condition_rating}/10`);
     console.log('');
     
-    console.log(`🔗 Profile: https://n-zero.dev/vehicles/${result.vehicleId}`);
+    console.log(`🔗 Profile: https://nuke.ag/vehicles/${result.vehicleId}`);
   }
 }
 

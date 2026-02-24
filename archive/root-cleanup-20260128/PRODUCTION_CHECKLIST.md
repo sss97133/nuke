@@ -2,7 +2,7 @@
 
 ## 🎯 Quick Answer
 
-For **production** on `https://n-zero.dev`, you need these environment variables in **Vercel**:
+For **production** on `https://nuke.ag`, you need these environment variables in **Vercel**:
 
 ### Required (Must Have)
 
@@ -70,7 +70,7 @@ This shows all environment variables currently set in Vercel.
 
 After setting environment variables and redeploying:
 
-1. **Visit production site**: `https://n-zero.dev`
+1. **Visit production site**: `https://nuke.ag`
 2. **Open browser console** (F12)
 3. **Check for errors**: Should be no missing API URL errors
 4. **Test authentication**: Try logging in

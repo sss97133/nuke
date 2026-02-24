@@ -1,6 +1,6 @@
 # Invoice Manager - Visual Walkthrough
 
-**URL**: https://n-zero.dev/invoices  
+**URL**: https://nuke.ag/invoices  
 **Status**: ✅ Live in Production  
 
 ---
@@ -9,7 +9,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  [n-zero] [Home] [Vehicles] [Organizations] [Financials] 👤 Profile    ║
+║  [nuke] [Home] [Vehicles] [Organizations] [Financials] 👤 Profile    ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║                                                                          ║
 ║  INVOICE MANAGER                                                         ║

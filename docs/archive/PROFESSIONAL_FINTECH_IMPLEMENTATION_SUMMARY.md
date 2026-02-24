@@ -310,7 +310,7 @@ GROUP BY DATE(created_at);
    - Verify: Tables created, data migrated
 
 2. **Test Deposit Flow**
-   - Visit: https://n-zero.dev/portfolio
+   - Visit: https://nuke.ag/portfolio
    - Click: "Deposit"
    - Amount: $3
    - Complete Stripe checkout
@@ -384,7 +384,7 @@ New System (Now Primary):
 
 ### 2. Test Deposit
 ```bash
-1. Go to https://n-zero.dev/portfolio
+1. Go to https://nuke.ag/portfolio
 2. Click "Deposit"
 3. Enter $3
 4. Complete Stripe checkout with test card

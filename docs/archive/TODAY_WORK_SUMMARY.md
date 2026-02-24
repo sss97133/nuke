@@ -223,7 +223,7 @@ node scripts/backfill-all-images.js 10 1000
 If it crashes or you stop it, just run again - it skips images that have `ai_last_scanned`.
 
 ### ✅ Monitoring is Ready
-Check progress at: `https://n-zero.dev/admin`
+Check progress at: `https://nuke.ag/admin`
 
 Or query database:
 ```sql

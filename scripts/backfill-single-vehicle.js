@@ -196,7 +196,7 @@ async function auditAndBackfill() {
   await supabase.rpc('calculate_vehicle_quality_score', { p_vehicle_id: vehicleId });
   
   console.log('✅ Updates applied successfully!');
-  console.log(`   View: https://n-zero.dev/vehicle/${vehicleId}`);
+  console.log(`   View: https://nuke.ag/vehicle/${vehicleId}`);
   
   // Show new quality score
   const { data: newScore } = await supabase

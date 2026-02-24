@@ -61,7 +61,7 @@ curl https://api.anthropic.com/v1/messages \
 ## To View Dashboard
 
 You need to:
-1. Login at: https://n-zero.dev/login
+1. Login at: https://nuke.ag/login
 2. Navigate to: /admin/image-processing
 3. Or access admin panel and click "Image Processing"
 

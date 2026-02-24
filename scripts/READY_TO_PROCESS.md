@@ -21,7 +21,7 @@
 4. No setup needed!
 
 **Try it:**
-1. Go to https://n-zero.dev
+1. Go to https://nuke.ag
 2. Go to any vehicle
 3. Upload an image
 4. Wait 5-10 seconds

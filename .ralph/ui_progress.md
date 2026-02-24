@@ -184,7 +184,7 @@
 
 ### Latest Deployment
 
-**https://n-zero.dev** (nuke project) - Updated 2026-01-23 21:00 UTC
+**https://nuke.ag** (nuke project) - Updated 2026-01-23 21:00 UTC
 
 Previous deployments:
 - https://nuke-pmzzoaek6-nzero.vercel.app

@@ -2,8 +2,8 @@
 
 ## ✅ **DEPLOYED TO PRODUCTION**
 
-**New URL**: https://nuke-r6xijxhud-nzero.vercel.app  
-**Main URL**: https://n-zero.dev (updates in 2-3 min)
+**New URL**: https://nuke-r6xijxhud-nuke.vercel.app  
+**Main URL**: https://nuke.ag (updates in 2-3 min)
 
 **Changes live:**
 - ✅ UnifiedWorkOrderReceipt (new modal)
@@ -18,7 +18,7 @@
 
 **Navigate to:**
 ```
-https://n-zero.dev/vehicle/5a1deb95-4b67-4cc3-9575-23bb5b180693
+https://nuke.ag/vehicle/5a1deb95-4b67-4cc3-9575-23bb5b180693
 ```
 
 **Find section:**
@@ -51,7 +51,7 @@ https://n-zero.dev/vehicle/5a1deb95-4b67-4cc3-9575-23bb5b180693
 
 **Navigate to:**
 ```
-https://n-zero.dev/dealer-ai-assistant/[your-org-id]
+https://nuke.ag/dealer-ai-assistant/[your-org-id]
 ```
 
 **Drop CSV:**

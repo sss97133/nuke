@@ -194,7 +194,7 @@ async function linkVehiclesToViva() {
   console.log(`\n📊 Summary:`);
   console.log(`  • ${vehicleMap.size} vehicles linked`);
   console.log(`  • ${nearbyImages.length} images connected`);
-  console.log(`  • Check: https://n-zero.dev/org/${VIVA_ID}`);
+  console.log(`  • Check: https://nuke.ag/org/${VIVA_ID}`);
 }
 
 // Haversine distance formula (meters)

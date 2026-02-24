@@ -111,7 +111,7 @@ The homepage was showing:
 
 ## Testing
 
-**URL**: https://n-zero.dev
+**URL**: https://nuke.ag
 
 **Expected Behavior**:
 1. No hero carousel

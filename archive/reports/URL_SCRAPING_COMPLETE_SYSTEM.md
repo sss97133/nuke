@@ -101,14 +101,14 @@ Status: LIVE
 ```
 AddVehicle.tsx: DEPLOYED 3:05 PM
 Maps ALL 25+ fields
-Status: LIVE on https://n-zero.dev
+Status: LIVE on https://nuke.ag
 ```
 
 ---
 
 ## How to Use
 
-1. **Go to:** https://n-zero.dev/vehicles/new
+1. **Go to:** https://nuke.ag/vehicles/new
 2. **Paste URL:** https://lasvegas.craigslist.org/cto/d/pahrump-gmc-squarebody-short-bed/7893296003.html
 3. **Wait 2-3 seconds**
 4. **Watch form auto-fill** with 25+ fields!

@@ -71,7 +71,7 @@
 
 ## 🚀 DEPLOYMENT
 
-**Production URL:** https://nuke-9m3xcjca9-nzero.vercel.app  
+**Production URL:** https://nuke-9m3xcjca9-nuke.vercel.app  
 **Bundle Hash:** _next/static/chunks/...  
 
 **User-Visible Changes:**

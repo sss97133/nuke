@@ -420,7 +420,7 @@ while (retries > 0) {
 **Time:** ~15 seconds
 **Cost:** $0
 
-**Live:** https://n-zero.dev/vehicle/a609454a-8f30-4fbf-af10-e8cd915964e8
+**Live:** https://nuke.ag/vehicle/a609454a-8f30-4fbf-af10-e8cd915964e8
 
 This is the **production-ready, scale-ready solution** for KSL scraping! 🎉
 

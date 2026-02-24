@@ -25,7 +25,7 @@ tail -f /tmp/image-processing.log
 ```
 
 ### Dashboard:
-**https://n-zero.dev/admin/image-processing**
+**https://nuke.ag/admin/image-processing**
 
 ### Database Query:
 ```sql

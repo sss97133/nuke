@@ -13,14 +13,14 @@ In the Vercel Domains page that just opened:
 ### **2. Domain Name Suggestions**
 
 **Short & Professional:**
-- `nuke.app` - Clean, modern
+- `nuke.ag` - Clean, modern
 - `nukeauto.app` - Descriptive
 - `nukecars.app` - Clear purpose
 
 **Descriptive:**
 - `nukeplatform.com` - Professional
-- `getnuke.app` - Action-oriented
-- `usenuke.app` - Simple
+- `getnuke.ag` - Action-oriented
+- `usenuke.ag` - Simple
 
 **Fun/Memorable:**
 - `nukevehicles.com` - Clear
@@ -91,9 +91,9 @@ https://qkgaybvrernstplzjaam.supabase.co/auth/v1/callback
 ## 🎯 **MY RECOMMENDATION:**
 
 Try these in order (most to least preferred):
-1. `nuke.app` - Perfect if available
+1. `nuke.ag` - Perfect if available
 2. `nukeauto.app` - Clear and professional
-3. `getnuke.app` - Action-oriented
+3. `getnuke.ag` - Action-oriented
 4. `nukeplatform.com` - Descriptive
 
 **Pick one and buy it now!** 🚀

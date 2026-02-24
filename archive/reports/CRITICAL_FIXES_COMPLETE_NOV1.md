@@ -134,7 +134,7 @@ Continue with TODOs 2-10:
 
 ## 📝 DEPLOYMENT STATUS
 
-✅ **Frontend deployed**: https://n-zero.dev  
+✅ **Frontend deployed**: https://nuke.ag  
 ✅ **Cache-busting**: `deployment-force` = `critical-fixes-nov1-pipeline`  
 ✅ **Edge Function deployed**: `extract-receipt-data`  
 ✅ **Expert agent deployed**: `vehicle-expert-agent`

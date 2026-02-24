@@ -267,7 +267,7 @@ vehicle_timeline_events {
 ## Deployment
 
 **Status**: ✅ Live on production  
-**URL**: https://n-zero.dev  
+**URL**: https://nuke.ag  
 **Deployment**: Oct 31, 2025  
 **Bundle**: Reduced by 26KB (removed bloated components)
 

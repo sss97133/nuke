@@ -573,7 +573,7 @@ const colorForHours = (h: number) => {
 ## ✅ USER FLOWS - COMPREHENSIVE TEST
 
 ### **Flow 1: Customer Requests Work**
-1. ✅ Visit org profile (https://n-zero.dev/org/xxx)
+1. ✅ Visit org profile (https://nuke.ag/org/xxx)
 2. ✅ Click "Request Work"
 3. ✅ Select vehicle from dropdown
 4. ✅ Enter work description

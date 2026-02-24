@@ -132,7 +132,7 @@ async function deleteAndReextract(listingUrl) {
   if (result.created_vehicle_ids && result.created_vehicle_ids.length > 0) {
     const vehicleId = result.created_vehicle_ids[0];
     console.log(`\n✅ New vehicle ID: ${vehicleId}`);
-    console.log(`   View at: https://n-zero.dev/vehicle/${vehicleId}`);
+    console.log(`   View at: https://nuke.ag/vehicle/${vehicleId}`);
   }
   
   console.log('\n✅ Done!\n');

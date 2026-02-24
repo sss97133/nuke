@@ -114,7 +114,7 @@
 
 ## 🚀 DEPLOYMENT
 
-✅ **Frontend**: https://n-zero.dev  
+✅ **Frontend**: https://nuke.ag  
 ✅ **Cache**: `all-fixes-complete-nov1-v2`  
 ✅ **Edge Functions**:
 - `extract-receipt-data` (AI parsing)

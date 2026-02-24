@@ -146,7 +146,7 @@ async function importAllListings() {
     });
   }
 
-  console.log(`\n✨ Import complete! Check https://n-zero.dev/org/${VIVA_ORG_ID}`);
+  console.log(`\n✨ Import complete! Check https://nuke.ag/org/${VIVA_ORG_ID}`);
 }
 
 importAllListings().catch(console.error);

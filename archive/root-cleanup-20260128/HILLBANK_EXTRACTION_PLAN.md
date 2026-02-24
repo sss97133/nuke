@@ -37,7 +37,7 @@ Or use the Supabase SQL editor to run the queries from `scripts/get_hillbank_inv
 The SQL query provides:
 
 1. **Counts** - For sale vs sold vehicles
-2. **All Vehicle URLs** - Both n-zero.dev and external URLs
+2. **All Vehicle URLs** - Both nuke.ag and external URLs
 3. **Prices** - Asking price, current value, sale price
 4. **Y/M/M** - Year, Make, Model, Trim, VIN, Mileage
 5. **Descriptions** - Full vehicle descriptions

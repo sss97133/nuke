@@ -30,7 +30,7 @@ type State =
 const RESERVED_SUBDOMAINS = new Set(['www', 'app', 'admin', 'api', 'staging', 'dev']);
 
 // Known production domains — everything before these is a subdomain
-const ROOT_DOMAINS = ['nuke.dev', 'n-zero.app', 'vercel.app'];
+const ROOT_DOMAINS = ['nuke.ag', 'vercel.app'];
 
 function extractSubdomain(hostname: string): string | null {
   // Local dev: support ?storefront=slug query param

@@ -1,7 +1,7 @@
 # Truth-Based Valuation Engine - Audit & Test Plan
 
 ## ✅ DEPLOYED TO PRODUCTION
-**URL:** https://n-zero.dev
+**URL:** https://nuke.ag
 
 ## What Changed
 
@@ -113,7 +113,7 @@ System automatically detects:
 
 ### Test 1: Basic Valuation (Your Bronco)
 
-1. Go to: `https://n-zero.dev/vehicle/eea40748-cdc1-4ae9-ade1-4431d14a7726`
+1. Go to: `https://nuke.ag/vehicle/eea40748-cdc1-4ae9-ade1-4431d14a7726`
 2. Scroll to "Valuation Breakdown" card
 3. **Check numbers:**
    - Purchase Price: Should show $75,000

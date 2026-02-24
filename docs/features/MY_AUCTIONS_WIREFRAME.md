@@ -1,7 +1,7 @@
 # My Auctions - Comprehensive Wireframe & Backend
 
 ## Overview
-"My Auctions" is a unified hub for tracking ALL vehicle listings across ALL platforms. Users can monitor their listings on Bring a Trailer, eBay, Cars & Bids, Hemmings, AutoTrader, Facebook Marketplace, and n-zero itself - all in one place. The goal is to become the ONLY place users check for their auction activity.
+"My Auctions" is a unified hub for tracking ALL vehicle listings across ALL platforms. Users can monitor their listings on Bring a Trailer, eBay, Cars & Bids, Hemmings, AutoTrader, Facebook Marketplace, and nuke itself - all in one place. The goal is to become the ONLY place users check for their auction activity.
 
 ---
 
@@ -20,7 +20,7 @@ Unlike platform-specific dashboards, "My Auctions" is:
 ## Supported Platforms
 
 ### Primary Platforms
-1. **n-zero** - Native platform auctions
+1. **nuke** - Native platform auctions
 2. **Bring a Trailer (BaT)** - Premium auction platform
 3. **eBay Motors** - Large marketplace
 4. **Cars & Bids** - Modern auction platform
@@ -31,7 +31,7 @@ Unlike platform-specific dashboards, "My Auctions" is:
 9. **Cars.com** - Traditional classifieds
 
 ### Platform Status
-- **Fully Integrated**: n-zero, BaT (via scraping/sync)
+- **Fully Integrated**: nuke, BaT (via scraping/sync)
 - **Export Ready**: eBay, Craigslist, Cars.com, Facebook
 - **Manual Entry**: Hemmings, AutoTrader (until API access)
 
@@ -73,7 +73,7 @@ Unlike platform-specific dashboards, "My Auctions" is:
 │                                                         │
 │  ┌─────────────────────────────────────────────────┐  │
 │  │ LISTING CARD                                      │  │
-│  │ [Platform Badge: n-zero] [Status: Active]       │  │
+│  │ [Platform Badge: nuke] [Status: Active]       │  │
 │  │                                                  │  │
 │  │ [Vehicle Image]  1980 Chevrolet Silverado       │  │
 │  │                  Current Bid: $12,500           │  │
@@ -146,7 +146,7 @@ Unlike platform-specific dashboards, "My Auctions" is:
 ### 6. **Quick Actions**
 - **[View Listing]** - Open on platform
 - **[Sync Now]** - Manually refresh data
-- **[Edit]** - Edit listing (if n-zero)
+- **[Edit]** - Edit listing (if nuke)
 - **[Analytics]** - Detailed performance
 - **[Export Data]** - Download listing data
 
@@ -247,7 +247,7 @@ When clicking a listing card, show expanded view:
 - **Data Captured**: Bid count, current bid
 - **Status Detection**: Active, Ended, Sold
 
-### n-zero (Native)
+### nuke (Native)
 **Integration Method**: Direct database access
 - **Sync Frequency**: Real-time (via Supabase realtime)
 - **Data Captured**: Full auction data
@@ -267,7 +267,7 @@ When clicking a listing card, show expanded view:
 
 1. **`listing_exports`** - Export tracking
    - `id`, `vehicle_id`, `user_id`
-   - `platform` (nzero, bat, ebay, etc.)
+   - `platform` (nuke, bat, ebay, etc.)
    - `status` (prepared, submitted, active, sold, expired)
    - `external_listing_url`, `external_listing_id`
    - `asking_price_cents`, `reserve_price_cents`
@@ -283,7 +283,7 @@ When clicking a listing card, show expanded view:
    - `final_price`, `sold_at`
    - `sync_enabled`, `last_synced_at`
 
-3. **`vehicle_listings`** - n-zero native listings
+3. **`vehicle_listings`** - nuke native listings
    - `id`, `vehicle_id`, `seller_id`
    - `sale_type` (auction, live_auction)
    - `current_high_bid_cents`, `reserve_price_cents`
@@ -350,13 +350,13 @@ CREATE INDEX IF NOT EXISTS idx_sync_log_synced ON listing_sync_log(synced_at DES
 #### 3. **`unified_listings_view`** (Materialized View)
 ```sql
 CREATE MATERIALIZED VIEW IF NOT EXISTS unified_listings_view AS
--- Native n-zero listings
+-- Native nuke listings
 SELECT 
   'native' as listing_source,
   vl.id as listing_id,
   vl.vehicle_id,
   vl.seller_id as user_id,
-  'nzero' as platform,
+  'nuke' as platform,
   vl.status as listing_status,
   vl.current_high_bid_cents / 100.0 as current_bid,
   vl.reserve_price_cents / 100.0 as reserve_price,
@@ -584,7 +584,7 @@ export class MyAuctionsService {
 ### 5. **Quick Actions**
 - View on platform
 - Sync now
-- Edit listing (n-zero)
+- Edit listing (nuke)
 - Export data
 - Analytics
 
@@ -633,7 +633,7 @@ export class MyAuctionsService {
 ## Integration Points
 
 - **Vehicle Profile**: Link to vehicle's listings
-- **Auction Marketplace**: Native n-zero listings
+- **Auction Marketplace**: Native nuke listings
 - **Listing Preparation**: Export to platforms
 - **Analytics Dashboard**: Performance metrics
 - **Notifications**: Alert system
@@ -645,7 +645,7 @@ export class MyAuctionsService {
 **Goal**: Become the ONLY place users check for auction activity
 
 1. **Real-time Updates**: Live bid tracking across platforms
-2. **Unified Bidding**: Bid on any platform from n-zero
+2. **Unified Bidding**: Bid on any platform from nuke
 3. **Smart Insights**: AI-powered listing optimization
 4. **Cross-Platform Analytics**: Compare performance across platforms
 5. **Automated Management**: Auto-sync, auto-update, auto-optimize

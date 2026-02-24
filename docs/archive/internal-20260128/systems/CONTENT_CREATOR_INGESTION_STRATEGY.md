@@ -9,7 +9,7 @@ Ingest data from automotive content creators (YouTubers, TikTokers, Instagram in
 - **`profiles` table**: User profiles (content creators are just users)
 - **`businesses` table**: Organizations (users can create organizations)
 - **`external_identities` table**: Already supports platforms like 'youtube', 'instagram', 'tiktok'
-- **`external_identity_claims`**: Proof-backed claiming system for linking external accounts to N-Zero users
+- **`external_identity_claims`**: Proof-backed claiming system for linking external accounts to Nuke users
 - **`vehicles` table**: Comprehensive vehicle data with provenance tracking
 - **`organization_vehicles`**: Links vehicles to organizations (data sources)
 - **`timeline_events`**: Vehicle history tracking
@@ -448,7 +448,7 @@ ADD COLUMN IF NOT EXISTS creator_content_id UUID REFERENCES creator_content(id) 
    - User corrections count
 
 3. **Engagement**
-   - Content views on N-Zero
+   - Content views on Nuke
    - User interactions with creator content
    - Vehicle profile views from content
 

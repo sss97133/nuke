@@ -10,7 +10,7 @@
 
 ### **1. Bundle Verification** ✅
 ```bash
-curl https://n-zero.dev | grep index
+curl https://nuke.ag | grep index
 
 Old: index-C85QmFI6.js ❌
 New: index-BJvHmMy1.js ✅
@@ -18,7 +18,7 @@ Newest: index-BhmU__gq.js ✅ (latest deployment)
 ```
 
 ### **2. Production-First Testing** ✅
-- Tested actual `n-zero.dev` (not localhost)
+- Tested actual `nuke.ag` (not localhost)
 - Hard refreshed multiple times
 - Verified bundle changed each deployment
 

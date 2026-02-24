@@ -1,13 +1,68 @@
 import { supabase } from '../lib/supabase';
-import type { 
-  Business, 
-  BusinessFormData, 
-  BusinessOwnership, 
-  BusinessUserRole, 
+import type {
+  Business,
+  Organization,
+  BusinessFormData,
+  BusinessOwnership,
+  BusinessUserRole,
   BusinessVehicleFleet,
-  BusinessTimelineEvent 
+  BusinessTimelineEvent,
+  EntityType,
 } from '../types/business';
 
+// OrganizationService — queries the organizations table directly
+export class OrganizationService {
+  static async getById(id: string): Promise<Organization | null> {
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw new Error(`Failed to fetch organization: ${error.message}`);
+    }
+    return data;
+  }
+
+  static async search(query: string, filters: {
+    entity_type?: EntityType;
+    city?: string;
+    state?: string;
+  } = {}): Promise<Organization[]> {
+    const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
+    let qb = supabase
+      .from('organizations')
+      .select('*')
+      .eq('is_public', true);
+
+    if (query) {
+      const safe = escapeILike(query);
+      qb = qb.or(`business_name.ilike.%${safe}%,description.ilike.%${safe}%`);
+    }
+    if (filters.entity_type) qb = qb.eq('entity_type', filters.entity_type);
+    if (filters.city) qb = qb.eq('city', filters.city);
+    if (filters.state) qb = qb.eq('state', filters.state);
+
+    const { data, error } = await qb.order('business_name').limit(50);
+    if (error) throw new Error(`Failed to search organizations: ${error.message}`);
+    return data || [];
+  }
+
+  static async getByEntityType(entityType: EntityType): Promise<Organization[]> {
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('entity_type', entityType)
+      .eq('is_public', true)
+      .order('business_name')
+      .limit(100);
+    if (error) throw new Error(`Failed to fetch by entity type: ${error.message}`);
+    return data || [];
+  }
+}
+
+// Backward compat: BusinessService still queries via the businesses VIEW
 export class BusinessService {
   
   /**

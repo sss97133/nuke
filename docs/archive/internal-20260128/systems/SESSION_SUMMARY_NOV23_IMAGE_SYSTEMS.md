@@ -161,7 +161,7 @@ nuke_frontend/src/components/image/ImageLightbox.tsx
 - ✅ No linter errors
 - ✅ TypeScript clean
 - ✅ Production deployed
-- ✅ Live on https://n-zero.dev
+- ✅ Live on https://nuke.ag
 
 **Status**: FULLY DEPLOYED TO PRODUCTION
 

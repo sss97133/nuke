@@ -6,7 +6,7 @@
 
 const https = require('https');
 
-const PRODUCTION_URL = 'https://nukefrontend-6dnwc1mpd-nzero.vercel.app';
+const PRODUCTION_URL = 'https://nukefrontend-6dnwc1mpd-nuke.vercel.app';
 const tests = [];
 
 function test(name, fn) {
@@ -59,7 +59,7 @@ test('HTML contains React root', async () => {
 
 test('Supabase edge functions reachable', async () => {
   // Test if Supabase project is reachable
-  const projectUrl = 'https://nuke-5jwweth5n-nzero.vercel.app';
+  const projectUrl = 'https://nuke-5jwweth5n-nuke.vercel.app';
   try {
     const res = await httpGet(projectUrl);
     log(`Supabase project status: ${res.status}`, 'info');

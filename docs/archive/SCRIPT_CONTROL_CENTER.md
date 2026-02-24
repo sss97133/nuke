@@ -2,7 +2,7 @@
 
 ## Access It
 
-**URL:** https://n-zero.dev/admin/scripts
+**URL:** https://nuke.ag/admin/scripts
 
 ## What It Shows
 

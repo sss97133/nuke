@@ -48,7 +48,7 @@
 
 1. **Go to Desert Performance**
    ```
-   https://n-zero.dev/org/10e77f53-c8d3-445e-b0dd-c518e6637e31
+   https://nuke.ag/org/10e77f53-c8d3-445e-b0dd-c518e6637e31
    ```
 
 2. **Click "Images" Tab**
@@ -292,9 +292,9 @@ if (scanResult.tags.includes('engine_rebuild')) {
 **Edge Function**: `scan-organization-image` ✅
 **Migration**: `organization_image_scanning_fixed` ✅
 
-**Live at**: https://n-zero.dev
+**Live at**: https://nuke.ag
 
-**Test org**: https://n-zero.dev/org/10e77f53-c8d3-445e-b0dd-c518e6637e31
+**Test org**: https://nuke.ag/org/10e77f53-c8d3-445e-b0dd-c518e6637e31
 
 **Ready for testing!** 🚀
 

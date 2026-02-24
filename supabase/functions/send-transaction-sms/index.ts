@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Transaction not found' }, 404)
     }
 
-    const baseUrl = Deno.env.get('FRONTEND_URL') || 'https://n-zero.dev'
+    const baseUrl = Deno.env.get('FRONTEND_URL') || 'https://nuke.ag'
     const vehicleName = `${transaction.vehicle?.year} ${transaction.vehicle?.make} ${transaction.vehicle?.model}`
     
     const results = []
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       const carrierPhoneValue = carrier_phone || ''
       
       if (transaction.buyer_phone) {
-        const message = `🚚 Carrier assigned for ${vehicleName}!\n\nCarrier: ${carrierNameValue}${carrierPhoneValue ? `\nPhone: ${carrierPhoneValue}` : ''}\n\nTrack at: ${baseUrl}/transaction/${transaction_id}\n\n-n-zero.dev`
+        const message = `🚚 Carrier assigned for ${vehicleName}!\n\nCarrier: ${carrierNameValue}${carrierPhoneValue ? `\nPhone: ${carrierPhoneValue}` : ''}\n\nTrack at: ${baseUrl}/transaction/${transaction_id}\n\n-nuke.ag`
         
         try {
           const twilioResponse = await sendTwilioSMS(transaction.buyer_phone, message)
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       const deliveryDateValue = delivery_date || 'soon'
       
       if (transaction.buyer_phone) {
-        const message = `✅ Your ${vehicleName} has been picked up!\n\nIn transit now. ETA: ${deliveryDateValue}\n\nTrack: ${baseUrl}/transaction/${transaction_id}\n\n-n-zero.dev`
+        const message = `✅ Your ${vehicleName} has been picked up!\n\nIn transit now. ETA: ${deliveryDateValue}\n\nTrack: ${baseUrl}/transaction/${transaction_id}\n\n-nuke.ag`
         
         try {
           const twilioResponse = await sendTwilioSMS(transaction.buyer_phone, message)
@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
     } else if (notification_type === 'delivered') {
       // Vehicle delivered notification
       if (transaction.buyer_phone) {
-        const message = `🎉 Your ${vehicleName} has been delivered!\n\nTransaction complete. Enjoy your vehicle!\n\nRate your experience: ${baseUrl}/transaction/${transaction_id}/review\n\n-n-zero.dev`
+        const message = `🎉 Your ${vehicleName} has been delivered!\n\nTransaction complete. Enjoy your vehicle!\n\nRate your experience: ${baseUrl}/transaction/${transaction_id}/review\n\n-nuke.ag`
         
         try {
           const twilioResponse = await sendTwilioSMS(transaction.buyer_phone, message)
@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
     } else if (notification_type === 'sign_request') {
       // SMS to buyer
       if (transaction.buyer_phone) {
-        const buyerMessage = `🚗 Sign your purchase agreement for ${vehicleName}!\n\nView & sign: ${baseUrl}/sign/${transaction.buyer_sign_token}\n\n-n-zero.dev`
+        const buyerMessage = `🚗 Sign your purchase agreement for ${vehicleName}!\n\nView & sign: ${baseUrl}/sign/${transaction.buyer_sign_token}\n\n-nuke.ag`
         
         try {
           const twilioResponse = await sendTwilioSMS(transaction.buyer_phone, buyerMessage)
@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
       // SMS to seller
       if (transaction.seller_phone) {
         const sellerName = transaction.buyer?.raw_user_meta_data?.full_name || 'A buyer'
-        const sellerMessage = `🚗 ${sellerName} wants to buy your ${vehicleName}!\n\nSign bill of sale: ${baseUrl}/sign/${transaction.seller_sign_token}\n\n-n-zero.dev`
+        const sellerMessage = `🚗 ${sellerName} wants to buy your ${vehicleName}!\n\nSign bill of sale: ${baseUrl}/sign/${transaction.seller_sign_token}\n\n-nuke.ag`
         
         try {
           const twilioResponse = await sendTwilioSMS(transaction.seller_phone, sellerMessage)
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
       
       // SMS to buyer
       if (transaction.buyer_phone) {
-        const buyerMessage = `✅ All documents signed for ${vehicleName}!\n\nNext: Wire ${salePrice} to seller. Check your email for payment instructions.\n\n-n-zero.dev`
+        const buyerMessage = `✅ All documents signed for ${vehicleName}!\n\nNext: Wire ${salePrice} to seller. Check your email for payment instructions.\n\n-nuke.ag`
         
         try {
           await sendTwilioSMS(transaction.buyer_phone, buyerMessage)
@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
 
       // SMS to seller
       if (transaction.seller_phone) {
-        const sellerMessage = `✅ All documents signed for ${vehicleName}!\n\nBuyer will send ${salePrice}. Mark as paid in your dashboard once received.\n\n-n-zero.dev`
+        const sellerMessage = `✅ All documents signed for ${vehicleName}!\n\nBuyer will send ${salePrice}. Mark as paid in your dashboard once received.\n\n-nuke.ag`
         
         try {
           await sendTwilioSMS(transaction.seller_phone, sellerMessage)

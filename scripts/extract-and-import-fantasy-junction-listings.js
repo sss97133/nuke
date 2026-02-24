@@ -362,7 +362,7 @@ async function main() {
       console.log('\n✅ Import complete!\n');
     }
     
-    console.log(`View organization: https://n-zero.dev/org/${ORG_ID}\n`);
+    console.log(`View organization: https://nuke.ag/org/${ORG_ID}\n`);
 
   } catch (err) {
     console.error('\n❌ Fatal error:', err.message);

@@ -36,7 +36,7 @@ function normalizeSources(sources: Array<string | null | undefined>, size: Image
   return out;
 }
 
-const DEFAULT_PLACEHOLDER = '/n-zero.png';
+const DEFAULT_PLACEHOLDER = '/nuke.png';
 
 // Shared preload cache to avoid duplicate preloads
 const preloadedUrls = new Set<string>();

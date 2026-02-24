@@ -140,7 +140,7 @@ STRIPE_SECRET_KEY=sk_live_...
 
 ### Dual Revenue Streams
 
-**1. N-Zero Auctions (Direct)**
+**1. Nuke Auctions (Direct)**
 - Commission: 3-5%
 - Deposit: 10% (configurable)
 - Settlement: Automatic
@@ -155,7 +155,7 @@ STRIPE_SECRET_KEY=sk_live_...
 ### Monthly Projections
 
 **100 Vehicles:**
-- 30 N-Zero auctions @ $25k avg = $22,500 (3%)
+- 30 Nuke auctions @ $25k avg = $22,500 (3%)
 - 70 exports @ 30% conversion = $15,750 (1.5%)
 - **Total: $38,250/month = $459k/year**
 

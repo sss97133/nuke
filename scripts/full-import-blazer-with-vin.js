@@ -98,7 +98,7 @@ async function fullImport() {
   }
   console.log('');
   
-  console.log(`🔗 Profile: https://n-zero.dev/vehicle/${result.vehicleId}`);
+  console.log(`🔗 Profile: https://nuke.ag/vehicle/${result.vehicleId}`);
   console.log('═══════════════════════════════════════════════════════════\n');
 }
 

@@ -10,7 +10,7 @@
 
 ### **1. CHECK IF NEW CODE IS LIVE:**
 
-Visit: https://n-zero.dev/?t=123456
+Visit: https://nuke.ag/?t=123456
 
 **Look for:**
 - New bundle hash in console
@@ -21,7 +21,7 @@ Visit: https://n-zero.dev/?t=123456
 
 ### **2. TEST SPATIAL WORKFLOW:**
 
-**Go to:** https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+**Go to:** https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 
 **Steps:**
 1. **Scroll down** to image gallery

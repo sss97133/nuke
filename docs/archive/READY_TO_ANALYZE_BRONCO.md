@@ -23,7 +23,7 @@
 ### Method 1: Browser Console (Easiest)
 
 1. Go to the Bronco's vehicle profile page:
-   https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
+   https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
 
 2. Open browser console (F12)
 

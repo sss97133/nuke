@@ -263,6 +263,6 @@ event_date: new Date(eventDate).toISOString().split('T')[0], // ✅ EXIF date
 ---
 
 **Status:** Deployed, waiting for feedback  
-**URL:** https://n-zero.dev (test on your phone)  
+**URL:** https://nuke.ag (test on your phone)  
 **Next:** Fix whatever breaks based on your testing
 

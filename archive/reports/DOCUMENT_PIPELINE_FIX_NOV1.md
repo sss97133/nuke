@@ -165,7 +165,7 @@ window.dispatchEvent(new Event('vehicle_valuation_updated'));
 
 ## Testing Checklist
 
-### Test on Mobile (n-zero.dev):
+### Test on Mobile (nuke.ag):
 1. Navigate to 1932 Ford Roadster vehicle
 2. Tap "Upload Doc" button
 3. Select "Receipt" category
@@ -238,7 +238,7 @@ WHERE id = '21ee373f-765e-4e24-a69d-e59e2af4f467';
 - ✅ Updates vehicle value in real-time
 - ✅ Refreshes UI automatically
 
-**Deployment**: ✅ Deployed to production at https://n-zero.dev
+**Deployment**: ✅ Deployed to production at https://nuke.ag
 
 **Cache-busting**: ✅ `deployment-force` meta tag updated
 

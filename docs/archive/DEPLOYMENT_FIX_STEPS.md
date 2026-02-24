@@ -11,10 +11,10 @@
 ✅ **Code Status**: All features implemented and committed  
 ✅ **Database**: Schema deployed with RLS policies  
 ✅ **Build Config**: Correct (vercel.json)  
-⚠️ **Production URL**: https://n-zero.vercel.app returns 404
+⚠️ **Production URL**: https://nuke.vercel.app returns 404
 
 ```bash
-$ curl -I https://n-zero.vercel.app
+$ curl -I https://nuke.vercel.app
 HTTP/2 404 
 x-vercel-error: DEPLOYMENT_NOT_FOUND
 ```
@@ -25,7 +25,7 @@ x-vercel-error: DEPLOYMENT_NOT_FOUND
 
 ### Option A: Check Vercel Dashboard
 1. Go to https://vercel.com/dashboard
-2. Look for "nuke" or "n-zero" project
+2. Look for "nuke" or "nuke" project
 3. Check if project exists and is active
 4. Verify current deployment URL
 
@@ -85,7 +85,7 @@ cd /Users/skylar/nuke/nuke_frontend
 vercel --prod --yes
 
 # Follow prompts:
-# - Project name: nuke (or n-zero)
+# - Project name: nuke (or nuke)
 # - Framework: Vite
 # - Root directory: nuke_frontend
 # - Build command: npm run build
@@ -97,7 +97,7 @@ vercel --prod --yes
 If project exists but domain doesn't work:
 
 1. Go to Vercel dashboard > Project Settings > Domains
-2. Add domain: `n-zero.vercel.app`
+2. Add domain: `nuke.vercel.app`
 3. OR note the actual production URL (e.g., `nuke-xyz123.vercel.app`)
 4. Update documentation with correct URL
 

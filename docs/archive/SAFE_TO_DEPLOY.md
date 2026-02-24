@@ -13,7 +13,7 @@
 
 ### What's Live Now:
 
-**Production URL:** https://n-zero.dev
+**Production URL:** https://nuke.ag
 
 **New pages available:**
 - `/admin/image-processing` - Processing dashboard
@@ -27,9 +27,9 @@
 
 ### For You (Admin):
 
-1. Go to: **https://n-zero.dev/admin**
+1. Go to: **https://nuke.ag/admin**
 2. Navigate to image processing section
-3. Or direct: **https://n-zero.dev/admin/image-processing**
+3. Or direct: **https://nuke.ag/admin/image-processing**
 
 Should see empty dashboard (normal - no processing yet)
 

@@ -2,7 +2,7 @@
 
 **Date:** November 4, 2025 12:30 AM  
 **Status:** PRODUCTION DEPLOYED  
-**URL:** https://n-zero.dev  
+**URL:** https://nuke.ag  
 **Bundle:** assets/index-BLjyO2TA.js
 
 ---
@@ -234,7 +234,7 @@ const MobileOverviewTab = React.memo(({ ... }) => {
 ## 🧪 Test It Yourself
 
 **On your phone:**
-1. Go to https://n-zero.dev
+1. Go to https://nuke.ag
 2. Open any vehicle (Bronco, K5, etc.)
 3. Swipe the hero image → **Feel the smoothness**
 4. Tap an image in gallery → Fullscreen viewer
@@ -279,7 +279,7 @@ const MobileOverviewTab = React.memo(({ ... }) => {
 - ✅ All tabs memoized
 - ✅ Trading moved to separate tab
 - ✅ Bundle: index-BLjyO2TA.js (2.44MB)
-- ✅ Deploy verified: https://n-zero.dev
+- ✅ Deploy verified: https://nuke.ag
 
 **Database:**
 - No changes needed (all UI)
@@ -327,7 +327,7 @@ const MobileOverviewTab = React.memo(({ ... }) => {
 ---
 
 **Status:** ✅ DEPLOYED & READY TO TEST  
-**Test URL:** https://n-zero.dev (on your phone)  
+**Test URL:** https://nuke.ag (on your phone)  
 **Feel:** Should be Instagram-smooth now ✨
 
 ---

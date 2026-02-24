@@ -9,7 +9,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 const DROPBOX_APP_KEY = Deno.env.get('DROPBOX_APP_KEY');
 const DROPBOX_APP_SECRET = Deno.env.get('DROPBOX_APP_SECRET');
-const REDIRECT_URI = 'https://n-zero.dev/dropbox/callback';
+const REDIRECT_URI = 'https://nuke.ag/dropbox/callback';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {

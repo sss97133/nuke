@@ -253,7 +253,7 @@ Tested on **Ernies Upholstery** (Non-owner):
 - ✅ First contributor edit access
 
 ### ✅ **Data Edge Cases**
-- ✅ Vehicles without images (n-zero.png placeholder)
+- ✅ Vehicles without images (nuke.png placeholder)
 - ✅ Vehicles with multiple relationship types
 - ✅ Images with GPS vs without GPS
 - ✅ Images with `taken_at` vs `uploaded_at` only
@@ -333,13 +333,13 @@ All identified issues during development were resolved:
 
 ### ✅ **Bundle Deployed**
 ```bash
-$ curl -s https://n-zero.dev | grep -o 'index-[^.]*\.js' | head -1
+$ curl -s https://nuke.ag | grep -o 'index-[^.]*\.js' | head -1
 index-CRMKDAjZ.js
 ```
 
 ### ✅ **URLs Tested**
-- https://n-zero.dev/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf (Viva! Las Vegas Autos)
-- https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41 (Ernies Upholstery)
+- https://nuke.ag/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf (Viva! Las Vegas Autos)
+- https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41 (Ernies Upholstery)
 
 ### ✅ **Console Logs**
 - No errors

@@ -99,7 +99,7 @@ vercel logs <deployment-url>  # View deployment logs
 - `STRIPE_SECRET_KEY` - Stripe secret key (Edge Functions only)
 
 **Access Levels:**
-- Production: Live site (n-zero.dev)
+- Production: Live site (nuke.ag)
 - Preview: Pull request deployments
 - Development: Local development
 
@@ -434,8 +434,8 @@ cd nuke_frontend && npm run build
 - **Database:** PostgreSQL (managed by Supabase)
 
 ### Vercel Project
-- **Project Name:** `nuke` or `n-zero`
-- **Production URL:** `https://n-zero.dev`
+- **Project Name:** `nuke` or `nuke`
+- **Production URL:** `https://nuke.ag`
 - **Framework:** Vite (React)
 - **Build Command:** `cd nuke_frontend && npm run build`
 

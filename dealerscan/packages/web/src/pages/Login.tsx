@@ -4,7 +4,7 @@ import { getSupabase } from '@dealerscan/shared'
 import { FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// OAuth must return HERE, not to n-zero. Supabase only honors redirectTo if the URL is in Auth → URL Configuration → Redirect URLs.
+// OAuth must return HERE, not to Nuke. Supabase only honors redirectTo if the URL is in Auth → URL Configuration → Redirect URLs.
 function getRedirectBase(): string {
   if (typeof window === 'undefined') return (import.meta.env.VITE_DEALERSCAN_APP_URL as string) || ''
   const env = import.meta.env.VITE_DEALERSCAN_APP_URL as string

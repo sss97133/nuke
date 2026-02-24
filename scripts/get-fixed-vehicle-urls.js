@@ -43,7 +43,7 @@ async function getRecentlyFixedVehicles() {
     const sourceType = sourceUrl?.includes('bringatrailer.com') ? 'BaT' : 'Other';
 
     console.log(`\n${i + 1}. ${vehicle.year} ${vehicle.make} ${vehicle.model} [${sourceType}]`);
-    console.log(`   📱 UI URL: https://n-zero.dev/vehicles/${vehicle.id}`);
+    console.log(`   📱 UI URL: https://nuke.ag/vehicles/${vehicle.id}`);
     console.log(`   🔗 Source: ${sourceUrl}`);
     console.log(`   💾 Fixed Data:`);
     console.log(`      VIN: ${vehicle.vin || 'null'}`);
@@ -58,7 +58,7 @@ async function getRecentlyFixedVehicles() {
 
   // Show first 5 as quick links
   vehicles.slice(0, 5).forEach((vehicle, i) => {
-    console.log(`${i + 1}. https://n-zero.dev/vehicles/${vehicle.id}`);
+    console.log(`${i + 1}. https://nuke.ag/vehicles/${vehicle.id}`);
   });
 
   if (vehicles.length > 5) {

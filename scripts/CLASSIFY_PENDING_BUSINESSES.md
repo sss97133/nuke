@@ -1,6 +1,6 @@
 # Classify Pending Businesses
 
-Script and process for assigning **business_type** to N-Zero businesses. We use **many specific types** (not just five) so "other" is only for truly unclassified rows.
+Script and process for assigning **business_type** to Nuke businesses. We use **many specific types** (not just five) so "other" is only for truly unclassified rows.
 
 ## Apply the migration first
 

@@ -2,7 +2,7 @@
 
 ## How to Access:
 
-**1. Go to:** https://n-zero.dev/admin
+**1. Go to:** https://nuke.ag/admin
 
 **2. You'll see tabs:**
 - Reviews
@@ -45,7 +45,7 @@ Once complete, we'll populate the professional appraisal tables.
 
 ## Direct Access:
 
-**URL:** https://n-zero.dev/admin
+**URL:** https://nuke.ag/admin
 
 Click the "TABLE STATUS" tab (rightmost tab)
 

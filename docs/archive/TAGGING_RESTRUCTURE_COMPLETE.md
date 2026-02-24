@@ -109,7 +109,7 @@ Image 1 of 50 • 3 shoppable parts
 
 ```
 Bundle: index-DNpDuzTb.js
-URL: https://n-zero.dev/
+URL: https://nuke.ag/
 
 ✅ No sidebar
 ✅ 3 square dots visible

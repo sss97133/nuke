@@ -1,7 +1,7 @@
 # 🔄 Vercel Redeploy Instructions
 
 ## Issue
-Production (https://n-zero.dev) is serving **stale cached code** with:
+Production (https://nuke.ag) is serving **stale cached code** with:
 - ❌ Emojis in badges ("💰 6931% GAIN")
 - ❌ INVEST buttons that were removed
 - ❌ Old UI from before today's changes
@@ -10,7 +10,7 @@ Production (https://n-zero.dev) is serving **stale cached code** with:
 
 ### Option 1: Vercel Dashboard (Recommended)
 
-1. Go to: https://vercel.com/nzero/nuke/deployments
+1. Go to: https://vercel.com/nuke/nuke/deployments
 2. Click on the latest deployment
 3. Click "Redeploy"
 4. ✅ **Check "Use existing Build Cache" = OFF**
@@ -44,7 +44,7 @@ git push origin main
 
 ## Verification After Redeploy
 
-Visit: https://n-zero.dev
+Visit: https://nuke.ag
 
 **Hard refresh** (don't use cached version):
 - Mac: `Cmd + Shift + R`
@@ -65,7 +65,7 @@ Visit: https://n-zero.dev
 
 ```bash
 # Via Vercel CLI
-vercel domains purge n-zero.dev
+vercel domains purge nuke.ag
 
 # Or via Vercel Dashboard
 Project Settings → Domains → Purge Cache
@@ -73,7 +73,7 @@ Project Settings → Domains → Purge Cache
 
 ### Clear CDN Cache
 
-Visit: https://n-zero.dev?_vercel_no_cache=1
+Visit: https://nuke.ag?_vercel_no_cache=1
 
 This forces bypass of edge cache.
 
@@ -101,7 +101,7 @@ If missing, add them and redeploy.
 - **Deployment live:** ~3-4 minutes total
 
 **Check deployment status:**
-https://vercel.com/nzero/nuke
+https://vercel.com/nuke/nuke
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Current Problem
 
-**Example Vehicle:** https://n-zero.dev/vehicle/22f9cce1-0c58-4177-b504-27aad1b0bd61
+**Example Vehicle:** https://nuke.ag/vehicle/22f9cce1-0c58-4177-b504-27aad1b0bd61
 
 **Current (WRONG) Data:**
 - Model: "shortbed truck**"

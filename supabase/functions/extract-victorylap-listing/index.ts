@@ -146,7 +146,7 @@ serve(async (req) => {
 
     const normalized = url.replace(/#.*$/, '').split('?')[0];
     const res = await fetch(normalized, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Nuke/1.0; +https://n-zero.dev)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Nuke/1.0; +https://nuke.ag)' },
     });
     if (!res.ok) {
       return new Response(

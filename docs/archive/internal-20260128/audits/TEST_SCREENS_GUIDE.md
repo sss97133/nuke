@@ -1,7 +1,7 @@
 # 🧪 FUNCTIONAL TESTING GUIDE - WITH SCREENSHOTS
 
 **Date:** October 25, 2025  
-**Environments:** Local (http://localhost:5173) + Production (https://n-zero.dev)
+**Environments:** Local (http://localhost:5173) + Production (https://nuke.ag)
 
 ---
 
@@ -288,16 +288,16 @@ test-7-checkout-modal.png
 curl -I http://localhost:5173
 
 # Test production
-curl -I https://n-zero.dev
+curl -I https://nuke.ag
 
 # Test specific vehicle profile
-curl -I https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+curl -I https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 
 # Check Vercel deployment status
 vercel ls
 
 # Check latest build
-vercel logs https://nuke-gaau0n1d8-nzero.vercel.app --follow
+vercel logs https://nuke-gaau0n1d8-nuke.vercel.app --follow
 ```
 
 ---
@@ -373,7 +373,7 @@ vercel logs https://nuke-gaau0n1d8-nzero.vercel.app --follow
 ## 🚀 **READY TO TEST:**
 
 **Local:** http://localhost:5173 (running)  
-**Production:** https://n-zero.dev (deployed)  
+**Production:** https://nuke.ag (deployed)  
 **Debug Logs:** ✅ Enabled  
 **Test Data:** ✅ 3 tags on image `59fec501-534d-4420-8c31-fb277c839959`
 

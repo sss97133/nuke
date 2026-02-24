@@ -82,12 +82,12 @@ git push origin main  # YOU MUST DO THIS MANUALLY (requires GitHub auth)
 - GitHub receives 7 commits
 - Vercel webhook triggers
 - Auto-build (~2 minutes)
-- Deploy to https://n-zero.dev
+- Deploy to https://nuke.ag
 - New lightbox goes live
 
 ### **Step 2: Test WITHOUT Data (Current State)**
 
-Visit: `https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c`
+Visit: `https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c`
 
 **Expected:**
 - Click any image
@@ -264,7 +264,7 @@ Actions: Click to select, double-click to order
 ### **Example:**
 User orders $89.99 bumper from LMC:
 - LMC gets $85.49
-- n-zero gets $4.50 (5%)
+- nuke gets $4.50 (5%)
 
 At scale:
 - 1000 users/month

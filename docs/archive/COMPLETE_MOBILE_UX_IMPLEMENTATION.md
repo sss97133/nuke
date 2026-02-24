@@ -155,8 +155,8 @@ Drivetrain: 4WD 🔍
 ## Production Deployment
 
 **Latest Commit**: dce1fe8d → Complete mobile UX
-**Vercel**: https://nuke-jf8tatrxq-nzero.vercel.app (building...)
-**Production**: https://n-zero.dev
+**Vercel**: https://nuke-jf8tatrxq-nuke.vercel.app (building...)
+**Production**: https://nuke.ag
 
 ## Test Checklist
 
@@ -213,7 +213,7 @@ Complete mobile overhaul done:
 - ✅ Phase 2: Views (Feed/Discover/Technical)
 - ✅ Phase 3: AI Specs (clickable with research modal)
 
-Test on mobile device at: https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+Test on mobile device at: https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 Hard refresh to see all new features!
 

@@ -1,6 +1,6 @@
 # 🧪 LIGHTBOX BROWSER TEST RESULTS
 **Test Date:** October 25, 2025, 16:05  
-**Test URL:** https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+**Test URL:** https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 ---
 

@@ -1,7 +1,7 @@
 # Complete Fixes - November 22, 2025 Session
 
 **Status:** ✅ ALL DEPLOYED TO PRODUCTION  
-**Bundle:** `nukefrontend-g2nho3smn-nzero.vercel.app`
+**Bundle:** `nukefrontend-g2nho3smn-nuke.vercel.app`
 
 ---
 

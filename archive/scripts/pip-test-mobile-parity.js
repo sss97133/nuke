@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
 
 (async () => {
   console.log('🧪 PIP TEST: Mobile Feature Parity\n');
-  console.log('Testing: https://n-zero.dev\n');
+  console.log('Testing: https://nuke.ag\n');
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
@@ -29,7 +29,7 @@ const { chromium } = require('playwright');
   try {
     // Navigate directly to homepage
     console.log('📍 Navigating to production...');
-    await page.goto('https://n-zero.dev', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto('https://nuke.ag', { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(2000);
     
     // Take screenshot of homepage
@@ -78,7 +78,7 @@ const { chromium } = require('playwright');
       
       // Continue with manual URL for testing
       console.log('   Using direct vehicle URL for testing...');
-      await page.goto('https://n-zero.dev/vehicles', { waitUntil: 'networkidle' });
+      await page.goto('https://nuke.ag/vehicles', { waitUntil: 'networkidle' });
       await page.waitForTimeout(2000);
       
       const vehLink = await page.locator('a[href*="/vehicle/"]').first();
@@ -342,7 +342,7 @@ const { chromium } = require('playwright');
 
     // TEST 8: Org Switcher (requires org membership)
     console.log('\n🏢 TEST 8: Organization Switcher');
-    await page.goto('https://n-zero.dev/mobile/org', { waitUntil: 'networkidle' });
+    await page.goto('https://nuke.ag/mobile/org', { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
     
     const orgSwitcher = await page.locator('button').filter({ has: page.locator('text=/owner|admin|staff/i') }).count();

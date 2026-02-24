@@ -64,8 +64,8 @@ Complete fix for image info panel data extraction pipeline, ensuring all EXIF da
 
 **Commit:** `03e54c47`  
 **Branch:** `main`  
-**Vercel Deployment:** https://vercel.com/nzero/nuke/ETcKGitjiRx6CxCxsjwVgcg5CY8q  
-**Production URL:** https://nuke-4xwb531w1-nzero.vercel.app
+**Vercel Deployment:** https://vercel.com/nuke/nuke/ETcKGitjiRx6CxCxsjwVgcg5CY8q  
+**Production URL:** https://nuke-4xwb531w1-nuke.vercel.app
 
 ## Verification Checklist
 
@@ -101,5 +101,5 @@ Complete fix for image info panel data extraction pipeline, ensuring all EXIF da
 
 **Deployment Status:** ✅ COMPLETE  
 **Build Status:** ✅ SUCCESS  
-**Production URL:** https://n-zero.dev
+**Production URL:** https://nuke.ag
 

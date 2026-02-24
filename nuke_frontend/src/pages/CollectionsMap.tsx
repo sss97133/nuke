@@ -1041,7 +1041,7 @@ export default function CollectionsMap() {
       c.instagram || '',
       c.lat,
       c.lng,
-      `https://nuke.build/org/${c.slug}`,
+      `https://nuke.ag/org/${c.slug}`,
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

@@ -59,7 +59,7 @@ npm install playwright @playwright/test
 # Set environment variables
 export SUPABASE_URL="your-supabase-url"
 export SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
-export BOT_BASE_URL="https://n-zero.dev"  # or localhost for local testing
+export BOT_BASE_URL="https://nuke.ag"  # or localhost for local testing
 ```
 
 ### Run All Bots
@@ -212,7 +212,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          BOT_BASE_URL: https://n-zero.dev
+          BOT_BASE_URL: https://nuke.ag
 ```
 
 ## The Debug Team Concept

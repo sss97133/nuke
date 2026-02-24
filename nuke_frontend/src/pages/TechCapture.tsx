@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ImageUploadService } from '../services/imageUploadService';
 
@@ -35,6 +35,7 @@ interface ProcessingEvent {
 
 export default function TechCapture() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -42,8 +43,14 @@ export default function TechCapture() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Get vehicle ID from QR code URL param
+  // Get vehicle ID from QR code URL param (QR should go to vehicle profile, not this page)
   const qrVehicleId = searchParams.get('v');
+
+  // Redirect QR scans to the truck's profile so the QR "goes to" the vehicle profile
+  useEffect(() => {
+    if (!qrVehicleId || !/^[0-9a-f-]{36}$/i.test(qrVehicleId)) return;
+    navigate(`/vehicle/${qrVehicleId}`, { replace: true });
+  }, [qrVehicleId, navigate]);
 
   // Auth + initial data load
   useEffect(() => {
@@ -52,7 +59,7 @@ export default function TechCapture() {
       if (!user) return;
       setUser(user);
 
-      // If QR code param, use that vehicle
+      // If QR code param, use that vehicle (before redirect; techs can use direct /tech/upload without ?v=)
       if (qrVehicleId) {
         setSelectedVehicleId(qrVehicleId);
       }

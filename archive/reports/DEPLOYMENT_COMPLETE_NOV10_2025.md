@@ -271,7 +271,7 @@ ORDER BY version DESC;
 - Core vehicle/image flows working perfectly
 - Organization database layer ready
 - Frontend integration needed for new features
-- Production site live and stable at https://n-zero.dev
+- Production site live and stable at https://nuke.ag
 
 **Next Phase: Frontend Integration**
 The hard infrastructure work is done. The database is rock-solid, secure, and performant. The remaining work is purely frontend UI development to expose the new features (organizations, valuations, work order research) that are already fully functional at the database layer.
@@ -281,6 +281,6 @@ The hard infrastructure work is done. The database is rock-solid, secure, and pe
 **Deployed by:** AI Assistant  
 **Date:** November 10, 2025  
 **Production Database:** aws-0-us-west-1.pooler.supabase.com  
-**Production Site:** https://n-zero.dev  
+**Production Site:** https://nuke.ag  
 **Status:** ✅ STABLE & OPERATIONAL
 

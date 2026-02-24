@@ -27,7 +27,7 @@ async function syncJaguarBid() {
   // Fetch the BAT page
   const response = await fetch(JAGUAR_BAT_URL, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; N-Zero/1.0)',
+      'User-Agent': 'Mozilla/5.0 (compatible; Nuke/1.0)',
       'Accept': 'text/html,application/xhtml+xml'
     }
   });

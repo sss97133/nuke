@@ -58,7 +58,7 @@ async function checkProgress() {
   }
   console.log('');
   
-  console.log('🔗 Profile: https://n-zero.dev/vehicle/' + VEHICLE_ID);
+  console.log('🔗 Profile: https://nuke.ag/vehicle/' + VEHICLE_ID);
   console.log('═══════════════════════════════════════════════════════════\n');
 }
 

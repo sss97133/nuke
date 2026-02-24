@@ -101,7 +101,7 @@
 
 ## What's Live in Production
 
-**URL**: https://n-zero.dev
+**URL**: https://nuke.ag
 **Bundle**: index-CV24wzwu.js (and deploying newer)
 
 **Working Features**:
@@ -211,7 +211,7 @@
 
 **Session Grade**: A+ (massive productivity, all critical issues resolved)
 
-Test everything at: https://n-zero.dev
+Test everything at: https://nuke.ag
 
 🎉 **INCREDIBLE SESSION - 10 MAJOR FEATURES SHIPPED!**
 

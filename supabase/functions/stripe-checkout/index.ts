@@ -118,7 +118,7 @@ serve(async (req) => {
     }
 
     // Create Checkout Session
-    const origin = req.headers.get("origin") || "https://nuke.dev";
+    const origin = req.headers.get("origin") || "https://nuke.ag";
     const sessionRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
       headers: {

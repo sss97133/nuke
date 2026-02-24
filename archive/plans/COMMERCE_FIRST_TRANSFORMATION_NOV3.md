@@ -176,7 +176,7 @@ The Commerce Dashboard shows how **documented work** increases vehicle value:
 ```bash
 ✅ Built successfully (3.62s)
 ✅ Deployed to Vercel production
-✅ Production URL: https://n-zero.dev (200 OK)
+✅ Production URL: https://nuke.ag (200 OK)
 ✅ Bundle size: 2.3MB
 ```
 
@@ -290,6 +290,6 @@ Every notification matters. Every metric drives revenue. Every feature proves va
 
 **Built by:** AI Assistant  
 **Deployed:** November 3, 2025, 10:15 PM PST  
-**Production:** https://n-zero.dev  
+**Production:** https://nuke.ag  
 **Philosophy:** "We have receipts so we can prove value so we can charge more."
 

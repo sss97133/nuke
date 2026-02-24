@@ -7,7 +7,7 @@
 
 ## 1. Introduction
 
-NUKE LTD ("NUKE," "we," "us," or "our") operates the NUKE platform at n-zero.dev (the "Platform"). This Privacy Policy explains how we collect, use, disclose, and protect your personal information when you use our Platform.
+NUKE LTD ("NUKE," "we," "us," or "our") operates the NUKE platform at nuke.ag (the "Platform"). This Privacy Policy explains how we collect, use, disclose, and protect your personal information when you use our Platform.
 
 By using the Platform, you consent to the practices described in this Privacy Policy.
 
@@ -131,7 +131,7 @@ You may request deletion of your personal data, subject to legal retention requi
 You may opt out of:
 - Marketing emails (unsubscribe link in each email)
 - Non-essential cookies (browser settings)
-- Data sharing for analytics (contact privacy@n-zero.dev)
+- Data sharing for analytics (contact privacy@nuke.ag)
 
 ### 7.5 Do Not Track
 We do not currently respond to "Do Not Track" browser signals.
@@ -147,7 +147,7 @@ California residents have additional rights under the California Consumer Privac
 - **Right to Opt-Out:** Opt out of sale of personal information (we do not sell)
 - **Non-Discrimination:** We will not discriminate against you for exercising these rights
 
-To exercise CCPA rights, contact privacy@n-zero.dev with "CCPA Request" in the subject line.
+To exercise CCPA rights, contact privacy@nuke.ag with "CCPA Request" in the subject line.
 
 ---
 
@@ -192,10 +192,10 @@ Attn: Privacy Officer
 Boulder City, NV 89005
 United States
 
-**Email:** privacy@n-zero.dev
+**Email:** privacy@nuke.ag
 **Phone:** (702) 624-6793
 
-**Data Protection Inquiries:** privacy@n-zero.dev
+**Data Protection Inquiries:** privacy@nuke.ag
 **Response Time:** Within 30 days of verified request
 
 ---

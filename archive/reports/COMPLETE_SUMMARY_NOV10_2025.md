@@ -118,7 +118,7 @@ PostgreSQL @ aws-0-us-west-1.pooler.supabase.com
 
 ### Frontend Layer
 ```
-React + TypeScript @ https://n-zero.dev
+React + TypeScript @ https://nuke.ag
 ├── VehicleProfile.tsx (integrated 3 new components)
 ├── OrganizationProfile.tsx (already working)
 ├── LinkedOrganizations component

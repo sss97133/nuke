@@ -183,6 +183,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     if (s === 'external_import') return 'External import';
     if (s === 'user_upload') return 'User upload';
     if (s === 'dropbox_import') return 'Dropbox import';
+    if (s === 'e2e_test') return 'BaT E2E Test';
     return s
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase());

@@ -68,7 +68,7 @@ async function recoverOrphanedUpload() {
   console.log('  Run: VEHICLE_ID=<id> node scripts/link-orphaned-images.js\n');
   
   console.log('Option B: Create New Vehicle + Link Images');
-  console.log('  1. Go to n-zero.dev/add-vehicle');
+  console.log('  1. Go to nuke.ag/add-vehicle');
   console.log('  2. Create the vehicle');
   console.log('  3. Run: VEHICLE_ID=<new-id> node scripts/link-orphaned-images.js\n');
   

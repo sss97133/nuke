@@ -6,10 +6,10 @@ Complete system for extracting, storing, and tracking comments from Bring a Trai
 ## Database Schema
 
 ### `bat_users`
-Tracks BaT usernames for future matching with N-Zero users.
+Tracks BaT usernames for future matching with Nuke users.
 - `bat_username` (unique) - BaT username
 - `bat_profile_url` - Link to BaT profile
-- `n_zero_user_id` - Link when BaT user creates N-Zero account
+- `n_zero_user_id` - Link when BaT user creates Nuke account
 - `total_comments` - Activity tracking
 - `first_seen_at` / `last_seen_at` - Activity timestamps
 
@@ -104,7 +104,7 @@ ORDER BY vehicle_count DESC;
 
 ## Future Enhancements
 
-1. **User Matching** - When BaT users create N-Zero accounts, match them automatically
+1. **User Matching** - When BaT users create Nuke accounts, match them automatically
 2. **Sentiment Analysis** - Analyze comment sentiment for market insights
 3. **Technical Info Extraction** - Identify comments with technical details
 4. **Bid Detection** - Detect when comments contain bid information
@@ -115,7 +115,7 @@ ORDER BY vehicle_count DESC;
 ## Integration Points
 
 - **Vehicle Timeline** - Comments appear in vehicle history
-- **User Profiles** - BaT users can be matched to N-Zero users
+- **User Profiles** - BaT users can be matched to Nuke users
 - **Market Intelligence** - Comments provide insights into vehicle condition, history, market sentiment
 - **Provenance** - Comments serve as additional data sources for vehicle information
 

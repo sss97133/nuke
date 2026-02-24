@@ -413,11 +413,11 @@ function calculateProviderPriority(
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │  💰 FINANCING OPTIONS                                   │ │
 │  │                                                          │ │
-│  │  Based on your N-Zero earnings history, you qualify:   │ │
+│  │  Based on your Nuke earnings history, you qualify:   │ │
 │  │                                                          │ │
 │  │  Equipment Loan:                                        │ │
 │  │  • $50,000 at 6.5% APR                                 │ │
-│  │  • Pre-qualified through N-Zero Capital                │ │
+│  │  • Pre-qualified through Nuke Capital                │ │
 │  │  • Repay from additional revenue                       │ │
 │  │  • [View Terms]                                        │ │
 │  │                                                          │ │
@@ -634,7 +634,7 @@ CREATE INDEX idx_job_queue_org ON job_matching_queue(organization_id);
 - No growth incentives
 - Manual dispatch
 
-### N-Zero Model (Uber)
+### Nuke Model (Uber)
 - **Tiered access** (UberX vs UberBlack)
 - **Quality ratings** matter
 - **Better providers** get better jobs
@@ -676,5 +676,5 @@ Everyone CAN accept any job, but:
 - [ ] In-platform loan applications
 - [ ] Automated underwriting
 
-This turns N-Zero into a **growth engine** for small businesses! 🚀
+This turns Nuke into a **growth engine** for small businesses! 🚀
 

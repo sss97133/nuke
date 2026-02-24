@@ -5,7 +5,7 @@ import type { Deal } from '@dealerscan/shared'
 import { Plus, FileText, AlertCircle, CheckCircle, Clock, Loader2, Download, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const PROFILE_APP_URL = (import.meta.env.VITE_NZERO_APP_URL || import.meta.env.VITE_PROFILE_APP_URL) as string | undefined
+const PROFILE_APP_URL = (import.meta.env.VITE_NUKE_APP_URL || import.meta.env.VITE_PROFILE_APP_URL) as string | undefined
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
   pending: { icon: Clock, color: 'text-gray-500 bg-gray-100', label: 'Pending' },

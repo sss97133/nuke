@@ -60,7 +60,7 @@ match_score =
 - Returns match score and reasoning
 
 ### 3. **Public Investment Opportunities Page** ✅
-**URL:** https://n-zero.dev/investment-opportunities
+**URL:** https://nuke.ag/investment-opportunities
 
 **Features:**
 - Filterable by investment score (High ≥80%, Good 70-80%, All)
@@ -241,6 +241,6 @@ This is how we become an incredible asset to the automotive market.
 ---
 
 **Current Status:** ✅ LIVE AND OPERATIONAL
-**URL:** https://n-zero.dev/investment-opportunities
+**URL:** https://nuke.ag/investment-opportunities
 **First Opportunity:** Viva Las Vegas Autos (74% score, $100-250K)
 

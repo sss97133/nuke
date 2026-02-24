@@ -2,7 +2,7 @@
 
 ## How to Access Admin
 
-### URL: https://n-zero.dev/admin
+### URL: https://nuke.ag/admin
 
 **Route:** `/admin`  
 **Component:** `AdminMissionControl.tsx`
@@ -33,7 +33,7 @@
 
 ## New: AI Batch Analysis Page
 
-### URL: https://n-zero.dev/admin/batch-analysis
+### URL: https://nuke.ag/admin/batch-analysis
 
 ### Features:
 
@@ -64,7 +64,7 @@
 ## How to Analyze the Bronco NOW
 
 ### Step 1: Go to Admin
-https://n-zero.dev/admin
+https://nuke.ag/admin
 
 ### Step 2: Click "AI Batch Analysis"
 The blue card with 🤖 icon
@@ -95,7 +95,7 @@ Next Steps:
 ```
 
 ### Step 6: Refresh Bronco Page
-https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
+https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
 
 **Before:**
 ```
@@ -190,7 +190,7 @@ $105,500 base
 ✅ **Button added to Mission Control** - Blue 🤖 card  
 ✅ **Deployed to production** - LIVE now  
 
-**Go to:** https://n-zero.dev/admin/batch-analysis
+**Go to:** https://nuke.ag/admin/batch-analysis
 
 Click "Full: Bronco" button and watch the AI analyze all 239 photos!
 

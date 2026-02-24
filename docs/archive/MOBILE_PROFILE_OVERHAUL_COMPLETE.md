@@ -58,8 +58,8 @@
 ## Production Deployment
 
 **URLs:**
-- Main: https://n-zero.dev
-- Latest: https://nuke-4ogizin1l-nzero.vercel.app
+- Main: https://nuke.ag
+- Latest: https://nuke-4ogizin1l-nuke.vercel.app
 - Bundle: index-BixGSZeY.js (building...)
 
 **Commit**: b57d1b18 + filter fixes
@@ -101,7 +101,7 @@
 1. **1974 K5 Blazer** (`05f27cc4-914e-425a-8ed8-cfea35c1928d`)
    - 171 timeline events
    - 200 images
-   - URL: https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+   - URL: https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 2. **1977 K5** (`e08bf694-970f-4cbe-8a74-8715158a0f2e`)
    - 72 events

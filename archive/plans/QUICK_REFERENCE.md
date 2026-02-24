@@ -2,9 +2,9 @@
 
 ## 🚀 Live URLs
 
-- **Ernie's Upholstery**: `https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41`
-- **1974 Ford Bronco**: `https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e`
-- **Organizations Directory**: `https://n-zero.dev/organizations`
+- **Ernie's Upholstery**: `https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41`
+- **1974 Ford Bronco**: `https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e`
+- **Organizations Directory**: `https://nuke.ag/organizations`
 
 ---
 

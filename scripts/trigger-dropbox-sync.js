@@ -2,7 +2,7 @@
 // This script forces the image upload for all Dropbox-imported vehicles
 
 const VIVA_ORG_ID = 'c433d27e-2159-4f8c-b4ae-32a5e44a77cf';
-const IMPORT_PAGE_URL = `https://n-zero.dev/dealer/${VIVA_ORG_ID}/dropbox-import`;
+const IMPORT_PAGE_URL = `https://nuke.ag/dealer/${VIVA_ORG_ID}/dropbox-import`;
 
 console.log('🚀 To trigger the Dropbox auto-sync:');
 console.log('');

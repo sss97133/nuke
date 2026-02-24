@@ -438,7 +438,7 @@
 
 **What Should Happen:**
 ```bash
-curl -s https://n-zero.dev | grep -o 'assets/index-.*\.js'
+curl -s https://nuke.ag | grep -o 'assets/index-.*\.js'
 # Verify hash changed after deploy
 ```
 

@@ -443,6 +443,6 @@ Subscribe to events:
 
 ## Support
 
-- **Documentation**: https://nuke.com/docs/api
+- **Documentation**: https://nuke.ag/docs/api
 - **Issues**: https://github.com/nukeplatform/nuke/issues
-- **Email**: api@nuke.com
+- **Email**: api@nuke.ag

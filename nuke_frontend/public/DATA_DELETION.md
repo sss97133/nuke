@@ -1,9 +1,9 @@
-# Data Deletion Instructions — N-Zero Platform
+# Data Deletion Instructions — Nuke Platform
 
-We respect your right to delete personal information associated with n-zero.dev. Follow the steps below to request deletion.
+We respect your right to delete personal information associated with nuke.ag. Follow the steps below to request deletion.
 
 ### 1. Email request
-Send an email to **privacy@n-zero.dev** from the email address associated with your N-Zero account. Use the subject line “Data Deletion Request – N-Zero”. Include:
+Send an email to **privacy@nuke.ag** from the email address associated with your Nuke account. Use the subject line “Data Deletion Request – Nuke”. Include:
 - Your full name
 - Organization(s) you belong to (if any)
 - Whether you want to delete just your user profile or all organization records you own
@@ -24,5 +24,5 @@ You will receive confirmation once deletion is complete, typically within 7 busi
 If you are the verified owner of an organization and want the entire workspace removed, state that explicitly in your email. We will coordinate with other contributors, cancel active marketplace listings, and permanently delete business records after the required notice period.
 
 ### 5. Questions
-Contact **privacy@n-zero.dev** for help at any time.
+Contact **privacy@nuke.ag** for help at any time.
 

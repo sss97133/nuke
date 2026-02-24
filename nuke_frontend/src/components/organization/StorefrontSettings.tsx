@@ -118,7 +118,7 @@ export default function StorefrontSettings({ organization, onSave }: Props) {
     }
   }, [organization, enabled, theme, accentColor, primaryColor, seoTitle, seoDescription, showPricing, current, onSave]);
 
-  const storefrontUrl = organization.slug ? `https://${organization.slug}.nuke.dev` : null;
+  const storefrontUrl = organization.slug ? `https://${organization.slug}.nuke.ag` : null;
 
   return (
     <div style={{ maxWidth: 600 }}>

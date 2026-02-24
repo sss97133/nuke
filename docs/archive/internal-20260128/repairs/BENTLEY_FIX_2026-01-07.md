@@ -3,7 +3,7 @@
 **Date**: 2026-01-07  
 **Vehicle ID**: `cde8da51-2b3b-4d82-8ca4-11e6f95d7928`  
 **BaT Listing**: https://bringatrailer.com/listing/2007-bentley-continental-gtc-59  
-**N-Zero Profile**: https://n-zero.dev/vehicle/cde8da51-2b3b-4d82-8ca4-11e6f95d7928
+**Nuke Profile**: https://nuke.ag/vehicle/cde8da51-2b3b-4d82-8ca4-11e6f95d7928
 
 ---
 
@@ -200,7 +200,7 @@ This single vehicle demonstrates **systemic contamination**:
 
 - **Extraction Attempt ID**: `951f0fd5-80ce-4c49-b2da-8cee92a23377`
 - **Manual Fix**: 2026-01-07 17:38 UTC
-- **Verification**: https://n-zero.dev/vehicle/cde8da51-2b3b-4d82-8ca4-11e6f95d7928
+- **Verification**: https://nuke.ag/vehicle/cde8da51-2b3b-4d82-8ca4-11e6f95d7928
 - **Source**: https://bringatrailer.com/listing/2007-bentley-continental-gtc-59/
 
 ---

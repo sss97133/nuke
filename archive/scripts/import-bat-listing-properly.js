@@ -190,6 +190,6 @@ if (!batUrl) {
 (async () => {
   const batData = await scrapeBaTListing(batUrl);
   await saveToDatabase(batData, batUrl);
-  console.log('\n✅ Done. Refresh n-zero.dev to see the vehicle with complete BaT data.');
+  console.log('\n✅ Done. Refresh nuke.ag to see the vehicle with complete BaT data.');
 })();
 

@@ -16,7 +16,7 @@ test.describe('Production Site Health', () => {
 
   test('has correct title', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/n-zero|nuke|Authentication/i);
+    await expect(page).toHaveTitle(/nuke|nuke|Authentication/i);
   });
 
   test('React root element exists', async ({ page }) => {

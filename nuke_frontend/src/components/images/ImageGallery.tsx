@@ -585,6 +585,13 @@ const ImageGallery = ({
   const applyQuarantinePolicy = (rows: any[]): any[] => {
     if (!Array.isArray(rows) || rows.length === 0) return rows;
 
+    // file:// URLs are local paths and never load on the web — exclude everywhere
+    const noFileUrls = rows.filter((img: any) => {
+      const u = String(img?.image_url || '').trim().toLowerCase();
+      return !u.startsWith('file://');
+    });
+    if (noFileUrls.length === 0) return [];
+
     const isOrgLogoPath = (img: any) => {
       const u = String(img?.image_url || '').toLowerCase();
       const p = String(img?.storage_path || '').toLowerCase();
@@ -613,7 +620,7 @@ const ImageGallery = ({
       );
     };
 
-    const noMismatched = rows.filter((img: any) => !isMismatchedVehicleAsset(img));
+    const noMismatched = noFileUrls.filter((img: any) => !isMismatchedVehicleAsset(img));
     if (noMismatched.length === 0) return [];
 
     const noLogos = noMismatched.filter((img: any) => !isOrgLogoPath(img));
@@ -816,6 +823,9 @@ const ImageGallery = ({
     return result.length > 0 ? result : (nonBat.length > 0 ? nonBat : rows);
   };
 
+  // Cap how many images we render at once to avoid 1000+ broken/slow grids (infinite scroll loads more).
+  const MAX_INITIAL_DISPLAY = 200;
+
   // When vehicle meta arrives, re-filter any already-loaded images so the UI doesn't briefly show
   // unrelated BaT homepage / other-lot images for bat_import vehicles.
   useEffect(() => {
@@ -824,7 +834,9 @@ const ImageGallery = ({
     const nextAll = applyBatCanonicalOverlay(filterBatNoiseRows(allImages), vehicleMeta);
     if (nextAll.length === allImages.length) return;
     setAllImages(nextAll);
-    setDisplayedImages(sortRows(applySourceFilter(nextAll), sortBy)); // NO LIMIT - show filtered images
+    const sorted = sortRows(applySourceFilter(nextAll), sortBy);
+    setDisplayedImages(sorted.slice(0, MAX_INITIAL_DISPLAY));
+    setAutoLoad(true);
     // Do not toggle usingFallback here; we only filter the current view.
   }, [vehicleMeta, applySourceFilter]); // intentionally not depending on allImages to avoid loops
 
@@ -914,7 +926,9 @@ const ImageGallery = ({
       const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
       setUsingFallback(false);
       setAllImages(images);
-      setDisplayedImages(sortRows(applySourceFilter(images), sortBy)); // NO LIMIT - show filtered images
+      const sorted = sortRows(applySourceFilter(images), sortBy);
+      setDisplayedImages(sorted.slice(0, MAX_INITIAL_DISPLAY));
+      setAutoLoad(true);
       setShowImages(true);
       onImagesUpdated?.();
     } catch (err) {
@@ -2453,13 +2467,11 @@ const ImageGallery = ({
                 setGroupBySource(next);
                 if (next) {
                   setGroupByCategory(false); // Disable category grouping when enabling source
-                  // Grouping is a "holistic" view: ensure we have the full in-memory list loaded.
-                  // This avoids confusing cases where only the first page renders and other source groups appear missing.
                   setShowImages(true);
                   try {
                     const sortedAll = sortRows(allImages || [], sortBy);
-                    setDisplayedImages(sortedAll);
-                    setAutoLoad(false);
+                    setDisplayedImages(sortedAll.slice(0, MAX_INITIAL_DISPLAY));
+                    setAutoLoad(true);
                   } catch {
                     // non-fatal
                   }

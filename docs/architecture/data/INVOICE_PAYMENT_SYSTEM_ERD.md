@@ -210,7 +210,7 @@ STEP 3: PAYMENT LINK CREATED
 ────────────────────────────
 Payment Token Generated
 ├─ Token: A1B2C3D4E5F6G7H8
-├─ Link: https://n-zero.dev/pay/A1B2C3D4E5F6G7H8
+├─ Link: https://nuke.ag/pay/A1B2C3D4E5F6G7H8
 ├─ Public access enabled
 └─ Sent to client (email/SMS/link share)
 
@@ -276,7 +276,7 @@ AUTHENTICATED ACCESS (Shop/User Login)
 ANONYMOUS USER FLOW
 ───────────────────
 1. Receives payment link (email/SMS/share)
-2. Clicks link: https://n-zero.dev/pay/TOKEN
+2. Clicks link: https://nuke.ag/pay/TOKEN
 3. Views invoice (no login)
 4. Selects payment method
 5. Marks as paid
@@ -331,7 +331,7 @@ ANONYMOUS USER FLOW
 ### **1. generate_invoice_payment_link(invoice_id)**
 ```sql
 -- Creates unique token and payment link
--- Returns: "https://n-zero.dev/pay/A1B2C3D4E5F6G7H8"
+-- Returns: "https://nuke.ag/pay/A1B2C3D4E5F6G7H8"
 ```
 
 ### **2. get_invoice_by_token(token)**

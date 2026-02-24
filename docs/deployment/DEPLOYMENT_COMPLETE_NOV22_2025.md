@@ -1,8 +1,8 @@
 # Deployment Complete - November 22, 2025
 
 **Time**: Production deployment successful  
-**Bundle**: `nuke-puco7o0ww-nzero.vercel.app`  
-**URL**: https://n-zero.dev
+**Bundle**: `nuke-puco7o0ww-nuke.vercel.app`  
+**URL**: https://nuke.ag
 
 ---
 
@@ -308,8 +308,8 @@ SELECT count(*) FROM vehicle_title_documents;
 ## Deployment Details
 
 **Vercel**:
-- ✅ Production: https://nuke-puco7o0ww-nzero.vercel.app
-- ✅ Inspect: https://vercel.com/nzero/nuke/HoRWcPRJrRu3f5SijkMbDmhTVLZn
+- ✅ Production: https://nuke-puco7o0ww-nuke.vercel.app
+- ✅ Inspect: https://vercel.com/nuke/nuke/HoRWcPRJrRu3f5SijkMbDmhTVLZn
 - ✅ Upload Size: 57.6KB
 - ✅ Build Time: 5 seconds
 

@@ -1,7 +1,7 @@
 # 🤖 Background Agent PR Audit - October 30, 2025
 
 **Status:** ✅ **COMPLETE - ALL VALUABLE CHANGES PUSHED TO PRODUCTION**  
-**Production URL:** https://n-zero.dev  
+**Production URL:** https://nuke.ag  
 **Final Commit:** 214506ed
 
 ---
@@ -229,7 +229,7 @@ git push origin --delete cursor/debug-rendering-error-with-hooks-e913
 ### **Production Checks:**
 ```bash
 # Verify deployment
-curl -I https://n-zero.dev
+curl -I https://nuke.ag
 # Should return 200 OK
 
 # Verify latest commit is live
@@ -237,7 +237,7 @@ git log origin/main --oneline -1
 # Should show: 214506ed Refactor vehicle creation...
 
 # Check Vercel deployment status
-# Visit: https://vercel.com/nzero/nuke/deployments
+# Visit: https://vercel.com/nuke/nuke/deployments
 ```
 
 ### **Mobile Testing:**
@@ -278,7 +278,7 @@ Successfully audited 26 background agent branches and integrated 5 valuable impr
 ✅ **SQL Error Handling** - More resilient backend  
 ✅ **Mobile Add Vehicle** - Better data tracking  
 
-**All changes are live in production** at https://n-zero.dev
+**All changes are live in production** at https://nuke.ag
 
 ---
 

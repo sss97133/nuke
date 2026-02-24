@@ -47,7 +47,7 @@ contribution_submissions:
 
 ### 3. Responsible Party Gets Notification
 
-Doug (Viva owner) goes to https://n-zero.dev/org/[viva-id]
+Doug (Viva owner) goes to https://nuke.ag/org/[viva-id]
 
 Sees at top of Overview tab:
 ```
@@ -183,7 +183,7 @@ This follows the "users as keys" philosophy - authenticate, upload, system handl
 
 ## STATUS: DEPLOYED TO PRODUCTION ✅
 
-Go to https://n-zero.dev/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf
+Go to https://nuke.ag/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf
 See "Pending Contribution Approvals (1)" at top
 Click "Approve" → System works end-to-end
 

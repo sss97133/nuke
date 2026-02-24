@@ -255,13 +255,13 @@ pendingOffersCount: pendingOffers.length     // Uses stale state
 
 **What We Did:**
 ```bash
-curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
+curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1
 # Result: (empty) - wrong command for Vite app
 ```
 
 **What We Should Do:**
 ```bash
-curl -s https://n-zero.dev | grep -o 'assets/index-.*\.js'
+curl -s https://nuke.ag | grep -o 'assets/index-.*\.js'
 ```
 
 **Verdict:** **UNVERIFIED - Don't know if deploys actually updated**

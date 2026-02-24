@@ -2,7 +2,7 @@
 
 **Date**: October 19, 2025  
 **Auditor**: OpenAI API + Playwright Browser Testing  
-**Site**: https://n-zero.dev  
+**Site**: https://nuke.ag  
 **Method**: Live browser testing with console monitoring
 
 ---

@@ -15,7 +15,7 @@ The **automation isn't scripts** - it's the **organization profile page itself**
 ## LIVE AUTOMATION TOOLS (Production)
 
 ### 1️⃣ Import BaT Sales (NEW - JUST DEPLOYED ✅)
-**Location:** `https://n-zero.dev/org/{org_id}` → Inventory Tab → "Import BaT Sales" button
+**Location:** `https://nuke.ag/org/{org_id}` → Inventory Tab → "Import BaT Sales" button
 
 **What it does:**
 - User pastes their BaT member URL (e.g., `https://bringatrailer.com/member/vivalasvegasautos/`)
@@ -97,7 +97,7 @@ The **automation isn't scripts** - it's the **organization profile page itself**
 
 ## THE FLOW (Real User Experience)
 
-### Example: New Dealer Joins N-Zero
+### Example: New Dealer Joins Nuke
 
 **Day 1: Create Org Profile**
 ```
@@ -196,22 +196,22 @@ Every action creates **triple value**:
 ## NEXT: API Integration (Phase 3)
 
 Once profiles are full, ONE-CLICK export:
-- Submit vehicle FROM N-Zero TO BaT
+- Submit vehicle FROM Nuke TO BaT
 - Pre-filled form (no re-typing)
-- N-Zero takes commission
+- Nuke takes commission
 - Fair play policy (no double-listing)
 
 **Why BaT will want this:**
 - Pre-validated data (higher quality listings)
 - Comprehensive documentation (better buyer confidence)
 - Larger seller pool (dealers with full inventory)
-- N-Zero handles data entry burden
+- Nuke handles data entry burden
 
 ---
 
 ## TEST IT NOW
 
-1. Go to https://n-zero.dev/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf
+1. Go to https://nuke.ag/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf
 2. Click "Inventory" tab
 3. See "Import BaT Sales" button
 4. Click it → Paste BaT member URL → Watch magic happen
@@ -232,7 +232,7 @@ Once profiles are full, ONE-CLICK export:
 - Timeline with 200+ events
 - **Zero manual entry for 95% of data**
 
-See: https://n-zero.dev/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf
+See: https://nuke.ag/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf
 
 ---
 

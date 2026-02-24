@@ -1,4 +1,4 @@
-# 🚀 Deployment Complete to n-zero.dev
+# 🚀 Deployment Complete to nuke.ag
 
 **Date:** October 24, 2025, 9:06 PM  
 **Status:** CODE PUSHED ✅ | DATABASE PENDING ⏳
@@ -8,7 +8,7 @@
 ## ✅ Frontend Deployed
 
 **Pushed to GitHub:** Commit `4f7d8d4b`  
-**Auto-deploying to:** https://n-zero.dev/  
+**Auto-deploying to:** https://nuke.ag/  
 **Vercel Status:** Check https://vercel.com/dashboard
 
 ### What's Deploying:
@@ -63,13 +63,13 @@
 
 ### Immediate Tests:
 
-1. **Visit https://n-zero.dev/**
+1. **Visit https://nuke.ag/**
    - [ ] Site loads without errors
    - [ ] Console has < 10 errors (down from 63)
    - [ ] No flashing/flickering
 
 2. **Test Market Page**
-   - [ ] Visit https://n-zero.dev/market
+   - [ ] Visit https://nuke.ag/market
    - [ ] Tabs work (Browse/Portfolio/Builder)
    - [ ] Risk warning shows (yellow banner)
    - [ ] Legal link works
@@ -211,7 +211,7 @@
 - Watch for build errors
 
 **After Deploy:**
-- Visit https://n-zero.dev/
+- Visit https://nuke.ag/
 - Check console (should be clean now)
 - Test Market page
 - Verify no flashing
@@ -286,7 +286,7 @@
 **Right now:**
 1. Watch Vercel deploy: https://vercel.com/dashboard
 2. Apply SQL migrations in Supabase
-3. Test https://n-zero.dev/ when build completes
+3. Test https://nuke.ag/ when build completes
 
 **Within 1 hour:**
 1. Verify no flashing on vehicle pages

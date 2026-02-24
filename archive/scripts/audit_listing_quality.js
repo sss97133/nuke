@@ -143,7 +143,7 @@ async function auditListingQuality() {
         console.log(`  ${v.name} (score: ${v.score}/100)`);
         console.log(`    Issues: ${v.issues.join(', ')}`);
         console.log(`    Images: ${v.images}, Events: ${v.events}`);
-        console.log(`    https://n-zero.dev/vehicle/${v.id}`);
+        console.log(`    https://nuke.ag/vehicle/${v.id}`);
         console.log('');
       });
     }

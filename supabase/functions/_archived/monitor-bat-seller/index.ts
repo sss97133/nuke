@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
 
     const response = await fetch(sellerUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; N-Zero/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; Nuke/1.0)',
         'Accept': 'text/html,application/xhtml+xml'
       }
     });
@@ -106,7 +106,7 @@ Deno.serve(async (req: Request) => {
         // Fetch listing page
         const listingResponse = await fetch(listingUrl, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; N-Zero/1.0)',
+            'User-Agent': 'Mozilla/5.0 (compatible; Nuke/1.0)',
             'Accept': 'text/html,application/xhtml+xml'
           }
         });

@@ -122,7 +122,7 @@ Fixed 12 UI/UX issues identified by user without breaking existing functionality
 ## 📊 DEPLOYMENT
 
 **Deployment:** ✅ Production (vercel --prod --force --yes)
-**URL:** https://nuke-b45dmvdy6-nzero.vercel.app
+**URL:** https://nuke-b45dmvdy6-nuke.vercel.app
 **Verification:** Bundle hash changed, deployment successful
 **Linter:** ✅ No errors
 

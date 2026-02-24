@@ -13,7 +13,7 @@
 
 ### For the Jeep Wrangler Issue:
 
-1. **Go to:** https://n-zero.dev/vehicle/f7a10a48-4cd8-4ff9-9166-702367d1c859
+1. **Go to:** https://nuke.ag/vehicle/f7a10a48-4cd8-4ff9-9166-702367d1c859
 2. **See:** Warning banner saying "Price Data Issue Detected"
 3. **Click:** "Auto-Fix" button
 4. **Wait:** 2-3 seconds

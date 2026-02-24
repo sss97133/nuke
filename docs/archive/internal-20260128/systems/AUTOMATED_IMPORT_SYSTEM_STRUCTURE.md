@@ -5,7 +5,7 @@
 ### Vehicle Lifecycle for Automated Imports
 
 1. **Creation** (via `scrape-all-craigslist-squarebodies`)
-   - `uploaded_by`: System user ID (e.g., `system@n-zero.dev` or admin user)
+   - `uploaded_by`: System user ID (e.g., `system@nuke.ag` or admin user)
    - `user_id`: Generated column (auto-set from `uploaded_by` or NULL)
    - `is_public`: `true` ✅
    - `status`: `'active'` ✅ (fixed)
@@ -130,7 +130,7 @@ vehicleInsert.origin_organization_id = orgId;
 ```
 
 ### 2. **Clear Attribution in UI** ⚠️ IMPORTANT
-**Problem**: Vehicles show "Uploaded by: system@n-zero.dev" which is confusing.
+**Problem**: Vehicles show "Uploaded by: system@nuke.ag" which is confusing.
 
 **Solution**:
 - Show organization name instead: "Discovered via: Craigslist Scraper"

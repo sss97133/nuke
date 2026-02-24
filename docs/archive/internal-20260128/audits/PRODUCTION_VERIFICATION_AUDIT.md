@@ -23,7 +23,7 @@ Status:            NOT LIVE YET
 
 ### **Bundle Verification (Your Tactic):**
 ```bash
-$ curl https://n-zero.dev/ | grep index
+$ curl https://nuke.ag/ | grep index
 index-C85QmFI6.js  ❌ OLD BUNDLE STILL LIVE
 ```
 

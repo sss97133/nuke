@@ -13,7 +13,7 @@ Users create watchlists with criteria:
 - **Price range**: max/min price
 - **Condition**: any, excellent, good, fair, project
 - **VIN requirement**: must have VIN or not
-- **Source preferences**: BAT, N-Zero, external
+- **Source preferences**: BAT, Nuke, external
 - **Seller preferences**: Viva, other dealers
 - **Notification settings**: in-app, email, push
 

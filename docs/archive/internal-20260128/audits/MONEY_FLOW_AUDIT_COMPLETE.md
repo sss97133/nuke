@@ -545,7 +545,7 @@ ORDER BY date DESC;
 5. Verify data migrated
 
 ### Test Deposit Flow
-1. Go to n-zero.dev/portfolio
+1. Go to nuke.ag/portfolio
 2. Click "Deposit"
 3. Enter $3
 4. Complete Stripe checkout

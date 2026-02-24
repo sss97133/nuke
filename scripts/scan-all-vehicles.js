@@ -94,7 +94,7 @@ async function main() {
 
   if (!progressError && progressRecord) {
     stats.scanProgressId = progressRecord.id;
-    console.log(`📊 Monitoring at: https://n-zero.dev/admin (Progress ID: ${progressRecord.id.slice(0,8)})\n`);
+    console.log(`📊 Monitoring at: https://nuke.ag/admin (Progress ID: ${progressRecord.id.slice(0,8)})\n`);
   }
 
   // Get vehicles with unscanned images - use manual query

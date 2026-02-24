@@ -816,7 +816,7 @@ GENERATE INVOICE FROM EVENT
     ↓
 CREATE PAYMENT LINK
     ├─ payment_token: Secure UUID
-    ├─ payment_link: https://n-zero.dev/pay/{token}
+    ├─ payment_link: https://nuke.ag/pay/{token}
     └─ Public access (no login required)
     ↓
 SHARE WITH CLIENT

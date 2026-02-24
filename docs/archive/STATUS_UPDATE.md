@@ -50,7 +50,7 @@
 ## ⚠️ BLOCKING ISSUES
 
 ### Bundle Cache / Deployment
-**Problem**: Production site (`n-zero.dev`) still serves old JavaScript bundle despite:
+**Problem**: Production site (`nuke.ag`) still serves old JavaScript bundle despite:
 - Code changes pushed to GitHub
 - Multiple Vercel deployments completed
 - Version number bumped in package.json

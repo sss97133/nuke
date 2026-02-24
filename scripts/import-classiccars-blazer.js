@@ -107,7 +107,7 @@ async function importListing() {
       });
     }
 
-    console.log(`\n🔗 View vehicle profile: https://n-zero.dev/vehicles/${data.vehicleId}`);
+    console.log(`\n🔗 View vehicle profile: https://nuke.ag/vehicles/${data.vehicleId}`);
     console.log(`\n✅ Done!`);
 
   } catch (error) {
