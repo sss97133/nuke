@@ -182,7 +182,7 @@ Action:
 
 ### ✅ Frontend:
 - Built: 2.47 MB bundle
-- Deployed: https://n-zero.dev
+- Deployed: https://nuke.ag
 - Bundle: `index-CyLaH4kq.js` (new hash)
 
 ### ✅ Database:
@@ -307,7 +307,7 @@ https://lasvegas.craigslist.org/cto/d/pahrump-gmc-squarebody-short-bed/789329600
 - Detects duplicates with GPS + time
 - Fixed 6 critical bugs
 
-**Everything is LIVE on https://n-zero.dev!** 🚀
+**Everything is LIVE on https://nuke.ag!** 🚀
 
 **Try your Craigslist URL now - it should work perfectly!**
 

@@ -2,7 +2,7 @@
 
 **Date:** October 25, 2025  
 **Total Commits:** 25 pushed to production  
-**Environment:** https://n-zero.dev  
+**Environment:** https://nuke.ag  
 **Bundle:** index-C8UIV56z.js ✅ LIVE  
 
 ---
@@ -100,7 +100,7 @@ recommend REPAIR (94% ROI)
 ### **Frontend (Vercel):**
 ```
 ✅ Bundle: index-C8UIV56z.js
-✅ Status: LIVE on n-zero.dev
+✅ Status: LIVE on nuke.ag
 ✅ All pages: 200 OK
 ✅ Debug logging: ENABLED
 ```
@@ -131,7 +131,7 @@ recommend REPAIR (94% ROI)
 
 ### **Spatial Parts Workflow:**
 ```
-1. Visit: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+1. Visit: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 2. Click blue truck image
 3. Should see: 3 green dots (bumper, headlight, grille)
 4. Hover dot: Tooltip shows part + price

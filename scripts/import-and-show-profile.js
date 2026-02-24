@@ -150,7 +150,7 @@ async function importAndShowProfile() {
     console.log('');
 
     console.log('═══════════════════════════════════════════════════════════');
-    console.log(`🔗 View full profile: https://n-zero.dev/vehicles/${result.vehicleId}`);
+    console.log(`🔗 View full profile: https://nuke.ag/vehicles/${result.vehicleId}`);
     console.log('═══════════════════════════════════════════════════════════\n');
 
   } catch (error) {

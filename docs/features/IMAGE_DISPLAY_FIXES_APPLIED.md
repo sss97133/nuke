@@ -583,7 +583,7 @@ vercel --prod --force --yes
 ### 4. Verify Deployment
 ```bash
 # Check bundle hash changed
-curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
+curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1
 ```
 
 ### 5. Process January Images

@@ -56,7 +56,7 @@ The Nuke database has **POOR** organization provenance health:
 
 - **Nuke** (`f32ea08c-c2c5-4ca9-896d-cb99ce6c7bfb`)
   - Discovered by: `0b9f107a-d124-49de-9ded-94698f63c1c4`
-  - Website: https://www.nukeltd.com
+  - Website: https://www.nuke.ag
   - Has 1 active contributor (owner)
   - **Status: GOOD - This is the gold standard**
 
@@ -317,7 +317,7 @@ The Nuke organization database has **poor provenance health** with only 0.4% of 
   "id": "f32ea08c-c2c5-4ca9-896d-cb99ce6c7bfb",
   "business_name": "Nuke",
   "discovered_by": "0b9f107a-d124-49de-9ded-94698f63c1c4",
-  "website": "https://www.nukeltd.com",
+  "website": "https://www.nuke.ag",
   "has_contributors": true
 }
 ```

@@ -2,6 +2,17 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
 
+/** Canonical app origin for QR codes and share links — vehicle profile URLs should point here. */
+export const CANONICAL_APP_ORIGIN = 'https://nuke.ag';
+
+/**
+ * Build the canonical vehicle profile URL for QR codes and sharing.
+ * Always uses nuke.ag so printed QRs and links don't break when the app is opened from another origin.
+ */
+export function getVehicleProfileUrl(vehicleId: string): string {
+  return `${CANONICAL_APP_ORIGIN}/vehicle/${vehicleId}`;
+}
+
 /**
  * Hook to manage page titles dynamically
  * 
@@ -17,14 +28,16 @@ export function usePageTitle(title: string | (() => string)) {
     if (resolvedTitle) {
       document.title = `${resolvedTitle} | Marque`;
     }
-    // Keep canonical URL in sync with current route
+    // Canonical URL: use nuke.ag for vehicle profile so QR codes and share links always point to the main site
     let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!link) {
       link = document.createElement('link');
       link.rel = 'canonical';
       document.head.appendChild(link);
     }
-    link.href = window.location.origin + location.pathname;
+    const pathname = location.pathname;
+    const isVehicleProfile = /^\/vehicle\/[0-9a-f-]{36}$/i.test(pathname);
+    link.href = isVehicleProfile ? `${CANONICAL_APP_ORIGIN}${pathname}` : window.location.origin + pathname;
   }, [title, location.pathname]);
 }
 

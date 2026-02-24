@@ -61,7 +61,7 @@
 
 **High-Quality Profile (YOU):**
 - ID: `05f27cc4-914e-425a-8ed8-cfea35c1928d`
-- URL: https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+- URL: https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 - VIN: `CKY184F130980` (real)
 - 200 photos
 - 185 timeline events
@@ -70,7 +70,7 @@
 
 **Low-Grade Duplicate (Dropbox):**
 - ID: `89afcc13-febb-4a79-a4ad-533471c2062f`
-- URL: https://n-zero.dev/vehicle/89afcc13-febb-4a79-a4ad-533471c2062f
+- URL: https://nuke.ag/vehicle/89afcc13-febb-4a79-a4ad-533471c2062f
 - VIN: `VIVA-1762059705454` (auto-generated)
 - 1 photo
 - 2 timeline events
@@ -86,7 +86,7 @@
 
 **Consolidated Profile:**
 - ID: `05f27cc4-914e-425a-8ed8-cfea35c1928d` (same)
-- URL: https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d (same)
+- URL: https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d (same)
 - VIN: `CKY184F130980` (preserved)
 - **201 photos** (200 + 1 from duplicate)
 - **187 events** (185 + 2 from duplicate)
@@ -120,10 +120,10 @@
 ## How to Test Right Now
 
 ### Step 1: Log In
-https://n-zero.dev/login
+https://nuke.ag/login
 
 ### Step 2: Visit Your Blazer
-https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 ### Step 3: Look for This (Example)
 
@@ -159,7 +159,7 @@ https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 If you want to see ALL 6 proposals at once:
 
-**URL:** https://n-zero.dev/admin/merge-proposals
+**URL:** https://nuke.ag/admin/merge-proposals
 
 Shows:
 - Stats dashboard (6 total, 6 needs review)
@@ -278,7 +278,7 @@ CREATE TABLE vehicle_merge_proposals (
 
 **Next Step:** Log in and test the merge on your '74 Blazer!
 
-**URL:** https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+**URL:** https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 You should see the yellow warning panel immediately. Click "Merge Profiles" and watch it work!
 

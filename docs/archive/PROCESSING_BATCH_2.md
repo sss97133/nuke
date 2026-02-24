@@ -31,7 +31,7 @@ SELECT COUNT(*) FILTER (WHERE angle IS NOT NULL) FROM vehicle_images;
 ```
 
 **Admin Dashboard:**
-https://n-zero.dev/admin → "Analytics" tab
+https://nuke.ag/admin → "Analytics" tab
 (Updates every 3 seconds with live progress)
 
 ## When Complete:

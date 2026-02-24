@@ -71,7 +71,7 @@ async function deploySQL() {
 
     console.log('\n✅ Deployment complete!\n');
     console.log('Next steps:');
-    console.log('1. Visit https://n-zero.dev/portfolio');
+    console.log('1. Visit https://nuke.ag/portfolio');
     console.log('2. Click "Deposit" and add $3');
     console.log('3. Verify balance shows $3.00');
     

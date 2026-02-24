@@ -1,7 +1,7 @@
 # Dashboard Rebuild - November 22, 2025
 
 **Status:** ✅ DEPLOYED TO PRODUCTION  
-**URL:** https://n-zero.dev/dashboard  
+**URL:** https://nuke.ag/dashboard  
 **Bundle:** `index-Bp6HJOdB.js`
 
 ---

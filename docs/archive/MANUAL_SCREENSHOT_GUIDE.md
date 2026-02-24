@@ -8,7 +8,7 @@
 
 ### **Screenshot 1: Homepage**
 ```
-URL: https://n-zero.dev
+URL: https://nuke.ag
 File: screenshot-1-homepage.png
 
 Capture:
@@ -19,7 +19,7 @@ Capture:
 
 ### **Screenshot 2: Vehicle Profile**
 ```
-URL: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+URL: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 File: screenshot-2-profile-page.png
 
 Capture:
@@ -183,7 +183,7 @@ That's all I need to diagnose and fix!
 
 ## 🚀 **QUICK TEST (30 SECONDS):**
 
-1. Open: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+1. Open: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 2. Console: Cmd+Option+J
 3. Click: Blue truck
 4. Look: For "🔍 TAG DEBUG:"

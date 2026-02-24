@@ -10,7 +10,7 @@ Prepared by: [Advisor Name / Nuke]
 
 ## Disclaimer
 
-This Information Memorandum (the "Memorandum") relating to N-Zero / Nuke (hereafter the "Company" or "Platform") has been prepared based on information provided by the Company, its founders, and other sources considered reliable. It is transmitted to a limited number of potential partners who might be interested in a transaction with the Company, and this only after signing a Non-Disclosure Agreement.
+This Information Memorandum (the "Memorandum") relating to Nuke / Nuke (hereafter the "Company" or "Platform") has been prepared based on information provided by the Company, its founders, and other sources considered reliable. It is transmitted to a limited number of potential partners who might be interested in a transaction with the Company, and this only after signing a Non-Disclosure Agreement.
 
 Neither the Company nor its advisors assume responsibility for, nor make any representation or warranty (express or implied) with respect to the accuracy or completeness of the information contained in this Memorandum. The Company expressly disclaims any liability for any statements, express or implied, contained in or omissions from this Memorandum.
 
@@ -65,7 +65,7 @@ This Confidential Memorandum does not constitute an offer, invitation or recomme
 
 - **Data aggregation at scale**: Continue autonomous ingestion across 80+ source types. 43 million collector vehicles in the US; adding ~3M/year at current rate
 - **Intelligence products**: Launch B2B data products (API subscriptions, valuation reports, market indices)
-- **Platform distribution**: Enable third-party developers and organizations to build on N-Zero data
+- **Platform distribution**: Enable third-party developers and organizations to build on Nuke data
 - **Revenue activation**: Convert data moat into recurring revenue through tiered access model
 
 ### Considered Transaction
@@ -95,8 +95,8 @@ Fundraising of **$2,000,000** via Post-Money SAFE (Y Combinator standard) at an 
 | Corporate structure | Nevada corporation, single founder |
 | Activity | Collector vehicle data infrastructure platform |
 | Founder & CEO | Skylar Williams |
-| Website | [nukeltd.com](https://www.nukeltd.com) |
-| Email | info@nukeltd.com |
+| Website | [nuke.ag](https://www.nuke.ag) |
+| Email | info@nuke.ag |
 | Phone | (702) 624-6793 |
 
 ### History / Key Milestones
@@ -104,7 +104,7 @@ Fundraising of **$2,000,000** via Post-Money SAFE (Y Combinator standard) at an 
 | Date | Milestone |
 |------|-----------|
 | 2022 | Nuke Ltd founded (Nevada) |
-| 2025 (early) | N-Zero platform development accelerates |
+| 2025 (early) | Nuke platform development accelerates |
 | Sep-Nov 2025 | Seed data (~100 vehicles), architecture design |
 | Dec 2025 | Pipeline activation - 9,697 vehicles extracted |
 | Jan 2026 | Autonomous operation begins - 196,417 vehicles added |
@@ -115,7 +115,7 @@ Fundraising of **$2,000,000** via Post-Money SAFE (Y Combinator standard) at an 
 
 **Skylar Williams** - Founder & CEO (100% ownership)
 
-Sole architect and builder of the N-Zero platform. Designed and implemented the complete technology stack from database architecture (922 PostgreSQL tables) through ML pipeline (YONO image classification, 100K+ training images) to production API (TypeScript SDK, 310 edge functions). Scaled the platform from concept to 768K+ vehicles tracking $41.6B in transaction value in under 6 months with no external engineering team.
+Sole architect and builder of the Nuke platform. Designed and implemented the complete technology stack from database architecture (922 PostgreSQL tables) through ML pipeline (YONO image classification, 100K+ training images) to production API (TypeScript SDK, 310 edge functions). Scaled the platform from concept to 768K+ vehicles tracking $41.6B in transaction value in under 6 months with no external engineering team.
 
 The autonomous architecture Skylar built - including the Ralph Wiggum extraction coordinator, self-healing queue management, and multi-agent coordination system - demonstrates a force-multiplier approach where a single technical founder can operate infrastructure that would typically require a team of 10-20 engineers.
 
@@ -127,7 +127,7 @@ The autonomous architecture Skylar built - including the Ralph Wiggum extraction
 
 ### Advisory Network
 
-N-Zero's advisory model reflects its autonomous architecture: AI advisory agents provide continuous strategic intelligence, supplemented by a human network of domain experts.
+Nuke's advisory model reflects its autonomous architecture: AI advisory agents provide continuous strategic intelligence, supplemented by a human network of domain experts.
 
 **AI Advisory Agents (Public):** The advisory board is composed of AI agents - autonomous systems modeled on domain expertise profiles that provide continuous, real-time strategic guidance. Unlike traditional boards that meet quarterly, AI advisors operate 24/7, processing market signals, competitive intelligence, and operational data. The advisory board is public and transparent - agent reasoning and recommendations are visible, building trust and generating operational data.
 
@@ -135,7 +135,7 @@ N-Zero's advisory model reflects its autonomous architecture: AI advisory agents
 
 ### Platform Architecture
 
-The N-Zero platform is organized around five layers:
+The Nuke platform is organized around five layers:
 
 **Layer 1: Ingestion**
 - 310 Deno TypeScript edge functions
@@ -176,7 +176,7 @@ Sources (80+ types) → Ingestion (310 functions) → Observations (immutable st
 
 ### Business Entity Tracking
 
-N-Zero tracks **2,401 registered businesses**; the schema supports 119 data fields per entity (financials, operational metrics, verification status, geographic data, team composition, service capabilities). **234 entities are classified**; the remainder are pending.
+Nuke tracks **2,401 registered businesses**; the schema supports 119 data fields per entity (financials, operational metrics, verification status, geographic data, team composition, service capabilities). **234 entities are classified**; the remainder are pending.
 
 | Business Type | Count |
 |--------------|-------|
@@ -290,7 +290,7 @@ N-Zero tracks **2,401 registered businesses**; the schema supports 119 data fiel
 
 ### 3.3 Source Trust Architecture
 
-Every data source in N-Zero carries a trust score. Examples:
+Every data source in Nuke carries a trust score. Examples:
 
 | Source | Category | Trust Score | Rationale |
 |--------|---------|-------------|-----------|
@@ -308,7 +308,7 @@ Every data source in N-Zero carries a trust score. Examples:
 
 ### 3.4 Vehicle Intelligence Schema
 
-Each vehicle entity in N-Zero can carry up to **119+ structured fields** extracted by AI from descriptions, comments, images, and registry data. This level of granularity is unprecedented in the collector vehicle market.
+Each vehicle entity in Nuke can carry up to **119+ structured fields** extracted by AI from descriptions, comments, images, and registry data. This level of granularity is unprecedented in the collector vehicle market.
 
 #### Identity Fields (12)
 | Field | Description | Example |
@@ -397,7 +397,7 @@ Distribution Layer
 
 ### 3.6 Market Segment Analysis
 
-N-Zero's database reveals distinct market segments with different characteristics:
+Nuke's database reveals distinct market segments with different characteristics:
 
 #### By Era
 
@@ -487,9 +487,9 @@ The collector vehicle ecosystem is composed of several interdependent segments:
 | **Lending** | Specialty vehicle lenders, banks | Growing segment | Collateral valuation, depreciation |
 | **Fractional ownership** | Rally, Otis, emerging platforms | Growing | Authenticated data, indices |
 
-### 4.3 N-Zero Market Penetration
+### 4.3 Nuke Market Penetration
 
-| Metric | N-Zero | Total Market | Coverage |
+| Metric | Nuke | Total Market | Coverage |
 |--------|--------|-------------|---------|
 | Vehicles tracked | 768,288 | 43 million (US) | 1.8% |
 | Transaction value tracked | $41.6 billion | $4.8B/year (auction) | 8.7x annual volume |
@@ -516,7 +516,7 @@ At current ingestion rate (8,320 vehicles/day = ~3M/year), coverage is expanding
 
 The European Union is the **largest regional market** for collector car auction sales globally. Heritage marques (Ferrari, Porsche, Mercedes-Benz, Jaguar, Aston Martin, Alfa Romeo) and premium events (Rétromobile Paris, Goodwood Festival of Speed, Villa d'Este Concorso) drive significant volume.
 
-**N-Zero's European data position (already in database):**
+**Nuke's European data position (already in database):**
 
 | Metric | Value |
 |--------|-------|
@@ -539,7 +539,7 @@ Germany, Italy, and the United Kingdom represent the largest European collector 
 
 The Japanese Domestic Market (JDM) collector segment is experiencing the fastest appreciation rates in the collector car world. The US 25-year import rule creates a rolling window of newly eligible Japanese vehicles each year, driving sustained demand.
 
-**N-Zero's JDM data position:**
+**Nuke's JDM data position:**
 
 | Make | Vehicles Tracked | Avg Sale Price |
 |------|-----------------|---------------|
@@ -572,11 +572,11 @@ The Japan-to-US export pipeline represents a unique data opportunity: tracking p
 
 ### Position: Enabler, Not Competitor
 
-N-Zero does not compete with any existing market participant. It provides a data infrastructure service that does not currently exist and is designed to integrate with everyone via API.
+Nuke does not compete with any existing market participant. It provides a data infrastructure service that does not currently exist and is designed to integrate with everyone via API.
 
 **"We don't make money if YOU don't make money."**
 
-| Ecosystem Player | Their Business | N-Zero's Relationship |
+| Ecosystem Player | Their Business | Nuke's Relationship |
 |-----------------|---------------|----------------------|
 | Carfax | Title/accident history | Future data source (~$700/mo available). We already enrich far beyond what Carfax covers using free public sources. |
 | Hagerty | Insurance + valuation | Data customer. Better valuation data improves their pricing accuracy. |
@@ -587,7 +587,7 @@ N-Zero does not compete with any existing market participant. It provides a data
 | Insurance companies | Risk pricing | Data licensing. Accurate valuations, provenance, condition data. |
 | Lenders | Vehicle-backed loans | Data licensing. Collateral valuation, depreciation curves. |
 
-**Why no one is competing with us:** The granular data N-Zero captures is simply available - in auction comments, forum threads, shop records, registry documents, social media posts, and owner knowledge. No one has built the database and pipeline to accept it. Existing players are marketplaces (they generate data but don't structure it), aggregators (they scrape prices but don't go deeper), insurance/editorial (they publish guides but don't compute from raw data), or mass-market (they don't serve collectors at all). N-Zero is the infrastructure layer underneath all of them.
+**Why no one is competing with us:** The granular data Nuke captures is simply available - in auction comments, forum threads, shop records, registry documents, social media posts, and owner knowledge. No one has built the database and pipeline to accept it. Existing players are marketplaces (they generate data but don't structure it), aggregators (they scrape prices but don't go deeper), insurance/editorial (they publish guides but don't compute from raw data), or mass-market (they don't serve collectors at all). Nuke is the infrastructure layer underneath all of them.
 
 ### Competitive Moat
 
@@ -634,7 +634,7 @@ N-Zero does not compete with any existing market participant. It provides a data
 **Phase 5: Platform Ecosystem (2027-2028)**
 - Third-party developer ecosystem on Nuke SDK
 - White-label data for dealer websites
-- Physical workspace network (N-Zero garages)
+- Physical workspace network (Nuke garages)
 - SEC-filed derivative and asset market for collector vehicles
 - Real-time auction intelligence feeds
 - Transaction escrow service with data-backed verification
@@ -656,7 +656,7 @@ Every revenue stream is aligned with ecosystem participant success:
 | **Transaction escrow** | Data-backed escrow for peer-to-peer transactions. Fee on completed sales. | $41.6B tracked volume, trust scoring |
 | **Derivative & asset market** | SEC-filed regulated market for collector vehicles as asset class. Trading fees. | 474K valuations, 237K price histories |
 | **Event sponsorship** | Collaborate with auction houses (never compete). Bring in sponsors. | 137K organization signals |
-| **Physical workspaces** | Build garages. Work done in N-Zero spaces feeds platform data. | Physical-digital data loop |
+| **Physical workspaces** | Build garages. Work done in Nuke spaces feeds platform data. | Physical-digital data loop |
 | **API access** | Tiered B2B data subscriptions for developers and organizations. | 310 microservices, production SDK |
 | **Live auction prediction market** | Kalshi-style prediction contracts on live auction outcomes. Viewers predict final prices in real-time; closest prediction wins. | 10.8M comments, 3.4M bids prove audience engagement. CFTC-regulated framework (Designated Contract Market). |
 
@@ -715,13 +715,13 @@ All 768K vehicles have been built entirely from freely available public data sou
 
 ### Market Risks
 
-**Economic sensitivity:** The collector vehicle market correlates with discretionary spending. However, N-Zero's risk profile differs from a transaction platform. As a data infrastructure provider, N-Zero becomes MORE valuable during uncertain markets - when pricing certainty is scarce, data is premium. The 2008-2009 recession saw collector car prices decline 15-20%, but demand for valuation data and appraisals actually increased as owners needed to know what their vehicles were worth for insurance, lending, and estate purposes.
+**Economic sensitivity:** The collector vehicle market correlates with discretionary spending. However, Nuke's risk profile differs from a transaction platform. As a data infrastructure provider, Nuke becomes MORE valuable during uncertain markets - when pricing certainty is scarce, data is premium. The 2008-2009 recession saw collector car prices decline 15-20%, but demand for valuation data and appraisals actually increased as owners needed to know what their vehicles were worth for insurance, lending, and estate purposes.
 
-**Market cyclicality:** The collector market has historically followed 7-10 year cycles. The current cycle is in a growth phase (2025 auction sales up 10%). N-Zero's multi-revenue model means it generates value across all cycle phases: bull markets drive transaction fees and prediction market volume; bear markets drive data licensing and insurance valuation demand.
+**Market cyclicality:** The collector market has historically followed 7-10 year cycles. The current cycle is in a growth phase (2025 auction sales up 10%). Nuke's multi-revenue model means it generates value across all cycle phases: bull markets drive transaction fees and prediction market volume; bear markets drive data licensing and insurance valuation demand.
 
 ### Technology Risks
 
-**Data source access:** Individual sources may restrict scraping or API access. N-Zero mitigates this through extreme source diversity (80+ types, 491K identities). The observation architecture is designed for source-level resilience - loss of any single source has minimal impact on the overall data asset.
+**Data source access:** Individual sources may restrict scraping or API access. Nuke mitigates this through extreme source diversity (80+ types, 491K identities). The observation architecture is designed for source-level resilience - loss of any single source has minimal impact on the overall data asset.
 
 **AI accuracy degradation:** Rapid market shifts could temporarily reduce valuation accuracy. The continuous training pipeline and sentiment monitoring provide self-correcting feedback loops. The current 6.3% median error improves with data volume.
 
@@ -729,7 +729,7 @@ All 768K vehicles have been built entirely from freely available public data sou
 
 ### Regulatory Risks
 
-**Prediction market (CFTC):** CFTC approval required for prediction market contracts. Kalshi has established regulatory precedent as a Designated Contract Market, operating in 43 states. However, ongoing legal challenges from state gambling commissions and tribal gaming interests demonstrate regulatory uncertainty. N-Zero would file as a separate DCM application, likely 12-18 months timeline.
+**Prediction market (CFTC):** CFTC approval required for prediction market contracts. Kalshi has established regulatory precedent as a Designated Contract Market, operating in 43 states. However, ongoing legal challenges from state gambling commissions and tribal gaming interests demonstrate regulatory uncertainty. Nuke would file as a separate DCM application, likely 12-18 months timeline.
 
 **Derivative/asset market (SEC):** SEC filing required for collector vehicle derivative instruments. Form D (Regulation D) for private offerings is well-established. Form C (Regulation Crowdfunding) is also an option. More complex derivative structures may require additional regulatory approvals.
 
@@ -737,9 +737,9 @@ All 768K vehicles have been built entirely from freely available public data sou
 
 ### Competitive Risks
 
-**Large player entry:** Hagerty ($1B+ revenue), Carfax (part of IHS Markit), or a major tech company could build a competing data platform. N-Zero's head start represents 12+ months of compressed development: 768K vehicles, 28.3M images, 310 microservices, 922 tables, proprietary ML models. Replicating this would require significant investment and time, during which N-Zero continues to compound its data advantage.
+**Large player entry:** Hagerty ($1B+ revenue), Carfax (part of IHS Markit), or a major tech company could build a competing data platform. Nuke's head start represents 12+ months of compressed development: 768K vehicles, 28.3M images, 310 microservices, 922 tables, proprietary ML models. Replicating this would require significant investment and time, during which Nuke continues to compound its data advantage.
 
-**Data commoditization:** If vehicle data becomes widely available through open APIs or government mandates, N-Zero's moat shifts from data possession to data intelligence (AI analysis, valuation accuracy, sentiment scoring, prediction markets). The intelligence layer is the durable competitive advantage.
+**Data commoditization:** If vehicle data becomes widely available through open APIs or government mandates, Nuke's moat shifts from data possession to data intelligence (AI analysis, valuation accuracy, sentiment scoring, prediction markets). The intelligence layer is the durable competitive advantage.
 
 ### Operational Risks
 
@@ -765,7 +765,7 @@ All 768K vehicles have been built entirely from freely available public data sou
 
 **Instrument rationale:** SAFEs represent 92% of all pre-seed rounds (Carta Q3 2025 data). No maturity date, no interest accrual, standardized Y Combinator terms. Multiple investors can close at different dates without reopening terms. Legal costs: $0-2K vs. $15-50K for a priced round.
 
-**Valuation rationale:** Median AI pre-seed valuation cap is $17M post-money (2025). N-Zero's data asset (770K+ vehicles, $41.6B tracked, proprietary ML, production SDK) exceeds typical pre-seed stage. CoStar Group - the closest comparable (data infrastructure for commercial real estate) - generates $2.7B annual revenue from a similar model applied to a similar-sized asset class ($1T+). An $18M cap provides investors a fair entry point while respecting the massive infrastructure already built.
+**Valuation rationale:** Median AI pre-seed valuation cap is $17M post-money (2025). Nuke's data asset (770K+ vehicles, $41.6B tracked, proprietary ML, production SDK) exceeds typical pre-seed stage. CoStar Group - the closest comparable (data infrastructure for commercial real estate) - generates $2.7B annual revenue from a similar model applied to a similar-sized asset class ($1T+). An $18M cap provides investors a fair entry point while respecting the massive infrastructure already built.
 
 ### Use of Funds
 
@@ -773,7 +773,7 @@ All 768K vehicles have been built entirely from freely available public data sou
 |----------|--------|---|---------|
 | **Co-Founder + Key Hires** | $800,000 | 40% | Technical co-founder/CTO (priority #1 - reduces key-person risk), 1-2 engineers for backend, ML, and B2B integration |
 | **Infrastructure & Scaling** | $400,000 | 20% | Database capacity (read replicas, compute scaling), storage for projected 100M+ images, API infrastructure for production B2B traffic, uptime and reliability hardening |
-| **Regulatory & Legal** | $300,000 | 15% | SEC registration (Form D for derivative/asset market), CFTC Designated Contract Market application (prediction market), corporate counsel, IP/trademark protection (N-Zero, YONO, Nuke) |
+| **Regulatory & Legal** | $300,000 | 15% | SEC registration (Form D for derivative/asset market), CFTC Designated Contract Market application (prediction market), corporate counsel, IP/trademark protection (Nuke, YONO, Nuke) |
 | **Revenue Launch** | $300,000 | 15% | API monetization infrastructure, first enterprise sales hires, partnership development (auction houses, dealers, insurers), initial go-to-market |
 | **Operations & Buffer** | $200,000 | 10% | Office/workspace, insurance, accounting, travel for partnership development, 6-month emergency buffer at current burn rate |
 
@@ -798,7 +798,7 @@ All 768K vehicles have been built entirely from freely available public data sou
 - **SEC:** Form D and any registration or exemption work for derivative/asset market initiatives; estimated $35–75K.  
 - **CFTC:** Designated Contract Market (DCM) application and ongoing compliance for prediction market; estimated $100–180K (phased over 18–24 months).  
 - **Corporate counsel:** Retainer for corporate, contracts, and governance; estimated $4–8K/month over the period ($72–144K).  
-- **IP and trademarks:** USPTO filings and enforcement for N-Zero, YONO, Nuke; estimated $8–20K.  
+- **IP and trademarks:** USPTO filings and enforcement for Nuke, YONO, Nuke; estimated $8–20K.  
 
 **4. Revenue Launch ($300,000)**  
 - **API monetization build:** Billing, usage metering, customer dashboards, and tiered access; estimated $40–80K.  
@@ -995,7 +995,7 @@ Complete listing of observation sources with trust scores and categories:
 
 ### Appendix D: Data Quality Framework
 
-N-Zero employs a multi-layer data quality framework:
+Nuke employs a multi-layer data quality framework:
 
 **Layer 1: Source Trust Scoring**
 Every observation source carries a base trust score (0.0 to 1.0). Higher-trust sources override lower-trust sources when conflicts exist. Factory registries (0.98) trump forum posts (0.50).
@@ -1047,36 +1047,36 @@ Subscription Tiers (Planned):
 ### Appendix F: Use Cases & Value Creation
 
 **Use Case 1: Dealer Inventory Intelligence**
-A specialty Porsche dealer lists a 1973 911S Targa. Without N-Zero: hours of manual research for pricing. With N-Zero API: instant valuation ($67,500, ±3.3% error), 47 comparable sales, sentiment analysis (0.82), AI-recommended listing platform (BaT), and market trend (up 12% YoY). Revenue: $299/mo API subscription + auction lead commission.
+A specialty Porsche dealer lists a 1973 911S Targa. Without Nuke: hours of manual research for pricing. With Nuke API: instant valuation ($67,500, ±3.3% error), 47 comparable sales, sentiment analysis (0.82), AI-recommended listing platform (BaT), and market trend (up 12% YoY). Revenue: $299/mo API subscription + auction lead commission.
 
 **Use Case 2: Insurance Portfolio Valuation**
-An insurer prices a policy for 15 collector vehicles. Without N-Zero: manual appraisal ($200-500 per vehicle, 2-3 weeks). With N-Zero: batch API returns all 15 valuations with confidence scores in milliseconds. Revenue: data licensing agreement.
+An insurer prices a policy for 15 collector vehicles. Without Nuke: manual appraisal ($200-500 per vehicle, 2-3 weeks). With Nuke: batch API returns all 15 valuations with confidence scores in milliseconds. Revenue: data licensing agreement.
 
 **Use Case 3: Live Auction Prediction**
-RM Sotheby's auctions a 1965 Ferrari 275 GTB. N-Zero shows AI estimate ($2.8M based on 14,092 Ferrari records). 5,000 viewers place $10 predictions. Vehicle sells for $3.1M. Closest predictor wins $45K. N-Zero earns $5K rake + crowd-sourced pricing data from all 5,000 predictions.
+RM Sotheby's auctions a 1965 Ferrari 275 GTB. Nuke shows AI estimate ($2.8M based on 14,092 Ferrari records). 5,000 viewers place $10 predictions. Vehicle sells for $3.1M. Closest predictor wins $45K. Nuke earns $5K rake + crowd-sourced pricing data from all 5,000 predictions.
 
 **Use Case 4: JDM Import Provenance**
-A buyer considers a 1995 R33 Skyline GT-R imported from Japan. N-Zero provides: complete provenance chain from Japanese auction (USS) through export dealer to US customs to state registration. Chassis number verification. Service history. Revenue: provenance report ($50-100) + escrow if transaction proceeds.
+A buyer considers a 1995 R33 Skyline GT-R imported from Japan. Nuke provides: complete provenance chain from Japanese auction (USS) through export dealer to US customs to state registration. Chassis number verification. Service history. Revenue: provenance report ($50-100) + escrow if transaction proceeds.
 
 **Use Case 5: Collection Portfolio Management**
-A collector owns 40 vehicles worth ~$8M across 3 states. N-Zero provides: real-time portfolio dashboard, 12-month performance, individual vehicle trends, insurance adequacy alerts, maintenance recommendations. Revenue: enterprise subscription ($999/mo).
+A collector owns 40 vehicles worth ~$8M across 3 states. Nuke provides: real-time portfolio dashboard, 12-month performance, individual vehicle trends, insurance adequacy alerts, maintenance recommendations. Revenue: enterprise subscription ($999/mo).
 
 **Use Case 6: Parts Marketplace Integration**
 Owner of a 1970 Plymouth 'Cuda receives AI alert: "Based on 47 similar vehicles at this mileage, your brake master cylinder is likely due for replacement. Here are 3 verified suppliers with pricing." Revenue: 5% commission on parts sale.
 
 ### Appendix G: Comparable Companies & Market Positioning
 
-| Company | Business | Revenue | Data | N-Zero Comparison |
+| Company | Business | Revenue | Data | Nuke Comparison |
 |---------|----------|---------|------|-------------------|
-| **Hagerty** (NYSE: HGTY) | Collector car insurance + media | $1B+ revenue (2024) | 2.7M insured vehicles | N-Zero provides deeper data per vehicle. Hagerty is a customer, not competitor. |
-| **Carfax** (IHS Markit) | Mass-market vehicle history | ~$1B+ revenue | 30B+ records (mass market) | Carfax covers mass market. N-Zero serves collectors specifically. Available as future enrichment (~$700/mo). |
-| **Classic.com** | Price aggregation | Private | Price data, limited depth | N-Zero has 10x the data depth (comments, sentiment, images, observations). |
-| **Bring a Trailer** | Online auction marketplace | ~$50M+ (est.) | 132K+ listings | BaT generates data. N-Zero structures and enriches it. Lead source. |
-| **Kalshi** | Prediction market | $50M+ ARR (est.) | Event outcomes | Regulatory model for N-Zero's live auction prediction market. |
-| **CoStar Group** | Commercial real estate data | $2.7B revenue (2024) | Property data platform | **Best comparable for N-Zero's model.** CoStar is the data layer for commercial real estate. N-Zero is the data layer for collector vehicles. |
-| **Zillow** | Residential real estate data | $2.2B revenue (2024) | 110M homes | Zillow's Zestimate is comparable to N-Zero's valuation engine. N-Zero's 6.3% median error is competitive with Zillow's 7.5% median error. |
+| **Hagerty** (NYSE: HGTY) | Collector car insurance + media | $1B+ revenue (2024) | 2.7M insured vehicles | Nuke provides deeper data per vehicle. Hagerty is a customer, not competitor. |
+| **Carfax** (IHS Markit) | Mass-market vehicle history | ~$1B+ revenue | 30B+ records (mass market) | Carfax covers mass market. Nuke serves collectors specifically. Available as future enrichment (~$700/mo). |
+| **Classic.com** | Price aggregation | Private | Price data, limited depth | Nuke has 10x the data depth (comments, sentiment, images, observations). |
+| **Bring a Trailer** | Online auction marketplace | ~$50M+ (est.) | 132K+ listings | BaT generates data. Nuke structures and enriches it. Lead source. |
+| **Kalshi** | Prediction market | $50M+ ARR (est.) | Event outcomes | Regulatory model for Nuke's live auction prediction market. |
+| **CoStar Group** | Commercial real estate data | $2.7B revenue (2024) | Property data platform | **Best comparable for Nuke's model.** CoStar is the data layer for commercial real estate. Nuke is the data layer for collector vehicles. |
+| **Zillow** | Residential real estate data | $2.2B revenue (2024) | 110M homes | Zillow's Zestimate is comparable to Nuke's valuation engine. Nuke's 6.3% median error is competitive with Zillow's 7.5% median error. |
 
-**The CoStar comparison is the most instructive.** CoStar Group provides data infrastructure for commercial real estate - an asset class with similar characteristics to collector vehicles (unique assets, illiquid markets, fragmented data, expert knowledge required). CoStar generates $2.7B in annual revenue from data subscriptions, analytics, and marketplace tools. The collector vehicle market ($1T+ in asset value) is of comparable scale but has no equivalent data infrastructure. N-Zero is building it.
+**The CoStar comparison is the most instructive.** CoStar Group provides data infrastructure for commercial real estate - an asset class with similar characteristics to collector vehicles (unique assets, illiquid markets, fragmented data, expert knowledge required). CoStar generates $2.7B in annual revenue from data subscriptions, analytics, and marketplace tools. The collector vehicle market ($1T+ in asset value) is of comparable scale but has no equivalent data infrastructure. Nuke is building it.
 
 ### Appendix H: Legal & Regulatory Roadmap
 
@@ -1087,14 +1087,14 @@ Owner of a 1970 Plymouth 'Cuda receives AI alert: "Based on 47 similar vehicles 
 | Privacy policy (CCPA/GDPR) | State/EU | In development | Q2 2026 |
 | SEC Form D (derivative market) | SEC | Planning | 2027-2028 |
 | CFTC DCM application (prediction market) | CFTC | Research phase | 2027 |
-| Trademark (N-Zero, YONO, Nuke) | USPTO | Not yet filed | Q2-Q3 2026 |
+| Trademark (Nuke, YONO, Nuke) | USPTO | Not yet filed | Q2-Q3 2026 |
 | Patent (observation architecture) | USPTO | Under review | TBD |
 
 ### Appendix I: Visual Identity
 
 **Design Philosophy:** Retro-modern computing aesthetic. Windows 95-inspired interface merged with modern data density. The visual language communicates: "serious data infrastructure, built by people who understand cars."
 
-**N-Zero Logo:** Blue pixel-art circular glow (`#66ccff` core) - retro computing aesthetic with automotive precision.
+**Nuke Logo:** Blue pixel-art circular glow (`#66ccff` core) - retro computing aesthetic with automotive precision.
 
 **Color System:**
 | Element | Light Mode | Dark Mode |
@@ -1117,5 +1117,5 @@ Owner of a 1970 Plymouth 'Cuda receives AI alert: "Based on 47 similar vehicles 
 
 *This document is confidential and intended only for the addressee.*
 *All data from live system queries on February 8, 2026.*
-*N-Zero is a project of Nuke Ltd (Nevada, 2022).*
+*Nuke is a project of Nuke Ltd (Nevada, 2022).*
 *Skylar Williams, Founder & CEO*

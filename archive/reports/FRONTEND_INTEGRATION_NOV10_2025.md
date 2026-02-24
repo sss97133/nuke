@@ -277,7 +277,7 @@ The site now displays:
 - Evidence-backed financial data
 - Confidence scores for every value
 
-**Production is live and functional at https://n-zero.dev** 🚀
+**Production is live and functional at https://nuke.ag** 🚀
 
 ---
 

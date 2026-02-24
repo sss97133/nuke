@@ -28,7 +28,7 @@ TIMELINE_EVENTS (work done)
     ↓
 GENERATED_INVOICES (invoice created)
     ├─ payment_token (public access key)
-    ├─ payment_link (https://n-zero.dev/pay/TOKEN)
+    ├─ payment_link (https://nuke.ag/pay/TOKEN)
     ├─ preferred_payment_method
     └─ payment_method_details (JSONB)
         ↓
@@ -115,10 +115,10 @@ After payment → "Create account to track all invoices" → Client signs up
 
 ```
 PUBLIC LINK:
-https://n-zero.dev/pay/A1B2C3D4E5F6G7H8
+https://nuke.ag/pay/A1B2C3D4E5F6G7H8
 
 COMPONENTS:
-- Domain: n-zero.dev
+- Domain: nuke.ag
 - Path: /pay/
 - Token: 32-character random string
   - Example: A1B2C3D4E5F6G7H8
@@ -259,7 +259,7 @@ SCENARIO: Oil Change Service
 3. PAYMENT LINK CREATED
    └─ generate_invoice_payment_link()
       ├─ Token: A1B2C3D4E5F6G7H8
-      └─ Link: https://n-zero.dev/pay/A1B2C3D4E5F6G7H8
+      └─ Link: https://nuke.ag/pay/A1B2C3D4E5F6G7H8
 
 4. SHOP SHARES LINK
    └─ Email sent to client OR

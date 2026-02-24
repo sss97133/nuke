@@ -1,6 +1,6 @@
 # 📱 Mobile Feature Parity - Manual Testing Guide
 
-**Production URL:** https://n-zero.dev  
+**Production URL:** https://nuke.ag  
 **Test Device:** Your iPhone/Android  
 **Account Needed:** Yes (for owner features)
 
@@ -43,7 +43,7 @@
 ### 🔐 Phase 2: Owner Features (Login Required)
 
 **Login First:**
-1. Go to https://n-zero.dev
+1. Go to https://nuke.ag
 2. Log in with your account
 3. Navigate to one of YOUR vehicles
 
@@ -123,7 +123,7 @@
 ### 🏢 Phase 3: Organization Features (Org Member Required)
 
 **Test 8: Organization Switcher**
-1. Visit https://n-zero.dev/mobile/org on mobile
+1. Visit https://nuke.ag/mobile/org on mobile
 2. **Expected (if you're in any orgs):**
    - Dropdown shows your organizations
    - Each shows: Logo, Name, Role
@@ -207,9 +207,9 @@ Check `test-results/` folder:
 
 **Commit:** `20bf483f`  
 **Build:** ✅ Successful  
-**Deploy:** ✅ Production (https://n-zero.dev)  
+**Deploy:** ✅ Production (https://nuke.ag)  
 **Bundle:** New static assets deployed  
-**Verification:** Run `curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1`
+**Verification:** Run `curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1`
 
 ---
 
@@ -218,7 +218,7 @@ Check `test-results/` folder:
 **Best way to verify everything:**
 
 1. **On Your Phone:**
-   - Visit https://n-zero.dev
+   - Visit https://nuke.ag
    - Log in
    - Go to one of YOUR vehicles
    - Test all 6 features above

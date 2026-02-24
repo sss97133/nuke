@@ -205,7 +205,7 @@
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │ 💡 Did you know?                                        │ │
 │  │                                                          │ │
-│  │ The N-Zero system coordinates between facilities and    │ │
+│  │ The Nuke system coordinates between facilities and    │ │
 │  │ independent skilled labor to get you the best quality   │ │
 │  │ work at fair prices. Everyone gets paid for their      │ │
 │  │ specialization!                                         │ │
@@ -252,7 +252,7 @@
 │  ├─ Master painter (40 hours)              $1,400           │
 │  └─ 70% of total                                            │
 │                                                               │
-│  Platform Fee (N-Zero)                     $200             │
+│  Platform Fee (Nuke)                     $200             │
 │  ├─ Coordination & matching                                 │
 │  ├─ Contract generation                                     │
 │  ├─ Payment processing                                      │
@@ -352,7 +352,7 @@
 │  • Labor receives: $1,400 (70%)                             │
 │  • Platform fee: $200 (10%)                                 │
 │                                                               │
-│  🔒 All payments protected by N-Zero escrow                 │
+│  🔒 All payments protected by Nuke escrow                 │
 │                                                               │
 ├──────────────────────────────────────────────────────────────┤
 │                                                               │

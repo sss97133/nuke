@@ -285,7 +285,7 @@ Result: ✅ Detected as "spid"
 - **URL**: https://supabase.com/dashboard/project/qkgaybvrernstplzjaam/functions
 
 ### Frontend
-- **Bundle**: nuke-f0cwmewnt-nzero.vercel.app
+- **Bundle**: nuke-f0cwmewnt-nuke.vercel.app
 - **Upload Size**: 24.8KB
 - **Build Time**: 4 seconds
 - **Status**: Production live
@@ -421,7 +421,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 ---
 
 **Deployed**: November 22, 2025  
-**Production URL**: https://n-zero.dev  
+**Production URL**: https://nuke.ag  
 **Edge Function**: detect-sensitive-document v2  
 **Frontend Build**: nuke-f0cwmewnt
 

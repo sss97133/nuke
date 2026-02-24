@@ -106,9 +106,9 @@ console.log('🔍 TAG DEBUG:', {
 
 ### **How to Test:**
 
-**Step 1: Visit n-zero.dev**
+**Step 1: Visit nuke.ag**
 ```
-https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 ```
 
 **Step 2: Open Browser Console**

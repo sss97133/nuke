@@ -2,7 +2,7 @@
 
 ## What We Built
 
-A comprehensive dual-revenue auction system that positions N-Zero as BOTH:
+A comprehensive dual-revenue auction system that positions Nuke as BOTH:
 1. **A competitive auction marketplace** (like Bring a Trailer)
 2. **A valuable listing preparation service** (helping users succeed on ANY platform)
 
@@ -15,7 +15,7 @@ A comprehensive dual-revenue auction system that positions N-Zero as BOTH:
 Build auction platform → Compete with BaT → Hope to steal users → Slow growth
 ```
 
-### N-Zero Approach (Multi-Platform Service)
+### Nuke Approach (Multi-Platform Service)
 ```
 Build auction platform + Export tools → Help users everywhere → Earn from all → Fast growth
 ```
@@ -28,7 +28,7 @@ Build auction platform + Export tools → Help users everywhere → Earn from al
 
 ### Two Revenue Streams
 
-**Stream 1: N-Zero Auctions**
+**Stream 1: Nuke Auctions**
 - User lists vehicle on our platform
 - We handle bidding, payments, escrow
 - We earn **3-5% success fee**
@@ -44,12 +44,12 @@ Build auction platform + Export tools → Help users everywhere → Earn from al
 ### Projected Revenue
 
 **Conservative (100 vehicles/month):**
-- 30 N-Zero auctions × $25k avg × 3% = $22,500/month
+- 30 Nuke auctions × $25k avg × 3% = $22,500/month
 - 70 exports × 30% conversion × $50k avg × 1.5% = $15,750/month
 - **Total: $38,250/month = $459,000/year**
 
 **Growth (1,000 vehicles/month):**
-- 300 N-Zero auctions = $225,000/month
+- 300 Nuke auctions = $225,000/month
 - 700 exports = $157,500/month
 - **Total: $382,500/month = $4.59M/year**
 
@@ -81,7 +81,7 @@ Build auction platform + Export tools → Help users everywhere → Earn from al
    - AI description generation
 
 4. **AuctionAnalyticsDashboard.tsx** - Performance metrics
-   - N-Zero auction stats
+   - Nuke auction stats
    - External platform analytics
    - Conversion tracking
    - Revenue reporting
@@ -137,7 +137,7 @@ Build auction platform + Export tools → Help users everywhere → Earn from al
 - Revenue tracking
 - Platform comparison
 
-### For N-Zero
+### For Nuke
 
 **Revenue:**
 - Dual income streams
@@ -163,7 +163,7 @@ Build auction platform + Export tools → Help users everywhere → Earn from al
 
 ### vs Bring a Trailer
 
-| Feature | BaT | N-Zero |
+| Feature | BaT | Nuke |
 |---------|-----|--------|
 | **Auction Duration** | 7 days fixed | 5 min to 14 days |
 | **Seller Fee** | 5% | 3% |
@@ -175,7 +175,7 @@ Build auction platform + Export tools → Help users everywhere → Earn from al
 
 ### vs eBay Motors
 
-| Feature | eBay | N-Zero |
+| Feature | eBay | Nuke |
 |---------|------|--------|
 | **Listing Prep** | Manual | Automated |
 | **Multiple Platforms** | No | Yes |
@@ -185,7 +185,7 @@ Build auction platform + Export tools → Help users everywhere → Earn from al
 
 ### vs Craigslist
 
-| Feature | Craigslist | N-Zero |
+| Feature | Craigslist | Nuke |
 |---------|-----------|--------|
 | **National Reach** | No | Yes |
 | **Secure Bidding** | No | Yes |
@@ -197,25 +197,25 @@ Build auction platform + Export tools → Help users everywhere → Earn from al
 
 ## User Flows
 
-### Flow 1: List on N-Zero
+### Flow 1: List on Nuke
 ```
 User has vehicle → Create Auction → Configure (type, pricing) → 
 Generate description → List → Bidding begins → Auction ends → 
-Vehicle sold → N-Zero earns 3-5%
+Vehicle sold → Nuke earns 3-5%
 ```
 
 ### Flow 2: Export to External Platforms
 ```
 User has vehicle → Prepare Listing → Select platforms (BaT, eBay, etc) → 
 Customize per platform → Export packages → User submits manually → 
-Track in N-Zero → Vehicle sells → N-Zero earns 1-2%
+Track in Nuke → Vehicle sells → Nuke earns 1-2%
 ```
 
 ### Flow 3: Multi-Platform Strategy
 ```
-User has vehicle → Prepare exports for BaT + eBay → List on N-Zero too → 
+User has vehicle → Prepare exports for BaT + eBay → List on Nuke too → 
 Maximize exposure → Sell on whichever gets best price → 
-N-Zero earns commission regardless
+Nuke earns commission regardless
 ```
 
 ---
@@ -288,7 +288,7 @@ N-Zero earns commission regardless
 
 ### Revenue
 - Monthly GMV (Gross Merchandise Value)
-- N-Zero auction revenue
+- Nuke auction revenue
 - External platform commissions
 - Average revenue per user
 - Commission per sale
@@ -352,7 +352,7 @@ N-Zero earns commission regardless
 
 ### 1. Win-Win-Win Model
 - **Users:** Free tools + choice of platforms
-- **N-Zero:** Multiple revenue streams + user loyalty
+- **Nuke:** Multiple revenue streams + user loyalty
 - **Other Platforms:** Better listings + engaged sellers
 
 ### 2. Lower Risk
@@ -481,6 +481,6 @@ We've built a sophisticated dual-revenue auction system that:
 
 **Built:** November 22, 2025  
 **By:** AI Assistant  
-**For:** N-Zero Platform  
+**For:** Nuke Platform  
 **Quality:** Zero linting errors, production-ready
 

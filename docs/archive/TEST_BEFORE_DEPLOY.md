@@ -247,7 +247,7 @@ vercel --yes
    ```
 
 3. **Verify Dashboard Loads**
-   - Visit: https://n-zero.dev/admin/image-processing
+   - Visit: https://nuke.ag/admin/image-processing
    - Should show 0 images processed (normal before batch run)
 
 4. **Start Small Batch** (100 images)

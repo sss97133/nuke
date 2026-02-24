@@ -3,8 +3,8 @@
 **Status:** 🎉 **ALL SYSTEMS DEPLOYED AND OPERATIONAL**  
 **Commit:** `fde348c5`  
 **Production Bundle:** `index-CpAdBFaJ.js` (NEW)  
-**Production URL:** https://n-zero.dev  
-**Deployment:** https://nuke-g46r5q4z3-nzero.vercel.app
+**Production URL:** https://nuke.ag  
+**Deployment:** https://nuke-g46r5q4z3-nuke.vercel.app
 
 ---
 
@@ -89,7 +89,7 @@ Integrated the BuyVehicleButton into vehicle sale settings:
 **Vercel Deployment:**
 ```
 ✅ Deployed to production
-   URL: https://nuke-g46r5q4z3-nzero.vercel.app
+   URL: https://nuke-g46r5q4z3-nuke.vercel.app
    Bundle: index-CpAdBFaJ.js (NEW)
    Build Time: 4 seconds
    Status: Production Ready
@@ -97,7 +97,7 @@ Integrated the BuyVehicleButton into vehicle sale settings:
 
 **Production Verification:**
 ```
-✅ n-zero.dev serving new bundle
+✅ nuke.ag serving new bundle
 ✅ index-CpAdBFaJ.js confirmed live
 ✅ All routes accessible
 ✅ BuyVehicleButton integrated
@@ -120,7 +120,7 @@ Integrated the BuyVehicleButton into vehicle sale settings:
 - ✅ Secrets configured (Stripe, Twilio, etc.)
 
 ### **Frontend:**
-- ✅ Production: https://n-zero.dev
+- ✅ Production: https://nuke.ag
 - ✅ Bundle: index-CpAdBFaJ.js
 - ✅ BuyVehicleButton integrated
 - ✅ All routes working
@@ -213,7 +213,7 @@ Net Profit: $291.03
 1. **Sign Request** (after fee payment):
    ```
    Hi [Name], sign your vehicle purchase documents:
-   https://n-zero.dev/sign/[unique-token]
+   https://nuke.ag/sign/[unique-token]
    
    Vehicle: 1983 GMC C1500
    Price: $15,000
@@ -261,7 +261,7 @@ supabase functions deploy centraldispatch-oauth-callback
 supabase functions deploy get-centraldispatch-auth-url
 
 # 3. Connect via UI
-# Visit: https://n-zero.dev/admin/shipping-settings
+# Visit: https://nuke.ag/admin/shipping-settings
 # Click: "Connect Central Dispatch"
 # Authorize on Central Dispatch OAuth page
 # Done! Automatic shipping listings will start
@@ -469,7 +469,7 @@ Could not resolve host: github.com
    ```
 
 2. **Connect via UI:**
-   - Visit: https://n-zero.dev/admin/shipping-settings
+   - Visit: https://nuke.ag/admin/shipping-settings
    - Click "Connect Central Dispatch"
    - Authorize on Central Dispatch
    - Verify connection status updates
@@ -595,7 +595,7 @@ Could not resolve host: github.com
    ```
 
 3. **Connect via UI:**
-   - Visit: https://n-zero.dev/admin/shipping-settings
+   - Visit: https://nuke.ag/admin/shipping-settings
    - Click "Connect Central Dispatch"
    - Complete OAuth flow
    - Verify connection status

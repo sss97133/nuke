@@ -9,7 +9,7 @@ const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const PRODUCTION_URL = 'https://n-zero.dev';
+const PRODUCTION_URL = 'https://nuke.ag';
 const AUTH_STATE_FILE = path.join(__dirname, '.auth-state.json');
 
 const DB_CONFIG = {
@@ -80,11 +80,11 @@ async function setupAuth(browser) {
   const context = await browser.newContext();
   const page = await context.newPage();
   
-  console.log('🌐 Opening n-zero.dev...');
+  console.log('🌐 Opening nuke.ag...');
   await page.goto(PRODUCTION_URL, { waitUntil: 'networkidle' });
   
   console.log('\n📋 INSTRUCTIONS:');
-  console.log('  1. Log in to n-zero.dev in the browser window');
+  console.log('  1. Log in to nuke.ag in the browser window');
   console.log('  2. Wait until you see your profile/dashboard');
   console.log('  3. Close this script (Ctrl+C) to save auth state\n');
   console.log('⏳ Waiting for you to log in...\n');

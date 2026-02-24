@@ -105,8 +105,8 @@ const KNOWN_PLATFORMS: Record<string, { type: string; business_type?: string; ha
   // Dealer / builder inventory (Wix, etc.)
   'victorylapclassics.net': { type: 'vehicle_listing', business_type: 'dealer', handler: 'victorylap' },
 
-  // N-Zero internal
-  'n-zero.dev': { type: 'n-zero_internal', handler: 'n-zero' },
+  // Nuke internal
+  'nuke.ag': { type: 'nuke_internal', handler: 'nuke' },
 };
 
 serve(async (req) => {
@@ -172,13 +172,13 @@ serve(async (req) => {
 
     // Handle known handlers
     switch (detection.handler) {
-      case 'n-zero':
-        if (detection.type === 'n-zero_org') {
-          ({ entityData, entityId } = await processNZeroOrgURL(url, supabase));
+      case 'nuke':
+        if (detection.type === 'nuke_org') {
+          ({ entityData, entityId } = await processNukeOrgURL(url, supabase));
           entityType = 'organization';
           action = 'linked';
-        } else if (detection.type === 'n-zero_vehicle') {
-          ({ entityData, entityId } = await processNZeroVehicleURL(url, supabase));
+        } else if (detection.type === 'nuke_vehicle') {
+          ({ entityData, entityId } = await processNukeVehicleURL(url, supabase));
           entityType = 'vehicle';
           action = 'linked';
         }
@@ -444,8 +444,8 @@ function mapToLeadType(detectedType: string): string {
     'classified_listing': 'vehicle_listing',
     'ebay_listing': 'vehicle_listing',
     'dealer_directory': 'website',
-    'n-zero_org': 'organization',
-    'n-zero_vehicle': 'vehicle_listing',
+    'nuke_org': 'organization',
+    'nuke_vehicle': 'vehicle_listing',
     'motorsport_event': 'event',
     'concours': 'event',
   };
@@ -506,7 +506,7 @@ async function analyzeURLWithPatterns(url: string, detection: URLDetectionResult
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0; +https://n-zero.dev)',
+        'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0; +https://nuke.ag)',
         'Accept': 'text/html,application/xhtml+xml',
       },
       signal: controller.signal,
@@ -601,11 +601,11 @@ function detectURLType(url: string): URLDetectionResult {
     const parsed = new URL(url);
     const hostname = parsed.hostname.replace(/^www\./, '').toLowerCase();
 
-    // Check N-Zero internal URLs first
-    if (hostname.includes('n-zero.dev')) {
-      if (url.includes('/org/')) return { type: 'n-zero_org', platform: 'n-zero', business_type: null, handler: 'n-zero', confidence: 1.0 };
-      if (url.includes('/vehicle/')) return { type: 'n-zero_vehicle', platform: 'n-zero', business_type: null, handler: 'n-zero', confidence: 1.0 };
-      return { type: 'n-zero_internal', platform: 'n-zero', business_type: null, handler: 'n-zero', confidence: 0.9 };
+    // Check Nuke internal URLs first
+    if (hostname.includes('nuke.ag')) {
+      if (url.includes('/org/')) return { type: 'nuke_org', platform: 'nuke', business_type: null, handler: 'nuke', confidence: 1.0 };
+      if (url.includes('/vehicle/')) return { type: 'nuke_vehicle', platform: 'nuke', business_type: null, handler: 'nuke', confidence: 1.0 };
+      return { type: 'nuke_internal', platform: 'nuke', business_type: null, handler: 'nuke', confidence: 0.9 };
     }
 
     // Check known platforms
@@ -1081,12 +1081,12 @@ async function matchListingToVehicle(
 // N-ZERO URL PROCESSORS
 // ============================================
 
-async function processNZeroOrgURL(url: string, supabase: any) {
+async function processNukeOrgURL(url: string, supabase: any) {
   // Extract org ID from URL
   const orgId = url.split('/org/')[1]?.split('?')[0];
   
   if (!orgId) {
-    throw new Error('Invalid n-zero org URL');
+    throw new Error('Invalid Nuke org URL');
   }
 
   // Fetch existing org data
@@ -1105,12 +1105,12 @@ async function processNZeroOrgURL(url: string, supabase: any) {
   };
 }
 
-async function processNZeroVehicleURL(url: string, supabase: any) {
+async function processNukeVehicleURL(url: string, supabase: any) {
   // Extract vehicle ID from URL
   const vehicleId = url.split('/vehicle/')[1]?.split('?')[0];
   
   if (!vehicleId) {
-    throw new Error('Invalid n-zero vehicle URL');
+    throw new Error('Invalid Nuke vehicle URL');
   }
 
   // Fetch existing vehicle data

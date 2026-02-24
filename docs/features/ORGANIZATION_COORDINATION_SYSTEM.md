@@ -2,7 +2,7 @@ Intelligent Organization Coordination System
 
 ## Vision Statement daddy this is a very funny movie what's so funny dummy
 
-**N-Zero transforms idle capacity into economic opportunity by intelligently matching customers, facilities, and skilled labor in real-time.**
+**Nuke transforms idle capacity into economic opportunity by intelligently matching customers, facilities, and skilled labor in real-time.**
 
 We are the **ultimate coordinator** - the invisible hand that:
 1. Finds underutilized facilities with the right equipment
@@ -67,7 +67,7 @@ Viva has the **infrastructure** but **limited full-time staff**:
 - They turn away work because they lack labor
 - Can't expand because hiring full-time staff is risky
 
-### The N-Zero Solution
+### The Nuke Solution
 
 #### 1. **Capacity Monetization**
 Instead of turning away work, Viva rents out their unused capacity:
@@ -77,7 +77,7 @@ Traditional Model:
 ├─ Revenue: ~$8,000/month
 └─ 60% equipment idle
 
-N-Zero Model:
+Nuke Model:
 ├─ 4 internal jobs + 8 coordinated jobs/month
 ├─ Facility fees: $8,000 (internal) + $3,200 (coordination)
 ├─ Total: ~$11,200/month
@@ -85,7 +85,7 @@ N-Zero Model:
 ```
 
 #### 2. **Labor Network Access**
-N-Zero maintains a pool of vetted skilled labor:
+Nuke maintains a pool of vetted skilled labor:
 - **Paint specialists** (12 in Las Vegas area)
 - **Mechanical technicians** (18 in Las Vegas area)
 - **Detailing experts** (7 in Las Vegas area)
@@ -110,18 +110,18 @@ Viva profit:   $800
 Labor:         Employee ($15/hr × 40 hrs = $600)
 ```
 
-N-Zero Model (Viva provides facility, independent labor):
+Nuke Model (Viva provides facility, independent labor):
 ```
 Customer pays:     $2,000
 Facility (Viva):   $400 (20%) - equipment + space
 Labor (John):      $1,400 (70%) - skilled work ($35/hr × 40 hrs)
-Platform (N-Zero): $200 (10%) - coordination + contracts
+Platform (Nuke): $200 (10%) - coordination + contracts
 
 Benefits:
 ├─ Customer: Same price, verified quality
 ├─ Viva: $400 for equipment access (40% margin vs 40% on full job)
 ├─ John: $1,400 for his time (2.3x employee wage)
-└─ N-Zero: $200 for coordination
+└─ Nuke: $200 for coordination
 ```
 
 **Scale this across 8 jobs/month**:
@@ -568,13 +568,13 @@ Milestone 4: Final delivery
 
 ### For Facilities (Viva! Las Vegas Autos)
 
-**Before N-Zero:**
+**Before Nuke:**
 - Revenue: $8,000/month (4 internal jobs)
 - Equipment utilization: 40%
 - Profit margin: 40% (~$3,200)
 - Staff: Owner + 2 employees (fixed cost)
 
-**After N-Zero:**
+**After Nuke:**
 - Revenue: $8,000 (internal) + $3,200 (facility fees)
 - Total: $11,200/month
 - Equipment utilization: 85%
@@ -584,13 +584,13 @@ Milestone 4: Final delivery
 
 ### For Labor (John Martinez)
 
-**Before N-Zero:**
+**Before Nuke:**
 - Finding clients: Manual networking, Craigslist, word-of-mouth
 - Time spent finding work: ~10 hours/week
 - Inconsistent income: $2,000-4,000/month
 - No facility access: Limited to mobile work
 
-**After N-Zero:**
+**After Nuke:**
 - Job matching: Automated, instant
 - Time spent finding work: ~1 hour/week
 - Consistent income: $4,000-5,000/month
@@ -599,20 +599,20 @@ Milestone 4: Final delivery
 
 ### For Customers
 
-**Before N-Zero:**
+**Before Nuke:**
 - Finding quality labor: Hours of research
 - Price uncertainty: Get 3-5 quotes, wide variance
 - Risk: Unknown labor quality
 - Limited options: Only shops with full staff
 
-**After N-Zero:**
+**After Nuke:**
 - Finding labor: 30-second quote
 - Price transparency: See exactly what you're paying for
 - Quality assurance: Vetted labor with reviews
 - More options: Any facility + any skilled worker
 - **Net benefit: Better prices + higher quality + less time**
 
-### For Platform (N-Zero)
+### For Platform (Nuke)
 
 **Per facility at scale:**
 - 8 coordinated jobs/month per facility

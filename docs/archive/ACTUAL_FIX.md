@@ -50,7 +50,7 @@ vercel --prod --force --yes
 ## The Header Change
 - File: `nuke_frontend/src/components/layout/ProfileBalancePill.tsx`
 - Change: Hides "$0.00" when balance is zero
-- Shows: Just "n-zero" + profile circle when balance is $0
+- Shows: Just "nuke" + profile circle when balance is $0
 
 ## If Deployment Still Fails
 Check Vercel build logs for the specific error and fix it.

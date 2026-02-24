@@ -6,7 +6,7 @@ A **public-facing market intelligence dashboard** that shows the "life force" of
 
 ## 📍 Access
 
-**URL:** https://n-zero.dev/market/squarebodies
+**URL:** https://nuke.ag/market/squarebodies
 
 **Public Access:** No login required - anyone can view market activity
 
@@ -125,5 +125,5 @@ Potential additions:
 
 **Last Updated:** January 2025  
 **Status:** Public market intelligence dashboard  
-**Access:** https://n-zero.dev/market/squarebodies
+**Access:** https://nuke.ag/market/squarebodies
 

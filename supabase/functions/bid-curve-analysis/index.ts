@@ -88,8 +88,11 @@ async function vehicleMode(supabase: any, body: any) {
 
   if (vErr) throw vErr;
 
-  // Get all bids for this vehicle, ordered by time
-  const { data: bids, error: bErr } = await supabase
+  // Get all bids for this vehicle — try bat_bids first, fallback to external_auction_bids
+  let bids: any[] = [];
+  let platform = "bat";
+
+  const { data: batBids, error: bErr } = await supabase
     .from("bat_bids")
     .select(
       "id, bid_amount, bid_timestamp, bat_username, is_winning_bid, is_final_bid"
@@ -98,6 +101,34 @@ async function vehicleMode(supabase: any, body: any) {
     .order("bid_timestamp", { ascending: true });
 
   if (bErr) throw bErr;
+
+  if (batBids && batBids.length > 0) {
+    bids = batBids;
+  } else {
+    // Fallback: check external_auction_bids (C&B, Hagerty, etc.)
+    const { data: extBids, error: eErr } = await supabase
+      .from("external_auction_bids")
+      .select(
+        "id, bid_amount, bid_timestamp, bidder_username, is_winning_bid, bid_number, platform"
+      )
+      .eq("vehicle_id", vehicleId)
+      .order("bid_number", { ascending: true });
+
+    if (eErr) throw eErr;
+
+    if (extBids && extBids.length > 0) {
+      platform = extBids[0].platform || "external";
+      // Normalize to same shape as bat_bids
+      bids = extBids.map((b: any) => ({
+        id: b.id,
+        bid_amount: b.bid_amount,
+        bid_timestamp: b.bid_timestamp,
+        bat_username: b.bidder_username,
+        is_winning_bid: b.is_winning_bid,
+        is_final_bid: false,
+      }));
+    }
+  }
 
   if (!bids || bids.length === 0) {
     return { vehicle, bids: [], summary: { bid_count: 0 } };
@@ -131,6 +162,7 @@ async function vehicleMode(supabase: any, body: any) {
 
   return {
     vehicle,
+    platform,
     bid_count: bids.length,
     bids: bids.map((b: any) => ({
       amount: Number(b.bid_amount),
@@ -295,8 +327,67 @@ async function bidderProfileMode(supabase: any, body: any) {
 
   if (rErr) throw rErr;
 
+  // Bidder style classification: analyze bid timing distribution
+  const { data: timing, error: tErr } = await supabase.rpc("execute_sql", {
+    query: `
+      WITH auction_ranges AS (
+        SELECT
+          bat_listing_id,
+          min(bid_timestamp) AS auction_start,
+          max(bid_timestamp) AS auction_end,
+          EXTRACT(EPOCH FROM max(bid_timestamp) - min(bid_timestamp)) AS duration_secs
+        FROM bat_bids
+        WHERE bat_listing_id IN (
+          SELECT DISTINCT bat_listing_id FROM bat_bids WHERE bat_username = '${safeUsername}'
+        )
+        GROUP BY bat_listing_id
+        HAVING count(*) >= 3
+      ),
+      bidder_timing AS (
+        SELECT
+          b.bat_listing_id,
+          CASE
+            WHEN ar.duration_secs > 0 THEN
+              EXTRACT(EPOCH FROM b.bid_timestamp - ar.auction_start) / ar.duration_secs
+            ELSE 0.5
+          END AS pct_through
+        FROM bat_bids b
+        JOIN auction_ranges ar ON ar.bat_listing_id = b.bat_listing_id
+        WHERE b.bat_username = '${safeUsername}'
+      )
+      SELECT
+        count(*) AS total_bids,
+        count(*) FILTER (WHERE pct_through <= 0.25) AS early_bids,
+        count(*) FILTER (WHERE pct_through >= 0.90) AS snipe_bids,
+        ROUND(stddev(pct_through)::numeric, 3) AS timing_stddev,
+        count(DISTINCT bat_listing_id) AS auctions_with_timing
+      FROM bidder_timing
+    `,
+  });
+
+  // Classify bidding style
+  let bidder_style = 'Steady Climber';
+  const profileObj = profile?.[0] ?? {};
+  const bidsPerAuction = (profileObj.total_bids || 0) / Math.max(profileObj.auctions_participated || 1, 1);
+
+  if (bidsPerAuction <= 1.2) {
+    bidder_style = 'One-Shot';
+  } else if (timing?.[0]) {
+    const t = timing[0];
+    const earlyPct = t.total_bids > 0 ? t.early_bids / t.total_bids : 0;
+    const snipePct = t.total_bids > 0 ? t.snipe_bids / t.total_bids : 0;
+
+    if (snipePct >= 0.5) {
+      bidder_style = 'Late Sniper';
+    } else if (earlyPct >= 0.5) {
+      bidder_style = 'Early Bird';
+    } else {
+      bidder_style = 'Steady Climber';
+    }
+  }
+
   return {
-    profile: profile?.[0] ?? {},
+    profile: { ...profileObj, bidder_style },
     preferred_makes: makes ?? [],
     recent_activity: recent ?? [],
   };

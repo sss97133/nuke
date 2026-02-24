@@ -204,7 +204,7 @@ CREATE FUNCTION notify_payment_received()    -- Fires on cash_transactions INSER
 - ✅ Real-time via WebSocket subscriptions
 - ✅ Value proof system: receipts → documented work → profit
 - ✅ Inventory value tracker with profit calculations
-- ✅ Deployed to production: https://n-zero.dev
+- ✅ Deployed to production: https://nuke.ag
 
 **Files Changed:** 7 files, ~1,719 lines added
 
@@ -435,7 +435,7 @@ INSERT INTO cash_transactions (type='deposit')
 - Color-coded: Green=profit, Yellow=urgent, Blue=opportunity
 - Real-time updates via Supabase subscriptions
 
-**Status:** ✅ DEPLOYED TO PRODUCTION (https://n-zero.dev)
+**Status:** ✅ DEPLOYED TO PRODUCTION (https://nuke.ag)
 
 ---
 
@@ -456,7 +456,7 @@ INSERT INTO cash_transactions (type='deposit')
 Build:        ✅ SUCCESS (3.62s)
 Bundle Size:  2.3MB (638KB gzip)
 Deploy:       ✅ vercel --prod --force --yes
-URL:          https://n-zero.dev
+URL:          https://nuke.ag
 Status:       200 OK
 ```
 

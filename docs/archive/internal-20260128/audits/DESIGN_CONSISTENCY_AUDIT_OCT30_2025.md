@@ -174,7 +174,7 @@ From your specs and previous documents:
 
 ## Next Steps
 
-1. **Verify Production Deploy** - Check https://n-zero.dev for new dense cards
+1. **Verify Production Deploy** - Check https://nuke.ag for new dense cards
 2. **User Feedback** - See if users prefer the new dense layout
 3. **Mobile Testing** - Ensure cards work well on mobile (they should)
 4. **Consider Consistency** - If users love it, apply to other pages

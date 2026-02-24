@@ -1,7 +1,7 @@
 # 🚀 Homepage, Dashboard & Organization System - COMPLETE
 
 **Deployed:** October 28, 2025  
-**Production:** https://nukefrontend-ckrh14im6-nzero.vercel.app  
+**Production:** https://nukefrontend-ckrh14im6-nuke.vercel.app  
 **Commit:** `f040cc0b`  
 **Status:** 🟢 **ALL SYSTEMS OPERATIONAL**
 
@@ -255,7 +255,7 @@ You can now create:
 
 **GitHub:** Pushed to `main` (commit `f040cc0b`)  
 **Vercel:** Force deployed to production  
-**URL:** https://nukefrontend-ckrh14im6-nzero.vercel.app
+**URL:** https://nukefrontend-ckrh14im6-nuke.vercel.app
 
 **Files Created (3):**
 - CashBalanceWidget.tsx

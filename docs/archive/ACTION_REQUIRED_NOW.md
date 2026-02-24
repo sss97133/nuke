@@ -18,7 +18,7 @@
 
 ### **The Good:**
 - ✅ Frontend code is correct and builds
-- ✅ Production site is live (https://n-zero.dev)
+- ✅ Production site is live (https://nuke.ag)
 - ✅ Design improvements completed
 - ✅ Security restrictions added to UI
 
@@ -64,7 +64,7 @@ Since `supabase db push` is broken, run these SQL files directly in Supabase:
 
 ### **Step 2: Test on Your iPhone** (15 minutes)
 
-Open https://n-zero.dev on your actual phone and test these 3 things:
+Open https://nuke.ag on your actual phone and test these 3 things:
 
 #### **Test 1: Add Vehicle** 🚗
 1. Tap + button (bottom right)
@@ -167,7 +167,7 @@ Or it might have real issues.
 https://supabase.com/dashboard/project/qkgaybvrernstplzjaam/sql
 
 **Production Site:**  
-https://n-zero.dev
+https://nuke.ag
 
 **SQL Files to Run (in this order):**
 1. `FIX_SCHEMA_CACHE.sql`

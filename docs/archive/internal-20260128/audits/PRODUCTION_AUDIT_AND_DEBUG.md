@@ -1,7 +1,7 @@
 # 🚨 PRODUCTION AUDIT & DEBUG REPORT
 
 **Date:** October 25, 2025  
-**Environment:** n-zero.dev (production)  
+**Environment:** nuke.ag (production)  
 **Focus:** Catalog Integration, AI Scanning, Spatial Matching
 
 ---

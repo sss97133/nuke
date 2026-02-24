@@ -40,7 +40,7 @@ You should see: ✓ Success. No rows returned
 
 ## Step 5: Test the Fix
 
-1. Go back to: https://n-zero.dev/admin/price-editor
+1. Go back to: https://nuke.ag/admin/price-editor
 2. Try editing and saving a price
 3. Should work without the 500 error!
 

@@ -26,6 +26,6 @@ npx playwright test --project=production
 Check that the new bundle is live:
 
 ```bash
-curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
+curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1
 ```
 

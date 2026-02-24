@@ -1,7 +1,7 @@
 # Test Plan: Intelligent Work Session Analyzer
 
 ## ✅ Deployed to Production
-**URL:** https://n-zero.dev
+**URL:** https://nuke.ag
 
 ## What Got Deployed
 
@@ -16,7 +16,7 @@
 
 1. **Navigate to your Bronco:**
    ```
-   https://n-zero.dev/vehicle/eea40748-cdc1-4ae9-ade1-4431d14a7726
+   https://nuke.ag/vehicle/eea40748-cdc1-4ae9-ade1-4431d14a7726
    ```
 
 2. **Scroll to the "Timeline Cleanup Tool" card**
@@ -59,7 +59,7 @@
 
 1. **Navigate to homepage:**
    ```
-   https://n-zero.dev
+   https://nuke.ag
    ```
 
 2. **Click "Technical" view mode**

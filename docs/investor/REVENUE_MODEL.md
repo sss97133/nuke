@@ -1,11 +1,11 @@
-# N-Zero Revenue Model
+# Nuke Revenue Model
 ## "We don't make money if YOU don't make money"
 
 ---
 
 ## Competitive Position: Not a Competitor - An Enabler
 
-N-Zero does not compete with existing players. We are **direct to consumer**: we are the buyer's confident. Buyers live here. Auctions, dealers, parts suppliers, and insurers are all chasing buyers—we are the shelter where those buyers already are. The platform integrates with everyone via API and makes the whole ecosystem more efficient; we don't capture share from incumbents, we add a layer they plug into.
+Nuke does not compete with existing players. We are **direct to consumer**: we are the buyer's confident. Buyers live here. Auctions, dealers, parts suppliers, and insurers are all chasing buyers—we are the shelter where those buyers already are. The platform integrates with everyone via API and makes the whole ecosystem more efficient; we don't capture share from incumbents, we add a layer they plug into.
 
 **Key principle: We slide in alongside everyone. We don't take away, we add.**
 
@@ -14,7 +14,7 @@ N-Zero does not compete with existing players. We are **direct to consumer**: we
 - **Parts suppliers** → They chase buyers. We AI-recommend parts to our users; they get sales they'd never see otherwise.
 - **Insurance** → They chase buyers. We provide better valuation data; they price more accurately and win more policies.
 
-The granular data we're building is out there; no one has built the database and pipeline to ingest it. That's what N-Zero is—and we built it where the buyers already live.
+The granular data we're building is out there; no one has built the database and pipeline to ingest it. That's what Nuke is—and we built it where the buyers already live.
 
 ---
 
@@ -22,7 +22,7 @@ The granular data we're building is out there; no one has built the database and
 
 ### 1. Auction Lead Commission
 
-**Framework:** N-Zero is the home for buyers and the home for technicians. We are not a dealer tool—we allow dealers to participate when they're willing to operate with full transparency. The industry has long suffered from opacity and from actors who take advantage of buyers; we protect all interests through **maximum transparency**. Transparency is what lets everyone make money fairly: our system gives every price a clear *why* and every listing a clear *what needs to be fixed*, so buyers trust and sellers get paid. We want to rebuild the dealer model, especially for dealers who are struggling and ready to do it right.
+**Framework:** Nuke is the home for buyers and the home for technicians. We are not a dealer tool—we allow dealers to participate when they're willing to operate with full transparency. The industry has long suffered from opacity and from actors who take advantage of buyers; we protect all interests through **maximum transparency**. Transparency is what lets everyone make money fairly: our system gives every price a clear *why* and every listing a clear *what needs to be fixed*, so buyers trust and sellers get paid. We want to rebuild the dealer model, especially for dealers who are struggling and ready to do it right.
 
 - AI identifies vehicles likely to sell and matches them to the right auction house
 - Commission on successful placements
@@ -66,14 +66,14 @@ The granular data we're building is out there; no one has built the database and
 - Build garages and create workspaces
 - Scale up productivity for builders, restorers, collections
 - Data-integrated: every workspace feeds back into the platform
-- Physical + digital loop: work done in N-Zero garages creates data, data increases platform value
+- Physical + digital loop: work done in Nuke garages creates data, data increases platform value
 
 ### 7. Live Auction Prediction Market
 - Kalshi-style prediction market for live auction outcomes
 - Viewers predict final sale prices in real-time while watching live auctions
 - Closest prediction wins the pot (minus platform rake)
 - Regulatory path: CFTC-regulated Designated Contract Market, following the framework Kalshi has proven viable in 43 US states
-- **Revenue driver**: Entry fees, spread on prediction contracts. 10.8M comments and 3.4M bids prove the audience already watches and engages with live auctions. N-Zero's 474K valuation estimates and 6.3% median accuracy provide the AI baseline. Each prediction event generates thousands of crowd-sourced pricing data points that feed back into the valuation engine.
+- **Revenue driver**: Entry fees, spread on prediction contracts. 10.8M comments and 3.4M bids prove the audience already watches and engages with live auctions. Nuke's 474K valuation estimates and 6.3% median accuracy provide the AI baseline. Each prediction event generates thousands of crowd-sourced pricing data points that feed back into the valuation engine.
 - **Why it works**: Collector car auctions are entertainment. The community is already there - commenting, bidding, debating. This monetizes that engagement while generating the most valuable real-time pricing data in the market.
 
 ### 8. API Access (B2B Data Subscriptions)
@@ -97,7 +97,7 @@ Every revenue stream is aligned with the success of the participants:
 - Workspace users restore vehicles → productivity → we earn workspace fees + data
 - Viewers predict auction outcomes → engagement → we earn rake + pricing data
 
-**N-Zero is the infrastructure that makes everyone else more successful.**
+**Nuke is the infrastructure that makes everyone else more successful.**
 
 ---
 
@@ -118,7 +118,7 @@ Every revenue stream is aligned with the success of the participants:
 ## International Revenue Opportunity
 
 ### European Market
-N-Zero already tracks 192,773 European-make vehicles ($19.5B in tracked value). European source integration (Classic Driver, AutoScout24, European marque registries, Bonhams, RM Sotheby's EU) would unlock API licensing and lead generation for the EU market - the largest regional collector car market globally.
+Nuke already tracks 192,773 European-make vehicles ($19.5B in tracked value). European source integration (Classic Driver, AutoScout24, European marque registries, Bonhams, RM Sotheby's EU) would unlock API licensing and lead generation for the EU market - the largest regional collector car market globally.
 
 ### Japanese / JDM Market
 ~44,200 JDM vehicles tracked. The US 25-year import rule creates continuous demand. Tracking Japan-to-US export provenance is a unique data product no one else offers.
@@ -131,4 +131,4 @@ This is not a marketing sidebar. It’s a conceptual expansion that clarifies wh
 
 The question: **How does an art car bridge the gap between vehicle assets and art?** A vehicle asset lives in one system (VIN, mechanical history, collector-car market). Art lives in another (artist, exhibition history, art-market logic). An art car is the object that sits in both—still a car, also an artwork. It has double provenance; it can trade in both markets. It forces the two systems to meet in one object.
 
-N-Zero already structures the vehicle side. The art car expands the concept: the same object can carry a second layer of meaning and value. If we can hold both dimensions in one profile—mechanical history and exhibition history, auction result as car and standing as artwork—we’re the system where that bridge gets built. That’s product and positioning, not dilution. Engaging the artists and institutions at that intersection (Warsh, Fleury, Prince, the galleries, the biennials) is how we show up where the question is already being asked: what is this object, and who gets to say?
+Nuke already structures the vehicle side. The art car expands the concept: the same object can carry a second layer of meaning and value. If we can hold both dimensions in one profile—mechanical history and exhibition history, auction result as car and standing as artwork—we’re the system where that bridge gets built. That’s product and positioning, not dilution. Engaging the artists and institutions at that intersection (Warsh, Fleury, Prince, the galleries, the biennials) is how we show up where the question is already being asked: what is this object, and who gets to say?

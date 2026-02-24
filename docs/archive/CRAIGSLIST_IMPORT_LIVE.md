@@ -2,7 +2,7 @@
 
 ## ✅ Status: FULLY OPERATIONAL
 
-- **Production URL**: https://n-zero.dev/add-vehicle
+- **Production URL**: https://nuke.ag/add-vehicle
 - **Edge Function**: Deployed & tested
 - **Response Time**: Edge function: 6s, Page load: 0.25s
 - **Last Deploy**: Commit `97ab2c61`
@@ -10,7 +10,7 @@
 ## 🚀 How It Works
 
 ### 1. User Experience
-1. Go to https://n-zero.dev/add-vehicle
+1. Go to https://nuke.ag/add-vehicle
 2. Paste any Craigslist vehicle listing URL
 3. Click import or wait 1 second (auto-triggers)
 4. Watch data auto-fill in ~6 seconds
@@ -231,7 +231,7 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-vehic
 ## 📞 Support
 
 ### Testing
-- **Test URL**: https://n-zero.dev/add-vehicle
+- **Test URL**: https://nuke.ag/add-vehicle
 - **Example**: Paste Craigslist GMC Suburban URL
 
 ### Issues

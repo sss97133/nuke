@@ -2,7 +2,7 @@
 /**
  * Automotive Odds Engine
  *
- * Uses n-zero's vehicle database to:
+ * Uses nuke's vehicle database to:
  * 1. Calculate fair odds on automotive outcomes
  * 2. Generate prediction markets we can offer
  * 3. Identify mispriced external markets
@@ -349,7 +349,7 @@ function addJuice(fairOdds: number, juice: number = 0.05): { yes: number; no: nu
 
 async function main() {
   console.log('=== AUTOMOTIVE ODDS ENGINE ===\n');
-  console.log('Generating markets from n-zero data...\n');
+  console.log('Generating markets from nuke data...\n');
 
   const markets: Market[] = [];
 

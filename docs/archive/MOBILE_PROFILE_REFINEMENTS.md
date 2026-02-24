@@ -121,12 +121,12 @@ CONNECTIONS: 2 suppliers, 3 tools, 1 person
 
 **Deployment**:
 - Commit: a850d01d
-- Production: https://nuke-fo5j0o5mr-nzero.vercel.app
+- Production: https://nuke-fo5j0o5mr-nuke.vercel.app
 - Status: Building...
 
 ## Test URL
 
-https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 **Expected behavior**:
 1. See swipeable image carousel

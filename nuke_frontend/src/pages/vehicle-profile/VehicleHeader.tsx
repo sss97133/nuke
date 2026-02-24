@@ -2338,7 +2338,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const cleanedModelForHeader = cleanListingishTitle(String(displayModel || ''), vehicle?.year ?? null, vehicle?.make ?? null);
   appendUnique(identityParts, cleanedModelForHeader);
   appendUnique(identityParts, (vehicle as any).series);
-  appendUnique(identityParts, (vehicle as any).trim);
+  // Skip trim if it's already contained in the model/series (e.g. "C2500 Sierra Classic 4×4 Conversion" + trim "Sierra Classic" -> no duplicate)
+  const trimPart = String((vehicle as any).trim || '').trim();
+  if (trimPart && !cleanedModelForHeader.toLowerCase().includes(trimPart.toLowerCase())) {
+    appendUnique(identityParts, (vehicle as any).trim);
+  }
 
   const identityLabel = identityParts.join(' ').trim() || 'Vehicle';
   
@@ -3186,7 +3190,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   headerAuctionHouse.label === 'Cars & Bids' ? 'https://carsandbids.com' :
                   headerAuctionHouse.label === 'Hagerty Marketplace' ? 'https://hagerty.com' :
                   headerAuctionHouse.label === 'PCarMarket' ? 'https://pcarmarket.com' :
-                  'https://n-zero.com'
+                  'https://nuke.ag'
                 );
                 return (
                   <div ref={auctionPopoverRef} className="badge-priority-3" style={{ position: 'relative' }}>
@@ -4090,7 +4094,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     const platformUrl = auctionPulse.listing_url || 
                       (auctionPulse.platform === 'cars_and_bids' ? 'https://carsandbids.com' : 
                        auctionPulse.platform === 'ebay_motors' ? 'https://ebay.com' : 
-                       'https://n-zero.com');
+                       'https://nuke.ag');
                     return (
                       <button
                         type="button"
@@ -4448,7 +4452,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                     style={{
                                       background: '#f59e0b',
                                       border: '1px solid #d97706',
-                                      color: 'white',
+                                      color: '#ffffff',
                                       padding: '4px 8px',
                                       borderRadius: '4px',
                                       fontSize: '7pt',

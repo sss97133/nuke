@@ -145,7 +145,7 @@
 
 ```
 TOP NAV BAR:
-├─ n-zero (logo/home)
+├─ nuke (logo/home)
 ├─ Home
 ├─ Vehicles
 ├─ Organizations
@@ -308,7 +308,7 @@ Borders:
 
 ### **Desktop Navigation**:
 ```
-[n-zero] [Home] [Vehicles] [Organizations] [Financials]     [Profile]
+[nuke] [Home] [Vehicles] [Organizations] [Financials]     [Profile]
 ```
 
 ### **Mobile Navigation**:

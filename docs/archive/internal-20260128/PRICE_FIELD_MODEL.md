@@ -1,4 +1,4 @@
-# N-Zero Price Field Model
+# Nuke Price Field Model
 
 **Document Version:** 1.0
 **Date:** 2026-01-22

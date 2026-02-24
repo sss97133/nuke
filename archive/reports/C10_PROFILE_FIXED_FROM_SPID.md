@@ -1,7 +1,7 @@
 # 1978 CHEVROLET C10 PROFILE - FIXED FROM SPID SHEET
 
 **Vehicle ID:** `9a8aaf17-ddb1-49a2-9b0a-1352807e7a06`  
-**Live URL:** https://n-zero.dev/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06
+**Live URL:** https://nuke.ag/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06
 
 ---
 

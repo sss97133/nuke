@@ -7,7 +7,7 @@
 
 ## 1. Agreement to Terms
 
-By accessing or using the NUKE platform at n-zero.dev (the "Platform"), you agree to be bound by these Terms of Service ("Terms"). The Platform is operated by NUKE LTD, a Nevada limited liability company ("NUKE," "we," "us," or "our").
+By accessing or using the NUKE platform at nuke.ag (the "Platform"), you agree to be bound by these Terms of Service ("Terms"). The Platform is operated by NUKE LTD, a Nevada limited liability company ("NUKE," "we," "us," or "our").
 
 If you are using the Platform on behalf of an organization, you represent and warrant that you have the authority to bind that organization to these Terms.
 
@@ -163,7 +163,7 @@ Either party may bring an individual action in small claims court if the claim q
 ## 13. Termination
 
 ### 13.1 By You
-You may terminate your account at any time by contacting us at legal@n-zero.dev.
+You may terminate your account at any time by contacting us at legal@nuke.ag.
 
 ### 13.2 By NUKE
 We may suspend or terminate your account if you violate these Terms, engage in fraudulent activity, or for any other reason at our sole discretion with or without notice.
@@ -202,7 +202,7 @@ You may not assign these Terms without our written consent. NUKE may assign thes
 Boulder City, NV 89005
 United States
 
-**Email:** legal@n-zero.dev
+**Email:** legal@nuke.ag
 **Phone:** (702) 624-6793
 
 **EIN:** 93-3397016

@@ -191,8 +191,8 @@ console.log(metrics); // Shows in Technical view mode
 
 ### Frontend
 - ✅ Built: `index-D5W11sfr.js`
-- ✅ Deployed: https://nuke-m7104w4gu-nzero.vercel.app
-- ✅ Production: https://n-zero.dev
+- ✅ Deployed: https://nuke-m7104w4gu-nuke.vercel.app
+- ✅ Production: https://nuke.ag
 
 ### Database
 - ⏳ Migration ready (needs manual application)
@@ -293,8 +293,8 @@ OpenAI API (GPT-4o with source constraints)
 
 ## Test URLs
 
-- **Production**: https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
-- **Staging**: https://nuke-m7104w4gu-nzero.vercel.app
+- **Production**: https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+- **Staging**: https://nuke-m7104w4gu-nuke.vercel.app
 
 Test on mobile device after applying migration!
 

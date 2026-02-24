@@ -46,5 +46,5 @@ GPS + time + metadata analysis:
 
 ## Test URLs
 - Investigation tool: Any vehicle with 10+ photos → "Investigate" button
-- Merge proposals: https://n-zero.dev/admin/merge-proposals
+- Merge proposals: https://nuke.ag/admin/merge-proposals
 - Mobile gestures: Any vehicle on mobile → long-press image

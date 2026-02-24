@@ -75,7 +75,7 @@ vercel --prod --yes    # Deploy to production
 ### Step 2: Access Dashboard
 ```bash
 # Visit as admin:
-https://n-zero.dev/admin/image-processing
+https://nuke.ag/admin/image-processing
 ```
 
 **Should show:** Empty dashboard (0 images processed yet)

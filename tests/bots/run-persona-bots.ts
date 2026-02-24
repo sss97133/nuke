@@ -30,7 +30,7 @@ const getArg = (name: string): string | undefined => {
 const count = parseInt(getArg('count') || '5', 10);
 const personaType = getArg('type');
 const username = getArg('username');
-const baseUrl = getArg('url') || process.env.BOT_BASE_URL || 'https://n-zero.dev';
+const baseUrl = getArg('url') || process.env.BOT_BASE_URL || 'https://nuke.ag';
 const headless = getArg('headless') !== 'false';
 const maxActions = parseInt(getArg('max-actions') || '15', 10);
 

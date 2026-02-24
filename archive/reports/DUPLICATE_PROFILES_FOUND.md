@@ -11,7 +11,7 @@
 ### 1974 Chevrolet K5 Blazer
 
 **Primary Profile (KEEP):**
-- URL: https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+- URL: https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 - VIN: `CKY184F130980` (real)
 - 200 photos
 - 185 timeline events
@@ -19,14 +19,14 @@
 - Created: Oct 3, 2025
 
 **Duplicate Profile (MERGE & DELETE):**
-- URL: https://n-zero.dev/vehicle/89afcc13-febb-4a79-a4ad-533471c2062f
+- URL: https://nuke.ag/vehicle/89afcc13-febb-4a79-a4ad-533471c2062f
 - VIN: `VIVA-1762059705454` (auto-generated)
 - 1 photo
 - 2 timeline events
 - Created: Nov 2, 2025 (Dropbox bulk import)
 
 **What to Do:**
-1. Log in to https://n-zero.dev
+1. Log in to https://nuke.ag
 2. Visit your Blazer profile (first URL above)
 3. You'll see a yellow warning panel at the top
 4. Click "Merge Profiles" button
@@ -109,13 +109,13 @@ When you click "Merge Profiles":
 ## Access the System
 
 ### As Owner (You)
-1. **Log in:** https://n-zero.dev/login
-2. **Visit your profile:** https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+1. **Log in:** https://nuke.ag/login
+2. **Visit your profile:** https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 3. **See yellow warning:** "Duplicate Profiles Detected (1)"
 4. **Review & merge:** 1-click consolidation
 
 ### As Admin (Global View)
-- **Dashboard:** https://n-zero.dev/admin/merge-proposals
+- **Dashboard:** https://nuke.ag/admin/merge-proposals
 - See all 6 system-wide proposals
 - Monitor merge success
 - Identify import issues
@@ -195,10 +195,10 @@ This solves it! The system will automatically detect and propose merges for:
 ## Dashboard Access
 
 **Admin Dashboard (All Proposals):**
-https://n-zero.dev/admin/merge-proposals
+https://nuke.ag/admin/merge-proposals
 
 **Your Vehicle (Owner View):**
-https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 ---
 

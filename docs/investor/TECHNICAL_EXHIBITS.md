@@ -300,12 +300,12 @@ vehicles ───────────────────────�
 
 ### Bitemporal Data Model
 
-Every observation in N-Zero carries two timestamps:
+Every observation in Nuke carries two timestamps:
 
 | Timestamp | Meaning | Example |
 |-----------|---------|---------|
 | `observed_at` | When the event actually occurred | "Vehicle sold on Jan 15, 2024" |
-| `ingested_at` | When N-Zero recorded the data | "We extracted this record on Feb 3, 2026" |
+| `ingested_at` | When Nuke recorded the data | "We extracted this record on Feb 3, 2026" |
 
 This bitemporal model enables:
 - **As-of queries**: "What did we know about this vehicle on date X?"
@@ -605,7 +605,7 @@ For each image processed, YONO produces:
 
 ### Design Principles
 
-The observation system is the architectural core of N-Zero. It replaces traditional table-per-source data models with a unified, source-agnostic event store.
+The observation system is the architectural core of Nuke. It replaces traditional table-per-source data models with a unified, source-agnostic event store.
 
 **Key design decisions:**
 
@@ -908,7 +908,7 @@ await nuke.observations.create({
 
 ## 9. SAMPLE VEHICLE INTELLIGENCE PROFILES
 
-The following examples demonstrate the depth of data N-Zero maintains per vehicle. These are representative profiles showing the 119+ structured fields in action.
+The following examples demonstrate the depth of data Nuke maintains per vehicle. These are representative profiles showing the 119+ structured fields in action.
 
 ### Example 1: 1967 Chevrolet Corvette 427/435 Convertible
 
@@ -1134,4 +1134,4 @@ The Nuke Index would be the first institutional-grade, data-driven, real-time ma
 
 *This document is confidential and intended only for the addressee.*
 *All technical specifications verified from live system on February 8, 2026.*
-*N-Zero is a project of Nuke Ltd (Nevada, 2022).*
+*Nuke is a project of Nuke Ltd (Nevada, 2022).*

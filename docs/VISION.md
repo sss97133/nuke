@@ -1,10 +1,10 @@
-# n-zero Vision
+# nuke Vision
 
 > **Read this before touching anything in the product. This is the founder's vision, not a spec.**
 
 ## The One-Liner
 
-n-zero makes every collector vehicle in the world liquid.
+nuke makes every collector vehicle in the world liquid.
 
 ## What This Is
 
@@ -21,7 +21,7 @@ The person who has everything. All the Porsches they ever wanted, all the fun pr
 The founder comes from a world where the game is: find a $4,000 Corvette from the original owner on Facebook Marketplace and buy it before anyone else. That instinct — the urgency, the ability to act without overthinking — is what this platform recreates at scale.
 
 - On Facebook Marketplace, the game is: find the absolute cheapest vehicle that's a sick deal and buy it immediately.
-- On n-zero, the game is: any vehicle, any time, anywhere — and we make it liquid.
+- On nuke, the game is: any vehicle, any time, anywhere — and we make it liquid.
 
 The platform teaches users to trust their instincts within structured rules. When you're here, you play by the rules of this game, and the game has structured logic.
 

@@ -102,8 +102,8 @@ Key files:
 - `parse-receipt` (latest) - OPEN_AI_API_KEY
 
 ### Vercel Frontend
-- **Production**: https://n-zero.dev
-- **Latest**: https://nuke-pdxey78xm-nzero.vercel.app
+- **Production**: https://nuke.ag
+- **Latest**: https://nuke-pdxey78xm-nuke.vercel.app
 - **Bundle**: index-DezdO1Zo.js
 - **Commits**: c43a6f4e → 07038b49 (multiple deployments)
 
@@ -128,7 +128,7 @@ cd /Users/skylar/nuke && node scripts/test-production.js
 ```
 
 Or visit:
-https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 ## Known Issues (Deferred)
 
@@ -195,7 +195,7 @@ Approximately 4-5 hours of intensive debugging, fixing, and implementing.
 
 **No blockers, no pending work, all systems operational!**
 
-Test URL: https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+Test URL: https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 
 Hard refresh (Cmd+Shift+R) to see all new features!
 

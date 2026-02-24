@@ -1,7 +1,7 @@
 # 🎉 ALL CRITICAL FIXES DEPLOYED - November 1, 2025
 
 **Status:** ✅ **PRODUCTION DEPLOYED**  
-**URL:** https://n-zero.dev  
+**URL:** https://nuke.ag  
 **Bundle:** index-CvTza1gV.js (1.62MB, 413KB gzipped)
 
 ---
@@ -109,7 +109,7 @@
 ---
 
 ### **FIX 6: Production Deployment** ✅
-**Frontend:** https://n-zero.dev  
+**Frontend:** https://nuke.ag  
 **Backend:** vehicle-expert-agent Edge Function updated  
 **Database:** 2 new tables, 1 RPC function, helper functions
 
@@ -200,8 +200,8 @@ Flow:
 
 ## 🚀 PRODUCTION STATUS
 
-**Deployment URL:** https://n-zero.dev  
-**Vercel:** https://nuke-pym8fdmhq-nzero.vercel.app  
+**Deployment URL:** https://nuke.ag  
+**Vercel:** https://nuke-pym8fdmhq-nuke.vercel.app  
 **Bundle Hash:** index-CvTza1gV.js
 
 **What's Live:**
@@ -275,5 +275,5 @@ The VehicleProfile system has been overhauled with:
 
 **Deployed by:** AI Assistant  
 **Date:** November 1, 2025  
-**Production URL:** https://n-zero.dev
+**Production URL:** https://nuke.ag
 

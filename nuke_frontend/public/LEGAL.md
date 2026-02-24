@@ -284,9 +284,9 @@ This Agreement is governed by the laws of the **State of Nevada**, without regar
 Boulder City, NV 89005
 United States
 
-**General Inquiries:** info@n-zero.dev
-**Legal/Compliance:** legal@n-zero.dev
-**Investor Relations:** investors@n-zero.dev
+**General Inquiries:** info@nuke.ag
+**Legal/Compliance:** legal@nuke.ag
+**Investor Relations:** investors@nuke.ag
 **Phone:** (702) 624-6793
 
 **EIN:** 93-3397016

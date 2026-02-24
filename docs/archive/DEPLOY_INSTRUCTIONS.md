@@ -60,7 +60,7 @@ Expected response:
 
 ## Verify on Frontend
 
-1. Go to https://n-zero.dev/add-vehicle
+1. Go to https://nuke.ag/add-vehicle
 2. Paste the Craigslist URL
 3. Watch it auto-fill vehicle data
 4. See images download automatically (13 images for the GMC Suburban)

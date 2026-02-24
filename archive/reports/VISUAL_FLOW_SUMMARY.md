@@ -67,7 +67,7 @@
 
 ```
 📱 CUSTOMER ON MOBILE
-    └─> Visits: n-zero.dev/org/ernies-upholstery
+    └─> Visits: nuke.ag/org/ernies-upholstery
     └─> Clicks: "Request Work"
          │
          ▼
@@ -287,9 +287,9 @@
 ## ✅ **Status: ALL SYSTEMS OPERATIONAL**
 
 **Production URLs:**
-- Organizations: `https://n-zero.dev/organizations`
-- Ernie's Profile: `https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41`
-- Bronco Profile: `https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e`
+- Organizations: `https://nuke.ag/organizations`
+- Ernie's Profile: `https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41`
+- Bronco Profile: `https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e`
 
 **Latest Deploy:** Bundle `SozPPLVo`
 

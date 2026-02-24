@@ -3,7 +3,7 @@
 ## ✅ ALL ISSUES FIXED AND DEPLOYED
 
 **Commit:** `00ad8308`  
-**Production:** https://nukefrontend-dg9jfa4nd-nzero.vercel.app  
+**Production:** https://nukefrontend-dg9jfa4nd-nuke.vercel.app  
 **Status:** 🟢 **LIVE**
 
 ---
@@ -164,7 +164,7 @@ INSERT INTO vehicle_user_permissions (
 5. Contributor permissions documented
 
 **Latest Commit:** `00ad8308`  
-**Production URL:** https://nukefrontend-dg9jfa4nd-nzero.vercel.app
+**Production URL:** https://nukefrontend-dg9jfa4nd-nuke.vercel.app
 
 ---
 
@@ -181,7 +181,7 @@ psql "$SUPABASE_DB_URL" -c "INSERT INTO vehicle_user_permissions (vehicle_id, us
 ```
 
 **Test Production:**
-- Mobile: https://nukefrontend-dg9jfa4nd-nzero.vercel.app (check 📷 FAB)
+- Mobile: https://nukefrontend-dg9jfa4nd-nuke.vercel.app (check 📷 FAB)
 - Desktop: Check pricing shows $140,615 (not $1,800)
 - Images: Click Load More → infinite scroll activates
 

@@ -9,7 +9,7 @@
 
 ### **Code:**
 - ✅ 10 commits pushed to GitHub (main branch)
-- ✅ Vercel CLI deployment triggered: `https://nukefrontend-lu5oxm5ji-nzero.vercel.app`
+- ✅ Vercel CLI deployment triggered: `https://nukefrontend-lu5oxm5ji-nuke.vercel.app`
 - ✅ Build completed successfully
 
 ### **Database:**
@@ -43,13 +43,13 @@ Position: x:50%, y:65% (center)
 
 ## ⏳ **CURRENT ISSUE:**
 
-**n-zero.dev still showing OLD bundle:**
+**nuke.ag still showing OLD bundle:**
 - Bundle hash: `index-BB5HYU31.js` (OLD)
 - Lightbox loads **3 tags** (console confirms: "✅ Loaded 3 tags")
 - But no green dots visible (old code doesn't have SpatialTagMarker)
 
 **Why:**
-- Custom domain (n-zero.dev) takes longer to propagate
+- Custom domain (nuke.ag) takes longer to propagate
 - Vercel CDN caching
 - Need to wait 5-15 minutes OR
 - Configure Vercel to auto-promote production deployment
@@ -58,7 +58,7 @@ Position: x:50%, y:65% (center)
 
 ## 🎯 **TO SEE IT WORK RIGHT NOW:**
 
-### **Option 1: Wait for n-zero.dev to update (5-15 min)**
+### **Option 1: Wait for nuke.ag to update (5-15 min)**
 
 Check bundle hash:
 ```javascript
@@ -80,14 +80,14 @@ When it changes from `BB5HYU31` to a new hash → **GREEN DOTS WILL APPEAR**
 
 ```bash
 cd /Users/skylar/nuke/nuke_frontend
-vercel alias set nukefrontend-lu5oxm5ji-nzero.vercel.app n-zero.dev
+vercel alias set nukefrontend-lu5oxm5ji-nuke.vercel.app nuke.ag
 ```
 
 ---
 
 ## 🧪 **TEST CHECKLIST (once deployed):**
 
-Visit: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+Visit: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 
 - [ ] **Page loads** - vehicle profile visible
 - [ ] **Scroll to images** - image gallery shows
@@ -220,7 +220,7 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-lmc-t
 ✅ **Database:** Live with test data  
 ✅ **Backend:** Edge Functions deployed  
 ✅ **Frontend:** Code pushed (10 commits)  
-⏳ **n-zero.dev:** Waiting for CDN refresh (5-15 min)
+⏳ **nuke.ag:** Waiting for CDN refresh (5-15 min)
 
 **Bundle check:**
 - OLD: `index-BB5HYU31.js` ← Currently showing

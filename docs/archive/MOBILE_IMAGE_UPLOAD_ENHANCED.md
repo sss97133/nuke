@@ -314,7 +314,7 @@ const handleQuickUpload = async (files: FileList | null) => {
 - ✅ Zero linting errors
 - ✅ Zero TypeScript errors
 
-**Live:** https://nukefrontend-5dzr395le-nzero.vercel.app
+**Live:** https://nukefrontend-5dzr395le-nuke.vercel.app
 
 ---
 

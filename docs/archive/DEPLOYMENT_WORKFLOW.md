@@ -86,4 +86,4 @@ vercel rollback
 - **Local Dev**: http://localhost:5174
 - **Production**: https://nuke-app.vercel.app
 - **GitHub**: https://github.com/sss97133/nuke/tree/production-clean
-- **Vercel Dashboard**: https://vercel.com/nzero/nuke-app
+- **Vercel Dashboard**: https://vercel.com/nuke/nuke-app

@@ -2,7 +2,7 @@
 
 ## The 1972 Chevrolet K10 Example
 
-**Vehicle**: https://n-zero.dev/vehicle/d7962908-9a01-4082-a85e-6bbe532550b2
+**Vehicle**: https://nuke.ag/vehicle/d7962908-9a01-4082-a85e-6bbe532550b2
 
 ### Data Sources Racing to Fill the Blanks:
 

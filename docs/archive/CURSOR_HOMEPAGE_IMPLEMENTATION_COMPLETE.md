@@ -2,7 +2,7 @@
 
 **Date**: October 19, 2025  
 **Status**: Deployed to Production  
-**URL**: https://n-zero.dev
+**URL**: https://nuke.ag
 
 ---
 
@@ -157,7 +157,7 @@ All components use:
 
 **Build**: ✅ Success  
 **Deploy**: ✅ Success  
-**URL**: https://n-zero.dev  
+**URL**: https://nuke.ag  
 
 **Bundle Size**:
 - CSS: 101.61 KB (17.46 KB gzipped)

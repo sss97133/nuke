@@ -2,7 +2,7 @@
 
 **Date:** October 28, 2025  
 **Status:** ✅ **PHASE 1 DEPLOYED TO PRODUCTION**  
-**Production:** https://nuke-770n8h865-nzero.vercel.app
+**Production:** https://nuke-770n8h865-nuke.vercel.app
 
 ---
 
@@ -126,7 +126,7 @@ Analyzed all 10 mobile components against design-system.css rules:
 ## 🚀 DEPLOYMENT STATUS
 
 **Phase 1:** ✅ LIVE ON PRODUCTION  
-**URL:** https://nuke-770n8h865-nzero.vercel.app  
+**URL:** https://nuke-770n8h865-nuke.vercel.app  
 **Commit:** 469773df "Design system compliance Phase 1"
 
 **Changes Visible:**

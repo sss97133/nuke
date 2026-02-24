@@ -90,7 +90,7 @@ Expected logs:
 ## Manual Test Instructions
 
 1. **Open in mobile Chrome** or resize browser to 375px
-2. **Navigate to**: `https://n-zero.dev/vehicle/92a39d4c-abd1-47b1-971d-dffe173c5793`
+2. **Navigate to**: `https://nuke.ag/vehicle/92a39d4c-abd1-47b1-971d-dffe173c5793`
 3. **Hard refresh**: Cmd+Shift+R (clear cache)
 4. **Verify bundle**: Open DevTools, check for `index-CGKmJS23.js`
 5. **Click TIMELINE tab**
@@ -143,7 +143,7 @@ vercel --prod --force --yes
 
 ```
 Vercel CLI 41.4.1
-Production: https://nuke-idaqlzpm9-nzero.vercel.app
+Production: https://nuke-idaqlzpm9-nuke.vercel.app
 Deploy time: ~10 seconds
 Status: Completing
 ```

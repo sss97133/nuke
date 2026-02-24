@@ -33,7 +33,7 @@ You have 30,000 photos on your phone/computer:
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│ n-zero  [Home] [Vehicles] [Auctions] [Organizations]    [@skylar] │ Main Nav
+│ nuke  [Home] [Vehicles] [Auctions] [Organizations]    [@skylar] │ Main Nav
 └────────────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────────────┐

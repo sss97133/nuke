@@ -41,7 +41,7 @@ Built a complete SPID (Service Parts Identification) sheet scanning and auto-fil
 
 ## 🔧 PROOF: 1978 CHEVROLET C10 FIXED
 
-**Vehicle:** https://n-zero.dev/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06
+**Vehicle:** https://nuke.ag/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06
 
 ### Before:
 ```

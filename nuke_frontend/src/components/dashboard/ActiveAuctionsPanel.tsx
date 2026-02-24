@@ -403,7 +403,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
     : 'Vehicle';
 
   const rawImg = vehicle?.primary_image_url || vehicle?.image_url || '';
-  const img = rawImg ? optimizeImageUrl(rawImg, 'thumbnail') || rawImg : '/n-zero.png';
+  const img = rawImg ? optimizeImageUrl(rawImg, 'thumbnail') || rawImg : '/nuke.png';
 
   const formatCurrency = (value: number | null) => {
     if (!value) return '$0';

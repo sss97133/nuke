@@ -44,7 +44,7 @@
   "notifications": {
     "comment": "Future feature - send alerts",
     "enabled": false,
-    "email": "admin@n-zero.dev",
+    "email": "admin@nuke.ag",
     "slack_webhook": null
   },
   

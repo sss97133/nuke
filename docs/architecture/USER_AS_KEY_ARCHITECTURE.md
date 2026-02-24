@@ -3,7 +3,7 @@
 ## Core Philosophy
 
 **Traditional Software:** Users push buttons → System reacts  
-**N-Zero Software:** User exists → System proactively works on their behalf
+**Nuke Software:** User exists → System proactively works on their behalf
 
 The user is not an operator. The user is a **KEY** - an authentication token that unlocks automatic, intelligent action.
 
@@ -130,7 +130,7 @@ async function cronSyncAllActiveListings() {
 2. **Auto-Linking:** Finds [https://bringatrailer.com/listing/1966-chevrolet-c10-pickup-105/](https://bringatrailer.com/listing/1966-chevrolet-c10-pickup-105/), auto-creates `external_listings` entry
 3. **Auto-Sync:** Cron job updates bid count (3), view count (8,487), watcher count (653) every hour
 4. **Auto-Notify:** If auction is ending in <24h, notifies all users who viewed this vehicle
-5. **Fair Play Attribution:** Auto-marks "BaT listed first" → no N-Zero commission, only affiliate credit
+5. **Fair Play Attribution:** Auto-marks "BaT listed first" → no Nuke commission, only affiliate credit
 
 **User just sees:**
 - Vehicle profile shows "Also listed on BaT" badge
@@ -368,14 +368,14 @@ $$ LANGUAGE plpgsql;
 
 **Traditional flow:**
 1. Viva lists on BaT first
-2. Viva employee has to manually copy/paste BaT URL into N-Zero
+2. Viva employee has to manually copy/paste BaT URL into Nuke
 3. User has to click "sync BaT data"
 4. User has to click "notify subscribers"
 
 **User-as-Key flow (AUTOMATIC):**
 1. Viva lists on BaT (morning)
 2. **Cron job (6 hours later):** Scrapes Viva's BaT member page, detects new listing
-3. **Auto-links** to N-Zero vehicle profile (by VIN)
+3. **Auto-links** to Nuke vehicle profile (by VIN)
 4. **Auto-creates** `external_listings` entry
 5. **Auto-notifies** all Viva subscribers: "New listing: 1972 K10 on BaT"
 6. **Auto-syncs** bid count every hour
@@ -410,21 +410,21 @@ $$ LANGUAGE plpgsql;
 ### Principle: **Complement, Don't Compete**
 
 **If BaT listed first:**
-- N-Zero displays BaT listing prominently
+- Nuke displays BaT listing prominently
 - All links go to BaT (not internal listing)
-- N-Zero earns affiliate commission (5-10% of BaT's fee)
+- Nuke earns affiliate commission (5-10% of BaT's fee)
 - Attribution tracking: "Originally listed on BaT by Viva"
 
-**If N-Zero listed first:**
-- N-Zero offers "Submit to BaT" button
-- Pre-fills BaT forms with N-Zero data
-- N-Zero earns listing commission (1-2% of sale price)
-- Attribution tracking: "Listed on N-Zero, cross-posted to BaT"
+**If Nuke listed first:**
+- Nuke offers "Submit to BaT" button
+- Pre-fills BaT forms with Nuke data
+- Nuke earns listing commission (1-2% of sale price)
+- Attribution tracking: "Listed on Nuke, cross-posted to BaT"
 
 **If listed simultaneously:**
 - Display both listings side-by-side
 - Track which gets more engagement
-- Commission split: N-Zero gets referring commission from BaT
+- Commission split: Nuke gets referring commission from BaT
 
 ### Transparency:
 ```typescript
@@ -437,8 +437,8 @@ $$ LANGUAGE plpgsql;
   Ends: May 3, 2024
   
   Fair Play Notice:
-  This vehicle was listed on BaT before N-Zero.
-  BaT gets full credit. N-Zero provides referral link.
+  This vehicle was listed on BaT before Nuke.
+  BaT gets full credit. Nuke provides referral link.
   If you bid through our link, we earn a small affiliate commission.
 </ExternalListingCard>
 ```
@@ -494,7 +494,7 @@ $$ LANGUAGE plpgsql;
 
 ## The Vision
 
-**You open N-Zero in the morning:**
+**You open Nuke in the morning:**
 - 3 new notifications (automatically detected overnight)
   1. "Viva listed a 1969 Camaro Z28" (you're auto-subscribed because you viewed 5 Viva vehicles)
   2. "Price dropped on 1972 K10 you viewed" (you never clicked "watch", system just knew)

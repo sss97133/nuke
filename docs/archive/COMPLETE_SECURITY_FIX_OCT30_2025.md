@@ -259,7 +259,7 @@ psql "postgresql://postgres:[PASSWORD]@db.tzorvvtvzrfqkdshcijr.supabase.co:5432/
 
 **Deployment:**
 - ✅ Vercel deploying now (2-3 minutes)
-- ✅ Will be live at https://n-zero.dev
+- ✅ Will be live at https://nuke.ag
 - ✅ Users will see restrictions immediately
 
 ### ⏳ What Needs Manual Action

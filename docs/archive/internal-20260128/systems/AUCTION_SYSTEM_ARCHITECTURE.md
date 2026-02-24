@@ -27,7 +27,7 @@
            ▼                        ▼                        ▼
 ```
 
-## Option 1: N-Zero Auction
+## Option 1: Nuke Auction
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -57,7 +57,7 @@
 │  Reserve Met     → Mark SOLD, notify buyer & seller          │
 │  Reserve Not Met → Mark EXPIRED, allow relist                │
 │                                                               │
-│  N-Zero earns: 3-5% commission                               │
+│  Nuke earns: 3-5% commission                               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -97,7 +97,7 @@
 │  • Download export packages                                  │
 │  • Submit manually to each platform                          │
 │  • OR use API integration (future)                           │
-│  • Track status in N-Zero dashboard                          │
+│  • Track status in Nuke dashboard                          │
 └─────────────────────────────────────────────────────────────┘
                            │
                            ▼
@@ -107,7 +107,7 @@
 │  • Export marked as "submitted" with URL                     │
 │  • Track status: active → sold/expired                       │
 │  • Record sale price and date                                │
-│  • N-Zero earns: 1-2% commission on verified sales          │
+│  • Nuke earns: 1-2% commission on verified sales          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -161,7 +161,7 @@
 ```
 START: User has vehicle in garage
 │
-├─► Wants to auction on N-Zero?
+├─► Wants to auction on Nuke?
 │   │
 │   YES → CreateAuctionListing.tsx
 │   │     ├─ Configure auction (type, duration)
@@ -211,7 +211,7 @@ END: Vehicle sold, commission earned
 │              COMBINED MONTHLY REVENUE                         │
 │                                                               │
 │  100 Vehicles/Month:                                          │
-│  • 30 on N-Zero    @ $1,000 avg = $30,000                    │
+│  • 30 on Nuke    @ $1,000 avg = $30,000                    │
 │  • 70 exported     @ $700 avg   = $49,000                    │
 │  ───────────────────────────────────────                     │
 │  TOTAL: $79,000/month = $948,000/year                        │
@@ -241,7 +241,7 @@ END: Vehicle sold, commission earned
 ┌──────────────────────────────────────────────────────────────┐
 │                  N-ZERO AUCTIONS TAB                         │
 ├──────────────────────────────────────────────────────────────┤
-│  Platform: N-Zero Internal                                   │
+│  Platform: Nuke Internal                                   │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
 │  │ Total Bids  │  │ Completed   │  │ Revenue     │         │
 │  │    1,234    │  │    45       │  │ $1,125,000  │         │
@@ -275,7 +275,7 @@ END: Vehicle sold, commission earned
 ┌───────────────────────────────────────────────────────────────┐
 │                  CURRENT STATE                                 │
 │                                                                 │
-│  N-Zero → Generate Package → User Submits Manually             │
+│  Nuke → Generate Package → User Submits Manually             │
 │                                                                 │
 │  Pros: No API complexity, works immediately                    │
 │  Cons: Manual submission required                              │
@@ -284,7 +284,7 @@ END: Vehicle sold, commission earned
 ┌───────────────────────────────────────────────────────────────┐
 │              FUTURE STATE (Phase 2)                            │
 │                                                                 │
-│  N-Zero → API Integration → Auto-Submit → Track Status         │
+│  Nuke → API Integration → Auto-Submit → Track Status         │
 │                                                                 │
 │  eBay API (OAuth) ────────────┐                                │
 │  BaT Form Submission ─────────┼─► Automated submission         │
@@ -302,7 +302,7 @@ END: Vehicle sold, commission earned
 │              BRING A TRAILER vs N-ZERO                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  BaT:                              N-Zero:                      │
+│  BaT:                              Nuke:                      │
 │  • 7-day auctions only             • 5-min to 14-day options    │
 │  • 5% seller fee                   • 3% seller fee              │
 │  • BaT platform only               • Multi-platform support     │
@@ -329,14 +329,14 @@ END: Vehicle sold, commission earned
 │  └─ Repeat usage rate              ▓▓▓▓▓▓▓▓░░ 72%              │
 │                                                                  │
 │  PLATFORM PERFORMANCE                                            │
-│  ├─ N-Zero conversion              ▓▓▓▓▓▓▓▓░░ 75%              │
+│  ├─ Nuke conversion              ▓▓▓▓▓▓▓▓░░ 75%              │
 │  ├─ BaT conversion                 ▓▓▓▓▓▓▓▓▓░ 85%              │
 │  ├─ eBay conversion                ▓▓▓▓▓▓▓░░░ 70%              │
 │  └─ Craigslist conversion          ▓▓▓▓▓▓░░░░ 60%              │
 │                                                                  │
 │  REVENUE                                                         │
 │  ├─ Monthly GMV                    $5,250,000                   │
-│  ├─ N-Zero commission              $157,500 (3%)                │
+│  ├─ Nuke commission              $157,500 (3%)                │
 │  ├─ External commission            $52,500 (1%)                 │
 │  └─ Total monthly revenue          $210,000                     │
 │                                                                  │

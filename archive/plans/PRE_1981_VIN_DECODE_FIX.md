@@ -56,7 +56,7 @@ CE1418647123
 The 1981 standard was created precisely because pre-1981 VINs were inconsistent across manufacturers.
 
 ## Live on Production
-- ✅ https://n-zero.dev/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06
+- ✅ https://nuke.ag/vehicle/9a8aaf17-ddb1-49a2-9b0a-1352807e7a06
 - Shows: **1968 Chevrolet C10**
 - Engine: **6.5L V8 (396 ci)**
 - Trim: **Cheyenne Super**

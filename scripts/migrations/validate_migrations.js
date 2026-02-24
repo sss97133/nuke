@@ -3,7 +3,7 @@
  * Validate Supabase migration filenames to prevent db push failures.
  * - Enforces YYYYMMDDHHMMSS_name.sql format
  * - Detects duplicate versions (YYYYMMDDHHMMSS) and day-only prefixes (YYYYMMDD_name.sql)
- * - Exits non-zero on any issues
+ * - Exits nonuke on any issues
  */
 
 import fs from 'fs';

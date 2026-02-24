@@ -234,5 +234,5 @@ This component implements the core timeline concepts:
 **Status**: ✅ DEPLOYED  
 **Commit**: `c74466e3`  
 **Date**: October 21, 2025  
-**Environment**: Production (n-zero.dev)
+**Environment**: Production (nuke.ag)
 

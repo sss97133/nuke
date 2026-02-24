@@ -68,7 +68,7 @@ By connecting third-party accounts, you authorize NUKE to exchange data with tho
 ## 4. Privacy and Data
 
 ### 4.1 Privacy Policy
-Your use of the Software is subject to our Privacy Policy at https://n-zero.dev/privacy, which is incorporated by reference.
+Your use of the Software is subject to our Privacy Policy at https://nuke.ag/privacy, which is incorporated by reference.
 
 ### 4.2 Data Security
 We implement industry-standard security measures to protect your data. However, no system is completely secure, and we cannot guarantee absolute security.
@@ -186,7 +186,7 @@ You agree to comply with all applicable export laws and regulations.
 Boulder City, NV 89005
 United States
 
-**Email:** legal@n-zero.dev
+**Email:** legal@nuke.ag
 **Phone:** (702) 624-6793
 
 **EIN:** 93-3397016

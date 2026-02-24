@@ -199,7 +199,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
     return (
       <div className={className} style={containerStyle} onClick={onClick}>
         <img
-          src="/n-zero.png"
+          src="/nuke.png"
           alt="No image"
           style={{
             width: size === 'small' ? '32px' : '48px',

@@ -247,7 +247,7 @@ async function mergeVehicles() {
   }
 
   console.log(`\n✅ Merge complete!`)
-  console.log(`   Target vehicle: https://n-zero.dev/vehicle/${targetVehicleId}`)
+  console.log(`   Target vehicle: https://nuke.ag/vehicle/${targetVehicleId}`)
   console.log(`   Source vehicle archived: ${sourceVehicleId}\n`)
 }
 

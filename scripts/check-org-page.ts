@@ -33,10 +33,10 @@ import { chromium } from 'playwright';
     }
   });
 
-  console.log('--- Navigating to https://n-zero.dev/org ---');
+  console.log('--- Navigating to https://nuke.ag/org ---');
 
   try {
-    const response = await page.goto('https://n-zero.dev/org', {
+    const response = await page.goto('https://nuke.ag/org', {
       waitUntil: 'networkidle',
       timeout: 30000
     });

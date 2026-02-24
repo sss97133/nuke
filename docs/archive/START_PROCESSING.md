@@ -52,7 +52,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbG...your-production-key
 ## 💡 Alternative: Process via UI Upload
 
 Don't want to batch process? Just upload images normally:
-1. Go to https://n-zero.dev
+1. Go to https://nuke.ag
 2. Upload images to vehicles
 3. They auto-analyze in the background
 

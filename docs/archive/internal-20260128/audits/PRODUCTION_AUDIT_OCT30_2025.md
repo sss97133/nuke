@@ -2,7 +2,7 @@
 
 **Audit Time:** 2:10 PM  
 **Method:** Browser inspection via Playwright  
-**URL:** https://n-zero.dev
+**URL:** https://nuke.ag
 
 ---
 
@@ -27,7 +27,7 @@
 ## 📊 Site Audit Results
 
 ### Navigation ✅
-- Logo: "n-zero" → Links to /
+- Logo: "nuke" → Links to /
 - Home → /dashboard
 - Vehicles → /vehicles
 - Market → /market
@@ -109,7 +109,7 @@
 1. **Clear Vercel Cache & Redeploy**
 ```bash
 # Option A: Via Vercel Dashboard
-Visit: https://vercel.com/nzero/nuke/deployments
+Visit: https://vercel.com/nuke/nuke/deployments
 Click: "Redeploy" on latest deployment
 Check: "Clear cache"
 

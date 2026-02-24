@@ -9,7 +9,7 @@ test.describe('MyAuctions Stats Modal', () => {
   test.beforeEach(async ({ page, baseURL }) => {
     // Navigate to profile page (MyAuctions is shown in the auctions tab)
     // Note: This requires authentication - adjust URL if needed
-    const url = baseURL ? `${baseURL}/profile` : 'https://n-zero.dev/profile';
+    const url = baseURL ? `${baseURL}/profile` : 'https://nuke.ag/profile';
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     
     // Wait for page to load

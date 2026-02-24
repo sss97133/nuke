@@ -72,7 +72,7 @@ export default class Nuke {
 
   constructor(apiKey: string, config?: Partial<NukeConfig>) {
     if (!apiKey) {
-      throw new NukeError('API key is required. Get one at https://nuke.com/settings/api-keys');
+      throw new NukeError('API key is required. Get one at https://nuke.ag/settings/api-keys');
     }
 
     this.apiKey = apiKey;

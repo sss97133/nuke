@@ -18,7 +18,7 @@ const { chromium } = require('playwright');
   try {
     console.log('Testing production for errors after RLS fixes...\n');
     
-    await page.goto('https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e?nocache=' + Date.now(), { 
+    await page.goto('https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e?nocache=' + Date.now(), { 
       waitUntil: 'networkidle', 
       timeout: 30000 
     });

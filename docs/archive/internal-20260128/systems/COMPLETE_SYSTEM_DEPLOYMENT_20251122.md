@@ -374,19 +374,19 @@ Social Value:
 
 ### **Navigate to these pages now**:
 
-1. **https://n-zero.dev/invoices**
+1. **https://nuke.ag/invoices**
    - Invoice Manager
    - List, filter, preview invoices
    - Track payment status
    - Record payments
 
-2. **https://n-zero.dev/financials**
+2. **https://nuke.ag/financials**
    - Financial Dashboard
    - P&L overview
    - Revenue breakdown
    - Export to CSV ✅
 
-3. **https://n-zero.dev/suppliers**
+3. **https://nuke.ag/suppliers**
    - Supplier Performance
    - Auto-calculated ratings
    - Quality metrics

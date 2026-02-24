@@ -3,7 +3,7 @@
 ## What You Can Do Right Now
 
 ### ✅ Things That Work
-1. Browse to https://n-zero.dev
+1. Browse to https://nuke.ag
 2. See vehicles (images load)
 3. Click on vehicles (detail pages load)
 4. Navigate around (no crashes)
@@ -81,7 +81,7 @@ Based on what you said:
 **STOP. WAIT. TEST.**
 
 1. Wait 10 minutes for Vercel to finish
-2. Refresh https://n-zero.dev/profile
+2. Refresh https://nuke.ag/profile
 3. See if contributions show (my last fix)
 4. Check if errors reduced
 5. THEN decide next steps

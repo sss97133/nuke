@@ -110,7 +110,7 @@ Since you're using remote Supabase, you may need to set these in Supabase's envi
    vercel --prod
    ```
 
-2. Go to your production URL (e.g., `https://n-zero.dev/login`)
+2. Go to your production URL (e.g., `https://nuke.ag/login`)
 3. Click **Continue with Google**
 4. Should redirect to Google OAuth
 5. After authorization, should redirect back to production

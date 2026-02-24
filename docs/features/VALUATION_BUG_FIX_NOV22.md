@@ -113,7 +113,7 @@ else if (!valuation.estimatedValue && vehicle?.current_value) {
 
 - **File Modified:** `nuke_frontend/src/services/vehicleValuationService.ts`
 - **Deployed:** November 22, 2025
-- **Status:** ✅ LIVE at https://n-zero.dev
+- **Status:** ✅ LIVE at https://nuke.ag
 
 ## Related Issues
 

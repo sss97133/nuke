@@ -658,7 +658,7 @@ async function acceptOffer(offerId: string) {
 ### For Providers
 
 **Traditional**: Wait for customers to call/email
-**N-Zero**: Proactively find customers who need your services
+**Nuke**: Proactively find customers who need your services
 
 ```
 Provider Value Prop:
@@ -673,7 +673,7 @@ Provider Value Prop:
 ### For Customers
 
 **Traditional**: Get spammed by shops
-**N-Zero**: Receive relevant, quality offers based on your actual needs
+**Nuke**: Receive relevant, quality offers based on your actual needs
 
 ```
 Customer Protection:

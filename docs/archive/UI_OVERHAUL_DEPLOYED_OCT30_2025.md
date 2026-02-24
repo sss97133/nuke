@@ -5,7 +5,7 @@
 **Commit:** `c71b341e`  
 **Branch:** `main`  
 **Deployed:** October 30, 2025  
-**Production URL:** https://n-zero.dev
+**Production URL:** https://nuke.ag
 
 ---
 
@@ -215,7 +215,7 @@ Tap → Opens modal with:
 ## 🧪 PIP TEST RESULTS
 
 **Test Run:** October 30, 2025  
-**Environment:** Production (https://n-zero.dev)  
+**Environment:** Production (https://nuke.ag)  
 **Device:** iPhone 14 Pro (390x844)
 
 ```

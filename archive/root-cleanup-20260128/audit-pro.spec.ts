@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 
-const BASE_URL = 'https://n-zero.dev';
+const BASE_URL = 'https://nuke.ag';
 
 interface AuditFinding {
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
@@ -48,7 +48,7 @@ test.describe('Goldman Sachs Style Platform Audit', () => {
     await page.screenshot({ path: 'audit/01-homepage.png', fullPage: true });
 
     // Check branding
-    const hasLogo = await page.locator('text=n-zero').first().isVisible().catch(() => false);
+    const hasLogo = await page.locator('text=nuke').first().isVisible().catch(() => false);
     if (!hasLogo) {
       log({ severity: 'MEDIUM', category: 'Branding', issue: 'Logo/brand not immediately visible', location: 'Homepage header' });
     }

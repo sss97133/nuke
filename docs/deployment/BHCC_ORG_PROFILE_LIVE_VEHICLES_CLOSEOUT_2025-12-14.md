@@ -5,8 +5,8 @@ Owner: Nuke (frontend + org profile UI)
 Scope: BHCC org profile visibility + Vehicles tab reliability + perf/rate-limit stability
 
 ## Production URLs (current)
-- Frontend (latest prod deploy used for validation): `https://nukefrontend-m67jk0tss-nzero.vercel.app`
-- BHCC org profile: `https://nukefrontend-m67jk0tss-nzero.vercel.app/org/bb6253c0-cb83-4d1c-b95c-09c811064af7`
+- Frontend (latest prod deploy used for validation): `https://nukefrontend-m67jk0tss-nuke.vercel.app`
+- BHCC org profile: `https://nukefrontend-m67jk0tss-nuke.vercel.app/org/bb6253c0-cb83-4d1c-b95c-09c811064af7`
 
 ## What was the problem?
 1. **Vehicles tab missing** on BHCC org profile.

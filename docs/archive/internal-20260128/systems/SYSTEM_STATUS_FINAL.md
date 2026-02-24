@@ -119,7 +119,7 @@ fetch('https://qkgaybvrernstplzjaam.supabase.co/functions/v1/analyze-image-tier1
 
 ### Upload More Documents via UI
 
-1. Go to any vehicle page: `https://n-zero.dev/vehicle/a76c1d50-eca3-4430-9422-a00ea88725fd`
+1. Go to any vehicle page: `https://nuke.ag/vehicle/a76c1d50-eca3-4430-9422-a00ea88725fd`
 2. Scroll to "Upload Reference Documents"
 3. Drop PDFs (brochures, manuals, etc.)
 4. System auto-detects type, uploads, queues for extraction

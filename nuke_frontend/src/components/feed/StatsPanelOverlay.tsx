@@ -325,7 +325,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                     {(statsPanelRows || []).map((v: any) => {
                       const title = `${v?.year ?? ''} ${v?.make ?? ''} ${v?.model ?? ''}`.trim() || 'Vehicle';
                       const rawImg = String(v?.primary_image_url || v?.image_url || '').trim();
-                      const img = rawImg ? (optimizeImageUrl(rawImg, 'thumbnail') || rawImg) : '/n-zero.png';
+                      const img = rawImg ? (optimizeImageUrl(rawImg, 'thumbnail') || rawImg) : '/nuke.png';
 
                       const salePrice = typeof v?.sale_price === 'number' ? v.sale_price : Number(v?.sale_price || 0) || 0;
                       const ask = typeof v?.asking_price === 'number' ? v.asking_price : Number(v?.asking_price || 0) || 0;

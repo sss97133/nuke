@@ -247,7 +247,7 @@ async function createNormalizedVehicle() {
   console.log('');
   
   console.log('═══════════════════════════════════════════════════════════');
-  console.log(`🔗 View profile: https://n-zero.dev/vehicles/${vehicle.id}`);
+  console.log(`🔗 View profile: https://nuke.ag/vehicles/${vehicle.id}`);
   console.log('═══════════════════════════════════════════════════════════\n');
 }
 
@@ -296,7 +296,7 @@ function showProfile(vehicle) {
   }
   
   console.log('═══════════════════════════════════════════════════════════');
-  console.log(`🔗 View profile: https://n-zero.dev/vehicles/${vehicle.id}`);
+  console.log(`🔗 View profile: https://nuke.ag/vehicles/${vehicle.id}`);
   console.log('═══════════════════════════════════════════════════════════\n');
 }
 

@@ -357,7 +357,7 @@ Priority breakdown:
 - [ ] Deploy migrations: `supabase db push`
 - [ ] Send notifications: `supabase db execute -f scripts/send_collaboration_notifications.sql`
 - [ ] Deploy frontend: `vercel --prod --force --yes`
-- [ ] Verify bundle changed: `curl https://n-zero.dev | grep _next/static`
+- [ ] Verify bundle changed: `curl https://nuke.ag | grep _next/static`
 - [ ] Test VIN validation: Try to make invalid VIN public (should fail)
 - [ ] Test CURRENT filter: Default tab should be CURRENT (not ALL)
 - [ ] Test notifications: Check collaborators receive them

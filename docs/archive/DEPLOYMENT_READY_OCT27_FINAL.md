@@ -154,7 +154,7 @@ vercel ls --yes | head -5
 
 ### **5. Test on Production:**
 ```bash
-curl https://n-zero.dev | grep -o "index-[^\"']*\.js"
+curl https://nuke.ag | grep -o "index-[^\"']*\.js"
 # Should show NEW bundle hash
 ```
 
@@ -163,7 +163,7 @@ curl https://n-zero.dev | grep -o "index-[^\"']*\.js"
 ## 🧪 TESTING CHECKLIST
 
 ### **After Deployment - Transaction System:**
-- [ ] Visit https://n-zero.dev/admin/shipping-settings
+- [ ] Visit https://nuke.ag/admin/shipping-settings
 - [ ] See "Not Connected" status (expected - awaiting CD credentials)
 - [ ] Test BuyVehicleButton on a vehicle page
 - [ ] Pay test facilitation fee ($2 in Stripe test mode)
@@ -337,7 +337,7 @@ chmod +x deploy-transaction-system.sh
 vercel ls --yes | head -3
 
 # Visit production
-curl https://n-zero.dev | grep index-
+curl https://nuke.ag | grep index-
 ```
 
 ---
@@ -453,7 +453,7 @@ supabase functions deploy centraldispatch-oauth-callback
 supabase functions deploy get-centraldispatch-auth-url
 
 # Connect via UI
-# Visit: https://n-zero.dev/admin/shipping-settings
+# Visit: https://nuke.ag/admin/shipping-settings
 # Click: "Connect Central Dispatch"
 ```
 
@@ -463,7 +463,7 @@ supabase functions deploy get-centraldispatch-auth-url
 
 ### **After Git Push + Deploy:**
 
-**Frontend (https://n-zero.dev):**
+**Frontend (https://nuke.ag):**
 - ✅ New bundle deployed
 - ✅ /sign/:token route works
 - ✅ /admin/shipping-settings accessible
@@ -565,7 +565,7 @@ import BuyVehicleButton from '../components/BuyVehicleButton';
 
 ## 🚀 WHAT'S LIVE RIGHT NOW
 
-### **Production URL:** https://n-zero.dev
+### **Production URL:** https://nuke.ag
 
 **Working Features:**
 - ✅ Image upload system (crash-resistant, duplicate-proof)

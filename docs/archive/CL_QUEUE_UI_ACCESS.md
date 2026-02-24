@@ -2,7 +2,7 @@
 
 ## 📍 Where to Find It
 
-**URL:** https://n-zero.dev/admin
+**URL:** https://nuke.ag/admin
 
 **Tab:** Click "CL SCRAPING" tab (rightmost tab in admin dashboard)
 
@@ -134,5 +134,5 @@ You'll know it's working when:
 ---
 
 **Last Updated:** January 2025  
-**Location:** https://n-zero.dev/admin → CL SCRAPING tab
+**Location:** https://nuke.ag/admin → CL SCRAPING tab
 

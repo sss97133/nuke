@@ -121,7 +121,7 @@ Looking at the PRs and git history, it appears that:
 - ✅ Pushed to production
 - ✅ Vercel deploying now
 
-**URL:** https://n-zero.dev
+**URL:** https://nuke.ag
 
 The homepage will now show your dense, horizontal card layout as originally specified.
 
@@ -129,7 +129,7 @@ The homepage will now show your dense, horizontal card layout as originally spec
 
 ## Next Steps
 
-1. **Verify on production** - Check https://n-zero.dev once Vercel deploys (2-3 minutes)
+1. **Verify on production** - Check https://nuke.ag once Vercel deploys (2-3 minutes)
 2. **Mobile view** - The dense cards should work well on mobile too
 3. **Other pages** - Consider updating `/market`, `/portfolio`, and other vehicle lists to use VehicleCardDense consistently
 

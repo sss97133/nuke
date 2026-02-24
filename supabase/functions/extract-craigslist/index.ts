@@ -97,7 +97,7 @@ async function extractCraigslistListing(url: string): Promise<CraigslistExtracte
   // Fetch HTML directly - Craigslist doesn't require JS rendering
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; Nuke/1.0; +https://nuke.com/bot)',
+      'User-Agent': 'Mozilla/5.0 (compatible; Nuke/1.0; +https://nuke.ag/bot)',
     },
   });
 

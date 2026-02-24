@@ -1,4 +1,4 @@
--- n-zero Internal Betting System
+-- nuke Internal Betting System
 -- Users bet on auction outcomes, platform takes rake
 
 -- ============================================

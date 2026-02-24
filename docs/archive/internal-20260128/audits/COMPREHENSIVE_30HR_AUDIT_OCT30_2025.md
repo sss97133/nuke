@@ -30,7 +30,7 @@ Bundle: index-D49hNiPf.js (1.7MB)
 
 ### 2. **Production Site is Live** ✅
 ```
-https://n-zero.dev → ✅ RESPONDS
+https://nuke.ag → ✅ RESPONDS
 Bundle: index-9fKYXxaj.js (deployed Oct 30)
 ```
 
@@ -245,7 +245,7 @@ node scripts/fix-schema-cache.js
 ---
 
 ### **Step 4: Verify Deployment** (3 mins)
-1. Go to: https://vercel.com/nzero/nuke/deployments
+1. Go to: https://vercel.com/nuke/nuke/deployments
 2. Confirm latest commit `89f5f30e` is deployed
 3. If not, trigger deployment:
    ```bash
@@ -259,7 +259,7 @@ node scripts/fix-schema-cache.js
 **Critical User Journeys:**
 
 1. **Add Vehicle Flow** 🚗
-   - Open https://n-zero.dev on mobile
+   - Open https://nuke.ag on mobile
    - Click + button
    - Enter: 1977 Chevrolet K5 Blazer
    - Add photo
@@ -306,7 +306,7 @@ git log origin/main --oneline -1
 # Should show: 89f5f30e
 
 # 2. Check Vercel deployment
-open https://vercel.com/nzero/nuke/deployments
+open https://vercel.com/nuke/nuke/deployments
 
 # 3. If needed, force redeploy
 git commit --allow-empty -m "chore: verify deployment"
@@ -314,7 +314,7 @@ git push origin main
 ```
 
 ### **Phase 3: Test (15 mins)**
-1. Open https://n-zero.dev on your iPhone
+1. Open https://nuke.ag on your iPhone
 2. Try adding a vehicle
 3. Try editing a price
 4. Try uploading a document
@@ -415,7 +415,7 @@ supabase db push
 node scripts/fix-schema-cache.js
 
 # 3. Test on mobile
-# Open https://n-zero.dev on your phone
+# Open https://nuke.ag on your phone
 # Try adding a vehicle
 
 # 4. Report back results

@@ -57,7 +57,7 @@
 ### Mobile Upload FAB
 ```bash
 # On your phone:
-1. Go to: nukefrontend-5dzr395le-nzero.vercel.app
+1. Go to: nukefrontend-5dzr395le-nuke.vercel.app
 2. Log in
 3. Open any vehicle
 4. Look bottom-right → see 📷
@@ -94,7 +94,7 @@
 
 ## 📊 PRODUCTION URLS
 
-**Frontend:** https://nukefrontend-5dzr395le-nzero.vercel.app  
+**Frontend:** https://nukefrontend-5dzr395le-nuke.vercel.app  
 **Latest Commit:** 365031f9  
 **Bundle:** index-5dzr395le.js
 
@@ -104,7 +104,7 @@
 
 ```bash
 # Check site is live
-curl -I https://nukefrontend-5dzr395le-nzero.vercel.app
+curl -I https://nukefrontend-5dzr395le-nuke.vercel.app
 
 # Check Supabase edge functions
 supabase functions list

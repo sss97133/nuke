@@ -62,7 +62,7 @@ async function verify() {
     console.log(`   ${status}: ${count}`);
   });
 
-  console.log(`\n🔗 Profile: https://n-zero.dev/vehicle/${VEHICLE_ID}`);
+  console.log(`\n🔗 Profile: https://nuke.ag/vehicle/${VEHICLE_ID}`);
   console.log('═══════════════════════════════════════════════════════════\n');
 }
 

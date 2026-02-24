@@ -70,6 +70,8 @@ serve(async (req) => {
           extractorUrl = supabaseUrl + '/functions/v1/extract-barn-finds-listing';
         } else if (url.includes('craigslist.org')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-craigslist';
+        } else if (url.includes('mecum.com')) {
+          extractorUrl = supabaseUrl + '/functions/v1/extract-mecum';
         } else if (url.includes('barrett-jackson.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-barrett-jackson';
         } else if (url.includes('broadarrowauctions.com')) {
@@ -110,6 +112,7 @@ serve(async (req) => {
         if (extractData.success) {
           const extractedVehicle = extractData.extracted || extractData;
           let vehicleId = extractedVehicle.vehicle_id || extractedVehicle.vehicleId || extractData.vehicle_id || extractData.vehicleId || null;
+          const qualityScore = extractData.quality_score ?? extractedVehicle.quality_score ?? null;
           let intelligenceDecision = null;
 
           // INTELLIGENCE LAYER: Validate before accepting
@@ -172,19 +175,24 @@ serve(async (req) => {
             }
           }
 
+          // If extractor returned a quality score, use it to flag low-quality extractions
+          const queueStatus = (qualityScore !== null && qualityScore < 0.3) ? 'pending_review' : 'complete';
+
           await supabase.from('import_queue').update({
-            status: 'complete',
+            status: queueStatus,
             processed_at: new Date().toISOString(),
             attempts: item.attempts + 1,
             vehicle_id: vehicleId,
+            error_message: queueStatus === 'pending_review' ? `Low quality score: ${qualityScore}` : null,
             locked_at: null,
             locked_by: null,
           }).eq('id', item.id);
           results.push({
             id: item.id,
-            status: 'complete',
+            status: queueStatus,
             url,
             vehicle_id: vehicleId,
+            quality_score: qualityScore,
             decision: intelligenceDecision?.decision || 'N/A'
           });
         } else {

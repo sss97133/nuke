@@ -1100,7 +1100,7 @@ serve(async (req) => {
         .rpc("generate_magic_link", { p_tech_id: techLink.id });
 
       if (tokenData) {
-        const baseUrl = Deno.env.get("PUBLIC_URL") || "https://n-zero.dev";
+        const baseUrl = Deno.env.get("PUBLIC_URL") || "https://nuke.ag";
         const link = `${baseUrl}/auth/magic?token=${tokenData}`;
         return twimlResponse(`Tap to log in (15 min): ${link}`);
       }

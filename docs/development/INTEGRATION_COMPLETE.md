@@ -153,7 +153,7 @@ supabase migration up --local
 ✅ Real-time bid updates
 
 ### For Authenticated Users
-✅ Create N-Zero auctions (standard or live)
+✅ Create Nuke auctions (standard or live)
 ✅ Prepare listings for external platforms
 ✅ Export to BaT, eBay, Craigslist, Cars.com, Facebook
 ✅ Track exports across all platforms
@@ -207,14 +207,14 @@ Main Nav
 2. Select platforms (BaT, eBay, Craigslist, etc.)
 3. Customize pricing and description
 4. Generate platform-specific packages
-5. Download exports or submit to N-Zero
+5. Download exports or submit to Nuke
 6. Track in analytics dashboard
 ```
 
 ### Flow 4: Track Performance
 ```
 1. Visit /auctions/analytics (requires login)
-2. View N-Zero auction stats
+2. View Nuke auction stats
 3. View external platform performance
 4. Compare conversion rates
 5. Track revenue and commissions
@@ -224,10 +224,10 @@ Main Nav
 
 ## Revenue Model
 
-### Internal Auctions (N-Zero)
+### Internal Auctions (Nuke)
 - **Fee:** 3-5% success fee
 - **Target:** Regular vehicles, core audience
-- **User submits:** Direct to N-Zero platform
+- **User submits:** Direct to Nuke platform
 
 ### External Platform Assistance
 - **Fee:** 1-2% commission on verified sales
@@ -236,7 +236,7 @@ Main Nav
 
 ### Example Revenue
 **100 vehicles/month:**
-- 30 on N-Zero @ 3% avg = $22,500
+- 30 on Nuke @ 3% avg = $22,500
 - 70 exported @ 1.5% avg = $15,750
 - **Total: $38,250/month = $459k/year**
 
@@ -333,7 +333,7 @@ supabase migration up --local
 
 ### Month 1 Goals
 - [ ] 50+ auction marketplace visits
-- [ ] 10+ N-Zero auctions created
+- [ ] 10+ Nuke auctions created
 - [ ] 25+ exports prepared
 - [ ] 3+ external platform sales
 

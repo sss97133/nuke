@@ -110,7 +110,7 @@ TOTAL: ~35px of chrome
 ### Production Deployed ✅
 - Branch: main
 - Deployment: Vercel production
-- URL: https://n-zero.dev
+- URL: https://nuke.ag
 - Status: LIVE
 
 ### Verification Steps:
@@ -119,7 +119,7 @@ TOTAL: ~35px of chrome
 3. ✅ No linter errors
 4. ✅ Desktop layout preserved
 5. ✅ Mobile layout simplified
-6. ⏳ Bundle verification (check https://n-zero.dev)
+6. ⏳ Bundle verification (check https://nuke.ag)
 
 ---
 

@@ -4,7 +4,7 @@
 
 ### Step 1: Go to Vehicle Profile
 Navigate to any vehicle profile:
-- URL: `https://n-zero.dev/vehicle/{vehicle-id}`
+- URL: `https://nuke.ag/vehicle/{vehicle-id}`
 - Or browse vehicles and click on one
 
 ### Step 2: Find Timeline Events
@@ -27,19 +27,19 @@ Here are vehicles with events ready to test:
 
 1. **1974 CHEVROLET Blazer** (159 events)
    - ID: `05f27cc4-914e-425a-8ed8-cfea35c1928d`
-   - URL: `https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d`
+   - URL: `https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d`
 
 2. **1977 CHEVROLET Blazer** (74 events)
    - ID: `e08bf694-970f-4cbe-8a74-8715158a0f2e`
-   - URL: `https://n-zero.dev/vehicle/e08bf694-970f-4cbe-8a74-8715158a0f2e`
+   - URL: `https://nuke.ag/vehicle/e08bf694-970f-4cbe-8a74-8715158a0f2e`
 
 3. **1983 GMC K2500** (60 events)
    - ID: `5a1deb95-4b67-4cc3-9575-23bb5b180693`
-   - URL: `https://n-zero.dev/vehicle/5a1deb95-4b67-4cc3-9575-23bb5b180693`
+   - URL: `https://nuke.ag/vehicle/5a1deb95-4b67-4cc3-9575-23bb5b180693`
 
 4. **1974 FORD Bronco** (test vehicle - 20 bundles)
    - ID: `eea40748-cdc1-4ae9-ade1-4431d14a7726`
-   - URL: `https://n-zero.dev/vehicle/eea40748-cdc1-4ae9-ade1-4431d14a7726`
+   - URL: `https://nuke.ag/vehicle/eea40748-cdc1-4ae9-ade1-4431d14a7726`
 
 ## 📋 What You'll See in Receipt
 

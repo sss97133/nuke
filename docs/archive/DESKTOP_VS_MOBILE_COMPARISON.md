@@ -40,7 +40,7 @@
 ### MOBILE LAYOUT (Single Column)
 ```
 ┌─────────────────────────────────────┐
-│ HEADER: [☰] n-zero      [🔔] [👤]  │ ← Sticky
+│ HEADER: [☰] nuke      [🔔] [👤]  │ ← Sticky
 ├─────────────────────────────────────┤
 │ [← Back] 1987 Chevy Silverado K10  │ ← Sticky
 ├─────────────────────────────────────┤
@@ -134,7 +134,7 @@
 ```
 CLOSED STATE:
 ┌─────────────────────────────────────┐
-│ [☰] n-zero            [🔔] [👤]    │ ← Top header (hamburger collapsed)
+│ [☰] nuke            [🔔] [👤]    │ ← Top header (hamburger collapsed)
 ├─────────────────────────────────────┤
 │                                     │
 │    [Page content fills screen]     │
@@ -208,7 +208,7 @@ OPEN STATE (tap ☰):
 ### MOBILE DASHBOARD (Vertical Stack)
 ```
 ┌─────────────────────────────────────┐
-│ [☰] n-zero            [🔔] [👤]    │
+│ [☰] nuke            [🔔] [👤]    │
 ├─────────────────────────────────────┤
 │ DASHBOARD                           │
 ├─────────────────────────────────────┤
@@ -306,7 +306,7 @@ OPEN STATE (tap ☰):
 ```
 STEP 1: METHOD SELECTION
 ┌─────────────────────────────────────┐
-│ [☰] n-zero            [🔔] [👤]    │
+│ [☰] nuke            [🔔] [👤]    │
 ├─────────────────────────────────────┤
 │ [← Back] ADD VEHICLE                │
 ├─────────────────────────────────────┤

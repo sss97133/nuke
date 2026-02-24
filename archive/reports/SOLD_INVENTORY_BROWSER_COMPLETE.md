@@ -257,7 +257,7 @@ thumbnail_url, medium_url, image_url
 
 **Build:** Successful (4.01s)  
 **Deploy:** Vercel Production  
-**URL:** https://n-zero.dev/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf  
+**URL:** https://nuke.ag/org/c433d27e-2159-4f8c-b4ae-32a5e44a77cf  
 
 **Bundle Size:**
 - Main JS: 2.4 MB (660 KB gzipped)

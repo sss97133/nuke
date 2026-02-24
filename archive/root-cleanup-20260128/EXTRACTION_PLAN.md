@@ -19,8 +19,8 @@
 ```
 
 ### Verify results:
-- BaT Org: https://n-zero.dev/org/bring-a-trailer
-- Homepage: https://n-zero.dev/
+- BaT Org: https://nuke.ag/org/bring-a-trailer
+- Homepage: https://nuke.ag/
 
 ## Current Status
 - **143 BaT vehicles** in database
@@ -67,9 +67,9 @@ SELECT COUNT(*) FROM bat_bids;
 ```
 
 ### View on frontend:
-- Org page: https://n-zero.dev/org/bring-a-trailer
-- All vehicles: https://n-zero.dev/vehicles
-- Homepage: https://n-zero.dev/
+- Org page: https://nuke.ag/org/bring-a-trailer
+- All vehicles: https://nuke.ag/vehicles
+- Homepage: https://nuke.ag/
 
 ## What NOT to do
 - ❌ Don't use untested functions

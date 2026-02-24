@@ -1,7 +1,7 @@
 # PROOF: GRANULAR VALIDATION SYSTEM WORKING
 
 ## Vehicle: 1972 Chevrolet K10
-https://n-zero.dev/vehicle/d7962908-9a01-4082-a85e-6bbe532550b2
+https://nuke.ag/vehicle/d7962908-9a01-4082-a85e-6bbe532550b2
 
 ## The Race Results (Database):
 

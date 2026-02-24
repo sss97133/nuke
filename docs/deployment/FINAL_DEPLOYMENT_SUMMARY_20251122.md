@@ -44,11 +44,11 @@
 ## 🚀 Live Production URLs
 
 ### **Financial Management Pages**:
-1. **https://n-zero.dev/invoices** - Invoice Manager
-2. **https://n-zero.dev/financials** - P&L Dashboard  
-3. **https://n-zero.dev/suppliers** - Supplier Performance
-4. **https://n-zero.dev/contracts** - Contract Manager
-5. **https://n-zero.dev/knowledge** - Knowledge Base
+1. **https://nuke.ag/invoices** - Invoice Manager
+2. **https://nuke.ag/financials** - P&L Dashboard  
+3. **https://nuke.ag/suppliers** - Supplier Performance
+4. **https://nuke.ag/contracts** - Contract Manager
+5. **https://nuke.ag/knowledge** - Knowledge Base
 
 ### **Enhanced Existing Pages**:
 - Any vehicle timeline → Click event → Enhanced financial modal
@@ -477,7 +477,7 @@ All pages follow unified design system:
 
 ### **Desktop Navigation**:
 ```
-[n-zero] [Home] [Vehicles] [Organizations] [Financials]  [Profile]
+[nuke] [Home] [Vehicles] [Organizations] [Financials]  [Profile]
 ```
 
 ### **Mobile Menu**:

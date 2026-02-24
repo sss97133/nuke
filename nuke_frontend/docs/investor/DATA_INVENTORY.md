@@ -227,7 +227,7 @@ At different API pricing tiers:
 
 ## WHAT WE CANNOT COMPUTE (Need From Founders)
 
-1. ~~**Project name**~~ → **N-Zero** ✅
+1. ~~**Project name**~~ → **Nuke** ✅
 2. ~~**Founder bios**~~ → Skylar Williams, Founder & CEO. Found in DB (business_related_persons). ✅
 3. ~~**Revenue model**~~ → 10-stream model documented ✅
 4. ~~**The ask**~~ → $2M Post-Money SAFE, $18M cap, detailed use of funds ✅

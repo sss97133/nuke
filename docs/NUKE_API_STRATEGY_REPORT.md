@@ -292,7 +292,7 @@ Nuke is a full-stack automotive data platform consisting of:
 | Data Pipeline | 312 Supabase Edge Functions (Deno/TypeScript) | Extraction, processing, enrichment |
 | Database | PostgreSQL via Supabase | 687 migrations, RLS-secured |
 | Backend API | Elixir/Phoenix | RESTful endpoints, rate limiting |
-| Frontend | React + Vite | Consumer interface (n-zero.dev) |
+| Frontend | React + Vite | Consumer interface (nuke.ag) |
 | SDK | TypeScript (@nuke/sdk) | Developer client library |
 | Mobile | Nuke Scanner, Nuke Desktop | Field data collection |
 | Sub-product | DealerScan | Dealer document OCR |
@@ -1044,7 +1044,7 @@ The APIs that developers love — Stripe, Twilio, Plaid — share common traits:
     "code": "vehicle_not_found",
     "message": "No vehicle found with VIN 1GCEK19K5RE123456",
     "param": "vin",
-    "doc_url": "https://docs.nuke.dev/errors/vehicle_not_found"
+    "doc_url": "https://docs.nuke.ag/errors/vehicle_not_found"
   }
 }
 ```
@@ -1237,7 +1237,7 @@ This is the addressable market at full product maturity. Near-term (12-month) ta
 **Actions:**
 1. Ship the public API with the target endpoint surface
 2. Publish the TypeScript SDK to npm
-3. Launch docs site (docs.nuke.dev)
+3. Launch docs site (docs.nuke.ag)
 4. Launch on Hacker News ("Show HN: The automotive data API with source provenance on every field")
 5. Post on Product Hunt
 6. Submit to API directories (RapidAPI, API Layer, ProgrammableWeb)
@@ -1431,7 +1431,7 @@ Nuke occupies a unique position: **broad vehicle coverage** (classic through mod
 
 | Week | Deliverable |
 |------|-------------|
-| 5 | Launch docs.nuke.dev (auto-generated from OpenAPI + hand-written guides) |
+| 5 | Launch docs.nuke.ag (auto-generated from OpenAPI + hand-written guides) |
 | 5 | Build interactive API playground |
 | 6 | Create sandbox environment with seeded test data |
 | 6 | Write Getting Started guide, Authentication guide, Webhooks guide |
@@ -1454,7 +1454,7 @@ Nuke occupies a unique position: **broad vehicle coverage** (classic through mod
 
 ## Key Dependencies
 
-1. **Domain**: Secure `api.nuke.dev` and `docs.nuke.dev`
+1. **Domain**: Secure `api.nuke.ag` and `docs.nuke.ag`
 2. **Hosting**: Decide if API gateway sits in front of Supabase Edge Functions or if Phoenix backend serves the public API
 3. **Metering**: Build or buy usage metering (Stripe Billing, Metronome, or custom)
 4. **Support**: Set up support channel (Intercom, Discord, or GitHub Discussions)
@@ -1640,7 +1640,7 @@ GET /v1/vehicles/JT2AE86C9P0123456
   "mileage_observed_at": "2025-11-15T00:00:00Z",
   "images": {
     "count": 42,
-    "primary": "https://storage.nuke.dev/vehicles/a1b2.../primary.jpg",
+    "primary": "https://storage.nuke.ag/vehicles/a1b2.../primary.jpg",
     "categories": {
       "exterior": 18,
       "interior": 10,

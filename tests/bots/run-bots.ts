@@ -24,7 +24,7 @@ const getArg = (name: string): string | undefined => {
 
 const selectedPersona = getArg('persona');
 const headless = getArg('headless') !== 'false';
-const baseUrl = getArg('url') || process.env.BOT_BASE_URL || 'https://n-zero.dev';
+const baseUrl = getArg('url') || process.env.BOT_BASE_URL || 'https://nuke.ag';
 
 // Initialize Supabase
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;

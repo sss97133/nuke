@@ -385,7 +385,7 @@ if (shop) {
 
 ✅ **Deployed to production**: November 1, 2025
 
-**Production URL**: https://n-zero.dev
+**Production URL**: https://nuke.ag
 
 ---
 

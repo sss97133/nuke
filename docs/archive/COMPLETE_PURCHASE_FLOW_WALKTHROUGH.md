@@ -8,7 +8,7 @@
 
 ### **Step 1: User Opens Vehicle Image (Engine Bay)**
 ```
-Location: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+Location: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 User: Taps on engine bay photo (image 2 of 50)
 Screen: Full-screen lightbox opens showing engine
 ```

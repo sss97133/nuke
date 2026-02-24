@@ -13,7 +13,7 @@
 - All other functionality preserved
 
 ### 2. Navigation Realigned ✅
-- **Logo (n-zero)** → Homepage (/) - Main public feed
+- **Logo (nuke)** → Homepage (/) - Main public feed
 - **Dashboard** → /dashboard - Personalized user feed (auth required)
 - **Vehicles** → /vehicles - User's vehicles (auth required)
 - **Organizations** → /organizations - Business hub (auth required)
@@ -21,7 +21,7 @@
 
 ### 3. Homepage as Public Feed ✅
 Current render shows:
-- ✅ Header with n-zero logo and navigation
+- ✅ Header with nuke logo and navigation
 - ✅ Search bar with ⌘K indicator
 - ✅ "0 vehicles · 0 active today" stats (loads from DB)
 - ✅ Filter pills (Recent, For Sale, Projects, Near Me)

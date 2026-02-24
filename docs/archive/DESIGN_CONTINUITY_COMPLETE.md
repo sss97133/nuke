@@ -250,10 +250,10 @@ grep -r "fontSize.*[2-9][0-9]px" nuke_frontend/src/components/financial/
 **After**: ONE design system, consistent everywhere
 
 **Test it**: Visit these pages, should all look unified:
-- https://n-zero.dev/ (homepage)
-- https://n-zero.dev/portfolio (portfolio)
-- https://n-zero.dev/vehicle/[id] (vehicle profile)
-- https://n-zero.dev/discover (discovery)
+- https://nuke.ag/ (homepage)
+- https://nuke.ag/portfolio (portfolio)
+- https://nuke.ag/vehicle/[id] (vehicle profile)
+- https://nuke.ag/discover (discovery)
 
 All should have:
 - Same background color

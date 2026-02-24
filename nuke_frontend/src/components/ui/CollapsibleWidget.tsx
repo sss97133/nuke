@@ -14,6 +14,8 @@ interface CollapsibleWidgetProps {
   badge?: React.ReactNode
   /** Optional action button in header */
   action?: React.ReactNode
+  /** Use design-system styling (flat, no radius, matches vehicle profile cards) */
+  variant?: 'default' | 'profile'
 }
 
 export function CollapsibleWidget({
@@ -25,20 +27,38 @@ export function CollapsibleWidget({
   contentClassName,
   badge,
   action,
+  variant = 'default',
 }: CollapsibleWidgetProps) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
+  const isProfile = variant === 'profile'
 
   return (
-    <div className={cn("rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700", className)}>
-      <button
+    <div
+      className={cn(
+        isProfile ? 'collapsible-widget--profile' : 'rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700',
+        isProfile && isCollapsed && 'is-collapsed',
+        className
+      )}
+    >
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setIsCollapsed(!isCollapsed)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsCollapsed(!isCollapsed); } }}
         className={cn(
-          "flex w-full items-center justify-between p-4 text-left",
+          'flex w-full items-center justify-between text-left cursor-pointer',
+          isProfile ? 'collapsible-widget--profile__header' : 'p-4',
           headerClassName
         )}
       >
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium uppercase tracking-wide text-gray-600 dark:text-gray-400">
+          <h3
+            className={
+              isProfile
+                ? 'collapsible-widget--profile__title'
+                : 'text-sm font-medium uppercase tracking-wide text-gray-600 dark:text-gray-400'
+            }
+          >
             {title}
           </h3>
           {badge}
@@ -49,14 +69,20 @@ export function CollapsibleWidget({
           )}
           <ChevronDown
             className={cn(
-              "h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform",
-              isCollapsed && "-rotate-90"
+              'h-4 w-4 transition-transform flex-shrink-0',
+              isProfile ? 'collapsible-widget--profile__chevron' : 'text-gray-500 dark:text-gray-400',
+              isCollapsed && '-rotate-90'
             )}
           />
         </div>
-      </button>
+      </div>
       {!isCollapsed && (
-        <div className={cn("border-t border-gray-200 dark:border-gray-700 p-4", contentClassName)}>
+        <div
+          className={cn(
+            isProfile ? 'collapsible-widget--profile__content' : 'border-t border-gray-200 dark:border-gray-700 p-4',
+            contentClassName
+          )}
+        >
           {children}
         </div>
       )}

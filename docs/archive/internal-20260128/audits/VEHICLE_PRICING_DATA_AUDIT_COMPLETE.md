@@ -212,7 +212,7 @@ In VehiclePriceSection.tsx, show data sources:
 ## 🔍 Testing Your Current System
 
 ### **Check Your Vehicle's Pricing:**
-1. Go to: https://n-zero.dev/vehicle/eea40748-cdc1-4ae9-ade1-4431d14a7726
+1. Go to: https://nuke.ag/vehicle/eea40748-cdc1-4ae9-ade1-4431d14a7726
 2. Look for "EST: $5,519" vs "ESTIMATED VALUE: $29,802"
 3. This discrepancy suggests multiple pricing systems running
 

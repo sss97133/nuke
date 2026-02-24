@@ -1,4 +1,4 @@
-# Critical Fixes - Deployed to n-zero.dev
+# Critical Fixes - Deployed to nuke.ag
 
 **Date:** October 24, 2025, 9:07 PM  
 **Status:** DEPLOYED ✅
@@ -93,7 +93,7 @@
 
 ### Frontend - DEPLOYED ✅
 **Pushed to GitHub:** Commit `4f7d8d4b`, `b3f516c0`  
-**Vercel:** Auto-deploying to https://n-zero.dev/  
+**Vercel:** Auto-deploying to https://nuke.ag/  
 **ETA:** 3-5 minutes
 
 ### Database - PENDING ⏳
@@ -140,7 +140,7 @@ Check: https://vercel.com/dashboard
 5. Verify success message
 
 ### 3. Test Immediately (5 min)
-- Visit https://n-zero.dev/vehicle/defba683-ea3d-4514-bee4-373e53b9252a
+- Visit https://nuke.ag/vehicle/defba683-ea3d-4514-bee4-373e53b9252a
 - Images should appear ✅
 - No flashing ✅
 - Can edit vehicle ✅

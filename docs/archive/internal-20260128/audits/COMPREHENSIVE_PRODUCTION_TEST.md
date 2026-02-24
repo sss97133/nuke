@@ -1,7 +1,7 @@
 # 🧪 COMPREHENSIVE PRODUCTION TEST RESULTS
 
 **Date:** October 25, 2025  
-**Environment:** https://n-zero.dev  
+**Environment:** https://nuke.ag  
 **Testing Method:** Supabase CLI + Network Tests  
 **(Playwright tools unavailable - manual browser verification needed for UI)**
 
@@ -210,7 +210,7 @@ Result: ✅ PASS - All functions active
 - ✅ Edge functions active
 
 **What You Need to Verify:**
-- Open browser to: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+- Open browser to: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 - Open console: Cmd+Option+J
 - Click image
 - Check for: "🔍 TAG DEBUG:"

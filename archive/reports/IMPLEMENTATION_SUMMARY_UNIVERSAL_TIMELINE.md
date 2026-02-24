@@ -119,7 +119,7 @@ User Uploads Images
 4. **Make Public / Template**
    - `is_public = true` → Shows in shop portfolio
    - `is_template = true` → "Order Similar Work" button
-   - Share link: `n-zero.dev/work-order/abc-123`
+   - Share link: `nuke.ag/work-order/abc-123`
 
 5. **(Optional) Link to Vehicle**
    - Customer installs engine in boat

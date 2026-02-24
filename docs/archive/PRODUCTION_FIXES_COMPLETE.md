@@ -11,7 +11,7 @@
 1. ✅ Removed `VITE_OPENAI_API_KEY` from Vercel production environment
 2. ✅ Updated `TitleScan.tsx` to use `extract-title-data` edge function
 3. ✅ Edge function already has correct API key configured in Supabase
-4. ✅ Deployed to production: https://nuke-nx5ujt7hr-nzero.vercel.app
+4. ✅ Deployed to production: https://nuke-nx5ujt7hr-nuke.vercel.app
 
 ### Problem 2: EXIF Library Error
 **Error**: `Uncaught ReferenceError: n is not defined` in `exif-C97ODzJD.js`
@@ -56,8 +56,8 @@ Frontend → Supabase Edge Function → OpenAI API (with valid key) → Success
 
 **Deployed**: October 18, 2025
 **Commit**: 5a0a7673
-**Vercel**: https://nuke-nx5ujt7hr-nzero.vercel.app
-**Inspect**: https://vercel.com/nzero/nuke/B8eH2qXon3y3QLsm9FUsrBovsHpY
+**Vercel**: https://nuke-nx5ujt7hr-nuke.vercel.app
+**Inspect**: https://vercel.com/nuke/nuke/B8eH2qXon3y3QLsm9FUsrBovsHpY
 
 ## Testing Required
 

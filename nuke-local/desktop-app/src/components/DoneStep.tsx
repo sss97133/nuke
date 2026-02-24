@@ -73,7 +73,7 @@ export default function DoneStep() {
           Process More Documents
         </button>
         <a
-          href="https://nuke.app"
+          href="https://nuke.ag"
           target="_blank"
           rel="noopener noreferrer"
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-nuke-600 rounded-lg hover:bg-nuke-500 transition"

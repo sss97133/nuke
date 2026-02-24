@@ -108,7 +108,7 @@ caption, user_id, latitude, longitude
 
 ## Verification Steps
 
-1. Refresh https://n-zero.dev
+1. Refresh https://nuke.ag
 2. Check Dashboard - should show 17 vehicles
 3. Check browser console - 400 errors should be gone
 4. Test vehicle profile - should load without column errors

@@ -32,7 +32,7 @@ You need a **Google OAuth 2.0 Client** (Web application) so "Continue with Googl
 3. Paste **Client ID** and **Client Secret** from Google.
 4. Save.
 
-## 3. Supabase URL Configuration (so you don’t land on n-zero)
+## 3. Supabase URL Configuration (so you don’t land on Nuke)
 
 **Authentication** → **URL Configuration**:
 

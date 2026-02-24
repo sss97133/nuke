@@ -15,7 +15,7 @@ const corsHeaders = {
 
 const QUICKBOOKS_CLIENT_ID = Deno.env.get('QUICKBOOKS_CLIENT_ID');
 const QUICKBOOKS_CLIENT_SECRET = Deno.env.get('QUICKBOOKS_CLIENT_SECRET');
-const QUICKBOOKS_REDIRECT_URI = Deno.env.get('QUICKBOOKS_REDIRECT_URI') || 'https://n-zero.dev/api/quickbooks/callback';
+const QUICKBOOKS_REDIRECT_URI = Deno.env.get('QUICKBOOKS_REDIRECT_URI') || 'https://nuke.ag/api/quickbooks/callback';
 const QUICKBOOKS_ENVIRONMENT = Deno.env.get('QUICKBOOKS_ENVIRONMENT') || 'sandbox'; // 'sandbox' or 'production'
 
 const QB_AUTH_URL = 'https://appcenter.intuit.com/connect/oauth2';

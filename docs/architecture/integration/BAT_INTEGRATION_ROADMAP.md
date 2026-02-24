@@ -1,13 +1,13 @@
 # Bring a Trailer Integration Roadmap
 
 ## Vision
-N-Zero becomes the central hub for dealer inventory management with **two-way BaT integration**, acting as a commission-based aggregator and submission service.
+Nuke becomes the central hub for dealer inventory management with **two-way BaT integration**, acting as a commission-based aggregator and submission service.
 
 ---
 
 ## Phase 1: Import Flow ✅ (COMPLETE)
 
-**Goal:** Populate N-Zero profiles with BaT-verified sale data
+**Goal:** Populate Nuke profiles with BaT-verified sale data
 
 ### Features Implemented:
 - [x] **BaT Listing Parser** - Edge Function to scrape individual BaT listings
@@ -52,11 +52,11 @@ Process:
 
 ## Phase 2: Export Flow 🚀 (COMING SOON)
 
-**Goal:** Submit vehicles FROM N-Zero TO BaT with one click
+**Goal:** Submit vehicles FROM Nuke TO BaT with one click
 
 ### Planned Features:
 - [ ] **BaT API Integration** - Official API access (or reverse-engineered form submission)
-- [ ] **One-Click Submission** - Pre-fill BaT forms from N-Zero vehicle data
+- [ ] **One-Click Submission** - Pre-fill BaT forms from Nuke vehicle data
 - [ ] **Commission Tracking** - Track which submissions convert to sales
 - [ ] **Automated Photo Upload** - Send high-res images directly to BaT
 - [ ] **Description Generator** - AI-powered listing descriptions from vehicle history
@@ -69,7 +69,7 @@ Input: { vehicleId: string, reservePrice?: number, listingDuration: number }
 Output: { batListingUrl: string, submissionId: string }
 
 Process:
-1. Fetch vehicle data from N-Zero
+1. Fetch vehicle data from Nuke
 2. Generate listing description (AI-powered from timeline/history)
 3. Select best 50 images (ranked by quality/engagement)
 4. Submit to BaT API with pre-filled form
@@ -84,27 +84,27 @@ Process:
 
 ### Example Flow:
 ```
-User has a 1972 Chevrolet K10 fully documented on N-Zero:
+User has a 1972 Chevrolet K10 fully documented on Nuke:
 - 59 high-res images from Dropbox
 - Complete timeline (restoration, service records)
 - Ghost-attributed photography credits
 - Data validation from multiple sources
 
 Click "Submit to BaT" →
-1. N-Zero generates compelling description from timeline
+1. Nuke generates compelling description from timeline
 2. Selects best 50 images (most liked, highest quality)
 3. Pre-fills BaT form with year/make/model/VIN/mileage
 4. Suggests reserve price based on comps ($65k-$85k)
 5. One-click submit → instant BaT listing
-6. Track bids in real-time on N-Zero
-7. If sold → N-Zero earns 1.5% commission ($1,275 on $85k sale)
+6. Track bids in real-time on Nuke
+7. If sold → Nuke earns 1.5% commission ($1,275 on $85k sale)
 ```
 
 ---
 
 ## Phase 3: API Marketplace 💰 (FUTURE)
 
-**Goal:** Open N-Zero BaT integration as API for other platforms
+**Goal:** Open Nuke BaT integration as API for other platforms
 
 ### Planned Features:
 - [ ] **Public API** - RESTful API for BaT import/export
@@ -182,7 +182,7 @@ Click "Submit to BaT" →
 
 ## Competitive Advantage
 
-**Why N-Zero wins:**
+**Why Nuke wins:**
 1. **Data Completeness** - Full vehicle history (not just sale records)
 2. **Ghost Attribution** - Proper credit for photographers/contributors
 3. **Multi-Source Validation** - BaT + Deal Jackets + Dropbox + User Input
@@ -192,7 +192,7 @@ Click "Submit to BaT" →
 
 **Market Positioning:**
 - BaT is the auction platform (high trust, established brand)
-- N-Zero is the inventory management layer (pre-submission optimization)
+- Nuke is the inventory management layer (pre-submission optimization)
 - Together: Dealers get best of both worlds
 
 ---

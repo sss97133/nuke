@@ -36,7 +36,7 @@
 #### Specific Homepage Features You Wanted:
 ```
 ┌────────────────────────────────────────────┐
-│ [Logo] n-zero        [Login] [Dark/Light] │  ← 32px header
+│ [Logo] nuke        [Login] [Dark/Light] │  ← 32px header
 ├────────────────────────────────────────────┤
 │  Vehicle marketplace & project tracker    │  ← 11px tagline
 │  ┌──────────────────────────────────────┐ │

@@ -1,7 +1,7 @@
-# 🎯 FINAL SUPABASE UPDATE FOR n-zero.dev
+# 🎯 FINAL SUPABASE UPDATE FOR nuke.ag
 
 ## ✅ **YOUR NEW DOMAIN IS LIVE!**
-**URL:** https://n-zero.dev
+**URL:** https://nuke.ag
 
 ---
 
@@ -10,16 +10,16 @@
 ### **1. Site URL**
 Change to:
 ```
-https://n-zero.dev
+https://nuke.ag
 ```
 
 ### **2. Redirect URLs**
 Add these (replace any old ones):
 ```
-https://n-zero.dev/**
-https://n-zero.dev/auth/callback
-https://n-zero.dev/vehicles
-https://n-zero.dev/dashboard
+https://nuke.ag/**
+https://nuke.ag/auth/callback
+https://nuke.ag/vehicles
+https://nuke.ag/dashboard
 ```
 
 ### **3. Click Save**
@@ -37,17 +37,17 @@ https://qkgaybvrernstplzjaam.supabase.co/auth/v1/callback
 
 ## 🧪 **TEST LOGIN AFTER:**
 
-1. Go to: **https://n-zero.dev**
+1. Go to: **https://nuke.ag**
 2. Click "Login with GitHub"
 3. Should redirect to GitHub
-4. Should redirect back to **https://n-zero.dev**
+4. Should redirect back to **https://nuke.ag**
 5. You're logged in! ✅
 
 ---
 
 ## 🎉 **FINAL RESULT:**
 
-- ✅ Clean domain: `n-zero.dev`
+- ✅ Clean domain: `nuke.ag`
 - ✅ Professional URL
 - ✅ Works from any device
 - ✅ 100% remote, zero localhost

@@ -131,7 +131,7 @@ For each image, the `analyze-image` edge function:
 ## MONITORING PROGRESS
 
 ### Option 1: Admin Dashboard
-Visit: `https://n-zero.dev/admin`
+Visit: `https://nuke.ag/admin`
 
 Shows real-time progress in the "AI Scanning Status" card.
 

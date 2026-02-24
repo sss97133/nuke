@@ -19,7 +19,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { profile_url, username, extract_vehicles = true, queue_only = false } = await req.json();
+    const { profile_url, username, extract_vehicles = true, queue_only = false, include_wins = false } = await req.json();
 
     if (!profile_url && !username) {
       return new Response(
@@ -165,6 +165,69 @@ Deno.serve(async (req: Request) => {
     listingUrlsArray = Array.from(listingUrls);
     console.log(`Found ${listingUrlsArray.length} unique listing URLs in profile (from scraping)`);
 
+    // If include_wins is set, also scrape the wins section
+    if (include_wins) {
+      console.log('include_wins=true: scraping auction wins section...');
+
+      // Wins are in <section class="section-won-listings"> with a "Show more" button
+      // that has data-item-type="auction_wins". Direct fetch gets the first 5 wins.
+      // Firecrawl with click actions gets the rest.
+
+      // First extract wins from the HTML we already have
+      const wonSection = profileHtml.match(/section-won-listings[\s\S]*?(?=<section|<\/main|$)/);
+      if (wonSection) {
+        const winHrefRegex = /href="(https:\/\/bringatrailer\.com\/listing\/[^"#]+)"/g;
+        let winMatch;
+        while ((winMatch = winHrefRegex.exec(wonSection[0])) !== null) {
+          let url = winMatch[1];
+          url = url.split('?')[0].split('#')[0];
+          if (!url.endsWith('/')) url += '/';
+          listingUrls.add(url);
+        }
+      }
+
+      // Use Firecrawl to click "Show more" on the wins section for pagination
+      if (FIRECRAWL_API_KEY) {
+        try {
+          const actions: any[] = [{ type: 'wait', milliseconds: 3000 }];
+          for (let i = 0; i < 15; i++) {
+            actions.push(
+              { type: 'click', selector: 'button[data-item-type="auction_wins"]' },
+              { type: 'wait', milliseconds: 2000 }
+            );
+          }
+
+          const winsResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: profileUrl,
+              formats: ['html'],
+              waitFor: 5000,
+              mobile: false,
+              actions,
+            }),
+          });
+
+          if (winsResponse.ok) {
+            const winsData = await winsResponse.json();
+            const winsHtml = winsData.data?.html || '';
+            const slugRegex = /bringatrailer\.com\/listing\/([a-z0-9-]+)/g;
+            let slugMatch;
+            while ((slugMatch = slugRegex.exec(winsHtml)) !== null) {
+              listingUrls.add(`https://bringatrailer.com/listing/${slugMatch[1]}/`);
+            }
+            console.log(`After wins scraping: ${listingUrls.size} total URLs`);
+          }
+        } catch (err: any) {
+          console.warn('Wins Firecrawl error:', err.message);
+        }
+      }
+    }
+
     // Also check existing bat_listings for this user (in case scraping missed them)
     const { data: existingListings } = await supabase
       .from('bat_listings')
@@ -172,7 +235,7 @@ Deno.serve(async (req: Request) => {
       .eq('seller_username', batUsername);
 
     const existingListingUrls = new Set(existingListings?.map(l => l.bat_listing_url) || []);
-    
+
     // Add any existing listings that weren't found by scraping
     existingListings?.forEach(listing => {
       if (listing.bat_listing_url && !listingUrls.has(listing.bat_listing_url)) {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This workflow demonstrates how to extract all BaT listings from an organization's member profile and import them into the n-zero database. Used for Fantasy Junction (~486 listings) but works for any BaT member profile.
+This workflow demonstrates how to extract all BaT listings from an organization's member profile and import them into the nuke database. Used for Fantasy Junction (~486 listings) but works for any BaT member profile.
 
 ## Key Insight: Smart Delays > IP Rotation
 
@@ -137,7 +137,7 @@ ps aux | grep scrape-all-fantasy-junction-bat-playwright
 
 ```bash
 # View organization profile
-open https://n-zero.dev/org/{ORG_ID}
+open https://nuke.ag/org/{ORG_ID}
 
 # Check vehicle count
 # (Query database or check org profile page)

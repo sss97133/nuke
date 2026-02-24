@@ -120,7 +120,7 @@ if (error1) {
 console.log('\n🔍 Checking specific URLs...');
 const specificUrls = [
   'https://www.lartdelautomobile.com/fiche/porsche-911-2-0l-1965',
-  'https://n-zero.dev/vehicle/5d851064-9b85-4fc3-a61a-7edc3f9996d7'
+  'https://nuke.ag/vehicle/5d851064-9b85-4fc3-a61a-7edc3f9996d7'
 ];
 
 for (const url of specificUrls) {
@@ -145,8 +145,8 @@ for (const url of specificUrls) {
     vehicle = v2;
   }
   
-  // Also try extracting ID from n-zero.dev URLs
-  if (!vehicle && url.includes('n-zero.dev/vehicle/')) {
+  // Also try extracting ID from nuke.ag URLs
+  if (!vehicle && url.includes('nuke.ag/vehicle/')) {
     const vehicleId = url.split('/vehicle/')[1]?.split('?')[0];
     if (vehicleId) {
       const { data: v3 } = await supabase

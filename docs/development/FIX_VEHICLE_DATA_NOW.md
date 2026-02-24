@@ -101,7 +101,7 @@ cd /Users/skylar/nuke/nuke_frontend
 vercel --prod --force --yes
 
 # Verify deployment
-curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
+curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1
 ```
 
 This fixes:

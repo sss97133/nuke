@@ -6,7 +6,7 @@
  */
 
 const RESEND_API_URL = "https://api.resend.com/emails";
-const FROM_EMAIL = "Nuke <noreply@nuke.dev>";
+const FROM_EMAIL = "Nuke <noreply@nuke.ag>";
 
 export interface EmailParams {
   to: string | string[];

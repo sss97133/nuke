@@ -2,11 +2,11 @@
 
 ## Access Admin
 
-**URL:** https://n-zero.dev/admin
+**URL:** https://nuke.ag/admin
 
 ## New AI Batch Analysis Page
 
-**URL:** https://n-zero.dev/admin/batch-analysis
+**URL:** https://nuke.ag/admin/batch-analysis
 
 ---
 
@@ -22,7 +22,7 @@
 ## To Analyze Bronco's 239 Photos
 
 ### Step 1: Go to Admin
-https://n-zero.dev/admin/batch-analysis
+https://nuke.ag/admin/batch-analysis
 
 ### Step 2: Click "FULL: BRONCO (ALL 239 IMAGES)"
 One-click preset button

@@ -420,7 +420,7 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-lmc-t
   -H "Authorization: Bearer [ANON_KEY]"
 
 # 4. Test on production:
-# - Open n-zero.dev/vehicle/[any-vehicle-id]
+# - Open nuke.ag/vehicle/[any-vehicle-id]
 # - Click an image
 # - See tags with "Add Part Info" buttons
 # - Enrich a tag → see it turn green

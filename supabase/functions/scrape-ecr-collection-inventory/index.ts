@@ -56,10 +56,10 @@ Deno.serve(async (req) => {
     if (business_id) {
       // Single collection mode
       const { data, error } = await supabase
-        .from("businesses")
+        .from("organizations")
         .select("id, slug, website, business_name")
         .eq("id", business_id)
-        .eq("business_type", "collection")
+        .eq("entity_type", "collection")
         .single();
 
       if (error || !data) {
@@ -72,9 +72,9 @@ Deno.serve(async (req) => {
     } else if (batch) {
       // Batch mode: find collections that haven't been scraped recently
       const { data, error } = await supabase
-        .from("businesses")
+        .from("organizations")
         .select("id, slug, website, business_name")
-        .eq("business_type", "collection")
+        .eq("entity_type", "collection")
         .not("website", "is", null)
         .or("last_inventory_sync.is.null,last_inventory_sync.lt." + new Date(Date.now() - 7 * 86400000).toISOString())
         .order("last_inventory_sync", { ascending: true, nullsFirst: true })
@@ -255,18 +255,39 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Step 6: Update collection's total_inventory count
+        // Step 6: Update collection's total_inventory count + entity_attributes
         const { count } = await supabase
           .from("business_vehicle_fleet")
           .select("*", { count: "exact", head: true })
           .eq("business_id", col.id)
           .eq("status", "active");
 
+        const collectionSize = count || collectionResult.cars_linked;
+
+        // Compute collection_focus (makes) and era_focus from linked vehicles
+        const makeMap = new Map<string, string>(); // lowercase → display form
+        const eras = new Set<string>();
+        for (const tv of allVehicles) {
+          if (tv.make) {
+            const key = tv.make.toLowerCase();
+            if (!makeMap.has(key)) makeMap.set(key, tv.make);
+          }
+          if (tv.year) {
+            const decade = Math.floor(tv.year / 10) * 10;
+            eras.add(`${decade}s`);
+          }
+        }
+
+        const entityAttrs: Record<string, unknown> = { collection_size: collectionSize };
+        if (makeMap.size > 0) entityAttrs.collection_focus = [...makeMap.values()].sort();
+        if (eras.size > 0) entityAttrs.era_focus = [...eras].sort();
+
         await supabase
-          .from("businesses")
+          .from("organizations")
           .update({
-            total_inventory: count || collectionResult.cars_linked,
+            total_inventory: collectionSize,
             last_inventory_sync: new Date().toISOString(),
+            entity_attributes: entityAttrs,
           })
           .eq("id", col.id);
 

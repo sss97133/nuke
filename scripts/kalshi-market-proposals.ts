@@ -2,7 +2,7 @@
 /**
  * Kalshi Market Proposal Generator
  *
- * Generates market proposals from n-zero vehicle data
+ * Generates market proposals from nuke vehicle data
  * that can be submitted to Kalshi for listing.
  *
  * Kalshi requirements:
@@ -249,7 +249,7 @@ ${proposal.resolution_source}
 ${proposal.why_interesting}
 
 ---
-*Generated from n-zero vehicle data platform (n-zero.dev)*
+*Generated from nuke vehicle data platform (nuke.ag)*
 *Data backing: ${JSON.stringify(proposal.data_backing, null, 2)}*
 `;
 }
@@ -258,7 +258,7 @@ ${proposal.why_interesting}
 
 async function main() {
   console.log('=== KALSHI MARKET PROPOSAL GENERATOR ===\n');
-  console.log('Analyzing n-zero vehicle data...\n');
+  console.log('Analyzing nuke vehicle data...\n');
 
   const stats = await getBaTStats();
   if (!stats) {

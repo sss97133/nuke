@@ -209,8 +209,8 @@ export class GMHeritageAdapter implements ServiceAdapter {
         year: vehicle.year,
         make: vehicle.make,
         model: vehicle.model,
-        customer_name: options?.customer_name || 'N-Zero Platform User',
-        customer_email: options?.customer_email || 'heritage@n-zero.dev',
+        customer_name: options?.customer_name || 'Nuke Platform User',
+        customer_email: options?.customer_email || 'heritage@nuke.ag',
         payment_method: 'credit_card',
         amount: 50.00
       };

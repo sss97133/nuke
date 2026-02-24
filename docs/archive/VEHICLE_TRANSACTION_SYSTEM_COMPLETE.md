@@ -123,13 +123,13 @@ Facilitation Fee (2%): $111.96
 ```
 To Buyer (SMS):
 "🚗 Sign your purchase agreement for 1983 GMC C1500!
-View & sign: https://n-zero.dev/sign/abc123-buyer-token
--n-zero.dev"
+View & sign: https://nuke.ag/sign/abc123-buyer-token
+-nuke.ag"
 
 To Seller (SMS):
 "🚗 John wants to buy your 1983 GMC C1500!
-Sign bill of sale: https://n-zero.dev/sign/def456-seller-token
--n-zero.dev"
+Sign bill of sale: https://nuke.ag/sign/def456-seller-token
+-nuke.ag"
 ```
 
 ### **Step 5: Digital Signing**
@@ -143,12 +143,12 @@ Sign bill of sale: https://n-zero.dev/sign/def456-seller-token
 To Buyer (SMS):
 "✅ All documents signed for 1983 GMC C1500!
 Next: Wire $5,598 to seller. Check email for payment instructions.
--n-zero.dev"
+-nuke.ag"
 
 To Seller (SMS):
 "✅ All documents signed for 1983 GMC C1500!
 Buyer will send $5,598. Mark as paid in dashboard once received.
--n-zero.dev"
+-nuke.ag"
 ```
 
 ### **Step 7: Funds Transfer (Off-Platform)**

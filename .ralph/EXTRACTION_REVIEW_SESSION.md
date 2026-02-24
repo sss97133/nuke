@@ -33,7 +33,7 @@ Nuke extracts vehicle data from auction sites (BaT, Mecum, Cars & Bids, PCarMark
 
 ### Example 1: Mecum Trans Am
 **Source:** https://www.mecum.com/lots/550167/1978-pontiac-trans-am/
-**Extracted:** https://n-zero.dev/vehicle/05bdfe89-58fb-4bcf-ba90-50d795ff1bda
+**Extracted:** https://nuke.ag/vehicle/05bdfe89-58fb-4bcf-ba90-50d795ff1bda
 **Vehicle ID:** `05bdfe89-58fb-4bcf-ba90-50d795ff1bda`
 
 ---
@@ -189,7 +189,7 @@ function parseTitle(title) {
 
 Paste your critiques. For each issue:
 1. Source URL
-2. Vehicle ID (or n-zero.dev URL)
+2. Vehicle ID (or nuke.ag URL)
 3. What's wrong/missing
 
 I'll query the data, compare to source, trace to code, and help fix.

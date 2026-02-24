@@ -32,7 +32,7 @@ export class BotRunner {
   constructor(persona: BotPersona, config: Partial<BotRunnerConfig> = {}) {
     this.persona = persona;
     this.config = {
-      baseUrl: process.env.BOT_BASE_URL || 'https://n-zero.dev',
+      baseUrl: process.env.BOT_BASE_URL || 'https://nuke.ag',
       headless: process.env.BOT_HEADLESS !== 'false',
       slowMo: persona.patience_level > 5 ? 100 : 50,
       timeout: this.calculateTimeout(),

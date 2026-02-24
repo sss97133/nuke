@@ -3,7 +3,7 @@
 ## What Just Happened (No User Clicks Required)
 
 ### The Annoying Problem You Found:
-- **N-Zero Profile:** https://n-zero.dev/vehicle/655f224f-d8ae-4fc6-a3ec-4ab8db234fdf  
+- **Nuke Profile:** https://nuke.ag/vehicle/655f224f-d8ae-4fc6-a3ec-4ab8db234fdf  
 - **BaT Listing:** https://bringatrailer.com/listing/1966-chevrolet-c10-pickup-105/  
 - **Your Reaction:** "Well look at that isn't that annoying"
 
@@ -28,8 +28,8 @@ Two separate profiles for the same vehicle. Traditional software would make you:
 
 3. **Auto-Created** `listing_attribution` entry for fair play:
    - BaT listed first: ✓
-   - N-Zero commission eligible: ✗ (BaT gets full credit)
-   - Attribution: "BaT listed first. N-Zero provides affiliate referral link."
+   - Nuke commission eligible: ✗ (BaT gets full credit)
+   - Attribution: "BaT listed first. Nuke provides affiliate referral link."
 
 4. **Auto-Displayed** on vehicle profile (refresh and see)
 
@@ -60,7 +60,7 @@ Result:
   "first_listed_platform": "bat",
   "n_zero_listed_first": false,
   "commission_eligible": false,
-  "attribution_notes": "BaT listed first. N-Zero provides affiliate referral link..."
+  "attribution_notes": "BaT listed first. Nuke provides affiliate referral link..."
 }
 ```
 
@@ -79,7 +79,7 @@ Result:
 ```typescript
 // I detected your frustration and acted immediately:
 
-1. Extracted vehicle ID from N-Zero URL
+1. Extracted vehicle ID from Nuke URL
 2. Extracted BaT listing data (scraping)
 3. Created external_listings entry
 4. Created listing_attribution for fair play
@@ -94,7 +94,7 @@ I did the rest.
 
 ## What You'll See Now (AUTOMATIC):
 
-Visit: https://n-zero.dev/vehicle/655f224f-d8ae-4fc6-a3ec-4ab8db234fdf
+Visit: https://nuke.ag/vehicle/655f224f-d8ae-4fc6-a3ec-4ab8db234fdf
 
 **New Section Appears (without you clicking anything):**
 
@@ -122,7 +122,7 @@ Visit: https://n-zero.dev/vehicle/655f224f-d8ae-4fc6-a3ec-4ab8db234fdf
 │ [View on Bring a Trailer →]                 │
 │                                             │
 │ Fair Play Policy:                           │
-│ N-Zero displays external listings for       │
+│ Nuke displays external listings for       │
 │ transparency. We provide affiliate links    │
 │ and track attribution to ensure proper      │
 │ credit and commission distribution.         │
@@ -139,7 +139,7 @@ Visit: https://n-zero.dev/vehicle/655f224f-d8ae-4fc6-a3ec-4ab8db234fdf
 **System does:**
 1. Cron job (every 6 hours) scrapes Viva's BaT member page
 2. Detects new listing
-3. Fuzzy matches to existing N-Zero vehicle (by VIN)
+3. Fuzzy matches to existing Nuke vehicle (by VIN)
 4. Auto-creates `external_listings` entry
 5. Auto-creates notification event
 6. Auto-notifies all users who viewed Viva vehicles 3+ times
@@ -221,5 +221,5 @@ Visit: https://n-zero.dev/vehicle/655f224f-d8ae-4fc6-a3ec-4ab8db234fdf
 **Software anticipates, acts, and reports back.**  
 **Users are keys, not operators.**
 
-Welcome to N-Zero.
+Welcome to Nuke.
 

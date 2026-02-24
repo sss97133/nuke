@@ -156,12 +156,12 @@ const channel = supabase
 - [ ] Customize description and pricing
 - [ ] Generate platform-specific packages
 - [ ] Download exports (JSON, HTML, TXT, CSV)
-- [ ] Submit to N-Zero directly
+- [ ] Submit to Nuke directly
 - [ ] Export tracked in database
 
 ### Analytics Dashboard
 - [ ] Overall metrics display correctly
-- [ ] N-Zero auction stats load
+- [ ] Nuke auction stats load
 - [ ] External platform stats load
 - [ ] Platform breakdown shows
 - [ ] Status distribution renders
@@ -384,7 +384,7 @@ const FEATURES = {
 1. **Dashboard Notice:**
 ```typescript
 <Banner>
-  New: List your vehicle on N-Zero or prepare exports for BaT, eBay, and more!
+  New: List your vehicle on Nuke or prepare exports for BaT, eBay, and more!
   <Link to="/auctions/create">Get Started</Link>
 </Banner>
 ```
@@ -394,7 +394,7 @@ const FEATURES = {
 <Card title="Ready to Sell?">
   <p>Choose where to list your vehicle:</p>
   <button onClick={() => navigate('/auctions/create')}>
-    Auction on N-Zero
+    Auction on Nuke
   </button>
   <button onClick={() => navigate('/auctions/prepare')}>
     Export to Other Platforms
@@ -470,19 +470,19 @@ ORDER BY revenue DESC;
 
 ### Week 1 Goals
 - [ ] 10+ exports created
-- [ ] 3+ N-Zero auctions live
+- [ ] 3+ Nuke auctions live
 - [ ] Zero critical bugs
 - [ ] User feedback collected
 
 ### Month 1 Goals
 - [ ] 100+ exports created
-- [ ] 20+ N-Zero auctions completed
+- [ ] 20+ Nuke auctions completed
 - [ ] First external platform sale
 - [ ] 50%+ export-to-submission rate
 
 ### Quarter 1 Goals
 - [ ] 1,000+ exports created
-- [ ] 100+ N-Zero sales
+- [ ] 100+ Nuke sales
 - [ ] $50k+ in commissions
 - [ ] 70%+ conversion rate
 

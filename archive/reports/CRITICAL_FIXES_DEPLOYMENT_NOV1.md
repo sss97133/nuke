@@ -2,7 +2,7 @@
 
 **Date:** November 1, 2025  
 **Status:** ✅ PHASE 1-5 COMPLETE & DEPLOYED TO PRODUCTION  
-**Deployment URL:** https://n-zero.dev
+**Deployment URL:** https://nuke.ag
 
 ---
 
@@ -100,7 +100,7 @@ get_vehicle_profile_data(vehicle_id UUID) → returns JSON
 ## 🚀 DEPLOYED TO PRODUCTION
 
 ### **Frontend**
-**URL:** https://n-zero.dev  
+**URL:** https://nuke.ag  
 **Bundle:** index-SSIyumpl.js (1.62MB, 413KB gzipped)  
 **Changes:**
 - Removed 3 broken UI components

@@ -79,8 +79,8 @@ extract_series_from_model(TEXT) → TEXT
 
 ## Production Deployment
 
-**Deployment URL**: https://nuke-9rkr4kt8n-nzero.vercel.app  
-**Vercel Dashboard**: https://vercel.com/nzero/nuke/Gtc5TFtq4NnoXAnP5pVNhPLLF8s3
+**Deployment URL**: https://nuke-9rkr4kt8n-nuke.vercel.app  
+**Vercel Dashboard**: https://vercel.com/nuke/nuke/Gtc5TFtq4NnoXAnP5pVNhPLLF8s3
 
 **Deployment Status**:
 - ✅ Build completed
@@ -195,7 +195,7 @@ Time: 2025-11-22 [exact time from deployment]
 Command: vercel --prod --force --yes
 Build Time: 6s
 Status: Completed
-Production URL: https://nuke-9rkr4kt8n-nzero.vercel.app
+Production URL: https://nuke-9rkr4kt8n-nuke.vercel.app
 ```
 
 ---

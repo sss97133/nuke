@@ -242,7 +242,7 @@ Profit Stakes: $3,485.42
 
 ### Test Profit Stakes (Recommended First)
 
-1. Go to any vehicle: https://n-zero.dev/vehicle/[id]
+1. Go to any vehicle: https://nuke.ag/vehicle/[id]
 2. Click "💰 Profit Stakes" tab
 3. See funding round (if active)
 4. Enter $3 stake
@@ -348,7 +348,7 @@ Then you can stake $3 on it!
 ✅ Frontend: DEPLOYING NOW (Vercel)  
 ✅ Cash: YOU HAVE $3.00 TO TEST  
 
-**Visit**: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+**Visit**: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 
 You should now see 4 financial product tabs!
 

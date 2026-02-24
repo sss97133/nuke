@@ -210,9 +210,9 @@ extract_series_from_model(TEXT) → TEXT
 
 ## 🚀 Production Deployment
 
-**URL**: https://nuke-gcd59s89k-nzero.vercel.app  
+**URL**: https://nuke-gcd59s89k-nuke.vercel.app  
 **Status**: ✅ Live  
-**Build**: https://vercel.com/nzero/nuke/9YXC8hXdMwXEWtuu1M8aJxZDR2fF
+**Build**: https://vercel.com/nuke/nuke/9YXC8hXdMwXEWtuu1M8aJxZDR2fF
 
 ### Verification Steps
 1. ✅ Visit K5 Blazer profile → Shows "1977 Chevrolet K5 Blazer"

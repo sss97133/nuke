@@ -280,10 +280,10 @@ vercel --prod --force --yes
 ### Step 4: Verify Deployment
 ```bash
 # Check bundle changed
-curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
+curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1
 
 # Test photo library page
-open https://n-zero.dev/photos
+open https://nuke.ag/photos
 ```
 
 ### Step 5: Setup AI Processing (Optional)

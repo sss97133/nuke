@@ -267,7 +267,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
       if (typeof rawUrl !== 'string') return null
       const s = rawUrl.trim()
       if (!s) return null
-      // Prevent relative URLs ("/foo") which would send users to n-zero.dev/foo (often 404).
+      // Prevent relative URLs ("/foo") which would send users to nuke.ag/foo (often 404).
       if (s.startsWith('/')) return null
       // Handle "www.vendor.com/..." without protocol
       const withProtocol = s.startsWith('http://') || s.startsWith('https://') ? s : (s.startsWith('www.') ? `https://${s}` : s)

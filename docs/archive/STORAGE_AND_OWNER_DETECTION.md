@@ -385,7 +385,7 @@ SELECT auto_expire_new_arrivals();
 ---
 
 **Deployed**: November 22, 2025  
-**Production URL**: https://n-zero.dev  
+**Production URL**: https://nuke.ag  
 **Edge Function**: auto-detect-vehicle-owner  
 **Cron Job**: expire-new-arrivals (daily 2 AM UTC)
 

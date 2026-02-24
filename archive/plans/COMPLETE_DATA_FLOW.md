@@ -395,7 +395,7 @@ const totalBoost = $9,906 + $4,300 + $1,125 + $1,250 = $16,581;
 
 **Organization Profile (Ernie's):**
 ```
-https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41
+https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41
 
 ┌─────────────────────────────────────────┐
 │ 📊 273 work orders in 2025              │
@@ -415,7 +415,7 @@ https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41
 
 **Vehicle Profile (Bronco):**
 ```
-https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
+https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
 
 ┌─────────────────────────────────────────┐
 │ 1974 Ford Bronco                        │
@@ -446,7 +446,7 @@ https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
 
 **User Profile:**
 ```
-https://n-zero.dev/profile
+https://nuke.ag/profile
 
 ┌─────────────────────────────────────────┐
 │ Recent Activity                         │

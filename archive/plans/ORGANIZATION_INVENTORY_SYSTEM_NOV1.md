@@ -2,7 +2,7 @@
 
 **Date**: November 1, 2025  
 **Status**: ✅ DEPLOYED TO PRODUCTION  
-**Production URL**: [Desert Performance Inventory](https://n-zero.dev/org/10e77f53-c8d3-445e-b0dd-c518e6637e31)
+**Production URL**: [Desert Performance Inventory](https://nuke.ag/org/10e77f53-c8d3-445e-b0dd-c518e6637e31)
 
 ---
 
@@ -502,7 +502,7 @@ INSERT INTO business_timeline_events (
 
 ## Summary
 
-The **Organization Inventory System** is now **live in production** at [https://n-zero.dev/org/10e77f53-c8d3-445e-b0dd-c518e6637e31](https://n-zero.dev/org/10e77f53-c8d3-445e-b0dd-c518e6637e31).
+The **Organization Inventory System** is now **live in production** at [https://nuke.ag/org/10e77f53-c8d3-445e-b0dd-c518e6637e31](https://nuke.ag/org/10e77f53-c8d3-445e-b0dd-c518e6637e31).
 
 **What makes it special:**
 

@@ -2,7 +2,7 @@
 
 **System:** Multi-stage Claude Vision + Catalog Reference  
 **Status:** Deployed to production  
-**Test URL:** https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+**Test URL:** https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 
 ---
 

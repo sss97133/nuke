@@ -1,8 +1,8 @@
 # Mobile Image Viewer Fix - November 22, 2025
 
 **Status:** ✅ DEPLOYED TO PRODUCTION  
-**URL:** https://n-zero.dev  
-**Bundle:** `nukefrontend-mp4x0e2po-nzero.vercel.app`
+**URL:** https://nuke.ag  
+**Bundle:** `nukefrontend-mp4x0e2po-nuke.vercel.app`
 
 ---
 

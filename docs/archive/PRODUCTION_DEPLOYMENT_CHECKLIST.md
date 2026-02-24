@@ -1,7 +1,7 @@
 # Production Deployment Checklist
 
 **Date:** October 24, 2025  
-**Platform:** Nuke (n-zero)  
+**Platform:** Nuke (nuke)  
 **Deployment Target:** Production
 
 ---

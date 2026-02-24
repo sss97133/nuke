@@ -320,7 +320,7 @@ $ node test-production-oct27.js
 
 ## ⚡ QUICK REFERENCE
 
-**Production URL:** https://nukefrontend-5dzr395le-nzero.vercel.app  
+**Production URL:** https://nukefrontend-5dzr395le-nuke.vercel.app  
 **GitHub Repo:** origin/main  
 **Latest Commit:** d071fde0  
 **Deployment Time:** October 27, 2025  

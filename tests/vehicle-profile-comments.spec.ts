@@ -8,7 +8,7 @@ import { test, expect } from 'playwright/test';
  */
 test.describe('Vehicle Profile - BMW 507 Comments', () => {
   const vehicleId = '4e52a421-11b8-4c22-8172-254d9d14371c';
-  const vehicleUrl = `https://n-zero.dev/vehicle/${vehicleId}`;
+  const vehicleUrl = `https://nuke.ag/vehicle/${vehicleId}`;
 
   test('should display BaT comments and chassis number', async ({ page }) => {
     await page.goto(vehicleUrl);

@@ -253,7 +253,7 @@ export default function App() {
           </div>
 
           <div style={{ marginTop: 24, fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
-            Create an account at nuke.com to sync your vehicle data
+            Create an account at nuke.ag to sync your vehicle data
           </div>
         </div>
       </div>
@@ -519,7 +519,7 @@ export default function App() {
                   <div style={{ fontSize: 12 }}>{user.email}</div>
                 </div>
 
-                <button className="btn btn-secondary" onClick={() => window.open('https://nuke.com/settings', '_blank')}>
+                <button className="btn btn-secondary" onClick={() => window.open('https://nuke.ag/settings', '_blank')}>
                   Manage Account on Web
                 </button>
               </div>

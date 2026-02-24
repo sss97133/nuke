@@ -113,8 +113,8 @@ Deno.serve(async (req) => {
         },
       ],
       mode: plan.recurring ? 'subscription' : 'payment',
-      success_url: success_url || `${Deno.env.get('SITE_URL') || 'https://n-zero.dev'}/settings?api_access=success`,
-      cancel_url: cancel_url || `${Deno.env.get('SITE_URL') || 'https://n-zero.dev'}/settings?api_access=cancelled`,
+      success_url: success_url || `${Deno.env.get('SITE_URL') || 'https://nuke.ag'}/settings?api_access=success`,
+      cancel_url: cancel_url || `${Deno.env.get('SITE_URL') || 'https://nuke.ag'}/settings?api_access=cancelled`,
       client_reference_id: user.id,
       metadata: {
         user_id: user.id,

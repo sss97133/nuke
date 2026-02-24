@@ -2,7 +2,7 @@
 
 **Date:** October 25, 2025  
 **Method:** Supabase Logs Analysis + Database Verification  
-**Environment:** https://n-zero.dev
+**Environment:** https://nuke.ag
 
 ---
 
@@ -235,7 +235,7 @@ Check CSS for display:none or opacity:0
 
 ### **Manual Browser Test:**
 
-**Step 1:** Open https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+**Step 1:** Open https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 
 **Step 2:** Open Developer Console
 - Mac: `Cmd + Option + J`

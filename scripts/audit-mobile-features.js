@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
 
 (async () => {
   console.log('🔍 COMPREHENSIVE MOBILE AUDIT\n');
-  console.log('Site: https://n-zero.dev\n');
+  console.log('Site: https://nuke.ag\n');
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
@@ -19,13 +19,13 @@ const { chromium } = require('playwright');
 
   try {
     // Navigate to homepage
-    await page.goto('https://n-zero.dev', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto('https://nuke.ag', { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     // Navigate directly to known vehicle
     const vehicleId = 'e08bf694-970f-4cbe-8a74-8715158a0f2e';
     console.log(`📍 Navigating directly to vehicle: ${vehicleId}`);
-    await page.goto(`https://n-zero.dev/vehicle/${vehicleId}`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`https://nuke.ag/vehicle/${vehicleId}`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(3000);
     
     // Check if mobile view is active

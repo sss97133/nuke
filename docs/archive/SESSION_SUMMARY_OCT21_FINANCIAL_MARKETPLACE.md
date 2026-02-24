@@ -234,10 +234,10 @@ Your cash_balance: += $4.65
 - Round ID: 2165a5c8-0536-4e36-97fc-6ac87829665e
 
 ### Test Flow:
-1. Visit: https://n-zero.dev/portfolio
+1. Visit: https://nuke.ag/portfolio
    - See: $3.00 cash balance ✅
 
-2. Visit: https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+2. Visit: https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
    - See: 4 financial product tabs ✅
    - Click: "💰 Stakes"
    - Enter: 3.00
@@ -268,7 +268,7 @@ WHERE user_id = '0b9f107a-d124-49de-9ded-94698f63c1c4';
 ### Frontend: ✅ DEPLOYING
 - Vercel deployment in progress
 - ETA: ~2 minutes
-- URL: https://n-zero.dev
+- URL: https://nuke.ag
 
 ### Edge Functions: ✅ UPDATED
 - stripe-webhook uses add_cash_to_user()

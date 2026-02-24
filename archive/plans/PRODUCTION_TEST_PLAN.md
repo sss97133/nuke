@@ -1,7 +1,7 @@
 # Production Testing Plan - Organization System
 
 ## Test URL
-**Ernie's Upholstery**: `https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41`
+**Ernie's Upholstery**: `https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41`
 
 ---
 

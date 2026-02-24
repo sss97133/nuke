@@ -1,8 +1,8 @@
-# Fix: Auth sending you to n-zero after Google sign-in
+# Fix: Auth sending you to Nuke after Google sign-in
 
 **Don’t have a Google OAuth app yet?** See **[GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md)** for creating the client and connecting it to Supabase.
 
-Supabase only redirects to the URL you request **if that URL is allowlisted**. Otherwise it sends users to the project **Site URL** (which is probably n-zero).
+Supabase only redirects to the URL you request **if that URL is allowlisted**. Otherwise it sends users to the project **Site URL** (which is probably Nuke).
 
 ## Do this once (2 minutes)
 
@@ -14,6 +14,6 @@ Supabase only redirects to the URL you request **if that URL is allowlisted**. O
    - `https://dealerscan-three.vercel.app/**`
 5. Save.
 
-After that, "Continue with Google" on dealerscan-three.vercel.app will return users to dealerscan-three.vercel.app/dashboard instead of n-zero.
+After that, "Continue with Google" on dealerscan-three.vercel.app will return users to dealerscan-three.vercel.app/dashboard instead of Nuke.
 
 No code deploy needed—this is project settings only.

@@ -171,7 +171,7 @@ Same as Pair A but reversed. These two proposals cancel each other out.
 
 ### For Vehicle Owners
 
-1. **Log in to n-zero.dev**
+1. **Log in to nuke.ag**
 2. **Visit your vehicle profile**
 3. **If duplicates exist:** Yellow warning panel appears below header
 4. **Review the comparison:** See which profile has more data
@@ -213,7 +213,7 @@ Same as Pair A but reversed. These two proposals cancel each other out.
 
 1. **Log in to your account**
 2. **Visit your 1974 K5 Blazer profile:**  
-   https://n-zero.dev/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
+   https://nuke.ag/vehicle/05f27cc4-914e-425a-8ed8-cfea35c1928d
 3. **You should see:** Yellow warning panel at top showing the duplicate
 4. **Click "Merge Profiles"** → Your 1 Dropbox photo will be added to your 200 photos
 5. **Duplicate deleted** → Clean, single profile

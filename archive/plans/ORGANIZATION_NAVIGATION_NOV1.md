@@ -14,12 +14,12 @@ Added a comprehensive **Organizations directory page** that allows users to brow
 ## Navigation Structure
 
 ### Before:
-- **n-zero** (homepage) → Shows all vehicles
+- **nuke** (homepage) → Shows all vehicles
 - **Vehicles** → Shows "my vehicles"
 - **Organizations** → Pointed to user's primary shop (confusing)
 
 ### After:
-- **n-zero** (homepage) → Shows all vehicles (unchanged)
+- **nuke** (homepage) → Shows all vehicles (unchanged)
 - **Vehicles** → Shows my vehicles (unchanged)
 - **Organizations** → **NEW: Shows ALL organizations directory** ✅
 
@@ -27,7 +27,7 @@ Added a comprehensive **Organizations directory page** that allows users to brow
 
 ## New Organizations Page
 
-**URL**: `https://n-zero.dev/organizations`
+**URL**: `https://nuke.ag/organizations`
 
 ### Features:
 
@@ -440,5 +440,5 @@ const filteredOrgs = organizations.filter(org => {
 
 ---
 
-**Live Now**: `https://n-zero.dev/organizations`
+**Live Now**: `https://nuke.ag/organizations`
 

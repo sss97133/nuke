@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Check n-zero.dev Vehicle Sold Status
+ * Check nuke.ag Vehicle Sold Status
  * 
- * Scrapes n-zero.dev vehicle pages to detect if vehicles are marked as sold
+ * Scrapes nuke.ag vehicle pages to detect if vehicles are marked as sold
  * (checks for banner-sold div or other sold indicators) and updates the database.
  * 
  * Usage:
- *   node scripts/check-nzero-sold-status.js [vehicle_id]
- *   node scripts/check-nzero-sold-status.js --all
- *   node scripts/check-nzero-sold-status.js --vehicle-url https://n-zero.dev/vehicle/[id]
+ *   node scripts/check-nuke-sold-status.js [vehicle_id]
+ *   node scripts/check-nuke-sold-status.js --all
+ *   node scripts/check-nuke-sold-status.js --vehicle-url https://nuke.ag/vehicle/[id]
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -64,10 +64,10 @@ async function checkDatabaseSoldStatus(vehicleId) {
 }
 
 /**
- * Check if a vehicle is sold on n-zero.dev using Playwright to render React
+ * Check if a vehicle is sold on nuke.ag using Playwright to render React
  */
 async function checkNZeroSoldStatus(vehicleId) {
-  const url = `https://n-zero.dev/vehicle/${vehicleId}`;
+  const url = `https://nuke.ag/vehicle/${vehicleId}`;
   
   try {
     // Try to use Playwright if available
@@ -230,7 +230,7 @@ async function checkNZeroSoldStatusFallback(url) {
  * Use Firecrawl API to properly render the React page and check for sold status
  */
 async function checkNZeroSoldStatusWithFirecrawl(vehicleId) {
-  const url = `https://n-zero.dev/vehicle/${vehicleId}`;
+  const url = `https://nuke.ag/vehicle/${vehicleId}`;
   const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
 
   if (!firecrawlApiKey) {
@@ -335,7 +335,7 @@ async function processVehicle(vehicleId) {
 
   console.log(`  Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
   console.log(`  Current status: ${vehicle.sale_status || 'null'}`);
-  console.log(`  URL: https://n-zero.dev/vehicle/${vehicleId}`);
+  console.log(`  URL: https://nuke.ag/vehicle/${vehicleId}`);
 
   // First check database
   console.log(`  🔍 Checking database for sold status...`);
@@ -355,8 +355,8 @@ async function processVehicle(vehicleId) {
     return;
   }
 
-  // If not found in database, check n-zero.dev frontend
-  console.log(`  🔍 Checking n-zero.dev frontend for sold status...`);
+  // If not found in database, check nuke.ag frontend
+  console.log(`  🔍 Checking nuke.ag frontend for sold status...`);
   const statusCheck = await checkNZeroSoldStatus(vehicleId);
 
   if (statusCheck.error) {

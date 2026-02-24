@@ -199,7 +199,7 @@ async function analyzeALLImages() {
     console.log(`   node scripts/retry-failed-images.js`);
   }
 
-  console.log(`\n🔗 Profile: https://n-zero.dev/vehicle/${VEHICLE_ID}`);
+  console.log(`\n🔗 Profile: https://nuke.ag/vehicle/${VEHICLE_ID}`);
   console.log(`═══════════════════════════════════════════════════════════\n`);
 
   // Verify all images have analysis

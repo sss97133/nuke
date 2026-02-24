@@ -85,13 +85,13 @@ Facilitation Fee (2%): $111.96
 ```
 To Buyer:
 "🚗 Sign your purchase agreement for 1983 GMC C1500!
-View & sign: https://n-zero.dev/sign/buyer-token-abc123
--n-zero.dev"
+View & sign: https://nuke.ag/sign/buyer-token-abc123
+-nuke.ag"
 
 To Seller:
 "🚗 John wants to buy your 1983 GMC C1500!
-Sign bill of sale: https://n-zero.dev/sign/seller-token-def456
--n-zero.dev"
+Sign bill of sale: https://nuke.ag/sign/seller-token-def456
+-nuke.ag"
 ```
 
 ### **Step 5: Digital Signing**
@@ -105,7 +105,7 @@ Sign bill of sale: https://n-zero.dev/sign/seller-token-def456
 To Buyer:
 "✅ All documents signed! 🚚 Creating shipping listing...
 Your vehicle will be posted for carrier bids. Track at: [link]
--n-zero.dev"
+-nuke.ag"
 ```
 
 **Central Dispatch API called automatically:**
@@ -136,8 +136,8 @@ To Buyer:
 "🚚 Carrier assigned for 1983 GMC C1500!
 Carrier: ABC Transport
 Phone: (555) 123-4567
-Track at: https://n-zero.dev/transaction/xyz/shipping
--n-zero.dev"
+Track at: https://nuke.ag/transaction/xyz/shipping
+-nuke.ag"
 ```
 
 ### **Step 9: Vehicle Picked Up** (Premium - Webhook)
@@ -146,7 +146,7 @@ To Buyer:
 "✅ Your 1983 GMC C1500 has been picked up!
 In transit now. ETA: Nov 10th
 Track: [link]
--n-zero.dev"
+-nuke.ag"
 ```
 
 ### **Step 10: Payment Instructions**
@@ -154,11 +154,11 @@ Track: [link]
 To Buyer:
 "💰 Vehicle in transit! Next: Wire $5,598 to seller.
 Check email for wire instructions.
--n-zero.dev"
+-nuke.ag"
 
 To Seller:
 "💰 Buyer will send $5,598. Mark as paid in dashboard once received.
--n-zero.dev"
+-nuke.ag"
 ```
 
 ### **Step 11: Vehicle Delivered** (Premium - Webhook)
@@ -167,7 +167,7 @@ To Buyer:
 "🎉 Your 1983 GMC C1500 has been delivered!
 Transaction complete. Enjoy your vehicle!
 Rate your experience: [link]
--n-zero.dev"
+-nuke.ag"
 ```
 
 **Automatic Actions:**
@@ -316,7 +316,7 @@ supabase functions deploy get-centraldispatch-auth-url
 ```
 
 ### **Step 5: Connect Central Dispatch**
-1. Visit: https://n-zero.dev/admin/shipping-settings
+1. Visit: https://nuke.ag/admin/shipping-settings
 2. Click "Connect Central Dispatch"
 3. Authorize on Central Dispatch website
 4. Redirected back to settings page
@@ -343,9 +343,9 @@ supabase functions deploy get-centraldispatch-auth-url
 To Buyer:
 🚗 Sign your purchase agreement for 1983 GMC C1500!
 
-View & sign: https://n-zero.dev/sign/abc123
+View & sign: https://nuke.ag/sign/abc123
 
--n-zero.dev
+-nuke.ag
 ```
 
 ### **Completion (Step 6):**
@@ -355,9 +355,9 @@ To Buyer:
 
 Your vehicle will be posted for carrier bids.
 
-Track at: https://n-zero.dev/transaction/xyz
+Track at: https://nuke.ag/transaction/xyz
 
--n-zero.dev
+-nuke.ag
 ```
 
 ### **Carrier Assigned (Step 8 - Premium):**
@@ -368,9 +368,9 @@ To Buyer:
 Carrier: ABC Transport
 Phone: (555) 123-4567
 
-Track at: https://n-zero.dev/transaction/xyz/shipping
+Track at: https://nuke.ag/transaction/xyz/shipping
 
--n-zero.dev
+-nuke.ag
 ```
 
 ### **Picked Up (Step 9 - Premium):**
@@ -380,9 +380,9 @@ To Buyer:
 
 In transit now. ETA: Nov 10th
 
-Track: https://n-zero.dev/transaction/xyz
+Track: https://nuke.ag/transaction/xyz
 
--n-zero.dev
+-nuke.ag
 ```
 
 ### **Delivered (Step 11 - Premium):**
@@ -392,9 +392,9 @@ To Buyer:
 
 Transaction complete. Enjoy your vehicle!
 
-Rate your experience: https://n-zero.dev/transaction/xyz/review
+Rate your experience: https://nuke.ag/transaction/xyz/review
 
--n-zero.dev
+-nuke.ag
 ```
 
 ---

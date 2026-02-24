@@ -2,7 +2,7 @@
 
 **Date:** October 25, 2025  
 **Bundle:** `index-DGJab7ZC.js` (LATEST - after fixes)  
-**Test URL:** https://n-zero.dev
+**Test URL:** https://nuke.ag
 
 ---
 

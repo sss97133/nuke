@@ -20,6 +20,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
+import { qualityGate } from '../_shared/extractionQualityGate.ts';
+import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
+
+const EXTRACTOR_VERSION = '2.0.0';
 
 // ============================================================================
 // TYPES
@@ -333,7 +337,7 @@ const BROWSER_HEADERS = {
   'Accept-Language': 'en-US,en;q=0.9',
 };
 
-async function fetchGoodingPageData(url: string): Promise<GoodingPageData> {
+async function fetchGoodingPageData(url: string, supabase?: any): Promise<GoodingPageData> {
   // Extract slug from URL
   let slug = url;
   if (url.includes('goodingco.com')) {
@@ -344,7 +348,7 @@ async function fetchGoodingPageData(url: string): Promise<GoodingPageData> {
     throw new Error('Could not extract lot slug from URL');
   }
 
-  // Fetch the Gatsby page-data.json directly
+  // Fetch the Gatsby page-data.json directly (ZERO Firecrawl cost)
   const pageDataUrl = `https://www.goodingco.com/page-data/lot/${slug}/page-data.json`;
   console.log(`[gooding] Fetching: ${pageDataUrl}`);
 
@@ -357,7 +361,37 @@ async function fetchGoodingPageData(url: string): Promise<GoodingPageData> {
     throw new Error(`HTTP ${response.status} fetching page-data.json`);
   }
 
-  const data = await response.json();
+  const text = await response.text();
+  const data = JSON.parse(text);
+
+  // Archive JSON to listing_page_snapshots (non-blocking)
+  if (supabase) {
+    try {
+      const hashData = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', hashData);
+      const sha256 = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      await supabase.from('listing_page_snapshots').insert({
+        platform: 'gooding',
+        listing_url: url,
+        fetched_at: new Date().toISOString(),
+        fetch_method: 'direct',
+        http_status: response.status,
+        success: true,
+        html: text, // Store JSON as "html" for consistency
+        html_sha256: sha256,
+        content_length: text.length,
+        metadata: { caller: 'extract-gooding', format: 'json', page_data_url: pageDataUrl },
+      });
+      console.log(`[gooding] Archived JSON snapshot (${text.length} bytes)`);
+    } catch (e: any) {
+      // 23505 = duplicate content hash — fine
+      if (!String(e?.code || e?.message || '').includes('23505')) {
+        console.warn(`[gooding] Snapshot archive failed (non-fatal): ${e?.message}`);
+      }
+    }
+  }
+
   return data as GoodingPageData;
 }
 
@@ -413,7 +447,49 @@ async function saveToDatabase(
   });
   let vehicleId: string | null = resolvedId;
 
+  // Also check by VIN (ILIKE pattern may timeout on 1M+ row table)
+  if (!vehicleId && extracted.vin && extracted.vin.length >= 5) {
+    const { data: byVin } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('vin', extracted.vin)
+      .limit(1)
+      .maybeSingle();
+    if (byVin?.id) vehicleId = byVin.id;
+  }
+
   let isNew = false;
+
+  // Build description from highlights + note
+  let description: string | null = extracted.description;
+  if (!description && extracted.highlights.length > 0) {
+    description = extracted.highlights.join('\n');
+  }
+  if (description) {
+    description = stripHtmlTags(description).trim().slice(0, 5000) || null;
+  }
+
+  // Quality gate
+  const rawVehicleData: Record<string, any> = {
+    year: extracted.year,
+    make: extracted.make,
+    model: extracted.model,
+    vin: extracted.vin,
+    sale_price: extracted.sale_price,
+    description,
+    color: null, // Gooding doesn't provide color directly
+    transmission: null,
+  };
+  const cleanedData = cleanVehicleFields(rawVehicleData, { platform: 'gooding' });
+  const gate = qualityGate(cleanedData, { source: 'gooding', sourceType: 'auction' });
+
+  if (gate.action === 'reject') {
+    console.warn(`[gooding] Quality gate REJECTED ${extracted.url}: ${gate.issues.join(', ')}`);
+    throw new Error(`Quality gate rejected (score=${gate.score}): ${gate.issues.slice(0, 3).join(', ')}`);
+  }
+  if (gate.action === 'flag_for_review') {
+    console.warn(`[gooding] Quality gate FLAGGED ${extracted.url} (score=${gate.score}): ${gate.issues.join(', ')}`);
+  }
 
   if (vehicleId) {
     // Update existing vehicle (vehicleId from listing, discovery_url, or slug match)
@@ -424,9 +500,11 @@ async function saveToDatabase(
       model: extracted.model,
       vin: extracted.vin || undefined,
       sale_price: extracted.sale_price,
+      description: description || undefined,
       sale_status: extracted.status === 'sold' ? 'sold' : (extracted.status === 'active' ? 'available' : extracted.status),
-      status: 'active', // so feed shows vehicle (feed filters out status = 'pending')
+      status: 'active',
       updated_at: new Date().toISOString(),
+      extractor_version: EXTRACTOR_VERSION,
     };
     if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
       const { data: existingVehicle } = await supabase
@@ -471,6 +549,9 @@ async function saveToDatabase(
       discovery_source: 'gooding',
       is_public: true,
       auction_source: 'gooding',
+      description: description || undefined,
+      source: 'gooding',
+      extractor_version: EXTRACTOR_VERSION,
       notes: notesParts.join('\n'),
     };
     if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
@@ -487,10 +568,29 @@ async function saveToDatabase(
       .maybeSingle();
 
     if (insertError) {
-      throw new Error(`Failed to insert vehicle: ${insertError?.message || insertError}`);
+      // Handle unique constraint violation (e.g. www vs non-www URL)
+      if (insertError.code === '23505' && insertError.message?.includes('discovery_url')) {
+        const normalizedUrl = extracted.url.replace('://www.', '://');
+        const { data: byUrl } = await supabase
+          .from('vehicles')
+          .select('id')
+          .or(`discovery_url.eq.${normalizedUrl},discovery_url.eq.${extracted.url}`)
+          .limit(1)
+          .maybeSingle();
+        if (byUrl?.id) {
+          vehicleId = byUrl.id;
+          isNew = false;
+          // Update instead
+          await supabase.from('vehicles').update(insertPayload).eq('id', vehicleId);
+        } else {
+          throw new Error(`Failed to insert vehicle: ${insertError.message}`);
+        }
+      } else {
+        throw new Error(`Failed to insert vehicle: ${insertError?.message || insertError}`);
+      }
+    } else {
+      vehicleId = newVehicle?.id;
     }
-
-    vehicleId = newVehicle?.id;
   }
 
   // Update/insert external_listings
@@ -617,7 +717,7 @@ async function processBatch(
         await new Promise(r => setTimeout(r, 200));
       }
 
-      const pageData = await fetchGoodingPageData(url);
+      const pageData = await fetchGoodingPageData(url, supabase);
       const extracted = extractFromPageData(pageData, url);
 
       // Skip non-vehicle items (memorabilia, signs, etc.)
@@ -665,7 +765,7 @@ serve(async (req) => {
     if (url) {
       console.log(`[gooding] Extracting: ${url}`);
 
-      const pageData = await fetchGoodingPageData(url);
+      const pageData = await fetchGoodingPageData(url, supabase);
       const extracted = extractFromPageData(pageData, url);
 
       let dbResult = null;

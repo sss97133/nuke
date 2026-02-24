@@ -2,7 +2,7 @@
 
 **Deployment Date:** October 27, 2025  
 **Status:** ✅ COMPLETE & VERIFIED  
-**Production URL:** https://nuke-5jwweth5n-nzero.vercel.app  
+**Production URL:** https://nuke-5jwweth5n-nuke.vercel.app  
 **Bundle:** `index-DaJD1E_Y.js`
 
 ---
@@ -73,7 +73,7 @@ Successfully deployed 4 major commits with image upload system improvements, cle
 ### Test Environment:
 - **Tool:** Playwright MCP v1.56.1
 - **Browser:** Chromium (mobile viewport: 375x667)
-- **Production URL:** https://nuke-5jwweth5n-nzero.vercel.app
+- **Production URL:** https://nuke-5jwweth5n-nuke.vercel.app
 - **Test Date:** October 27, 2025
 
 ### Tests Performed:
@@ -138,8 +138,8 @@ Warnings: Large chunks (expected), missing exports (non-critical)
 - **Upload Size:** 2.2MB
 - **Build Duration:** 42 seconds
 - **Status:** ● Ready (Production)
-- **Deployment URL:** https://nuke-5jwweth5n-nzero.vercel.app
-- **Domain Alias:** https://n-zero.dev (auto-alias)
+- **Deployment URL:** https://nuke-5jwweth5n-nuke.vercel.app
+- **Domain Alias:** https://nuke.ag (auto-alias)
 
 ---
 
@@ -162,7 +162,7 @@ Warnings: Large chunks (expected), missing exports (non-critical)
 ## ✅ PRODUCTION VERIFICATION
 
 ### Site Status:
-- **URL:** https://n-zero.dev → https://nuke-5jwweth5n-nzero.vercel.app
+- **URL:** https://nuke.ag → https://nuke-5jwweth5n-nuke.vercel.app
 - **Bundle:** index-DaJD1E_Y.js (NEW - was index-Cyhj7_Mj.js)
 - **Load Time:** ~3 seconds to interactive
 - **Data:** 19 vehicles loading from Supabase
@@ -327,7 +327,7 @@ vercel --prod --yes
 ## ✅ SIGN-OFF
 
 **Deployment Status:** ✅ COMPLETE  
-**Production URL:** https://n-zero.dev  
+**Production URL:** https://nuke.ag  
 **Testing Status:** ✅ VERIFIED  
 **Documentation:** ✅ COMPLETE  
 

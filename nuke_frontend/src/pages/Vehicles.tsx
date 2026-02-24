@@ -1388,13 +1388,13 @@ const VehiclesInner: React.FC = () => {
 
   const handleCardDragStart = (e: React.DragEvent, vehicleId: string) => {
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('application/n-zero.vehicle', JSON.stringify({ vehicleId }));
+    e.dataTransfer.setData('application/nuke.vehicle', JSON.stringify({ vehicleId }));
     e.dataTransfer.setData('text/plain', vehicleId);
   };
 
   const extractVehicleIdFromDrop = (e: React.DragEvent): string | null => {
     try {
-      const json = e.dataTransfer.getData('application/n-zero.vehicle');
+      const json = e.dataTransfer.getData('application/nuke.vehicle');
       if (json) {
         const parsed = JSON.parse(json);
         if (parsed?.vehicleId && typeof parsed.vehicleId === 'string') return parsed.vehicleId;

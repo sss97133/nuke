@@ -8,7 +8,7 @@
 ## How to Add a New Organization
 
 ### Method 1: Direct URL
-Navigate to: **`https://n-zero.dev/org/create`**
+Navigate to: **`https://nuke.ag/org/create`**
 
 ### Method 2: From Navigation
 1. Go to any organization profile
@@ -60,7 +60,7 @@ The "Contribute Data" button on the organization profile allows you to:
 **How to Edit Your Inventory Items:**
 
 1. **Navigate to the organization profile**
-   - Go to `https://n-zero.dev/org/[org-id]`
+   - Go to `https://nuke.ag/org/[org-id]`
 
 2. **Click the "Inventory" tab**
    - Filter by type if needed (Tool, Equipment, Facility, etc.)

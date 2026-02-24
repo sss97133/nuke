@@ -125,7 +125,7 @@ When we add Twilio SMS support:
 ## Test It Now
 
 **Mobile:**
-1. Visit on phone: `https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41`
+1. Visit on phone: `https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41`
 2. Tap "Request Work"
 3. Tap "📸 Take Photos / Upload"
 4. Camera opens → Take photos of the work needed

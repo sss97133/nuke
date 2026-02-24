@@ -7,7 +7,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   const [showGallery, setShowGallery] = useState(false);
   const [fitMode, setFitMode] = useState<'cover' | 'contain'>(() => {
     try {
-      const v = window.localStorage.getItem('n_zero_hero_image_fit_mode');
+      const v = window.localStorage.getItem('nuke_hero_image_fit_mode');
       return v === 'contain' ? 'contain' : 'cover';
     } catch {
       return 'cover';
@@ -80,7 +80,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
               e.stopPropagation();
               setFitMode((prev) => {
                 const next = prev === 'cover' ? 'contain' : 'cover';
-                try { window.localStorage.setItem('n_zero_hero_image_fit_mode', next); } catch { /* ignore */ }
+                try { window.localStorage.setItem('nuke_hero_image_fit_mode', next); } catch { /* ignore */ }
                 return next;
               });
             }}

@@ -385,8 +385,8 @@ serve(async (req) => {
     vehicleIds = [...new Set(vehicleIds)];
     console.log(`[enrich-listing-content] Processing ${vehicleIds.length} vehicles (dry_run=${dryRun}, force=${force})`);
 
-    // Process vehicles concurrently (up to 10 at a time)
-    const CONCURRENCY = 10;
+    // Process vehicles concurrently (up to 25 at a time)
+    const CONCURRENCY = 25;
     const results: any[] = [];
     let enriched = 0;
     let skipped = 0;

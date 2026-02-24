@@ -6,7 +6,7 @@
 
 ## 1️⃣ **VERCEL DASHBOARD** (Rename Project)
 
-### **URL:** https://vercel.com/nzero/nuke_frontend/settings
+### **URL:** https://vercel.com/nuke/nuke_frontend/settings
 
 ### **Steps:**
 1. ✅ **Already open** (I opened it for you)

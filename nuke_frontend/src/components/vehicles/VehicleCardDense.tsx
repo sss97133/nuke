@@ -1486,7 +1486,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
             fill={true}
             objectFit={thumbnailFit}
-            placeholderSrc="/n-zero.png"
+            placeholderSrc="/nuke.png"
             placeholderOpacity={0.25}
             optimizeSize="small"
           />
@@ -1600,7 +1600,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
             fill={true}
             objectFit={thumbnailFit}
-            placeholderSrc="/n-zero.png"
+            placeholderSrc="/nuke.png"
             placeholderOpacity={0.25}
             optimizeSize="medium"
           />
@@ -2185,7 +2185,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             // `ResilientImage` fill mode previously used a wrapper with `height: 100%`,
             // which collapses when the parent height isn't definite. Force absolute fill.
             style={{ position: 'absolute', inset: 0 }}
-            placeholderSrc="/n-zero.png"
+            placeholderSrc="/nuke.png"
             placeholderOpacity={0.25}
             optimizeSize={imageOptimizeSize}
           />
@@ -3055,7 +3055,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                               alt="Evidence image"
                               fill={true}
                               objectFit="cover"
-                              placeholderSrc="/n-zero.png"
+                              placeholderSrc="/nuke.png"
                               placeholderOpacity={0.15}
                               optimizeSize="thumbnail"
                             />

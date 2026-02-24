@@ -216,7 +216,7 @@ Created comprehensive guide on:
    - See instant feedback
 
 3. **Merge Proposals:**
-   - Visit https://n-zero.dev/admin/merge-proposals
+   - Visit https://nuke.ag/admin/merge-proposals
    - See 5 valid proposals (K5/K20 gone!)
    - Confidence scores + AI reasoning
 

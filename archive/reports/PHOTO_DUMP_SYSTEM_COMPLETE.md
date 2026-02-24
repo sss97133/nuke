@@ -2,7 +2,7 @@
 
 **Date:** November 4, 2025  
 **Status:** DEPLOYED TO PRODUCTION  
-**URL:** https://n-zero.dev
+**URL:** https://nuke.ag
 
 ---
 
@@ -404,7 +404,7 @@ GPS → "Ernie's Upholstery, Laughlin, NV"
 ## 🚀 Deployment Status
 
 ### **Production URLs:**
-- **Frontend:** https://n-zero.dev ✅
+- **Frontend:** https://nuke.ag ✅
 - **Bundle:** assets/index-CiQwppWx.js (2.35MB) ✅
 
 ### **Database:**
@@ -503,11 +503,11 @@ After you test tonight, we can add:
 
 **Status:** ✅ **READY TO USE TONIGHT**
 
-**Try it:** Open n-zero.dev on your phone, tap Photo Dump button, select your 60 photos from today, and let AI organize them!
+**Try it:** Open nuke.ag on your phone, tap Photo Dump button, select your 60 photos from today, and let AI organize them!
 
 ---
 
 **Built:** November 4, 2025, 12:20 AM PST  
-**Deployed:** https://n-zero.dev  
+**Deployed:** https://nuke.ag  
 **Next:** Test with real workflow → Add automation → Enable auto-filing
 

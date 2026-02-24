@@ -53,7 +53,7 @@ git push origin main
 
 **Vercel will automatically:**
 - Build the frontend (`npm run build`)
-- Deploy to https://n-zero.dev
+- Deploy to https://nuke.ag
 - Usually takes 2-3 minutes
 
 ### Option 2: Manual Build (Local Test)
@@ -83,8 +83,8 @@ Then deploy `dist/` folder to Vercel manually or via CLI.
 
 Visit production URLs:
 ```
-https://n-zero.dev/vehicle/{any-vehicle-id}
-https://n-zero.dev/org/{any-org-id}
+https://nuke.ag/vehicle/{any-vehicle-id}
+https://nuke.ag/org/{any-org-id}
 ```
 
 Check for:
@@ -246,7 +246,7 @@ After deployment, verify:
 
 - [ ] Production build completes without errors
 - [ ] Vercel deployment succeeds
-- [ ] https://n-zero.dev loads
+- [ ] https://nuke.ag loads
 - [ ] Vehicle pages show new components
 - [ ] Organization pages load
 - [ ] No console errors
@@ -292,7 +292,7 @@ After deployment, verify:
 ### Check for Errors
 ```bash
 # Watch Vercel logs
-vercel logs n-zero.dev --follow
+vercel logs nuke.ag --follow
 
 # Or check Vercel dashboard
 ```

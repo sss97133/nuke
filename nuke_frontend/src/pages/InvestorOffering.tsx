@@ -65,7 +65,7 @@ const sha256 = async (s: string): Promise<string> => {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 };
-const PORTAL_PROFILE_KEY = 'nzero_investor_portal_profile';
+const PORTAL_PROFILE_KEY = 'nuke_investor_portal_profile';
 
 export default function InvestorOffering() {
   const [phase, setPhase] = useState<'gate' | 'acknowledge' | 'portal'>('gate');
@@ -218,7 +218,7 @@ export default function InvestorOffering() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${doc.title} - N-Zero / Nuke Ltd</title>
+        <title>${doc.title} - Nuke Ltd</title>
         <style>
           body {
             font-family: Arial, sans-serif;
@@ -254,7 +254,7 @@ export default function InvestorOffering() {
       </head>
       <body>
         <div class="header-stamp">
-          <strong>CONFIDENTIAL</strong> - N-Zero / Nuke Ltd<br/>
+          <strong>CONFIDENTIAL</strong> - Nuke Ltd<br/>
           Document: ${doc.title}<br/>
           Accessed by: ${viewerName || 'Anonymous'} ${viewerEmail ? `(${viewerEmail})` : ''} ${viewerOrg ? `- ${viewerOrg}` : ''}<br/>
           Session: ${sessionId.substring(0, 8)}<br/>
@@ -427,7 +427,7 @@ export default function InvestorOffering() {
           }}>
             This portal contains confidential information.<br />
             Access is logged and monitored. Unauthorized access is prohibited.<br />
-            Contact info@nukeltd.com for access credentials.
+            Contact info@nuke.ag for access credentials.
           </div>
         </div>
       </div>

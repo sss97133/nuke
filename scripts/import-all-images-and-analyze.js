@@ -246,7 +246,7 @@ async function importAndAnalyzeAll() {
   if (extractedVIN) {
     console.log(`  VIN extracted: ${extractedVIN} (from image ${vinImageIndex}, confidence: ${vinConfidence}%)`);
   }
-  console.log(`\n🔗 Profile: https://n-zero.dev/vehicle/${VEHICLE_ID}\n`);
+  console.log(`\n🔗 Profile: https://nuke.ag/vehicle/${VEHICLE_ID}\n`);
 }
 
 async function analyzeCondition(base64Image, apiKey) {

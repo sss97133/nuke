@@ -6,7 +6,7 @@
 
 const { chromium } = require('playwright');
 
-const SITE_URL = 'https://n-zero.dev';
+const SITE_URL = 'https://nuke.ag';
 
 async function auditSite() {
   console.log('╔═══════════════════════════════════════════════════════╗');
@@ -39,7 +39,7 @@ async function auditSite() {
     page.on('response', response => {
       if (response.status() >= 400) {
         const url = response.url();
-        if (url.includes('supabase') || url.includes('n-zero')) {
+        if (url.includes('supabase') || url.includes('nuke')) {
           errors.push(`${response.status()} - ${url.split('?')[0].split('/').pop()}`);
         }
       }

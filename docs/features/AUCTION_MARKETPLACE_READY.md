@@ -2,7 +2,7 @@
 
 ## What We Built
 
-A complete auction system inspired by Bring a Trailer, PLUS listing preparation tools that position N-Zero as a valuable service for sellers across ALL platforms.
+A complete auction system inspired by Bring a Trailer, PLUS listing preparation tools that position Nuke as a valuable service for sellers across ALL platforms.
 
 ---
 
@@ -19,10 +19,10 @@ A complete auction system inspired by Bring a Trailer, PLUS listing preparation 
 
 ### 2. Listing Preparation Wizard (`/auctions/prepare`)
 - 4-step wizard to prepare listings for multiple platforms
-- Supports: N-Zero, BaT, eBay, Craigslist, Cars.com, Facebook
+- Supports: Nuke, BaT, eBay, Craigslist, Cars.com, Facebook
 - Platform-specific formatting (HTML, JSON, plain text)
 - Export packages in multiple formats
-- Direct submission to N-Zero
+- Direct submission to Nuke
 
 **File:** `nuke_frontend/src/components/auction/ListingPreparationWizard.tsx`
 
@@ -35,7 +35,7 @@ A complete auction system inspired by Bring a Trailer, PLUS listing preparation 
 **Migration:** `supabase/migrations/20251122_listing_export_tracking.sql`
 
 ### 4. Analytics Dashboard (`/auctions/analytics`)
-- N-Zero auction performance metrics
+- Nuke auction performance metrics
 - External platform export analytics
 - Platform breakdown and conversion rates
 - Revenue and commission tracking
@@ -70,7 +70,7 @@ A complete auction system inspired by Bring a Trailer, PLUS listing preparation 
 - Hope to steal their users
 - High barriers to adoption
 
-**N-Zero Approach:**
+**Nuke Approach:**
 - Build auction platform AND export tools
 - Help users succeed on ANY platform
 - Position as valuable service provider
@@ -83,9 +83,9 @@ A complete auction system inspired by Bring a Trailer, PLUS listing preparation 
 - Export to multiple platforms
 - AI-powered descriptions
 - Comprehensive analytics
-- Option to auction on N-Zero OR elsewhere
+- Option to auction on Nuke OR elsewhere
 
-**For N-Zero:**
+**For Nuke:**
 - Internal auction revenue (3-5% fees)
 - External platform commissions (1-2%)
 - User retention through tools
@@ -103,7 +103,7 @@ A complete auction system inspired by Bring a Trailer, PLUS listing preparation 
 
 ## Business Model
 
-### Internal Auctions (N-Zero)
+### Internal Auctions (Nuke)
 - **Listing Fee:** Free
 - **Success Fee:** 3-5% of final sale price
 - **Target:** Vehicles that fit our audience
@@ -116,7 +116,7 @@ A complete auction system inspired by Bring a Trailer, PLUS listing preparation 
 ### Revenue Projection
 
 **Example: 100 Vehicles/Month**
-- 30 list on N-Zero → 10 sell @ avg $25k = $7,500 revenue (3%)
+- 30 list on Nuke → 10 sell @ avg $25k = $7,500 revenue (3%)
 - 70 export to BaT → 20 sell @ avg $50k = $10,000 commission (1%)
 - **Total Monthly Revenue:** $17,500
 - **Annual Revenue:** $210,000
@@ -191,12 +191,12 @@ supabase
 - ✅ Custom pricing per platform
 - ✅ Platform-specific formatting
 - ✅ Export to JSON, HTML, CSV, TXT
-- ✅ Direct N-Zero submission
+- ✅ Direct Nuke submission
 - ✅ Export tracking in database
 
 ### Analytics
 - ✅ Overall performance metrics
-- ✅ N-Zero auction stats
+- ✅ Nuke auction stats
 - ✅ External platform breakdown
 - ✅ Conversion rate tracking
 - ✅ Revenue and commission totals
@@ -355,13 +355,13 @@ Serious inquiries only.
 - Total revenue
 - Average conversion rate
 
-**N-Zero Specific:**
+**Nuke Specific:**
 - Auction listings
 - Active auctions
 - Completed sales
 - Total bids received
 - Average sale price
-- N-Zero conversion rate
+- Nuke conversion rate
 
 **External Platforms:**
 - Exports by platform
@@ -439,7 +439,7 @@ Professional listing preparation tools available free to all users, building pla
 ### Short Term (30 days)
 - Export wizard usage rate
 - Platforms most commonly selected
-- N-Zero vs external platform preference
+- Nuke vs external platform preference
 - Description AI adoption rate
 
 ### Medium Term (90 days)

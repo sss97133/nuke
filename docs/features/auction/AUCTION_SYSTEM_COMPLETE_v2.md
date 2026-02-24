@@ -2,7 +2,7 @@
 
 ## Overview
 
-A comprehensive auction marketplace system inspired by Bring a Trailer, combined with listing preparation tools that help users export to multiple selling platforms. This positions N-Zero as both a direct auction platform AND a valuable preparation/submission service for other marketplaces.
+A comprehensive auction marketplace system inspired by Bring a Trailer, combined with listing preparation tools that help users export to multiple selling platforms. This positions Nuke as both a direct auction platform AND a valuable preparation/submission service for other marketplaces.
 
 ---
 
@@ -75,13 +75,13 @@ const channel = supabase
 
 ### Purpose
 
-Help users prepare professional listings for multiple platforms without competing directly. We act as the preparation service, giving users the option to list on N-Zero OR export to external platforms.
+Help users prepare professional listings for multiple platforms without competing directly. We act as the preparation service, giving users the option to list on Nuke OR export to external platforms.
 
 ### Supported Platforms
 
 | Platform | Export Format | Features |
 |----------|--------------|----------|
-| **N-Zero** | Direct Submit | Full auction features |
+| **Nuke** | Direct Submit | Full auction features |
 | **Bring a Trailer** | JSON/Text | Optimized descriptions, 50 images |
 | **eBay Motors** | HTML | Structured specs, 24 images |
 | **Craigslist** | Plain Text | Concise format, local focus |
@@ -102,13 +102,13 @@ Help users prepare professional listings for multiple platforms without competin
 
 #### Step 3: Customize Listing
 - Set asking price
-- Set reserve price (N-Zero auctions only)
+- Set reserve price (Nuke auctions only)
 - Write/edit description
 - AI optimization for each platform
 
 #### Step 4: Export & Submit
 - Download packages for external platforms
-- Direct submit to N-Zero
+- Direct submit to Nuke
 - Track exports in database
 
 ### Platform-Specific Formatting
@@ -165,7 +165,7 @@ CREATE TABLE listing_exports (
   
   -- Platform
   platform TEXT CHECK (platform IN (
-    'nzero', 'bat', 'ebay', 'craigslist', 
+    'nuke', 'bat', 'ebay', 'craigslist', 
     'carscom', 'facebook', 'autotrader', 'other'
   )),
   
@@ -330,12 +330,12 @@ await ListingExportService.updateExportStatus(
 
 **Overall Performance:**
 - Total listings across all platforms
-- Active auctions on N-Zero
+- Active auctions on Nuke
 - Total sales (internal + external)
 - Total revenue
 - Conversion rates
 
-**N-Zero Auction Metrics:**
+**Nuke Auction Metrics:**
 - Total listings
 - Active auctions
 - Completed sales
@@ -419,7 +419,7 @@ nuke_frontend/src/components/auction/CreateAuctionListing.tsx
 
 ## Commission Model
 
-### N-Zero Platform
+### Nuke Platform
 - **Listing Fee**: Free
 - **Success Fee**: 3-5% of final sale price
 - **Premium Features**: Highlighted listings, featured placement
@@ -514,7 +514,7 @@ supabase functions deploy generate-auction-description
 
 ## Business Model
 
-### Direct Competition (N-Zero Auctions)
+### Direct Competition (Nuke Auctions)
 - We host the auction
 - We handle bidding and payments
 - We earn 3-5% success fee
@@ -534,7 +534,7 @@ supabase functions deploy generate-auction-description
 - Professional quality
 - Data-driven pricing suggestions
 
-**For N-Zero:**
+**For Nuke:**
 - User retention (they need our tools)
 - Commission income from exports
 - Data insights from all platforms
@@ -574,7 +574,7 @@ supabase functions deploy generate-auction-description
 - Multi-platform listings
 
 ### Revenue
-- N-Zero auction fees
+- Nuke auction fees
 - External platform commissions
 - Average revenue per listing
 - Total GMV (Gross Merchandise Value)
@@ -669,7 +669,7 @@ GROUP BY platform;
 
 ## Conclusion
 
-This system positions N-Zero as both a competitive auction platform AND a valuable service provider for sellers using other platforms. We win either way:
+This system positions Nuke as both a competitive auction platform AND a valuable service provider for sellers using other platforms. We win either way:
 - Direct auctions earn us 3-5% fees
 - Export assistance builds loyalty and earns 1-2% commissions
 - Users stay engaged with our platform for tools and analytics

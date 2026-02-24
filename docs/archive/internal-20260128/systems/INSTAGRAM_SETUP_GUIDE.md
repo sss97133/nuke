@@ -43,7 +43,7 @@ FACEBOOK_APP_SECRET=your_facebook_app_secret_here
 INSTAGRAM_ACCESS_TOKEN=your_long_lived_token_here
 
 # Optional (for webhook verification)
-INSTAGRAM_WEBHOOK_VERIFY_TOKEN=n-zero-webhook-token
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN=nuke-webhook-token
 ```
 
 **Note**: The `INSTAGRAM_ACCESS_TOKEN` will be automatically stored when users connect via OAuth. You can also manually set it for testing.
@@ -123,7 +123,7 @@ SELECT backfill_instagram_content(
 2. Webhooks → Instagram
 3. Subscribe to `media` field
 4. Callback URL: `https://your-project.supabase.co/functions/v1/process-instagram-webhook`
-5. Verify Token: `n-zero-webhook-token` (or your custom token)
+5. Verify Token: `nuke-webhook-token` (or your custom token)
 
 #### Webhook Verification
 

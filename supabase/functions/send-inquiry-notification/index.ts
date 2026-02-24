@@ -125,7 +125,7 @@ serve(async (req) => {
 
           <p style="color: #888; font-size: 12px; margin-top: 24px;">
             — Nuke Platform<br>
-            <a href="https://nuke.dev">nuke.dev</a>
+            <a href="https://nuke.ag">nuke.ag</a>
           </p>
         </div>
       `,

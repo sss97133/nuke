@@ -1,6 +1,6 @@
 # Deal jacket pipeline: how we handle your data
 
-This is the **paid service** we are developing in **n-zero**. The goal: automate folder naming and turn raw deal-jacket images into a **per-car repository** that can be viewed and queried.
+This is the **paid service** we are developing in **Nuke**. The goal: automate folder naming and turn raw deal-jacket images into a **per-car repository** that can be viewed and queried.
 
 **Core principle: users must be able to SEE how their data is handled.** Transparency—where each file went, which deal it belongs to, how we named folders—builds trust and confirms we captured everything correctly.
 
@@ -114,18 +114,18 @@ So: **Connect photos** = connect external gallery → reference-only storage →
 ## Bulk export and connect to profile
 
 - **Bulk export:** Users need to export all deal jackets in one shot (e.g. one JSON or ZIP) so they can move data into their workflow or the framework. Single-deal export exists; add **bulk export** (all deals + pages) as one file.
-- **Connect to profile:** The data is already tied to a profile in the system, but nobody can use it without **the framework** (n-zero, vehicle profile, org). So we need an explicit **Connect to profile** (or **Open in n-zero**) entry point: from a deal jacket, open the corresponding vehicle/org profile in the app where they have the framework to view and use the data.
+- **Connect to profile:** The data is already tied to a profile in the system, but nobody can use it without **the framework** (Nuke, vehicle profile, org). So we need an explicit **Connect to profile** (or **Open in Nuke**) entry point: from a deal jacket, open the corresponding vehicle/org profile in the app where they have the framework to view and use the data.
 - **Upload photos:** Add an **Upload photos** option that does the **same thing** as the deal jacket flow: image analysis, organization (separate by deal jacket), naming (YMM/VIN), extraction, and link to profile. Same pipeline—just another entry point (e.g. from a vehicle profile: “Upload photos” → same analysis and organization, then attached to that profile).
 
 ---
 
-## Delivered as paid service in n-zero
+## Delivered as paid service in Nuke
 
 - This pipeline (file vs folder input, separation, auto-naming, per-car repository, link to org) is the **paid service**.
 - **Transparency** (users see how their data is handled) is part of the product.
 - **Bulk export** and **Connect to profile** make the data usable inside the framework.
 - **Upload photos** (same analysis + organization) is the entry point from profiles.
-- Billing/credits apply to extraction and usage; product surface lives in **n-zero**.
+- Billing/credits apply to extraction and usage; product surface lives in **Nuke**.
 
 ---
 
@@ -140,4 +140,4 @@ So: **Connect photos** = connect external gallery → reference-only storage →
 | Folder mode | Folder = one deal | Folder = one vehicle profile; create in DB, link to org |
 | Visibility | Basic deal view | User SEES: which file → which deal, auto names, doc-type breakdown |
 
-This doc is the product spec; implementation will live in n-zero and in shared extraction/merge logic (e.g. DealerScan edge functions and DB schema as needed).
+This doc is the product spec; implementation will live in Nuke and in shared extraction/merge logic (e.g. DealerScan edge functions and DB schema as needed).

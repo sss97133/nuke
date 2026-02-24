@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ToastProvider as OldToastProvider } from './hooks/useToast';
@@ -12,8 +13,15 @@ import AppLayout from './components/layout/AppLayout';
 import { DomainRoutes } from './routes/DomainRoutes';
 import HomePage from './pages/HomePage';
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 5 * 60 * 1000, retry: 1 },
+  },
+});
+
 export default function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <ToastProvider>
         <OldToastProvider>
@@ -39,6 +47,7 @@ export default function App() {
         </OldToastProvider>
       </ToastProvider>
     </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

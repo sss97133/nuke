@@ -55,7 +55,7 @@
 
 **On your phone or mobile browser (375px width):**
 
-1. **Navigate**: `https://n-zero.dev/vehicle/92a39d4c-abd1-47b1-971d-dffe173c5793`
+1. **Navigate**: `https://nuke.ag/vehicle/92a39d4c-abd1-47b1-971d-dffe173c5793`
 2. **Hard refresh**: Cmd+Shift+R  
 3. **Verify bundle**: DevTools → should show `index-BY_M2AHz.js`
 4. **Click TIMELINE tab** → Should load instantly ✅

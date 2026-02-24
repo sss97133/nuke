@@ -189,7 +189,7 @@ CREATE TRIGGER trg_auto_tag_org_from_gps
 - Total: ~5-10 minutes from git push
 
 ### Step 3: Test on Production
-Visit: https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
+Visit: https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
 
 **Open browser console (F12) and look for:**
 ```
@@ -207,7 +207,7 @@ Visit: https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
 ### Step 4: Test Other Vehicles
 Try these (they have org relationships):
 ```
-https://n-zero.dev/vehicle/{any-vehicle-id}
+https://nuke.ag/vehicle/{any-vehicle-id}
 ```
 
 Run this to find more:
@@ -225,7 +225,7 @@ const { Client } = require('pg');
   });
   await client.connect();
   const r = await client.query('SELECT v.id, v.year, v.make, v.model, b.business_name FROM vehicles v INNER JOIN organization_vehicles ov ON v.id = ov.vehicle_id INNER JOIN businesses b ON ov.organization_id = b.id WHERE v.is_public = true LIMIT 5');
-  r.rows.forEach(v => console.log(\`https://n-zero.dev/vehicle/\${v.id}  →  \${v.year} \${v.make} \${v.model} @ \${v.business_name}\`));
+  r.rows.forEach(v => console.log(\`https://nuke.ag/vehicle/\${v.id}  →  \${v.year} \${v.make} \${v.model} @ \${v.business_name}\`));
   await client.end();
 })();
 "
@@ -249,7 +249,7 @@ node verify_deployment.js
 This will tell you exactly what's missing.
 
 ### Option 3: Manual Verification
-1. Go to https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
+1. Go to https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e
 2. Right-click → Inspect Element
 3. Open Console tab
 4. Hard refresh (Cmd+Shift+R)
@@ -296,7 +296,7 @@ When deployment completes, you'll have:
 
 **Status:** ✅ Complete, deployed, propagating  
 **ETA Live:** 5-10 minutes from last push (check Vercel)  
-**Test URL:** https://n-zero.dev/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e  
+**Test URL:** https://nuke.ag/vehicle/79fe1a2b-9099-45b5-92c0-54e7f896089e  
 **Expected Result:** 3 organization cards showing Ernies Upholstery + Viva! Las Vegas
 
 🚀 **THE WORK IS DONE. VERCEL IS DEPLOYING.** 🚀

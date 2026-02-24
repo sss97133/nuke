@@ -43,7 +43,7 @@ These orgs have proper user attribution AND source URLs:
 
 - **Nuke** (`f32ea08c-c2c5-4ca9-896d-cb99ce6c7bfb`)
   - Discovered by: `0b9f107a-d124-49de-9ded-94698f63c1c4`
-  - Website: https://www.nukeltd.com
+  - Website: https://www.nuke.ag
   - Has 1 contributor (owner)
 
 ### 2. Has User But No URL (6 orgs, 2.7%)

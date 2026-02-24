@@ -242,7 +242,7 @@ vercel --prod --force --yes
 
 ```bash
 # Check that bundle hash changed
-curl -s https://n-zero.dev | grep -o '_next/static/[^/]*' | head -1
+curl -s https://nuke.ag | grep -o '_next/static/[^/]*' | head -1
 
 # Compare with previous hash to confirm new deployment
 ```
@@ -307,7 +307,7 @@ ORDER BY cn.priority DESC, cn.created_at DESC;
 
 ### Test 4: Frontend Display
 
-1. **Navigate to Organization Page:** https://n-zero.dev/organization/VIVA_ORG_ID
+1. **Navigate to Organization Page:** https://nuke.ag/organization/VIVA_ORG_ID
 2. **Check Default Tab:** Should be "CURRENT" (not "ALL")
 3. **Check VIN Warnings:** 
    - Vehicles with invalid VINs show red ❌ badge
@@ -497,7 +497,7 @@ If you encounter issues:
 1. Check the troubleshooting section above
 2. Review migration logs: `supabase db inspect`
 3. Check frontend console for errors
-4. Verify bundle deployed: `curl https://n-zero.dev | grep _next/static`
+4. Verify bundle deployed: `curl https://nuke.ag | grep _next/static`
 
 Remember: The system is designed to be **production-safe**. Invalid VINs cannot break your public listings.
 

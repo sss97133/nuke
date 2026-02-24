@@ -455,7 +455,7 @@ scripts/fix-rls-direct.js         # Direct pg connection
 
 ### 1. Homepage
 ```
-1. Visit https://n-zero.dev
+1. Visit https://nuke.ag
 2. See clean hero carousel (no emojis)
 3. Click on "1977" → Goes to /market?year=1977
 4. Click time period filter → Feed updates

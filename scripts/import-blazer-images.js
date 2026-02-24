@@ -206,7 +206,7 @@ async function importImages() {
   console.log('═══════════════════════════════════════════════════════════\n');
   console.log(`${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.series ? ' ' + vehicle.series : ''}`);
   console.log(`Images: ${images?.length || 0}`);
-  console.log(`\n🔗 Profile: https://n-zero.dev/vehicles/${VEHICLE_ID}`);
+  console.log(`\n🔗 Profile: https://nuke.ag/vehicles/${VEHICLE_ID}`);
   console.log('═══════════════════════════════════════════════════════════\n');
 }
 

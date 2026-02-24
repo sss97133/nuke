@@ -1,7 +1,7 @@
 # Mendable Data Sources
 
 ## Overview
-Your Mendable project has **100+ data sources** ingested, primarily from Bring a Trailer and n-zero.dev.
+Your Mendable project has **100+ data sources** ingested, primarily from Bring a Trailer and nuke.ag.
 
 ## Data Sources
 
@@ -14,7 +14,7 @@ Your Mendable project has **100+ data sources** ingested, primarily from Bring a
   - Various categories and filters
 - **Content pages**: FAQ, how it works, shipping info, etc.
 
-### n-zero.dev
+### nuke.ag
 - Your platform website ingested
 - Ready for querying about your platform features
 

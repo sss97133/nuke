@@ -14,7 +14,7 @@ A native desktop application for scanning local files and syncing vehicle data t
 
 - **Node.js** 18+
 - **Rust** (for Tauri)
-- **Nuke Account**: Create one at [nuke.com](https://nuke.com)
+- **Nuke Account**: Create one at [nuke.ag](https://nuke.ag)
 
 ### Optional
 

@@ -74,7 +74,7 @@ The repair RPC does several heavy CTEs and multiple UPDATEs; on vehicles with ma
 
 2. **Optionally** count “repairs” when the RPC did *any* work, e.g. also when `cleared_primaries > 0`, so the report reflects “we fixed something” even if the primary row was already correct and only duplicates were cleared.
 
-### B. So VIN backfill from metadata can ever be non-zero
+### B. So VIN backfill from metadata can ever be nonuke
 
 1. **Have extractors write VIN into `origin_metadata`** when they extract (e.g. bat-simple-extract: when updating/inserting a vehicle, set `origin_metadata = coalesce(origin_metadata, '{}'::jsonb) || jsonb_build_object('vin', extracted.vin)` when vin is present). Then future backfill runs can use it.
 2. Or **drop the “VIN from metadata” path** and rely only on re-extract (bat-simple-extract) for missing VIN; document that in the script.

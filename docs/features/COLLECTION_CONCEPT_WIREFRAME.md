@@ -1,7 +1,7 @@
 # Collection Concept - Comprehensive Wireframe
 
 ## Overview
-A "Collection" is more than just vehicles - it's a personal showcase that defines the user. It represents ownership, curation, and personal identity in the n-zero ecosystem.
+A "Collection" is more than just vehicles - it's a personal showcase that defines the user. It represents ownership, curation, and personal identity in the nuke ecosystem.
 
 ---
 

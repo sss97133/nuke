@@ -54,8 +54,8 @@ SELECT
   v.sale_status,
   ov.status as org_vehicle_status,
   
-  -- Vehicle URL (n-zero.dev)
-  CONCAT('https://n-zero.dev/vehicle/', v.id) as vehicle_url,
+  -- Vehicle URL (nuke.ag)
+  CONCAT('https://nuke.ag/vehicle/', v.id) as vehicle_url,
   
   -- External listing URL (if exists)
   COALESCE(
@@ -142,7 +142,7 @@ SELECT
   v.mileage,
   ov.asking_price,
   ov.listing_status,
-  CONCAT('https://n-zero.dev/vehicle/', v.id) as vehicle_url,
+  CONCAT('https://nuke.ag/vehicle/', v.id) as vehicle_url,
   (SELECT image_url FROM vehicle_images vi WHERE vi.vehicle_id = v.id ORDER BY vi.is_primary DESC NULLS LAST LIMIT 1) as primary_image,
   v.description,
   ov.created_at::date as added_date

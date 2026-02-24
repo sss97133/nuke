@@ -20,7 +20,7 @@
 - `image_annotations` - For future clickable hotspots
 
 **Test It:**
-1. Go to `https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41`
+1. Go to `https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41`
 2. Click any green day on the heatmap
 3. **NEW popup** opens with tabs
 4. Click **bookmark flag** (🏳 → 🏴)

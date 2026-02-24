@@ -147,7 +147,7 @@ async function analyzeExistingImages() {
   console.log(`\n✅ Complete!`);
   console.log(`  Analyzed: ${analyzed}`);
   console.log(`  Failed: ${failed}`);
-  console.log(`\n🔗 Profile: https://n-zero.dev/vehicle/${VEHICLE_ID}\n`);
+  console.log(`\n🔗 Profile: https://nuke.ag/vehicle/${VEHICLE_ID}\n`);
 }
 
 async function analyzeImage(base64Image, apiKey) {

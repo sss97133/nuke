@@ -2,7 +2,7 @@
 
 ## Use Case: Organizations That Prioritize Instagram
 
-**Example**: [L'Art de l'Automobile](https://www.instagram.com/lartdelautomobile) - [N-Zero Organization](https://n-zero.dev/org/39773a0e-106c-4afa-ae50-f95cbd74d074)
+**Example**: [L'Art de l'Automobile](https://www.instagram.com/lartdelautomobile) - [Nuke Organization](https://nuke.ag/org/39773a0e-106c-4afa-ae50-f95cbd74d074)
 
 **Challenge**: 
 - Instagram posts often have minimal text (captions, hashtags)

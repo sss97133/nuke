@@ -1,10 +1,10 @@
 # DealerScan – Deploy to production (e.g. dealerscan-three.vercel.app)
 
-## 1. OAuth: don’t send logins to another site (n-zero)
+## 1. OAuth: don’t send logins to another site (Nuke)
 
-**If Google sign-in sends you to n-zero**, the fix is in Supabase, not code. See **[AUTH_FIX.md](./AUTH_FIX.md)** for the exact steps.
+**If Google sign-in sends you to Nuke**, the fix is in Supabase, not code. See **[AUTH_FIX.md](./AUTH_FIX.md)** for the exact steps.
 
-Summary: Supabase Auth only redirects to your app if the URL is allowlisted. Otherwise it uses the project **Site URL** (n-zero).
+Summary: Supabase Auth only redirects to your app if the URL is allowlisted. Otherwise it uses the project **Site URL** (Nuke).
 
 - In **Supabase Dashboard** → **Authentication** → **URL Configuration**:
   - **Site URL**: set to `https://dealerscan-three.vercel.app` (or your DealerScan app URL).
@@ -96,4 +96,4 @@ Vercel builds from your **Git repo**. If you’ve pushed but the site still show
 
 ---
 
-**Product:** Deal jacket pipeline (separate image set → packets → per-car repository, automated naming, paid service in n-zero): [docs/PRODUCT_DEAL_JACKET_PIPELINE.md](docs/PRODUCT_DEAL_JACKET_PIPELINE.md)
+**Product:** Deal jacket pipeline (separate image set → packets → per-car repository, automated naming, paid service in Nuke): [docs/PRODUCT_DEAL_JACKET_PIPELINE.md](docs/PRODUCT_DEAL_JACKET_PIPELINE.md)

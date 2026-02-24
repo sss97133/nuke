@@ -331,7 +331,7 @@ Also integrated 5 valuable changes from background agents:
 ## 📦 DEPLOYMENT STATUS
 
 ### Production
-- **URL:** https://n-zero.dev
+- **URL:** https://nuke.ag
 - **Branch:** main
 - **Last Commit:** 9df771ca (4 minutes ago)
 - **Status:** 🟢 LIVE
@@ -371,7 +371,7 @@ Also integrated 5 valuable changes from background agents:
 8. **Production verified** via PIP audit
 
 ### What's Working Right Now
-Visit https://n-zero.dev and you'll see:
+Visit https://nuke.ag and you'll see:
 
 **Desktop:**
 - Clean hero carousel (no emojis, no invest buttons)

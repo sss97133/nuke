@@ -175,7 +175,7 @@ Widget:
 **Deployed:** `npx vercel --prod --yes --force`  
 **Bundle:** index-4faid34a5.js
 
-**Production URL:** https://nukefrontend-4faid34a5-nzero.vercel.app
+**Production URL:** https://nukefrontend-4faid34a5-nuke.vercel.app
 
 ---
 

@@ -9,4 +9,4 @@ Disallow: /vault/
 Disallow: /capture
 Disallow: /dealer/
 
-Sitemap: https://n-zero.dev/sitemap.xml
+Sitemap: https://nuke.ag/sitemap.xml

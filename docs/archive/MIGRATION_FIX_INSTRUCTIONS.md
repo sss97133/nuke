@@ -61,7 +61,7 @@ supabase db pull
 Before resetting migrations, **verify the SQL fixes worked:**
 
 1. **Add Vehicle Test:**
-   - Open https://n-zero.dev on phone
+   - Open https://nuke.ag on phone
    - Tap + button
    - Enter: 1977 Chevrolet K5 Blazer
    - Add photo

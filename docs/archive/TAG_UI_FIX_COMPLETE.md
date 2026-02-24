@@ -138,7 +138,7 @@ borderRadius:     0px (always)
 
 ## 🧪 **Test It Now:**
 
-1. **Open:** https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
+1. **Open:** https://nuke.ag/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c
 2. **Hard refresh** (Cmd+Shift+R or pull down on mobile)
 3. Click any image to open lightbox
 4. **Check:**
@@ -173,7 +173,7 @@ borderRadius:     0px (always)
 ✅ Committed to GitHub
 ✅ Pushed to main branch
 ✅ Deployed to Vercel production
-✅ Live at n-zero.dev
+✅ Live at nuke.ag
 ```
 
 ---

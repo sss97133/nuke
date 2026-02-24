@@ -199,7 +199,7 @@ Interest: 569 views → 2x market average
 **Committed:** c12bd99f  
 **Status:** ✅ DEPLOYED TO PRODUCTION
 
-**Production URL:** https://nukefrontend-ldevclary-nzero.vercel.app/vehicles
+**Production URL:** https://nukefrontend-ldevclary-nuke.vercel.app/vehicles
 
 ---
 

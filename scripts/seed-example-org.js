@@ -123,7 +123,7 @@ async function seedOrganization() {
     console.log('✅ Stock offering created (DSRT @ $1.00/share)');
 
     console.log('\n✅ SUCCESS: Organization seeded!');
-    console.log(`   View at: https://n-zero.dev/org/${org.id}`);
+    console.log(`   View at: https://nuke.ag/org/${org.id}`);
     console.log(`   Name: ${org.business_name}`);
     console.log(`   Stock: ${org.stock_symbol}`);
 

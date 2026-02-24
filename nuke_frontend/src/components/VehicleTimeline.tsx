@@ -506,6 +506,39 @@ const VehicleTimeline: React.FC<{
         console.error('Error loading auction events:', err);
       }
 
+      // Build BaT activity per day from auction_comments (7-day auction window: bids/comments by date)
+      const batActivityByDay = new Map<string, { bids: number; comments: number }>();
+      for (const c of auctionData || []) {
+        const at = (c as any)?.posted_at;
+        if (!at) continue;
+        const day = toDateOnly(at);
+        const prev = batActivityByDay.get(day) || { bids: 0, comments: 0 };
+        const isBid = String((c as any)?.comment_type || '').toLowerCase() === 'bid';
+        if (isBid) prev.bids += 1;
+        else prev.comments += 1;
+        batActivityByDay.set(day, prev);
+      }
+      const batActivityEvents: any[] = [];
+      batActivityByDay.forEach((counts, dayYmd) => {
+        const label =
+          counts.bids > 0 && counts.comments > 0
+            ? `${counts.bids} bid${counts.bids !== 1 ? 's' : ''}, ${counts.comments} comment${counts.comments !== 1 ? 's' : ''}`
+            : counts.bids > 0
+              ? `${counts.bids} bid${counts.bids !== 1 ? 's' : ''}`
+              : `${counts.comments} comment${counts.comments !== 1 ? 's' : ''}`;
+        batActivityEvents.push({
+          id: `bat-activity-${vehicleId}-${dayYmd}`,
+          vehicle_id: vehicleId,
+          event_type: 'auction_bid_placed',
+          event_date: dayYmd,
+          title: `BaT activity: ${label}`,
+          description: 'Bring a Trailer auction activity',
+          created_at: new Date().toISOString(),
+          metadata: { source: 'auction_comments', ...counts },
+          __table: 'auction_comments',
+        });
+      });
+
       // Load photo dates for calendar heatmap (photos ARE activity even if not events)
       const { data: imageData } = await supabase
         .from('vehicle_images')
@@ -564,7 +597,7 @@ const VehicleTimeline: React.FC<{
           }
 
           if (isLiveAuction) {
-            const alreadyOpenedKey = `nzero_open_receipt_${vehicleId}_${todayYmd}`;
+            const alreadyOpenedKey = `nuke_open_receipt_${vehicleId}_${todayYmd}`;
             const alreadyOpened = (() => {
               try { return window.localStorage.getItem(alreadyOpenedKey) === '1'; } catch { return false; }
             })();
@@ -678,6 +711,7 @@ const VehicleTimeline: React.FC<{
         const mergedFallback: any[] = [
           ...(futureAuctionEvents || []),
           ...(auctionTimelineEvents || []),
+          ...(batActivityEvents || []),
         ];
         setEvents(mergedFallback.length > 0 ? (mergedFallback as any) : []);
       } else {
@@ -687,6 +721,17 @@ const VehicleTimeline: React.FC<{
         if (auctionTimelineEvents.length > 0) {
           merged = [...auctionTimelineEvents, ...merged];
           for (const ev of auctionTimelineEvents) {
+            if (ev?.event_date) {
+              const dateKey = toDateOnly(ev.event_date);
+              activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
+            }
+          }
+        }
+
+        // Add BaT 7-day auction activity (bids/comments per day from auction_comments)
+        if (batActivityEvents.length > 0) {
+          merged = [...batActivityEvents, ...merged];
+          for (const ev of batActivityEvents) {
             if (ev?.event_date) {
               const dateKey = toDateOnly(ev.event_date);
               activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
@@ -795,7 +840,11 @@ const VehicleTimeline: React.FC<{
       general: 'badge-secondary',
       custom: 'badge-dark',
       life: 'badge-info',
-      scheduled_auction: 'badge-primary'
+      scheduled_auction: 'badge-primary',
+      auction_sold: 'badge-warning',
+      auction_ended: 'badge-secondary',
+      auction_reserve_not_met: 'badge-secondary',
+      ownership_transfer: 'badge-warning',
     };
     return eventTypeColors[eventType] || 'badge-secondary';
   };

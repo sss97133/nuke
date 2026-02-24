@@ -297,5 +297,5 @@ The fractional ownership trading system is **production-ready** for integration.
 
 **Built by:** AI Assistant  
 **Date:** November 1, 2025  
-**Platform:** n-zero.dev
+**Platform:** nuke.ag
 

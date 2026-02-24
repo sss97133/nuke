@@ -3,7 +3,7 @@
 ## Executive Summary
 
 **Status**: 95% Complete - Production Ready
-**Deployment**: All fixes deployed to https://n-zero.dev
+**Deployment**: All fixes deployed to https://nuke.ag
 **Bundle**: `DoxI_Lj8`
 
 ---
@@ -197,16 +197,16 @@ total_vehicles: 0 ✅ (correct, none linked)
 3. **Trading System Ready** - Org stocks fully functional on backend
 4. **AI Pipeline Complete** - Scanning works, just needs production testing
 5. **Zero Emojis** - Clean, professional UI throughout
-6. **Production Deployed** - All changes live on https://n-zero.dev
+6. **Production Deployed** - All changes live on https://nuke.ag
 
 ---
 
 ## Production URLs
 
-- **Organizations Directory**: https://n-zero.dev/organizations
-- **Desert Performance**: https://n-zero.dev/org/10e77f53-c8d3-445e-b0dd-c518e6637e31
-- **Ernies Upholstery**: https://n-zero.dev/org/e796ca48-f3af-41b5-be13-5335bb422b41
-- **Hot Kiss Restoration**: https://n-zero.dev/org/1f76d43c-4dd6-4ee9-99df-6c46fd284654
+- **Organizations Directory**: https://nuke.ag/organizations
+- **Desert Performance**: https://nuke.ag/org/10e77f53-c8d3-445e-b0dd-c518e6637e31
+- **Ernies Upholstery**: https://nuke.ag/org/e796ca48-f3af-41b5-be13-5335bb422b41
+- **Hot Kiss Restoration**: https://nuke.ag/org/1f76d43c-4dd6-4ee9-99df-6c46fd284654
 
 ---
 

@@ -12,7 +12,7 @@ info:
     - **API Key**: Pass via `X-API-Key` header
     - **Bearer Token**: Supabase JWT via `Authorization: Bearer <token>` header
 
-    Get your API key at [https://nuke.com/settings/api-keys](https://nuke.com/settings/api-keys)
+    Get your API key at [https://nuke.ag/settings/api-keys](https://nuke.ag/settings/api-keys)
 
     ## Rate Limiting
 
@@ -26,7 +26,7 @@ info:
   version: 1.0.0
   contact:
     name: Nuke Support
-    url: https://nuke.com/support
+    url: https://nuke.ag/support
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -899,7 +899,7 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
-      description: API key from https://nuke.com/settings/api-keys
+      description: API key from https://nuke.ag/settings/api-keys
     BearerAuth:
       type: http
       scheme: bearer

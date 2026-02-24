@@ -91,7 +91,7 @@ export const AuctionPlatformBadge: React.FC<{ platform: string; urlForFavicon?: 
                 ? 'https://facebook.com'
                 : typeof window !== 'undefined'
                   ? window.location.origin
-                  : 'https://n-zero.com');
+                  : 'https://nuke.ag');
 
   return (
     <span

@@ -46,7 +46,7 @@ serve(async (req) => {
       const { data: systemUser } = await supabase
         .from('profiles')
         .select('id')
-        .or('email.eq.system@n-zero.dev,email.eq.admin@n-zero.dev')
+        .or('email.eq.system@nuke.ag,email.eq.admin@nuke.ag')
         .limit(1)
         .maybeSingle()
       

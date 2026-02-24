@@ -70,8 +70,8 @@ On mobile, the vehicle profile header had overlapping elements:
 
 ## Deployment
 - Deployed: November 23, 2025
-- Vercel URL: https://nuke-lx51kxo50-nzero.vercel.app
-- Production: https://n-zero.dev
+- Vercel URL: https://nuke-lx51kxo50-nuke.vercel.app
+- Production: https://nuke.ag
 - Status: ✅ Live
 
 ## Files Modified

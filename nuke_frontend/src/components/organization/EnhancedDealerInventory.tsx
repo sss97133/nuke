@@ -747,7 +747,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         alt={`${v.vehicles.year} ${v.vehicles.make} ${v.vehicles.model}`}
                         fill={true}
                         objectFit="cover"
-                        placeholderSrc="/n-zero.png"
+                        placeholderSrc="/nuke.png"
                         placeholderOpacity={0.3}
                       />
 
@@ -979,7 +979,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                             alt={`${v.vehicles.year} ${v.vehicles.make} ${v.vehicles.model}`}
                             fill={true}
                             objectFit="cover"
-                            placeholderSrc="/n-zero.png"
+                            placeholderSrc="/nuke.png"
                             placeholderOpacity={0.3}
                           />
                         </div>

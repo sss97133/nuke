@@ -232,7 +232,7 @@ Bot: Active vehicle cleared.
 **Step 2: Configure polling**
 ```bash
 # Every 15 minutes, pull new submissions
-curl "https://api.nuke.dev/v1/business-data/submissions?since=2026-02-05T00:00:00Z" \
+curl "https://api.nuke.ag/v1/business-data/submissions?since=2026-02-05T00:00:00Z" \
   -H "X-API-Key: nk_live_xxx"
 ```
 
@@ -247,7 +247,7 @@ curl "https://api.nuke.dev/v1/business-data/submissions?since=2026-02-05T00:00:0
       "vehicle": { "vin": "WBA3A5C51CF123456", "year": 2015, "make": "BMW", "model": "M3" },
       "work_type": "body_work",
       "description": "Sanding rocker panel area",
-      "photo_urls": ["https://storage.nuke.dev/photos/...jpg"],
+      "photo_urls": ["https://storage.nuke.ag/photos/...jpg"],
       "confidence": 0.92
     }
   ]
