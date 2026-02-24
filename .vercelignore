@@ -1,0 +1,14 @@
+node_modules
+.git
+supabase
+nuke_api
+scripts
+database
+data
+docs
+dealerscan
+.claude
+*.log
+*.lock
+nuke_frontend/node_modules
+nuke_frontend/dist
