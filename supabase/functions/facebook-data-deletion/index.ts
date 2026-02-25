@@ -108,7 +108,7 @@ serve(async (req) => {
 
     // Return the required response format
     // Facebook expects a URL where users can check deletion status and a confirmation code
-    const statusUrl = `https://www.nuke.ag/data-deletion-status?code=${confirmationCode}`;
+    const statusUrl = `https://nuke.ag/data-deletion-status?code=${confirmationCode}`;
 
     return new Response(
       JSON.stringify({
