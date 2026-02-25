@@ -2649,7 +2649,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               {cleanedModelForHeader}
             </span>
           )}
-          {(vehicle as any)?.series && (
+          {(vehicle as any)?.series && !cleanedModelForHeader.toLowerCase().includes(String((vehicle as any).series).toLowerCase()) && (
             <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap' }}>
               {(vehicle as any).series}
             </span>
