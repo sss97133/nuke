@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,6 +41,8 @@ serve(async (req) => {
     for (const item of queueItems) {
       try {
         const url = item.listing_url;
+        // Normalize URL for domain routing (strip protocol, www, trailing slash, query/hash)
+        const normalizedUrl = normalizeListingUrlKey(url) || '';
         if (!url) {
           await supabase.from('import_queue').update({
             status: 'failed',
@@ -54,41 +57,42 @@ serve(async (req) => {
         }
         let extractorUrl = null;
 
-        if (url.includes('bringatrailer.com')) {
+        // Use normalized URL for domain routing (handles www, mixed case, trailing slashes)
+        if (normalizedUrl.includes('bringatrailer.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/complete-bat-import';
-        } else if (url.includes('carsandbids.com')) {
+        } else if (normalizedUrl.includes('carsandbids.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-cars-and-bids-core';
-        } else if (url.includes('pcarmarket.com')) {
+        } else if (normalizedUrl.includes('pcarmarket.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/import-pcarmarket-listing';
-        } else if (url.includes('hagerty.com')) {
+        } else if (normalizedUrl.includes('hagerty.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-hagerty-listing';
-        } else if (url.includes('classic.com')) {
+        } else if (normalizedUrl.includes('classic.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/import-classic-auction';
-        } else if (url.includes('collectingcars.com')) {
+        } else if (normalizedUrl.includes('collectingcars.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-collecting-cars';
-        } else if (url.includes('barnfinds.com')) {
+        } else if (normalizedUrl.includes('barnfinds.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-barn-finds-listing';
-        } else if (url.includes('craigslist.org')) {
+        } else if (normalizedUrl.includes('craigslist.org')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-craigslist';
-        } else if (url.includes('mecum.com')) {
+        } else if (normalizedUrl.includes('mecum.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-mecum';
-        } else if (url.includes('barrett-jackson.com')) {
+        } else if (normalizedUrl.includes('barrett-jackson.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-barrett-jackson';
-        } else if (url.includes('broadarrowauctions.com')) {
+        } else if (normalizedUrl.includes('broadarrowauctions.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-broad-arrow';
-        } else if (url.includes('gaaclassiccars.com')) {
+        } else if (normalizedUrl.includes('gaaclassiccars.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-gaa-classics';
-        } else if (url.includes('bhauction.com')) {
+        } else if (normalizedUrl.includes('bhauction.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-bh-auction';
-        } else if (url.includes('bonhams.com') || url.includes('cars.bonhams.com')) {
+        } else if (normalizedUrl.includes('bonhams.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-bonhams';
-        } else if (url.includes('rmsothebys.com')) {
+        } else if (normalizedUrl.includes('rmsothebys.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-rmsothebys';
-        } else if (url.includes('goodingco.com')) {
+        } else if (normalizedUrl.includes('goodingco.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-gooding';
-        } else if (url.includes('velocityrestorations.com') || url.includes('coolnvintage.com') || url.includes('brabus.com') || url.includes('icon4x4.com') || url.includes('ringbrothers.com')) {
+        } else if (normalizedUrl.includes('velocityrestorations.com') || normalizedUrl.includes('coolnvintage.com') || normalizedUrl.includes('brabus.com') || normalizedUrl.includes('icon4x4.com') || normalizedUrl.includes('ringbrothers.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-specialty-builder';
-        } else if (url.includes('vanguardmotorsales.com')) {
+        } else if (normalizedUrl.includes('vanguardmotorsales.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         } else {
           extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
