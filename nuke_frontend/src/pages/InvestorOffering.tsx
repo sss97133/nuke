@@ -337,15 +337,6 @@ export default function InvestorOffering() {
         }}>
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
-            <div style={{
-              fontSize: '8pt',
-              letterSpacing: '3px',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted)',
-              marginBottom: 'var(--space-2)',
-            }}>
-              NUKE
-            </div>
             <h1 style={{
               fontSize: '16pt',
               fontWeight: 'bold',
