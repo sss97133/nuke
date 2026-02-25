@@ -1947,7 +1947,6 @@ const ImageGallery = ({
 
   // Load tag counts for all images (disabled - using new tagging system)
   const loadImageTagCounts = async () => {
-    console.debug('Tag counts disabled in ImageGallery - use SimplePhotoTagger instead');
     setImageTagCounts({});
     return;
   };

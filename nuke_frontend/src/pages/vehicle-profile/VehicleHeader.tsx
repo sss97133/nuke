@@ -1249,8 +1249,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       await supabase
         .from('vehicle_sale_settings')
         .upsert({ vehicle_id: vehicle.id, display_price_mode: mode, updated_at: new Date().toISOString() } as any, { onConflict: 'vehicle_id' });
-    } catch (e) {
-      console.debug('Display mode persistence skipped/failed:', e);
+    } catch {
+      // Display mode persistence failed silently
     }
   };
 
@@ -1267,8 +1267,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           display_responsible_custom: typeof custom === 'string' ? custom : responsibleCustom,
           updated_at: new Date().toISOString()
         } as any, { onConflict: 'vehicle_id' });
-    } catch (e) {
-      console.debug('Responsible mode persistence skipped/failed:', e);
+    } catch {
+      // Responsible mode persistence failed silently
     }
   };
 
