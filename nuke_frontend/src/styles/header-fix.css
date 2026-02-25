@@ -28,7 +28,7 @@
   padding: 0 8px;
   display: grid;
   align-items: center;
-  /* 8% Marque | 2% spacer | (remaining, ~80%) agent | 2% spacer | >=8% capsule (can grow) */
+  /* 8% Nuke | 2% spacer | (remaining, ~80%) agent | 2% spacer | >=8% capsule (can grow) */
   grid-template-columns: 8% 2% minmax(0, 1fr) 2% minmax(8%, max-content);
   height: 40px;
   box-sizing: border-box;
@@ -36,9 +36,9 @@
 
 /* ============================================================================
    3-COLUMN HEADER LAYOUT (with fixed proportional spacers)
-   Target: 8% Marque, 2% space, 80% agent input, 2% space, 8% capsule
+   Target: 8% Nuke, 2% space, 80% agent input, 2% space, 8% capsule
    Notes:
-   - Marque dropdown is a popup, so opening it should not affect layout.
+   - Nuke dropdown is a popup, so opening it should not affect layout.
    - capsule can expand; when it does, it steals space from the agent input.
    ============================================================================ */
 

@@ -19,7 +19,7 @@ const LS_KEY = 'nuke_hub_tab';
 
 function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   const navigate = useNavigate();
-  usePageTitle('Marque');
+  usePageTitle('Nuke');
 
   return (
     <div style={{
@@ -43,7 +43,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           margin: '0 0 16px',
           color: '#fff',
         }}>
-          Marque
+          Nuke
         </h1>
         <p style={{
           fontSize: 'clamp(14px, 2.5vw, 18px)',
@@ -119,7 +119,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           { title: 'Vehicle Identity', desc: 'Canonical profiles built from every data source — auction results, service records, photos, VIN decodes.' },
           { title: 'Market Data', desc: 'Real-time pricing across BaT, eBay, Craigslist, Hagerty, and dozens more platforms.' },
           { title: 'Deal Scoring', desc: 'Instant valuation estimates and deal scores so you know if a listing is priced right.' },
-          { title: 'API & SDK', desc: 'Programmatic access to vehicle data. Build your own tools on top of the Marque dataset.' },
+          { title: 'API & SDK', desc: 'Programmatic access to vehicle data. Build your own tools on top of the Nuke dataset.' },
         ].map((feature) => (
           <div key={feature.title} style={{
             padding: '20px 16px',

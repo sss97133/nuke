@@ -26,7 +26,7 @@ export function usePageTitle(title: string | (() => string)) {
   useEffect(() => {
     const resolvedTitle = typeof title === 'function' ? title() : title;
     if (resolvedTitle) {
-      document.title = `${resolvedTitle} | Marque`;
+      document.title = `${resolvedTitle} | Nuke`;
     }
     // Canonical URL: use nuke.ag for vehicle profile so QR codes and share links always point to the main site
     let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
@@ -102,14 +102,14 @@ export function getTitleFromRoute(pathname: string): string {
   const segments = pathname.split('/').filter(Boolean);
   
   if (segments.length === 0) {
-    return 'Marque';
+    return 'Nuke';
   }
 
   const [first, second, third] = segments;
 
   // Homepage
   if (first === '' || first === undefined) {
-    return 'Marque';
+    return 'Nuke';
   }
 
   // Vehicle routes

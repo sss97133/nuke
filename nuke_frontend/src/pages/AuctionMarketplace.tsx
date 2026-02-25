@@ -435,7 +435,7 @@ export default function AuctionMarketplace() {
           // Show rows that are explicitly active OR have a future end_date.
           .or(`listing_status.eq.active,end_date.gt.${nowIso}`);
 
-      // 1. Load native vehicle_listings (Marque auctions)
+      // 1. Load native vehicle_listings (Nuke auctions)
       const { data: nativeListings, error: nativeError } = await runWithVehicleFallback(runNativeQuery);
 
       if (!nativeError && nativeListings) {

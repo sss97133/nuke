@@ -133,7 +133,7 @@ const FeedTableView: React.FC<FeedTableViewProps> = ({
                   />
                 ) : (
                   <div style={{ width: 'min(100px, 15vw)', height: 'min(60px, 9vw)', background: 'var(--grey-200)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src="/nuke.png" alt="Marque" style={{ width: '60%', opacity: 0.3, objectFit: 'contain' }} />
+                    <img src="/nuke.png" alt="Nuke" style={{ width: '60%', opacity: 0.3, objectFit: 'contain' }} />
                   </div>
                 )}
               </td>

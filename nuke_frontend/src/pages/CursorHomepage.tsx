@@ -26,7 +26,7 @@ import { normalizeSupabaseStorageUrl, cleanDisplayMake, cleanDisplayModel } from
 import { DEFAULT_FILTERS, getRememberFilters, loadSavedFilters, saveFiltersToStorage, clearPersistedFiltersAndSort, STORAGE_KEY, REMEMBER_FILTERS_KEY, LOCATION_FAVORITES_KEY } from '../lib/filterPersistence';
 
 const CursorHomepage: React.FC = () => {
-  usePageTitle('Marque');
+  usePageTitle('Nuke');
   const [feedVehicles, setFeedVehicles] = useState<HypeVehicle[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<HypeVehicle[]>([]);
   const [loading, setLoading] = useState(true);

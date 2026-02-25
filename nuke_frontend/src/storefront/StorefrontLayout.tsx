@@ -137,7 +137,7 @@ export default function StorefrontLayout({ organization, children }: Props) {
               </a>
             )}
             <span style={{ color: 'var(--text-disabled)' }}>
-              Powered by <a href="https://nuke.ag" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Marque</a>
+              Powered by <a href="https://nuke.ag" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Nuke</a>
             </span>
           </div>
         </div>

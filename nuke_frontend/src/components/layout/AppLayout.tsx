@@ -45,7 +45,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [orgNavPath, setOrgNavPath] = useState<string>('/org');
-  const [marqueMenuOpen, setMarqueMenuOpen] = useState(false);
+  const [marqueMenuOpen, setNukeMenuOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -198,7 +198,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('[data-marque-menu]')) {
-        setMarqueMenuOpen(false);
+        setNukeMenuOpen(false);
         setVehiclesSubMenuOpen(false);
         setVehicleSearch('');
       }
@@ -385,13 +385,13 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       {/* Main Navigation Header */}
       <div className="header-wrapper" ref={headerWrapperRef}>
         <div className="header-content">
-          {/* Marque button (dropdown is popup so doesn't affect layout) */}
+          {/* Nuke button (dropdown is popup so doesn't affect layout) */}
           <div className="header-slot-left">
             <div className="header-left">
-              {/* Marque Expandable Menu */}
+              {/* Nuke Expandable Menu */}
               <div style={{ position: 'relative' }} data-marque-menu>
                 <button
-                  onClick={() => setMarqueMenuOpen(!marqueMenuOpen)}
+                  onClick={() => setNukeMenuOpen(!marqueMenuOpen)}
                   aria-expanded={marqueMenuOpen}
                   aria-haspopup="true"
                   className={`nav-link ${marqueMenuOpen ? 'active' : ''}`}
@@ -405,7 +405,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                     gap: '4px'
                   }}
                 >
-                  <span>Marque</span>
+                  <span>Nuke</span>
                   <span style={{ fontSize: '7pt' }}>{marqueMenuOpen ? '▼' : '▶'}</span>
                 </button>
 
@@ -458,23 +458,23 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       <span style={{ fontSize: '7pt', marginLeft: '8px' }}>▶</span>
                     </button>
                     )}
-                    <Link to="/search" className={`nav-link ${isActivePage('/search') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Search</Link>
-                    <Link to="/auctions" className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Auctions</Link>
-                    <Link to={orgNavPath} className={`nav-link ${isActivePage('/org') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Organizations</Link>
+                    <Link to="/search" className={`nav-link ${isActivePage('/search') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>Search</Link>
+                    <Link to="/auctions" className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>Auctions</Link>
+                    <Link to={orgNavPath} className={`nav-link ${isActivePage('/org') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>Organizations</Link>
                     {session && (
                     <>
-                    <Link to="/pipeline" className={`nav-link ${isActivePage('/pipeline') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Acquisitions</Link>
-                    <Link to="/invoices" className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Invoices</Link>
-                    <Link to="/restoration" className={`nav-link ${isActivePage('/restoration') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Restoration Intake</Link>
+                    <Link to="/pipeline" className={`nav-link ${isActivePage('/pipeline') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>Acquisitions</Link>
+                    <Link to="/invoices" className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>Invoices</Link>
+                    <Link to="/restoration" className={`nav-link ${isActivePage('/restoration') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>Restoration Intake</Link>
                     </>
                     )}
-                    <Link to="/market" className={`nav-link ${isActivePage('/market') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Market</Link>
-                    <Link to="/predictions" className={`nav-link ${isActivePage('/predictions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>Predictions</Link>
+                    <Link to="/market" className={`nav-link ${isActivePage('/market') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>Market</Link>
+                    <Link to="/predictions" className={`nav-link ${isActivePage('/predictions') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>Predictions</Link>
                     <div style={{ borderTop: '2px solid var(--border)', marginTop: '2px' }} />
-                    <Link to="/api" className={`nav-link ${isActivePage('/api') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>API</Link>
-                    <Link to="/developers" className={`nav-link ${isActivePage('/developers') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>SDK Docs</Link>
-                    <a href="https://www.npmjs.com/package/@nuke1/sdk" target="_blank" rel="noopener noreferrer" className="nav-link" style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setMarqueMenuOpen(false)}>NPM Package</a>
-                    <Link to="/offering" className={`nav-link ${isActivePage('/offering') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', color: '#e8c547' }} onClick={() => setMarqueMenuOpen(false)}>Deck</Link>
+                    <Link to="/api" className={`nav-link ${isActivePage('/api') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>API</Link>
+                    <Link to="/developers" className={`nav-link ${isActivePage('/developers') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>SDK Docs</Link>
+                    <a href="https://www.npmjs.com/package/@nuke1/sdk" target="_blank" rel="noopener noreferrer" className="nav-link" style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={() => setNukeMenuOpen(false)}>NPM Package</a>
+                    <Link to="/offering" className={`nav-link ${isActivePage('/offering') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', color: '#e8c547' }} onClick={() => setNukeMenuOpen(false)}>Deck</Link>
                   </div>
 
                   {/* Vehicles panel - pops out to the RIGHT */}
@@ -543,7 +543,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                               <button
                                 key={v.id}
                                 onClick={() => {
-                                  setMarqueMenuOpen(false);
+                                  setNukeMenuOpen(false);
                                   setVehiclesSubMenuOpen(false);
                                   setVehicleSearch('');
                                   navigate(`/vehicle/${v.id}`, { state: { vehicleTitle: v.title } });
@@ -587,7 +587,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       <Link
                         to="/vehicles"
                         onClick={() => {
-                          setMarqueMenuOpen(false);
+                          setNukeMenuOpen(false);
                           setVehiclesSubMenuOpen(false);
                           setVehicleSearch('');
                         }}
@@ -820,14 +820,14 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         <Link
           to="/"
           className={`mobile-bottom-nav-item ${location.pathname === '/' ? 'active' : ''}`}
-          onClick={() => setMarqueMenuOpen(false)}
+          onClick={() => setNukeMenuOpen(false)}
         >
           Home
         </Link>
         <Link
           to="/capture"
           className={`mobile-bottom-nav-item ${location.pathname === '/capture' ? 'active' : ''}`}
-          onClick={() => setMarqueMenuOpen(false)}
+          onClick={() => setNukeMenuOpen(false)}
           aria-label="Add vehicle"
         >
           +
@@ -835,7 +835,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         <Link
           to="/profile"
           className={`mobile-bottom-nav-item ${location.pathname.startsWith('/profile') ? 'active' : ''}`}
-          onClick={() => setMarqueMenuOpen(false)}
+          onClick={() => setNukeMenuOpen(false)}
         >
           Profile
         </Link>
@@ -847,7 +847,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       {/* Footer */}
       <footer className="app-footer">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'center', fontSize: '8pt' }}>
-          <span>Marque © 2026</span>
+          <span>Nuke © 2026</span>
           <Link to="/about" style={{ color: 'inherit', textDecoration: 'underline' }}>About</Link>
           <Link to="/privacy" style={{ color: 'inherit', textDecoration: 'underline' }}>Privacy Policy</Link>
           <Link to="/terms" style={{ color: 'inherit', textDecoration: 'underline' }}>Terms of Service</Link>
