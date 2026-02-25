@@ -20,13 +20,13 @@ interface Transaction {
 }
 
 const TRANSACTION_TYPES: Record<string, { label: string; icon: React.ComponentType; color: string }> = {
-  purchase: { label: 'Purchase', icon: FiDollarSign, color: 'blue' },
-  sale: { label: 'Sale', icon: FiDollarSign, color: 'green' },
+  purchase: { label: 'Purchase', icon: DollarSign, color: 'blue' },
+  sale: { label: 'Sale', icon: DollarSign, color: 'green' },
   appraisal: { label: 'Appraisal', icon: TrendingUp, color: 'purple' },
   market_value_update: { label: 'Market Value', icon: TrendingUp, color: 'indigo' },
-  insurance_valuation: { label: 'Insurance', icon: FiDollarSign, color: 'yellow' },
-  trade: { label: 'Trade', icon: FiDollarSign, color: 'orange' },
-  auction: { label: 'Auction', icon: FiDollarSign, color: 'red' }
+  insurance_valuation: { label: 'Insurance', icon: DollarSign, color: 'yellow' },
+  trade: { label: 'Trade', icon: DollarSign, color: 'orange' },
+  auction: { label: 'Auction', icon: DollarSign, color: 'red' }
 };
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) => {
@@ -119,7 +119,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
           <div className="space-y-4">
             {transactions.map((transaction, index) => {
               const config = TRANSACTION_TYPES[transaction.transaction_type || 'purchase'] || TRANSACTION_TYPES.purchase;
-              const Icon = config?.icon || FiDollarSign;
+              const Icon = config?.icon || DollarSign;
               const isFirst = index === 0;
               const isLast = index === transactions.length - 1;
 
