@@ -197,6 +197,86 @@ async function scrapeMultipleLocations(
 /**
  * Test the scraper with a single location
  */
+/**
+ * Fetch marketplace listings via GraphQL API using lsd token
+ * Works from any IP since it's an authenticated API call
+ */
+async function fetchListingsViaGraphQL(
+  locationSlug: string,
+  lat: number,
+  lng: number,
+  lsd: string,
+  yearMin = 1960,
+  yearMax = 1999,
+  cursor: string | null = null
+): Promise<any[]> {
+  const variables = {
+    buyLocation: { latitude: lat, longitude: lng },
+    categoryIDArray: [807311116002614],
+    contextual_data: [],
+    count: 24,
+    cursor,
+    marketplaceBrowseContext: "CATEGORY_FEED",
+    numericVerticalFields: [],
+    numericVerticalFieldsBetween: [{ max: yearMax, min: yearMin, name: "year" }],
+    priceRange: [0, 214748364700],
+    radius: 65000,
+    scale: 2,
+    stringVerticalFields: [],
+    topicPageParams: { location_id: locationSlug, url: "vehicles" },
+  };
+
+  const body = new URLSearchParams({
+    doc_id: "33269364996041474",
+    variables: JSON.stringify(variables),
+    lsd,
+    __a: "1",
+    __comet_req: "15",
+    server_timestamps: "true",
+  });
+
+  const resp = await fetch("https://www.facebook.com/api/graphql/", {
+    method: "POST",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "*/*",
+      "Origin": "https://www.facebook.com",
+      "Referer": `https://www.facebook.com/marketplace/${locationSlug}/vehicles/`,
+      "sec-fetch-site": "same-origin",
+      "sec-fetch-mode": "cors",
+      "x-fb-lsd": lsd,
+    },
+    body: body.toString(),
+  });
+
+  if (!resp.ok) return [];
+
+  const text = await resp.text();
+  let json: any = null;
+  try { json = JSON.parse(text); } catch {}
+
+  // Log the raw response for debugging
+  console.log("GraphQL status:", resp.status);
+  console.log("GraphQL response (first 1000):", text.slice(0, 1000));
+
+  const edges = json?.data?.marketplace_search?.feed_units?.edges || [];
+  return {
+    listings: edges
+      .map((e: any) => e.node?.listing)
+      .filter((l: any) => l && l.marketplace_listing_title),
+    debug: {
+      status: resp.status,
+      response_preview: text.slice(0, 500),
+      has_data: !!json?.data,
+      has_errors: !!json?.errors,
+      errors: json?.errors?.slice(0, 2),
+      edge_count: edges.length,
+      data_keys: json?.data ? Object.keys(json.data) : [],
+    }
+  };
+}
+
 async function testScraper(location: string): Promise<Response> {
   console.log(`Testing scraper on: ${location}`);
 
@@ -210,6 +290,16 @@ async function testScraper(location: string): Promise<Response> {
     const priceMatches = html.match(/"amount_with_offset_in_currency":"[0-9]+"/g) || [];
     const idMatches = html.match(/"id":"[0-9]{10,}"/g) || [];
 
+    // Try to get lsd token for GraphQL calls
+    const lsdMatch = html.match(/"LSD"[^}]{0,30}"token":"([^"]+)"/);
+    const lsd = lsdMatch?.[1] || null;
+
+    let graphqlResult: any = { listings: [], debug: null };
+    if (lsd) {
+      // Use GraphQL API instead of HTML parsing
+      graphqlResult = await fetchListingsViaGraphQL(location, 30.2672, -97.7431, lsd) || { listings: [], debug: null };
+    }
+
     const listings = extractListings(html);
     const vintage = listings.filter((l) => l.year && l.year >= 1960 && l.year <= 1999);
 
@@ -217,11 +307,21 @@ async function testScraper(location: string): Promise<Response> {
       success: true,
       location,
       html_size_kb: (html.length / 1024).toFixed(1),
+      lsd_found: !!lsd,
+      lsd_value: lsd?.slice(0, 20),
       raw_patterns: {
         titles: titleMatches.length,
         prices: priceMatches.length,
         ids: idMatches.length,
       },
+      graphql_listings: graphqlResult.listings.length,
+      graphql_debug: graphqlResult.debug,
+      graphql_sample: graphqlResult.listings.slice(0, 5).map((l: any) => ({
+        title: l.marketplace_listing_title,
+        price: l.listing_price?.amount,
+        city: l.location?.reverse_geocode?.city,
+        id: l.id,
+      })),
       parsed_listings: listings.length,
       vintage_count: vintage.length,
       sample_listings: listings.slice(0, 10).map((l) => ({
