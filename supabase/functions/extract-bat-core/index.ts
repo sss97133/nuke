@@ -1668,7 +1668,7 @@ serve(async (req) => {
         try {
           const { data: existingRows, error: existingErr } = await supabase
             .from("vehicle_images")
-            .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate")
+            .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate, file_hash")
             .eq("vehicle_id", vehicleId)
             // Keep parity with gallery filters
             .not("is_document", "is", true)
@@ -1695,10 +1695,13 @@ serve(async (req) => {
           };
 
           const byKey = new Map<string, any>();
+          const existingFileHashes = new Set<string>();
           for (const r of existing) {
             const k = keyFromRow(r);
             if (!k) continue;
             if (!byKey.has(k)) byKey.set(k, r);
+            const fh = String((r as any)?.file_hash || "").trim();
+            if (fh) existingFileHashes.add(fh);
           }
 
           const updates: any[] = [];
@@ -1707,6 +1710,8 @@ serve(async (req) => {
 
           for (let idx = 0; idx < cleanedImages.length; idx++) {
             const imgUrl = cleanedImages[idx];
+            // Reject non-web URLs (file://, ftp://, blob:, etc.)
+            if (!/^https?:\/\//i.test(imgUrl)) continue;
             const k = imgUrl.toLowerCase();
             const row = byKey.get(k);
 
@@ -1795,7 +1800,61 @@ serve(async (req) => {
             if (upErr) console.warn(`vehicle_images provenance upsert failed (non-fatal): ${upErr.message}`);
           }
 
-          if (inserts.length > 0) {
+          // Content-hash dedup: fetch + hash new images to catch duplicates with different URLs
+          if (inserts.length > 0 && existingFileHashes.size > 0) {
+            try {
+              const HASH_CONCURRENCY = 5;
+              const dedupedInserts: typeof inserts = [];
+              for (let i = 0; i < inserts.length; i += HASH_CONCURRENCY) {
+                const batch = inserts.slice(i, i + HASH_CONCURRENCY);
+                const results = await Promise.allSettled(
+                  batch.map(async (ins) => {
+                    try {
+                      const resp = await fetch(ins.image_url, {
+                        signal: AbortSignal.timeout(8000),
+                        headers: { "Accept": "image/*" },
+                      });
+                      if (!resp.ok || !resp.body) return { insert: ins, hash: null };
+                      const bytes = new Uint8Array(await resp.arrayBuffer());
+                      if (bytes.length < 100) return { insert: ins, hash: null }; // too small
+                      const hash = await sha256Hex(new TextDecoder().decode(bytes));
+                      return { insert: ins, hash };
+                    } catch {
+                      return { insert: ins, hash: null };
+                    }
+                  })
+                );
+                for (const r of results) {
+                  if (r.status !== "fulfilled") continue;
+                  const { insert: ins, hash } = r.value;
+                  if (hash && existingFileHashes.has(hash)) {
+                    console.log(`Content-hash dedup: skipping duplicate image ${ins.image_url.substring(0, 60)}...`);
+                    continue;
+                  }
+                  if (hash) {
+                    ins.file_hash = hash;
+                    existingFileHashes.add(hash); // prevent intra-batch dupes
+                  }
+                  dedupedInserts.push(ins);
+                }
+              }
+              if (dedupedInserts.length > 0) {
+                const { error: insErr } = await supabase
+                  .from("vehicle_images")
+                  .insert(dedupedInserts);
+                if (insErr) console.warn(`vehicle_images insert failed (non-fatal): ${insErr.message}`);
+              }
+              if (dedupedInserts.length < inserts.length) {
+                console.log(`Content-hash dedup: removed ${inserts.length - dedupedInserts.length} duplicate images`);
+              }
+            } catch (hashErr: any) {
+              console.warn(`Content-hash dedup failed (falling back to direct insert): ${hashErr?.message}`);
+              const { error: insErr } = await supabase
+                .from("vehicle_images")
+                .insert(inserts);
+              if (insErr) console.warn(`vehicle_images insert failed (non-fatal): ${insErr.message}`);
+            }
+          } else if (inserts.length > 0) {
             const { error: insErr } = await supabase
               .from("vehicle_images")
               .insert(inserts);
@@ -1975,7 +2034,7 @@ serve(async (req) => {
         (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
       const batListingPayload: any = {
         vehicle_id: vehicleId,
-        bat_listing_url: listingUrlCanonical.endsWith('/') ? listingUrlCanonical : `${listingUrlCanonical}/`,
+        bat_listing_url: canonicalUrl(listingUrlCanonical),
         bat_lot_number: essentials.lot_number || null,
         bat_listing_title: identity.title || null,
         auction_end_date: essentials.auction_end_date || null,

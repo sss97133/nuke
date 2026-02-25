@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
     // Get current vehicle data to avoid overwriting user-entered data
     const { data: currentVehicle } = await supabase
       .from('vehicles')
-      .select('make, model, year, engine_size, transmission, drivetrain, body_style, doors, fuel_type')
+      .select('make, model, year, engine_size, transmission, drivetrain, body_style, doors, fuel_type, data_quality_flags')
       .eq('id', vehicle_id)
       .maybeSingle()
 
@@ -176,11 +176,61 @@ Deno.serve(async (req) => {
       throw new Error(`Vehicle not found: ${vehicle_id}`)
     }
 
+    // VIN CROSS-VALIDATION: Detect conflicts between NHTSA data and existing vehicle data
+    // If existing fields conflict with VIN decode, flag instead of silently filling
+    const conflicts: Record<string, { existing: string, nhtsa: string }> = {}
+    const normStr = (s: any) => String(s || '').trim().toLowerCase()
+
+    if (currentVehicle?.make && decoded.make && normStr(currentVehicle.make) !== normStr(decoded.make)) {
+      // Allow known aliases (e.g., "Chevrolet" vs "Chevy")
+      const makeAliases: Record<string, string[]> = {
+        'chevrolet': ['chevy'], 'mercedes-benz': ['mercedes', 'mb'],
+        'volkswagen': ['vw'], 'bmw': ['bayerische motoren werke'],
+      }
+      const existNorm = normStr(currentVehicle.make)
+      const nhtsaNorm = normStr(decoded.make)
+      const isAlias = Object.entries(makeAliases).some(([canonical, aliases]) =>
+        (existNorm === canonical && aliases.includes(nhtsaNorm)) ||
+        (nhtsaNorm === canonical && aliases.includes(existNorm))
+      )
+      if (!isAlias) {
+        conflicts.make = { existing: currentVehicle.make, nhtsa: decoded.make }
+      }
+    }
+    if (currentVehicle?.year && decoded.year && currentVehicle.year !== decoded.year) {
+      conflicts.year = { existing: String(currentVehicle.year), nhtsa: String(decoded.year) }
+    }
+
+    // If conflicts detected, flag the vehicle and do NOT apply conflicting fields
+    if (Object.keys(conflicts).length > 0) {
+      console.warn(`VIN CONFLICT for vehicle ${vehicle_id}: ${JSON.stringify(conflicts)}`)
+
+      const existingFlags = (currentVehicle?.data_quality_flags && typeof currentVehicle.data_quality_flags === 'object')
+        ? currentVehicle.data_quality_flags : {}
+      const updatedFlags = {
+        ...(existingFlags as any),
+        vin_conflicts: {
+          vin,
+          conflicts,
+          flagged_at: new Date().toISOString(),
+          nhtsa_decoded: decoded,
+        },
+      }
+
+      await supabase
+        .from('vehicles')
+        .update({ data_quality_flags: updatedFlags, updated_at: new Date().toISOString() })
+        .eq('id', vehicle_id)
+
+      console.log(`Flagged vehicle ${vehicle_id} with VIN conflicts - not applying conflicting fields`)
+    }
+
     // Only update fields that are empty (don't overwrite existing data)
+    // AND skip fields that have conflicts
     const updates: any = {}
-    if (!currentVehicle?.make && decoded.make) updates.make = decoded.make
+    if (!currentVehicle?.make && decoded.make && !conflicts.make) updates.make = decoded.make
     if (!currentVehicle?.model && decoded.model) updates.model = decoded.model
-    if (!currentVehicle?.year && decoded.year) updates.year = decoded.year
+    if (!currentVehicle?.year && decoded.year && !conflicts.year) updates.year = decoded.year
     if (!currentVehicle?.engine_size && decoded.engine_size) updates.engine_size = decoded.engine_size
     if (!currentVehicle?.transmission && decoded.transmission) updates.transmission = decoded.transmission
     if (!currentVehicle?.drivetrain && decoded.drivetrain) updates.drivetrain = decoded.drivetrain
@@ -231,7 +281,10 @@ Deno.serve(async (req) => {
         success: true,
         vin,
         decoded_fields: Object.keys(updates),
-        message: `Decoded ${Object.keys(updates).length} fields`
+        conflicts: Object.keys(conflicts).length > 0 ? conflicts : undefined,
+        message: Object.keys(conflicts).length > 0
+          ? `Decoded ${Object.keys(updates).length} fields, ${Object.keys(conflicts).length} conflicts flagged`
+          : `Decoded ${Object.keys(updates).length} fields`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
