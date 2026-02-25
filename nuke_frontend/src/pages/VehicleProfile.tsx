@@ -55,7 +55,6 @@ import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 import VehicleAuctionQuickStartCard from '../components/auction/VehicleAuctionQuickStartCard';
 // Lazy load heavy components to avoid circular dependencies
 const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
-// VehicleProfileTabs removed - using curated layout instead
 import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 import type { Session } from '@supabase/supabase-js';
 import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
@@ -437,8 +436,8 @@ const VehicleProfile: React.FC = () => {
               }
               if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
             }
-          } catch (e) {
-            console.debug('[VehicleProfile] carsandbids fallback listing images skipped:', e);
+          } catch {
+            // carsandbids fallback listing images skipped
           }
 
           return;
@@ -468,8 +467,8 @@ const VehicleProfile: React.FC = () => {
           }
           if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
         }
-      } catch (e) {
-        console.debug('[VehicleProfile] fallback listing images skipped:', e);
+      } catch {
+        // fallback listing images skipped
       }
     })();
     // Intentionally omit leadImageUrl to avoid re-fetch loops; we set it opportunistically.
@@ -898,7 +897,7 @@ const VehicleProfile: React.FC = () => {
     if (!(isRowOwner || isVerifiedOwner || hasContributorAccess)) return;
     expertAnalysisRunningRef.current = true;
     try {
-      console.info('[VehicleProfile] Triggering vehicle-expert-agent for', vehId);
+      // Trigger vehicle-expert-agent
       const { error } = await supabase.functions.invoke('vehicle-expert-agent', {
         body: { vehicleId: vehId }
       });
@@ -2105,8 +2104,8 @@ const VehicleProfile: React.FC = () => {
           setViewCount(prev => prev + 1);
         }
       }
-    } catch (error) {
-      console.debug('Error recording view:', error);
+    } catch {
+      // View recording failed silently
     }
   };
 
@@ -2125,8 +2124,7 @@ const VehicleProfile: React.FC = () => {
         // Fallback to vehicle.view_count if table doesn't exist
         setViewCount(vehicle?.view_count || 0);
       }
-    } catch (error) {
-      console.debug('Error loading view count:', error);
+    } catch {
       setViewCount(vehicle?.view_count || 0);
     }
   };
@@ -3594,16 +3592,6 @@ const VehicleProfile: React.FC = () => {
     );
   }
   
-  // Debug ownership check (only in development)
-  if (process.env.NODE_ENV === 'development') {
-    console.debug('Permissions:', {
-      isVerifiedOwner,
-      hasContributorAccess,
-      contributorRole,
-      canCreateAgreements: contributorRole === 'consigner' || isVerifiedOwner
-    });
-  }
-
   // readinessScore removed - was computed but never used in render
 
   const renderWorkspaceContent = () => {
