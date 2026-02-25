@@ -266,7 +266,7 @@ export default function TechCapture() {
   if (!user) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'monospace', color: '#9ca3af' }}>
-        <div style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>Marque</div>
+        <div style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>Nuke</div>
         <div>Sign in to start capturing</div>
       </div>
     );
@@ -292,7 +292,7 @@ export default function TechCapture() {
         borderBottom: '1px solid #333',
       }}>
         <div style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-          Marque
+          Nuke
         </div>
         <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
           {events.filter(e => e.status === 'processing').length > 0 && (

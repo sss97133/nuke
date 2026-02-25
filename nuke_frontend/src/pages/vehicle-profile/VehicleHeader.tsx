@@ -3899,7 +3899,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       Is this you?
                     </p>
                     <ol style={{ margin: '0 0 8px 0', paddingLeft: '16px', fontSize: '7pt' }}>
-                      <li style={{ marginBottom: '4px' }}>Login or create a Marque account</li>
+                      <li style={{ marginBottom: '4px' }}>Login or create a Nuke account</li>
                       <li style={{ marginBottom: '4px' }}>Link your BaT username</li>
                       <li style={{ marginBottom: '4px' }}>Claim ownership of this vehicle</li>
                     </ol>

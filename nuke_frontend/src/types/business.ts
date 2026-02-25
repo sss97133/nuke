@@ -742,7 +742,7 @@ export const ENTITY_TYPES: { value: EntityType; label: string; category: string 
   { value: 'heritage_division', label: 'Heritage Division', category: 'Manufacturer' },
   { value: 'importer_distributor', label: 'Importer/Distributor', category: 'Manufacturer' },
   // Association
-  { value: 'marque_club', label: 'Marque Club', category: 'Association' },
+  { value: 'marque_club', label: 'Nuke Club', category: 'Association' },
   { value: 'club', label: 'Club', category: 'Association' },
   { value: 'registry', label: 'Registry', category: 'Association' },
   { value: 'concours', label: 'Concours/Event', category: 'Association' },

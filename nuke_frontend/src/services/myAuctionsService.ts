@@ -106,7 +106,7 @@ export class MyAuctionsService {
       const orgRoleById = new Map(orgMemberships.map(m => [m.organization_id, m.role]));
       const orgNameById = new Map(orgMemberships.map(m => [m.organization_id, m.organization_name].filter(Boolean) as [string, string]));
 
-      // 1. Native Marque listings
+      // 1. Native Nuke listings
       const { data: nativeListings, error: nativeError } = await supabase
         .from('vehicle_listings')
         .select(`

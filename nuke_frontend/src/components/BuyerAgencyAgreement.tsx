@@ -348,7 +348,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
       <div className="card-header">
         <h2 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>Buyer Agency Agreement</h2>
         <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Authorize Marque to bid on your behalf at external auctions
+          Authorize Nuke to bid on your behalf at external auctions
         </p>
       </div>
 
@@ -408,7 +408,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
 
               <p><strong>1. Appointment as Agent</strong></p>
               <p style={{ marginBottom: '12px' }}>
-                By signing this agreement, you ("Buyer") appoint Marque ("Agent") as your exclusive
+                By signing this agreement, you ("Buyer") appoint Nuke ("Agent") as your exclusive
                 buyer's agent for the purpose of bidding on and purchasing vehicles at external
                 auction platforms including but not limited to Bring a Trailer, Cars & Bids,
                 RM Sotheby's, Gooding & Company, and other online and in-person auctions.
@@ -493,7 +493,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
               />
               <span style={{ fontSize: '9pt' }}>
                 I have read and agree to the terms and conditions of this Buyer Agency Agreement.
-                I understand that Marque will act as my agent for bidding on external auctions
+                I understand that Nuke will act as my agent for bidding on external auctions
                 and that I am responsible for a risk-adjusted commission based on the schedule above.
               </span>
             </label>
