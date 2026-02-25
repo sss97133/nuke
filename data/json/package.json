@@ -22,7 +22,7 @@
     "@anthropic-ai/sdk": "^0.62.0",
     "@supabase/supabase-js": "^2.57.4",
     "@types/papaparse": "^5.3.16",
-    "aws-sdk": "^2.1692.0",
+    "aws-sdk": "^2.1693.0",
     "dotenv": "^17.2.2",
     "exifreader": "^4.32.0",
     "node-fetch": "^3.3.2",
