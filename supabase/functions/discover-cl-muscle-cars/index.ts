@@ -171,7 +171,7 @@ serve(async (req) => {
         for (const search of searchTermsToUse) {
           try {
             // CL search URL: cars+trucks, sort by date, year range 1958-1973
-            const searchUrl = `https://${region}.craigslist.org/search/cta?query=${encodeURIComponent(search.term)}&sort=date&min_auto_year=1958&max_auto_year=1973`;
+            const searchUrl = `https://${region}.craigslist.org/search/cto?query=${encodeURIComponent(search.term)}&sort=date&min_auto_year=1958&max_auto_year=1973`;
 
             stats.searches_performed++;
 
@@ -198,11 +198,11 @@ serve(async (req) => {
 
               // Regex-only parsing (no DOM parser - too slow for edge functions)
               // Extract listing URLs from CL search results HTML
-              const urlPattern = /https?:\/\/[a-z]+\.craigslist\.org\/[a-z]{2,4}\/ct[aod]\/d\/[^"'\s<>]+\.html/g;
+              const urlPattern = /https?:\/\/[a-z]+\.craigslist\.org\/[a-z]{2,4}\/cto\/d\/[^"'\s<>]+\.html/g;
               const urlMatches = html.match(urlPattern) || [];
 
               // Also try relative URLs
-              const relPattern = /href="(\/[a-z]{2,4}\/ct[aod]\/d\/[^"]+\.html)"/g;
+              const relPattern = /href="(\/[a-z]{2,4}\/cto\/d\/[^"]+\.html)"/g;
               let relMatch;
               while ((relMatch = relPattern.exec(html)) !== null) {
                 urlMatches.push(`https://${region}.craigslist.org${relMatch[1]}`);
@@ -292,6 +292,7 @@ serve(async (req) => {
           price: l.price,
           priority: l.priority,
           discovered_by: 'discover-cl-muscle-cars',
+          seller_type: l.url.includes('/cto/') ? 'owner' : l.url.includes('/ctd/') ? 'dealer' : 'unknown',
         },
       }));
 
