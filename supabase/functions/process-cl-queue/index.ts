@@ -218,6 +218,18 @@ serve(async (req) => {
 
     console.log(`📋 Processing ${queueItems.length} listings from queue...`)
 
+    // Load active blocklist once per batch
+    const { data: blocklist } = await supabase
+      .from('seller_blocklist')
+      .select('fingerprint_type, fingerprint_value, reason')
+      .eq('active', true)
+    const blockedDomains = (blocklist || [])
+      .filter(b => b.fingerprint_type === 'domain')
+      .map(b => b.fingerprint_value.toLowerCase())
+    const blockedPhones = (blocklist || [])
+      .filter(b => b.fingerprint_type === 'phone')
+      .map(b => b.fingerprint_value)
+
     const stats = {
       processed: 0,
       created: 0,
@@ -371,6 +383,22 @@ serve(async (req) => {
               }
             }
           }
+        }
+
+        // Check against seller blocklist (domains in description, phones)
+        const descAndUrl = ((rawDesc || '') + ' ' + queueItem.listing_url).toLowerCase()
+        const blockedDomain = blockedDomains.find(d => descAndUrl.includes(d))
+        const blockedPhone = blockedPhones.find(p => descAndUrl.includes(p))
+        if (blockedDomain || blockedPhone) {
+          const match = blockedDomain || blockedPhone
+          await supabase.from('craigslist_listing_queue').update({
+            status: 'skipped',
+            error_message: `Blocked seller: ${match}`,
+            processed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }).eq('id', queueItem.id)
+          console.log(`  🚫 Blocked: ${match}`)
+          return { status: 'skipped' }
         }
 
         // Fall back to discovery hints (make_hint/model_hint stored in queue metadata)
