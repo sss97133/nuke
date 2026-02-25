@@ -38,6 +38,8 @@ export interface PipelineEntry {
       listing_fees_pct?: number;
     };
   } | null;
+  discovery_date: string | null;
+  stage_updated_at: string | null;
   created_at: string;
   updated_at: string;
 }
