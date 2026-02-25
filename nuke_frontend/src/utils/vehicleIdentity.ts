@@ -202,12 +202,13 @@ export function getVehicleIdentityTokens(
     model ? { kind: 'model', value: model } : null,
   ].filter(Boolean) as VehicleIdentityToken[];
 
-  // Skip series if it's already contained in model (avoids duplicate e.g. "K2500 Sierra Classic Sierra Classic")
+  // Skip series/trim if already contained in model (avoids "K2500 Sierra Classic Sierra Classic")
   const seriesIsRedundant = series && model && model.toLowerCase().includes(series.toLowerCase());
+  const trimIsRedundant = trim && model && model.toLowerCase().includes(trim.toLowerCase());
 
   const differentiatorsAll: VehicleIdentityToken[] = [
     series && !seriesIsRedundant ? { kind: 'series', value: series } : null,
-    trim ? { kind: 'trim', value: trim } : null,
+    trim && !trimIsRedundant ? { kind: 'trim', value: trim } : null,
     includeTransmission && transmissionDisplay ? { kind: 'transmission', value: transmissionDisplay } : null,
   ].filter(Boolean) as VehicleIdentityToken[];
 
