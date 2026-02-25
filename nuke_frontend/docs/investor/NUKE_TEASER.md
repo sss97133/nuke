@@ -1,4 +1,4 @@
-# PROJECT N-ZERO
+# PROJECT NUKE
 ## Executive Summary / Teaser
 
 **DRAFT - CONFIDENTIAL**
@@ -15,22 +15,22 @@ There are 43 million vehicles in the United States that function as stores of va
 
 ---
 
-### Key Figures (Live System - February 2026)
+### Key Figures (Live System - {{GENERATED_DATE}})
 
 | | |
 |---|---|
-| **Vehicles tracked** | 768,288 |
-| **Total transaction value tracked** | $41.6 billion |
-| **Vehicle images indexed** | 28.3 million |
-| **Auction comments processed** | 10.8 million |
-| **Valuation estimates generated** | 474,484 |
+| **Vehicles tracked** | {{VEHICLE_COUNT}} |
+| **Total transaction value tracked** | {{TOTAL_VALUE_B}} |
+| **Vehicle images indexed** | {{IMAGE_COUNT_M}} |
+| **Auction comments processed** | {{COMMENT_COUNT_M}} |
+| **Valuation estimates generated** | {{ESTIMATE_COUNT}} |
 | **Valuation accuracy (median error)** | 6.3% |
-| **Data sources (organizations)** | 491,605 identities across the ecosystem |
-| **Registered businesses** | 2,401 (dealers, auction houses, shops, collections) |
-| **Autonomous AI analyses** | 127,109 vehicles with sentiment scoring |
-| **Database** | 100 GB across 922 tables |
-| **Microservices** | 310 edge functions |
-| **Data freshness** | 97.8% updated within last 7 days |
+| **Data sources (organizations)** | {{IDENTITY_COUNT}} identities across the ecosystem |
+| **Registered businesses** | {{ORG_COUNT}} (dealers, auction houses, shops, collections) |
+| **Autonomous AI analyses** | {{ANALYSIS_COUNT}} vehicles with sentiment scoring |
+| **Database** | {{DB_SIZE_GB}} GB across {{TABLE_COUNT}} tables |
+| **Microservices** | {{EDGE_FUNCTION_COUNT}} edge functions |
+| **Data freshness** | {{DATA_FRESHNESS}} updated within last 7 days |
 
 ---
 
@@ -38,7 +38,7 @@ There are 43 million vehicles in the United States that function as stores of va
 
 Nuke is a vertically-integrated data platform:
 
-1. **Ingestion** - Three paths. **Agentic extraction** is primary: AI-driven pipelines that discover, fetch, and structure data from 80+ source types (auctions, forums, registries, shops, social media, government databases) with minimal human intervention; 310 microservices run continuously. **Traditional fallback tooling** (scheduled scrapers, APIs, Firecrawl) handles sources where agentic flows aren’t deployed yet. **User-driven ingestion**: users grant access via the app or by downloading our software and interact through text messaging; the system is fully agentic end-to-end—like a ClawdBot for car data. Users just give us access; we do the rest.
+1. **Ingestion** - Three paths. **Agentic extraction** is primary: AI-driven pipelines that discover, fetch, and structure data from 80+ source types (auctions, forums, registries, shops, social media, government databases) with minimal human intervention; {{EDGE_FUNCTION_COUNT}} microservices run continuously. **Traditional fallback tooling** (scheduled scrapers, APIs, Firecrawl) handles sources where agentic flows aren't deployed yet. **User-driven ingestion**: users grant access via the app or by downloading our software and interact through text messaging; the system is fully agentic end-to-end—like a ClawdBot for car data. Users just give us access; we do the rest.
 
 2. **Intelligence** - AI-powered analysis of every data point: sentiment scoring, valuation estimation, provenance verification, image classification. Every observation is immutable and confidence-scored.
 
@@ -54,7 +54,7 @@ Nuke is a vertically-integrated data platform:
 
 ### Proven Intelligence: Sentiment Predicts Value
 
-Our AI analysis of 100,711 vehicles with community sentiment data reveals a direct correlation:
+Our AI analysis of {{ANALYSIS_COUNT}} vehicles with community sentiment data reveals a direct correlation:
 
 | Community Sentiment | Median Sale Price |
 |---|---|
@@ -94,6 +94,7 @@ Nuke does not compete with existing players. It integrates with everyone via API
 | Dec 2025 | 9,697 | Pipeline activation |
 | Jan 2026 | 196,417 | Autonomous operation begins |
 | Feb 1-8, 2026 | 561,994 | Setting the foundation for autonomous |
+| Last 24 hours | {{DAILY_RATE}} | Ongoing autonomous ingestion |
 
 **Feb 1-8 we set the foundation for autonomous.** The platform added more vehicles in those 8 days than in all prior months combined; from that base, autonomous extraction scales without additional human capital.
 
@@ -115,9 +116,9 @@ We offer an **API** that plugs into any workflow—human or agent. The platform 
 
 **Skylar Williams** - Founder & CEO
 
-Sole founder and architect of Nuke Ltd and the Nuke platform. Designed and built the entire technology stack: 310 microservices, 922-table database architecture, proprietary ML pipeline (YONO), autonomous extraction coordinator (Ralph Wiggum), and production TypeScript SDK. The platform processes 8,320+ vehicles per day with zero additional headcount.
+Sole founder and architect of Nuke Ltd and the Nuke platform. Designed and built the entire technology stack: {{EDGE_FUNCTION_COUNT}} microservices, {{TABLE_COUNT}}-table database architecture, proprietary ML pipeline (YONO), autonomous extraction coordinator (Ralph Wiggum), and production TypeScript SDK. The platform processes {{DAILY_RATE}}+ vehicles per day with zero additional headcount.
 
-**Nuke Ltd** - Nevada corporation (2022). 676 Wells Rd, Boulder City, NV 89005. [nuke.ag](https://www.nuke.ag)
+**Nuke Ltd** - Nevada corporation (2025). 676 Wells Rd, Boulder City, NV 89005. [nuke.ag](https://www.nuke.ag)
 
 ---
 

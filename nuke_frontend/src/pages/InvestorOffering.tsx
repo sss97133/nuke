@@ -59,19 +59,107 @@ const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; content: stri
   },
 };
 
-// SHA-256 of access code - prevents casual extraction from JS bundle
-const ACCESS_CODE_SHA256 = '008e140c0a9b5d96d458d8a4563094610aeded3573772e5ed6c500b9b411b5bc';
+// SHA-256 hashes of valid access codes (lowercase-trimmed before hashing)
+const ACCESS_CODE_HASHES = new Set([
+  '223e688a072af23f80f45a69e03b55c2caecece716270767179933fd345e95ac', // 0915
+  'e9ab39f01d431c5250493a3dc493bba9c43f73a4461c72b5135ee09738582af7', // 1129
+  '46372791018924b8cbc444334300f85a211d2f29a56f2bb4890780b5983fc201', // 1025
+]);
 const sha256 = async (s: string): Promise<string> => {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 const PORTAL_PROFILE_KEY = 'nuke_investor_portal_profile';
 
+// ── Live stats for template interpolation ────────────────────────────────────
+
+interface PortalStats {
+  vehicle_count: number;
+  image_count: number;
+  comment_count: number;
+  bid_count: number;
+  estimate_count: number;
+  analysis_count: number;
+  identity_count: number;
+  org_count: number;
+  user_profiles: number;
+  observations_count: number;
+  image_extractions: number;
+  total_value: number;
+  vehicles_with_price: number;
+  db_size_gb: number;
+  table_count: number;
+  edge_function_count: number;
+  data_freshness_pct: number;
+  daily_rate: number;
+  queue_complete: number;
+  queue_pending: number;
+  queue_failed: number;
+  generated_at: string;
+}
+
+function fmt(n: number): string {
+  return n.toLocaleString('en-US');
+}
+function fmtM(n: number): string {
+  if (n >= 1_000_000) return (Math.round(n / 100_000) / 10).toFixed(1) + ' million';
+  if (n >= 1_000) return (Math.round(n / 100) / 10).toFixed(1) + 'K';
+  return String(n);
+}
+function fmtB(n: number): string {
+  if (n >= 1_000_000_000) return '$' + (Math.round(n / 100_000_000) / 10).toFixed(1) + ' billion';
+  if (n >= 1_000_000) return '$' + (Math.round(n / 100_000) / 10).toFixed(1) + 'M';
+  return '$' + fmt(n);
+}
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+function fmtDateISO(iso: string): string {
+  return new Date(iso).toISOString().slice(0, 10);
+}
+
+function buildTemplateVars(s: PortalStats): Record<string, string> {
+  return {
+    '{{VEHICLE_COUNT}}':       fmt(s.vehicle_count),
+    '{{IMAGE_COUNT_M}}':       fmtM(s.image_count),
+    '{{IMAGE_COUNT_EXACT}}':   fmt(s.image_count),
+    '{{COMMENT_COUNT_M}}':     fmtM(s.comment_count),
+    '{{COMMENT_COUNT_EXACT}}': fmt(s.comment_count),
+    '{{BID_COUNT}}':           fmt(s.bid_count),
+    '{{ESTIMATE_COUNT}}':      fmt(s.estimate_count),
+    '{{ANALYSIS_COUNT}}':      fmt(s.analysis_count),
+    '{{IDENTITY_COUNT}}':      fmt(s.identity_count),
+    '{{ORG_COUNT}}':           fmt(s.org_count),
+    '{{USER_PROFILES}}':       fmt(s.user_profiles),
+    '{{OBSERVATIONS_COUNT}}':  fmt(s.observations_count),
+    '{{IMAGE_EXTRACTIONS}}':   fmt(s.image_extractions),
+    '{{TOTAL_VALUE_B}}':       fmtB(s.total_value),
+    '{{TOTAL_VALUE_EXACT}}':   '$' + fmt(s.total_value),
+    '{{VEHICLES_WITH_PRICE}}': fmt(s.vehicles_with_price),
+    '{{DB_SIZE_GB}}':          String(s.db_size_gb),
+    '{{TABLE_COUNT}}':         fmt(s.table_count),
+    '{{EDGE_FUNCTION_COUNT}}': String(s.edge_function_count),
+    '{{DATA_FRESHNESS}}':      s.data_freshness_pct.toFixed(1) + '%',
+    '{{DAILY_RATE}}':          fmt(s.daily_rate),
+    '{{QUEUE_COMPLETE}}':      fmt(s.queue_complete),
+    '{{QUEUE_PENDING}}':       fmt(s.queue_pending),
+    '{{QUEUE_FAILED}}':        fmt(s.queue_failed),
+    '{{GENERATED_DATE}}':      fmtDate(s.generated_at),
+    '{{GENERATED_DATE_ISO}}':  fmtDateISO(s.generated_at),
+  };
+}
+
+function interpolate(md: string, vars: Record<string, string>): string {
+  return Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(k, v), md);
+}
+
 export default function InvestorOffering() {
   const [phase, setPhase] = useState<'gate' | 'acknowledge' | 'portal'>('gate');
   const [accessCode, setAccessCode] = useState('');
   const [codeError, setCodeError] = useState('');
   const [activeDoc, setActiveDoc] = useState<DocTab>('teaser');
+  const [portalStats, setPortalStats] = useState<PortalStats | null>(null);
   const [sessionId] = useState(() => crypto.randomUUID());
   const [viewerName, setViewerName] = useState('');
   const [viewerEmail, setViewerEmail] = useState('');
@@ -151,7 +239,7 @@ export default function InvestorOffering() {
 
   const handleAccessCode = async () => {
     const hash = await sha256(accessCode.toLowerCase().trim());
-    if (hash === ACCESS_CODE_SHA256) {
+    if (ACCESS_CODE_HASHES.has(hash)) {
       setPhase('acknowledge');
       logAccess({ action: 'access_code_accepted' });
       setCodeError('');
@@ -185,6 +273,12 @@ export default function InvestorOffering() {
 
     setPhase('portal');
     setAccessGrantedAt(new Date().toISOString());
+    // Fetch live stats to hydrate markdown templates
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    fetch(`${supabaseUrl}/functions/v1/investor-portal-stats`)
+      .then(r => r.json())
+      .then((stats: PortalStats) => setPortalStats(stats))
+      .catch(() => { /* silently fall back to static content */ });
     logAccess({
       action: 'nda_acknowledged',
       metadata: {
@@ -273,7 +367,8 @@ export default function InvestorOffering() {
     const contentDiv = printWindow.document.getElementById('content');
     if (contentDiv) {
       // Simple markdown to HTML (the print window doesn't have React)
-      const html = markdownToHtml(doc.content);
+      const content = portalStats ? interpolate(doc.content, buildTemplateVars(portalStats)) : doc.content;
+      const html = markdownToHtml(content);
       contentDiv.innerHTML = html;
     }
 
@@ -869,7 +964,7 @@ export default function InvestorOffering() {
               ),
             }}
           >
-            {doc.content}
+            {portalStats ? interpolate(doc.content, buildTemplateVars(portalStats)) : doc.content}
           </ReactMarkdown>
         </div>
 
