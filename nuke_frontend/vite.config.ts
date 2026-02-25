@@ -23,10 +23,22 @@ export default defineConfig({
         manualChunks(id) {
           // Function-based manualChunks avoids TDZ issues from static config
           if (id.includes('node_modules')) {
+            // IMPORTANT: @react-three/fiber MUST stay in vendor (same chunk as React).
+            // @react-three/fiber depends on use-sync-external-store, zustand, scheduler, etc.
+            // which are all React-ecosystem packages. If @react-three/fiber lands in the 'three'
+            // chunk, we get a circular ESM dependency: vendor.js → three.js → vendor.js, leaving
+            // React module wrappers undefined at evaluation time and causing a blank page.
+            // Solution: put @react-three/* in vendor with React; only bare three.js goes in 'three'.
+            if (
+              id.includes('@react-three') ||
+              id.includes('use-sync-external-store') ||
+              id.includes('/zustand/') ||
+              id.includes('/tunnel-rat/')
+            ) return 'vendor';
             if (id.includes('react-dom') || id.includes('/react/') || id.includes('recharts') || id.includes('d3-')) return 'vendor';
             if (id.includes('@supabase/')) return 'supabase';
             if (id.includes('pdfjs-dist')) return 'pdf';
-            if (id.includes('three') || id.includes('@react-three')) return 'three';
+            if (id.includes('three')) return 'three';
             if (id.includes('exceljs')) return 'exceljs';
             if (id.includes('tesseract')) return 'tesseract';
             if (id.includes('leaflet')) return 'maps';
