@@ -373,48 +373,20 @@ serve(async (req) => {
           }
         }
 
-        // Only use extracted data - don't fill with defaults
-        const finalMake = make || data.make || null
-        const finalModel = model || data.model || null
+        // Fall back to discovery hints (make_hint/model_hint stored in queue metadata)
+        // These are more reliable than slug-parsed model strings
+        const hintMake = (queueItem.metadata as any)?.make_hint || null
+        const hintModel = (queueItem.metadata as any)?.model_hint || null
 
-        // Filter for squarebodies (1973-1991 Chevy/GMC)
-        const isSquarebody = 
-          yearNum >= 1973 && yearNum <= 1991 &&
-          (finalMake === 'chevrolet' || finalMake === 'gmc' || finalMake === 'chevy') &&
-          (finalModel.includes('truck') || 
-           finalModel.includes('pickup') ||
-           finalModel.includes('suburban') ||
-           finalModel.includes('blazer') ||
-           finalModel.includes('jimmy') ||
-           finalModel.includes('c10') ||
-           finalModel.includes('c20') ||
-           finalModel.includes('c30') ||
-           finalModel.includes('k10') ||
-           finalModel.includes('k20') ||
-           finalModel.includes('k30') ||
-           finalModel === 'c/k' ||
-           (data.title || '').toLowerCase().includes('squarebody') ||
-           (data.title || '').toLowerCase().includes('square body') ||
-           (data.description || '').toLowerCase().includes('squarebody') ||
-           (data.description || '').toLowerCase().includes('square body'))
+        const finalMake = make || data.make || hintMake || null
 
-        if (!isSquarebody) {
-          await supabase
-            .from('craigslist_listing_queue')
-            .update({
-              status: 'skipped',
-              error_message: 'Not a squarebody (1973-1991 Chevy/GMC)',
-              processed_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', queueItem.id)
-
-          console.log(`  ⏭️  Skipped: Not a squarebody`)
-          return { status: 'skipped' }
-        }
+        // Only use scraped model if it looks clean (short, no dashes/punctuation noise)
+        const scrapedModel = model || data.model || null
+        const scrapedModelIsClean = scrapedModel && scrapedModel.length < 30 && !/[-–—]/.test(scrapedModel)
+        const finalModel = (scrapedModelIsClean ? scrapedModel : null) || hintModel || null
 
         // Validate required fields
-        if (!yearNum || isNaN(yearNum) || yearNum < 1973 || yearNum > 1991) {
+        if (!yearNum || isNaN(yearNum) || yearNum < 1958 || yearNum > 1991) {
           await supabase
             .from('craigslist_listing_queue')
             .update({
