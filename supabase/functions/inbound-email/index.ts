@@ -68,10 +68,14 @@ Deno.serve(async (req) => {
     console.log(`  To: ${JSON.stringify(data.to)}`);
     console.log(`  Subject: ${data.subject}`);
 
-    // Parse sender name and address
-    const fromMatch = data.from?.match(/^(?:"?([^"]*)"?\s*)?<?([^>]+)>?$/);
-    const fromName = fromMatch?.[1]?.trim() || null;
-    const fromAddress = fromMatch?.[2]?.trim() || data.from;
+    // Parse sender name and address from "Name <email>" or bare "email"
+    let fromName: string | null = null;
+    let fromAddress: string = data.from || "";
+    const angleMatch = data.from?.match(/^(.*?)\s*<([^>]+)>$/);
+    if (angleMatch) {
+      fromName = angleMatch[1].replace(/^["']|["']$/g, "").trim() || null;
+      fromAddress = angleMatch[2].trim();
+    }
 
     // Determine which nuke.ag address received it
     const toAddresses: string[] = Array.isArray(data.to) ? data.to : [data.to];
@@ -83,7 +87,7 @@ Deno.serve(async (req) => {
     let headers: Record<string, string> | null = null;
 
     try {
-      const emailRes = await fetch(`${RESEND_API_URL}/emails/${emailId}`, {
+      const emailRes = await fetch(`${RESEND_API_URL}/emails/receiving/${emailId}`, {
         headers: { Authorization: `Bearer ${resendApiKey}` },
       });
 
@@ -92,8 +96,18 @@ Deno.serve(async (req) => {
         bodyHtml = emailContent.html || null;
         bodyText = emailContent.text || null;
         headers = emailContent.headers || null;
+        // Use the API's from field if available (more reliable)
+        if (emailContent.from) {
+          const apiAngle = emailContent.from.match(/^(.*?)\s*<([^>]+)>$/);
+          if (apiAngle) {
+            fromName = apiAngle[1].replace(/^["']|["']$/g, "").trim() || fromName;
+            fromAddress = apiAngle[2].trim();
+          } else {
+            fromAddress = emailContent.from;
+          }
+        }
       } else {
-        console.warn(`Failed to fetch email content: ${emailRes.status}`);
+        console.warn(`Failed to fetch email content: ${emailRes.status} ${await emailRes.text()}`);
       }
     } catch (fetchErr) {
       console.warn("Error fetching email content:", fetchErr);
