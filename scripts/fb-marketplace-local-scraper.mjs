@@ -86,7 +86,7 @@ const METRO_AREAS = {
 const CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const BINGBOT_UA = "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)";
 
-async function getLsdToken(location) {
+async function fetchPageHtml(location) {
   const url = `https://www.facebook.com/marketplace/${location}/vehicles/`;
   const r = await fetch(url, {
     headers: {
@@ -95,11 +95,35 @@ async function getLsdToken(location) {
       "Accept-Language": "en-US,en;q=0.9",
     },
   });
-  if (!r.ok) throw new Error(`HTTP ${r.status} fetching page for lsd`);
+  if (!r.ok) throw new Error(`HTTP ${r.status} fetching page`);
   const html = await r.text();
-  const lsd = html.match(/"LSD"[^}]{0,30}"token":"([^"]+)"/)?.[1];
-  if (!lsd) throw new Error("Could not extract lsd token");
-  return lsd;
+  const lsd = html.match(/"LSD"[^}]{0,30}"token":"([^"]+)"/)?.[1] || null;
+  return { html, lsd };
+}
+
+// Extract listings directly from SSR HTML (fallback when GraphQL is rate-limited)
+function extractFromHtml(html) {
+  const listings = [];
+  const seen = new Set();
+  const titleRegex = /"marketplace_listing_title":"([^"]+)"/g;
+  let m;
+  while ((m = titleRegex.exec(html)) !== null) {
+    const title = m[1].replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    const pos = m.index;
+    const ctx = html.substring(Math.max(0, pos - 2000), Math.min(html.length, pos + 2000));
+    const id = ctx.match(/"id":"(\d{10,})"/)?.[1];
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const priceMatch = ctx.match(/"amount_with_offset_in_currency":"(\d+)"/);
+    const offsetMatch = ctx.match(/"offset":(\d+)/);
+    const offset = offsetMatch ? parseInt(offsetMatch[1]) : 100;
+    const price = priceMatch ? parseInt(priceMatch[1]) / offset : null;
+    const city = ctx.match(/"city":"([^"]+)"/)?.[1] || null;
+    const state = ctx.match(/"state":"([^"]+)"/)?.[1] || null;
+    const imageUri = ctx.match(/"uri":"(https:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/)?.[1] || null;
+    listings.push({ id, marketplace_listing_title: title, listing_price: price ? { amount: String(price) } : null, location: { reverse_geocode: { city, state } }, primary_listing_photo: imageUri ? { image: { uri: imageUri } } : null });
+  }
+  return listings;
 }
 
 async function fetchPage(location, lat, lng, lsd, cursor = null) {
@@ -188,12 +212,15 @@ function parseTitle(title) {
 async function scrapeLocation(slug, { lat, lng, label }, maxPages) {
   console.log(`\n[${label}] Starting scrape...`);
 
-  let lsd;
+  let lsd = null;
+  let firstPageHtml = null;
   try {
-    lsd = await getLsdToken(slug);
-    console.log(`  lsd: ${lsd.slice(0, 15)}...`);
+    const result = await fetchPageHtml(slug);
+    lsd = result.lsd;
+    firstPageHtml = result.html;
+    console.log(`  lsd: ${lsd ? lsd.slice(0, 15) + "..." : "none"}`);
   } catch (e) {
-    console.error(`  Failed to get lsd: ${e.message}`);
+    console.error(`  Failed to fetch page: ${e.message}`);
     return { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 1 };
   }
 
@@ -201,34 +228,67 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages) {
   let page = 0;
   let allListings = [];
   let stats = { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 0 };
+  let graphqlRateLimited = false;
 
   while (page < maxPages) {
-    try {
-      const { edges, nextCursor } = await fetchPage(slug, lat, lng, lsd, cursor);
+    let rawListings = [];
+
+    // Page 1: always try to use the HTML we already fetched as fallback
+    if (page === 0 && (graphqlRateLimited || !lsd)) {
+      rawListings = extractFromHtml(firstPageHtml);
+      stats.found += rawListings.length;
       page++;
-      stats.found += edges.length;
-
-      const vintage = edges
-        .map((e) => e.node?.listing)
-        .filter((l) => {
-          if (!l?.marketplace_listing_title) return false;
-          const year = parseYear(l.marketplace_listing_title);
-          return year && year >= YEAR_MIN && year <= YEAR_MAX;
-        });
-
-      console.log(`  Page ${page}: ${edges.length} listings, ${vintage.length} vintage`);
-      allListings.push(...vintage);
-
-      if (!nextCursor) break;
-      cursor = nextCursor;
-
-      // Rate limiting
-      await sleep(1500 + Math.random() * 1000);
-    } catch (e) {
-      console.error(`  Page ${page + 1} error: ${e.message}`);
-      stats.errors++;
-      break;
+      console.log(`  Page 1 (HTML): ${rawListings.length} listings`);
+    } else {
+      try {
+        const { edges, nextCursor } = await fetchPage(slug, lat, lng, lsd, cursor);
+        page++;
+        stats.found += edges.length;
+        rawListings = edges.map((e) => e.node?.listing).filter(Boolean);
+        console.log(`  Page ${page}: ${edges.length} listings`);
+        cursor = nextCursor;
+        if (!nextCursor) {
+          // No more pages
+          const vintage = rawListings.filter((l) => {
+            const year = parseYear(l.marketplace_listing_title);
+            return year && year >= YEAR_MIN && year <= YEAR_MAX;
+          });
+          allListings.push(...vintage);
+          break;
+        }
+        await sleep(1500 + Math.random() * 1000);
+      } catch (e) {
+        if (e.message.includes("Rate limit")) {
+          console.warn(`  GraphQL rate-limited — falling back to HTML for page 1`);
+          graphqlRateLimited = true;
+          stats.errors++;
+          // Use HTML we already have for page 1 data
+          rawListings = extractFromHtml(firstPageHtml);
+          stats.found += rawListings.length;
+          page++;
+          console.log(`  Page 1 (HTML fallback): ${rawListings.length} listings`);
+          // Can't paginate via HTML, stop after page 1
+          const vintage = rawListings.filter((l) => {
+            const year = parseYear(l.marketplace_listing_title);
+            return year && year >= YEAR_MIN && year <= YEAR_MAX;
+          });
+          allListings.push(...vintage);
+          break;
+        } else {
+          console.error(`  Page ${page + 1} error: ${e.message}`);
+          stats.errors++;
+          break;
+        }
+      }
     }
+
+    const vintage = rawListings.filter((l) => {
+      const year = parseYear(l.marketplace_listing_title);
+      return year && year >= YEAR_MIN && year <= YEAR_MAX;
+    });
+    allListings.push(...vintage);
+
+    if (graphqlRateLimited || !cursor) break;
   }
 
   stats.vintage = allListings.length;
@@ -331,7 +391,7 @@ async function main() {
     totals.errors += stats.errors;
 
     if (locationsToScrape.length > 1) {
-      await sleep(3000 + Math.random() * 2000);
+      await sleep(6000 + Math.random() * 4000);
     }
   }
 
