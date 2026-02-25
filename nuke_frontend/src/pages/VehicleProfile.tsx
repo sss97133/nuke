@@ -208,8 +208,7 @@ const VehicleProfile: React.FC = () => {
   const [fallbackListingImageUrls, setFallbackListingImageUrls] = useState<string[]>([]);
   const [viewCount, setViewCount] = useState<number>(0);
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
-  // Tabs disabled until backend processing is ready
-  // const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabId>('evidence');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabId>('evidence');
 
   // STATE DECLARATIONS
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
@@ -3644,77 +3643,91 @@ const VehicleProfile: React.FC = () => {
       }
     };
 
+    // Tab visibility helper
+    const tab = activeWorkspaceTab;
+    const isEvidence = tab === 'evidence';
+    const isFacts = tab === 'facts';
+    const isCommerce = tab === 'commerce';
+    const isFinancials = tab === 'financials';
+
     return (
       <>
-        {/* Primary Image and Timeline - Full width top section (one column) */}
-        <section className="section">
-          <CollapsibleWidget
-            title="Timeline"
-            defaultCollapsed={true}
-            badge={<span className="text-xs text-gray-500 dark:text-gray-400">{timelineEvents.length} event{timelineEvents.length === 1 ? '' : 's'}</span>}
-          >
-            <VehicleTimelineSection
-              vehicle={vehicle}
-              session={session}
-              permissions={permissions}
-              onAddEventClick={() => setShowAddEvent(true)}
-            />
-          </CollapsibleWidget>
-        </section>
+        {/* Primary Image and Timeline - Evidence tab only */}
+        {isEvidence && (
+          <section className="section">
+            <CollapsibleWidget
+              title="Timeline"
+              defaultCollapsed={true}
+              badge={<span className="text-xs text-gray-500 dark:text-gray-400">{timelineEvents.length} event{timelineEvents.length === 1 ? '' : 's'}</span>}
+            >
+              <VehicleTimelineSection
+                vehicle={vehicle}
+                session={session}
+                permissions={permissions}
+                onAddEventClick={() => setShowAddEvent(true)}
+              />
+            </CollapsibleWidget>
+          </section>
+        )}
 
         {/* Two Column Layout: Left (vehicle info, investment, ref docs, description, comments & bids, privacy) | Right (image gallery) */}
         <section className="section">
           <div className="vehicle-profile-two-column">
             {/* Left Column */}
             <div className="vehicle-profile-left-column" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {/* Vehicle Info */}
-              <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
-                <VehicleBasicInfo
-                  vehicle={vehicle}
-                  session={session}
-                  permissions={permissions}
-                  onDataPointClick={handleDataPointClick}
-                  onEditClick={handleEditClick}
-                />
-              </React.Suspense>
+              {/* Vehicle Info — Facts tab */}
+              {isFacts && (
+                <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
+                  <VehicleBasicInfo
+                    vehicle={vehicle}
+                    session={session}
+                    permissions={permissions}
+                    onDataPointClick={handleDataPointClick}
+                    onEditClick={handleEditClick}
+                  />
+                </React.Suspense>
+              )}
 
-              <CollapsibleWidget title="Live Streaming" defaultCollapsed={true}>
-                <VehicleStreamingCard
-                  vehicleId={vehicle.id}
-                  vehicleName={getVehicleTitle(vehicle)}
-                  session={session}
-                  canManage={Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess)}
-                  liveSession={liveSession}
-                  onSessionUpdated={loadLiveSession}
-                />
-              </CollapsibleWidget>
+              {/* Live Streaming — Financials tab */}
+              {isFinancials && (
+                <CollapsibleWidget title="Live Streaming" defaultCollapsed={false}>
+                  <VehicleStreamingCard
+                    vehicleId={vehicle.id}
+                    vehicleName={getVehicleTitle(vehicle)}
+                    session={session}
+                    canManage={Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess)}
+                    liveSession={liveSession}
+                    onSessionUpdated={loadLiveSession}
+                  />
+                </CollapsibleWidget>
+              )}
 
-              {/* Investment ledger documents */}
-              {(isVerifiedOwner || hasContributorAccess) && (
-                <CollapsibleWidget title="Ledger Documents" defaultCollapsed={true}>
+              {/* Investment ledger documents — Financials tab */}
+              {isFinancials && (isVerifiedOwner || hasContributorAccess) && (
+                <CollapsibleWidget title="Ledger Documents" defaultCollapsed={false}>
                   <VehicleLedgerDocumentsCard vehicleId={vehicle.id} canManage={Boolean(isVerifiedOwner || hasContributorAccess)} />
                 </CollapsibleWidget>
               )}
 
-              {/* Deal Jacket Forensics — shows when forensic analysis has been done */}
-              <CollapsibleWidget title="Deal Jacket Forensics" defaultCollapsed={true}>
-                <VehicleDealJacketForensicsCard vehicleId={vehicle.id} />
-              </CollapsibleWidget>
+              {/* Deal Jacket Forensics — Commerce tab */}
+              {isCommerce && (
+                <CollapsibleWidget title="Deal Jacket Forensics" defaultCollapsed={false}>
+                  <VehicleDealJacketForensicsCard vehicleId={vehicle.id} />
+                </CollapsibleWidget>
+              )}
 
-              {/* Wiring plan + parts quote generator */}
-              {(isRowOwner || isVerifiedOwner) && (
+              {/* Wiring plan + parts quote generator — Financials tab */}
+              {isFinancials && (isRowOwner || isVerifiedOwner) && (
                 <>
-                  <CollapsibleWidget title="Wiring Plan" defaultCollapsed={true}>
+                  <CollapsibleWidget title="Wiring Plan" defaultCollapsed={false}>
                     <WiringQueryContextBar
                       vehicleId={vehicle.id}
                       vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
-                      onQuoteGenerated={() => {
-                        // Quote will be displayed in PartsQuoteGenerator (owned by that component)
-                      }}
+                      onQuoteGenerated={() => {}}
                     />
                   </CollapsibleWidget>
 
-                  <CollapsibleWidget title="AI Parts Quote Generator" defaultCollapsed={true}>
+                  <CollapsibleWidget title="AI Parts Quote Generator" defaultCollapsed={false}>
                     <PartsQuoteGenerator
                       vehicleId={vehicle.id}
                       vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
@@ -3723,27 +3736,33 @@ const VehicleProfile: React.FC = () => {
                 </>
               )}
 
-              {/* Proof tasks / public scrutiny (data gaps) */}
-              <CollapsibleWidget title="Data Gaps" defaultCollapsed={true}>
-                <VehicleDataGapsCard
-                  vehicleId={vehicle.id}
-                  canTriggerAnalysis={canTriggerProofAnalysis}
-                  canAdminOverride={isAdminUser}
-                />
-              </CollapsibleWidget>
+              {/* Proof tasks / public scrutiny — Facts tab */}
+              {isFacts && (
+                <CollapsibleWidget title="Data Gaps" defaultCollapsed={false}>
+                  <VehicleDataGapsCard
+                    vehicleId={vehicle.id}
+                    canTriggerAnalysis={canTriggerProofAnalysis}
+                    canAdminOverride={isAdminUser}
+                  />
+                </CollapsibleWidget>
+              )}
 
-              {/* Research notes / open questions */}
-              <CollapsibleWidget title="Research Items" defaultCollapsed={true}>
-                <VehicleResearchItemsCard vehicleId={vehicle.id} />
-              </CollapsibleWidget>
+              {/* Research notes — Facts tab */}
+              {isFacts && (
+                <CollapsibleWidget title="Research Items" defaultCollapsed={false}>
+                  <VehicleResearchItemsCard vehicleId={vehicle.id} />
+                </CollapsibleWidget>
+              )}
 
-              {/* Performance Profile (video game stats) */}
-              <CollapsibleWidget title="Performance Profile" defaultCollapsed={true}>
-                <VehiclePerformanceCard vehicleId={vehicle.id} compact />
-              </CollapsibleWidget>
+              {/* Performance Profile — Facts tab */}
+              {isFacts && (
+                <CollapsibleWidget title="Performance Profile" defaultCollapsed={false}>
+                  <VehiclePerformanceCard vehicleId={vehicle.id} compact />
+                </CollapsibleWidget>
+              )}
 
-              {/* Engine Bay Analysis — from AI vision analysis of engine photos */}
-              {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
+              {/* Engine Bay Analysis — Facts tab */}
+              {isFacts && (vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
                 <CollapsibleWidget title="Engine Bay Analysis" defaultCollapsed={true} badge={
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {(vehicle as any).origin_metadata.engine_bay_analysis.engine_family}
@@ -3840,140 +3859,160 @@ const VehicleProfile: React.FC = () => {
                 </CollapsibleWidget>
               )}
 
-              {/* Investment Summary */}
-              <CollapsibleWidget title="ROI Summary" defaultCollapsed={true}>
-                <VehicleROISummaryCard vehicleId={vehicle.id} />
-              </CollapsibleWidget>
+              {/* Investment Summary — Commerce tab */}
+              {isCommerce && (
+                <CollapsibleWidget title="ROI Summary" defaultCollapsed={false}>
+                  <VehicleROISummaryCard vehicleId={vehicle.id} />
+                </CollapsibleWidget>
+              )}
 
-              {/* Nuke Estimate: Multi-signal valuation with deal/heat scoring */}
-              <CollapsibleWidget title="Nuke Estimate" defaultCollapsed={true} badge={<span className="text-xs text-gray-500 dark:text-gray-400">Valuation & deal score</span>}>
-                <NukeEstimatePanel
-                  vehicleId={vehicle.id}
-                  vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
-                />
-              </CollapsibleWidget>
-
-              {/* Pricing & Value (Market vs Nuke marks) */}
-              <CollapsibleWidget title="Pricing & Value" defaultCollapsed={true}>
-                <VehiclePricingValueCard
-                  vehicle={vehicle}
-                  auctionPulse={auctionPulse}
-                  valuationIntel={valuationIntel as any}
-                  readinessSnapshot={readinessSnapshot as any}
-                />
-              </CollapsibleWidget>
-
-              {/* Auction history / external listings (supports relists like BaT "-2") */}
-              <CollapsibleWidget title="Auction History" defaultCollapsed={true} badge={<span className="text-xs text-gray-500 dark:text-gray-400">View auction history</span>}>
-                <ExternalListingCard vehicleId={vehicle.id} />
-              </CollapsibleWidget>
-
-              <CollapsibleWidget title="Auction Quick Start" defaultCollapsed={true}>
-                <VehicleAuctionQuickStartCard
-                  vehicle={{
-                    id: vehicle.id,
-                    year: vehicle.year,
-                    make: vehicle.make,
-                    model: vehicle.model,
-                    trim: (vehicle as any)?.trim ?? null,
-                    mileage: (vehicle as any)?.mileage ?? null,
-                  }}
-                  canManage={Boolean(isRowOwner || isVerifiedOwner)}
-                />
-              </CollapsibleWidget>
-              
-              {/* Structured listing data (Options / Service records / etc.) - REMOVED: redundant with Basic Info */}
-              {/* <VehicleStructuredListingDataCard vehicle={vehicle} /> */}
-              
-              {/* Reference Documents - Upload and Display (merged) */}
-              <CollapsibleWidget title="Reference Library" defaultCollapsed={true}>
-                <VehicleReferenceLibrary
+              {/* Nuke Estimate — Commerce tab */}
+              {isCommerce && (
+                <CollapsibleWidget title="Nuke Estimate" defaultCollapsed={false} badge={<span className="text-xs text-gray-500 dark:text-gray-400">Valuation & deal score</span>}>
+                  <NukeEstimatePanel
                     vehicleId={vehicle.id}
-                  userId={session?.user?.id}
+                    vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
+                  />
+                </CollapsibleWidget>
+              )}
+
+              {/* Pricing & Value — Commerce tab */}
+              {isCommerce && (
+                <CollapsibleWidget title="Pricing & Value" defaultCollapsed={false}>
+                  <VehiclePricingValueCard
+                    vehicle={vehicle}
+                    auctionPulse={auctionPulse}
+                    valuationIntel={valuationIntel as any}
+                    readinessSnapshot={readinessSnapshot as any}
+                  />
+                </CollapsibleWidget>
+              )}
+
+              {/* Auction history — Commerce tab */}
+              {isCommerce && (
+                <CollapsibleWidget title="Auction History" defaultCollapsed={false} badge={<span className="text-xs text-gray-500 dark:text-gray-400">View auction history</span>}>
+                  <ExternalListingCard vehicleId={vehicle.id} />
+                </CollapsibleWidget>
+              )}
+
+              {/* Auction Quick Start — Commerce tab */}
+              {isCommerce && (
+                <CollapsibleWidget title="Auction Quick Start" defaultCollapsed={false}>
+                  <VehicleAuctionQuickStartCard
+                    vehicle={{
+                      id: vehicle.id,
+                      year: vehicle.year,
+                      make: vehicle.make,
+                      model: vehicle.model,
+                      trim: (vehicle as any)?.trim ?? null,
+                      mileage: (vehicle as any)?.mileage ?? null,
+                    }}
+                    canManage={Boolean(isRowOwner || isVerifiedOwner)}
+                  />
+                </CollapsibleWidget>
+              )}
+
+              {/* Reference Documents — Financials tab */}
+              {isFinancials && (
+                <CollapsibleWidget title="Reference Library" defaultCollapsed={false}>
+                  <VehicleReferenceLibrary
+                    vehicleId={vehicle.id}
+                    userId={session?.user?.id}
                     year={vehicle.year}
                     make={vehicle.make}
                     series={(vehicle as any).series}
                     model={vehicle.model}
                     bodyStyle={(vehicle as any).body_style}
-                  refreshKey={referenceLibraryRefreshKey}
+                    refreshKey={referenceLibraryRefreshKey}
                     onUploadComplete={() => {
                       loadVehicle();
                       setReferenceLibraryRefreshKey((v) => v + 1);
                     }}
-                />
-              </CollapsibleWidget>
+                  />
+                </CollapsibleWidget>
+              )}
 
-              {/* Description */}
-              <CollapsibleWidget
-                title="Description"
-                defaultCollapsed={true}
-                badge={vehicle.description ? <span className="text-xs text-gray-500 dark:text-gray-400" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>{String(vehicle.description).slice(0, 80)}{String(vehicle.description).length > 80 ? '...' : ''}</span> : undefined}
-              >
-                <VehicleDescriptionCard
-                  vehicleId={vehicle.id}
-                  initialDescription={vehicle.description}
-                  isEditable={canEdit}
-                  onUpdate={() => {}}
-                />
-              </CollapsibleWidget>
+              {/* Description — Evidence tab */}
+              {isEvidence && (
+                <CollapsibleWidget
+                  title="Description"
+                  defaultCollapsed={true}
+                  badge={vehicle.description ? <span className="text-xs text-gray-500 dark:text-gray-400" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>{String(vehicle.description).slice(0, 80)}{String(vehicle.description).length > 80 ? '...' : ''}</span> : undefined}
+                >
+                  <VehicleDescriptionCard
+                    vehicleId={vehicle.id}
+                    initialDescription={vehicle.description}
+                    isEditable={canEdit}
+                    onUpdate={() => {}}
+                  />
+                </CollapsibleWidget>
+              )}
 
-              {/* Data sources / evidence */}
-              <CollapsibleWidget title="Data Sources" defaultCollapsed={true} badge={dataSources.length > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">{dataSources.length} source{dataSources.length === 1 ? '' : 's'}</span> : undefined}>
-                <div>
-                  {(importMeta.builder || importMeta.seller) && (
-                    <div className="text-small text-muted" style={{ marginBottom: '8px' }}>
-                      {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
-                      {importMeta.builder && importMeta.seller ? ' • ' : null}
-                      {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
-                    </div>
-                  )}
-                  {dataSources.length === 0 ? (
-                    <div className="text-small text-muted">No external sources attached yet.</div>
-                  ) : (
-                    <ul style={{ margin: '0', paddingLeft: '18px' }}>
-                      {dataSources.map((url) => (
-                        <li key={url} className="text-small">
-                          <a href={url} target="_blank" rel="noreferrer">
-                            {sourceLabel(url)}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </CollapsibleWidget>
+              {/* Data sources — Evidence tab */}
+              {isEvidence && (
+                <CollapsibleWidget title="Data Sources" defaultCollapsed={true} badge={dataSources.length > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">{dataSources.length} source{dataSources.length === 1 ? '' : 's'}</span> : undefined}>
+                  <div>
+                    {(importMeta.builder || importMeta.seller) && (
+                      <div className="text-small text-muted" style={{ marginBottom: '8px' }}>
+                        {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
+                        {importMeta.builder && importMeta.seller ? ' • ' : null}
+                        {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
+                      </div>
+                    )}
+                    {dataSources.length === 0 ? (
+                      <div className="text-small text-muted">No external sources attached yet.</div>
+                    ) : (
+                      <ul style={{ margin: '0', paddingLeft: '18px' }}>
+                        {dataSources.map((url) => (
+                          <li key={url} className="text-small">
+                            <a href={url} target="_blank" rel="noreferrer">
+                              {sourceLabel(url)}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </CollapsibleWidget>
+              )}
 
-              {/* Community Insights - AI-analyzed sentiment from observations */}
-              <CollapsibleWidget title="Community Insights" defaultCollapsed={true}>
-                <VehicleCommunityInsights vehicleId={vehicle.id} />
-              </CollapsibleWidget>
+              {/* Community Insights — Evidence tab */}
+              {isEvidence && (
+                <CollapsibleWidget title="Community Insights" defaultCollapsed={true}>
+                  <VehicleCommunityInsights vehicleId={vehicle.id} />
+                </CollapsibleWidget>
+              )}
 
-              {/* Document Intelligence - AI-analyzed receipts and service records */}
-              <CollapsibleWidget title="Document Intelligence" defaultCollapsed={true}>
-                <VehicleDocumentIntelligence vehicleId={vehicle.id} />
-              </CollapsibleWidget>
+              {/* Document Intelligence — Evidence tab */}
+              {isEvidence && (
+                <CollapsibleWidget title="Document Intelligence" defaultCollapsed={true}>
+                  <VehicleDocumentIntelligence vehicleId={vehicle.id} />
+                </CollapsibleWidget>
+              )}
 
-              {/* Comments & Bids - Sticky below header/auction bar, scrollable independently */}
-              <CollapsibleWidget
-                title="Comments"
-                defaultCollapsed={true}
-                badge={totalCommentCount > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">View {totalCommentCount} comment{totalCommentCount === 1 ? '' : 's'}</span> : undefined}
-              >
-                <VehicleCommentsCard
-                  vehicleId={vehicle.id}
-                  session={session}
-                  collapsed={isMobile}
-                  maxVisible={isMobile ? 6 : 50}
-                  containerId="vehicle-comments"
-                  containerStyle={{
-                    scrollMarginTop: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px + 8px)`,
-                    maxHeight: `calc(100vh - var(--header-height, 40px) - ${vehicleHeaderHeight}px - 16px)`,
-                  }}
-                />
-              </CollapsibleWidget>
+              {/* Comments — Evidence tab */}
+              {isEvidence && (
+                <CollapsibleWidget
+                  title="Comments"
+                  defaultCollapsed={true}
+                  badge={totalCommentCount > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">View {totalCommentCount} comment{totalCommentCount === 1 ? '' : 's'}</span> : undefined}
+                >
+                  <VehicleCommentsCard
+                    vehicleId={vehicle.id}
+                    session={session}
+                    collapsed={isMobile}
+                    maxVisible={isMobile ? 6 : 50}
+                    containerId="vehicle-comments"
+                    containerStyle={{
+                      scrollMarginTop: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px + 8px)`,
+                      maxHeight: `calc(100vh - var(--header-height, 40px) - ${vehicleHeaderHeight}px - 16px)`,
+                    }}
+                  />
+                </CollapsibleWidget>
+              )}
 
-              {/* Privacy Settings */}
-              {!vehicle.isAnonymous && session && (
+              {/* Privacy Settings — Evidence tab */}
+              {isEvidence && !vehicle.isAnonymous && session && (
                 <CollapsibleWidget title="Privacy Settings" defaultCollapsed={true} badge={<span className={`text-xs ${isPublic ? 'text-green-500' : 'text-gray-500'}`}>{isPublic ? 'Public' : 'Private'}</span>}>
                   <div className="vehicle-detail">
                     <span>Visibility</span>
@@ -3997,26 +4036,28 @@ const VehicleProfile: React.FC = () => {
               )}
             </div>
 
-            {/* Right Column: Image Gallery & Videos */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Images - Collapsible */}
-              <CollapsibleGalleryCard
-                vehicleId={vehicle.id}
-                vehicleImages={vehicleImages}
-                fallbackListingImageUrls={fallbackListingImageUrls}
-                vehicle={vehicle}
-                onImagesUpdated={() => {
-                  loadVehicle();
-                  loadTimelineEvents();
-                  loadVehicleImages();
-                }}
-              />
+            {/* Right Column: Image Gallery & Videos — Evidence tab only */}
+            {isEvidence && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Images - Collapsible */}
+                <CollapsibleGalleryCard
+                  vehicleId={vehicle.id}
+                  vehicleImages={vehicleImages}
+                  fallbackListingImageUrls={fallbackListingImageUrls}
+                  vehicle={vehicle}
+                  onImagesUpdated={() => {
+                    loadVehicle();
+                    loadTimelineEvents();
+                    loadVehicleImages();
+                  }}
+                />
 
-              {/* Video Moments - Collapsible */}
-              <CollapsibleWidget title="Videos" defaultCollapsed={true}>
-                <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
-              </CollapsibleWidget>
-            </div>
+                {/* Video Moments - Collapsible */}
+                <CollapsibleWidget title="Videos" defaultCollapsed={true}>
+                  <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
+                </CollapsibleWidget>
+              </div>
+            )}
           </div>
         </section>
       </>
@@ -4176,7 +4217,48 @@ const VehicleProfile: React.FC = () => {
           />
         )}
 
-        {/* Main Content - Curated layout (no tabs) */}
+        {/* Workspace Tab Bar */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'stretch',
+          background: '#1a1a1a',
+          borderTop: '1px solid #333',
+          borderBottom: '2px solid #000',
+          height: 30,
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          marginTop: 'var(--space-2)',
+        }}>
+          {WORKSPACE_TABS.map(t => {
+            const active = activeWorkspaceTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveWorkspaceTab(t.id as WorkspaceTabId)}
+                title={t.helper}
+                style={{
+                  padding: '0 20px',
+                  fontSize: '11px',
+                  fontFamily: 'Arial, sans-serif',
+                  fontWeight: 600,
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  border: 'none',
+                  borderBottom: active ? '2px solid #fff' : '2px solid transparent',
+                  background: active ? '#2a2a2a' : 'transparent',
+                  color: active ? '#fff' : '#999',
+                  cursor: 'pointer',
+                  marginBottom: '-2px',
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Main Content - Tab-filtered workspace */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
           {renderWorkspaceContent()}
         </div>

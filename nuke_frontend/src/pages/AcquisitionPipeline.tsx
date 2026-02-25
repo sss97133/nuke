@@ -19,13 +19,30 @@ function scoreTxt(score: number | null): string {
   return 'PASS';
 }
 
-function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: string, action: string) => void }) {
+function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: string, action: string, params?: Record<string, unknown>) => void }) {
   const [open, setOpen] = useState(false);
+  const [inlineInput, setInlineInput] = useState<{ action: string; value: string } | null>(null);
   const proof = entry.market_proof_data;
   const hasUrl = entry.discovery_url?.startsWith('http');
   const profit = entry.estimated_profit || proof?.net_profit || 0;
   const roi = proof?.roi_pct || 0;
   const location = [entry.location_city, entry.location_state].filter(Boolean).join(', ');
+
+  const submitInlineInput = () => {
+    if (!inlineInput) return;
+    const params: Record<string, unknown> = {};
+    if (inlineInput.action === 'schedule_inspection') {
+      params.shop_name = inlineInput.value.trim() || 'TBD';
+    } else if (inlineInput.action === 'make_offer') {
+      if (!inlineInput.value.trim()) return;
+      params.offer_amount = parseInt(inlineInput.value.replace(/[^0-9]/g, ''));
+    } else if (inlineInput.action === 'accept_deal') {
+      if (!inlineInput.value.trim()) return;
+      params.purchase_price = parseInt(inlineInput.value.replace(/[^0-9]/g, ''));
+    }
+    onAction(entry.id, inlineInput.action, params);
+    setInlineInput(null);
+  };
 
   const nextAction: Record<string, { action: string; label: string }> = {
     target: { action: 'contact', label: 'Contact' },
@@ -167,14 +184,43 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                     {proof.cost_notes.join(' · ')}
                   </div>
                 )}
-                {act && (
+                {act && !inlineInput && (
                   <button
                     className="button button-primary"
                     style={{ marginTop: 'var(--space-3)', fontSize: '8pt' }}
-                    onClick={e => { e.stopPropagation(); onAction(entry.id, act.action); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      const needsInput = ['schedule_inspection', 'make_offer', 'accept_deal'].includes(act.action);
+                      if (needsInput) {
+                        setOpen(true);
+                        setInlineInput({ action: act.action, value: '' });
+                      } else {
+                        onAction(entry.id, act.action);
+                      }
+                    }}
                   >
                     {act.label} →
                   </button>
+                )}
+                {inlineInput && (
+                  <div style={{ marginTop: 'var(--space-3)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ marginBottom: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3px', fontSize: '8pt' }}>
+                      {inlineInput.action === 'schedule_inspection' ? 'Shop Name' : inlineInput.action === 'make_offer' ? 'Offer Amount ($)' : 'Purchase Price ($)'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                      <input
+                        type={inlineInput.action === 'schedule_inspection' ? 'text' : 'number'}
+                        value={inlineInput.value}
+                        placeholder={inlineInput.action === 'schedule_inspection' ? 'Shop name...' : '0'}
+                        onChange={e => setInlineInput({ ...inlineInput, value: e.target.value })}
+                        onKeyDown={e => { if (e.key === 'Enter') submitInlineInput(); if (e.key === 'Escape') setInlineInput(null); }}
+                        autoFocus
+                        style={{ flex: 1, padding: '4px 8px', fontFamily: 'monospace', border: '1px solid var(--border-dark)', background: 'var(--surface)', color: 'var(--text)', fontSize: '8pt' }}
+                      />
+                      <button className="button button-primary" style={{ fontSize: '8pt', padding: '2px 8px' }} onClick={submitInlineInput}>✓</button>
+                      <button className="button" style={{ fontSize: '8pt', padding: '2px 8px' }} onClick={() => setInlineInput(null)}>✕</button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -210,26 +256,12 @@ export default function AcquisitionPipeline() {
     all: entries.length,
   };
 
-  const handleAction = async (id: string, action: string) => {
+  const handleAction = async (id: string, action: string, params: Record<string, unknown> = {}) => {
     setActionError(null);
     try {
-      const params: Record<string, unknown> = {};
       if (action === 'contact') {
         params.contact_method = 'CL email reply';
         params.contact_notes = 'Initial contact from pipeline';
-      }
-      if (action === 'schedule_inspection') {
-        params.shop_name = prompt('Shop name:') || 'TBD';
-      }
-      if (action === 'make_offer') {
-        const amount = prompt('Offer amount ($):');
-        if (!amount) return;
-        params.offer_amount = parseInt(amount.replace(/[^0-9]/g, ''));
-      }
-      if (action === 'accept_deal') {
-        const price = prompt('Purchase price ($):');
-        if (!price) return;
-        params.purchase_price = parseInt(price.replace(/[^0-9]/g, ''));
       }
       await advanceStage(id, action, params);
     } catch (err) {
