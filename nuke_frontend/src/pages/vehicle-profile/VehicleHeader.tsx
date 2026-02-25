@@ -7,18 +7,18 @@ import { formatCurrencyAmount, resolveCurrencyCode } from '../../utils/currency'
 import { supabase } from '../../lib/supabase';
 // Deprecated modals (history/analysis/tag review) intentionally removed from UI
 import { VehicleValuationService } from '../../services/vehicleValuationService';
-import TradePanel from '../../components/trading/TradePanel';
+const TradePanel = React.lazy(() => import('../../components/trading/TradePanel'));
 import { VehicleDeduplicationService } from '../../services/vehicleDeduplicationService';
-import { ValueProvenancePopup } from '../../components/ValueProvenancePopup';
-import DataValidationPopup from '../../components/vehicle/DataValidationPopup';
+const ValueProvenancePopup = React.lazy(() => import('../../components/ValueProvenancePopup').then(m => ({ default: m.ValueProvenancePopup })));
+const DataValidationPopup = React.lazy(() => import('../../components/vehicle/DataValidationPopup'));
 import { useVINProofs } from '../../hooks/useVINProofs';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 import MemeDropBadge from '../../components/vehicle/MemeDropBadge';
 import vinDecoderService from '../../services/vinDecoder';
-import UpdateSalePriceModal from '../../components/vehicle/UpdateSalePriceModal';
-import { FollowAuctionCard } from '../../components/auction/FollowAuctionCard';
-import OrganizationInvestmentCard from '../../components/organization/OrganizationInvestmentCard';
+const UpdateSalePriceModal = React.lazy(() => import('../../components/vehicle/UpdateSalePriceModal'));
+const FollowAuctionCard = React.lazy(() => import('../../components/auction/FollowAuctionCard').then(m => ({ default: m.FollowAuctionCard })));
+const OrganizationInvestmentCard = React.lazy(() => import('../../components/organization/OrganizationInvestmentCard'));
 import { CircularAvatar } from '../../components/common/CircularAvatar';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -4958,16 +4958,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                        (organizationLinks || []).find((o: any) => o.organization_id === showOrgInvestmentCard);
             if (!org) return null;
             return (
-              <OrganizationInvestmentCard
-                organizationId={showOrgInvestmentCard}
-                organizationName={org.business_name || 'Unknown'}
-                relationshipType={org.relationship_type || 'collaborator'}
-                onClose={() => {
-                  setShowOrgInvestmentCard(null);
-                  setOrgCardAnchor(null);
-                }}
-                anchorElement={orgCardAnchor}
-              />
+              <React.Suspense fallback={null}>
+                <OrganizationInvestmentCard
+                  organizationId={showOrgInvestmentCard}
+                  organizationName={org.business_name || 'Unknown'}
+                  relationshipType={org.relationship_type || 'collaborator'}
+                  onClose={() => {
+                    setShowOrgInvestmentCard(null);
+                    setOrgCardAnchor(null);
+                  }}
+                  anchorElement={orgCardAnchor}
+                />
+              </React.Suspense>
             );
           })()}
         </div>
@@ -5414,12 +5416,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           )}
 
           {showVinValidation && vehicle?.id && vehicle?.vin && (
-            <DataValidationPopup
-              vehicleId={vehicle.id}
-              fieldName="vin"
-              fieldValue={vehicle.vin}
-              onClose={() => setShowVinValidation(false)}
-            />
+            <React.Suspense fallback={null}>
+              <DataValidationPopup
+                vehicleId={vehicle.id}
+                fieldName="vin"
+                fieldValue={vehicle.vin}
+                onClose={() => setShowVinValidation(false)}
+              />
+            </React.Suspense>
           )}
         </div>
       </div>
@@ -5639,12 +5643,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           onClick={() => setShowTrade(false)}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ width: '520px', maxWidth: '95vw' }}>
-            <TradePanel
-              vehicleId={vehicle?.id || ''}
-              vehicleName={vehicle ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() || 'Vehicle' : 'Vehicle'}
-              currentSharePrice={(valuation && typeof valuation.sharePrice === 'number') ? valuation.sharePrice : 1.00}
-              totalShares={1000}
-            />
+            <React.Suspense fallback={null}>
+              <TradePanel
+                vehicleId={vehicle?.id || ''}
+                vehicleName={vehicle ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() || 'Vehicle' : 'Vehicle'}
+                currentSharePrice={(valuation && typeof valuation.sharePrice === 'number') ? valuation.sharePrice : 1.00}
+                totalShares={1000}
+              />
+            </React.Suspense>
             <div style={{ textAlign: 'right', marginTop: 6 }}>
               <button className="button button-small" onClick={() => setShowTrade(false)} style={{ fontSize: '8pt' }}>Close</button>
             </div>
@@ -5653,6 +5659,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       )}
 
       {showProvenancePopup && vehicle && (
+        <React.Suspense fallback={null}>
         <ValueProvenancePopup
           vehicleId={vehicle.id}
           field={(() => {
@@ -5771,10 +5778,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             window.location.reload(); // Simple refresh for now
           }}
         />
+        </React.Suspense>
       )}
 
       {/* Update Sale Price Modal */}
       {vehicle && (
+        <React.Suspense fallback={null}>
         <UpdateSalePriceModal
           vehicleId={vehicle.id}
           vehicleName={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
@@ -5788,12 +5797,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             window.location.reload();
           }}
         />
+        </React.Suspense>
       )}
 
       {/* Follow Auction Card - positioned relative to price button */}
       {vehicle && showFollowAuctionCard && futureAuctionListing && (
-        <div 
-          style={{ 
+        <div
+          style={{
             position: 'absolute',
             top: '100%',
             right: 0,
@@ -5801,6 +5811,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             marginTop: '8px'
           }}
         >
+          <React.Suspense fallback={null}>
           <FollowAuctionCard
             vehicleId={vehicle.id}
             listingUrl={futureAuctionListing.listing_url}
@@ -5808,6 +5819,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             auctionDate={futureAuctionListing.start_date || futureAuctionListing.end_date || futureAuctionListing.metadata?.sale_date}
             onClose={() => setShowFollowAuctionCard(false)}
           />
+          </React.Suspense>
         </div>
       )}
     </div>
