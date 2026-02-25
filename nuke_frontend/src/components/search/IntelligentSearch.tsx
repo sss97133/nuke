@@ -276,7 +276,24 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         // ignore; fall through to regular search
       }
     }
-    
+
+    // Fast-path: VIN lookup — 17-char alphanumeric (no I, O, Q)
+    const looksLikeVin = /^[A-HJ-NPR-Z0-9]{17}$/i.test(trimmedQuery);
+    if (looksLikeVin) {
+      try {
+        const { data: vehicleByVin } = await supabase
+          .from('vehicles')
+          .select('id')
+          .ilike('vin', trimmedQuery)
+          .maybeSingle();
+        if (vehicleByVin?.id) {
+          navigate(`/vehicle/${vehicleByVin.id}`);
+          return;
+        }
+      } catch {
+        // ignore; fall through to regular search
+      }
+    }
 
     // Check if query is a Craigslist URL - check DB first, then import if needed
     const craigslistUrlPattern = /https?:\/\/([^.]+)\.craigslist\.org\/[^/]+\/d\/[^/]+\/[^/]+\.html/i;

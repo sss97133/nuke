@@ -134,6 +134,7 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState<{current: number, total: number} | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [vinMatchedVehicle, setVinMatchedVehicle] = useState<{ id: string; year: number; make: string; model: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get current user
@@ -911,6 +912,24 @@ Redirecting to vehicle profile...`);
     }
   }, [formData.import_url, handleUrlScraping]);
 
+  // VIN live dedup: check DB when user types a full VIN
+  React.useEffect(() => {
+    const vin = (formData.vin || '').trim().toUpperCase();
+    if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+      setVinMatchedVehicle(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
+      const { data } = await supabase
+        .from('vehicles')
+        .select('id, year, make, model')
+        .ilike('vin', vin)
+        .maybeSingle();
+      setVinMatchedVehicle(data ?? null);
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.vin]);
+
   // (mobile rendering is handled near the bottom, after all hooks)
 
   // Handle submission - no validation, accept anything
@@ -928,6 +947,14 @@ Redirecting to vehicle profile...`);
 
     if (!user) {
       setSubmitError('You must be logged in to add a vehicle');
+      return;
+    }
+
+    // Final VIN dedup guard before creating
+    if (vinMatchedVehicle) {
+      if (window.confirm(`This VIN already exists in the database as ${vinMatchedVehicle.year} ${vinMatchedVehicle.make} ${vinMatchedVehicle.model}.\n\nGo to existing vehicle instead?`)) {
+        navigate(`/vehicle/${vinMatchedVehicle.id}`);
+      }
       return;
     }
 
@@ -1588,6 +1615,35 @@ Redirecting to vehicle profile...`);
                     {(formError || submitError) && (
                       <div className="alert alert-error mb-4">
                         <div className="text-small">{formError || submitError}</div>
+                      </div>
+                    )}
+
+                    {/* VIN match banner — this vehicle is already in the DB */}
+                    {vinMatchedVehicle && (
+                      <div style={{
+                        padding: 'var(--space-3)',
+                        border: '2px solid var(--warning)',
+                        background: 'var(--warning-dim)',
+                        marginBottom: 'var(--space-3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 'var(--space-3)',
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 700 }}>Already in the database</div>
+                          <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                            {vinMatchedVehicle.year} {vinMatchedVehicle.make} {vinMatchedVehicle.model} — VIN matched
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="button button-primary"
+                          style={{ fontSize: '8pt', whiteSpace: 'nowrap' }}
+                          onClick={() => navigate(`/vehicle/${vinMatchedVehicle.id}`)}
+                        >
+                          View Vehicle →
+                        </button>
                       </div>
                     )}
 

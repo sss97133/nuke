@@ -10,8 +10,8 @@ const UnifiedMap = lazy(() => import('../components/map/UnifiedMap'));
 type TabId = 'garage' | 'feed' | 'map';
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'garage', label: 'Garage' },
   { id: 'feed', label: 'Feed' },
+  { id: 'garage', label: 'Garage' },
   { id: 'map', label: 'Map' },
 ];
 
@@ -175,7 +175,7 @@ export default function HomePage() {
     if (fromUrl && TABS.some(t => t.id === fromUrl)) return fromUrl;
     const fromStorage = localStorage.getItem(LS_KEY) as TabId | null;
     if (fromStorage && TABS.some(t => t.id === fromStorage)) return fromStorage;
-    return user ? 'garage' : 'feed';
+    return 'feed';
   }, []);
 
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
@@ -185,7 +185,7 @@ export default function HomePage() {
     const fromUrl = searchParams.get('tab') as TabId | null;
     const fromStorage = localStorage.getItem(LS_KEY) as TabId | null;
     if (!fromUrl && !fromStorage) {
-      setActiveTab(user ? 'garage' : 'feed');
+      setActiveTab('feed');
     }
     // If URL has ?tab=... and user is logged out, show the feed directly
     if (!user && fromUrl) {
