@@ -6,7 +6,7 @@ import { test, expect } from 'playwright/test';
  */
 
 test.describe('Production Visual Verification', () => {
-  const baseURL = 'https://nukefrontend-5dzr395le-nzero.vercel.app';
+  const baseURL = 'https://nuke.ag';
 
   test('homepage loads and shows vehicle grid', async ({ page }) => {
     await page.goto(baseURL);
@@ -157,7 +157,7 @@ test.describe('Production Visual Verification', () => {
 
 test.describe('Feature-Specific Tests', () => {
   test('verify security headers', async ({ page }) => {
-    const response = await page.goto('https://nukefrontend-5dzr395le-nzero.vercel.app');
+    const response = await page.goto('https://nuke.ag');
     
     if (response) {
       const headers = response.headers();
@@ -172,7 +172,7 @@ test.describe('Feature-Specific Tests', () => {
   });
 
   test('verify page structure', async ({ page }) => {
-    await page.goto('https://nukefrontend-5dzr395le-nzero.vercel.app');
+    await page.goto('https://nuke.ag');
     await page.waitForLoadState('domcontentloaded');
     
     // Check for React root
