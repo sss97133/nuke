@@ -26,7 +26,7 @@ export function usePageTitle(title: string | (() => string)) {
   useEffect(() => {
     const resolvedTitle = typeof title === 'function' ? title() : title;
     if (resolvedTitle) {
-      document.title = `${resolvedTitle} | Nuke`;
+      document.title = resolvedTitle === 'Nuke' ? 'Nuke' : `${resolvedTitle} | Nuke`;
     }
     // Canonical URL: use nuke.ag for vehicle profile so QR codes and share links always point to the main site
     let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
