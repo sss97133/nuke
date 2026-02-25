@@ -206,7 +206,7 @@ function extractContactInfo(text: string): {
 // Core bingbot fetch + parse
 // ---------------------------------------------------------------------------
 
-async function extractFullListing(url: string): Promise<RefinedData> {
+async function extractFullListing(url: string, debug = false): Promise<RefinedData & { _debug?: Record<string, unknown> }> {
   // Normalize to www (m. returns a generic redirect for bots)
   const normalizedUrl = url
     .replace("m.facebook.com", "www.facebook.com")
@@ -228,85 +228,55 @@ async function extractFullListing(url: string): Promise<RefinedData> {
 
   const html = await resp.text();
 
-  // --- Title ---
-  const titleRaw =
-    jsonVal(html, "marketplace_listing_title") ||
-    html.match(/<meta property="og:title" content="([^"]+)"/)?.[1] ||
-    null;
-  const title = titleRaw ? decodeHtmlEntities(titleRaw) : null;
+  // -------------------------------------------------------------------------
+  // IMPORTANT: On individual listing pages, og: meta tags carry the data for
+  // the *requested* listing. JSON blobs in the page body belong to related /
+  // recommended listings — do NOT use them for primary field extraction.
+  // -------------------------------------------------------------------------
+
+  // --- Title (og:title is canonical for the requested listing) ---
+  const ogTitle = html.match(/<meta property="og:title" content="([^"]+)"/)?.[1];
+  const title = ogTitle ? decodeHtmlEntities(decodeUnicode(ogTitle)) : null;
+
+  // --- Description (og:description is full text for the requested listing) ---
+  const ogDesc = html.match(/<meta property="og:description" content="([^"]+)"/)?.[1];
+  const description = ogDesc ? decodeHtmlEntities(decodeUnicode(ogDesc)) : null;
+
+  // --- Primary image ---
+  // og:image is the high-res scontent URL for the requested listing.
+  const ogImage = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1];
+  const primaryImage = ogImage ? decodeHtmlEntities(ogImage) : null;
 
   // --- Price ---
-  const priceRaw = html.match(/"amount_with_offset_in_currency":"(\d+)"/)?.[1];
-  const offsetRaw = html.match(/"offset":(\d+)/)?.[1];
-  const offset = offsetRaw ? parseInt(offsetRaw, 10) : 100;
-  const priceFromAmount = html.match(/"amount":"([\d.]+)"/)?.[1];
-  let price: number | null = null;
-  if (priceRaw) {
-    price = parseInt(priceRaw, 10) / offset;
-  } else if (priceFromAmount) {
-    price = parseFloat(priceFromAmount);
-  }
-
-  // --- Description ---
-  // Try JSON blob first (has full text), then og:description (truncated)
-  const descJson =
-    jsonVal(html, "vehicle_description_text") ||
-    // "description":{"text":"..."} pattern
-    html.match(/"description":\{"text":"((?:[^"\\]|\\.)*)"/s)?.[1]?.replace(/\\n/g, "\n").replace(/\\\//g, "/") ||
-    null;
-  const descOg = html.match(
-    /<meta property="og:description" content="([^"]+)"/
-  )?.[1];
-  const description = descJson
-    ? decodeUnicode(descJson)
-    : descOg
-    ? decodeHtmlEntities(decodeUnicode(descOg))
-    : null;
+  // Price is NOT reliably available without auth on individual pages.
+  // Return null — callers should preserve the price already stored from the
+  // initial scrape rather than overwriting with null.
+  const price: number | null = null;
 
   // --- Mileage ---
-  // subtitle field reliably contains "180K miles" etc. in search results.
-  // Individual pages may also have driven_mileage or mileage structured data.
-  const subtitle = jsonVal(html, "subtitle");
-  const mileageStr =
-    subtitle ||
-    jsonVal(html, "driven_mileage") ||
-    html.match(/"kms_formatted":"([^"]+)"/)?.[1] ||
-    null;
-  const mileage = mileageStr ? parseMileage(mileageStr) : null;
+  // Parse from description if seller mentioned it (common: "180k miles", "88,000 mi")
+  const mileage = description ? parseMileage(description) : null;
 
-  // --- Vehicle attributes ---
-  const transmission = jsonVal(html, "transmission");
-  const exteriorColor = jsonVal(html, "exterior_color");
-  const interiorColor = jsonVal(html, "interior_color");
+  // --- Vehicle attributes from description text ---
+  const transmission =
+    description?.match(/\b(automatic|manual|standard|auto)\b/i)?.[1]?.toLowerCase() ?? null;
 
   // --- Location ---
-  const city = jsonVal(html, "city");
-  const state = jsonVal(html, "state");
-  const location = city && state ? `${city}, ${state}` : city || null;
+  // og:url contains the item ID; location may appear in description or not at all.
+  // We don't extract location here — the initial scrape already captured it.
+  const location: string | null = null;
 
   // --- Seller ---
-  // In search result pages the seller block is: "marketplace_listing_seller":{...,"name":"X"}
-  const sellerBlock = html.match(
-    /"marketplace_listing_seller":\{([^}]{0,400})\}/s
-  )?.[1];
-  const sellerName = sellerBlock
-    ? (sellerBlock.match(/"name":"([^"]+)"/)?.[1] ?? null)
-    : null;
+  // Not available without auth on item pages.
+  const sellerName: string | null = null;
 
   // --- Images ---
-  // Bingbot gets lookaside crawler URLs (not scontent) for the primary photo.
-  // Collect all unique URIs that look like image URLs.
   const imageSet = new Set<string>();
-  const ogImage = html.match(
-    /<meta property="og:image" content="([^"]+)"/
-  )?.[1];
-  if (ogImage) imageSet.add(decodeHtmlEntities(ogImage));
+  if (primaryImage) imageSet.add(primaryImage);
 
-  for (const m of html.matchAll(
-    /"uri":"(https:\/\/(?:lookaside\.fbsbx\.com|scontent)[^"]+)"/g
-  )) {
+  // Additional scontent images embedded in the page (if any)
+  for (const m of html.matchAll(/"uri":"(https:\/\/scontent[^"]+)"/g)) {
     const u = decodeUnicode(m[1].replace(/\\\//g, "/"));
-    // Skip tiny thumbnails and emoji
     if (!u.includes("emoji") && !u.includes("_s.") && !u.includes("_t.")) {
       imageSet.add(u);
     }
@@ -314,19 +284,20 @@ async function extractFullListing(url: string): Promise<RefinedData> {
 
   const all_images = [...imageSet].slice(0, 20);
 
-  // --- Contact info in description ---
-  const contactSrc = [description, subtitle].filter(Boolean).join(" ");
-  const { phones, emails } = extractContactInfo(contactSrc);
+  // --- Contact info from description ---
+  const { phones, emails } = extractContactInfo(description ?? "");
 
   // --- Parse title for year/make/model ---
-  const parsed = title ? parseTitle(title) : { year: null, make: null, model: null, cleanPrice: null };
+  const parsed = title
+    ? parseTitle(title)
+    : { year: null, make: null, model: null, cleanPrice: null };
 
-  return {
+  const result: RefinedData & { _debug?: Record<string, unknown> } = {
     title,
     parsed_year: parsed.year,
     parsed_make: parsed.make,
     parsed_model: parsed.model,
-    price: price ?? parsed.cleanPrice,
+    price, // null — preserve existing price in caller
     description,
     seller_name: sellerName,
     all_images,
@@ -334,10 +305,23 @@ async function extractFullListing(url: string): Promise<RefinedData> {
     contact_emails: emails,
     mileage,
     transmission,
-    exterior_color: exteriorColor,
-    interior_color: interiorColor,
-    location,
+    exterior_color: null,
+    interior_color: null,
+    location, // null — preserve existing location in caller
   };
+
+  if (debug) {
+    result._debug = {
+      http_status: resp.status,
+      html_size: html.length,
+      og_title: ogTitle ?? null,
+      og_desc: ogDesc?.slice(0, 200) ?? null,
+      og_image: ogImage?.slice(0, 100) ?? null,
+      html_snippet: html.slice(0, 500),
+    };
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -356,51 +340,46 @@ Deno.serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const { facebook_id, url, batch_size } = body;
+    const { facebook_id, url, batch_size, debug } = body;
 
     // ---- Single listing ----
     if (facebook_id || url) {
       const listingUrl =
         url || `https://www.facebook.com/marketplace/item/${facebook_id}/`;
 
-      const refined = await extractFullListing(listingUrl);
+      const refined = await extractFullListing(listingUrl, !!debug);
 
       if (facebook_id) {
         const updates: Record<string, unknown> = {
-          title: refined.title,
-          parsed_year: refined.parsed_year,
-          parsed_make: refined.parsed_make ? refined.parsed_make.toLowerCase() : null,
-          parsed_model: refined.parsed_model ? refined.parsed_model.toLowerCase() : null,
-          // Also write to legacy extracted_* columns for backwards compat
-          extracted_year: refined.parsed_year,
-          extracted_make: refined.parsed_make ? refined.parsed_make.toLowerCase() : null,
-          extracted_model: refined.parsed_model ? refined.parsed_model.toLowerCase() : null,
-          description: refined.description,
-          seller_name: refined.seller_name,
-          all_images: refined.all_images.length > 0 ? refined.all_images : undefined,
-          // extracted_mileage = legacy column, mileage = new column
-          mileage: refined.mileage,
-          extracted_mileage: refined.mileage,
-          transmission: refined.transmission,
-          exterior_color: refined.exterior_color,
-          interior_color: refined.interior_color,
-          location: refined.location,
           refined_at: new Date().toISOString(),
         };
-        if (refined.price !== null) {
-          updates.price = refined.price;
-          updates.asking_price = refined.price;
+        // Only write non-null values to avoid clobbering existing scraped data
+        if (refined.title) updates.title = refined.title;
+        if (refined.parsed_year) {
+          updates.parsed_year = refined.parsed_year;
+          updates.extracted_year = refined.parsed_year;
         }
+        if (refined.parsed_make) {
+          updates.parsed_make = refined.parsed_make.toLowerCase();
+          updates.extracted_make = refined.parsed_make.toLowerCase();
+        }
+        if (refined.parsed_model) {
+          updates.parsed_model = refined.parsed_model.toLowerCase();
+          updates.extracted_model = refined.parsed_model.toLowerCase();
+        }
+        if (refined.description) updates.description = refined.description;
+        if (refined.mileage) {
+          updates.mileage = refined.mileage;
+          updates.extracted_mileage = refined.mileage;
+        }
+        if (refined.transmission) updates.transmission = refined.transmission;
+        if (refined.all_images.length > 0) updates.all_images = refined.all_images;
         // Pack phones/emails into contact_info JSONB (existing column)
         if (refined.contact_phones.length > 0 || refined.contact_emails.length > 0) {
           updates.contact_info = {
             phones: refined.contact_phones,
             emails: refined.contact_emails,
           };
-        }
-        // Remove undefined keys
-        for (const k of Object.keys(updates)) {
-          if (updates[k] === undefined) delete updates[k];
         }
 
         const { error: updateError } = await supabase
@@ -445,36 +424,33 @@ Deno.serve(async (req) => {
         const refined = await extractFullListing(listing.url);
 
         const updates: Record<string, unknown> = {
-          parsed_year: refined.parsed_year,
-          parsed_make: refined.parsed_make ? refined.parsed_make.toLowerCase() : null,
-          parsed_model: refined.parsed_model ? refined.parsed_model.toLowerCase() : null,
-          extracted_year: refined.parsed_year,
-          extracted_make: refined.parsed_make ? refined.parsed_make.toLowerCase() : null,
-          extracted_model: refined.parsed_model ? refined.parsed_model.toLowerCase() : null,
-          description: refined.description,
-          seller_name: refined.seller_name,
-          mileage: refined.mileage,
-          extracted_mileage: refined.mileage,
-          transmission: refined.transmission,
-          exterior_color: refined.exterior_color,
-          interior_color: refined.interior_color,
-          location: refined.location,
           refined_at: new Date().toISOString(),
         };
-        if (refined.price !== null) {
-          updates.price = refined.price;
-          updates.asking_price = refined.price;
+        if (refined.title) updates.title = refined.title;
+        if (refined.parsed_year) {
+          updates.parsed_year = refined.parsed_year;
+          updates.extracted_year = refined.parsed_year;
         }
+        if (refined.parsed_make) {
+          updates.parsed_make = refined.parsed_make.toLowerCase();
+          updates.extracted_make = refined.parsed_make.toLowerCase();
+        }
+        if (refined.parsed_model) {
+          updates.parsed_model = refined.parsed_model.toLowerCase();
+          updates.extracted_model = refined.parsed_model.toLowerCase();
+        }
+        if (refined.description) updates.description = refined.description;
+        if (refined.mileage) {
+          updates.mileage = refined.mileage;
+          updates.extracted_mileage = refined.mileage;
+        }
+        if (refined.transmission) updates.transmission = refined.transmission;
         if (refined.all_images.length > 0) updates.all_images = refined.all_images;
         if (refined.contact_phones.length > 0 || refined.contact_emails.length > 0) {
           updates.contact_info = {
             phones: refined.contact_phones,
             emails: refined.contact_emails,
           };
-        }
-
-        for (const k of Object.keys(updates)) {
-          if (updates[k] === undefined || updates[k] === null) delete updates[k];
         }
 
         await supabase
