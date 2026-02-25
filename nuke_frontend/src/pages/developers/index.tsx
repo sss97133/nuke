@@ -300,51 +300,58 @@ const SECTIONS = [
 /* ------------------------------------------------------------------ */
 
 function OverviewSection() {
+  const [stats, setStats] = useState<{ vehicles: string; observations: string; valuations: string; images: string } | null>(null);
+
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/functions/v1/db-stats`)
+      .then(r => r.json())
+      .then((d) => {
+        const fmtK = (n: number) => n >= 1_000_000
+          ? (Math.floor(n / 100_000) / 10).toFixed(1) + 'M'
+          : Math.floor(n / 1_000) + 'K';
+        setStats({
+          vehicles:     fmtK(d.vehicles   || d.total_vehicles || 0),
+          observations: fmtK(d.details?.observations?.total || d.observations || 0),
+          valuations:   fmtK(d.nuke_estimates || d.details?.valuations?.nuke_estimates || 0),
+          images:       fmtK(d.images     || d.total_images  || 0),
+        });
+      })
+      .catch(() => { /* leave null — no stat bar shown on error */ });
+  }, []);
+
+  const statRows = stats
+    ? [
+        { value: stats.vehicles,     label: 'Vehicles' },
+        { value: stats.observations, label: 'Observations' },
+        { value: stats.valuations,   label: 'Valuations' },
+        { value: stats.images,       label: 'Images' },
+      ]
+    : null;
+
   return (
     <div>
       <h1 style={s.h1}>Nuke Developer Documentation</h1>
       <p style={s.p}>
-        Nuke is a vehicle intelligence platform with data on 938K+ collector and enthusiast vehicles.
-        Every data point has provenance tracking and confidence scores. Build apps that search, analyze,
-        value, and extract vehicle data from 34+ source platforms.
+        Nuke is a vehicle intelligence platform. Every data point has provenance tracking
+        and confidence scores. Build apps that search, analyze, value, and extract vehicle
+        data from 34+ source platforms.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
-        {[
-          { value: '938K+', label: 'Vehicles' },
-          { value: '625K+', label: 'Observations' },
-          { value: '507K+', label: 'Valuations' },
-          { value: '30M+', label: 'Images' },
-        ].map((stat) => (
-          <div key={stat.label} style={{
-            background: 'var(--grey-100)',
-            border: '1px solid var(--border-light)',
-            padding: 'var(--space-3)',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '10pt', fontWeight: 'bold', fontFamily: 'monospace' }}>{stat.value}</div>
-            <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      <h2 style={s.h2}>What You Can Build</h2>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-        {[
-          { title: 'AI Valuation Agent', desc: 'Build agents that estimate fair market value using 8 signal sources — comparables, sentiment, rarity, bid curves, and more.' },
-          { title: 'Inventory Intelligence', desc: 'Feed dealer or shop inventory into the platform. Get automatic market comps, price positioning, and demand signals.' },
-          { title: 'Restoration Tracker', desc: 'Ingest photos and receipts via the Business Data API. AI extracts work type, parts, costs, and builds a service timeline.' },
-          { title: 'Market Research Tool', desc: 'Query 625K+ observations across 34 platforms. Analyze trends by segment, era, or specific model with structured data.' },
-          { title: 'Listing Extractor', desc: 'Point the AI extraction endpoint at any car listing URL. Get structured year/make/model/price/images data back.' },
-          { title: 'MCP-Powered Chat', desc: 'Connect any AI agent to the Nuke MCP server. Give your chatbot instant access to vehicle search, valuation, and identification.' },
-        ].map((item) => (
-          <div key={item.title} style={s.card}>
-            <div style={{ fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>{item.title}</div>
-            <div style={{ color: 'var(--text-muted)', lineHeight: '1.4' }}>{item.desc}</div>
-          </div>
-        ))}
-      </div>
+      {statRows && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
+          {statRows.map((stat) => (
+            <div key={stat.label} style={{
+              background: 'var(--grey-100)',
+              border: '1px solid var(--border-light)',
+              padding: 'var(--space-3)',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '10pt', fontWeight: 'bold', fontFamily: 'monospace' }}>{stat.value}</div>
+              <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <h2 style={s.h2}>API Surface</h2>
       <table style={s.table}>
@@ -1612,7 +1619,7 @@ function ValuationsSection() {
       <h1 style={s.h1}>Valuations (The Nuke Estimate)</h1>
       <p style={s.p}>
         The Nuke Estimate is an 8-signal AI valuation that combines comparable sales, community sentiment,
-        rarity data, bid curves, market trends, and more. Currently covering 506K+ vehicles (62.4% of the database).
+        rarity data, bid curves, market trends, and more.
       </p>
 
       <div style={s.endpoint}>
