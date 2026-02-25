@@ -24,6 +24,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
   const [inlineInput, setInlineInput] = useState<{ action: string; value: string } | null>(null);
   const proof = entry.market_proof_data;
   const hasUrl = entry.discovery_url?.startsWith('http');
+  const clUrl = !hasUrl && entry.discovery_url?.startsWith('cl://') ? entry.discovery_url : null;
   const profit = entry.estimated_profit || proof?.net_profit || 0;
   const roi = proof?.roi_pct || 0;
   const location = [entry.location_city, entry.location_state].filter(Boolean).join(', ');
@@ -73,6 +74,19 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
         <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', fontWeight: 700 }}>
           {entry.year || '?'} {entry.make} {entry.model || ''}
           {location && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>{location}</span>}
+          {hasUrl && (
+            <a
+              href={entry.discovery_url!}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400, fontSize: '9pt', textDecoration: 'none' }}
+              title="View source listing"
+            >↗</a>
+          )}
+          {clUrl && (
+            <span style={{ marginLeft: 8, color: 'var(--text-disabled)', fontWeight: 400, fontSize: '9pt' }} title={clUrl}>CL</span>
+          )}
         </td>
         <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>
           {scoreTxt(entry.deal_score)}
@@ -169,6 +183,11 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                   >
                     View Listing →
                   </a>
+                )}
+                {clUrl && (
+                  <div style={{ marginBottom: 'var(--space-1)', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '8pt', wordBreak: 'break-all' }}>
+                    {clUrl}
+                  </div>
                 )}
                 {entry.discovery_source && (
                   <div style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-1)' }}>Source: {entry.discovery_source}</div>
