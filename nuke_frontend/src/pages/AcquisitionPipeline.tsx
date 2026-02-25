@@ -27,11 +27,21 @@ function scoreTxt(score: number | null): string {
   return 'PASS';
 }
 
+function stalenessInfo(discoveryDate: string | null, stageUpdatedAt: string | null): { label: string; color: string } | null {
+  const ref = stageUpdatedAt || discoveryDate;
+  if (!ref) return null;
+  const days = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+  if (days >= 30) return { label: `${days}d`, color: '#c0392b' };
+  if (days >= 14) return { label: `${days}d`, color: '#e67e22' };
+  return null;
+}
+
 function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: string, action: string, params?: Record<string, unknown>) => void }) {
   const [open, setOpen] = useState(false);
   const [inlineInput, setInlineInput] = useState<{ action: string; value: string } | null>(null);
   const proof = entry.market_proof_data;
   const hasUrl = entry.discovery_url?.startsWith('http');
+  const stale = stalenessInfo(entry.discovery_date, entry.stage_updated_at);
   const clUrl = !hasUrl && entry.discovery_url?.startsWith('cl://') ? entry.discovery_url : null;
   const profit = entry.estimated_profit || proof?.net_profit || 0;
   const roi = proof?.roi_pct || 0;
@@ -106,6 +116,11 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
         <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>
           {scoreTxt(entry.deal_score)}
           {entry.deal_score != null && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>{entry.deal_score}</span>}
+          {stale && (
+            <span title={`Discovery is ${stale.label} old — comps may be stale`} style={{ marginLeft: 6, color: stale.color, fontWeight: 700, fontSize: '7pt' }}>
+              {stale.label}
+            </span>
+          )}
         </td>
         <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontFamily: 'monospace' }}>
           {fmt(entry.asking_price)}
