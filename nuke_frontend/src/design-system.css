@@ -2132,7 +2132,7 @@ body {
 /* Vehicle Profile Two Column Layout */
 .vehicle-profile-two-column {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
 }
 

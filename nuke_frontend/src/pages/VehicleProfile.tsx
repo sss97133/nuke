@@ -7,12 +7,12 @@ import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
 import { useAdminAccess } from '../hooks/useAdminAccess';
 import { TimelineEventService } from '../services/timelineEventService';
-import AddEventWizard from '../components/AddEventWizard';
-import EventMap from '../components/EventMap';
-// AppLayout now provided globally by App.tsx
-import VehicleDataEditor from '../components/vehicle/VehicleDataEditor';
-import EnhancedImageTagger from '../components/vehicle/EnhancedImageTagger';
-import { VisualValuationBreakdown } from '../components/vehicle/VisualValuationBreakdown';
+// Lazy-load heavy tab-specific and modal components
+const AddEventWizard = React.lazy(() => import('../components/AddEventWizard'));
+const EventMap = React.lazy(() => import('../components/EventMap'));
+const VehicleDataEditor = React.lazy(() => import('../components/vehicle/VehicleDataEditor'));
+const EnhancedImageTagger = React.lazy(() => import('../components/vehicle/EnhancedImageTagger'));
+const VisualValuationBreakdown = React.lazy(() => import('../components/vehicle/VisualValuationBreakdown').then(m => ({ default: m.VisualValuationBreakdown })));
 // Lazy load vehicle profile components to avoid circular dependencies
 const VehicleHeader = React.lazy(() => import('./vehicle-profile/VehicleHeader'));
 const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroImage'));
@@ -27,47 +27,47 @@ import type {
   LiveSession
 } from './vehicle-profile/types';
 import '../design-system.css';
-import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
+const VehicleShareHolders = React.lazy(() => import('../components/vehicle/VehicleShareHolders'));
 import FinancialProducts from '../components/financial/FinancialProducts';
-import ExternalListingCard from '../components/vehicle/ExternalListingCard';
+const ExternalListingCard = React.lazy(() => import('../components/vehicle/ExternalListingCard'));
 import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
-import AddOrganizationRelationship from '../components/vehicle/AddOrganizationRelationship';
-import ValuationCitations from '../components/vehicle/ValuationCitations';
-import { PartsQuoteGenerator } from '../components/PartsQuoteGenerator';
+const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
+const ValuationCitations = React.lazy(() => import('../components/vehicle/ValuationCitations'));
+const PartsQuoteGenerator = React.lazy(() => import('../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 import WiringQueryContextBar from '../components/wiring/WiringQueryContextBar';
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
-import LiveAuctionBanner from '../components/auction/LiveAuctionBanner';
-import ExternalAuctionLiveBanner from '../components/auction/ExternalAuctionLiveBanner';
+const LiveAuctionBanner = React.lazy(() => import('../components/auction/LiveAuctionBanner'));
+const ExternalAuctionLiveBanner = React.lazy(() => import('../components/auction/ExternalAuctionLiveBanner'));
 import { resolveCurrencyCode, formatCurrencyAmount } from '../utils/currency';
-import TransactionHistory from '../components/vehicle/TransactionHistory';
-import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
-import { BATListingManager } from '../components/vehicle/BATListingManager';
-import VehicleDescriptionCard from '../components/vehicle/VehicleDescriptionCard';
-import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
-import VehicleCommunityInsights from '../components/vehicle/VehicleCommunityInsights';
-import VehicleDocumentIntelligence from '../components/vehicle/VehicleDocumentIntelligence';
-import VehicleROISummaryCard from '../components/vehicle/VehicleROISummaryCard';
-import VehiclePerformanceCard from '../components/vehicle/VehiclePerformanceCard';
-import { VehiclePricingValueCard } from '../components/vehicle/VehiclePricingValueCard';
-import NukeEstimatePanel from '../components/vehicle/NukeEstimatePanel';
-import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
+const TransactionHistory = React.lazy(() => import('../components/vehicle/TransactionHistory'));
+const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
+const BATListingManager = React.lazy(() => import('../components/vehicle/BATListingManager').then(m => ({ default: m.BATListingManager })));
+const VehicleDescriptionCard = React.lazy(() => import('../components/vehicle/VehicleDescriptionCard'));
+const VehicleCommentsCard = React.lazy(() => import('../components/vehicle/VehicleCommentsCard'));
+const VehicleCommunityInsights = React.lazy(() => import('../components/vehicle/VehicleCommunityInsights'));
+const VehicleDocumentIntelligence = React.lazy(() => import('../components/vehicle/VehicleDocumentIntelligence'));
+const VehicleROISummaryCard = React.lazy(() => import('../components/vehicle/VehicleROISummaryCard'));
+const VehiclePerformanceCard = React.lazy(() => import('../components/vehicle/VehiclePerformanceCard'));
+const VehiclePricingValueCard = React.lazy(() => import('../components/vehicle/VehiclePricingValueCard').then(m => ({ default: m.VehiclePricingValueCard })));
+const NukeEstimatePanel = React.lazy(() => import('../components/vehicle/NukeEstimatePanel'));
+const VehicleStructuredListingDataCard = React.lazy(() => import('./vehicle-profile/VehicleStructuredListingDataCard').then(m => ({ default: m.VehicleStructuredListingDataCard })));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
-import VehicleAuctionQuickStartCard from '../components/auction/VehicleAuctionQuickStartCard';
+const VehicleAuctionQuickStartCard = React.lazy(() => import('../components/auction/VehicleAuctionQuickStartCard'));
 // Lazy load heavy components to avoid circular dependencies
 const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
 import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 import type { Session } from '@supabase/supabase-js';
-import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
-import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel';
+const VehicleReferenceLibrary = React.lazy(() => import('../components/vehicle/VehicleReferenceLibrary'));
+const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 import { AdminNotificationService } from '../services/adminNotificationService';
-import ImageGallery from '../components/images/ImageGallery';
-import VehicleVideoSection from '../components/vehicle/VehicleVideoSection';
-import { VehicleDataGapsCard } from '../components/vehicle/VehicleDataGapsCard';
-import VehicleResearchItemsCard from '../components/vehicle/VehicleResearchItemsCard';
-import { VehicleLedgerDocumentsCard } from '../components/vehicle/VehicleLedgerDocumentsCard';
-import VehicleDealJacketForensicsCard from '../components/vehicle/VehicleDealJacketForensicsCard';
-import VehicleStreamingCard from '../components/vehicle/VehicleStreamingCard';
+const ImageGallery = React.lazy(() => import('../components/images/ImageGallery'));
+const VehicleVideoSection = React.lazy(() => import('../components/vehicle/VehicleVideoSection'));
+const VehicleDataGapsCard = React.lazy(() => import('../components/vehicle/VehicleDataGapsCard').then(m => ({ default: m.VehicleDataGapsCard })));
+const VehicleResearchItemsCard = React.lazy(() => import('../components/vehicle/VehicleResearchItemsCard'));
+const VehicleLedgerDocumentsCard = React.lazy(() => import('../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
+const VehicleDealJacketForensicsCard = React.lazy(() => import('../components/vehicle/VehicleDealJacketForensicsCard'));
+const VehicleStreamingCard = React.lazy(() => import('../components/vehicle/VehicleStreamingCard'));
 import { CollapsibleWidget } from '../components/ui/CollapsibleWidget';
 
 const WORKSPACE_TABS = [
@@ -3639,23 +3639,21 @@ const VehicleProfile: React.FC = () => {
 
     return (
       <>
-        {/* Primary Image and Timeline - Evidence tab only */}
-        {isEvidence && (
-          <section className="section">
-            <CollapsibleWidget
-              title="Timeline"
-              defaultCollapsed={true}
-              badge={<span className="text-xs text-gray-500 dark:text-gray-400">{timelineEvents.length} event{timelineEvents.length === 1 ? '' : 's'}</span>}
-            >
-              <VehicleTimelineSection
-                vehicle={vehicle}
-                session={session}
-                permissions={permissions}
-                onAddEventClick={() => setShowAddEvent(true)}
-              />
-            </CollapsibleWidget>
-          </section>
-        )}
+        {/* Primary Image and Timeline */}
+        <section className="section">
+          <CollapsibleWidget
+            title="Timeline"
+            defaultCollapsed={false}
+            badge={<span className="text-xs text-gray-500 dark:text-gray-400">{timelineEvents.length} event{timelineEvents.length === 1 ? '' : 's'}</span>}
+          >
+            <VehicleTimelineSection
+              vehicle={vehicle}
+              session={session}
+              permissions={permissions}
+              onAddEventClick={() => setShowAddEvent(true)}
+            />
+          </CollapsibleWidget>
+        </section>
 
         {/* Two Column Layout: Left (vehicle info, investment, ref docs, description, comments & bids, privacy) | Right (image gallery) */}
         <section className="section">
@@ -3919,87 +3917,77 @@ const VehicleProfile: React.FC = () => {
                 </CollapsibleWidget>
               )}
 
-              {/* Description — Evidence tab */}
-              {isEvidence && (
-                <CollapsibleWidget
-                  title="Description"
-                  defaultCollapsed={true}
-                  badge={vehicle.description ? <span className="text-xs text-gray-500 dark:text-gray-400" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>{String(vehicle.description).slice(0, 80)}{String(vehicle.description).length > 80 ? '...' : ''}</span> : undefined}
-                >
-                  <VehicleDescriptionCard
-                    vehicleId={vehicle.id}
-                    initialDescription={vehicle.description}
-                    isEditable={canEdit}
-                    onUpdate={() => {}}
-                  />
-                </CollapsibleWidget>
-              )}
+              {/* Description */}
+              <CollapsibleWidget
+                title="Description"
+                defaultCollapsed={false}
+                badge={vehicle.description ? <span className="text-xs text-gray-500 dark:text-gray-400" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>{String(vehicle.description).slice(0, 80)}{String(vehicle.description).length > 80 ? '...' : ''}</span> : undefined}
+              >
+                <VehicleDescriptionCard
+                  vehicleId={vehicle.id}
+                  initialDescription={vehicle.description}
+                  isEditable={canEdit}
+                  onUpdate={() => {}}
+                />
+              </CollapsibleWidget>
 
-              {/* Data sources — Evidence tab */}
-              {isEvidence && (
-                <CollapsibleWidget title="Data Sources" defaultCollapsed={true} badge={dataSources.length > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">{dataSources.length} source{dataSources.length === 1 ? '' : 's'}</span> : undefined}>
-                  <div>
-                    {(importMeta.builder || importMeta.seller) && (
-                      <div className="text-small text-muted" style={{ marginBottom: '8px' }}>
-                        {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
-                        {importMeta.builder && importMeta.seller ? ' • ' : null}
-                        {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
-                      </div>
-                    )}
-                    {dataSources.length === 0 ? (
-                      <div className="text-small text-muted">No external sources attached yet.</div>
-                    ) : (
-                      <ul style={{ margin: '0', paddingLeft: '18px' }}>
-                        {dataSources.map((url) => (
-                          <li key={url} className="text-small">
-                            <a href={url} target="_blank" rel="noreferrer">
-                              {sourceLabel(url)}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </CollapsibleWidget>
-              )}
+              {/* Data sources */}
+              <CollapsibleWidget title="Data Sources" defaultCollapsed={true} badge={dataSources.length > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">{dataSources.length} source{dataSources.length === 1 ? '' : 's'}</span> : undefined}>
+                <div>
+                  {(importMeta.builder || importMeta.seller) && (
+                    <div className="text-small text-muted" style={{ marginBottom: '8px' }}>
+                      {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
+                      {importMeta.builder && importMeta.seller ? ' • ' : null}
+                      {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
+                    </div>
+                  )}
+                  {dataSources.length === 0 ? (
+                    <div className="text-small text-muted">No external sources attached yet.</div>
+                  ) : (
+                    <ul style={{ margin: '0', paddingLeft: '18px' }}>
+                      {dataSources.map((url) => (
+                        <li key={url} className="text-small">
+                          <a href={url} target="_blank" rel="noreferrer">
+                            {sourceLabel(url)}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </CollapsibleWidget>
 
-              {/* Community Insights — Evidence tab */}
-              {isEvidence && (
-                <CollapsibleWidget title="Community Insights" defaultCollapsed={true}>
-                  <VehicleCommunityInsights vehicleId={vehicle.id} />
-                </CollapsibleWidget>
-              )}
+              {/* Community Insights */}
+              <CollapsibleWidget title="Community Insights" defaultCollapsed={true}>
+                <VehicleCommunityInsights vehicleId={vehicle.id} />
+              </CollapsibleWidget>
 
-              {/* Document Intelligence — Evidence tab */}
-              {isEvidence && (
-                <CollapsibleWidget title="Document Intelligence" defaultCollapsed={true}>
-                  <VehicleDocumentIntelligence vehicleId={vehicle.id} />
-                </CollapsibleWidget>
-              )}
+              {/* Document Intelligence */}
+              <CollapsibleWidget title="Document Intelligence" defaultCollapsed={true}>
+                <VehicleDocumentIntelligence vehicleId={vehicle.id} />
+              </CollapsibleWidget>
 
-              {/* Comments — Evidence tab */}
-              {isEvidence && (
-                <CollapsibleWidget
-                  title="Comments"
-                  defaultCollapsed={true}
-                  badge={totalCommentCount > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">View {totalCommentCount} comment{totalCommentCount === 1 ? '' : 's'}</span> : undefined}
-                >
-                  <VehicleCommentsCard
-                    vehicleId={vehicle.id}
-                    session={session}
-                    collapsed={isMobile}
-                    maxVisible={isMobile ? 6 : 50}
-                    containerId="vehicle-comments"
-                    containerStyle={{
-                      scrollMarginTop: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px + 8px)`,
-                      maxHeight: `calc(100vh - var(--header-height, 40px) - ${vehicleHeaderHeight}px - 16px)`,
-                    }}
-                  />
-                </CollapsibleWidget>
-              )}
+              {/* Comments */}
+              <CollapsibleWidget
+                title="Comments"
+                defaultCollapsed={false}
+                badge={totalCommentCount > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">View {totalCommentCount} comment{totalCommentCount === 1 ? '' : 's'}</span> : undefined}
+              >
+                <VehicleCommentsCard
+                  vehicleId={vehicle.id}
+                  session={session}
+                  collapsed={isMobile}
+                  maxVisible={isMobile ? 6 : 50}
+                  containerId="vehicle-comments"
+                  containerStyle={{
+                    scrollMarginTop: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px + 8px)`,
+                    maxHeight: `calc(100vh - var(--header-height, 40px) - ${vehicleHeaderHeight}px - 16px)`,
+                  }}
+                />
+              </CollapsibleWidget>
 
-              {/* Privacy Settings — Evidence tab */}
-              {isEvidence && !vehicle.isAnonymous && session && (
+              {/* Privacy Settings */}
+              {!vehicle.isAnonymous && session && (
                 <CollapsibleWidget title="Privacy Settings" defaultCollapsed={true} badge={<span className={`text-xs ${isPublic ? 'text-green-500' : 'text-gray-500'}`}>{isPublic ? 'Public' : 'Private'}</span>}>
                   <div className="vehicle-detail">
                     <span>Visibility</span>
@@ -4023,28 +4011,26 @@ const VehicleProfile: React.FC = () => {
               )}
             </div>
 
-            {/* Right Column: Image Gallery & Videos — Evidence tab only */}
-            {isEvidence && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Images - Collapsible */}
-                <CollapsibleGalleryCard
-                  vehicleId={vehicle.id}
-                  vehicleImages={vehicleImages}
-                  fallbackListingImageUrls={fallbackListingImageUrls}
-                  vehicle={vehicle}
-                  onImagesUpdated={() => {
-                    loadVehicle();
-                    loadTimelineEvents();
-                    loadVehicleImages();
-                  }}
-                />
+            {/* Right Column: Image Gallery & Videos */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Images - Collapsible */}
+              <CollapsibleGalleryCard
+                vehicleId={vehicle.id}
+                vehicleImages={vehicleImages}
+                fallbackListingImageUrls={fallbackListingImageUrls}
+                vehicle={vehicle}
+                onImagesUpdated={() => {
+                  loadVehicle();
+                  loadTimelineEvents();
+                  loadVehicleImages();
+                }}
+              />
 
-                {/* Video Moments - Collapsible */}
-                <CollapsibleWidget title="Videos" defaultCollapsed={true}>
-                  <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
-                </CollapsibleWidget>
-              </div>
-            )}
+              {/* Video Moments - Collapsible */}
+              <CollapsibleWidget title="Videos" defaultCollapsed={true}>
+                <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
+              </CollapsibleWidget>
+            </div>
           </div>
         </section>
       </>
@@ -4126,13 +4112,13 @@ const VehicleProfile: React.FC = () => {
 
         {/* Live Auction Banner - Show if vehicle has active Nuke auction */}
         {vehicle && (
-          <LiveAuctionBanner vehicleId={vehicle.id} />
+          <React.Suspense fallback={null}><LiveAuctionBanner vehicleId={vehicle.id} /></React.Suspense>
         )}
 
         {/* External Auction Live Banner - Show if vehicle has active BaT/C&B/etc auction */}
         {vehicle && auctionPulse?.listing_url && ['active', 'live'].includes(String(auctionPulse?.listing_status || '').toLowerCase()) && (
           <div style={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-2) auto 0' }}>
-            <ExternalAuctionLiveBanner
+            <React.Suspense fallback={null}><ExternalAuctionLiveBanner
               externalListingId={auctionPulse?.external_listing_id || null}
               platform={auctionPulse?.platform || 'bat'}
               listingUrl={auctionPulse?.listing_url || ''}
@@ -4144,7 +4130,7 @@ const VehicleProfile: React.FC = () => {
               listingStatus={auctionPulse?.listing_status || null}
               lastUpdatedAt={auctionPulse?.updated_at || null}
               currencyCode={auctionCurrency}
-            />
+            /></React.Suspense>
           </div>
         )}
 
@@ -4192,16 +4178,18 @@ const VehicleProfile: React.FC = () => {
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (
-          <AddOrganizationRelationship
-            vehicleId={vehicle.id}
-            vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-            userId={session.user.id}
-            onSuccess={() => {
-              loadLinkedOrgs(vehicle.id);
-              setShowAddOrgRelationship(false);
-            }}
-            onClose={() => setShowAddOrgRelationship(false)}
-          />
+          <React.Suspense fallback={null}>
+            <AddOrganizationRelationship
+              vehicleId={vehicle.id}
+              vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              userId={session.user.id}
+              onSuccess={() => {
+                loadLinkedOrgs(vehicle.id);
+                setShowAddOrgRelationship(false);
+              }}
+              onClose={() => setShowAddOrgRelationship(false)}
+            />
+          </React.Suspense>
         )}
 
         {/* Workspace Tab Bar */}
@@ -4247,24 +4235,26 @@ const VehicleProfile: React.FC = () => {
 
         {/* Main Content - Tab-filtered workspace */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
-          {renderWorkspaceContent()}
+          <React.Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '11px' }}>Loading...</div>}>
+            {renderWorkspaceContent()}
+          </React.Suspense>
         </div>
 
         {/* Granular Validation Popup */}
         {validationPopup.open && vehicle && (
-          <ValidationPopupV2
+          <React.Suspense fallback={null}><ValidationPopupV2
             vehicleId={vehicle.id}
             fieldName={validationPopup.fieldName}
             fieldValue={validationPopup.fieldValue}
             vehicleYear={vehicle.year}
             vehicleMake={vehicle.make}
             onClose={() => setValidationPopup(prev => ({ ...prev, open: false }))}
-          />
+          /></React.Suspense>
         )}
 
       {/* Add Event Wizard Modal */}
       {showAddEvent && (
-        <AddEventWizard
+        <React.Suspense fallback={null}><AddEventWizard
           vehicleId={vehicle.id}
           onClose={() => {
             setShowAddEvent(false);
@@ -4279,19 +4269,19 @@ const VehicleProfile: React.FC = () => {
             }));
           }}
           currentUser={session?.user || null}
-        />
+        /></React.Suspense>
       )}
 
       {/* Data Editor Modal */}
       {showDataEditor && (
-        <VehicleDataEditor
+        <React.Suspense fallback={null}><VehicleDataEditor
           vehicleId={vehicle?.id || ''}
           onClose={() => {
             setShowDataEditor(false);
             // Reload vehicle data after editing
             loadVehicle();
           }}
-        />
+        /></React.Suspense>
       )}
 
       {/* Ownership Claim Modal */}
@@ -4342,13 +4332,15 @@ const VehicleProfile: React.FC = () => {
               </button>
             </div>
             <div style={{ padding: '16px' }}>
-              <VehicleOwnershipPanel
-                vehicle={vehicle}
-                session={session}
-                isOwner={isRowOwner || isVerifiedOwner}
-                hasContributorAccess={hasContributorAccess}
-                contributorRole={contributorRole ?? undefined}
-              />
+              <React.Suspense fallback={<div style={{ padding: '12px', color: '#999' }}>Loading...</div>}>
+                <VehicleOwnershipPanel
+                  vehicle={vehicle}
+                  session={session}
+                  isOwner={isRowOwner || isVerifiedOwner}
+                  hasContributorAccess={hasContributorAccess}
+                  contributorRole={contributorRole ?? undefined}
+                />
+              </React.Suspense>
             </div>
           </div>
         </div>
