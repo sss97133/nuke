@@ -1,7 +1,7 @@
 # Investor Document Data Inventory
 ## Factual Data Available vs. Needed
 
-Generated: 2026-02-08 from live database queries
+Generated: {{GENERATED_DATE_ISO}} from live database queries
 
 ---
 
@@ -10,34 +10,22 @@ Generated: 2026-02-08 from live database queries
 ### Platform Scale
 | Metric | Value | Source |
 |--------|-------|--------|
-| Total vehicles tracked | 768,288 | `SELECT COUNT(*) FROM vehicles` |
-| Total vehicle images | 28,361,696 | `vehicle_images` table |
-| Total auction comments ingested | 10,876,766 | `auction_comments` table |
-| Total bids tracked | 3,486,742 | `bat_bids` table |
-| Total dollar volume tracked | $41,617,202,366 | `SUM(sale_price)` |
-| Vehicles with price data | 514,961 | `WHERE sale_price > 0` |
-| AI sentiment analyses completed | 127,109 | `comment_discoveries` |
-| Valuation estimates generated | 474,484 | `nuke_estimates` |
-| User profiles mapped | 493,265 | `bat_user_profiles` |
-| External identities | 491,605 | `external_identities` |
-| Vehicle observations | 628,695 | `vehicle_observations` |
-| Image AI extractions | 212,985 | `image_work_extractions` |
-| Image tags generated | 203,065 | `image_tags` |
-| Camera position analyses | 86,823 | `image_camera_position` |
-| Build thread posts | 58,519 | `build_posts` |
-| Timeline events | 767,940 | `timeline_events` |
-| Organization behavior signals | 137,561 | `organization_behavior_signals` |
-| Vehicle agents (autonomous) | 208,373 | `vehicle_agents` |
-| Listing page snapshots | 325,367 | `listing_page_snapshots` |
-| Field extraction log entries | 2,901,902 | `field_extraction_log` |
-| Service executions | 284,005 | `service_executions` |
-| Database size | 100 GB | `pg_database_size()` |
-| Database tables | 922 | `pg_stat_user_tables` |
-| Edge functions deployed | 310 | directory count |
+| Total vehicles tracked | {{VEHICLE_COUNT}} | `SELECT COUNT(*) FROM vehicles` |
+| Total vehicle images | {{IMAGE_COUNT_EXACT}} | `vehicle_images` table |
+| Total auction comments ingested | {{COMMENT_COUNT_EXACT}} | `auction_comments` table |
+| Total bids tracked | {{BID_COUNT}} | `bat_bids` table |
+| Total dollar volume tracked | {{TOTAL_VALUE_EXACT}} | `SUM(sale_price)` |
+| Vehicles with price data | {{VEHICLES_WITH_PRICE}} | `WHERE sale_price > 0` |
+| AI sentiment analyses completed | {{ANALYSIS_COUNT}} | `comment_discoveries` |
+| Valuation estimates generated | {{ESTIMATE_COUNT}} | `nuke_estimates` |
+| User profiles mapped | {{USER_PROFILES}} | `bat_user_profiles` |
+| External identities | {{IDENTITY_COUNT}} | `external_identities` |
+| Vehicle observations | {{OBSERVATIONS_COUNT}} | `vehicle_observations` |
+| Image AI extractions | {{IMAGE_EXTRACTIONS}} | `image_work_extractions` |
+| Database size | {{DB_SIZE_GB}} GB | `pg_database_size()` |
+| Database tables | {{TABLE_COUNT}} | `pg_stat_user_tables` |
+| Edge functions deployed | {{EDGE_FUNCTION_COUNT}} | directory count |
 | Registered data sources | 80 | `observation_sources` |
-| Distinct vehicle makes | 6,089 | `COUNT(DISTINCT make)` |
-| Distinct make/model combinations | 120,350 | `COUNT(DISTINCT make+model)` |
-| Highest value vehicle | $43,260,000 | 1962 Ferrari 250 GTO |
 
 ### Price Coverage by Decade
 | Era | Vehicles w/ Prices | Avg Sale Price | Total Value |
@@ -88,22 +76,21 @@ Generated: 2026-02-08 from live database queries
 | Dec 2025 | 9,697 | Initial extraction runs |
 | Jan 2026 | 196,417 | Pipeline activation |
 | Feb 1-8 2026 | 561,994 | Setting the foundation for autonomous |
-| Last 24 hours | 8,320 | Ongoing autonomous ingestion |
+| Last 24 hours | {{DAILY_RATE}} | Ongoing autonomous ingestion |
 
 ### Queue Health
 | Status | Count |
 |--------|-------|
-| Complete | 241,914 |
-| Pending | 69 |
-| Failed | 74,437 |
-| Skipped | 21,031 |
-| Active sources | 451 |
+| Complete | {{QUEUE_COMPLETE}} |
+| Pending | {{QUEUE_PENDING}} |
+| Failed | {{QUEUE_FAILED}} |
+| Data freshness | {{DATA_FRESHNESS}} updated within 7 days |
 
 ### Infrastructure
 | Component | Detail |
 |-----------|--------|
-| Edge Functions | 310 Deno TypeScript microservices |
-| Database Tables | 922 PostgreSQL tables |
+| Edge Functions | {{EDGE_FUNCTION_COUNT}} Deno TypeScript microservices |
+| Database Tables | {{TABLE_COUNT}} PostgreSQL tables |
 | Tech Stack | Elixir/Phoenix + React + Supabase + PyTorch |
 | Frontend Pages | 93+ pages/components |
 | SDK | Production TypeScript SDK (nuke-sdk) |
@@ -138,22 +125,20 @@ Generated: 2026-02-08 from live database queries
 ## CALCULATIONS AVAILABLE NOW (Can Compute for Documents)
 
 ### 1. Market Coverage
-- **Our vehicles**: 768,288
+- **Our vehicles**: {{VEHICLE_COUNT}}
 - **US collector vehicles**: 43 million (Hagerty)
 - **US car enthusiasts**: 69 million (Hagerty)
 - **Total insurable value**: $1 trillion+ (Hagerty)
-- **Coverage**: 1.8% of total US collector vehicles
-- **Transaction coverage**: $41.6B tracked vs $4.8B/year auction market = 8.7x annual volume
+- **Transaction coverage**: {{TOTAL_VALUE_B}} tracked vs $4.8B/year auction market
 
 ### 2. Data Density per Vehicle
-- Avg images per vehicle: 28.3M / 768K = ~36.9 images per vehicle
-- Avg comments per vehicle (BaT): 10.8M / 132K listings = ~82 comments per listing
-- Avg bids per vehicle (BaT): 3.4M / 132K = ~26 bids per listing
+- Avg images per vehicle: {{IMAGE_COUNT_M}} / {{VEHICLE_COUNT}} = ~36.9 images per vehicle
+- Avg comments per vehicle (BaT): {{COMMENT_COUNT_M}} / 132K listings = ~82 comments per listing
 
 ### 3. AI Processing Depth
-- 127,109 vehicles with sentiment analysis (16.5% of total)
-- 474,484 vehicles with valuation estimates (61.7% of total)
-- 212,985 images with AI extraction (0.75% of images - huge growth opportunity)
+- {{ANALYSIS_COUNT}} vehicles with sentiment analysis
+- {{ESTIMATE_COUNT}} vehicles with valuation estimates
+- {{IMAGE_EXTRACTIONS}} images with AI extraction
 
 ### 4. Revenue Modeling (Scenarios)
 At different API pricing tiers:
@@ -168,7 +153,7 @@ At different API pricing tiers:
 ### 5. Data Growth Projection
 - Dec→Jan growth: 20.2x (9.7K → 196K)
 - Jan→Feb (projected): 3.4x (196K → ~672K in 8 days)
-- At current daily rate (8,320/day): +3M vehicles/year
+- At current daily rate ({{DAILY_RATE}}/day): +3M vehicles/year
 - Total US collector market: 43M vehicles (Hagerty)
 - Annual auction market: $4.8B, ~71K vehicles sold (2025)
 - Global classic car market: $39.7B (2024) → $77.8B projected (2032), 8.7% CAGR
@@ -185,58 +170,20 @@ At different API pricing tiers:
 **Used in**: Teaser, BP, IM
 
 #### 3. Data Freshness Distribution ✅
-**Result**: 64.5% within 24h, 97.8% within 7 days, 100% within 30 days
-**Used in**: Teaser (97.8% stat), BP, IM
+**Result**: 64.5% within 24h, {{DATA_FRESHNESS}} within 7 days, 100% within 30 days
+**Used in**: Teaser ({{DATA_FRESHNESS}} stat), BP, IM
 
 #### 5. Organization Revenue Potential ✅
-**Result**: 2,401 businesses: 108 dealers, 67 garages, 52 auction houses, 4 restoration shops, 3 performance shops, 2,167 pending classification
+**Result**: {{ORG_COUNT}} businesses: 108 dealers, 67 garages, 52 auction houses, 4 restoration shops, 3 performance shops, remainder pending classification
 **Used in**: BP, IM
 
 #### 7. Sentiment → Price Correlation ✅
-**Result**: 100,712 vehicles analyzed. Very Negative: $13,250 median → Very Positive: $25,000 median = 89% premium. Avg sentiment: 0.79
-**Detailed**: Very Negative (1,447 vehicles, avg $17,877), Negative (2,777, avg $26,831), Neutral (8,031, avg $27,162), Positive (25,291, avg $32,430), Very Positive (63,166, avg $45,410)
+**Result**: {{ANALYSIS_COUNT}} vehicles analyzed. Very Negative: $13,250 median → Very Positive: $25,000 median = 89% premium. Avg sentiment: 0.79
 **Used in**: Teaser, BP, IM
 
 #### 8. VIN Coverage Rate ✅
-**Result**: 21.0% (161,065 of 768,309). Many collector vehicles predate VIN standardization (1981).
+**Result**: 21.0% (161,065 of {{VEHICLE_COUNT}}). Many collector vehicles predate VIN standardization (1981).
 **Used in**: BP, IM
-
-### REMAINING (Pipeline Additions to Build)
-
-#### 2. Multi-Source Correlation Score
-**Status**: Observation system has limited data (only 20 vehicles with 2+ sources). Most data flows through dedicated extractors, not the observation system yet. This stat will improve as more data migrates to observation architecture.
-**Action**: Track cross-table corroboration (vehicles with data in images + comments + bids + estimates).
-
-#### 4. User Engagement Scoring
-**What**: Activity levels of the 493K tracked users
-**Why**: Shows community/marketplace potential. "Top 10% of users participate in X auctions per year."
-
-#### 6. Geographic Coverage Heat Map
-**What**: Vehicle distribution by state/county (zip_to_fips has 41K entries)
-**Why**: Shows national coverage. Can generate an actual map.
-
-#### 9. Duplicate Detection Effectiveness
-**What**: Of 336K duplicate detection jobs, how many actual duplicates found and merged?
-**Why**: Shows data quality commitment.
-
-#### 10. Time-Series Value Index ("Nuke Index")
-**What**: Track average prices by make/model over time (we have enough historical data)
-**Why**: "Nuke Index" - like the S&P 500 for collector cars. This is the killer product.
-
----
-
-## WHAT WE CANNOT COMPUTE (Need From Founders)
-
-1. ~~**Project name**~~ → **Nuke** ✅
-2. ~~**Founder bios**~~ → Skylar Williams, Founder & CEO. Found in DB (business_related_persons). ✅
-3. ~~**Revenue model**~~ → 10-stream model documented ✅
-4. ~~**The ask**~~ → $2M Post-Money SAFE, $18M cap, detailed use of funds ✅
-5. ~~**Legal entity**~~ → Nuke Ltd, Nevada 2022, 10M auth / 1M issued, 100% founder, $0 debt ✅
-6. ~~**Competitive positioning narrative**~~ → "Enabler, Not Competitor" ✅
-7. ~~**Visual identity**~~ → Retro-modern Windows 95, #66ccff logo, 20+ automotive themes ✅
-8. ~~**Current monthly burn rate**~~ → ~$1,000-$1,600/mo (Supabase, OpenAI, Anthropic, Cursor, Firecrawl) ✅
-9. ~~**Advisory board**~~ → AI advisory agents (public) + human strategic network (Combres, Goldfarb, Lopez, Harris) ✅
-10. ~~**Co-founder need**~~ → Documented as #1 hire priority, 40% of use of funds ✅
 
 ---
 
