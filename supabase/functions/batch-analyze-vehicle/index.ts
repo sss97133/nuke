@@ -56,16 +56,20 @@ serve(async (req) => {
     console.log(`   Force reanalysis: ${force_reanalysis}`)
     console.log(`   Max images: ${max_images || 'unlimited'}`)
 
-    // Get all images for this vehicle
+    // Cap max_images to prevent unbounded AI API calls
+    const safeMaxImages = Math.max(1, Math.min(max_images || 100, 200))
+
+    // Get pending images for this vehicle (skip already completed/processing)
     let query = supabase
       .from('vehicle_images')
       .select('id, image_url, vehicle_id')
       .eq('vehicle_id', vehicle_id)
-      .order('taken_at', { ascending: true })
+      .order('created_at', { ascending: true })
+      .limit(safeMaxImages)
 
-    // Cap max_images to prevent unbounded AI API calls
-    const safeMaxImages = Math.max(1, Math.min(max_images || 50, 100))
-    query = query.limit(safeMaxImages)
+    if (!force_reanalysis) {
+      query = query.eq('ai_processing_status', 'pending')
+    }
 
     const { data: images, error: imagesError } = await query
 
@@ -75,9 +79,9 @@ serve(async (req) => {
 
     if (!images || images.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'No images found for this vehicle',
+        JSON.stringify({
+          success: true,
+          message: 'No pending images found for this vehicle',
           analyzed: 0,
           skipped: 0,
           failed: 0
@@ -86,37 +90,9 @@ serve(async (req) => {
       )
     }
 
-    console.log(`📸 Found ${images.length} images to analyze`)
+    console.log(`📸 Found ${images.length} pending images to analyze`)
 
-    // Check which images already have analysis (if not forcing)
-    let imagesToAnalyze = images
-    if (!force_reanalysis) {
-      const imageIds = images.map(img => img.id)
-      
-      // Check for existing tags
-      const { data: existingTags } = await supabase
-        .from('image_tags')
-        .select('image_id')
-        .in('image_id', imageIds)
-
-      const analyzedImageIds = new Set(existingTags?.map(tag => tag.image_id) || [])
-      
-      imagesToAnalyze = images.filter(img => !analyzedImageIds.has(img.id))
-      console.log(`   ${images.length - imagesToAnalyze.length} already analyzed, ${imagesToAnalyze.length} need analysis`)
-    }
-
-    if (imagesToAnalyze.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'All images already analyzed',
-          analyzed: 0,
-          skipped: images.length,
-          failed: 0
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const imagesToAnalyze = images
 
     // Analyze images in batches (5 at a time to avoid overwhelming)
     const batchSize = 5
@@ -200,7 +176,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: `Analyzed ${analyzed} images, ${failed} failed, ${images.length - imagesToAnalyze.length} skipped`,
+        message: `Analyzed ${analyzed} images, ${failed} failed`,
         total_images: images.length,
         analyzed,
         skipped: images.length - imagesToAnalyze.length,

@@ -1154,8 +1154,8 @@ const CursorHomepage: React.FC = () => {
               .from('vehicle_images')
               .select('vehicle_id, thumbnail_url, medium_url, image_url, variants, file_size')
               .in('vehicle_id', chunk)
-              .order('is_primary', { ascending: false })
-              .order('created_at', { ascending: true });
+              .eq('is_primary', true)
+              .limit(chunk.length);
             
             if (imgErr) {
               // Non-fatal: continue without thumbnails

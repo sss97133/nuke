@@ -265,9 +265,24 @@ export default function TechCapture() {
 
   if (!user) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'monospace', color: '#9ca3af' }}>
-        <div style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>Nuke</div>
-        <div>Sign in to start capturing</div>
+      <div style={{ minHeight: '100dvh', backgroundColor: '#111', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace' }}>
+        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#e5e7eb', marginBottom: '0.5rem' }}>Nuke</div>
+        <div style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '2rem' }}>Techs take photos, we do the rest.</div>
+        <a
+          href="/login"
+          style={{
+            padding: '0.75rem 2rem',
+            backgroundColor: '#e5e7eb',
+            color: '#111',
+            fontFamily: 'monospace',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+            textDecoration: 'none',
+            borderRadius: '0.5rem',
+          }}
+        >
+          Sign In
+        </a>
       </div>
     );
   }

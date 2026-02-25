@@ -127,7 +127,7 @@ serve(async (req) => {
 
       const { data: vehicles } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, vin, status, primary_image_url')
+        .select('id, year, make, model, vin, status, primary_image_url, seller_name, bat_seller')
         .eq('vin', vin)
         .eq('is_public', true)
         .limit(5);
@@ -141,7 +141,7 @@ serve(async (req) => {
             subtitle: `VIN: ${v.vin}`,
             image_url: v.primary_image_url,
             relevance_score: 1.0,
-            metadata: { vin: v.vin, status: v.status }
+            metadata: { vin: v.vin, status: v.status, owner: v.seller_name || v.bat_seller || undefined }
           });
         }
       }
@@ -178,7 +178,7 @@ serve(async (req) => {
 
       const { data: vehicles } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url')
+        .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url, seller_name, bat_seller')
         .eq('year', year)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
@@ -194,7 +194,7 @@ serve(async (req) => {
             subtitle: price ? `$${price.toLocaleString()}` : undefined,
             image_url: v.primary_image_url,
             relevance_score: 0.95,
-            metadata: { year: v.year, make: v.make, model: v.model }
+            metadata: { year: v.year, make: v.make, model: v.model, owner: v.seller_name || v.bat_seller || undefined }
           });
         }
       }
@@ -244,7 +244,7 @@ serve(async (req) => {
             // This works even if the RPC has schema issues
             const { data: directResults } = await supabase
               .from('vehicles')
-              .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url')
+              .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url, seller_name, bat_seller')
               .eq('is_public', true)
               .textSearch('search_vector', tsqueryStr, { type: 'plain', config: 'english' })
               .limit(vehicleLimit);
@@ -260,7 +260,7 @@ serve(async (req) => {
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
           let vehicleQuery = supabase
             .from('vehicles')
-            .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url')
+            .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url, seller_name, bat_seller')
             .eq('is_public', true);
 
           if (yearMatch) {
@@ -314,7 +314,7 @@ serve(async (req) => {
               subtitle: price ? `$${price.toLocaleString()}` : v.vin ? `VIN: ${v.vin.slice(-6)}` : undefined,
               image_url: v.primary_image_url,
               relevance_score: score,
-              metadata: { year: v.year, make: v.make, model: v.model, vin: v.vin }
+              metadata: { year: v.year, make: v.make, model: v.model, vin: v.vin, owner: v.seller_name || v.bat_seller || undefined }
             });
           }
         }
