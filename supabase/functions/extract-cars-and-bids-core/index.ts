@@ -74,6 +74,7 @@ interface CabExtractedData {
   images: string[];
   engine: string | null;
   transmission: string | null;
+  drivetrain: string | null;
   exteriorColor: string | null;
   interiorColor: string | null;
   location: string | null;
@@ -82,28 +83,48 @@ interface CabExtractedData {
   auctionStatus: string | null;
   sellerId: string | null;
   sellerName: string | null;
+  sellerProfileUrl: string | null;
   description: string | null;
   lotNumber: string | null;
-  // C&B specific fields
+  bodyStyle: string | null;
+  titleStatus: string | null;
+  noReserve: boolean;
+  viewCount: number | null;
+  watchingCount: number | null;
+  carfaxUrl: string | null;
+  videoUrl: string | null;
+  // Content sections
   dougsTake: string | null;
   highlights: string | null;
   equipment: string | null;
-  bodyStyle: string | null;
+  modifications: string | null;
+  knownFlaws: string | null;
+  recentServiceHistory: string | null;
+  otherItemsIncluded: string | null;
+  ownershipHistory: string | null;
+  sellerNotes: string | null;
+  // Stats
   commentCount: number | null;
   bidCount: number | null;
+  bidHistory: Array<{ id: string; bidder: string; amount: number; timeAgo: string | null }>;
 }
 
 /**
  * Parse C&B listing HTML directly against known DOM structure.
- * No LLM, no markdown — reads server-rendered HTML using known selectors.
+ * No LLM — reads rendered HTML using known selectors from live DOM inspection (2026-02).
  *
- * Priority order per field:
- *   1. ld+json Product schema (most reliable — server-rendered for SEO)
- *   2. og:title (mileage) / page <title> (VIN fallback)
- *   3. dt/dd pairs (all vehicle facts)
- *   4. Auction stat elements (.bid-value, .bid-icon, .num-comments)
- *   5. Detail sections (.dougs-take, .detail-highlights, .detail-equipment)
- *   6. CDN image URLs (media.carsandbids.com)
+ * Data sources (in priority order):
+ *   1. og:title → year, make, model, mileage
+ *   2. dt/dd pairs → all vehicle facts (2 separate <dl> blocks on page)
+ *   3. Auction stat elements (.bid-value, .views-icon, .watching-icon, etc.)
+ *   4. Detail sections (.dougs-take, .detail-highlights, .detail-equipment,
+ *      .detail-modifications, .detail-known_flaws, .detail-recent_service_history,
+ *      .detail-other_items, .detail-ownership_history, .detail-seller_notes)
+ *   5. CDN image URLs (media.carsandbids.com)
+ *   6. Carfax link, video, No Reserve flag, bid history
+ *
+ * NOTE: ld+json is NOT present in Firecrawl-rendered HTML (C&B is a React SPA;
+ * ld+json is only in pre-hydration server response). All data comes from rendered DOM.
  */
 function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
   const result: CabExtractedData = {
@@ -112,79 +133,64 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
     location: null, currentBid: null, endDate: null, auctionStatus: null, sellerId: null,
     sellerName: null, description: null, lotNumber: null, bodyStyle: null,
     dougsTake: null, highlights: null, equipment: null, commentCount: null, bidCount: null,
+    drivetrain: null, titleStatus: null, noReserve: false, viewCount: null, watchingCount: null,
+    carfaxUrl: null, videoUrl: null, modifications: null, knownFlaws: null,
+    recentServiceHistory: null, otherItemsIncluded: null, ownershipHistory: null, sellerNotes: null,
+    sellerProfileUrl: null, bidHistory: [],
   };
 
   try {
-    // 1. ld+json Product schema (server-rendered for SEO — most reliable)
-    for (const match of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
-      try {
-        const schema = JSON.parse(match[1]);
-        const items: any[] = Array.isArray(schema['@graph']) ? schema['@graph'] : [schema];
-        for (const item of items) {
-          const type = item['@type'];
-          if (type === 'Product' || type === 'Car' || type === 'Vehicle') {
-            if (!result.year && item.vehicleModelDate) result.year = parseInt(item.vehicleModelDate, 10);
-            if (!result.make && item.brand?.name) result.make = item.brand.name;
-            if (!result.model && item.name) {
-              // Strip "2016 Porsche " prefix from Product name if present
-              const m = item.name.match(/^\d{4}\s+\S+\s+(.+)$/);
-              result.model = m ? m[1] : item.name;
-            }
-            if (!result.vin && item.vehicleIdentificationNumber) {
-              result.vin = item.vehicleIdentificationNumber.toUpperCase();
-            }
-            if (!result.currentBid && item.offers?.price) {
-              const p = parseInt(String(item.offers.price).replace(/[^0-9]/g, ''), 10);
-              if (p > 0) result.currentBid = p;
-            }
-            // Hero image from schema
-            const img = Array.isArray(item.image) ? item.image[0] : item.image;
-            if (typeof img === 'string' && img.includes('carsandbids')) result.images.push(img);
-          }
-        }
-      } catch { /* skip malformed ld+json */ }
-    }
-    if (result.year) console.log(`✅ C&B [ld+json]: ${result.year} ${result.make} ${result.model}, VIN=${result.vin}`);
+    // Helper: strip <button> elements first, then all HTML tags
+    const cleanDdText = (raw: string): string =>
+      raw.replace(/<button[^>]*>[\s\S]*?<\/button>/gi, '')
+         .replace(/<[^>]+>/g, ' ')
+         .replace(/\s+/g, ' ')
+         .trim();
 
-    // 2. og:title — extract mileage (and year/make/model as fallback)
-    // Format: "2016 Porsche Boxster Spyder - ~21,000 Miles, 6-Speed Manual, Silver"
+    // 1. og:title — primary source for year/make/model + mileage
+    // Format: "2016 Porsche Boxster Spyder - ~12,800 Miles, 6-Speed Manual, 3.8L Flat-6, Garnet Red Interior"
     const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
     if (ogTitleMatch) {
       const ogTitle = ogTitleMatch[1];
-      if (!result.year || !result.make) {
-        const ymm = ogTitle.match(/^(\d{4})\s+(\S+)\s+([^-]+)/);
+      const ymm = ogTitle.match(/^(\d{4})\s+(\S+)\s+([^-]+)/);
+      if (ymm) {
+        result.year = parseInt(ymm[1], 10);
+        result.make = ymm[2].trim();
+        result.model = ymm[3].trim();
+      }
+      const mi = ogTitle.match(/~?([\d,]+)\s*Miles/i);
+      if (mi) result.mileage = parseInt(mi[1].replace(/,/g, ''), 10) || null;
+    }
+
+    // h1 as title fallback
+    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    if (h1Match) {
+      const h1Text = h1Match[1].trim();
+      if (!result.year) {
+        const ymm = h1Text.match(/^(\d{4})\s+(\S+)\s+(.+)$/);
         if (ymm) {
           result.year = parseInt(ymm[1], 10);
           result.make = ymm[2].trim();
           result.model = ymm[3].trim();
         }
       }
-      if (!result.mileage) {
-        const mi = ogTitle.match(/~?([\d,]+)\s*Miles/i);
-        if (mi) result.mileage = parseInt(mi[1].replace(/,/g, ''), 10) || null;
-      }
     }
 
-    // Build title
     if (result.year && result.make && result.model) {
       result.title = `${result.year} ${result.make} ${result.model}`;
     }
 
-    // 3. <title> tag — VIN fallback ("VIN: XXXXXXXXXXXXXXXXX")
-    if (!result.vin) {
-      const titleEl = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-      if (titleEl) {
-        const v = titleEl[1].match(/VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i);
-        if (v) result.vin = v[1].toUpperCase();
-      }
-    }
+    // 2. No Reserve flag
+    result.noReserve = /cnb-nr-tag/i.test(html) || /no\s+reserve/i.test(html);
 
-    // 4. dt/dd pairs — all vehicle facts
-    // <dt>Mileage</dt><dd>21,000</dd> — may have whitespace/tags between
+    // 3. dt/dd pairs — ALL vehicle facts
+    // C&B has 2 <dl> blocks: quick-facts (Make/Model/Mileage/VIN/Title Status/Location/Seller)
+    // and spec dl (Engine/Drivetrain/Transmission/Body Style/Exterior Color/Interior Color/Seller Type)
+    // IMPORTANT: Model dd contains a <button>Save</button> — must strip buttons before reading
     for (const match of html.matchAll(/<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi)) {
-      const label = match[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
-      const value = match[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      const label = cleanDdText(match[1]).toLowerCase();
+      const value = cleanDdText(match[2]);
       if (!value || !label) continue;
       switch (label) {
         case 'make': if (!result.make) result.make = value; break;
@@ -197,7 +203,9 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
           break;
         }
         case 'vin': if (!result.vin && value.length >= 11) result.vin = value.toUpperCase(); break;
+        case 'title status': if (!result.titleStatus) result.titleStatus = value; break;
         case 'engine': if (!result.engine) result.engine = value; break;
+        case 'drivetrain': if (!result.drivetrain) result.drivetrain = value; break;
         case 'transmission': if (!result.transmission) result.transmission = value; break;
         case 'body style': if (!result.bodyStyle) result.bodyStyle = value; break;
         case 'exterior color': if (!result.exteriorColor) result.exteriorColor = value; break;
@@ -214,85 +222,21 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
         }
       }
     }
-    console.log(`✅ C&B [dt/dd]: mileage=${result.mileage}, vin=${result.vin}, engine=${result.engine}, trans=${result.transmission}`);
+    console.log(`✅ C&B [dt/dd]: mileage=${result.mileage}, vin=${result.vin}, engine=${result.engine}, trans=${result.transmission}, drivetrain=${result.drivetrain}, titleStatus=${result.titleStatus}`);
 
-    // 5. Auction stats
-    // Bid value: class="bid-value">$52,000
-    if (!result.currentBid) {
-      const bidValMatch = html.match(/class=["'][^"']*bid-value[^"']*["'][^>]*>\s*\$?([\d,]+)/i);
-      if (bidValMatch) {
-        const b = parseInt(bidValMatch[1].replace(/,/g, ''), 10);
-        if (b > 0) result.currentBid = b;
+    // Update title with corrected make/model from dt/dd
+    if (result.year && result.make && result.model && !result.title) {
+      result.title = `${result.year} ${result.make} ${result.model}`;
+    }
+
+    // 4. VIN from <title> tag ("VIN: XXXXXXXXXXXXXXXXX") and plain text fallbacks
+    if (!result.vin) {
+      const titleEl = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      if (titleEl) {
+        const v = titleEl[1].match(/VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i);
+        if (v) result.vin = v[1].toUpperCase();
       }
     }
-
-    // Auction status
-    if (!result.auctionStatus) {
-      if (/sold\s+for\s+\$/i.test(html) || /class=["'][^"']*\bsold\b[^"']*["']/i.test(html)) {
-        result.auctionStatus = 'sold';
-      } else if (/auction\s+ended/i.test(html) || /reserve\s+not\s+met/i.test(html)) {
-        result.auctionStatus = 'ended';
-      } else {
-        result.auctionStatus = 'active';
-      }
-    }
-
-    // Bid count
-    const bidCountMatch = html.match(/class=["'][^"']*bid-icon[^"']*["'][\s\S]{0,200}?(\d+)\s*(?:Bid|bid)/i);
-    if (bidCountMatch) result.bidCount = parseInt(bidCountMatch[1], 10) || null;
-
-    // Comment count
-    const commentCountMatch = html.match(/num-comments[\s\S]{0,200}?class=["'][^"']*value[^"']*["'][^>]*>\s*(\d+)/i);
-    if (commentCountMatch) result.commentCount = parseInt(commentCountMatch[1], 10) || null;
-
-    // End date
-    const endDateMatch = html.match(/data-(?:countdown-date|end-date)=["']([^"']+)["']/i) ||
-                         html.match(/"endDate"\s*:\s*"([^"]+)"/i);
-    if (endDateMatch) {
-      try {
-        const d = new Date(endDateMatch[1]);
-        if (!isNaN(d.getTime())) result.endDate = d.toISOString();
-      } catch { /* ignore */ }
-    }
-
-    // 6. Detail sections — Doug's Take, Highlights, Equipment
-    const sectionDefs: Array<[keyof CabExtractedData, string]> = [
-      ['dougsTake', 'dougs-take'],
-      ['highlights', 'detail-highlights'],
-      ['equipment', 'detail-equipment'],
-    ];
-    for (const [field, cls] of sectionDefs) {
-      const clsRe = new RegExp(
-        `class=["'][^"']*${cls}[^"']*["'][\\s\\S]{0,2000}?class=["'][^"']*detail-body[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>`,
-        'i'
-      );
-      const m = html.match(clsRe);
-      if (m) {
-        (result as any)[field] = m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000);
-      }
-    }
-
-    // 7. Gallery images — CDN URLs (skip small thumbnails)
-    const seenImages = new Set<string>(result.images.map(u => u.split('?')[0]));
-    for (const m of html.matchAll(/https:\/\/media\.carsandbids\.com\/[^"'\s)>]+/gi)) {
-      const url = m[0];
-      const cleanUrl = url.split('?')[0];
-      // Skip thumbnails: width=80, 160, 320 in CDN transform path
-      if (/\/cdn-cgi\/image\/[^/]*width=(?:80|160|320)[,/]/.test(url)) continue;
-      if (!seenImages.has(cleanUrl)) {
-        seenImages.add(cleanUrl);
-        result.images.push(url);
-      }
-    }
-    console.log(`✅ C&B [images]: ${result.images.length} found`);
-
-    // 8. Lot number from URL path (/auctions/XXXXXX/)
-    const lotSource = sourceUrl || '';
-    const lotMatch = lotSource.match(/\/auctions\/([A-Za-z0-9]+)/i) ||
-                     html.match(/carsandbids\.com\/auctions\/([A-Za-z0-9]+)/i);
-    if (lotMatch) result.lotNumber = lotMatch[1];
-
-    // 9. VIN from plain text patterns (final fallback)
     if (!result.vin) {
       const vinPatterns = [
         /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
@@ -305,9 +249,141 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
       }
     }
 
-    // 10. og:description as description fallback
+    // 5. Auction stats
+    // Bid value: class="bid-value">$52,000
+    if (!result.currentBid) {
+      const bidValMatch = html.match(/class=["'][^"']*bid-value[^"']*["'][^>]*>\s*\$?([\d,]+)/i);
+      if (bidValMatch) {
+        const b = parseInt(bidValMatch[1].replace(/,/g, ''), 10);
+        if (b > 0) result.currentBid = b;
+      }
+    }
+
+    // Bid count
+    const bidCountMatch = html.match(/num-bids[\s\S]{0,300}?class=["'][^"']*value[^"']*["'][^>]*>\s*(\d+)/i);
+    if (bidCountMatch) result.bidCount = parseInt(bidCountMatch[1], 10) || null;
+
+    // Comment count
+    const commentCountMatch = html.match(/num-comments[\s\S]{0,300}?class=["'][^"']*value[^"']*["'][^>]*>\s*(\d+)/i);
+    if (commentCountMatch) result.commentCount = parseInt(commentCountMatch[1], 10) || null;
+
+    // Views count (.views-icon)
+    const viewsMatch = html.match(/views-icon[\s\S]{0,300}?>([\d,]+)</i);
+    if (viewsMatch) result.viewCount = parseInt(viewsMatch[1].replace(/,/g, ''), 10) || null;
+
+    // Watching count (.watching-icon)
+    const watchingMatch = html.match(/watching-icon[\s\S]{0,300}?>([\d,]+)</i);
+    if (watchingMatch) result.watchingCount = parseInt(watchingMatch[1].replace(/,/g, ''), 10) || null;
+
+    // End date
+    const endDateMatch = html.match(/data-(?:countdown-date|end-date)=["']([^"']+)["']/i) ||
+                         html.match(/"endDate"\s*:\s*"([^"]+)"/i);
+    if (endDateMatch) {
+      try {
+        const d = new Date(endDateMatch[1]);
+        if (!isNaN(d.getTime())) result.endDate = d.toISOString();
+      } catch { /* ignore */ }
+    }
+
+    // Auction status
+    // C&B: "Auction Ended" = sold (unless "Reserve Not Met" also present)
+    if (!result.auctionStatus) {
+      if (/reserve\s+not\s+met/i.test(html)) {
+        result.auctionStatus = 'reserve_not_met';
+      } else if (/auction\s+ended/i.test(html) || /sold\s+for\s+\$/i.test(html)) {
+        result.auctionStatus = 'sold';
+      } else {
+        result.auctionStatus = 'active';
+      }
+    }
+
+    // 6. Detail sections — all known C&B section types
+    const sectionDefs: Array<[keyof CabExtractedData, string]> = [
+      ['dougsTake', 'dougs-take'],
+      ['highlights', 'detail-highlights'],
+      ['equipment', 'detail-equipment'],
+      ['modifications', 'detail-modifications'],
+      ['knownFlaws', 'detail-known_flaws'],
+      ['recentServiceHistory', 'detail-recent_service_history'],
+      ['otherItemsIncluded', 'detail-other_items'],
+      ['ownershipHistory', 'detail-ownership_history'],
+      ['sellerNotes', 'detail-seller_notes'],
+    ];
+    for (const [field, cls] of sectionDefs) {
+      // Match outer class div, then find inner .detail-body, capture until </div>
+      const clsRe = new RegExp(
+        `class=["'][^"']*${cls}[^"']*["'][\\s\\S]{0,3000}?class=["'][^"']*detail-body[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>`,
+        'i'
+      );
+      const m = html.match(clsRe);
+      if (m) {
+        const text = m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (text) (result as any)[field] = text.slice(0, 10000);
+      }
+    }
+
+    // 7. Carfax URL
+    const carfaxMatch = html.match(/href=["'](https:\/\/www\.carfax\.com[^"']+)["'][^>]*class=["'][^"']*carfax/i) ||
+                        html.match(/class=["'][^"']*carfax[^"']*["'][^>]*href=["'](https:\/\/www\.carfax\.com[^"']+)["']/i) ||
+                        html.match(/href=["'](https:\/\/www\.carfax\.com\/[^"']+)["']/i);
+    if (carfaxMatch) result.carfaxUrl = carfaxMatch[1];
+
+    // 8. Video URL (Cloudflare Stream)
+    const videoMatch = html.match(/customer-[a-z0-9]+\.cloudflarestream\.com\/([a-f0-9]{32})\/thumbnails/i);
+    if (videoMatch) {
+      result.videoUrl = `https://customer-${html.match(/customer-([a-z0-9]+)\.cloudflarestream/)![1]}.cloudflarestream.com/${videoMatch[1]}/`;
+    }
+
+    // 9. Seller profile URL
+    const sellerProfileMatch = html.match(/class=["'][^"']*seller[^"']*["'][^>]*>[\s\S]{0,500}?href=["'](\/user\/[^"']+)["']/i);
+    if (sellerProfileMatch) result.sellerProfileUrl = `https://carsandbids.com${sellerProfileMatch[1]}`;
+
+    // 10. Bid history — rendered in DOM (up to N bids per page)
+    const bidItems = html.matchAll(/<li[^>]*data-id=["']([^"']+)["'][^>]*class=["'][^"']*\bbid\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi);
+    for (const m of bidItems) {
+      const bidHtml = m[2];
+      const bidderMatch = bidHtml.match(/usericon[^>]*title=["']([^"']+)["']/i);
+      const amountMatch = bidHtml.match(/bid-value[^>]*>\s*\$?([\d,]+)/i);
+      const timeMatch = bidHtml.match(/data-full=["']([^"']+)["']/i);
+      if (bidderMatch && amountMatch) {
+        result.bidHistory.push({
+          id: m[1],
+          bidder: bidderMatch[1],
+          amount: parseInt(amountMatch[1].replace(/,/g, ''), 10),
+          timeAgo: timeMatch?.[1] || null,
+        });
+      }
+    }
+    if (result.bidHistory.length > 0) console.log(`✅ C&B [bids]: ${result.bidHistory.length} bids extracted`);
+
+    // 11. Gallery images — CDN URLs (skip small thumbnails width=80/160/320)
+    const seenImages = new Set<string>();
+    for (const m of html.matchAll(/https:\/\/media\.carsandbids\.com\/[^"'\s)>]+/gi)) {
+      const url = m[0];
+      const cleanUrl = url.split('?')[0];
+      if (/\/cdn-cgi\/image\/[^/]*width=(?:80|160|320)[,/]/.test(url)) continue;
+      if (!seenImages.has(cleanUrl)) {
+        seenImages.add(cleanUrl);
+        result.images.push(url);
+      }
+    }
+    // og:image as primary if gallery is empty
+    if (result.images.length === 0) {
+      const ogImg = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+      if (ogImg && ogImg[1].includes('carsandbids')) result.images.push(ogImg[1]);
+    }
+    console.log(`✅ C&B [images]: ${result.images.length} found`);
+
+    // 12. Lot number from URL
+    const lotSource = sourceUrl || '';
+    const lotMatch = lotSource.match(/\/auctions\/([A-Za-z0-9]+)/i) ||
+                     html.match(/carsandbids\.com\/auctions\/([A-Za-z0-9]+)/i);
+    if (lotMatch) result.lotNumber = lotMatch[1];
+
+    // 13. og:description as description
     const ogDescMatch = html.match(/<meta[^>]*(?:property|name)=["'](?:og:)?description["'][^>]*content=["']([^"']+)["']/i);
-    if (ogDescMatch && !result.description) result.description = ogDescMatch[1];
+    if (ogDescMatch) result.description = ogDescMatch[1];
 
   } catch (e) {
     console.error('⚠️ C&B: Error parsing HTML:', e);
@@ -367,6 +443,8 @@ async function trySaveHtmlSnapshot(args: {
     const htmlText = html ?? null;
     const htmlSha = htmlText ? await sha256Hex(htmlText) : null;
     const contentLength = htmlText ? htmlText.length : 0;
+    // Extract markdown from metadata if provided (stored as dedicated column, not in jsonb)
+    const { markdown: mdText, ...restMeta } = (metadata || {}) as Record<string, unknown>;
 
     const payload: any = {
       platform: "carsandbids",
@@ -378,7 +456,8 @@ async function trySaveHtmlSnapshot(args: {
       html: htmlText,
       html_sha256: htmlSha,
       content_length: contentLength,
-      ...(metadata || {}),
+      markdown: mdText || null,
+      ...(restMeta),
     };
 
     // Use insert (not upsert) - constraint name differs from expected
@@ -432,7 +511,7 @@ serve(async (req) => {
     const cacheMaxAgeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
     const { data: cachedSnapshot } = await supabase
       .from('listing_page_snapshots')
-      .select('html, fetched_at')
+      .select('html, markdown, fetched_at')
       .eq('listing_url', listingUrlNorm)
       .eq('success', true)
       .gte('fetched_at', new Date(Date.now() - cacheMaxAgeMs).toISOString())
@@ -441,23 +520,25 @@ serve(async (req) => {
       .maybeSingle();
 
     let html: string;
+    let markdown: string = '';
     let httpStatus: number | null;
     let responseTimeMs: number;
     let fromCache = false;
 
     if (cachedSnapshot?.html) {
       html = cachedSnapshot.html;
+      markdown = cachedSnapshot.markdown || '';
       httpStatus = 200;
       responseTimeMs = 0;
       fromCache = true;
-      console.log(`✅ C&B: Cache hit — using snapshot from ${cachedSnapshot.fetched_at} (${html.length} chars)`);
+      console.log(`✅ C&B: Cache hit — using snapshot from ${cachedSnapshot.fetched_at} (${html.length} chars, markdown: ${markdown.length} chars)`);
     } else {
       // Cache miss — fetch via Firecrawl (C&B is a React SPA, blocks direct fetch)
       const scrapeStart = Date.now();
       const firecrawlResult = await firecrawlScrape(
         {
           url: listingUrlNorm,
-          formats: ['html'],  // HTML only — we parse directly, no markdown needed
+          formats: ['html', 'markdown'],  // Both — same credit cost, markdown stored in cache for detail sections
           onlyMainContent: false,
           waitFor: 3000,
           actions: [
@@ -478,6 +559,7 @@ serve(async (req) => {
       );
 
       html = firecrawlResult.data?.html || '';
+      markdown = firecrawlResult.data?.markdown || '';
       httpStatus = firecrawlResult.httpStatus;
       responseTimeMs = Date.now() - scrapeStart;
 
@@ -502,9 +584,9 @@ serve(async (req) => {
         throw new Error(firecrawlResult.error || `Firecrawl returned insufficient HTML (${html?.length || 0} chars)`);
       }
 
-      console.log(`✅ C&B: Firecrawl returned ${html.length} chars of HTML — saving to cache`);
+      console.log(`✅ C&B: Firecrawl returned ${html.length} chars HTML + ${markdown.length} chars markdown — saving to cache`);
 
-      // Save to cache for zero-cost future extractions
+      // Save both HTML and markdown to cache — zero-cost future extractions
       await trySaveHtmlSnapshot({
         supabase,
         listingUrl: listingUrlNorm,
@@ -512,6 +594,7 @@ serve(async (req) => {
         success: true,
         errorMessage: null,
         html,
+        metadata: { markdown },
       });
     }
 
@@ -575,19 +658,29 @@ serve(async (req) => {
       model: extracted.model,
       vin: extracted.vin,
       mileage: extracted.mileage,
-      color: extracted.exteriorColor,  // vehicles table uses 'color' not 'exterior_color'
+      color: extracted.exteriorColor,
       interior_color: extracted.interiorColor,
-      engine_type: extracted.engine,   // vehicles table uses 'engine_type' not 'engine'
+      engine_type: extracted.engine,
       transmission: extracted.transmission,
+      drivetrain: extracted.drivetrain,
       body_style: extracted.bodyStyle,
-      // Create rich description from Doug's Take + Highlights
+      title_status: extracted.titleStatus,
+      // Rich description: all content sections combined
       description: [
         extracted.dougsTake ? `**Doug's Take:**\n${extracted.dougsTake}` : null,
         extracted.highlights ? `**Highlights:**\n${extracted.highlights}` : null,
+        extracted.equipment ? `**Equipment:**\n${extracted.equipment}` : null,
+        extracted.modifications ? `**Modifications:**\n${extracted.modifications}` : null,
+        extracted.knownFlaws ? `**Known Flaws:**\n${extracted.knownFlaws}` : null,
+        extracted.recentServiceHistory ? `**Recent Service History:**\n${extracted.recentServiceHistory}` : null,
+        extracted.otherItemsIncluded ? `**Other Items Included:**\n${extracted.otherItemsIncluded}` : null,
+        extracted.ownershipHistory ? `**Ownership History:**\n${extracted.ownershipHistory}` : null,
+        extracted.sellerNotes ? `**Seller Notes:**\n${extracted.sellerNotes}` : null,
         extracted.description,
       ].filter(Boolean).join('\n\n') || null,
       location: extracted.location,
-      // Only set sale_price if auction actually sold, otherwise set high_bid
+      // sale_price = final sale amount; high_bid = bid that didn't result in sale
+      // C&B: 'sold' = auction ended + reserve met, 'reserve_not_met' = ended without sale
       sale_price: extracted.auctionStatus === 'sold' ? extracted.currentBid : null,
       high_bid: extracted.auctionStatus !== 'sold' ? extracted.currentBid : null,
       bid_count: extracted.bidCount,
@@ -595,16 +688,35 @@ serve(async (req) => {
       discovery_source: "carsandbids",
       listing_source: "extract-cars-and-bids-core",
       status: "active",
-      // Store C&B-specific data in import_metadata
+      // Full C&B metadata — everything we extracted, structured
       import_metadata: {
         platform: "carsandbids",
+        auction_status: extracted.auctionStatus,
+        no_reserve: extracted.noReserve,
+        lot_number: extracted.lotNumber,
+        // Content sections
         dougs_take: extracted.dougsTake,
         highlights: extracted.highlights,
         equipment: extracted.equipment,
+        modifications: extracted.modifications,
+        known_flaws: extracted.knownFlaws,
+        recent_service_history: extracted.recentServiceHistory,
+        other_items_included: extracted.otherItemsIncluded,
+        ownership_history: extracted.ownershipHistory,
+        seller_notes: extracted.sellerNotes,
+        // Stats
         comment_count: extracted.commentCount,
         bid_count: extracted.bidCount,
-        auction_status: extracted.auctionStatus,
+        view_count: extracted.viewCount,
+        watching_count: extracted.watchingCount,
+        // Links
+        carfax_url: extracted.carfaxUrl,
+        video_url: extracted.videoUrl,
+        seller_profile_url: extracted.sellerProfileUrl,
+        // Bid history
+        bid_history: extracted.bidHistory.length > 0 ? extracted.bidHistory : null,
         extracted_at: new Date().toISOString(),
+        from_cache: fromCache,
       },
     };
 
