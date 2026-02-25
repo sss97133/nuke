@@ -23,9 +23,8 @@ export default defineConfig({
         manualChunks(id) {
           // Function-based manualChunks avoids TDZ issues from static config
           if (id.includes('node_modules')) {
-            if (id.includes('react-dom') || id.includes('/react/')) return 'vendor';
+            if (id.includes('react-dom') || id.includes('/react/') || id.includes('recharts') || id.includes('d3-')) return 'vendor';
             if (id.includes('@supabase/')) return 'supabase';
-            if (id.includes('recharts') || id.includes('d3-')) return 'charts';
             if (id.includes('pdfjs-dist')) return 'pdf';
             if (id.includes('three') || id.includes('@react-three')) return 'three';
             if (id.includes('exceljs')) return 'exceljs';
