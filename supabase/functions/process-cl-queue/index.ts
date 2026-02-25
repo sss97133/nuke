@@ -891,6 +891,15 @@ serve(async (req) => {
             })
             .eq('id', queueItem.id)
 
+          // Link vehicle back to acquisition_pipeline if a matching entry exists
+          if (vehicleId) {
+            await supabase
+              .from('acquisition_pipeline')
+              .update({ vehicle_id: vehicleId })
+              .eq('discovery_url', queueItem.listing_url)
+              .is('vehicle_id', null)
+          }
+
           console.log(`  ✅ Updated: ${yearNum} ${finalMake} ${finalModel}`)
           return { status: 'updated', vehicleId: vehicleId || undefined }
         }
@@ -905,6 +914,15 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           })
           .eq('id', queueItem.id)
+
+        // Link vehicle back to acquisition_pipeline if a matching entry exists
+        if (vehicleId) {
+          await supabase
+            .from('acquisition_pipeline')
+            .update({ vehicle_id: vehicleId })
+            .eq('discovery_url', queueItem.listing_url)
+            .is('vehicle_id', null)
+        }
 
         console.log(`  ✅ Created: ${yearNum} ${finalMake} ${finalModel}`)
         return { status: 'created', vehicleId: vehicleId || undefined }

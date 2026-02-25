@@ -410,6 +410,22 @@ serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
+    // Immediately kick queue processor so listings are scraped while still live
+    // -----------------------------------------------------------------------
+    if (stats.listings_added_to_queue > 0) {
+      const fnBase = `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
+      fetch(`${fnBase}/process-cl-queue`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ batch_size: 50 }),
+      }).catch(() => {});
+      console.log(`[discover] Triggered process-cl-queue for ${stats.listings_added_to_queue} new listings`);
+    }
+
+    // -----------------------------------------------------------------------
     // Function chaining
     // -----------------------------------------------------------------------
     const allRegions = regions || CRAIGSLIST_REGIONS;
