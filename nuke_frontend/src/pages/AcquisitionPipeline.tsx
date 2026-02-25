@@ -11,6 +11,14 @@ function fmt(n: number | null | undefined): string {
   return '$' + n.toLocaleString();
 }
 
+function clToSearchUrl(clUrl: string): string {
+  // cl://chicago/1967/Chevrolet/Camaro/49900
+  const path = clUrl.replace('cl://', '');
+  const [city, year, make, model] = path.split('/');
+  const query = [year, make, model].filter(Boolean).join(' ');
+  return `https://${city}.craigslist.org/search/cto?query=${encodeURIComponent(query)}`;
+}
+
 function scoreTxt(score: number | null): string {
   if (!score) return '—';
   if (score >= 80) return 'STRONG BUY';
@@ -85,7 +93,14 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
             >↗</a>
           )}
           {clUrl && (
-            <span style={{ marginLeft: 8, color: 'var(--text-disabled)', fontWeight: 400, fontSize: '9pt' }} title={clUrl}>CL</span>
+            <a
+              href={clToSearchUrl(clUrl)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400, fontSize: '9pt', textDecoration: 'none' }}
+              title="Search Craigslist"
+            >↗</a>
           )}
         </td>
         <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>
@@ -185,9 +200,14 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                   </a>
                 )}
                 {clUrl && (
-                  <div style={{ marginBottom: 'var(--space-1)', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '8pt', wordBreak: 'break-all' }}>
-                    {clUrl}
-                  </div>
+                  <a
+                    href={clToSearchUrl(clUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'block', marginBottom: 'var(--space-1)', textDecoration: 'underline' }}
+                  >
+                    Search Craigslist →
+                  </a>
                 )}
                 {entry.discovery_source && (
                   <div style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-1)' }}>Source: {entry.discovery_source}</div>
