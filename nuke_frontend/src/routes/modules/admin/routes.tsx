@@ -38,6 +38,7 @@ const AdminRalphBrief = React.lazy(() => import('../../../pages/admin/AdminRalph
 const NLQueryConsole = React.lazy(() => import('../../../pages/admin/NLQueryConsole'));
 const AdminIdentityClaims = React.lazy(() => import('../../../pages/admin/AdminIdentityClaims'));
 const InventoryAnalytics = React.lazy(() => import('../../../pages/admin/InventoryAnalytics'));
+const AdminInbox = React.lazy(() => import('../../../pages/admin/AdminInbox'));
 
 const LazyFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '9pt' }}>
@@ -60,6 +61,9 @@ const AdminModuleRoutes = () => {
           <Route path="merge-proposals" element={<MergeProposalsDashboard />} />
           <Route path="pending-vehicles" element={<AdminPendingVehicles />} />
           <Route path="identity-claims" element={<AdminIdentityClaims />} />
+
+          {/* Inbox */}
+          <Route path="inbox" element={<AdminInbox />} />
 
           {/* Ops */}
           <Route path="ralph" element={<AdminRalphBrief />} />

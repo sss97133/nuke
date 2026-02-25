@@ -12,6 +12,7 @@ type Card = {
 };
 
 const cards: Card[] = [
+  { title: 'Inbox', description: 'Email inbox — privacy, legal, info, investors @nuke.ag', to: '/admin/inbox' },
   { title: 'Identity Claims', description: 'Review and approve user identity claims (446K seeds)', to: '/admin/identity-claims' },
   { title: 'Reviews', description: 'Contributor onboarding, queues, and admin review tools', to: '/admin/reviews' },
   { title: 'Verifications', description: 'User verification review and status changes', to: '/admin/verifications' },
