@@ -1644,7 +1644,7 @@ const VehicleProfile: React.FC = () => {
       if (!vehicle?.id) return;
       const { data, error } = await supabase
         .from('live_streaming_sessions')
-        .select('id, platform, stream_url, title, ended_at, stream_provider')
+        .select('id, platform, stream_url, title, ended_at')
         .eq('vehicle_id', vehicle.id)
         .is('ended_at', null)
         .order('started_at', { ascending: false })
@@ -1660,7 +1660,6 @@ const VehicleProfile: React.FC = () => {
         platform: data.platform,
         stream_url: data.stream_url,
         title: data.title,
-        stream_provider: data.stream_provider
       });
       else setLiveSession(null);
     } catch (err) {
