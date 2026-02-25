@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -11,7 +11,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/layout/AppLayout';
 import { DomainRoutes } from './routes/DomainRoutes';
-import HomePage from './pages/HomePage';
+const HomePage = React.lazy(() => import('./pages/HomePage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +32,7 @@ export default function App() {
               <AppLayout>
                 <Routes>
                   {/* Hub: tabbed homepage (Garage, Feed, Map, Market) */}
-                  <Route path="/" element={<HomePage />} />
+                  <Route path="/" element={<Suspense fallback={null}><HomePage /></Suspense>} />
                   {/* Domain modules + legacy shims */}
                   <Route path="/*" element={<DomainRoutes />} />
                 </Routes>

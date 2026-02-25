@@ -2,8 +2,7 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Eager load so /vehicle/:id always works (no lazy-chunk failure)
-import VehicleProfile from '../../../pages/VehicleProfile';
+const VehicleProfile = React.lazy(() => import('../../../pages/VehicleProfile'));
 const VehiclesDashboard = React.lazy(() => import('../../../pages/VehiclesDashboard'));
 const VehiclesLegacy = React.lazy(() => import('../../../pages/Vehicles'));
 const AddVehicle = React.lazy(() => import('../../../pages/add-vehicle/AddVehicle'));
