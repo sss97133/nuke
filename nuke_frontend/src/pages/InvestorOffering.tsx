@@ -218,7 +218,7 @@ export default function InvestorOffering() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${doc.title} - Nuke Ltd</title>
+        <title>${doc.title} - Nuke</title>
         <style>
           body {
             font-family: Arial, sans-serif;
@@ -254,7 +254,7 @@ export default function InvestorOffering() {
       </head>
       <body>
         <div class="header-stamp">
-          <strong>CONFIDENTIAL</strong> - Nuke Ltd<br/>
+          <strong>CONFIDENTIAL</strong> - Nuke<br/>
           Document: ${doc.title}<br/>
           Accessed by: ${viewerName || 'Anonymous'} ${viewerEmail ? `(${viewerEmail})` : ''} ${viewerOrg ? `- ${viewerOrg}` : ''}<br/>
           Session: ${sessionId.substring(0, 8)}<br/>
@@ -344,7 +344,7 @@ export default function InvestorOffering() {
               color: 'var(--text-muted)',
               marginBottom: 'var(--space-2)',
             }}>
-              NUKE LTD
+              NUKE
             </div>
             <h1 style={{
               fontSize: '16pt',
@@ -352,7 +352,7 @@ export default function InvestorOffering() {
               margin: 0,
               letterSpacing: '1px',
             }}>
-              N-ZERO
+              NUKE
             </h1>
             <div style={{
               fontSize: '9pt',
@@ -456,7 +456,7 @@ export default function InvestorOffering() {
             color: 'var(--text-muted)',
             marginBottom: 'var(--space-1)',
           }}>
-            N-ZERO / NUKE LTD
+            NUKE / NUKE
           </div>
           <h1 style={{
             fontSize: '14pt',
@@ -536,8 +536,8 @@ export default function InvestorOffering() {
             </div>
 
             {[
-              { key: 'confidential' as const, text: 'I understand that the materials contained in this portal are CONFIDENTIAL and proprietary to Nuke Ltd.' },
-              { key: 'noDistribute' as const, text: 'I agree NOT to copy, distribute, forward, or share any materials from this portal without prior written consent from Nuke Ltd.' },
+              { key: 'confidential' as const, text: 'I understand that the materials contained in this portal are CONFIDENTIAL and proprietary to Nuke.' },
+              { key: 'noDistribute' as const, text: 'I agree NOT to copy, distribute, forward, or share any materials from this portal without prior written consent from Nuke.' },
               { key: 'noOffer' as const, text: 'I understand that these materials do NOT constitute an offer or solicitation to sell or purchase securities. No investment decision should be based solely on these materials.' },
               { key: 'understand' as const, text: 'I acknowledge that my access to this portal is logged, including my IP address, viewing duration, and document interactions, and I consent to this monitoring.' },
             ].map(({ key, text }) => (
@@ -613,7 +613,7 @@ export default function InvestorOffering() {
       }}>
         <div>
           <div style={{ fontSize: '8pt', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-            N-ZERO INVESTOR DATA ROOM
+            NUKE INVESTOR DATA ROOM
           </div>
           <div style={{ fontSize: '7pt', color: 'var(--text-disabled)', marginTop: '2px' }}>
             Session: {sessionId.substring(0, 8)} | Viewer: {viewerName} | Since: {accessGrantedAt ? new Date(accessGrantedAt).toLocaleTimeString() : ''}
@@ -706,7 +706,7 @@ export default function InvestorOffering() {
           justifyContent: 'space-between',
         }}>
           <span>{doc.subtitle}</span>
-          <span>Nuke Ltd - {new Date().toLocaleDateString()}</span>
+          <span>Nuke - {new Date().toLocaleDateString()}</span>
         </div>
 
         {/* Rendered Markdown */}
@@ -892,7 +892,7 @@ export default function InvestorOffering() {
           textAlign: 'center',
           lineHeight: '1.6',
         }}>
-          CONFIDENTIAL - This document is the property of Nuke Ltd.<br />
+          CONFIDENTIAL - This document is the property of Nuke.<br />
           Session {sessionId.substring(0, 8)} | Viewer: {viewerName} ({viewerEmail})<br />
           All access logged and monitored. Distribution prohibited without written consent.
         </div>
