@@ -541,18 +541,25 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
   let html = fetchResult.html || "";
   let markdown = fetchResult.markdown || null;
 
-  // Check if we got meaningful content — Bonhams behind Cloudflare may return
-  // a challenge page or empty body from edge functions
-  const hasJsonLdQuick = html.includes("application/ld+json");
-  if (!hasJsonLdQuick && html.length < 5000) {
-    console.log(`[Bonhams] Direct fetch got ${html.length} bytes, no JSON-LD — retrying with Firecrawl`);
+  // Check if we got meaningful content.
+  // Bonhams uses client-side React rendering — the direct fetch returns a bare
+  // React shell (~120KB) with NO lot data visible in the HTML. We need Firecrawl
+  // (JS rendering) to extract lot descriptions and specs.
+  // Skip Firecrawl only when we already have rich markdown (from a prior Firecrawl run).
+  // NOTE: The React shell always has JSON-LD site metadata AND is 120KB+, so we cannot
+  // use hasJsonLd or html.length as indicators of meaningful content — both are misleading.
+  const hasLotContent = markdown && markdown.length > 5000; // Rich markdown means we already have JS-rendered content
+  const needsFirecrawl = !hasLotContent; // Always Firecrawl unless we already have good markdown
+
+  if (needsFirecrawl) {
+    console.log(`[Bonhams] No cached/JS-rendered content (html=${html.length}b, md=${markdown?.length || 0}b) — using Firecrawl`);
     fetchResult = await archiveFetch(url, {
       platform: "bonhams",
       callerName: "extract-bonhams",
       useFirecrawl: true,
       includeMarkdown: true,
-      waitForJs: 3000,
-      skipCache: true, // Skip cache since the cached version is the bad direct fetch
+      waitForJs: 4000,
+      skipCache: true, // Force fresh Firecrawl render (not cached direct-fetch HTML)
     });
     html = fetchResult.html || "";
     markdown = fetchResult.markdown || null;
@@ -587,21 +594,77 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
     }
   }
 
-  // 3. Description from JSON-LD (already clean text, no HTML)
-  let description: string | null = null;
-  if (jsonLd?.description) {
-    description = stripHtmlTags(jsonLd.description).trim();
-    if (description.length > 10000) description = description.slice(0, 10000);
-  }
-
-  // Fall back to meta description
-  if (!description) {
-    const metaDesc = html.match(/name="description"\s+content="([^"]+)"/i)?.[1];
-    if (metaDesc) {
-      description = stripHtmlTags(metaDesc).trim();
-      if (description.length > 10000) description = description.slice(0, 10000);
+  // Fallback: parse title from markdown heading or h1 in markdown
+  // Bonhams markdown has "# 1989 Jaguar XJ-S V12 Convertible" or
+  // "## **1989 Jaguar XJ-S V12 Convertible**  Registration no. F493..."
+  if (!titleData.year && !titleData.make && markdown) {
+    const mdHeadings = [
+      markdown.match(/^#{1,3}\s+\**([12][0-9]{3}\s+[A-Za-z][^\n*]+)/m)?.[1],
+      markdown.match(/Lot\s+\d+\s*\n+\n*([12][0-9]{3}\s+[A-Za-z][^\n*\[]+)/m)?.[1],
+    ].filter(Boolean);
+    for (const heading of mdHeadings) {
+      if (heading) {
+        const fromMd = parseBonhamsName(heading.trim().replace(/Registration.*$/i, "").trim());
+        if (fromMd.year) { Object.assign(titleData, fromMd); break; }
+      }
     }
   }
+
+  // 3. Description — try multiple sources, prefer richest
+
+  let description: string | null = null;
+
+  // A. Markdown Footnotes section (richest source — Bonhams stores lot description here)
+  if (markdown) {
+    const footnotesMatch = markdown.match(/###?\s*Footnotes?\s*\n+([\s\S]+?)(?=\n#{1,3}\s|\n---|\n\*{3}|$)/i);
+    if (footnotesMatch?.[1]) {
+      const text = footnotesMatch[1]
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Strip markdown links
+        .replace(/_([^_]+)_/g, "$1")              // Strip italic markers
+        .replace(/\*\*([^*]+)\*\*/g, "$1")        // Strip bold markers
+        .replace(/\n{3,}/g, "\n\n")               // Normalize whitespace
+        .trim();
+      if (text.length > 100) {
+        description = text.slice(0, 10000);
+      }
+    }
+  }
+
+  // B. Inline body text: paragraphs between lot-title H2 and "## Additional information".
+  // Covers lots that don't use a Footnotes section (common in older Bonhams auctions).
+  // Pattern: "## **{Year} {Make} {Model}**  Chassis no. ...\n\n{description paragraphs}\n\n## Additional information"
+  if (!description && markdown) {
+    const bodyMatch = markdown.match(
+      /##\s+\*?\*?[12][0-9]{3}[^\n]+\n{1,4}([\s\S]+?)(?=##\s+Additional\s+information|###\s+Footnotes|$)/i
+    );
+    if (bodyMatch?.[1]) {
+      const raw = bodyMatch[1]
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")   // strip links, keep text
+        .replace(/!\[[^\]]*\]\([^)]+\)/g, "")        // strip images
+        .replace(/^(DetailsPhotos|Share|Follow|Previous Lot|Next Lot|VIEW ALL PHOTOS.*)$/gm, "")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")           // strip bold
+        .replace(/_([^_]+)_/g, "$1")                 // strip italic
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+      // Reject if it looks like navigation/boilerplate rather than vehicle description
+      const boilerplatePatterns = /^(this sale is now finished|auction information|buyer|payment|shipping)/i;
+      if (raw.length > 150 && !boilerplatePatterns.test(raw)) {
+        description = raw.slice(0, 10000);
+      }
+    }
+  }
+
+  // C. JSON-LD description (often generic site description, lower priority)
+  if (!description && jsonLd?.description) {
+    const jsonLdDesc = stripHtmlTags(jsonLd.description).trim();
+    // Only use JSON-LD description if it looks like actual lot content (not generic "View X at Bonhams")
+    if (jsonLdDesc.length > 150 && !jsonLdDesc.toLowerCase().startsWith("view ")) {
+      description = jsonLdDesc.length > 10000 ? jsonLdDesc.slice(0, 10000) : jsonLdDesc;
+    }
+  }
+
+  // D. Meta description (last resort — usually generic)
+  // Skip: meta description on Bonhams is typically "View [title] at [sale]" — not useful
 
   // 4. Extract specs from description text
   const specSource = description || markdown || stripHtmlTags(html.slice(0, 50000));
@@ -1221,6 +1284,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
+          // vehicle_id at top level for CQP compatibility
+          vehicle_id: saveResult?.vehicleId || undefined,
           extracted: {
             ...extracted,
             vehicle_id: saveResult?.vehicleId || undefined,

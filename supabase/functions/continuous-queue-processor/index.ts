@@ -89,7 +89,7 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
   },
   mecum: {
     pattern: "%mecum.com%",
-    extractor: "extract-vehicle-data-ai",
+    extractor: "extract-mecum",
     minDelay: 1500,
     maxDelay: 3000,
     sourceIds: ["5bb6b479-9eaf-4e06-ba35-4d0ff86b9b7c", "aacb688b-41d4-407c-8d5e-348ce7f02a18"],
@@ -134,6 +134,7 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     extractor: "extract-gooding",
     minDelay: 2000,
     maxDelay: 4000,
+    sourceIds: ["92411068-c4e6-45a6-ac96-61f51f944cac", "3b7d5507-1d97-4b43-a2aa-58522d86e06c", "ce74e304-d190-4041-9cce-cb950652b9c4"],
   },
   gaa: {
     pattern: "%gaaclassiccars.com%",
@@ -143,7 +144,7 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
   },
   ebay: {
     pattern: "%ebay.com%",
-    extractor: "extract-vehicle-data-ai",
+    extractor: "extract-ebay-motors",
     minDelay: 1500,
     maxDelay: 3000,
   },

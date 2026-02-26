@@ -508,14 +508,13 @@ serve(async (req) => {
     console.log(`extract-cars-and-bids-core: Processing ${listingUrlCanonical}`);
 
     // Cache-first: check listing_page_snapshots before calling Firecrawl
-    // A snapshot saved from any prior extraction is reusable indefinitely for re-extraction
-    const cacheMaxAgeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+    // Historical auction pages are immutable once ended — no TTL needed.
+    // Use any existing snapshot (no age filter) to avoid re-fetching stripped ended-auction pages.
     const { data: cachedSnapshot } = await supabase
       .from('listing_page_snapshots')
       .select('html, markdown, fetched_at')
       .eq('listing_url', listingUrlNorm)
       .eq('success', true)
-      .gte('fetched_at', new Date(Date.now() - cacheMaxAgeMs).toISOString())
       .order('fetched_at', { ascending: false })
       .limit(1)
       .maybeSingle();

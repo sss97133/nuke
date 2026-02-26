@@ -68,6 +68,102 @@ interface MecumVehicle {
   extraction_method: "next_data" | "markdown";
 }
 
+// ─── Parse description from blocks (HIGHLIGHTS + EQUIPMENT) ─────────────
+// post.content is always empty on Mecum — description lives in Gutenberg blocks
+
+function parseBlocksDescription(blocks: any[]): { description: string | null; engine: string | null } {
+  const sections: { heading: string; items: string[] }[] = [];
+  let specEngine: string | null = null;
+
+  function stripHtml(s: string): string {
+    return String(s)
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // Flatten blocks recursively, tracking heading→item context
+  function walk(blocks: any[], currentSection: string[] | null): void {
+    for (const block of blocks) {
+      if (!block || typeof block !== "object") continue;
+      const name = block.name || "";
+      const attrs = block.attributes || {};
+      const content = stripHtml(attrs.content || attrs.text || "");
+
+      if (name === "core/heading") {
+        if (content) {
+          const heading = content.toUpperCase();
+          sections.push({ heading, items: [] });
+          currentSection = sections[sections.length - 1].items;
+
+          // Detect SPECIFICATIONS ENGINE from label+value pairs
+          if (heading === "SPECIFICATIONS") {
+            // Engine will appear as a subsequent paragraph
+          }
+        }
+      } else if (name === "core/list-item") {
+        if (content && currentSection) {
+          currentSection.push(content);
+        }
+      } else if (name === "core/paragraph" && content) {
+        // In SPECIFICATIONS section, label+value pairs come as alternating paragraphs
+        // We don't use these for description but note engine
+      }
+
+      if (Array.isArray(block.innerBlocks) && block.innerBlocks.length > 0) {
+        walk(block.innerBlocks, currentSection);
+      }
+    }
+  }
+
+  walk(blocks, null);
+
+  // Also extract engine from SPECIFICATIONS block label/value pairs
+  // Pattern: paragraphs alternate "ENGINE" then "3.0L Inline 6-Cylinder"
+  function extractSpecValue(blocks: any[], label: string): string | null {
+    let foundLabel = false;
+    const flat: string[] = [];
+    function walkFlat(bs: any[]) {
+      for (const b of bs) {
+        if (!b || typeof b !== "object") continue;
+        if (b.name === "core/paragraph") {
+          const t = stripHtml(b.attributes?.content || "");
+          if (t) flat.push(t);
+        }
+        if (Array.isArray(b.innerBlocks)) walkFlat(b.innerBlocks);
+      }
+    }
+    walkFlat(blocks);
+    for (let i = 0; i < flat.length - 1; i++) {
+      if (flat[i].toUpperCase() === label.toUpperCase()) {
+        return flat[i + 1] || null;
+      }
+    }
+    return null;
+  }
+
+  specEngine = extractSpecValue(blocks, "ENGINE");
+
+  const parts: string[] = [];
+  const highlights = sections.find((s) => s.heading === "HIGHLIGHTS");
+  const equipment = sections.find((s) => s.heading === "EQUIPMENT");
+
+  if (highlights?.items.length) {
+    parts.push(highlights.items.map((i) => `• ${i}`).join("\n"));
+  }
+  if (equipment?.items.length) {
+    parts.push("Equipment:\n" + equipment.items.map((i) => `• ${i}`).join("\n"));
+  }
+
+  const combined = parts.join("\n\n").trim();
+  return {
+    description: combined.length > 30 ? combined.slice(0, 5000) : null,
+    engine: specEngine,
+  };
+}
+
 // ─── Title case helper ──────────────────────────────────────────────────
 
 function titleCase(s: string): string {
@@ -212,10 +308,19 @@ function parseNextData(html: string, url: string): MecumVehicle | null {
     vehicle.body_style = division; // e.g., "Motorcycles", "Road Art", etc.
   }
 
-  // Description from content blocks or lotSeries
-  // Mecum puts description in parsed content blocks
-  if (post.content) {
-    // Strip HTML from WordPress content
+  // Description from blocks (HIGHLIGHTS + EQUIPMENT list items)
+  // post.content is always empty on Mecum — description lives in Gutenberg blocks
+  if (Array.isArray(post.blocks) && post.blocks.length > 0) {
+    const { description: blockDesc, engine: blockEngine } = parseBlocksDescription(post.blocks);
+    if (blockDesc) vehicle.description = blockDesc;
+    // Use block-parsed engine if lotSeries looks wrong (non-engine text)
+    if (blockEngine && (!vehicle.engine || vehicle.engine.length > 60)) {
+      vehicle.engine = blockEngine;
+    }
+  }
+
+  // Fallback: post.content (usually empty but check anyway)
+  if (!vehicle.description && post.content) {
     const stripped = String(post.content)
       .replace(/<script[\s\S]*?<\/script>/gi, "")
       .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -806,17 +911,27 @@ serve(async (req) => {
       );
       const concurrency = Math.min(Number(body.concurrency) || 3, 10);
 
-      // Find Mecum vehicles missing description or sale_price
-      const { data: candidates, error: candErr } = await supabase
-        .from("vehicles")
-        .select("id, discovery_url")
-        .eq("discovery_source", "mecum")
-        .or("description.is.null,sale_price.is.null")
-        .not("discovery_url", "is", null)
-        .order("updated_at", { ascending: true })
+      // Find Mecum candidates via import_queue (avoids full-table-scan timeout on vehicles)
+      // Uses import_queue to find pending mecum items that have a vehicle_id already linked,
+      // which covers both newly queued items and items reset from 'complete' for backfill.
+      const { data: queueItems, error: candErr } = await supabase
+        .from("import_queue")
+        .select("vehicle_id, listing_url")
+        .like("listing_url", "%mecum.com%")
+        .in("status", ["pending", "complete"])
+        .not("vehicle_id", "is", null)
+        .order("processed_at", { ascending: true })
         .limit(limit);
 
       if (candErr) throw new Error(`Query error: ${candErr.message}`);
+
+      const candidates = (queueItems || [])
+        .filter((i: any) => i.listing_url?.includes("mecum.com"))
+        .map((i: any) => ({ id: i.vehicle_id as string, discovery_url: i.listing_url as string }));
+
+      if (!candidates?.length) {
+        return okJson({ success: true, message: "No Mecum candidates to enrich", processed: 0 });
+      }
       if (!candidates?.length) {
         return okJson({ success: true, message: "No Mecum candidates to enrich", processed: 0 });
       }

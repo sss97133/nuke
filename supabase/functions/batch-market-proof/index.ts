@@ -92,6 +92,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ pipeline_id: entry.id }),
+          signal: AbortSignal.timeout(30_000),
         });
 
         if (!response.ok) {
@@ -125,7 +126,9 @@ serve(async (req) => {
           error: null,
         });
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+        const msg = isTimeout ? 'market-proof timed out after 30s' : (err instanceof Error ? err.message : String(err));
+        console.error(`[batch-market-proof] ${isTimeout ? 'TIMEOUT' : 'ERROR'}: ${entry.year} ${entry.make} ${entry.model} — ${msg}`);
         results.push({
           id: entry.id,
           year: entry.year,
