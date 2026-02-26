@@ -1,29 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 
-// Simple auth hook to work with existing session-based auth
+// Simple auth hook to work with existing session-based auth.
+// Initializes from the localStorage cache synchronously so the profile page
+// doesn't wait for an async getUser() round-trip before loading data.
 const useAuth = () => {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  
+  const cached = readCachedSession();
+  const [user, setUser] = useState<any>(cached?.user ?? null);
+  const [loading, setLoading] = useState(!cached);
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       setLoading(false);
     };
-    
+
     getUser();
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
-    
+
     return () => subscription.unsubscribe();
   }, []);
-  
+
   return { user, loading };
 };
 // AppLayout now provided globally by App.tsx
