@@ -728,6 +728,25 @@ async function processFacebookURL(
       resolvedUrl = resolved.og_url;
     } else {
       console.warn('FB relay unavailable or returned login, share link unresolved');
+      // Extract share type (p=post, r=reel) and content ID before falling through
+      const shareTypeMatch = resolvedUrl.match(/facebook\.com\/share\/([pr])\/([A-Za-z0-9_-]+)/);
+      const shareType = shareTypeMatch?.[1] ?? 'p';
+      const shareId = shareTypeMatch?.[2] ?? shareMatch[1];
+      const leadId = await createDiscoveryLead(supabase, {
+        url: resolvedUrl,
+        type: 'facebook_share',
+        suggestedType: 'vehicle_listing',
+        confidence: 0.7,
+        userId,
+        metadata: { share_type: shareType, share_id: shareId, unresolved: true, needs_relay: true },
+      });
+      return {
+        entityData: { share_type: shareType, share_id: shareId, unresolved: true },
+        entityId: leadId,
+        action: 'discovered',
+        message: `FB share link queued (relay offline — will resolve when relay is back)`,
+        entityType: 'facebook_share',
+      };
     }
   }
 
