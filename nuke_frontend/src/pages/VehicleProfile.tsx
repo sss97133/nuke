@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatSupabaseInvokeError } from '../utils/formatSupabaseInvokeError';
+import { readCachedSession } from '../utils/cachedSession';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
@@ -62,6 +63,7 @@ const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/V
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 import { AdminNotificationService } from '../services/adminNotificationService';
 const ImageGallery = React.lazy(() => import('../components/images/ImageGallery'));
+const BundleReviewQueue = React.lazy(() => import('../components/images/BundleReviewQueue'));
 const VehicleVideoSection = React.lazy(() => import('../components/vehicle/VehicleVideoSection'));
 const VehicleDataGapsCard = React.lazy(() => import('../components/vehicle/VehicleDataGapsCard').then(m => ({ default: m.VehicleDataGapsCard })));
 const VehicleResearchItemsCard = React.lazy(() => import('../components/vehicle/VehicleResearchItemsCard'));
@@ -202,7 +204,9 @@ const VehicleProfile: React.FC = () => {
   
   // All state hooks must be declared before any conditional returns
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
-  const [session, setSession] = useState<any>(null);
+  // Initialize session from localStorage cache so loadVehicle() doesn't have to
+  // wait for the async getSession() round-trip before it can start.
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [fallbackListingImageUrls, setFallbackListingImageUrls] = useState<string[]>([]);
   const [viewCount, setViewCount] = useState<number>(0);
@@ -291,7 +295,9 @@ const VehicleProfile: React.FC = () => {
   const [bookmarklets, setBookmarklets] = useState<{ key: string; label: string; href: string }[]>([]);
   const [composeText, setComposeText] = useState<{ title: string; description: string; specs: string[] }>({ title: '', description: '', specs: [] });
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  // Start as true if we have a cached session — eliminates the auth-gate waterfall
+  // for returning users. The async checkInitialAuth() still runs to validate/refresh.
+  const [authChecked, setAuthChecked] = useState(() => readCachedSession() !== null);
   const [latestExpertValuation, setLatestExpertValuation] = useState<any | null>(null);
   const expertAnalysisRunningRef = React.useRef(false);
   const [linkedOrganizations, setLinkedOrganizations] = useState<LinkedOrg[]>([]);
@@ -2900,8 +2906,21 @@ const VehicleProfile: React.FC = () => {
             score += 20;
           }
           
-          // Penalize interior/detail/document shots
-          if (urlLower.includes('interior') || urlLower.includes('inside') || 
+          // Use AI-detected angle from DB record — this is the reliable signal for UUID-named files
+          const angle = record?.ai_detected_angle || record?.angle || '';
+          if (angle) {
+            if (angle.includes('three_quarter')) score += 35;
+            else if (angle.includes('exterior_side')) score += 28;
+            else if (angle.includes('exterior_front')) score += 22;
+            else if (angle.includes('exterior_rear')) score += 18;
+            else if (angle.includes('detail_shot')) score -= 30;
+            else if (angle.includes('interior')) score -= 30;
+            else if (angle.includes('under_hood') || angle.includes('engine')) score -= 20;
+            else if (angle.includes('document') || angle.includes('sticker')) score -= 50;
+          }
+
+          // Penalize interior/detail/document shots by URL keywords (fallback for non-AI-analyzed)
+          if (urlLower.includes('interior') || urlLower.includes('inside') ||
               urlLower.includes('cabin') || urlLower.includes('dash') ||
               urlLower.includes('engine') || urlLower.includes('underhood') ||
               urlLower.includes('detail') || urlLower.includes('close') ||
@@ -2909,9 +2928,9 @@ const VehicleProfile: React.FC = () => {
               urlLower.includes('sticker') || urlLower.includes('monroney')) {
             score -= 30;
           }
-          
-          // Boost for exterior keywords (if in filename/path)
-          if (urlLower.includes('exterior') || urlLower.includes('side') || 
+
+          // Boost for exterior keywords (fallback for non-AI-analyzed)
+          if (urlLower.includes('exterior') || urlLower.includes('side') ||
               urlLower.includes('front') || urlLower.includes('rear') ||
               urlLower.includes('profile') || urlLower.includes('full')) {
             score += 15;
@@ -4013,6 +4032,16 @@ const VehicleProfile: React.FC = () => {
 
             {/* Right Column: Image Gallery & Videos */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Session Review Queue — auto-created events needing owner input */}
+              {session && (
+                <React.Suspense fallback={null}>
+                  <BundleReviewQueue
+                    vehicleId={vehicle.id}
+                    onComplete={() => loadTimelineEvents()}
+                  />
+                </React.Suspense>
+              )}
+
               {/* Images - Collapsible */}
               <CollapsibleGalleryCard
                 vehicleId={vehicle.id}
