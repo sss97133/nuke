@@ -40,7 +40,7 @@ export function useSession() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, full_name, avatar_url, user_type, trust_score, role, moderator_level')
+        .select('id, username, full_name, avatar_url, user_type, role, moderator_level')
         .eq('id', userId)
         .single();
       if (!error && data) setUserProfile(data);
