@@ -224,6 +224,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     lastSeenAt: string | null;
   } | null>(null);
   const [showAccessInfo, setShowAccessInfo] = useState(false);
+  const [transferStatus, setTransferStatus] = useState<{
+    transfer_id: string;
+    status: string;
+    progress: { completed: number; total: number; pct: number };
+    current_milestone: { type: string; label: string; status: string; deadline_at: string | null } | null;
+    days_since_activity: number | null;
+    buyer: { handle: string; platform: string; claimed: boolean } | null;
+  } | null>(null);
   const locationRef = useRef<HTMLDivElement>(null);
   const ownerClaimRef = useRef<HTMLDivElement>(null);
   const accessRef = useRef<HTMLDivElement>(null);
@@ -1435,17 +1443,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return `${pad(h)}:${pad(m)}:${pad(s)}`;
   };
 
-  // Get the most up-to-date end_date for timer display
-  const timerEndDate = useMemo(() => {
-    // Priority 1: auctionPulse (most up-to-date telemetry)
-    if (auctionPulse?.end_date) return auctionPulse.end_date;
-    // Priority 2: external_listings (if available in vehicle data)
-    const v: any = vehicle as any;
-    const externalListing = v?.external_listings?.[0];
-    if (externalListing?.end_date) return externalListing.end_date;
-    // Priority 3: vehicle-level auction_end_date
-    return v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date || null;
-  }, [auctionPulse?.end_date, vehicle]);
+  // Same computation as auctionEndDateForTimer above — alias to avoid duplicate useMemo
+  const timerEndDate = auctionEndDateForTimer;
 
   const isAuctionLive = useMemo(() => {
     const v: any = vehicle as any;
@@ -1659,9 +1658,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
 
     if (metaSeller) {
-      // Detect platform for generating correct profile URL
+      // Detect platform for generating correct profile URL.
+      // Check bat_auction_url / discovery_url before falling back to profile_origin, because
+      // manually-entered vehicles that later get a BaT listing have profile_origin="manual_entry"
+      // which would incorrectly produce platform="manual_entry" and break the seller link.
+      const isBatUrl =
+        String((vehicle as any)?.bat_auction_url || '').includes('bringatrailer.com') ||
+        String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com') ||
+        String((vehicle as any)?.listing_url || '').includes('bringatrailer.com');
       const platform = String(
         (auctionPulse as any)?.platform ||
+        (isBatUrl ? 'bat' : null) ||
         (vehicle as any)?.profile_origin?.replace('_import', '') ||
         'bat'
       ).toLowerCase();
@@ -2226,26 +2233,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // Guardrails: if it's still a paragraph, treat as unusable.
     if (s.length > 80) return '';
     return s;
-
-    // Remove contaminated listing patterns: "Model - COLOR - $Price (Location)"
-    if (s.includes(' - $') || (s.includes(' - ') && s.match(/\$[\d,]+/))) {
-      const parts = s.split(/\s*-\s*(?=\$|\([A-Z])/);
-      if (parts.length > 0) {
-        s = parts[0].trim();
-      }
-    }
-    
-    // Remove color patterns that might still be present
-    s = s.replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').trim();
-    
-    // Remove location patterns like "(Torrance)", "(Los Angeles)"
-    s = s.replace(/\s*\([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\)\s*$/g, '').trim();
-
-    // Collapse whitespace
-    s = s.replace(/\s+/g, ' ').trim();
-    // Trim trailing separators from previous removals
-    s = s.replace(/[-–—]\s*$/g, '').trim();
-    return s;
   };
 
   const appendUnique = (arr: Array<string | number>, part: any) => {
@@ -2574,6 +2561,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
   }, [showPendingDetails]);
 
+  // Fetch transfer status for this vehicle (shows active transfer milestone in badge row)
+  useEffect(() => {
+    if (!vehicle?.id) return;
+    let cancelled = false;
+    supabase.functions.invoke('transfer-status-api', { body: { vehicle_id: vehicle.id } })
+      .then(({ data }) => {
+        if (!cancelled && data?.transfer_id) setTransferStatus(data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [vehicle?.id]);
 
   return (
     <div
@@ -2888,6 +2886,68 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {vehicle?.id && (
             <div className="badge-priority-4">
               <MemeDropBadge vehicleId={vehicle.id} compact />
+            </div>
+          )}
+
+          {/* Transfer status badge — active transfer milestone + progress */}
+          {transferStatus && (
+            <div className="badge-priority-4" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span
+                className="badge"
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.3px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: transferStatus.status === 'completed' ? '#dcfce7' :
+                              transferStatus.status === 'stalled' ? '#fef3c7' : '#eff6ff',
+                  color: transferStatus.status === 'completed' ? '#166534' :
+                         transferStatus.status === 'stalled' ? '#92400e' : '#1e40af',
+                  border: `1px solid ${transferStatus.status === 'completed' ? '#86efac' :
+                                        transferStatus.status === 'stalled' ? '#fcd34d' : '#93c5fd'}`,
+                  borderRadius: '3px',
+                  padding: '2px 5px',
+                }}
+                title={[
+                  `Transfer: ${transferStatus.status}`,
+                  transferStatus.current_milestone ? `Current: ${transferStatus.current_milestone.label}` : null,
+                  `Progress: ${transferStatus.progress.pct}%`,
+                  transferStatus.days_since_activity !== null ? `${transferStatus.days_since_activity}d since activity` : null,
+                ].filter(Boolean).join(' · ')}
+              >
+                <span style={{ opacity: 0.6 }}>→</span>
+                {transferStatus.current_milestone
+                  ? transferStatus.current_milestone.label
+                  : transferStatus.status === 'completed' ? 'Complete' : 'Transfer'}
+                {transferStatus.progress.pct > 0 && (
+                  <span style={{ opacity: 0.6, fontSize: '8px' }}>{transferStatus.progress.pct}%</span>
+                )}
+                {transferStatus.days_since_activity !== null && transferStatus.days_since_activity >= 7 && (
+                  <span style={{ color: transferStatus.status === 'stalled' ? '#b45309' : '#64748b', fontSize: '8px' }}>
+                    · {transferStatus.days_since_activity}d
+                  </span>
+                )}
+              </span>
+              {transferStatus.buyer && (
+                <span
+                  style={{
+                    fontSize: '9px',
+                    fontFamily: 'monospace',
+                    color: transferStatus.buyer.claimed ? 'var(--text)' : 'var(--text-muted)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                  title={`Buyer: @${transferStatus.buyer.handle} on ${transferStatus.buyer.platform}${transferStatus.buyer.claimed ? ' (verified)' : ' (unclaimed)'}`}
+                >
+                  @{transferStatus.buyer.handle}
+                  {!transferStatus.buyer.claimed && (
+                    <sup style={{ fontSize: '6px', color: 'var(--warning)', marginLeft: '1px' }}>◇</sup>
+                  )}
+                </span>
+              )}
             </div>
           )}
 
@@ -4866,9 +4926,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   .filter((org) => {
                     const name = String(org?.business_name || '').toLowerCase();
                     const origin = String((vehicle as any)?.profile_origin || '').toLowerCase();
-                    const hasBatMember = !!batMemberLink;
-                    // For BaT imports, don't show the generic BaT org bubble when we have a concrete seller identity.
-                    if (hasBatMember && (origin.includes('bat') || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com'))) {
+                    // Suppress the BaT org bubble when the auction house badge already covers BaT.
+                    // batMemberLink reads origin_metadata.bat_seller, but bat_seller is also a direct
+                    // column — check both so manually-entered vehicles with a BaT listing don't get
+                    // the org pill duplicated alongside the headerAuctionHouse favicon.
+                    const hasBatSignal =
+                      !!batMemberLink ||
+                      !!(vehicle as any)?.bat_seller ||
+                      origin.includes('bat') ||
+                      String((vehicle as any)?.bat_auction_url || '').includes('bringatrailer.com') ||
+                      String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com');
+                    if (hasBatSignal) {
                       if (name.includes('bring a trailer') || name === 'bat' || name.includes('ba t')) return false;
                     }
                     return true;
