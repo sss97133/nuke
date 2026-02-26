@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { secureDocumentService, type SecureDocument } from '../services/secureDocumentService';
 import { ImageHoverPreview, IDHoverCard } from '../components/admin';
 import { FaviconIcon } from '../components/common/FaviconIcon';
@@ -19,7 +20,7 @@ interface VerificationStats {
 const AdminVerifications: React.FC = () => {
   const [pending, setPending] = useState<SecureDocument[]>([]);
   const [orgRequests, setOrgRequests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [signedUrlMap, setSignedUrlMap] = useState<Record<string, string>>({});

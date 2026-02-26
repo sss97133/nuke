@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import GrokTerminal from '../components/GrokTerminal';
 
 interface Vehicle {
@@ -146,8 +147,8 @@ export default function SocialWorkspace() {
   const [composeText, setComposeText] = useState('');
   const [composeImages, setComposeImages] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
+  const [userId, setUserId] = useState<string | null>(() => readCachedSession()?.user?.id ?? null);
   const [posting, setPosting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);

@@ -3,6 +3,7 @@ import { supabase, getSupabaseFunctionsUrl } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { ImageHoverPreview, AnalysisModelPopup, FunctionResultMonitor } from '../components/admin';
 import { useAdminAccess } from '../hooks/useAdminAccess';
+import { readCachedSession } from '../utils/cachedSession';
 
 interface SystemStats {
   totalVehicles: number;
@@ -52,7 +53,7 @@ const AdminMissionControl: React.FC = () => {
   const [angleCoverage, setAngleCoverage] = useState<any | null>(null);
   const [analysisQueue, setAnalysisQueue] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [processing, setProcessing] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState<any>(null);
   const [imageScanStats, setImageScanStats] = useState<any>(null);

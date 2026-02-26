@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CashBalanceService } from '../services/cashBalanceService';
+import { readCachedSession } from '../utils/cachedSession';
 
 type SegmentIndexRow = {
   segment_id: string;
@@ -66,7 +67,7 @@ export default function MarketDashboard() {
   const [segments, setSegments] = useState<SegmentIndexRow[]>([]);
   const [vehicles, setVehicles] = useState<VehicleInvestment[]>([]);
   const [overview, setOverview] = useState<MarketOverview | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'etfs' | 'vehicles'>('overview');
   const [cashCents, setCashCents] = useState<number>(0);
