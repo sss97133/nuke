@@ -271,6 +271,20 @@ function postProcessResult(result: any): { data: any; needsReview: boolean; revi
 // ─── IMAGE UTILITIES ───────────────────────────────────────────────────────
 
 async function getImageAsBase64(storagePath: string): Promise<{ base64: string; mediaType: string }> {
+  // If storagePath is a full URL, fetch directly
+  if (storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
+    const resp = await fetch(storagePath);
+    if (!resp.ok) throw new Error(`Cannot access image: ${storagePath}`);
+    const buffer = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 8192;
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize) as unknown as number[]);
+    }
+    return { base64: btoa(binary), mediaType: resp.headers.get("content-type") || "image/jpeg" };
+  }
+
   // Get signed URL from Supabase Storage
   const { data: signedData, error: signError } = await supabase.storage
     .from('deal-documents')

@@ -3,6 +3,121 @@
 **Append-only. Add entries when completing significant work.**
 Agents read this to avoid rebuilding things that already exist.
 
+## 2026-02-26 (YONO vision v2 session)
+
+### YONO Vision V2 — Phase 1-4 Infrastructure — COMPLETED 2026-02-26
+
+**What was killed:** EfficientNet-B0 make/model classifier as the primary direction. Make/model is already known from text. Vision should answer what text cannot.
+
+**New architecture:** Florence-2-base (microsoft/florence-2-base, 231M params) with multi-task classification head for:
+- `condition_score` (1-5): exterior condition
+- `damage_flags` (multi-label): rust, dent, crack, paint_fade, broken_glass, missing_parts, accident_damage
+- `modification_flags` (multi-label): lift_kit, lowered, aftermarket_wheels, roll_cage, engine_swap, body_kit, exhaust_mod, suspension_mod
+- `photo_quality_score` (1-5): photo usefulness filter
+- `interior_quality` (1-5 or null): interior condition when visible
+- `photo_type` (9 classes): exterior_front/rear/side, interior, engine, wheel, detail, undercarriage, other
+
+**Phase 1 — Auto-labeling:**
+- [built] `yono/scripts/auto_label_images.py` — samples 3000 images from .image_cache/, sends to claude-haiku-4-5-20251001 vision, writes to training_labels/labels.jsonl
+- [running] Labeling PID 62327: ~2500+ labels generated, 4 workers, finishing ~3000 total
+- [data] Labels at `yono/training_labels/labels.jsonl` — 2488+ rows
+- [data] Distribution: 40% score-4 condition, 38% have damage, 20% have mods, diverse photo types
+
+**Phase 2 — Florence-2 fine-tuning:**
+- [built] `yono/scripts/train_florence2.py` — full fine-tuning script for MPS/Florence-2
+- [fixed] Florence-2 processor compatibility: pinned transformers==4.49.0, installed einops
+- [running] Training PID 68092: epoch 1/10 in progress on MPS, loss dropping from 7.87→7.0
+- [arch] DaViT vision encoder (4 block groups), `model._encode_image()` → (batch, 577, 768) features
+- [arch] VehicleVisionHead: mean-pool over 577 tokens → LayerNorm → 512 → 6 task heads
+- Checkpoints save to `yono/outputs/florence2/`, best model to `yono/models/yono_vision_v2_head.safetensors`
+
+**Phase 3 — Server update:**
+- [deployed] `yono/server.py` updated with `VisionAnalyzer` class and new endpoints:
+  - `POST /analyze` — single image → condition_score, damage_flags, modification_flags, photo_quality, photo_type
+  - `POST /analyze/batch` — up to 20 images
+  - Existing `/classify` endpoint UNCHANGED (production-safe)
+- [arch] VisionAnalyzer auto-detects: if `yono_vision_v2_head.safetensors` exists → fine-tuned mode, else → zero-shot captioning mode
+- [note] Zero-shot Florence-2 generates `<DETAILED_CAPTION>` text, extracts flags via keyword matching
+
+**Phase 4 — Edge function + DB:**
+- [deployed] `supabase/functions/yono-analyze/index.ts` — deployed to Supabase
+  - Single image: `{ image_url, image_id? }` → analysis result + optional DB write
+  - Batch: `{ images: [{ image_url, image_id? }] }` → batch results
+  - Auto-writes to vehicle_images when image_id provided
+- [deployed] DB migration `database/migrations/20260226_yono_vision_v2.sql` applied:
+  - Added to vehicle_images: condition_score, damage_flags, modification_flags, photo_quality_score, vision_analyzed_at, vision_model_version
+  - All 6 columns verified present in production DB
+  - Indexes: idx_vehicle_images_condition_score, idx_vehicle_images_damage_flags (GIN), idx_vehicle_images_pending_vision
+
+**What still needs to complete (background processes running):**
+- Labeling (PID 62327): ~500 more to finish → 3000 total
+- Training (PID 68092): epoch 1/10 running, ~55 min total
+- After training: `yono/models/yono_vision_v2_head.safetensors` auto-saved, server restarts load it
+
+## 2026-02-26 (vehicle-profile session)
+
+### Vehicle Profile Page — Finished — COMPLETED 2026-02-26
+- [facts] data_quality_score (0-100 integer) now shows in VehicleBasicInfo with color-coded progress bar
+- [facts] FactExplorerPanel (was defined but never rendered) now shows in Facts tab
+- [evidence] WorkMemorySection (was imported but never rendered) now shows for owners/contributors in Evidence tab
+- [commerce] Fixed double-wrapping: VehicleROISummaryCard + VehiclePricingValueCard both have internal CollapsibleWidgets; removed outer wrappers that were hiding content
+- [commerce] VehicleDealJacketForensicsCard: replaced null return with "No deal jacket forensics available" empty state
+- [header] Area Demographics: replaced confusing -- dashes with clean "unavailable" state
+- [sanitizer] VehicleBasicInfo: reject mid-sentence fragments (", and four-wheel disc brakes" type contamination)
+- All 4 tabs verified crash-free on both minimal-data and rich-data vehicles
+- Committed 5a915f327, pushed, Vercel deploying
+
+## 2026-02-26 (evening session continued)
+
+### Order Book Matching Engine + market_fund_buy Cash Fix — COMPLETED 2026-02-26
+- deduct_reserved_cash(), credit_cash(), release_reserved_cash() — cash settlement helpers
+- market_fund_buy() rewritten: atomic cash deduction before share issuance (was TODO/skipped)
+- match_order_book(order_id): full price-time priority matching engine
+  - Price-time priority (best price first, oldest order first)
+  - Fill at maker price, 2% commission deducted from seller proceeds
+  - share_holdings ON CONFLICT upsert for buyer, decrement for seller
+  - Cash settlement via helper functions; over-reserved cash released on full buy fill
+  - FOR UPDATE SKIP LOCKED for concurrent safety
+  - Updates market_orders, share_holdings, vehicle_offerings in one transaction
+- cancel_market_order(): SECURITY DEFINER cancel + releases reserved cash (unfilled portion)
+- tradingService.ts cancelOrder(): now calls cancel_market_order RPC (was direct table update, cash never released)
+- Migration: 20260226_order_book_and_fund_buy.sql — committed 6028c0377, pushed
+
+## 2026-02-26 (afternoon/evening session)
+
+### Queue Throughput — 6 new source workers added
+- Mecum: 3 new CQP workers (jobs 217-219), `* * * * *` continuous
+- PCarMarket: 3 new CQP workers (jobs 220-222), `* * * * *` continuous
+- 21,028 Mecum + 5,578 PCarMarket now actively draining
+
+### Failed Record Triage — 0 failed remaining
+- BaT: Skipped category pages + template URLs (Invalid BaT URL errors)
+- BaT: Reset 1 transient 406 error
+- BroadArrow: Skipped memorabilia (watches, scale models, sold page)
+- BroadArrow: Reset legitimate vehicle failures (wrecker/fire truck)
+- BJ: Reset invalid-routing failures (were hitting wrong extractor)
+- Duplicate VIN: Skipped gracefully
+
+### Quality Score Backfill — Fixed + Running
+- **Root cause found**: 47 triggers × 89 indexes = 710ms/row
+- **Fix 1**: Dropped `idx_vehicles_quality_score` and `idx_vehicles_quality_backfill` (no longer needed during backfill)
+- **Fix 2**: DO block with `SET LOCAL session_replication_role = 'replica'` bypasses all 47 triggers → 20ms/row
+- **Fix 3**: Temp table JOIN pattern (`_qb_batch`) for efficient query planning instead of `ANY(array)`
+- **Fix 4**: 30-second sleep offset to stagger from peak cron contention at :00
+- Cron 228: `quality-score-backfill`, 300 rows/run at :30 past each minute
+- `quality_backfill_state` table tracks keyset pagination cursor (last_vehicle_id)
+- Rate: ~300 rows/min = 18k/hr → ~69 hours for 1.25M records
+- `trg_update_vehicle_quality_score` trigger fixed (×100 multiplier, was truncating to 0)
+
+### YONO Export Script — ctid Pagination Fix — COMPLETED 2026-02-26
+
+- Root cause: planner uses PK index → scans 28M rows → Supabase 120s timeout; partial index has reltuples=0 (ignored)
+- Fix: rewrote `export_supabase_training.py` to use **ctid-based physical page range scans** (8000 blocks/batch = ~2300 rows, ~6s per batch)
+- Added `--skip-download` flag: exports all JSONL metadata without downloading images (saves disk space — only 33GB free)
+- New ctid batches start at batch_0103+ (existing 100+2 batches preserved)
+- Export running: ~838K records, ETA ~1hr, writing to `training-data/images/`
+- Also built `idx_vi_training_covering` covering index (usable once planner stats update via future VACUUM)
+
 ### Market Exchange Backend — COMPLETED 2026-02-26
 
 - `pre_trade_risk_check` RPC deployed (was missing — orders fell open)
@@ -115,6 +230,33 @@ Agents read this to avoid rebuilding things that already exist.
 Format: `- [area] What was built — where it lives`
 
 ---
+
+## 2026-02-26 (Extraction Quality Sprint — Phase 2, post context-compression)
+
+### Critical Description Fix — Mecum
+- **Root cause**: `post.content` in Mecum __NEXT_DATA__ is ALWAYS empty. Description lives in Gutenberg blocks under HIGHLIGHTS + EQUIPMENT headings.
+- **Fix**: Added `parseBlocksDescription()` to extract-mecum — recursively walks `post.blocks[]`, finds `core/list-item` elements under HIGHLIGHTS and EQUIPMENT headings, strips HTML, joins with bullet format.
+- **Also**: Engine extraction from SPECIFICATIONS block (label/value pairs in blocks, more reliable than `lotSeries` which is sometimes charity text).
+- **Result**: Description rate from 0% → expected 60%+ for Mecum lots. Quality score example: 0.73 → 0.93.
+- **Mecum backfill**: Reset 35,146 completed mecum items (processed before 2026-02-20) to 'pending' for re-extraction. 5 dedicated mecum CQP workers (jobs 217-219, 231-232) actively draining.
+
+### Critical Description Fix — Bonhams
+- **Root cause 1**: `extractBonhamsLot` only looked at `jsonLd.description` (generic site text) and meta description. The actual lot description is in `### Footnotes` section of the Firecrawl markdown.
+- **Root cause 2**: JSON-LD/og:title not available in React shell HTML → year/make/model were null.
+- **Root cause 3**: Firecrawl only triggered when `html.length < 5000`, but Bonhams CSR shell is 120KB.
+- **Fix 1**: Added Footnotes markdown section parsing in `extractBonhamsLot()` — regex matches `### Footnotes\n+...`, strips markdown formatting, trims to 10K chars.
+- **Fix 2**: Added markdown heading fallback for title parsing when og:title unavailable.
+- **Fix 3**: Firecrawl now fires when `!fetchResult.cached && !hasLotContent` — fires on all fresh fetches (not just tiny pages). Cache hit = uses stored markdown, no Firecrawl cost.
+- **Result**: Description rate from 0% → expected 60%+ for Bonhams lots. All tested at cost_cents=0 (cached). Fresh fetches use Firecrawl (~$0.01/page × 2.6K pending = ~$26).
+
+### Queue Workers Added
+- Jobs 231, 232: mecum-queue-worker-4, mecum-queue-worker-5 (5 total mecum CQP workers now)
+- Jobs 233, 234: gooding-queue-worker-1, gooding-queue-worker-2 (Gooding was only in general round-robin, now dedicated)
+- Jobs 229, 230: removed (bad re_enrich implementation that caused timeout)
+
+### Pipeline State (current)
+- Mecum: 55K pending / 731/hr → ~75 hrs | B-J: 24K / 2028/hr → ~12 hrs | C&B: 31K / 989/hr → ~31 hrs
+- BaT: 4K / 844/hr → ~5 hrs | Bonhams: 2.6K / 671/hr → ~4 hrs | PCar: 5.1K / 164/hr → ~31 hrs | Gooding: 1.6K / (new workers, accelerating)
 
 ## 2026-02-26
 - [cron] **9 dedicated source workers added** (jobs 191-199): cnb-queue-worker-1/2/3, bj-queue-worker-1/2/3, broadarrow-queue-worker-1/2/3 — each runs every minute, batch_size=5, continuous=true, max_runtime=50s. Targets C&B (36k pending), BJ (8.4k pending), Broad Arrow (1.1k pending). BAT already covered by jobs 123-127.
@@ -340,3 +482,69 @@ Start a new date section if today's date isn't already here.
 - [perf] **Lazy markdown loading**: InvestorOffering + OrganizationOfferingTab — 6 static `?raw` imports converted to dynamic per-tab imports (~378K now loaded on-demand)
 - [fix] **User-scoped realtime channels**: notification_badge + cash balance channels now scoped by userId
 - [fix] **SubdomainRouter synchronous init**: eliminated loading gate for non-storefront domains
+
+## 2026-02-26 (extraction quality sprint — autonomous)
+
+### PCarMarket 4-Layer Field Fix — DEPLOYED
+- **Root cause**: PCarMarket extractor had no color/engine/transmission in interface, extraction path, LLM fallback, or vehicleData write — fields extracted by Firecrawl but never stored
+- **Fix**: Added to all 4 layers — TypeScript interface, JSON extraction (`jsonData.vehicle?.exterior_color` etc.), LLM fallback (`llm.exterior_color` etc.), vehicleData write object (`color`, `interior_color`, `engine_type`, `transmission`)
+- **Verified**: Porsche 993 test → "Zenith Blue Metallic", "Midnight Blue", "3.6 L flat-six, 282 HP", "6-Speed Manual" ✓
+- **File**: `supabase/functions/import-pcarmarket-listing/index.ts`
+
+### Backfill Queue — 88K+ items across all sources
+All queued via `import_queue` → CQP → dedicated extractors. Free/low-cost extraction paths used where available.
+- **Bonhams**: 24,978 shell records with NULL listing_source queued (old bulk importer predated extract-bonhams v3)
+- **C&B**: 18,261 cab-fast-discover shells with no prior queue entry
+- **Barrett-Jackson**: 13,602 B-J vehicles with no prior queue entry; 13,057 "complete" items reset where VIN was missing
+- **BaT**: 8,052 BaT vehicles missing VIN or mileage re-queued
+- **PCarMarket**: 5,483 existing PCarMarket vehicles missing color queued at low priority
+- **Mecum**: 20,903 mecum-checkpoint/fast-discover shells with no prior queue entry (free __NEXT_DATA__ extraction)
+
+### CQP Extractor Routing Fixes — DEPLOYED
+- **Mecum**: Route changed `extract-vehicle-data-ai` → `extract-mecum` (dedicated, uses free `__NEXT_DATA__` JSON, quality gate, proper WordPress content extraction)
+- **eBay**: Route changed `extract-vehicle-data-ai` → `extract-ebay-motors` (dedicated, quality filters, strict field validation)
+- **File**: `supabase/functions/continuous-queue-processor/index.ts`
+
+### v_extraction_quality View Created
+```sql
+-- Tracks field completeness by listing_source
+-- Key fields: VIN, mileage, color, interior_color, engine, transmission, description, sale_price
+SELECT * FROM v_extraction_quality ORDER BY pct_all_key_fields DESC;
+```
+
+### Pipeline Progress (snapshot ~4h after start)
+- BaT: 696 complete, 7,957 pending
+- B-J: 1,637 complete, 32,320 pending
+- C&B: 773 complete, 34,943 pending
+- Bonhams: 511 complete, 5,250 pending
+- PCarMarket: active (5,563 pending)
+- Mecum: 20,680 newly queued, extraction now routed to extract-mecum (free)
+
+### Additional Extraction Quality Fixes (continued from session)
+
+**CQP routing fixes** — `supabase/functions/continuous-queue-processor/index.ts`:
+- `mecum` → `extract-mecum` (was `extract-vehicle-data-ai` — using free `__NEXT_DATA__` is 10x better quality)
+- `ebay` → `extract-ebay-motors` (was `extract-vehicle-data-ai` — dedicated quality-filtered extractor)
+- Gooding: added sourceIds for fast queue claiming (no more full-table LIKE scan)
+
+**C&B snapshot cache fix** — `supabase/functions/extract-cars-and-bids-core/index.ts`:
+- Removed 7-day TTL on listing_page_snapshots — historical auction pages are immutable once ended
+- Old C&B data permanently lost from live pages; existing snapshots (19K) now reusable indefinitely
+
+**Gooding backfill** — 1,724 old `gooding_extract` records (goodingco.com URLs) queued for `extract-gooding`:
+- Were labeled 'gooding_extract' but had goodingco.com URLs — missed by B-J backfill
+- extract-gooding getting rich provenance descriptions ("Brilliant George Weaver Design...", "Stunning One-Off Brewster/Inskip Coachwork")
+- Quality improvement: 1.5% description → ~85% after extraction
+
+**Pipeline throughput** (measured rates):
+- B-J: 2,478/hr (25K pending, ETA ~10 hrs)
+- C&B: 1,141/hr (32K pending, ETA ~28 hrs) 
+- BaT: 1,022/hr (4.7K pending, ETA ~4.6 hrs)
+- Bonhams: 741/hr (3.2K pending, ETA ~4.3 hrs)
+- Mecum: 329/hr (20.5K pending, ETA ~62 hrs) — free, no Firecrawl cost
+- Gooding: 214/hr (1.7K pending, ETA ~8 hrs)
+
+**Known limitations** (inherent, not fixable):
+- Old C&B ended auctions (18K cab-fast-discover): spec data permanently gone from live pages
+- Bonhams 0% description: JSON-LD doesn't include it, requires JS-rendered body parsing
+- Rennlist 7.4% color: forum posts, no structured color field
