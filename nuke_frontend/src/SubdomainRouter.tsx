@@ -56,16 +56,22 @@ function extractSubdomain(hostname: string): string | null {
   return null;
 }
 
+// Compute initial state synchronously — avoids a "loading..." flash for the
+// 99% case where the hostname has no subdomain (localhost, nuke.ag root, etc.)
+function getInitialState(): State {
+  const subdomain = extractSubdomain(window.location.hostname);
+  if (!subdomain) return { kind: 'main-app' };
+  return { kind: 'loading' };
+}
+
 export default function SubdomainRouter() {
-  const [state, setState] = useState<State>({ kind: 'loading' });
+  const [state, setState] = useState<State>(getInitialState);
 
   useEffect(() => {
     const subdomain = extractSubdomain(window.location.hostname);
 
-    if (!subdomain) {
-      setState({ kind: 'main-app' });
-      return;
-    }
+    // Already resolved synchronously in getInitialState
+    if (!subdomain) return;
 
     // Look up org by slug
     supabase
