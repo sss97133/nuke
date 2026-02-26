@@ -16,7 +16,7 @@ export function useCashBalance(userId: string | undefined) {
     const timer = setTimeout(() => loadBalance(userId), 100);
 
     const channel = supabase
-      .channel('balance')
+      .channel(`balance:${userId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
