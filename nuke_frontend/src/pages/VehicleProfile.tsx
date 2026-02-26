@@ -1039,6 +1039,22 @@ const VehicleProfile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId, authChecked]);
 
+  // Auto-create bundle events when owner views their vehicle
+  // Fire-and-forget: idempotent, safe to run on every load
+  useEffect(() => {
+    if (!vehicleId || !canEdit) return;
+    const token = session?.access_token;
+    if (!token) return;
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-create-bundle-events`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ vehicle_id: vehicleId }),
+    }).catch(() => {}); // intentionally silent — not critical path
+  }, [vehicleId, canEdit, session?.access_token]);
+
   // Listen for auth state changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

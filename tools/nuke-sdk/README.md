@@ -1,23 +1,27 @@
-# @nuke/sdk
+# @nuke1/sdk
 
 Official TypeScript SDK for the Nuke Vehicle Data API.
 
 ## Installation
 
 ```bash
-npm install @nuke/sdk
+npm install @nuke1/sdk
 # or
-yarn add @nuke/sdk
+yarn add @nuke1/sdk
 # or
-pnpm add @nuke/sdk
+pnpm add @nuke1/sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import Nuke from '@nuke/sdk';
+import Nuke from '@nuke1/sdk';
 
 const nuke = new Nuke('nk_live_your_api_key');
+
+// Classify a vehicle photo — free, powered by YONO
+const result = await nuke.vision.classify('https://cdn.example.com/car.jpg');
+console.log(result.make, result.confidence); // "Porsche" 0.91
 
 // Create a vehicle
 const vehicle = await nuke.vehicles.create({
@@ -26,11 +30,56 @@ const vehicle = await nuke.vehicles.create({
   model: '911S',
   vin: 'WP0AA0918LS123456',
 });
-
-console.log('Created vehicle:', vehicle.id);
 ```
 
 ## API Reference
+
+### Vision
+
+Classify and analyze vehicle images using YONO — a locally-trained model that runs free. No cloud API cost for make classification.
+
+```typescript
+// Classify: image URL → make, confidence, top-5 predictions
+const result = await nuke.vision.classify('https://cdn.example.com/car.jpg');
+// {
+//   make: 'Porsche',
+//   confidence: 0.91,
+//   top5: [['Porsche', 0.91], ['BMW', 0.04], ...],
+//   is_vehicle: true,
+//   source: 'yono',
+//   cost_usd: 0,
+//   ms: 4.2
+// }
+
+// Pass a string directly or use the params object
+await nuke.vision.classify({ image_url: 'https://...', top_k: 10 });
+
+// Analyze: full scene analysis — category, angle, condition, camera position
+const analysis = await nuke.vision.analyze('https://cdn.example.com/car.jpg');
+// {
+//   make: 'Porsche',
+//   confidence: 0.91,
+//   category: 'exterior',
+//   subject: 'exterior.panel.door.front.driver',
+//   description: 'Left front door of a 911, showing...',
+//   condition_notes: 'Minor surface rust on lower sill',
+//   visible_damage: true,
+//   camera_position: { azimuth_deg: 90, elevation_deg: 15, distance_mm: 3500 },
+//   source: 'yono+cloud',
+//   cost_usd: 0.0012
+// }
+
+// Batch: classify up to 100 images in one call — all free via YONO
+const batch = await nuke.vision.batch([
+  { image_url: 'https://cdn.example.com/car1.jpg' },
+  { image_url: 'https://cdn.example.com/car2.jpg' },
+  'https://cdn.example.com/car3.jpg',
+]);
+// { results: [...], count: 3, cost_usd: 0, elapsed_ms: 142 }
+```
+
+**Cost:** Make classification via YONO is `$0.00/image`. Full analysis (category, condition, camera position) uses cloud vision and costs `$0.0001–$0.004/image`.
+
 
 ### Vehicles
 
@@ -158,7 +207,7 @@ const rotated = await nuke.webhooks.rotateSecret('uuid-here');
 #### Verifying Webhook Signatures
 
 ```typescript
-import { Webhooks } from '@nuke/sdk';
+import { Webhooks } from '@nuke1/sdk';
 
 // Express.js example
 app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
@@ -188,7 +237,7 @@ app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
 ## Error Handling
 
 ```typescript
-import Nuke, { NukeError, NukeAPIError, NukeRateLimitError } from '@nuke/sdk';
+import Nuke, { NukeError, NukeAPIError, NukeRateLimitError } from '@nuke1/sdk';
 
 try {
   await nuke.vehicles.create({ year: 1970 });
@@ -234,7 +283,10 @@ import type {
   WebhookEndpoint,
   WebhookPayload,
   BatchResult,
-} from '@nuke/sdk';
+  VisionClassifyResult,
+  VisionAnalyzeResult,
+  VisionBatchResult,
+} from '@nuke1/sdk';
 ```
 
 ## License

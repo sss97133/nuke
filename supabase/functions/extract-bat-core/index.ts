@@ -16,6 +16,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
+import { parseLocation } from "../_shared/parseLocation.ts";
 
 // Extractor versioning - update on each significant change
 const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
@@ -1177,6 +1178,7 @@ serve(async (req) => {
     const bestExteriorColor = essentials.exterior_color || inferredColors.exterior_color;
     const bestInteriorColor = essentials.interior_color || inferredColors.interior_color;
     const bestListingLocation = essentials.location || null;
+    const parsedLocation = parseLocation(essentials.location);
 
     // Resolve existing vehicle
     let vehicleId: string | null = providedVehicleId;
@@ -1250,7 +1252,11 @@ serve(async (req) => {
         bat_seller: essentials.seller_username || null,
         bat_buyer: essentials.buyer_username || null,
         bat_location: essentials.location || null,
-        listing_location: bestListingLocation,
+        listing_location: parsedLocation.clean,
+        listing_location_raw: parsedLocation.raw,
+        listing_location_source: 'bat',
+        listing_location_confidence: parsedLocation.confidence,
+        listing_location_observed_at: new Date().toISOString(),
         bat_lot_number: essentials.lot_number || null,
         bat_bids: essentials.bid_count || 0,
         bat_comments: essentials.comment_count || 0,
@@ -1421,7 +1427,13 @@ serve(async (req) => {
       if ((!existing?.bat_seller || listingIsLatestOrEqual) && essentials.seller_username) updatePayload.bat_seller = essentials.seller_username;
       if ((!existing?.bat_buyer || listingIsLatestOrEqual) && essentials.buyer_username) updatePayload.bat_buyer = essentials.buyer_username;
       if ((!existing?.bat_location || listingIsLatestOrEqual) && essentials.location) updatePayload.bat_location = essentials.location;
-      if ((!existing?.listing_location || listingIsLatestOrEqual) && bestListingLocation) updatePayload.listing_location = bestListingLocation;
+      if ((!existing?.listing_location || listingIsLatestOrEqual) && parsedLocation.clean) {
+        updatePayload.listing_location = parsedLocation.clean;
+        updatePayload.listing_location_raw = parsedLocation.raw;
+        updatePayload.listing_location_source = 'bat';
+        updatePayload.listing_location_confidence = parsedLocation.confidence;
+        updatePayload.listing_location_observed_at = new Date().toISOString();
+      }
       if ((!existing?.bat_lot_number || listingIsLatestOrEqual) && essentials.lot_number) updatePayload.bat_lot_number = essentials.lot_number;
       if (!existing?.body_style && bestBodyStyle) updatePayload.body_style = bestBodyStyle;
 
@@ -1646,6 +1658,29 @@ serve(async (req) => {
         }
       }
       updatedIds.push(vehicleId);
+    }
+
+    // Write location observation
+    if (vehicleId && parsedLocation.clean) {
+      try {
+        await supabase.from("vehicle_location_observations").insert({
+          vehicle_id: vehicleId,
+          source_type: "listing",
+          source_platform: "bat",
+          source_url: listingUrlCanonical,
+          observed_at: new Date().toISOString(),
+          location_text_raw: parsedLocation.raw,
+          location_text_clean: parsedLocation.clean,
+          city: parsedLocation.city,
+          region_code: parsedLocation.state,
+          postal_code: parsedLocation.zip,
+          precision: parsedLocation.city ? "city" : "region",
+          confidence: parsedLocation.confidence,
+          metadata: {},
+        });
+      } catch (locErr) {
+        console.warn("⚠️ Failed to write vehicle_location_observations:", locErr);
+      }
     }
 
     // Save images (external URLs only)

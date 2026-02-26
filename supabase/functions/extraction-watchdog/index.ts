@@ -405,6 +405,35 @@ async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<s
     }
   }
 
+  // ── 5b. Rescue orphaned 'failed' items back to 'pending' ──
+  // The claim function only picks up status='pending'. Items set to status='failed'
+  // by older code paths (process-import-queue) are permanently orphaned — never retried.
+  // Any failed item with remaining attempts should be given another chance.
+  try {
+    const { data: rescueResult } = await supabase.rpc("execute_recovery_sql", {
+      p_sql: `UPDATE import_queue
+              SET status = 'pending',
+                  next_attempt_at = now() + interval '5 minutes',
+                  error_message = NULL,
+                  failure_category = NULL
+              WHERE status = 'failed'
+                AND attempts < ${THRESHOLDS.max_attempts_before_skip}
+                AND (failure_category NOT IN ('gone', 'auth_required', 'blocked', 'bad_data', 'non_vehicle', 'filtered')
+                     OR failure_category IS NULL)
+                AND error_message NOT ILIKE '%410%'
+                AND error_message NOT ILIKE '%404%'
+                AND error_message NOT ILIKE '%not found%'
+                AND error_message NOT ILIKE '%requires login%'
+                AND error_message NOT ILIKE '%permanently unavailable%'`,
+    });
+    const rescueCount = rescueResult?.[0]?.affected ?? 0;
+    if (rescueCount > 0) {
+      actions.push(`Rescued ${rescueCount} orphaned failed items back to pending for retry`);
+    }
+  } catch (err) {
+    console.error("[Watchdog] Rescue failed items error:", err);
+  }
+
   // ── 6. Per-source circuit breaker ──
   // If a source has high error rate, pause all its pending items instead of
   // letting the processor churn through them and fail repeatedly.

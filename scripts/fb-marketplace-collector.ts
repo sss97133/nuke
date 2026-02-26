@@ -2,15 +2,20 @@
 /**
  * Facebook Marketplace Local Collector
  *
- * Two-phase collection:
- * 1. Bot UA scrapes search results (finds listing IDs locally - works from residential IPs)
- * 2. Calls extract-facebook-marketplace edge function (uses Firecrawl) for full details
+ * Tier-aware collection across year ranges. Each location is searched
+ * per tier so high-priority eras get dedicated queries.
  *
  * Usage:
- *   npx tsx scripts/fb-marketplace-collector.ts [--max-locations=50] [--state=TX] [--skip-details]
+ *   dotenvx run -- npx tsx scripts/fb-marketplace-collector.ts
+ *   dotenvx run -- npx tsx scripts/fb-marketplace-collector.ts --tier=64-72
+ *   dotenvx run -- npx tsx scripts/fb-marketplace-collector.ts --state=TX --max-locations=20
+ *   dotenvx run -- npx tsx scripts/fb-marketplace-collector.ts --skip-details
  *
  * Options:
- *   --skip-details  Skip Firecrawl detail extraction (just find IDs)
+ *   --tier=64-72        Focus on a single tier (64-72 | 73-87 | 88-00 | 01-07 | 08-13 | 55-63 | pre-55)
+ *   --max-locations=N   Locations to sweep per run (default: 30)
+ *   --state=TX          Filter to a single state
+ *   --skip-details      Skip Firecrawl enrichment (just find IDs, faster)
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -27,13 +32,28 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const BOT_USER_AGENT = "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)";
+
+// Year tiers in priority order (listed first = swept most)
+// Priority is how often to include this tier in a given sweep pass:
+//   3 = every run, 2 = every other run, 1 = every third run
+const TIERS = [
+  { id: "64-72",  label: "1964–1972 Muscle Era",    minYear: 1964, maxYear: 1972, priority: 3 },
+  { id: "55-63",  label: "1955–1963 Golden Age",     minYear: 1955, maxYear: 1963, priority: 3 },
+  { id: "pre-55", label: "Pre-1955 Antique",          minYear: 1900, maxYear: 1954, priority: 3 },
+  { id: "73-87",  label: "1973–1987 Squarebody Era", minYear: 1973, maxYear: 1987, priority: 2 },
+  { id: "88-00",  label: "1988–2000 OBS/Modern Classic", minYear: 1988, maxYear: 2000, priority: 2 },
+  { id: "01-07",  label: "2001–2007",                minYear: 2001, maxYear: 2007, priority: 1 },
+  { id: "08-13",  label: "2008–2013",                minYear: 2008, maxYear: 2013, priority: 1 },
+] as const;
+
+type TierId = typeof TIERS[number]["id"];
+
 const CONFIG = {
-  BOT_USER_AGENT: "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
-  YEAR_MIN: 1960,
-  YEAR_MAX: 1999,
-  DELAY_BETWEEN_LOCATIONS_MS: 30000, // 30 seconds between location searches
-  DELAY_BETWEEN_DETAILS_MS: 3000, // 3 seconds between Firecrawl calls
-  MAX_DETAILS_PER_LOCATION: 5, // Limit Firecrawl calls per location
+  DELAY_BETWEEN_TIER_SEARCHES_MS: 8000,   // 8s between tier searches within a location
+  DELAY_BETWEEN_LOCATIONS_MS: 25000,       // 25s between locations
+  DELAY_BETWEEN_DETAILS_MS: 3000,
+  MAX_DETAILS_PER_LOCATION: 5,
 };
 
 interface Location {
@@ -52,18 +72,37 @@ interface FoundListing {
   url: string;
 }
 
+// Get current sweep pass number from DB to know which tiers to include
+async function getSweepPassNumber(): Promise<number> {
+  const { count } = await supabase
+    .from("fb_sweep_jobs")
+    .select("*", { count: "exact", head: true });
+  return (count || 0) + 1;
+}
+
 async function main() {
   const args = process.argv.slice(2);
-  const maxLocations = parseInt(args.find(a => a.startsWith("--max-locations="))?.split("=")[1] || "50");
+  const maxLocations = parseInt(args.find(a => a.startsWith("--max-locations="))?.split("=")[1] || "30");
   const stateFilter = args.find(a => a.startsWith("--state="))?.split("=")[1];
   const skipDetails = args.includes("--skip-details");
+  const tierFilter = args.find(a => a.startsWith("--tier="))?.split("=")[1] as TierId | undefined;
 
-  console.log("🚀 Facebook Marketplace Collector (Full Pipeline)");
-  console.log("==================================================");
-  console.log(`Max locations: ${maxLocations}`);
-  console.log(`State filter: ${stateFilter || "ALL"}`);
-  console.log(`Year range: ${CONFIG.YEAR_MIN}-${CONFIG.YEAR_MAX}`);
-  console.log(`Detail extraction: ${skipDetails ? "DISABLED" : "ENABLED (Firecrawl)"}`);
+  // Determine which tiers to run this pass based on priority
+  const passNum = await getSweepPassNumber();
+  const activeTiers = tierFilter
+    ? TIERS.filter((t) => t.id === tierFilter)
+    : TIERS.filter((t) => passNum % (4 - t.priority) === 0 || t.priority === 3);
+
+  if (!activeTiers.length) {
+    console.error("No matching tiers found.");
+    process.exit(1);
+  }
+
+  console.log("FB Marketplace Collector");
+  console.log("========================");
+  console.log(`Pass #${passNum}  |  Locations: ${maxLocations}  |  State: ${stateFilter || "ALL"}`);
+  console.log(`Active tiers: ${activeTiers.map((t) => t.id).join(", ")}`);
+  console.log(`Detail extraction: ${skipDetails ? "off" : "on (Firecrawl)"}`);
   console.log();
 
   // Fetch locations
@@ -84,14 +123,15 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`📍 Processing ${locations.length} locations\n`);
+  console.log(`Processing ${locations.length} locations\n`);
 
-  let stats = {
+  const stats = {
     locations_processed: 0,
     listings_found: 0,
     new_listings: 0,
     details_extracted: 0,
     errors: 0,
+    by_tier: {} as Record<string, number>,
   };
 
   for (let i = 0; i < locations.length; i++) {
@@ -99,111 +139,117 @@ async function main() {
     const progress = `[${i + 1}/${locations.length}]`;
 
     try {
-      console.log(`\n${progress} 📍 ${location.name}, ${location.state_code}`);
+      console.log(`\n${progress} ${location.name}, ${location.state_code}`);
 
-      // Phase 1: Find listings via bot scraper
-      const found = await findListingsInLocation(location.name);
-      console.log(`   Found ${found.length} vintage listings in search`);
-      stats.listings_found += found.length;
+      let locationNew = 0;
 
-      // Check which are new
-      const newListings: FoundListing[] = [];
-      for (const listing of found) {
-        const { data: existing } = await supabase
-          .from("marketplace_listings")
-          .select("id")
-          .eq("facebook_id", listing.facebook_id)
-          .single();
+      for (let t = 0; t < activeTiers.length; t++) {
+        const tier = activeTiers[t];
+        process.stdout.write(`  ${tier.id}: `);
 
-        if (!existing) {
-          newListings.push(listing);
-        }
-      }
+        try {
+          const found = await findListingsInLocation(location.name, tier.minYear, tier.maxYear);
+          stats.listings_found += found.length;
 
-      if (newListings.length === 0) {
-        console.log(`   No new listings (all ${found.length} already tracked)`);
-      } else {
-        console.log(`   🆕 ${newListings.length} NEW listings to extract`);
-        stats.new_listings += newListings.length;
+          // Filter to new only
+          const existingIds = found.length > 0
+            ? await getExistingIds(found.map((l) => l.facebook_id))
+            : new Set<string>();
 
-        // Phase 2: Get full details via Firecrawl
-        if (!skipDetails) {
-          const toExtract = newListings.slice(0, CONFIG.MAX_DETAILS_PER_LOCATION);
-          for (let j = 0; j < toExtract.length; j++) {
-            const listing = toExtract[j];
-            try {
-              process.stdout.write(`   [${j + 1}/${toExtract.length}] Extracting ${listing.facebook_id}... `);
+          const newListings = found.filter((l) => !existingIds.has(l.facebook_id));
+          locationNew += newListings.length;
+          stats.new_listings += newListings.length;
+          stats.by_tier[tier.id] = (stats.by_tier[tier.id] || 0) + newListings.length;
 
-              const result = await extractFullDetails(listing.url);
-              if (result.success) {
-                console.log(`✓ ${result.year} ${result.make} ${result.model}`);
-                stats.details_extracted++;
-              } else {
-                console.log(`✗ ${result.error}`);
+          if (!newListings.length) {
+            console.log(`${found.length} found, 0 new`);
+          } else {
+            console.log(`${found.length} found, ${newListings.length} new`);
+
+            if (!skipDetails) {
+              const toExtract = newListings.slice(0, CONFIG.MAX_DETAILS_PER_LOCATION);
+              for (let j = 0; j < toExtract.length; j++) {
+                const listing = toExtract[j];
+                try {
+                  process.stdout.write(`    extracting ${listing.facebook_id}... `);
+                  const result = await extractFullDetails(listing.url);
+                  if (result.success) {
+                    console.log(`${result.year} ${result.make} ${result.model}`);
+                    stats.details_extracted++;
+                  } else {
+                    console.log(`fail: ${result.error}`);
+                  }
+                  if (j < toExtract.length - 1) await sleep(CONFIG.DELAY_BETWEEN_DETAILS_MS);
+                } catch (err: any) {
+                  console.log(`error: ${err.message}`);
+                  stats.errors++;
+                }
               }
-
-              if (j < toExtract.length - 1) {
-                await sleep(CONFIG.DELAY_BETWEEN_DETAILS_MS);
+            } else {
+              for (const listing of newListings) {
+                await storeBasicListing(listing);
               }
-            } catch (err: any) {
-              console.log(`✗ Error: ${err.message}`);
-              stats.errors++;
             }
           }
+        } catch (err: any) {
+          console.log(`error: ${err.message}`);
+          stats.errors++;
+        }
 
-          if (newListings.length > CONFIG.MAX_DETAILS_PER_LOCATION) {
-            console.log(`   ⏭️  Skipped ${newListings.length - CONFIG.MAX_DETAILS_PER_LOCATION} (limit per location)`);
-          }
-        } else {
-          // Just store basic info without Firecrawl
-          for (const listing of newListings) {
-            await storeBasicListing(listing);
-          }
+        if (t < activeTiers.length - 1) {
+          await sleep(CONFIG.DELAY_BETWEEN_TIER_SEARCHES_MS);
         }
       }
 
-      // Update location sweep time
       await supabase
         .from("fb_marketplace_locations")
-        .update({
-          last_sweep_at: new Date().toISOString(),
-          last_sweep_listings: found.length,
-        })
+        .update({ last_sweep_at: new Date().toISOString(), last_sweep_listings: locationNew })
         .eq("id", location.id);
 
       stats.locations_processed++;
 
-      // Rate limit between locations
       if (i < locations.length - 1) {
-        console.log(`   ⏳ Waiting ${CONFIG.DELAY_BETWEEN_LOCATIONS_MS / 1000}s...`);
+        process.stdout.write(`  waiting ${CONFIG.DELAY_BETWEEN_LOCATIONS_MS / 1000}s...\r`);
         await sleep(CONFIG.DELAY_BETWEEN_LOCATIONS_MS);
       }
     } catch (err: any) {
-      console.log(`   ✗ Location error: ${err.message}`);
+      console.log(`  location error: ${err.message}`);
       stats.errors++;
     }
   }
 
-  console.log("\n==================================================");
-  console.log("📊 Collection Complete");
-  console.log("==================================================");
-  console.log(`Locations processed: ${stats.locations_processed}/${locations.length}`);
-  console.log(`Listings found in searches: ${stats.listings_found}`);
-  console.log(`New listings discovered: ${stats.new_listings}`);
-  console.log(`Full details extracted: ${stats.details_extracted}`);
-  console.log(`Errors: ${stats.errors}`);
+  console.log("\n========================");
+  console.log("Collection Complete");
+  console.log("========================");
+  console.log(`Locations: ${stats.locations_processed}/${locations.length}`);
+  console.log(`Found: ${stats.listings_found}  New: ${stats.new_listings}  Enriched: ${stats.details_extracted}  Errors: ${stats.errors}`);
+  if (Object.keys(stats.by_tier).length) {
+    console.log("\nNew by tier:");
+    const tierOrder = ["64-72", "55-63", "pre-55", "73-87", "88-00", "01-07", "08-13"];
+    for (const id of tierOrder) {
+      if (stats.by_tier[id]) console.log(`  ${id}: ${stats.by_tier[id]}`);
+    }
+  }
+}
+
+async function getExistingIds(facebookIds: string[]): Promise<Set<string>> {
+  const { data } = await supabase
+    .from("marketplace_listings")
+    .select("facebook_id")
+    .in("facebook_id", facebookIds);
+  return new Set((data || []).map((r) => r.facebook_id));
 }
 
 /**
  * Phase 1: Find listings via bot user agent (runs locally)
  */
-async function findListingsInLocation(locationName: string): Promise<FoundListing[]> {
+async function findListingsInLocation(locationName: string, minYear: number, maxYear: number): Promise<FoundListing[]> {
   const locationSlug = locationName.split(",")[0].toLowerCase().replace(/\s+/g, "");
-  const url = `https://www.facebook.com/marketplace/${locationSlug}/vehicles?minYear=${CONFIG.YEAR_MIN}&maxYear=${CONFIG.YEAR_MAX}&sortBy=creation_time_descend`;
+  const url = `https://www.facebook.com/marketplace/${locationSlug}/vehicles?minYear=${minYear}&maxYear=${maxYear}&sortBy=creation_time_descend`;
 
   const response = await fetch(url, {
     headers: {
-      "User-Agent": CONFIG.BOT_USER_AGENT,
+      "User-Agent": BOT_USER_AGENT,
       Accept: "text/html",
       "Accept-Language": "en-US,en;q=0.9",
     },
@@ -256,8 +302,8 @@ async function findListingsInLocation(locationName: string): Promise<FoundListin
     seenIds.add(idMatch[1]);
     const parsed = parseVehicleTitle(title);
 
-    // Only include vintage
-    if (parsed.year && parsed.year >= CONFIG.YEAR_MIN && parsed.year <= CONFIG.YEAR_MAX) {
+    // Only include listings in the requested year range
+    if (parsed.year && parsed.year >= minYear && parsed.year <= maxYear) {
       listings.push({
         facebook_id: idMatch[1],
         title,

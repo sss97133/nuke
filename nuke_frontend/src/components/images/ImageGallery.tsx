@@ -243,9 +243,14 @@ const ImageGallery = ({
   const [error, setError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<'grid' | 'masonry' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'masonry' | 'list' | 'bundles'>('grid');
   // Default to newest-first to keep ordering stable across vehicles while AI sorting ramps up.
   const [sortBy, setSortBy] = useState<'quality' | 'date_desc' | 'date_asc'>('date_desc');
+  // Bundle (sessions) view state
+  const [bundles, setBundles] = useState<any[]>([]);
+  const [bundlesLoading, setBundlesLoading] = useState(false);
+  const [bundleCollapsed, setBundleCollapsed] = useState<Record<string, boolean>>({});
+  const [bundleThumbnails, setBundleThumbnails] = useState<Record<string, string[]>>({});
   const [showFilters, setShowFilters] = useState(false);
   const [showImages, setShowImages] = useState(false);
   const [imagesPerPage] = useState(25);
@@ -466,6 +471,39 @@ const ImageGallery = ({
       }
     })();
   }, [vehicleId]);
+
+  // Load bundles when sessions view is activated
+  useEffect(() => {
+    if (viewMode !== 'bundles' || !vehicleId) return;
+    if (bundles.length > 0) return; // already loaded
+    setBundlesLoading(true);
+    supabase
+      .rpc('get_image_bundles_for_vehicle', { p_vehicle_id: vehicleId, p_min_images: 1 })
+      .then(async ({ data, error }) => {
+        if (error) { console.error('[ImageGallery bundles]', error); setBundlesLoading(false); return; }
+        const rows = (data || []) as any[];
+        setBundles(rows);
+        setBundlesLoading(false);
+        // Fetch 3 thumbnails per bundle
+        for (const bundle of rows) {
+          const dateStr = String(bundle.bundle_date);
+          const ids: string[] = (bundle.image_ids || []).slice(0, 3);
+          if (ids.length === 0) continue;
+          supabase
+            .from('vehicle_images')
+            .select('id, thumbnail_url, medium_url, image_url, variants')
+            .in('id', ids)
+            .then(({ data: imgs }) => {
+              if (!imgs) return;
+              const urls = imgs.map((img: any) => {
+                const v = img.variants as any;
+                return v?.thumbnail || img.thumbnail_url || img.medium_url || img.image_url;
+              }).filter(Boolean);
+              setBundleThumbnails(prev => ({ ...prev, [dateStr]: urls }));
+            });
+        }
+      });
+  }, [viewMode, vehicleId]);
 
   const buildBatImageNeedle = (v: any): string | null => {
     try {
@@ -2434,19 +2472,36 @@ const ImageGallery = ({
             <button
               onClick={() => setViewMode('list')}
               className={viewMode === 'list' ? 'button button-primary' : 'button'}
-              style={{ 
-                padding: '4px 12px', 
-                fontSize: '8pt', 
-                margin: 0, 
-                border: 'none', 
-                borderRadius: 0, 
-                height: '24px', 
+              style={{
+                padding: '4px 12px',
+                fontSize: '8pt',
+                margin: 0,
+                border: 'none',
+                borderRadius: 0,
+                height: '24px',
                 minHeight: '24px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
               }}
             >
               Info
+            </button>
+            <button
+              onClick={() => setViewMode('bundles')}
+              className={viewMode === 'bundles' ? 'button button-primary' : 'button'}
+              style={{
+                padding: '4px 12px',
+                fontSize: '8pt',
+                margin: 0,
+                border: 'none',
+                borderRadius: 0,
+                height: '24px',
+                minHeight: '24px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+            >
+              Sessions
             </button>
           </div>
 
@@ -3622,6 +3677,83 @@ const ImageGallery = ({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Sessions (Bundle) View */}
+      {viewMode === 'bundles' && (
+        <div style={{ padding: '8px 0' }}>
+          {bundlesLoading && (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+              Loading sessions…
+            </div>
+          )}
+          {!bundlesLoading && bundles.length === 0 && (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+              No sessions found. Images need EXIF dates to be grouped into sessions.
+            </div>
+          )}
+          {bundles.map(bundle => {
+            const dateStr = String(bundle.bundle_date);
+            const isCollapsed = bundleCollapsed[dateStr] ?? false;
+            const thumbs: string[] = bundleThumbnails[dateStr] || [];
+            const dateLabel = new Date(dateStr + 'T12:00:00Z').toLocaleDateString('en-US', {
+              weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+            });
+            const durationMin = bundle.duration_minutes ? Math.round(Number(bundle.duration_minutes)) : null;
+            return (
+              <div key={dateStr} style={{ borderBottom: '1px solid var(--border)' }}>
+                {/* Bundle header */}
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', cursor: 'pointer', background: 'var(--white)' }}
+                  onClick={() => setBundleCollapsed(prev => ({ ...prev, [dateStr]: !isCollapsed }))}
+                >
+                  {/* Thumbnails */}
+                  <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+                    {thumbs.slice(0, 3).map((url, i) => (
+                      <img key={i} src={url} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '2px', background: 'var(--grey-100)' }} />
+                    ))}
+                    {thumbs.length === 0 && <div style={{ width: '40px', height: '40px', background: 'var(--grey-100)', borderRadius: '2px' }} />}
+                  </div>
+                  {/* Date + meta */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{dateLabel}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {bundle.image_count} photos
+                      {durationMin ? ` · ${durationMin < 60 ? `${durationMin}m` : `${Math.round(durationMin / 60)}h`} session` : ''}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{isCollapsed ? '▶' : '▼'}</span>
+                </div>
+                {/* Expanded: show images in a small grid */}
+                {!isCollapsed && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '2px', padding: '2px 12px 12px' }}>
+                    {(bundle.image_ids || []).slice(0, 40).map((imgId: string, idx: number) => {
+                      const img = allImages.find(i => i.id === imgId);
+                      if (!img) return null;
+                      return (
+                        <img
+                          key={imgId}
+                          src={getOptimalImageUrl(img, 'thumbnail')}
+                          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '2px', cursor: 'pointer' }}
+                          onClick={() => {
+                            const globalIdx = allImages.findIndex(i => i.id === imgId);
+                            if (globalIdx >= 0) openLightbox(globalIdx);
+                          }}
+                          loading="lazy"
+                        />
+                      );
+                    })}
+                    {(bundle.image_ids || []).length > 40 && (
+                      <div style={{ gridColumn: '1/-1', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }}>
+                        + {bundle.image_ids.length - 40} more
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
