@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import '../design-system.css';
+import { readCachedSession } from '../utils/cachedSession';
 
 type ReceiptDoc = {
   id: string;
@@ -42,7 +43,7 @@ export default function UnlinkedReceipts() {
   const navigate = useNavigate();
   const [receipts, setReceipts] = useState<ReceiptDoc[]>([]);
   const [vehicleMap, setVehicleMap] = useState<Record<string, VehicleSummary>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [error, setError] = useState<string | null>(null);
 
   const loadReceipts = async () => {

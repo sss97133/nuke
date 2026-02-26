@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { readCachedSession } from '../utils/cachedSession';
 
 interface ApiKeyInfo {
   id: string;
@@ -29,7 +30,7 @@ export default function DeveloperDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [keys, setKeys] = useState<ApiKeyInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [newKeyName, setNewKeyName] = useState('');
   const [creatingKey, setCreatingKey] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);

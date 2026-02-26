@@ -9,11 +9,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import VaultPortfolio from '../components/vault/VaultPortfolio';
+import { readCachedSession } from '../utils/cachedSession';
 
 export default function VaultPage() {
   const navigate = useNavigate();
-  const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(() => readCachedSession()?.user?.id ?? null);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
 
   useEffect(() => {
     const getUser = async () => {

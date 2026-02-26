@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { DashboardService } from '../services/dashboardService';
 import type { DashboardNotification, PendingWorkApproval, PendingVehicleAssignment } from '../services/dashboardService';
 import { MessageCard } from '../components/dashboard/MessageCard';
@@ -19,7 +20,7 @@ interface PendingCounts {
 
 
 export default function Dashboard() {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [initialLoad, setInitialLoad] = useState(true);
   const [pendingCounts, setPendingCounts] = useState<PendingCounts | null>(null);
   const [notifications, setNotifications] = useState<DashboardNotification[]>([]);

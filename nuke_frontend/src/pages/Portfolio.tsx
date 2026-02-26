@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { CashBalanceService } from '../services/cashBalanceService';
 import type { CashTransaction } from '../services/cashBalanceService';
 import CashBalance from '../components/trading/CashBalance';
@@ -73,7 +74,7 @@ export default function Portfolio() {
   const [bonds, setBonds] = useState<Bond[]>([]);
   const [ownedVehicles, setOwnedVehicles] = useState<OwnedVehicle[]>([]);
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [activeTab, setActiveTab] = useState<'overview' | 'cash' | 'shares' | 'orgs' | 'stakes' | 'bonds' | 'vehicles'>('overview');
 
   useEffect(() => {

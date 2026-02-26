@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { readCachedSession } from '../utils/cachedSession';
 
 interface Invoice {
   id: string;
@@ -37,7 +38,7 @@ interface Invoice {
 
 const InvoiceManager: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'unpaid' | 'paid'>('all');
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [myVehicles, setMyVehicles] = useState<Array<{ id: string; year: number | null; make: string | null; model: string | null; trim: string | null }>>([]);

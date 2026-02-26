@@ -12,6 +12,7 @@ import { PersonalPhotoLibraryService } from '../services/personalPhotoLibrarySer
 import type { PersonalPhoto, VehicleSuggestion } from '../services/personalPhotoLibraryService';
 import { ImageUploadService } from '../services/imageUploadService';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { ImageSetService } from '../services/imageSetService';
 import type { ImageSet } from '../services/imageSetService';
 import { useToast } from '../hooks/useToast';
@@ -29,7 +30,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<VehicleSuggestion[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [personalAlbums, setPersonalAlbums] = useState<ImageSet[]>([]);
   
   // UI state  
