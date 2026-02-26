@@ -3589,33 +3589,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       )}
                     </div>
                     
-                    {/* Area Demographics (placeholder - would need API) */}
-                    <div style={{ 
-                      borderTop: '1px solid var(--border)', 
+                    {/* Area Demographics */}
+                    <div style={{
+                      borderTop: '1px solid var(--border)',
                       paddingTop: '8px',
                       marginTop: '8px'
                     }}>
                       <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-muted)', fontSize: '7pt' }}>
                         AREA VEHICLE DEMOGRAPHICS
                       </div>
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
                         {(vehicle as any)?.zip_code ? (
-                          <>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                              <span>Similar vehicles nearby</span>
-                              <span>--</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                              <span>Avg. market price</span>
-                              <span>--</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                              <span>Climate rating</span>
-                              <span>--</span>
-                            </div>
-                          </>
+                          <span style={{ fontStyle: 'italic' }}>
+                            Area data not yet available for {(vehicle as any).zip_code}
+                          </span>
                         ) : (
-                          <span>Add ZIP code for area demographics</span>
+                          <span style={{ fontStyle: 'italic' }}>Add ZIP code to enable area data</span>
                         )}
                       </div>
                     </div>

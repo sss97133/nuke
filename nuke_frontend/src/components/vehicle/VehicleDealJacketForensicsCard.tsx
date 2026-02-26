@@ -189,7 +189,11 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
     return <div style={{ padding: 12, fontSize: '10pt', color: 'var(--text-muted)' }}>Loading forensics...</div>;
   }
 
-  if (!summary) return null; // No forensics data — don't render
+  if (!summary) return (
+    <div style={{ padding: '8px', fontSize: '9pt', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+      No deal jacket forensics available for this vehicle.
+    </div>
+  );
 
   const reconPct = summary.purchase_cost > 0
     ? Math.round((summary.total_recon / summary.purchase_cost) * 100)

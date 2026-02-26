@@ -149,7 +149,7 @@ export function VehiclePricingValueCard(props: {
       <CollapsibleWidget
         className="vehicle-profile-section"
         title="Pricing & Value"
-        defaultCollapsed={true}
+        defaultCollapsed={false}
         action={
           <div style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
             <button className="button button-small" onClick={() => setShowAnalysis(true)} style={{ fontSize: '8pt' }}>

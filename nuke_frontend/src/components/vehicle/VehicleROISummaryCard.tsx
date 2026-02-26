@@ -90,7 +90,7 @@ export default function VehicleROISummaryCard({ vehicleId }: { vehicleId: string
   }, [vehicleId]);
 
   return (
-    <CollapsibleWidget className="vehicle-profile-section" title="Investment Summary" defaultCollapsed={true}>
+    <CollapsibleWidget className="vehicle-profile-section" title="Investment Summary" defaultCollapsed={false}>
       {loading ? (
         <div className="text-small text-muted">Loading ROI…</div>
       ) : error ? (
