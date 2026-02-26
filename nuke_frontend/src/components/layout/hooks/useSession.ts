@@ -1,26 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
-
-// Read the Supabase session synchronously from localStorage so that returning
-// users see content immediately, without waiting for the async getSession()
-// network round-trip.  The async call still runs in the background to validate
-// the token and handle refresh/logout, but we no longer block first paint on it.
-function readCachedSession(): any | null {
-  try {
-    const url = (import.meta as any).env?.VITE_SUPABASE_URL as string | undefined ?? '';
-    const projectRef = url.match(/\/\/([^.]+)\./)?.[1];
-    if (!projectRef) return null;
-    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.access_token || !parsed?.user) return null;
-    // Reject already-expired tokens so we don't flash stale user state
-    if (parsed.expires_at && Date.now() / 1000 > parsed.expires_at) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
+import { readCachedSession } from '../../../utils/cachedSession';
 
 export function useSession() {
   const [session, setSession] = useState<any>(() => readCachedSession());
