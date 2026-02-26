@@ -3,11 +3,37 @@
 **Append-only. Add entries when completing significant work.**
 Agents read this to avoid rebuilding things that already exist.
 
+## 2026-02-26
+
+### [vision] api-v1-vision deployed + SDK v1.3.1 nuke.vision live on npm
+- api-v1-vision edge function: POST /classify (YONO, $0), /analyze (YONO+cloud), /batch (100 images)
+- tools/nuke-sdk/src/resources/vision.ts: nuke.vision.classify/analyze/batch — committed + published
+- SDK v1.3.1 live at @nuke1/sdk on npm
+
+### [context] Multi-agent coordination system built
+- DONE.md + PROJECT_STATE.md + ACTIVE_AGENTS.md cleanup
+- claude-checkpoint (Stop hook auto-saves git state) + claude-handoff (explicit agent handoff)
+- Global CLAUDE.md: session start ritual + context pressure rule
+- Dependabot: 3 high alerts resolved, gitignore fixed for tools/
+
+### [bonhams] Import Queue Triage — 17,964 memorabilia pre-skipped
+- Analyzed 24,037 pending bonhams records via URL pattern analysis
+- Built vehicle indicator regex: chassis-no|frame-no|vin-|engine-no OR year-make slug patterns (~60 makes)
+- `UPDATE import_queue SET status='skipped', error_message='memorabilia: skipped by url pattern'` — 17,964 records
+- Remaining for extraction: 5,976 pending (5,042 bonhams.com + 934 cars.bonhams.com) — all genuine vehicles
+- Scheduled 3 dedicated workers: `bonhams-queue-worker-1/2/3` (cron jobs 200/201/202), `* * * * *`, 5 lots/batch, 50s runtime
+- Workers route through `continuous-queue-processor` → `extract-bonhams` (already configured in SOURCE_CONFIGS)
+
 Format: `- [area] What was built — where it lives`
 
 ---
 
 ## 2026-02-26
+- [cron] **9 dedicated source workers added** (jobs 191-199): cnb-queue-worker-1/2/3, bj-queue-worker-1/2/3, broadarrow-queue-worker-1/2/3 — each runs every minute, batch_size=5, continuous=true, max_runtime=50s. Targets C&B (36k pending), BJ (8.4k pending), Broad Arrow (1.1k pending). BAT already covered by jobs 123-127.
+- [extraction] **14,616 stuck items rescued** — reset to pending: Barrett-Jackson (8,254), C&B (3,301), BaT (1,821), Broad Arrow (1,151), Vanguard/Hemmings/CC (89)
+- [extraction] **extraction-watchdog**: added step 5b — rescues orphaned `status='failed'` items (claim function only picks pending; failed items were permanently abandoned by old PIQ code path)
+- [extraction] Root causes documented: (1) claim fn ignores failed status, (2) watchdog ate items before 2/25 extractor rewrite, (3) bulk 2/17 importer had multi-word make parser bug (Aston Martin→make='Aston',model='Martin')
+- [extraction] PCarMarket 16,712 skipped items NOT reset yet — uses Firecrawl per call, needs decision on cost vs data value
 - [pipeline] Discovery→extraction gap fixed: listings no longer expire before extraction triggers
 - [bat] Removed dead workflows, restored bat-dom-map-health-runner
 - [fb-marketplace] refine-fb-listing: og: meta tags, bingbot HTML fetch, skip-null-overwrites logic
@@ -137,3 +163,61 @@ When you complete significant work, add a line at the TOP of the relevant date s
 ```
 
 Start a new date section if today's date isn't already here.
+
+### Ownership Transfer Automation Framework — COMPLETED 2026-02-26
+
+**What was built:**
+- `transfer-automator` edge function: seeds transfers from auction_events closes, handles idempotency, resolves/creates ghost shell identities, seeds 18-28 milestones with deadlines
+- `transfer-advance` edge function: AI classifies free-form signals (SMS/email/platform events) against pending milestones, advances them, stores communication records; falls back to keyword heuristics when no AI key
+- DB trigger `trg_auto_create_transfer_on_auction_close`: fires AFTER INSERT/UPDATE OF outcome on auction_events where NEW.outcome='sold', calls transfer-automator via pg_net async
+- DB trigger `trg_upgrade_transfers_on_identity_claim`: fires when external_identities.claimed_by_user_id changes NULL→value, auto-populates to_user_id/from_user_id on matching transfers (ghost shell → real user upgrade)
+- `transfer_staleness_sweep(stale_days)` SQL function: marks overdue milestones + stalled transfers, safe to call from cron or edge function
+- Cron job 189 `transfer-staleness-sweep`: runs `transfer_staleness_sweep(14)` every 4h
+- `backfill_transfers_for_sold_auctions(batch_size)`: backfill pg_net caller for existing 170k sold auctions
+
+**Schema extended:**
+- `transfer_communications` got: milestone_type_inferred, ai_classification_confidence, has_attachments, attachment_names, raw_metadata
+- `communication_source` enum extended with 'document'
+
+**Entry points:**
+- New auction closes: automatic via DB trigger → pg_net → transfer-automator
+- Email webhook: POST /transfer-advance {action: "ingest_email", transfer_id, from_email, subject, body_text}
+- SMS webhook: POST /transfer-advance {action: "ingest_sms", transfer_id, from_number, body_text}
+- Manual advance: POST /transfer-advance {action: "advance_manual", transfer_id, milestone_type}
+- Query state: POST /transfer-automator {action: "get_transfer", vehicle_id or transfer_id}
+
+### Transfer Webhook Integration — COMPLETED 2026-02-26
+
+**New edge functions:**
+- `transfer-email-webhook` — Resend inbound email webhook handler
+- `transfer-sms-webhook` — Twilio inbound SMS webhook handler
+
+**Schema additions:**
+- `ownership_transfers`: inbox_email, buyer_phone, seller_phone, buyer_email, seller_email
+- `transfer_status` enum: added 'stalled' value
+- `transfer_communications`: milestone_type_inferred, ai_classification_confidence, has_attachments, attachment_names, raw_metadata
+
+**Webhook URLs (live):**
+- Email: https://qkgaybvrernstplzjaam.supabase.co/functions/v1/transfer-email-webhook
+- SMS: https://qkgaybvrernstplzjaam.supabase.co/functions/v1/transfer-sms-webhook
+
+**Routing logic:**
+- Email: TO address `t-{10hex}@nuke.ag` → direct transfer lookup; FROM email → buyer_email/seller_email match
+- SMS: FROM phone (10-digit normalized) → buyer_phone/seller_phone match
+
+**Configuration needed:**
+- Resend: Domain → nuke.ag → Inbound → catch-all `t-*@nuke.ag` → webhook URL above
+- Twilio: Phone Number → Messaging → Webhook URL above, HTTP POST
+
+**Per-transfer inbox:**
+- Every transfer gets `inbox_email = t-{first10hexchars_of_trigger_id}@nuke.ag`
+- 138 existing transfers backfilled with inbox_email
+- Backfill buyer_phone/seller_phone via: POST /transfer-automator {action: "update_contacts", transfer_id, buyer_phone, buyer_email}
+
+## 2026-02-26 (perf sprint)
+- [perf] **SubdomainRouter**: compute initial state synchronously — eliminates "loading..." flash for non-storefront domains
+- [perf] **useSession**: read Supabase session from localStorage cache synchronously — auth spinner eliminated for returning users; select('*') → explicit columns
+- [perf] **vendor.js**: moved recharts + d3 out of vendor chunk into 'charts' chunk — vendor 813KB → 393KB (half)
+- [perf] **useSession**: ref guard on fetchProfile — eliminates duplicate profiles query from getSession + INITIAL_SESSION double-fire
+- [perf] **useNotificationBadge/useCashBalance**: user-scoped channel names (notification_badge:{userId}, balance:{userId})
+- [perf] **VehicleProfile**: extracted readCachedSession() to utils/cachedSession.ts; initialize session + authChecked from cache — loadVehicle() no longer blocked on async getSession() round-trip
