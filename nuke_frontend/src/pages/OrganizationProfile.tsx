@@ -1,46 +1,47 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactDOM from 'react-dom';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { FaviconIcon } from '../components/common/FaviconIcon';
-import TradePanel from '../components/trading/TradePanel';
-import AddOrganizationData from '../components/organization/AddOrganizationData';
-import OrganizationInventory from '../components/organization/OrganizationInventory';
+// Always loaded — used in the overview tab or global page structure
 import OrganizationTimelineHeatmap from '../components/organization/OrganizationTimelineHeatmap';
-import OrganizationLocationPicker from '../components/organization/OrganizationLocationPicker';
-import LaborRateEditor from '../components/organization/LaborRateEditor';
-import WorkOrderRequestForm from '../components/organization/WorkOrderRequestForm';
-import DropboxImporter from '../components/dealer/DropboxImporter';
-import MobileVINScanner from '../components/dealer/MobileVINScanner';
-import ContractorWorkInput from '../components/contractor/ContractorWorkInput';
-import OrganizationEditor from '../components/organization/OrganizationEditor';
-import EnhancedDealerInventory from '../components/organization/EnhancedDealerInventory';
-import BaTBulkImporter from '../components/dealer/BaTBulkImporter';
 import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowser';
 import { ServiceVehicleCardRich } from '../components/organization/ServiceVehicleCardRich';
-import MarketplaceComplianceForm from '../components/organization/MarketplaceComplianceForm';
-import OrganizationNotifications from '../components/organization/OrganizationNotifications';
-import VehicleInquiryModal from '../components/organization/VehicleInquiryModal';
 import { extractImageMetadata } from '../utils/imageMetadata';
 import { DynamicTabBar } from '../components/organization/DynamicTabBar';
-import { OrganizationServiceTab } from '../components/organization/OrganizationServiceTab';
-import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
-import OrganizationLegalTab from '../components/organization/OrganizationLegalTab';
-import OrganizationOfferingTab from '../components/organization/OrganizationOfferingTab';
-import DataRoomGate from '../components/organization/DataRoomGate';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import VehicleThumbnail from '../components/VehicleThumbnail';
-import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
-import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
-import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
-import StorefrontSettings from '../components/organization/StorefrontSettings';
-import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
 import { getOrganizationProfileData } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
-import CollectionIntelligenceTab from '../components/organization/CollectionIntelligenceTab';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import '../design-system.css';
+
+// Lazy-loaded — only pulled in when the relevant tab or modal is activated
+const TradePanel = React.lazy(() => import('../components/trading/TradePanel'));
+const AddOrganizationData = React.lazy(() => import('../components/organization/AddOrganizationData'));
+const OrganizationInventory = React.lazy(() => import('../components/organization/OrganizationInventory'));
+const OrganizationLocationPicker = React.lazy(() => import('../components/organization/OrganizationLocationPicker'));
+const LaborRateEditor = React.lazy(() => import('../components/organization/LaborRateEditor'));
+const WorkOrderRequestForm = React.lazy(() => import('../components/organization/WorkOrderRequestForm'));
+const MobileVINScanner = React.lazy(() => import('../components/dealer/MobileVINScanner'));
+const ContractorWorkInput = React.lazy(() => import('../components/contractor/ContractorWorkInput'));
+const OrganizationEditor = React.lazy(() => import('../components/organization/OrganizationEditor'));
+const EnhancedDealerInventory = React.lazy(() => import('../components/organization/EnhancedDealerInventory'));
+const BaTBulkImporter = React.lazy(() => import('../components/dealer/BaTBulkImporter'));
+const MarketplaceComplianceForm = React.lazy(() => import('../components/organization/MarketplaceComplianceForm'));
+const OrganizationNotifications = React.lazy(() => import('../components/organization/OrganizationNotifications'));
+const VehicleInquiryModal = React.lazy(() => import('../components/organization/VehicleInquiryModal'));
+const OrganizationServiceTab = React.lazy(() => import('../components/organization/OrganizationServiceTab').then(m => ({ default: m.OrganizationServiceTab })));
+const OrganizationAuctionsTab = React.lazy(() => import('../components/organization/OrganizationAuctionsTab').then(m => ({ default: m.OrganizationAuctionsTab })));
+const OrganizationLegalTab = React.lazy(() => import('../components/organization/OrganizationLegalTab'));
+const OrganizationOfferingTab = React.lazy(() => import('../components/organization/OrganizationOfferingTab'));
+const DataRoomGate = React.lazy(() => import('../components/organization/DataRoomGate'));
+const ProfileListingsTab = React.lazy(() => import('../components/profile/ProfileListingsTab').then(m => ({ default: m.ProfileListingsTab })));
+const ProfileBidsTab = React.lazy(() => import('../components/profile/ProfileBidsTab').then(m => ({ default: m.ProfileBidsTab })));
+const StorefrontSettings = React.lazy(() => import('../components/organization/StorefrontSettings'));
+const ProfileSuccessStoriesTab = React.lazy(() => import('../components/profile/ProfileSuccessStoriesTab').then(m => ({ default: m.ProfileSuccessStoriesTab })));
+const CollectionIntelligenceTab = React.lazy(() => import('../components/organization/CollectionIntelligenceTab'));
 
 // Canonical Bring a Trailer org – we show extraction coverage (target 222k, queue) and turnover/metrics note
 const BAT_ORG_ID = 'd2bd6370-11d1-4af0-8dd2-3de2c3899166';
@@ -2089,8 +2090,9 @@ export default function OrganizationProfile() {
         </div>
       )}
 
-      {/* Content */}
-      <div style={{ 
+      {/* Content — Suspense covers all lazy tab + modal components */}
+      <Suspense fallback={null}>
+      <div style={{
         padding: '16px',
         background: 'var(--bg, #f5f5f5)',
         color: 'var(--text, #2a2a2a)',
@@ -3958,6 +3960,7 @@ export default function OrganizationProfile() {
           }}
         />
       )}
+      </Suspense>
     </div>
   );
 }
