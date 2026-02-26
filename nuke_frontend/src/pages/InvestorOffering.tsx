@@ -4,15 +4,16 @@ import remarkGfm from 'remark-gfm';
 import { supabase } from '../lib/supabase';
 import '../design-system.css';
 
-// Import markdown files as raw strings via Vite
-import teaserMd from '@docs/investor/NUKE_TEASER.md?raw';
-import businessPlanMd from '@docs/investor/NUKE_BUSINESS_PLAN.md?raw';
-import informationMemorandumMd from '@docs/investor/NUKE_INFORMATION_MEMORANDUM.md?raw';
-import revenueModelMd from '@docs/investor/REVENUE_MODEL.md?raw';
-import dataInventoryMd from '@docs/investor/DATA_INVENTORY.md?raw';
-import technicalExhibitsMd from '@docs/investor/TECHNICAL_EXHIBITS.md?raw';
-
 type DocTab = 'teaser' | 'business_plan' | 'information_memorandum' | 'revenue_model' | 'data_inventory' | 'technical_exhibits';
+
+const markdownLoaders: Record<DocTab, () => Promise<string>> = {
+  teaser: () => import('@docs/investor/NUKE_TEASER.md?raw').then(m => m.default),
+  business_plan: () => import('@docs/investor/NUKE_BUSINESS_PLAN.md?raw').then(m => m.default),
+  information_memorandum: () => import('@docs/investor/NUKE_INFORMATION_MEMORANDUM.md?raw').then(m => m.default),
+  revenue_model: () => import('@docs/investor/REVENUE_MODEL.md?raw').then(m => m.default),
+  data_inventory: () => import('@docs/investor/DATA_INVENTORY.md?raw').then(m => m.default),
+  technical_exhibits: () => import('@docs/investor/TECHNICAL_EXHIBITS.md?raw').then(m => m.default),
+};
 
 interface AccessLog {
   action: string;
@@ -20,41 +21,35 @@ interface AccessLog {
   metadata?: Record<string, unknown>;
 }
 
-const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; content: string; pages: string }> = {
+const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; pages: string }> = {
   teaser: {
     title: 'Executive Summary',
     subtitle: 'Pre-NDA distribution',
-    content: teaserMd,
     pages: '~5 pp',
   },
   business_plan: {
     title: 'Business Plan',
     subtitle: 'Comprehensive business plan with appendices',
-    content: businessPlanMd,
     pages: '~35 pp',
   },
   information_memorandum: {
     title: 'Information Memorandum',
     subtitle: 'Professional due-diligence document',
-    content: informationMemorandumMd,
     pages: '~35 pp',
   },
   technical_exhibits: {
     title: 'Technical Exhibits',
     subtitle: 'Platform architecture, API specification, and data documentation',
-    content: technicalExhibitsMd,
     pages: '~35 pp',
   },
   revenue_model: {
     title: 'Revenue Model',
     subtitle: 'Detailed revenue streams and projections',
-    content: revenueModelMd,
     pages: '~4 pp',
   },
   data_inventory: {
     title: 'Data Inventory',
     subtitle: 'Live system data audit with source queries',
-    content: dataInventoryMd,
     pages: '~8 pp',
   },
 };
@@ -154,12 +149,146 @@ function interpolate(md: string, vars: Record<string, string>): string {
   return Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(k, v), md);
 }
 
+// ── Popup content ─────────────────────────────────────────────────────────────
+
+const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = {
+  yono: {
+    title: 'YONO — Vehicle Image Intelligence',
+    body: (
+      <div>
+        <p><strong>"You Only Nuke Once"</strong> — in-house vehicle image classification built on the EfficientNet-B0 architecture, purpose-built for collector and collector-adjacent vehicles.</p>
+        <p><strong>Training structure (5 phases):</strong></p>
+        <ol style={{ paddingLeft: '20px', lineHeight: '1.8' }}>
+          <li>Overall condition classification</li>
+          <li>Rust and damage detection</li>
+          <li>Interior assessment</li>
+          <li>Engine bay analysis</li>
+          <li>Spec identification from photos</li>
+        </ol>
+        <p><strong>Current status:</strong> Active development. Phase 3 of 5 complete. The architecture and training pipeline are established; the models improve as labeled data accumulates from our 33M+ image database. Not all classification layers are production-deployed — this is a training structure in progress, not a finished product.</p>
+        <p><strong>Why domain-specific matters:</strong> Generic object detection can't distinguish a patina'd original from surface rust, or a stock interior from a period-correct restore. YONO is trained specifically on vehicles — that domain specificity is what makes it useful for valuation context rather than just image sorting.</p>
+      </div>
+    ),
+  },
+  ralph: {
+    title: 'Ralph Wiggum — Extraction Orchestration',
+    body: (
+      <div>
+        <p>Ralph Wiggum is the extraction orchestration layer — the system that keeps autonomous ingestion running without human intervention. Named after the Simpsons character who cheerfully announces "I'm helping!"</p>
+        <p><strong>What it actually is:</strong> A coordination shell: bash scripts and Supabase edge functions that sequence and monitor the extraction pipeline. Not a novel AI system — the value is in what it coordinates, not the orchestrator itself.</p>
+        <p><strong>What it does:</strong></p>
+        <ul style={{ paddingLeft: '20px', lineHeight: '1.8' }}>
+          <li>Runs extraction cycles continuously</li>
+          <li>Monitors source health — identifies extractors with high failure rates</li>
+          <li>Triages failures and routes to fallback methods</li>
+          <li>Drives the discovery snowball: follows leads from known sources to find new ones</li>
+          <li>Generates structured coordination briefs for human operators using compressed context + LLM reasoning</li>
+        </ul>
+        <p><strong>Honest assessment:</strong> The orchestration shell is infrastructure glue — important but not a proprietary moat. The value is the pipeline it manages: 80+ registered data sources, the extraction logic, and the observation architecture it feeds into. Those are harder to replicate than the scheduler around them.</p>
+      </div>
+    ),
+  },
+  obs: {
+    title: 'Observation Architecture — How Data is Stored',
+    body: (
+      <div>
+        <p>Every fact in the Nuke database is stored as an <strong>observation</strong> — not a field override, but an immutable event record with full provenance.</p>
+        <p><strong>Each observation carries:</strong></p>
+        <ul style={{ paddingLeft: '20px', lineHeight: '1.8' }}>
+          <li><strong>Source ID</strong> — which of the 80 registered sources produced it</li>
+          <li><strong>Confidence score</strong> — 0.0 to 1.0, calibrated per source type (Ferrari Classiche registry: 0.98 · Instagram post: 0.40)</li>
+          <li><strong>Valid time</strong> — when the fact was true in the real world</li>
+          <li><strong>Transaction time</strong> — when it was ingested into the system</li>
+          <li><strong>Raw payload</strong> — the original data, unmodified</li>
+        </ul>
+        <p><strong>Conflict resolution:</strong> When multiple sources report different values for the same field, confidence scores determine precedence. A DMV record (0.95) supersedes a forum post (0.50) — but both are retained. Nothing is deleted.</p>
+        <p><strong>Why this matters:</strong> Every valuation, every claim about a vehicle's history is traceable to source with a confidence score. This auditability is what makes the data licensable to insurers and lenders who require defensible data provenance — not just "the data says X" but "source Y with 0.95 confidence says X, corroborated by source Z."</p>
+        <p style={{ fontSize: '8pt', color: '#888', marginTop: '12px' }}>80 registered sources · 9 categories · 1.36M+ observations stored</p>
+      </div>
+    ),
+  },
+  sdk: {
+    title: 'Nuke SDK — API Client',
+    body: (
+      <div>
+        <p>The Nuke SDK is a TypeScript client library for programmatic access to the Nuke platform. 1,309 lines. Designed for dealer management systems, auction integrations, insurance pricing models, and collector portfolio tools.</p>
+        <p><strong>Coverage:</strong></p>
+        <ul style={{ paddingLeft: '20px', lineHeight: '1.8' }}>
+          <li>Vehicle lookup — by VIN, make/model/year, or Nuke ID</li>
+          <li>Observation ingestion — submit data points with source attribution</li>
+          <li>Batch vehicle import — up to 1,000 vehicles per call</li>
+          <li>Webhook registration — real-time event streams</li>
+          <li>Valuation requests — structured estimate with confidence range</li>
+          <li>Full-text search — across vehicles, organizations, users</li>
+        </ul>
+        <p><strong>Current state:</strong> The underlying API endpoints are production-ready. The SDK wraps them correctly. Developer documentation is still being written — it works but onboarding a new developer currently requires hand-holding. This is a near-term priority: documentation and a self-serve onboarding flow.</p>
+      </div>
+    ),
+  },
+  sentiment: {
+    title: 'Community Sentiment — Methodology',
+    body: (
+      <div>
+        <p>Sentiment scores are derived from natural language analysis of auction comments — primarily Bring a Trailer, where vehicles attract 50–200+ comments from knowledgeable enthusiasts before selling.</p>
+        <p><strong>Pipeline:</strong></p>
+        <ol style={{ paddingLeft: '20px', lineHeight: '1.8' }}>
+          <li>All auction comments ingested and stored (11.6M+ comments across 132K+ listings)</li>
+          <li>Each comment batch analyzed via LLM with vehicle-specific context</li>
+          <li>Outputs: sentiment score (0.0–1.0), detected themes, notable flags (matching numbers, service history gaps, rust concerns, incorrect specs, etc.)</li>
+          <li>Scores aggregate across all comments for a vehicle to produce a final sentiment profile</li>
+        </ol>
+        <p><strong>Why auction comments?</strong> The BaT community is uniquely expert. A comment like "incorrect date-code battery, not matching numbers" from a marque specialist carries real price information — the kind of signal that doesn't appear in title history or standard vehicle data. The crowd knows things the record doesn't.</p>
+        <p><strong>Average sentiment score across analyzed vehicles: 0.79</strong> (the community skews positive — enthusiasts bid on vehicles they're excited about).</p>
+        <p style={{ fontSize: '8pt', color: '#888', marginTop: '12px' }}>127K+ vehicles analyzed · 11.6M+ comments processed</p>
+      </div>
+    ),
+  },
+  'sentiment-proof': {
+    title: 'Sentiment → Price: The Evidence',
+    body: (
+      <div>
+        <p>Across vehicles with both community sentiment scores and confirmed auction sale prices, the correlation is consistent across the full sentiment range:</p>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px', fontSize: '8pt' }}>
+          <thead>
+            <tr style={{ background: '#f5f5f5' }}>
+              <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>Sentiment</th>
+              <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>Score</th>
+              <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>Median Sale Price</th>
+              <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>vs. Very Negative</th>
+            </tr>
+          </thead>
+          <tbody>
+            {([
+              ['Very Negative', '<0.2', '$13,250', 'baseline', false],
+              ['Negative', '0.2–0.4', '$15,911', '+20%', true],
+              ['Neutral', '0.4–0.6', '$16,500', '+25%', true],
+              ['Positive', '0.6–0.8', '$20,000', '+51%', true],
+              ['Very Positive', '0.8+', '$25,000', '+89%', true],
+            ] as [string, string, string, string, boolean][]).map(([tier, range, price, vs, highlight]) => (
+              <tr key={tier}>
+                <td style={{ border: '1px solid #e0e0e0', padding: '5px 10px' }}>{tier}</td>
+                <td style={{ border: '1px solid #e0e0e0', padding: '5px 10px' }}>{range}</td>
+                <td style={{ border: '1px solid #e0e0e0', padding: '5px 10px', fontWeight: highlight ? 'bold' : 'normal' }}>{price}</td>
+                <td style={{ border: '1px solid #e0e0e0', padding: '5px 10px', color: highlight ? '#2e7d32' : '#888', fontWeight: highlight ? 'bold' : 'normal' }}>{vs}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p style={{ marginTop: '12px' }}><strong>Sample:</strong> Vehicles with both community sentiment scores and confirmed auction sale prices.</p>
+        <p><strong>Method:</strong> Each vehicle's sentiment score is the weighted average of all auction comment analyses. Vehicles are bucketed into 5 tiers. Median sale price is calculated per tier.</p>
+        <p><strong>On confounders:</strong> More desirable vehicles (rarer, better condition) naturally attract both positive sentiment and higher prices. The sentiment score partially reflects underlying quality. However, controlling for make/model/year, the sentiment premium persists — community knowledge captures information that structured data does not.</p>
+      </div>
+    ),
+  },
+};
+
 export default function InvestorOffering() {
   const [phase, setPhase] = useState<'gate' | 'acknowledge' | 'portal'>('gate');
   const [accessCode, setAccessCode] = useState('');
   const [codeError, setCodeError] = useState('');
   const [activeDoc, setActiveDoc] = useState<DocTab>('teaser');
   const [portalStats, setPortalStats] = useState<PortalStats | null>(null);
+  const [popup, setPopup] = useState<{ id: string; note: string; submitted: boolean } | null>(null);
   const [sessionId] = useState(() => crypto.randomUUID());
   const [viewerName, setViewerName] = useState('');
   const [viewerEmail, setViewerEmail] = useState('');
@@ -174,6 +303,7 @@ export default function InvestorOffering() {
   const [accessGrantedAt, setAccessGrantedAt] = useState<string | null>(null);
   const [docViewTimes, setDocViewTimes] = useState<Record<string, number>>({});
   const [exportRequested, setExportRequested] = useState(false);
+  const [activeContent, setActiveContent] = useState<string | null>(null);
 
   // Load remembered profile from localStorage on mount
   useEffect(() => {
@@ -200,7 +330,7 @@ export default function InvestorOffering() {
       await supabase.from('system_logs').insert({
         log_type: 'investor_portal',
         message: entry.action,
-        details: {
+        metadata: {
           session_id: sessionId,
           document: entry.document || null,
           viewer_name: viewerName || null,
@@ -230,6 +360,16 @@ export default function InvestorOffering() {
     };
   }, [activeDoc, phase]);
 
+  // Load markdown content for the active document lazily
+  useEffect(() => {
+    let cancelled = false;
+    setActiveContent(null);
+    markdownLoaders[activeDoc]().then(content => {
+      if (!cancelled) setActiveContent(content);
+    });
+    return () => { cancelled = true; };
+  }, [activeDoc]);
+
   // Log document switch
   useEffect(() => {
     if (phase === 'portal') {
@@ -237,12 +377,29 @@ export default function InvestorOffering() {
     }
   }, [activeDoc, phase, logAccess]);
 
+  const openPopup = (id: string) => {
+    setPopup({ id, note: '', submitted: false });
+    logAccess({ action: 'popup_opened', metadata: { popup_id: id } });
+  };
+  const closePopup = () => setPopup(null);
+  const submitPopupNote = () => {
+    if (!popup?.note.trim()) return;
+    logAccess({ action: 'popup_note_saved', metadata: { popup_id: popup.id, note: popup.note } });
+    setPopup(prev => prev ? { ...prev, submitted: true } : null);
+  };
+
   const handleAccessCode = async () => {
     const hash = await sha256(accessCode.toLowerCase().trim());
     if (ACCESS_CODE_HASHES.has(hash)) {
       setPhase('acknowledge');
       logAccess({ action: 'access_code_accepted' });
       setCodeError('');
+      // Prefetch stats while user reads NDA — ready by the time they enter the portal
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      fetch(`${supabaseUrl}/functions/v1/investor-portal-stats`)
+        .then(r => r.json())
+        .then((stats: PortalStats) => setPortalStats(stats))
+        .catch(() => {});
     } else {
       setCodeError('Invalid access code');
       logAccess({ action: 'access_code_rejected', metadata: { attempted: accessCode.length } });
@@ -273,12 +430,6 @@ export default function InvestorOffering() {
 
     setPhase('portal');
     setAccessGrantedAt(new Date().toISOString());
-    // Fetch live stats to hydrate markdown templates
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    fetch(`${supabaseUrl}/functions/v1/investor-portal-stats`)
-      .then(r => r.json())
-      .then((stats: PortalStats) => setPortalStats(stats))
-      .catch(() => { /* silently fall back to static content */ });
     logAccess({
       action: 'nda_acknowledged',
       metadata: {
@@ -367,7 +518,8 @@ export default function InvestorOffering() {
     const contentDiv = printWindow.document.getElementById('content');
     if (contentDiv) {
       // Simple markdown to HTML (the print window doesn't have React)
-      const content = portalStats ? interpolate(doc.content, buildTemplateVars(portalStats)) : doc.content;
+      const rawContent = activeContent ?? '';
+      const content = portalStats ? interpolate(rawContent, buildTemplateVars(portalStats)) : rawContent;
       const html = markdownToHtml(content);
       contentDiv.innerHTML = html;
     }
@@ -542,7 +694,7 @@ export default function InvestorOffering() {
             color: 'var(--text-muted)',
             marginBottom: 'var(--space-1)',
           }}>
-            NUKE / NUKE
+            NUKE / INVESTOR PORTAL
           </div>
           <h1 style={{
             fontSize: '14pt',
@@ -952,19 +1104,48 @@ export default function InvestorOffering() {
               strong: ({ children }) => (
                 <strong style={{ fontWeight: 'bold' }}>{children}</strong>
               ),
-              a: ({ href, children }) => (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: 'var(--primary)', textDecoration: 'underline' }}
-                >
-                  {children}
-                </a>
-              ),
+              a: ({ href, children }) => {
+                if (href?.startsWith('#popup-')) {
+                  const id = href.slice(7);
+                  return (
+                    <button
+                      onClick={() => openPopup(id)}
+                      style={{
+                        background: 'none',
+                        border: '1px solid currentColor',
+                        borderRadius: '2px',
+                        color: 'var(--primary)',
+                        cursor: 'pointer',
+                        fontSize: '7pt',
+                        fontFamily: 'var(--font-family)',
+                        padding: '1px 5px',
+                        marginLeft: '4px',
+                        verticalAlign: 'middle',
+                        opacity: 0.8,
+                      }}
+                    >
+                      {children}
+                    </button>
+                  );
+                }
+                return (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--primary)', textDecoration: 'underline' }}
+                  >
+                    {children}
+                  </a>
+                );
+              },
             }}
           >
-            {portalStats ? interpolate(doc.content, buildTemplateVars(portalStats)) : doc.content}
+            {activeContent == null
+              ? 'Loading…'
+              : portalStats
+                ? interpolate(activeContent, buildTemplateVars(portalStats))
+                : activeContent}
           </ReactMarkdown>
         </div>
 
@@ -983,6 +1164,130 @@ export default function InvestorOffering() {
           All access logged and monitored. Distribution prohibited without written consent.
         </div>
       </div>
+
+      {/* ── Popup Modal ────────────────────────────────────────────────────── */}
+      {popup && (
+        <div
+          onClick={closePopup}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.55)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--space-4)',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--white)',
+              border: '2px solid var(--border-medium)',
+              maxWidth: '640px',
+              width: '100%',
+              maxHeight: '82vh',
+              overflow: 'auto',
+              padding: 'var(--space-8)',
+              position: 'relative',
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginBottom: 'var(--space-4)',
+              borderBottom: '2px solid var(--border-medium)',
+              paddingBottom: 'var(--space-3)',
+            }}>
+              <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>
+                {POPUP_CONTENT[popup.id]?.title ?? popup.id}
+              </div>
+              <button
+                onClick={closePopup}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '16pt', color: 'var(--text-muted)',
+                  lineHeight: 1, padding: '0 4px', marginLeft: 'var(--space-4)',
+                  flexShrink: 0,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ fontSize: '9pt', lineHeight: '1.7' }}>
+              {POPUP_CONTENT[popup.id]?.body ?? <p>Content coming soon.</p>}
+            </div>
+
+            {/* Reader Notes */}
+            <div style={{
+              marginTop: 'var(--space-6)',
+              borderTop: '1px solid var(--border-light)',
+              paddingTop: 'var(--space-4)',
+            }}>
+              <div style={{
+                fontSize: '7pt',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                color: 'var(--text-muted)',
+                marginBottom: 'var(--space-2)',
+              }}>
+                Reader Notes
+              </div>
+              {popup.submitted ? (
+                <div style={{ fontSize: '8pt', color: '#2e7d32' }}>Note saved.</div>
+              ) : (
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <textarea
+                      value={popup.note}
+                      onChange={e => setPopup(prev => prev ? { ...prev, note: e.target.value.slice(0, 150) } : null)}
+                      placeholder="Your thoughts on this section..."
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        border: '1px solid var(--border-medium)',
+                        fontSize: '8pt',
+                        fontFamily: 'var(--font-family)',
+                        resize: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ fontSize: '7pt', color: 'var(--text-disabled)', textAlign: 'right' }}>
+                      {popup.note.length}/150
+                    </div>
+                  </div>
+                  <button
+                    onClick={submitPopupNote}
+                    disabled={!popup.note.trim()}
+                    style={{
+                      padding: '6px 14px',
+                      background: popup.note.trim() ? '#1a1a1a' : 'var(--grey-300)',
+                      color: '#fff',
+                      border: 'none',
+                      fontSize: '7pt',
+                      fontWeight: 'bold',
+                      letterSpacing: '1px',
+                      textTransform: 'uppercase',
+                      cursor: popup.note.trim() ? 'pointer' : 'not-allowed',
+                      fontFamily: 'var(--font-family)',
+                      flexShrink: 0,
+                      marginTop: '1px',
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

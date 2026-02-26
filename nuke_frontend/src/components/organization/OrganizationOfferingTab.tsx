@@ -5,51 +5,46 @@ import { supabase } from '../../lib/supabase';
 import KeyFiguresWithCharts from './KeyFiguresWithCharts';
 import TechStackStrip from './TechStackStrip';
 
-// Import markdown files as raw strings via Vite
-import teaserMd from '@docs/investor/NUKE_TEASER.md?raw';
-import businessPlanMd from '@docs/investor/NUKE_BUSINESS_PLAN.md?raw';
-import informationMemorandumMd from '@docs/investor/NUKE_INFORMATION_MEMORANDUM.md?raw';
-import revenueModelMd from '@docs/investor/REVENUE_MODEL.md?raw';
-import dataInventoryMd from '@docs/investor/DATA_INVENTORY.md?raw';
-import technicalExhibitsMd from '@docs/investor/TECHNICAL_EXHIBITS.md?raw';
-
 type DocTab = 'teaser' | 'business_plan' | 'information_memorandum' | 'revenue_model' | 'data_inventory' | 'technical_exhibits';
 
-const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; content: string; pages: string }> = {
+const markdownLoaders: Record<DocTab, () => Promise<string>> = {
+  teaser: () => import('@docs/investor/NUKE_TEASER.md?raw').then(m => m.default),
+  business_plan: () => import('@docs/investor/NUKE_BUSINESS_PLAN.md?raw').then(m => m.default),
+  information_memorandum: () => import('@docs/investor/NUKE_INFORMATION_MEMORANDUM.md?raw').then(m => m.default),
+  revenue_model: () => import('@docs/investor/REVENUE_MODEL.md?raw').then(m => m.default),
+  data_inventory: () => import('@docs/investor/DATA_INVENTORY.md?raw').then(m => m.default),
+  technical_exhibits: () => import('@docs/investor/TECHNICAL_EXHIBITS.md?raw').then(m => m.default),
+};
+
+const DOCUMENTS: Record<DocTab, { title: string; subtitle: string; pages: string }> = {
   teaser: {
     title: 'Executive Summary',
     subtitle: 'Pre-NDA distribution',
-    content: teaserMd,
     pages: '~5 pp',
   },
   business_plan: {
     title: 'Business Plan',
     subtitle: 'Comprehensive business plan with appendices',
-    content: businessPlanMd,
     pages: '~35 pp',
   },
   information_memorandum: {
     title: 'Information Memorandum',
     subtitle: 'Professional due-diligence document',
-    content: informationMemorandumMd,
     pages: '~35 pp',
   },
   technical_exhibits: {
     title: 'Technical Exhibits',
     subtitle: 'Platform architecture, API specification, and data documentation',
-    content: technicalExhibitsMd,
     pages: '~35 pp',
   },
   revenue_model: {
     title: 'Revenue Model',
     subtitle: 'Detailed revenue streams and projections',
-    content: revenueModelMd,
     pages: '~4 pp',
   },
   data_inventory: {
     title: 'Data Inventory',
     subtitle: 'Live system data audit with source queries',
-    content: dataInventoryMd,
     pages: '~8 pp',
   },
 };
@@ -62,6 +57,7 @@ interface Props {
 
 export default function OrganizationOfferingTab({ organizationId, organizationName, isOwner }: Props) {
   const [activeDoc, setActiveDoc] = useState<DocTab>('teaser');
+  const [activeContent, setActiveContent] = useState<string | null>(null);
   const [sessionId] = useState(() => crypto.randomUUID());
 
   const logAccess = useCallback(async (action: string, document?: string) => {
@@ -83,6 +79,16 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
       // Silent fail
     }
   }, [sessionId, organizationId]);
+
+  // Load markdown content lazily on tab switch
+  useEffect(() => {
+    let cancelled = false;
+    setActiveContent(null);
+    markdownLoaders[activeDoc]().then(content => {
+      if (!cancelled) setActiveContent(content);
+    });
+    return () => { cancelled = true; };
+  }, [activeDoc]);
 
   useEffect(() => {
     logAccess('document_viewed', activeDoc);
@@ -143,7 +149,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
 
     const contentDiv = printWindow.document.getElementById('content');
     if (contentDiv) {
-      contentDiv.innerHTML = markdownToHtml(doc.content);
+      contentDiv.innerHTML = markdownToHtml(activeContent ?? '');
     }
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
@@ -178,21 +184,21 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
   const doc = DOCUMENTS[activeDoc];
 
   const teaserParts = useMemo(() => {
-    if (activeDoc !== 'teaser') return null;
-    const oppStart = teaserMd.indexOf('### The Opportunity');
-    const keyStart = teaserMd.indexOf('### Key Figures');
-    if (keyStart === -1) return { intro: teaserMd, middle: '', after: '', hasKeyFigures: false };
-    const keyEnd = teaserMd.indexOf('\n---\n', keyStart);
-    const afterStart = keyEnd === -1 ? teaserMd.length : keyEnd + 1;
-    const intro = oppStart === -1 ? teaserMd.slice(0, keyStart).trimEnd() : teaserMd.slice(0, oppStart).trimEnd();
-    const middle = oppStart === -1 ? '' : teaserMd.slice(oppStart, keyStart).trimEnd();
+    if (activeDoc !== 'teaser' || !activeContent) return null;
+    const oppStart = activeContent.indexOf('### The Opportunity');
+    const keyStart = activeContent.indexOf('### Key Figures');
+    if (keyStart === -1) return { intro: activeContent, middle: '', after: '', hasKeyFigures: false };
+    const keyEnd = activeContent.indexOf('\n---\n', keyStart);
+    const afterStart = keyEnd === -1 ? activeContent.length : keyEnd + 1;
+    const intro = oppStart === -1 ? activeContent.slice(0, keyStart).trimEnd() : activeContent.slice(0, oppStart).trimEnd();
+    const middle = oppStart === -1 ? '' : activeContent.slice(oppStart, keyStart).trimEnd();
     return {
       intro,
       middle,
-      after: teaserMd.slice(afterStart).trimStart(),
+      after: activeContent.slice(afterStart).trimStart(),
       hasKeyFigures: true,
     };
-  }, [activeDoc]);
+  }, [activeDoc, activeContent]);
 
   const markdownComponents = {
     h1: ({ children }: { children?: React.ReactNode }) => (
@@ -339,7 +345,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
             </>
           ) : (
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {doc.content}
+            {activeContent ?? 'Loading…'}
           </ReactMarkdown>
           )}
         </div>
