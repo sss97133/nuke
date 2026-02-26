@@ -466,6 +466,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     if (!s) return '';
     if (s.length > 200) return s.substring(0, 197) + '...'; // Truncate very long values instead of hiding
     if (s.includes('{') || s.includes('}') || s.includes(';') || s.includes('}.') || s.includes('/*') || s.includes('*/')) return '';
+    // Reject values that are clearly mid-sentence fragments (start with comma/conjunction)
+    if (/^[,;]\s+/.test(s) || /^,?\s*(and|or|but|with|the)\s+/i.test(s)) return '';
     
     // Detect and remove BaT listing contamination patterns
     // Patterns like: "for sale on BaT Auctions", "sold for $X on [Date]", "(Lot #XXX)", "| Bring a Trailer"
@@ -840,6 +842,41 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
 
           {/* Additional details */}
           {renderVehicleDetails()}
+
+          {/* Data Quality Score */}
+          {typeof (vehicle as any).data_quality_score === 'number' && (
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0, marginTop: '6px', borderTop: '1px solid var(--border)' }}>
+              <span>Data Quality</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{
+                  fontWeight: 700,
+                  color: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
+                         (vehicle as any).data_quality_score >= 40 ? '#eab308' : '#ef4444',
+                  fontSize: '9pt',
+                  fontFamily: 'monospace'
+                }}>
+                  {(vehicle as any).data_quality_score}/100
+                </span>
+                <span style={{
+                  display: 'inline-block',
+                  width: '48px',
+                  height: '4px',
+                  background: 'var(--border)',
+                  borderRadius: '2px',
+                  overflow: 'hidden'
+                }}>
+                  <span style={{
+                    display: 'block',
+                    height: '100%',
+                    width: `${Math.min(100, Math.max(0, (vehicle as any).data_quality_score))}%`,
+                    background: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
+                                (vehicle as any).data_quality_score >= 40 ? '#eab308' : '#ef4444',
+                    borderRadius: '2px'
+                  }} />
+                </span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

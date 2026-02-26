@@ -3695,6 +3695,16 @@ const VehicleProfile: React.FC = () => {
           <div className="vehicle-profile-two-column">
             {/* Left Column */}
             <div className="vehicle-profile-left-column" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {/* Work Memory Capture — Evidence tab, owners & contributors only */}
+              {isEvidence && (isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+                <React.Suspense fallback={null}>
+                  <WorkMemorySection
+                    vehicleId={vehicle.id}
+                    permissions={permissions}
+                  />
+                </React.Suspense>
+              )}
+
               {/* Vehicle Info — Facts tab */}
               {isFacts && (
                 <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
@@ -3879,11 +3889,14 @@ const VehicleProfile: React.FC = () => {
                 </CollapsibleWidget>
               )}
 
-              {/* Investment Summary — Commerce tab */}
+              {/* Fact Explorer — Facts tab */}
+              {isFacts && (
+                <FactExplorerPanel vehicleId={vehicle.id} readinessScore={null} />
+              )}
+
+              {/* Investment Summary — Commerce tab (VehicleROISummaryCard has its own CollapsibleWidget internally) */}
               {isCommerce && (
-                <CollapsibleWidget title="ROI Summary" defaultCollapsed={false}>
-                  <VehicleROISummaryCard vehicleId={vehicle.id} />
-                </CollapsibleWidget>
+                <VehicleROISummaryCard vehicleId={vehicle.id} />
               )}
 
               {/* Nuke Estimate — Commerce tab */}
@@ -3896,16 +3909,14 @@ const VehicleProfile: React.FC = () => {
                 </CollapsibleWidget>
               )}
 
-              {/* Pricing & Value — Commerce tab */}
+              {/* Pricing & Value — Commerce tab (VehiclePricingValueCard has its own CollapsibleWidget internally) */}
               {isCommerce && (
-                <CollapsibleWidget title="Pricing & Value" defaultCollapsed={false}>
-                  <VehiclePricingValueCard
-                    vehicle={vehicle}
-                    auctionPulse={auctionPulse}
-                    valuationIntel={valuationIntel as any}
-                    readinessSnapshot={readinessSnapshot as any}
-                  />
-                </CollapsibleWidget>
+                <VehiclePricingValueCard
+                  vehicle={vehicle}
+                  auctionPulse={auctionPulse}
+                  valuationIntel={valuationIntel as any}
+                  readinessSnapshot={readinessSnapshot as any}
+                />
               )}
 
               {/* Auction history — Commerce tab */}
