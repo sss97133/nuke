@@ -5,6 +5,7 @@ import { readCachedSession } from '../utils/cachedSession';
 import { CashBalanceService } from '../services/cashBalanceService';
 import type { CashTransaction } from '../services/cashBalanceService';
 import CashBalance from '../components/trading/CashBalance';
+import { TradingService } from '../services/tradingService';
 
 interface ShareHolding {
   offering_id: string;
@@ -65,6 +66,32 @@ interface OrgHolding {
   unrealized_gain_loss_pct: number;
 }
 
+interface OpenOrder {
+  id: string;
+  offering_id: string;
+  order_type: 'buy' | 'sell';
+  status: string;
+  shares_requested: number;
+  shares_filled: number;
+  price_per_share: number;
+  created_at: string;
+  vehicle_year?: number;
+  vehicle_make?: string;
+  vehicle_model?: string;
+}
+
+interface FundHolding {
+  id: string;
+  fund_id: string;
+  shares_owned: number;
+  entry_nav: number;
+  current_nav: number;
+  unrealized_gain_loss_usd: number;
+  unrealized_gain_loss_pct: number;
+  fund_symbol?: string;
+  segment_name?: string;
+}
+
 export default function Portfolio() {
   const navigate = useNavigate();
   const [cashBalance, setCashBalance] = useState<any>(null);
@@ -74,8 +101,11 @@ export default function Portfolio() {
   const [bonds, setBonds] = useState<Bond[]>([]);
   const [ownedVehicles, setOwnedVehicles] = useState<OwnedVehicle[]>([]);
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
+  const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
+  const [fundHoldings, setFundHoldings] = useState<FundHolding[]>([]);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => readCachedSession() === null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'cash' | 'shares' | 'orgs' | 'stakes' | 'bonds' | 'vehicles'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'cash' | 'shares' | 'orders' | 'orgs' | 'stakes' | 'bonds' | 'vehicles'>('overview');
 
   useEffect(() => {
     loadData();
@@ -164,6 +194,65 @@ export default function Portfolio() {
           unrealized_gain_loss_pct: h.unrealized_gain_loss_pct
         }));
         setOrgHoldings(formattedOrgHoldings);
+      }
+
+      // Load open orders (active + partially filled)
+      const { data: ordersData } = await supabase
+        .from('market_orders')
+        .select(`
+          id, offering_id, order_type, status,
+          shares_requested, shares_filled, price_per_share, created_at,
+          vehicle_offerings!inner(
+            vehicles!inner(year, make, model)
+          )
+        `)
+        .eq('user_id', user.id)
+        .in('status', ['active', 'partially_filled'])
+        .order('created_at', { ascending: false });
+
+      if (ordersData) {
+        setOpenOrders(ordersData.map((o: any) => ({
+          id: o.id,
+          offering_id: o.offering_id,
+          order_type: o.order_type,
+          status: o.status,
+          shares_requested: o.shares_requested,
+          shares_filled: o.shares_filled,
+          price_per_share: parseFloat(o.price_per_share),
+          created_at: o.created_at,
+          vehicle_year:  o.vehicle_offerings?.vehicles?.year,
+          vehicle_make:  o.vehicle_offerings?.vehicles?.make,
+          vehicle_model: o.vehicle_offerings?.vehicles?.model,
+        })));
+      }
+
+      // Load ETF fund holdings
+      const { data: fundHoldingsData } = await supabase
+        .from('market_fund_holdings')
+        .select(`
+          id, fund_id, shares_owned, entry_nav, current_nav,
+          unrealized_gain_loss_usd, unrealized_gain_loss_pct,
+          market_funds!inner(
+            symbol,
+            market_segments!inner(name)
+          )
+        `)
+        .eq('user_id', user.id)
+        .gt('shares_owned', 0)
+        .order('unrealized_gain_loss_usd', { ascending: false });
+
+      if (fundHoldingsData) {
+        setFundHoldings(fundHoldingsData.map((f: any) => ({
+          id: f.id,
+          fund_id: f.fund_id,
+          shares_owned: parseFloat(f.shares_owned),
+          entry_nav: parseFloat(f.entry_nav),
+          current_nav: parseFloat(f.current_nav),
+          unrealized_gain_loss_usd: parseFloat(f.unrealized_gain_loss_usd || 0),
+          unrealized_gain_loss_pct: parseFloat(f.unrealized_gain_loss_pct || 0),
+          fund_symbol:   f.market_funds?.symbol,
+          segment_name:  f.market_funds?.market_segments?.name,
+        })));
       }
 
       // Load transactions
@@ -294,6 +383,32 @@ export default function Portfolio() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    setCancellingOrderId(orderId);
+    try {
+      const ok = await TradingService.cancelOrder(orderId);
+      if (ok) {
+        setOpenOrders(prev => prev.filter(o => o.id !== orderId));
+        // Refresh cash balance (reserved cash was released)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const bal = await CashBalanceService.getUserBalance(user.id);
+          setCashBalance(bal);
+        }
+      }
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
+  const formatAge = (dateString: string) => {
+    const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
   };
 
   const formatDate = (dateString: string) => {
@@ -540,6 +655,25 @@ export default function Portfolio() {
           </button>
 
           <button
+            onClick={() => setActiveTab('orders')}
+            style={{
+              border: '2px solid var(--border)',
+              background: activeTab === 'orders' ? 'var(--accent-dim)' : 'var(--surface)',
+              color: activeTab === 'orders' ? 'var(--accent)' : 'var(--text)',
+              padding: '6px 12px',
+              fontSize: '9px',
+              fontWeight: 600,
+              fontFamily: 'Arial, sans-serif',
+              cursor: 'pointer',
+              transition: '0.12s',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Orders{openOrders.length > 0 ? ` (${openOrders.length})` : ''}
+          </button>
+
+          <button
             onClick={() => setActiveTab('stakes')}
             style={{
               border: '2px solid var(--border)',
@@ -737,20 +871,123 @@ export default function Portfolio() {
             </div>
           )}
 
+          {/* Orders Tab */}
+          {activeTab === 'orders' && (
+            <>
+              {openOrders.length === 0 ? (
+                <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '9px' }}>
+                  No open orders.
+                </div>
+              ) : (
+                <div>
+                  {/* Header row */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 60px 1fr 1fr 80px 80px',
+                    gap: '12px',
+                    padding: '10px 20px',
+                    borderBottom: '2px solid var(--border)',
+                    fontSize: '8px',
+                    fontWeight: 700,
+                    color: 'var(--text-secondary)',
+                    textTransform: 'uppercase'
+                  }}>
+                    <div>Vehicle</div>
+                    <div>Side</div>
+                    <div>Filled / Total</div>
+                    <div>Price</div>
+                    <div>Age</div>
+                    <div></div>
+                  </div>
+                  {openOrders.map((order) => (
+                    <div key={order.id} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 60px 1fr 1fr 80px 80px',
+                      gap: '12px',
+                      padding: '12px 20px',
+                      borderBottom: '1px solid var(--border)',
+                      alignItems: 'center',
+                      fontSize: '9px'
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>
+                          {order.vehicle_year} {order.vehicle_make} {order.vehicle_model}
+                        </div>
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginTop: 2 }}>
+                          {order.status === 'partially_filled' ? 'partially filled' : 'resting'}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{
+                          padding: '2px 6px',
+                          borderRadius: '3px',
+                          fontWeight: 700,
+                          fontSize: '8px',
+                          background: order.order_type === 'buy' ? 'rgba(16,185,129,0.15)' : 'rgba(220,38,38,0.15)',
+                          color: order.order_type === 'buy' ? 'var(--success, #059669)' : 'var(--danger, #b91c1c)'
+                        }}>
+                          {order.order_type.toUpperCase()}
+                        </span>
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                        {order.shares_filled} / {order.shares_requested}
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>shares</div>
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                        ${order.price_per_share.toFixed(4)}
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                          limit
+                        </div>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)' }}>
+                        {formatAge(order.created_at)}
+                      </div>
+                      <div>
+                        <button
+                          onClick={() => handleCancelOrder(order.id)}
+                          disabled={cancellingOrderId === order.id}
+                          style={{
+                            border: '1px solid var(--border)',
+                            background: 'var(--surface)',
+                            color: 'var(--danger, #b91c1c)',
+                            padding: '4px 8px',
+                            fontSize: '8px',
+                            fontWeight: 600,
+                            cursor: cancellingOrderId === order.id ? 'not-allowed' : 'pointer',
+                            borderRadius: '3px',
+                            opacity: cancellingOrderId === order.id ? 0.5 : 1,
+                            fontFamily: 'Arial, sans-serif'
+                          }}
+                        >
+                          {cancellingOrderId === order.id ? '...' : 'Cancel'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
           {/* Shares Tab */}
           {activeTab === 'shares' && (
             <>
-              {holdings.length === 0 ? (
+              {holdings.length === 0 && fundHoldings.length === 0 ? (
                 <div style={{
                   padding: '48px 20px',
                   textAlign: 'center',
                   color: 'var(--text-secondary)',
                   fontSize: '9px'
                 }}>
-                  No holdings yet. Invest in vehicles to build your portfolio.
+                  No holdings yet. Invest in vehicles or ETF funds to build your portfolio.
                 </div>
               ) : (
                 <div>
+                  {holdings.length > 0 && (
+                  <div style={{ padding: '10px 20px 6px', fontSize: '8px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>
+                    Vehicle Shares
+                  </div>
+                  )}
                   {holdings.map((holding, index) => (
                     <div
                       key={holding.offering_id}
@@ -830,6 +1067,54 @@ export default function Portfolio() {
                       </div>
                     </div>
                   ))}
+
+                  {/* ETF Fund Holdings */}
+                  {fundHoldings.length > 0 && (
+                    <>
+                      <div style={{ padding: '10px 20px 6px', fontSize: '8px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', borderTop: holdings.length > 0 ? '2px solid var(--border)' : 'none', borderBottom: '1px solid var(--border)' }}>
+                        ETF Fund Holdings
+                      </div>
+                      {fundHoldings.map((f) => (
+                        <div key={f.id} style={{
+                          padding: '14px 20px',
+                          borderBottom: '1px solid var(--border)',
+                          display: 'grid',
+                          gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                          gap: '16px',
+                          alignItems: 'center',
+                          fontSize: '9px'
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '10px' }}>{f.fund_symbol}</div>
+                            <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>{f.segment_name}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '8px', marginTop: 2 }}>
+                              {f.shares_owned.toFixed(6)} shares @ {f.entry_nav.toFixed(4)} NAV
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 600 }}>${f.current_nav.toFixed(4)}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '8px' }}>current NAV</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700 }}>
+                              {CashBalanceService.formatCurrency(Math.round(f.shares_owned * f.current_nav * 100))}
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '8px' }}>market value</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700, color: f.unrealized_gain_loss_usd >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                              {f.unrealized_gain_loss_usd >= 0 ? '+' : ''}
+                              {CashBalanceService.formatCurrency(Math.round(f.unrealized_gain_loss_usd * 100))}
+                            </div>
+                            <div style={{ fontSize: '8px', color: f.unrealized_gain_loss_pct >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                              {f.unrealized_gain_loss_pct >= 0 ? '+' : ''}
+                              {f.unrealized_gain_loss_pct.toFixed(2)}%
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
             </>
