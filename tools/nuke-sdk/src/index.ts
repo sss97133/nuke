@@ -31,6 +31,14 @@
 // Re-export types
 export * from './types';
 export * from './errors';
+export type {
+  VisionClassifyResult,
+  VisionAnalyzeResult,
+  VisionBatchResult,
+  VisionClassifyParams,
+  VisionAnalyzeParams,
+  VisionBatchItem,
+} from './resources/vision';
 
 import { NukeConfig, RequestOptions } from './types';
 import { Vehicles } from './resources/vehicles';
@@ -45,11 +53,12 @@ import { VehicleHistory } from './resources/vehicle-history';
 import { VehicleAuction } from './resources/vehicle-auction';
 import { MarketTrends } from './resources/market-trends';
 import { Search } from './resources/search';
+import { Vision } from './resources/vision';
 import { NukeError, NukeAPIError, NukeAuthenticationError, NukeRateLimitError } from './errors';
 
 const DEFAULT_BASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '1.2.0';
+const SDK_VERSION = '1.3.1';
 
 export default class Nuke {
   private apiKey: string;
@@ -69,6 +78,7 @@ export default class Nuke {
   public vehicleAuction: VehicleAuction;
   public marketTrends: MarketTrends;
   public search: Search;
+  public vision: Vision;
 
   constructor(apiKey: string, config?: Partial<NukeConfig>) {
     if (!apiKey) {
@@ -92,6 +102,7 @@ export default class Nuke {
     this.vehicleAuction = new VehicleAuction(this);
     this.marketTrends = new MarketTrends(this);
     this.search = new Search(this);
+    this.vision = new Vision(this);
   }
 
   /**
