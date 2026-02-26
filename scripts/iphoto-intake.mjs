@@ -102,10 +102,15 @@ async function findVehicle(year, make, model) {
 function exportAlbum(albumName, destDir) {
   mkdirSync(destDir, { recursive: true });
   console.log(`  Exporting "${albumName}" → ${destDir}`);
+  // --download-missing uses AppleScript and can block indefinitely on single missing photos.
+  // Since Photos library is fully synced (osxphotos query --missing returns 0-1), skip it.
+  // Use --use-photos-export for Photos-native export (handles edited/HDR correctly).
+  // Note: --download-missing uses AppleScript and blocks indefinitely on iCloud-only photos.
+  // Omitting it means truly missing photos are skipped, which is the desired behavior when
+  // the library is already synced locally.
   const result = spawnSync('osxphotos', [
     'export', destDir,
     '--album', albumName,
-    '--download-missing',
     '--overwrite',
   ], { encoding: 'utf8', stdio: 'pipe' });
 
@@ -119,10 +124,17 @@ function exportAlbum(albumName, destDir) {
 function convertHeicToJpeg(srcDir, destDir) {
   mkdirSync(destDir, { recursive: true });
   const heicFiles = readdirSync(srcDir).filter(f => /\.heic$/i.test(f));
+  let skipped = 0;
   for (const f of heicFiles) {
     const outName = f.replace(/\.heic$/i, '.jpg');
-    execSync(`sips -s format jpeg "${join(srcDir, f)}" --out "${join(destDir, outName)}" -s formatOptions 85 > /dev/null 2>&1`);
+    try {
+      execSync(`sips -s format jpeg "${join(srcDir, f)}" --out "${join(destDir, outName)}" -s formatOptions 85 > /dev/null 2>&1`);
+    } catch (e) {
+      // File may be iCloud-only stub or corrupted — skip silently
+      skipped++;
+    }
   }
+  if (skipped > 0) console.log(`  Skipped ${skipped} HEIC files (iCloud-only or unreadable)`);
   // Copy non-HEIC images
   for (const f of readdirSync(srcDir)) {
     if (/\.(jpg|jpeg|png)$/i.test(f)) {

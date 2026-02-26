@@ -1,190 +1,208 @@
 """
-YONO Inference Server on Modal
+YONO Inference Server on Modal — ASGI/FastAPI edition
 
-Hosts the YONO hierarchical classifier as a stable HTTPS endpoint.
-Set YONO_SIDECAR_URL in Supabase env to the deployment URL to enable
-zero-cost image classification in all edge functions.
+Single base URL with path routing — compatible with yono-classify edge function.
+Set YONO_SIDECAR_URL in Supabase to the Modal app URL.
 
 Deploy:
   modal deploy yono/modal_serve.py
 
 Get URL:
-  modal app show yono-serve   (look for the web_endpoint URL)
+  modal app show yono-serve
+  (the @modal.asgi_app URL, e.g. https://nuke--yono-serve-fastapi-app.modal.run)
 
-Then in Supabase:
-  supabase secrets set YONO_SIDECAR_URL=https://<modal-org>--yono-serve-classify.modal.run
+Then set in Supabase:
+  supabase secrets set YONO_SIDECAR_URL=https://nuke--yono-serve-fastapi-app.modal.run
 
-Endpoints (same API as local server.py):
+Endpoints:
   GET  /health
-  POST /classify       { image_url, top_k? }
-  POST /classify/batch { images: [{image_url},...] }
+  POST /classify        { image_url, top_k? }
+  POST /classify/batch  { images: [{image_url, top_k?},...] }
 """
 
 import modal
+from pathlib import Path
 
 app = modal.App("yono-serve")
 
-# Container with ONNX runtime + PIL
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install([
-        "onnxruntime==1.17.3",
+        "onnxruntime==1.19.2",
         "Pillow",
         "fastapi[standard]",
+        "uvicorn",
         "httpx",
-        "numpy",
+        "numpy<2",
     ])
 )
 
-# Persistent volume holding ONNX models (populated by modal_train.py or manual upload)
 volume = modal.Volume.from_name("yono-data", create_if_missing=True)
 
 MODELS_DIR = "/data/models"
-FLAT_ONNX = f"{MODELS_DIR}/yono_make_v1.onnx"
-FLAT_LABELS = f"{MODELS_DIR}/yono_labels.json"
-HIER_FAMILY_ONNX = f"{MODELS_DIR}/hier_family.onnx"
-HIER_LABELS = f"{MODELS_DIR}/hier_labels.json"
 
 
-@app.cls(
+def _load_models():
+    """Load ONNX models from volume. Returns (flat_sess, flat_labels, tier1_sess, family_labels, tier2)."""
+    import json
+    import onnxruntime as ort
+
+    flat_sess = flat_labels = flat_input = None
+    tier1_sess = tier1_input = None
+    family_labels = []
+    tier2 = {}
+    tier2_labels = {}
+    tier2_input = None
+
+    flat_path = Path(f"{MODELS_DIR}/yono_make_v1.onnx")
+    flat_labels_path = Path(f"{MODELS_DIR}/yono_labels.json")
+    if flat_path.exists() and flat_labels_path.exists():
+        flat_sess = ort.InferenceSession(str(flat_path), providers=["CPUExecutionProvider"])
+        flat_input = flat_sess.get_inputs()[0].name
+        with open(flat_labels_path) as f:
+            data = json.load(f)
+        flat_labels = data["labels"]
+        print(f"[YONO] Flat model: {len(flat_labels)} classes")
+
+    hier_path = Path(f"{MODELS_DIR}/hier_family.onnx")
+    hier_labels_path = Path(f"{MODELS_DIR}/hier_labels.json")
+    if hier_path.exists() and hier_labels_path.exists():
+        tier1_sess = ort.InferenceSession(str(hier_path), providers=["CPUExecutionProvider"])
+        tier1_input = tier1_sess.get_inputs()[0].name
+        with open(hier_labels_path) as f:
+            all_labels = json.load(f)
+        family_map = all_labels.get("hier_family", {})
+        family_labels = sorted(family_map, key=lambda k: family_map[k])
+        for family in family_labels:
+            t2_path = Path(f"{MODELS_DIR}/hier_{family}.onnx")
+            if t2_path.exists():
+                sess = ort.InferenceSession(str(t2_path), providers=["CPUExecutionProvider"])
+                tier2[family] = sess
+                tier2_input = sess.get_inputs()[0].name
+                tier2_labels[family] = sorted(
+                    all_labels.get(f"hier_{family}", {}),
+                    key=lambda k: all_labels[f"hier_{family}"][k]
+                )
+        print(f"[YONO] Hierarchical: tier1={bool(tier1_sess)}, tier2={list(tier2.keys())}")
+
+    if not flat_sess and not tier1_sess:
+        raise RuntimeError("No YONO models found in /data/models — upload models first")
+
+    return flat_sess, flat_labels, flat_input, tier1_sess, tier1_input, family_labels, tier2, tier2_labels, tier2_input
+
+
+@app.function(
     image=image,
     volumes={"/data": volume},
-    min_containers=0,        # scale-to-zero when idle
-    scaledown_window=300,    # keep warm for 5 min after last request
-    allow_concurrent_inputs=10,
+    min_containers=1,        # keep 1 warm — cold start is 3-5s
+    scaledown_window=600,    # keep warm 10 min after last request
 )
-class YONOServer:
-    @modal.enter()
-    def load_models(self):
-        import json
-        import numpy as np
-        import onnxruntime as ort
-        from pathlib import Path
+@modal.concurrent(max_inputs=20)
+@modal.asgi_app()
+def fastapi_app():
+    import asyncio
+    import io
+    import json
+    import time
 
-        self._mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        self._std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    import httpx
+    import numpy as np
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from PIL import Image
 
-        self._flat_sess = None
-        self._flat_labels = []
-        self._tier1_sess = None
-        self._family_labels = []
-        self._tier2: dict = {}
-        self._tier2_labels: dict = {}
+    api = FastAPI(title="YONO Inference Server")
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-        # Load flat model
-        if Path(FLAT_ONNX).exists() and Path(FLAT_LABELS).exists():
-            self._flat_sess = ort.InferenceSession(FLAT_ONNX, providers=["CPUExecutionProvider"])
-            self._flat_input = self._flat_sess.get_inputs()[0].name
-            with open(FLAT_LABELS) as f:
-                data = json.load(f)
-            self._flat_labels = data["labels"]
-            self._flat_meta = data.get("meta", {})
-            print(f"Flat model loaded: {len(self._flat_labels)} classes")
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
-        # Load hierarchical Tier 1
-        if Path(HIER_FAMILY_ONNX).exists() and Path(HIER_LABELS).exists():
-            self._tier1_sess = ort.InferenceSession(HIER_FAMILY_ONNX, providers=["CPUExecutionProvider"])
-            self._tier1_input = self._tier1_sess.get_inputs()[0].name
-            with open(HIER_LABELS) as f:
-                all_labels = json.load(f)
-            family_map = all_labels.get("hier_family", {})
-            self._family_labels = sorted(family_map, key=lambda k: family_map[k])
-            # Load any Tier 2 per-family models
-            for family in self._family_labels:
-                tier2_path = f"{MODELS_DIR}/hier_{family}.onnx"
-                if Path(tier2_path).exists():
-                    sess = ort.InferenceSession(tier2_path, providers=["CPUExecutionProvider"])
-                    self._tier2[family] = sess
-                    self._tier2_input = sess.get_inputs()[0].name
-                    self._tier2_labels[family] = sorted(
-                        all_labels.get(f"hier_{family}", {}),
-                        key=lambda k: all_labels[f"hier_{family}"][k]
-                    )
-            print(f"Hierarchical: tier1={bool(self._tier1_sess)}, tier2={list(self._tier2.keys())}")
+    (flat_sess, flat_labels, flat_input,
+     tier1_sess, tier1_input, family_labels,
+     tier2, tier2_labels, tier2_input) = _load_models()
 
-        if not self._flat_sess and not self._tier1_sess:
-            raise RuntimeError("No YONO models found in /data/models — upload models first")
+    started_at = time.time()
 
-    def _preprocess(self, image_bytes: bytes) -> "np.ndarray":
-        import io
-        import numpy as np
-        from PIL import Image
+    def _preprocess(image_bytes: bytes) -> np.ndarray:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB").resize((224, 224))
         arr = np.array(img, dtype=np.float32) / 255.0
-        arr = (arr - self._mean) / self._std
+        arr = (arr - mean) / std
         return arr.transpose(2, 0, 1)[np.newaxis]
 
-    def _softmax(self, x: "np.ndarray") -> "np.ndarray":
-        import numpy as np
+    def _softmax(x: np.ndarray) -> np.ndarray:
         e = np.exp(x - x.max(axis=1, keepdims=True))
         return e / e.sum(axis=1, keepdims=True)
 
-    def _classify_tensor(self, tensor: "np.ndarray", top_k: int = 5) -> dict:
-        # Tier 1: family
-        family = None
-        family_confidence = None
-        if self._tier1_sess:
-            logits = self._tier1_sess.run(None, {self._tier1_input: tensor})[0]
-            probs = self._softmax(logits)[0]
+    def _classify(tensor: np.ndarray, top_k: int = 5) -> dict:
+        # Tier 1 → Tier 2 hierarchical path
+        if tier1_sess:
+            logits = tier1_sess.run(None, {tier1_input: tensor})[0]
+            probs = _softmax(logits)[0]
             top_idx = int(probs.argmax())
-            family = self._family_labels[top_idx]
-            family_confidence = float(probs[top_idx])
+            family = family_labels[top_idx]
+            family_conf = float(probs[top_idx])
 
-            # Tier 2: make within family
-            if family in self._tier2:
-                sess = self._tier2[family]
-                input_name = sess.get_inputs()[0].name
-                logits2 = sess.run(None, {input_name: tensor})[0]
-                probs2 = self._softmax(logits2)[0]
-                labels2 = self._tier2_labels[family]
-                top_indices = probs2.argsort()[::-1][:top_k]
-                top5 = [[labels2[i], float(probs2[i])] for i in top_indices]
+            if family in tier2:
+                sess = tier2[family]
+                inp = sess.get_inputs()[0].name
+                logits2 = sess.run(None, {inp: tensor})[0]
+                probs2 = _softmax(logits2)[0]
+                labels2 = tier2_labels[family]
+                top_ix = probs2.argsort()[::-1][:top_k]
+                top5 = [[labels2[i], float(probs2[i])] for i in top_ix]
                 return {
-                    "make": top5[0][0],
-                    "confidence": top5[0][1],
-                    "family": family,
-                    "family_confidence": family_confidence,
-                    "top5": top5,
-                    "source": "hierarchical",
+                    "make": top5[0][0], "confidence": top5[0][1],
+                    "family": family, "family_confidence": family_conf,
+                    "top5": top5, "source": "hierarchical",
                     "is_vehicle": top5[0][1] >= 0.20,
                 }
+            # Tier 1 only (no tier 2 for this family yet)
+            return {
+                "make": family, "confidence": family_conf,
+                "family": family, "family_confidence": family_conf,
+                "top5": [[family, family_conf]],
+                "source": "hierarchical_tier1_only",
+                "is_vehicle": family_conf >= 0.25,
+            }
 
         # Flat fallback
-        if self._flat_sess:
-            logits = self._flat_sess.run(None, {self._flat_input: tensor})[0]
-            probs = self._softmax(logits)[0]
-            top_indices = probs.argsort()[::-1][:top_k]
-            top5 = [[self._flat_labels[i], float(probs[i])] for i in top_indices]
+        if flat_sess:
+            logits = flat_sess.run(None, {flat_input: tensor})[0]
+            probs = _softmax(logits)[0]
+            top_ix = probs.argsort()[::-1][:top_k]
+            top5 = [[flat_labels[i], float(probs[i])] for i in top_ix]
             return {
-                "make": top5[0][0],
-                "confidence": top5[0][1],
-                "family": None,
-                "family_confidence": None,
-                "top5": top5,
-                "source": "flat_fallback",
+                "make": top5[0][0], "confidence": top5[0][1],
+                "family": None, "family_confidence": None,
+                "top5": top5, "source": "flat_fallback",
                 "is_vehicle": top5[0][1] >= 0.25,
             }
 
-        return {"make": None, "confidence": 0.0, "top5": [], "source": "unavailable", "is_vehicle": False}
+        return {"make": None, "confidence": 0.0, "top5": [],
+                "source": "unavailable", "is_vehicle": False}
 
-    @modal.web_endpoint(method="GET", label="health")
-    def health(self):
+    @api.get("/health")
+    def health():
         return {
             "status": "ok",
-            "tier1": self._tier1_sess is not None,
-            "tier2_families": list(self._tier2.keys()),
-            "flat": self._flat_sess is not None,
-            "flat_classes": len(self._flat_labels),
+            "tier1": tier1_sess is not None,
+            "tier2_families": list(tier2.keys()),
+            "flat": flat_sess is not None,
+            "flat_classes": len(flat_labels) if flat_labels else 0,
+            "uptime_s": round(time.time() - started_at, 1),
         }
 
-    @modal.web_endpoint(method="POST", label="classify")
-    async def classify(self, request: dict):
-        import httpx
-        import time
-        image_url = request.get("image_url")
-        top_k = request.get("top_k", 5)
+    @api.post("/classify")
+    async def classify(body: dict):
+        image_url = body.get("image_url")
+        top_k = body.get("top_k", 5)
         if not image_url:
-            return {"error": "Missing image_url"}, 400
+            return {"error": "Missing image_url"}
 
         t0 = time.perf_counter()
         async with httpx.AsyncClient(timeout=20) as client:
@@ -192,21 +210,18 @@ class YONOServer:
             resp.raise_for_status()
             image_bytes = resp.content
 
-        tensor = self._preprocess(image_bytes)
-        result = self._classify_tensor(tensor, top_k=top_k)
-        elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
-        return {**result, "ms": elapsed_ms, "image_url": image_url}
+        tensor = _preprocess(image_bytes)
+        result = _classify(tensor, top_k=top_k)
+        ms = round((time.perf_counter() - t0) * 1000, 1)
+        return {**result, "ms": ms}
 
-    @modal.web_endpoint(method="POST", label="classify-batch")
-    async def classify_batch(self, request: dict):
-        import httpx
-        import asyncio
-        import time
-        images = request.get("images", [])
+    @api.post("/classify/batch")
+    async def classify_batch(body: dict):
+        images = body.get("images", [])
         if len(images) > 50:
-            return {"error": "Max 50 images per batch"}, 400
+            return {"error": "Max 50 images per batch"}
 
-        async def classify_one(item):
+        async def one(item):
             t0 = time.perf_counter()
             url = item.get("image_url", "")
             top_k = item.get("top_k", 5)
@@ -214,12 +229,14 @@ class YONOServer:
                 async with httpx.AsyncClient(timeout=20) as client:
                     resp = await client.get(url)
                     resp.raise_for_status()
-                    tensor = self._preprocess(resp.content)
-                    result = self._classify_tensor(tensor, top_k=top_k)
-                    ms = round((time.perf_counter() - t0) * 1000, 1)
-                    return {**result, "ms": ms, "image_url": url}
+                    tensor = _preprocess(resp.content)
+                    result = _classify(tensor, top_k=top_k)
+                    return {**result, "ms": round((time.perf_counter() - t0) * 1000, 1), "image_url": url}
             except Exception as e:
                 return {"image_url": url, "error": str(e)}
 
-        results = await asyncio.gather(*[classify_one(item) for item in images])
+        import asyncio
+        results = await asyncio.gather(*[one(item) for item in images])
         return {"results": list(results), "count": len(results)}
+
+    return api
