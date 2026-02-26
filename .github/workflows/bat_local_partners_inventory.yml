@@ -51,17 +51,17 @@ jobs:
             local name="$1"
             local path="$2"
             local body="$3"
-            echo "$name"
+            echo "$name" >&2
             OUT="$(post "$path" "$body")"
             HTTP="$(echo "$OUT" | tail -n 1 | sed 's/^HTTP://')"
             RESP="$(echo "$OUT" | sed '$d')"
-            echo "HTTP $HTTP"
+            echo "HTTP $HTTP" >&2
             # Always print a snippet for debugging
-            echo "$RESP" | head -c 800
-            echo ""
+            echo "$RESP" | head -c 800 >&2
+            echo "" >&2
             # Fail fast on non-2xx
             if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
-              echo "Non-2xx response from $path"
+              echo "Non-2xx response from $path" >&2
               exit 1
             fi
             # Also ensure JSON is valid
