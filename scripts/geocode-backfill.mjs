@@ -104,6 +104,25 @@ function parseLocation(raw) {
 
 // --- Geocoding ---
 
+const geoCache = new Map(); // "city|state" → geo result or null
+
+async function geocode(city, state) {
+  const key = `${city.toLowerCase()}|${state}`;
+  if (geoCache.has(key)) return geoCache.get(key);
+
+  // Pass 1: lookup table (fast, no rate limit)
+  let geo = await lookupInTable(city, state);
+
+  // Pass 2: Nominatim fallback
+  if (!geo) {
+    geo = await nominatimGeocode(city, state);
+    await sleep(NOMINATIM_DELAY_MS);
+  }
+
+  geoCache.set(key, geo); // cache null too (avoid re-querying dead locations)
+  return geo;
+}
+
 async function lookupInTable(city, state) {
   const { data } = await supabase
     .from('fb_marketplace_locations')
@@ -149,7 +168,21 @@ async function main() {
   console.log(`   Fetching vehicles...\n`);
 
   const stats = { total: 0, lookup_hit: 0, nominatim_hit: 0, skipped: 0, failed: 0 };
-  let offset = START_OFFSET;
+  let lastId = START_OFFSET === 0 ? '00000000-0000-0000-0000-000000000000' : null;
+  let processedTotal = 0;
+
+  // If START_OFFSET is a numeric offset, find the ID to start from
+  if (START_OFFSET > 0 && !lastId) {
+    const { data: anchor } = await supabase
+      .from('vehicles')
+      .select('id')
+      .or('listing_location.not.is.null,location.not.is.null')
+      .is('gps_latitude', null)
+      .order('id', { ascending: true })
+      .limit(1)
+      .range(START_OFFSET, START_OFFSET);
+    lastId = anchor?.[0]?.id || '00000000-0000-0000-0000-000000000000';
+  }
 
   while (true) {
     const { data: vehicles, error } = await supabase
@@ -157,13 +190,14 @@ async function main() {
       .select('id, listing_location, location')
       .or('listing_location.not.is.null,location.not.is.null')
       .is('gps_latitude', null)
+      .gt('id', lastId)
       .order('id', { ascending: true })
-      .range(offset, offset + BATCH_SIZE - 1);
+      .limit(BATCH_SIZE);
 
     if (error) { console.error('Fetch error:', error.message); break; }
     if (!vehicles || vehicles.length === 0) { console.log('✅ No more vehicles to geocode.'); break; }
 
-    console.log(`Batch offset=${offset}: ${vehicles.length} vehicles`);
+    console.log(`Batch processed=${processedTotal}: ${vehicles.length} vehicles`);
 
     for (const v of vehicles) {
       const rawLoc = v.listing_location || v.location;
@@ -176,16 +210,13 @@ async function main() {
 
       stats.total++;
 
-      // Pass 1: lookup table
-      let geo = await lookupInTable(parsed.city, parsed.state);
+      const cacheKey = `${parsed.city.toLowerCase()}|${parsed.state}`;
+      const wasCached = geoCache.has(cacheKey);
+      const geo = await geocode(parsed.city, parsed.state);
 
-      // Pass 2: Nominatim fallback
-      if (!geo) {
-        geo = await nominatimGeocode(parsed.city, parsed.state);
-        if (geo) stats.nominatim_hit++;
-        await sleep(NOMINATIM_DELAY_MS);
-      } else {
-        stats.lookup_hit++;
+      if (!wasCached && geo) {
+        if (geo.source === 'lookup_table') stats.lookup_hit++;
+        else stats.nominatim_hit++;
       }
 
       if (!geo) {
@@ -231,9 +262,10 @@ async function main() {
     const pct = stats.total > 0
       ? ((stats.lookup_hit + stats.nominatim_hit) / stats.total * 100).toFixed(1)
       : '0';
-    console.log(`  → geocoded: ${stats.lookup_hit + stats.nominatim_hit} (${pct}%), lookup: ${stats.lookup_hit}, nominatim: ${stats.nominatim_hit}, skipped: ${stats.skipped}, failed: ${stats.failed}`);
+    console.log(`  → geocoded: ${stats.lookup_hit + stats.nominatim_hit} (${pct}%), lookup: ${stats.lookup_hit}, nominatim: ${stats.nominatim_hit}, cache_size: ${geoCache.size}, skipped: ${stats.skipped}, failed: ${stats.failed}`);
 
-    offset += vehicles.length;
+    lastId = vehicles[vehicles.length - 1].id;
+    processedTotal += vehicles.length;
     if (vehicles.length < BATCH_SIZE) break;
   }
 

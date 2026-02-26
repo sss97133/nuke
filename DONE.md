@@ -3,7 +3,51 @@
 **Append-only. Add entries when completing significant work.**
 Agents read this to avoid rebuilding things that already exist.
 
+## 2026-02-26 (YONO sidecar + agent infrastructure session)
+
+### YONO FastAPI Sidecar — SHIPPED TO MODAL — COMPLETED 2026-02-26
+- `yono/modal_serve.py` rewritten to use `@modal.asgi_app()` — single base URL with path routing
+- Deployed: `https://sss97133--yono-serve-fastapi-app.modal.run`
+- Fixed: onnxruntime 1.17.3→1.19.2 + `numpy<2` (NumPy 2.x incompatibility), `allow_concurrent_inputs`→`@modal.concurrent` deprecation
+- `YONO_SIDECAR_URL` set in Supabase secrets
+- Full round-trip validated: `yono-classify` → Modal → ONNX → `{"make":"german","confidence":0.78,...,"available":true}`
+- Endpoints: GET /health, POST /classify, POST /classify/batch
+- `min_containers=1` keeps one warm (avoids cold starts)
+- P85 + P100 agent_tasks both marked completed
+
+### Multi-Agent Infrastructure — COMPLETED 2026-02-26
+- `CODEBASE_MAP.md` — 413-line semantic map of all 397 edge functions (27KB)
+- `NUKE_COMPANY_BRIEF.md` — constitutional document loaded by all agents
+- `.claude/agents/` — CLAUDE.md files for all roles: coo, cto, cfo, cpo, cdo, vp-extraction, vp-ai, vp-platform, vp-vehicle-intel, vp-deal-flow, vp-orgs, vp-docs, vp-photos, worker
+- `~/bin/open-agent` — launches any role with session resume support
+- `~/bin/save-session` — persists session ID for future resume
+- `~/bin/list-tasks` — shows pending agent_tasks queue
+- `agent-monitor` edge function — reactive issue scanner, pg_cron job 235 every 5min
+  - Detects: stale locks, import queue backlog, BaT tasks stuck, missing quality scores, YONO down
+  - Creates agent_tasks routed to correct VP automatically
+
 ## 2026-02-26 (YONO vision v2 session)
+
+### YONO Vision V2 — Zone System + Auto-Launcher — COMPLETED 2026-02-26
+
+**Zone labeling:** 100% complete. All 2764 records in `training_labels/labels.jsonl` now have `vehicle_zone` from the 41-zone taxonomy. Zone distribution: ext_front_driver=260, int_dashboard=222, mech_engine_bay=219, ext_driver_side=216, other=206, ext_undercarriage=197...
+
+**Zone classifier training:** Watcher launched (PID 80532). Polls until condition model (PID 68092) finishes, then auto-launches `train_zone_classifier.py --epochs 15`. Logs to `yono/outputs/zone_classifier/watcher.log` and `training.log`.
+
+**Bug fixed:** `_zone_classifier` missing from `global` declaration in `server.py` lifespan function — would have caused ZoneClassifier to always be None at module level even after loading.
+
+**Scripts:**
+- `yono/scripts/wait_then_train_zones.sh` — watcher that auto-launches zone training after condition model finishes
+- `yono/outputs/zone_classifier/` — output directory created
+
+**Background processes:**
+- PID 68092: `train_florence2.py` — epoch 3/10, still running. Watcher waiting on this.
+- PID 80532: `wait_then_train_zones.sh` — watching PID 68092, will auto-launch zone training.
+
+**What to do after both finish:**
+1. Restart `server.py` to load both fine-tuned models
+2. Run `generate_condition_report.py --all-bat` to build condition reports
+3. Install colmap (`brew install colmap`) then run `bat_reconstruct.py`
 
 ### YONO Vision V2 — Phase 1-4 Infrastructure — COMPLETED 2026-02-26
 
@@ -186,10 +230,14 @@ Agents read this to avoid rebuilding things that already exist.
 - `vehicles.gps_latitude`, `vehicles.gps_longitude` — being filled by backfill script
 - `vehicle_location_observations` — now written on every extraction with city/state/confidence
 
-**Current state:**
-- Backfill running: ~28k vehicles, 100% Nominatim success rate, ~8.5 hours to complete
-- Monitor: `tail -f /tmp/geocode-backfill.log`
-- Verify results: `SELECT COUNT(*) FROM vehicles WHERE gps_latitude IS NOT NULL;`
+**Current state (updated 2026-02-26 ~18:50):**
+- Actual scope: 132,915 vehicles need geocoding (111,697 have listing_location from BAT/CL history, 28,700 have legacy location col — more than initial 28k estimate)
+- Backfill running: PID 8523, ~1,498 geocoded so far, ~131k remaining
+- DB index created: `idx_vehicles_geocode_backfill` on vehicles(id) WHERE (listing_location/location NOT NULL) AND gps_latitude IS NULL — enables keyset pagination without full table scan
+- In-memory geo cache added to script: avoids repeat Nominatim calls for same city/state (estimate ~3-5k unique city/state combos in 133k records). Cache warms over first ~100 batches, then subsequent batches are near-instant.
+- ETA: overnight (~10-15 hours given Nominatim rate limit on first pass, then cache-accelerated)
+- Monitor: `tail -f /tmp/geocode-backfill.log` (stdout is buffered — DB writes happen live, log flushes in batches)
+- Verify: `SELECT COUNT(*) FROM vehicles WHERE gps_latitude IS NOT NULL;`
 
 ## 2026-02-26
 
@@ -548,3 +596,42 @@ SELECT * FROM v_extraction_quality ORDER BY pct_all_key_fields DESC;
 - Old C&B ended auctions (18K cab-fast-discover): spec data permanently gone from live pages
 - Bonhams 0% description: JSON-LD doesn't include it, requires JS-rendered body parsing
 - Rennlist 7.4% color: forum posts, no structured color field
+
+## 2026-02-26 (Extraction Quality Sprint — Phase 3, post-compression)
+
+### Bonhams Description Fix — 0% → 66% — COMPLETED 2026-02-26 ~22:00
+
+**Root causes found (3 total, not 1):**
+1. Firecrawl trigger condition was wrong: `(!hasJsonLd || html.length < 5000)` always false for Bonhams React shell (120KB, has JSON-LD metadata). Firecrawl NEVER ran for fresh pages.
+2. Footnotes-only extraction: ~30% of Bonhams lots have a `### Footnotes` section. The other 70% have inline description paragraphs directly after the lot title H2.
+3. vehicle_id not linked (fixed in prior sub-session).
+
+**Fixes deployed:**
+- `extract-bonhams/index.ts`: Changed `needsFirecrawl` condition from `!fetchResult.cached && !hasLotContent && (!hasJsonLd || html.length < 5000)` to `!hasLotContent`. Now fires Firecrawl whenever we don't have rich markdown, regardless of HTML content.
+- `extract-bonhams/index.ts`: Added extraction path B — inline body description: regex captures paragraphs between the lot title H2 (`## **{Year} {Make}...`) and `## Additional information`. Covers lots without Footnotes sections (the majority).
+- Result: description rate **0% → 66%** (47/71 lots in first 10 min after deploy). Avg description length 3,564 chars.
+
+**Verified on:**
+- 1929 Brough Superior SS100: 4,800-char description from Footnotes section ✓
+- 1933 Fiat 508 Balilla: full inline body description extracted ✓  
+- 1934 Dodge, 1935 MG Magnette, 1949 Triumph: confirmed having descriptions ✓
+
+### Gooding Throughput Boost — 43/hr → 187/hr — COMPLETED 2026-02-26
+
+- Added crons 233, 234 (gooding-queue-worker-1, gooding-queue-worker-2) in Phase 2
+- By Phase 3: confirmed 187/hr actual throughput (was 43/hr round-robin)
+- ETA reduced: 36 hrs → 7 hrs for remaining 1.3K pending
+
+### Final Pipeline State (2026-02-26 ~22:00)
+
+| Source   | Pending | Rate/hr | ETA hrs |
+|----------|---------|---------|---------|
+| mecum    | 54,520  | 828     | ~66     |
+| c&b      | 30,486  | 984     | ~31     |
+| b-j      | 22,676  | 1,931   | ~12     |
+| pcarmarket| 4,963  | 157     | ~32     |
+| bat      | 3,550   | 832     | ~4      |
+| bonhams  | 2,435   | 573     | ~4      |
+| gooding  | 1,317   | 187     | ~7      |
+
+All descriptions now being extracted correctly. Bonhams: Firecrawl fires for every uncached page, both Footnotes AND inline body parsed.

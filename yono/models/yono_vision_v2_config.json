@@ -1,0 +1,40 @@
+{
+  "model_base": "microsoft/florence-2-base",
+  "hidden_size": 768,
+  "image_size": 768,
+  "n_damage": 7,
+  "n_mods": 8,
+  "n_photo_types": 9,
+  "damage_flags": [
+    "rust",
+    "dent",
+    "crack",
+    "paint_fade",
+    "broken_glass",
+    "missing_parts",
+    "accident_damage"
+  ],
+  "mod_flags": [
+    "lift_kit",
+    "lowered",
+    "aftermarket_wheels",
+    "roll_cage",
+    "engine_swap",
+    "body_kit",
+    "exhaust_mod",
+    "suspension_mod"
+  ],
+  "photo_types": [
+    "exterior_front",
+    "exterior_rear",
+    "exterior_side",
+    "interior",
+    "engine",
+    "wheel",
+    "detail",
+    "undercarriage",
+    "other"
+  ],
+  "best_val_loss": 3.4017025381326675,
+  "version": "v2"
+}

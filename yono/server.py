@@ -551,7 +551,7 @@ class VisionAnalyzer:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _hier, _flat, _vision_analyzer
+    global _hier, _flat, _vision_analyzer, _zone_classifier
     print("Loading YONO models...")
 
     # Load make classifier (existing, unchanged)

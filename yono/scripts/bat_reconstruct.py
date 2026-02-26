@@ -74,23 +74,25 @@ def check_colmap() -> bool:
     """Check if COLMAP is installed and working."""
     try:
         result = subprocess.run(
-            [COLMAP_BIN, "--version"],
+            [COLMAP_BIN, "help"],
             capture_output=True, text=True, timeout=10,
         )
-        if result.returncode == 0:
-            version = result.stdout.strip() or result.stderr.strip()
-            print(f"COLMAP found: {version[:60]}")
+        # colmap exits 0 on help; parse version from output
+        output = result.stdout.strip() or result.stderr.strip()
+        if "COLMAP" in output:
+            version_line = output.split("\n")[0]
+            print(f"COLMAP found: {version_line[:80]}")
             return True
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
     return False
 
 
-def psql(sql: str, timeout: int = 30) -> list:
+def psql(sql: str, timeout: int = 90) -> list:
     """Run a psql COPY query and return rows as dicts."""
     import csv, io
     env = os.environ.copy()
-    env["PGOPTIONS"] = "-c statement_timeout=25000"
+    env["PGOPTIONS"] = "-c statement_timeout=85000"
     result = subprocess.run(
         ["psql", PG_CONN, "-t"],
         input=sql,

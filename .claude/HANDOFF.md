@@ -1,20 +1,19 @@
-# Auto-Checkpoint — 2026-02-26 17:39:45
+# Auto-Checkpoint — 2026-02-26 18:48:47
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
-none
+cfb69b3ff feat: shareable competitor page — Vercel Edge Middleware OG tags + share button
+20d895f5c feat: add 'vs. Competition' nav link to MarketDashboard header
 
 ## Uncommitted Changes
 .claude/ACTIVE_AGENTS.md
 .claude/HANDOFF.md
 DONE.md
 mcp-server
-supabase/functions/continuous-queue-processor/index.ts
-supabase/functions/document-ocr-worker/index.ts
-supabase/functions/extract-bonhams/index.ts
-supabase/functions/extract-cars-and-bids-core/index.ts
-supabase/functions/extract-mecum/index.ts
-yono/scripts/export_supabase_training.py
+scripts/geocode-backfill.mjs
+scripts/iphoto-intake.mjs
+yono/modal_serve.py
+yono/scripts/bat_reconstruct.py
 yono/server.py
 
 ## Staged

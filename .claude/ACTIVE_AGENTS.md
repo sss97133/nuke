@@ -5,21 +5,26 @@
 
 ## CURRENTLY ACTIVE
 
-### YONO Vision V2 — COMPLETED 2026-02-26 (vision ML agent)
-- All 4 phases done. Background processes still running.
-- **Labeling PID 62327**: auto_label_images.py — 2600+/3000 done, finishing in ~5min
-- **Training PID 68092**: train_florence2.py — epoch 1/10, step 260/433, loss 7.9→6.8
-- See DONE.md for full details. DO NOT interrupt PIDs 62327 or 68092.
+### YONO Vision V2 — BACKGROUND TRAINING 2026-02-26
+- All 4 phases + zone system done. Background processes still running.
+- **Training PID 68092**: train_florence2.py — epoch 3/10, loss 3.86, cond_acc 75%
+  - DO NOT interrupt. Saves to yono/models/yono_vision_v2_head.safetensors when done.
+- **Watcher PID 80532**: wait_then_train_zones.sh — auto-launches zone classifier when PID 68092 finishes
+  - Zone training will start automatically: train_zone_classifier.py --epochs 15
+  - Logs: yono/outputs/zone_classifier/training.log
+- **Zone labeling**: COMPLETE (2764/2764 records labeled)
+- **server.py fix**: `_zone_classifier` global declaration bug fixed
 
 ### Extraction Quality Sprint — ACTIVE 2026-02-26 (continued after context compression)
 - **Phase 1** (earlier): CQP routing fixes: mecum→extract-mecum, ebay→extract-ebay-motors, gooding sourceIds. C&B 7-day cache TTL removed.
 - **Phase 2** (this session): **CRITICAL DESCRIPTION FIXES**:
-  - **extract-mecum**: Added `parseBlocksDescription()` — parses HIGHLIGHTS + EQUIPMENT from Gutenberg blocks (post.content was always empty!). Description rate went from 0% → ~60%+. Quality score 0.73→0.93.
-  - **extract-bonhams**: Added `### Footnotes` markdown section parsing for rich lot descriptions. Added markdown heading title fallback. Fixed Firecrawl trigger (now fires on all non-cached pages, not just html<5KB). Description rate from 0% → expected 60%+.
-  - **35K Mecum backfill**: Reset all mecum items completed before 2026-02-20 (35,146 records) to 'pending' for re-extraction with blocks fix.
-  - **Crons added**: 231 (mecum-queue-worker-4), 232 (mecum-queue-worker-5), 233-234 (gooding-queue-worker-1,2)
+  - **extract-mecum**: Added `parseBlocksDescription()` — parses HIGHLIGHTS + EQUIPMENT from Gutenberg blocks (post.content was always empty!). Description rate 0%→60%+. Quality 0.73→0.93.
+  - **extract-bonhams Phase 2**: Footnotes parsing, markdown title fallback, vehicle_id top-level fix.
+  - **extract-bonhams Phase 3**: Firecrawl trigger fixed (`!hasLotContent` only — React shell always has JSON-LD + 120KB, old `(!hasJsonLd || html.length < 5000)` was always false). Added inline body extraction (paragraphs between lot title H2 and `## Additional information`). Result: **0% → 66% description rate**, avg 3,564 chars.
+  - **35K Mecum backfill**: Reset mecum items completed before 2026-02-20 to pending for re-extraction.
+  - **Crons added**: 231-232 (mecum-queue-worker-4,5), 233-234 (gooding-queue-worker-1,2)
   - **Crons removed**: 229, 230 (bad re_enrich workers)
-- **Queue state**: mecum 55K pending (~81hrs), C&B 31K, B-J 24K, PCar 5K, BaT 4K, Bonhams 2.6K, Gooding 1.6K
+- **Current queue**: mecum 54.5K/828hr (~66h), C&B 30.5K/984hr (~31h), B-J 22.7K/1931hr (~12h), PCar 5K/157hr (~32h), BaT 3.6K/832hr (~4h), Bonhams 2.4K/573hr (~4h), Gooding 1.3K/187hr (~7h)
 - **DO NOT**: touch quality_backfill_state, recreate idx_vehicles_quality_score/backfill indexes; touch C&B snapshot cache logic; kill PIDs 34496 or 5727
 
 ### Queue Coordinator — ACTIVE 2026-02-26 20:00 (this terminal)
@@ -49,6 +54,11 @@
   - Progress: ~27% (808K/2923K blocks), writing to training-data/images/batch_0103+
   - ETA: ~1 hour to complete all 838K records
   - DO NOT kill or restart this export
+
+### YONO FastAPI Sidecar — COMPLETED 2026-02-26
+- Deployed to Modal: https://sss97133--yono-serve-fastapi-app.modal.run
+- YONO_SIDECAR_URL set in Supabase, yono-classify full round-trip validated
+- Both agent_tasks (P85 + P100) marked completed
 
 ---
 
