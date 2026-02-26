@@ -174,18 +174,20 @@ export class TradingService {
    */
   static async cancelOrder(orderId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('market_orders')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-        .eq('id', orderId)
-        .eq('status', 'active'); // Only cancel active orders
+      const { data, error } = await supabase.rpc('cancel_market_order', {
+        p_order_id: orderId
+      });
 
       if (error) {
         console.error('[TradingService] Cancel order error:', error);
         return false;
       }
 
-      // TODO: Release reserved funds/shares
+      const result = Array.isArray(data) ? data[0] : data;
+      if (!result?.cancelled) {
+        console.warn('[TradingService] Order not cancelled:', result?.message);
+        return false;
+      }
 
       return true;
     } catch (error) {
