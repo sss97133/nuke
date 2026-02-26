@@ -13,20 +13,22 @@ type FundRow = {
   segment?: {
     name: string;
     description: string | null;
-    manager_type: 'ai' | 'human';
+    manager_type: string;
     year_min: number | null;
     year_max: number | null;
     makes: string[] | null;
     model_keywords: string[] | null;
   };
+  stats?: {
+    vehicle_count: number;
+    market_cap_usd: number;
+    change_7d_pct: number | null;
+    change_30d_pct: number | null;
+    stats_updated_at: string | null;
+  };
 };
 
-type SegmentStats = {
-  vehicle_count: number;
-  market_cap_usd: number;
-  change_7d_pct: number | null;
-  change_30d_pct: number | null;
-};
+const EXCHANGE_API = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-v1-exchange`;
 
 const formatUSD0 = (value: number) =>
   new Intl.NumberFormat('en-US', {
@@ -54,7 +56,6 @@ export default function MarketFundDetail() {
   const navigate = useNavigate();
 
   const [fund, setFund] = useState<FundRow | null>(null);
-  const [stats, setStats] = useState<SegmentStats | null>(null);
   const [cashCents, setCashCents] = useState<number>(0);
   const [amount, setAmount] = useState<string>('100');
   const [buying, setBuying] = useState(false);
@@ -75,72 +76,26 @@ export default function MarketFundDetail() {
 
         if (!symbol) return;
 
-        const { data: fundRows, error: fundError } = await supabase
-          .from('market_funds')
-          .select(
-            `
-            id,
-            symbol,
-            nav_share_price,
-            total_shares_outstanding,
-            total_aum_usd,
-            segment_id,
-            segment:market_segments (
-              name,
-              description,
-              manager_type,
-              year_min,
-              year_max,
-              makes,
-              model_keywords
-            )
-          `
-          )
-          .eq('symbol', symbol)
-          .maybeSingle();
+        // Use api-v1-exchange for fund data + cached stats (avoids slow market_segment_stats RPC)
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
 
-        if (fundError) throw fundError;
-        if (!fundRows) {
+        const res = await fetch(`${EXCHANGE_API}?action=fund&symbol=${encodeURIComponent(symbol)}`, { headers });
+        if (!res.ok) throw new Error(`Exchange API error: ${res.status}`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+        if (!json.fund) {
           setFund(null);
-          setStats(null);
           return;
         }
 
-        const row: any = fundRows;
-        const nextFund: FundRow = {
-          id: row.id,
-          symbol: row.symbol,
-          nav_share_price: Number(row.nav_share_price),
-          total_shares_outstanding: Number(row.total_shares_outstanding),
-          total_aum_usd: Number(row.total_aum_usd),
-          segment_id: row.segment_id,
-          segment: row.segment
-            ? {
-                name: row.segment.name,
-                description: row.segment.description,
-                manager_type: row.segment.manager_type,
-                year_min: row.segment.year_min,
-                year_max: row.segment.year_max,
-                makes: row.segment.makes,
-                model_keywords: row.segment.model_keywords
-              }
-            : undefined
-        };
-        setFund(nextFund);
-
-        const { data: statData, error: statError } = await supabase.rpc('market_segment_stats', {
-          p_segment_id: nextFund.segment_id
-        });
-        if (statError) throw statError;
-        const first = Array.isArray(statData) ? statData[0] : statData;
-        setStats({
-          vehicle_count: Number(first?.vehicle_count || 0),
-          market_cap_usd: Number(first?.market_cap_usd || 0),
-          change_7d_pct: first?.change_7d_pct === null ? null : Number(first?.change_7d_pct),
-          change_30d_pct: first?.change_30d_pct === null ? null : Number(first?.change_30d_pct)
-        });
-
-        const { data: { session } } = await supabase.auth.getSession();
+        setFund(json.fund);
         if (session?.user) {
           const bal = await CashBalanceService.getUserBalance(session.user.id);
           setCashCents(bal?.available_cents || 0);
@@ -245,19 +200,19 @@ export default function MarketFundDetail() {
             <div className="card-body" style={{ display: 'grid', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Vehicles</span>
-                <strong>{(stats?.vehicle_count || 0).toLocaleString()}</strong>
+                <strong>{(fund?.stats?.vehicle_count || 0).toLocaleString()}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Market Cap</span>
-                <strong>{formatUSD0(stats?.market_cap_usd || 0)}</strong>
+                <strong>{formatUSD0(fund?.stats?.market_cap_usd || 0)}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>7d</span>
-                <strong>{formatPct(stats?.change_7d_pct ?? null)}</strong>
+                <strong>{formatPct(fund?.stats?.change_7d_pct ?? null)}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>30d</span>
-                <strong>{formatPct(stats?.change_30d_pct ?? null)}</strong>
+                <strong>{formatPct(fund?.stats?.change_30d_pct ?? null)}</strong>
               </div>
             </div>
           </div>

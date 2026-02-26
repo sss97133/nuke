@@ -3,6 +3,45 @@
 **Append-only. Add entries when completing significant work.**
 Agents read this to avoid rebuilding things that already exist.
 
+### Market Exchange Backend — COMPLETED 2026-02-26
+
+- `pre_trade_risk_check` RPC deployed (was missing — orders fell open)
+- `update_vehicle_offering_prices()`: share price = nuke_estimate / total_shares, >0.5% threshold
+- `mark_to_market()`: updates unrealized P&L on share_holdings + market_fund_holdings
+- `market_segment_stats_cache` table: pre-computed stats, avoids 2-min full table scan
+- `refresh_segment_stats_cache()` + pg_cron job 212 (every 4h)
+- `update_market_nav()`: reads cache, NAV = $10 × (current_cap / baseline_cap)
+- `run_exchange_pricing_cycle()`: chains all steps, returns JSONB summary
+- `update-exchange-prices` edge fn: cron-triggered, full cycle <1s
+- `api-v1-exchange` edge fn: unified read API (funds+stats, offerings, holdings)
+- Baselines: PORS $5B, TRUK $1.25B, SQBD $80M, Y79 $317M. All funds at NAV $10.00.
+- MarketExchange.tsx + MarketFundDetail.tsx: replaced slow RPC with api-v1-exchange (instant load)
+- pg_cron job 213: pricing cycle every 15min
+
+### EXIF Pipeline Forward-Fix + Image Bundle Review UX — COMPLETED 2026-02-26
+
+**What was built (continuation of EXIF backfill session):**
+
+**Daemon EXIF format fix (`scripts/photo-auto-sync-daemon.py`):**
+- Fixed `create_vehicle_image_record()` to write structured EXIF format instead of flat: `{camera: {make, model}, location: {latitude, longitude}, DateTimeOriginal, exif_status: 'synced_from_photos'}`
+- Previously wrote flat `{camera_make, camera_model}` which bypassed `reprocess-image-exif` filter checks
+- Now future photo syncs produce EXIF data that matches the system's expected schema
+
+**Image Bundle Review UX (all pieces now wired):**
+- `BundleReviewQueue.tsx` — fully built component (review queue card in Evidence tab)
+- `auto-create-bundle-events` edge function — deployed, creates `timeline_events` with `needs_input: true` per bundle
+- `suggest-bundle-label` edge function — deployed, uses Claude Vision to suggest event title/type
+- Gallery `bundles` view mode — "Sessions" toggle already in ImageGallery.tsx
+- `VehicleProfile.tsx` — added fire-and-forget call to `auto-create-bundle-events` on owner profile load
+
+**Dave's GMC K2500 current state:**
+- 4 events with `needs_input: true`: Sep 25, Oct 01, Oct 18, Feb 10
+- All 4 have AI suggestions pre-baked in `metadata.ai_suggestion`
+- All 580 images have correct `taken_at` (clean 5-session timeline)
+- BundleReviewQueue renders these automatically in the Evidence tab
+
+**Commit:** 76a35a4d7, pushed to main, Vercel deploying
+
 ### data_quality_score Backfill — COMPLETED 2026-02-26
 
 **What was built:**

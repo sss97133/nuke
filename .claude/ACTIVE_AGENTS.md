@@ -5,12 +5,11 @@
 
 ## CURRENTLY ACTIVE
 
-### Image Bundle Review UX — IN PROGRESS 2026-02-26 (terminal: vehicle-profile-ui)
-- **Task**: Build bundle-grouped gallery + review queue for Dave's GMC K2500 (vehicle a90c008a)
-- **Files touching**: src/components/images/, src/pages/VehicleProfile.tsx, src/pages/vehicle-profile/
-- **Prior work**: EXIF backfill complete (580 images clean), daemon EXIF format fixed
-- **Status**: Starting UI implementation per plan at ~/.claude/plans/delightful-seeking-narwhal.md
-- **DO NOT**: touch reprocess-image-exif, photo-sync-orchestrator, photo-auto-sync-daemon.py
+### Image Bundle Review UX — COMPLETED 2026-02-26 (terminal: vehicle-profile-ui)
+- BundleReviewQueue.tsx wired in Evidence tab; 4 needs_input events exist for Dave's GMC
+- auto-create-bundle-events + suggest-bundle-label deployed; auto-triggered on owner profile load
+- photo-auto-sync-daemon.py: structured EXIF format fix (camera.make, exif_status: 'synced_from_photos')
+- Committed 76a35a4d7, pushed, Vercel deploying
 
 ### VehicleHeader Transfer Badge — COMPLETED 2026-02-26 19:00
 - transfer-automator, transfer-advance, transfer-email-webhook, transfer-sms-webhook, transfer-status-api deployed
@@ -33,6 +32,15 @@
 - Before editing a shared edge function: check this file
 
 ---
+
+### Market Exchange Backend Integration — COMPLETED 2026-02-26 17:15
+- pre_trade_risk_check RPC, update_vehicle_offering_prices, update_market_nav (cache-based), mark_to_market, run_exchange_pricing_cycle deployed
+- market_segment_stats_cache table + refresh_segment_stats_cache() — avoids 2-min full-table scan
+- update-exchange-prices edge function deployed — full pricing cycle in <1s
+- api-v1-exchange edge function deployed — unified read API (funds + offerings + holdings)
+- MarketExchange.tsx + MarketFundDetail.tsx: replaced slow market_segment_stats RPC with api-v1-exchange
+- pg_cron: job 212 (exchange pricing every 15min), job 213 (segment stats refresh every 4h)
+- Baselines seeded: PORS $5B, TRUK $1.25B, SQBD $80M, Y79 $317M
 
 ## COMPLETED THIS SESSION (reference)
 

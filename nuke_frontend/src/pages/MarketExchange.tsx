@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
-type MarketFundRow = {
+type FundWithStats = {
   id: string;
   symbol: string;
-  fund_type: 'etf' | 'fund';
-  status: 'active' | 'paused' | 'closed';
+  fund_type: string;
+  status: string;
   nav_share_price: number;
   total_shares_outstanding: number;
   total_aum_usd: number;
@@ -16,15 +16,15 @@ type MarketFundRow = {
     slug: string;
     name: string;
     description: string | null;
-    manager_type: 'ai' | 'human';
+    manager_type: string;
   };
-};
-
-type SegmentStats = {
-  vehicle_count: number;
-  market_cap_usd: number;
-  change_7d_pct: number | null;
-  change_30d_pct: number | null;
+  stats: {
+    vehicle_count: number;
+    market_cap_usd: number;
+    change_7d_pct: number | null;
+    change_30d_pct: number | null;
+    stats_updated_at: string | null;
+  };
 };
 
 const formatUSD0 = (value: number) =>
@@ -40,30 +40,24 @@ const formatPct = (value: number | null) => {
   return `${sign}${value.toFixed(2)}%`;
 };
 
+const EXCHANGE_API = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-v1-exchange`;
+
 export default function MarketExchange() {
   const navigate = useNavigate();
-  const [funds, setFunds] = useState<MarketFundRow[]>([]);
-  const [statsBySegmentId, setStatsBySegmentId] = useState<Record<string, SegmentStats>>({});
+  const [funds, setFunds] = useState<FundWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const tiles = useMemo(() => {
-    return funds.map((f) => {
-      const seg = f.segment;
-      const stats = statsBySegmentId[f.segment_id];
-      const change7 = stats?.change_7d_pct ?? null;
-      const marketCap = stats?.market_cap_usd ?? 0;
-      const vehicleCount = stats?.vehicle_count ?? 0;
-      return {
-        fund: f,
-        label: seg?.name || f.symbol,
-        managerType: seg?.manager_type || 'ai',
-        marketCap,
-        vehicleCount,
-        change7
-      };
-    });
-  }, [funds, statsBySegmentId]);
+    return funds.map((f) => ({
+      fund: f,
+      label: f.segment?.name || f.symbol,
+      managerType: f.segment?.manager_type || 'ai',
+      marketCap: f.stats.market_cap_usd,
+      vehicleCount: f.stats.vehicle_count,
+      change7: f.stats.change_7d_pct
+    }));
+  }, [funds]);
 
   useEffect(() => {
     (async () => {
@@ -71,81 +65,22 @@ export default function MarketExchange() {
         setLoading(true);
         setError(null);
 
-        const { data: fundRows, error: fundError } = await supabase
-          .from('market_funds')
-          .select(
-            `
-            id,
-            symbol,
-            fund_type,
-            status,
-            nav_share_price,
-            total_shares_outstanding,
-            total_aum_usd,
-            segment_id,
-            segment:market_segments (
-              id,
-              slug,
-              name,
-              description,
-              manager_type
-            )
-          `
-          )
-          .eq('status', 'active')
-          .order('symbol', { ascending: true });
-
-        if (fundError) throw fundError;
-        const rows = (fundRows || []) as any[];
-        setFunds(
-          rows.map((r) => ({
-            id: r.id,
-            symbol: r.symbol,
-            fund_type: r.fund_type,
-            status: r.status,
-            nav_share_price: Number(r.nav_share_price),
-            total_shares_outstanding: Number(r.total_shares_outstanding),
-            total_aum_usd: Number(r.total_aum_usd),
-            segment_id: r.segment_id,
-            segment: r.segment
-              ? {
-                  id: r.segment.id,
-                  slug: r.segment.slug,
-                  name: r.segment.name,
-                  description: r.segment.description,
-                  manager_type: r.segment.manager_type
-                }
-              : undefined
-          }))
-        );
-
-        // Load stats per segment via RPC (fast + centralized)
-        const statsEntries = await Promise.allSettled(
-          rows.map(async (r) => {
-            const { data, error } = await supabase.rpc('market_segment_stats', {
-              p_segment_id: r.segment_id
-            });
-            if (error) throw error;
-            const first = Array.isArray(data) ? data[0] : data;
-            return {
-              segmentId: r.segment_id,
-              stats: {
-                vehicle_count: Number(first?.vehicle_count || 0),
-                market_cap_usd: Number(first?.market_cap_usd || 0),
-                change_7d_pct: first?.change_7d_pct === null ? null : Number(first?.change_7d_pct),
-                change_30d_pct: first?.change_30d_pct === null ? null : Number(first?.change_30d_pct)
-              } as SegmentStats
-            };
-          })
-        );
-
-        const next: Record<string, SegmentStats> = {};
-        for (const e of statsEntries) {
-          if (e.status === 'fulfilled') {
-            next[e.value.segmentId] = e.value.stats;
-          }
+        // Single call to api-v1-exchange — returns funds with cached stats (no slow RPC)
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
         }
-        setStatsBySegmentId(next);
+
+        const res = await fetch(`${EXCHANGE_API}?action=funds`, { headers });
+        if (!res.ok) throw new Error(`Exchange API error: ${res.status}`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        setFunds(json.funds || []);
       } catch (e: any) {
         console.error('Failed to load market exchange:', e);
         setError(e?.message || 'Failed to load market exchange');
