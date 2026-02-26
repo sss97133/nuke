@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+const SHARE_URL  = 'https://nuke.ag/market/competitors';
+const SHARE_TEXT = 'Nuke vs. Rally — fractional vehicle ownership comparison. 1.25M vehicles with real transaction data vs. Hagerty appraisals.';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -256,6 +259,36 @@ const NUKE_ADVANTAGES = [
 export default function MarketCompetitors() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [copied, setCopied] = useState(false);
+
+  // Update document title + meta tags for Slack/WhatsApp/iMessage previews
+  useEffect(() => {
+    const prev = document.title;
+    document.title = 'Nuke vs. Rally — Fractional Vehicle Ownership Comparison';
+
+    const setMeta = (sel: string, attr: string, val: string) => {
+      const el = document.querySelector(sel);
+      if (el) el.setAttribute(attr, val);
+    };
+    setMeta('meta[name="description"]',           'content', SHARE_TEXT);
+    setMeta('meta[property="og:title"]',          'content', 'Nuke vs. Rally — Fractional Vehicle Ownership Comparison');
+    setMeta('meta[property="og:description"]',    'content', SHARE_TEXT);
+    setMeta('meta[property="og:url"]',            'content', SHARE_URL);
+    setMeta('meta[name="twitter:title"]',         'content', 'Nuke vs. Rally — Fractional Vehicle Ownership Comparison');
+    setMeta('meta[name="twitter:description"]',   'content', SHARE_TEXT);
+
+    return () => { document.title = prev; };
+  }, []);
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: document.title, url: SHARE_URL, text: SHARE_TEXT });
+    } else {
+      await navigator.clipboard.writeText(SHARE_URL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const categories = ['All', ...Array.from(new Set(FEATURES.map(f => f.category)))];
   const visibleFeatures = activeCategory === 'All'
@@ -277,6 +310,13 @@ export default function MarketCompetitors() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              className="button button-primary"
+              onClick={handleShare}
+              style={{ minWidth: '100px' }}
+            >
+              {copied ? 'Copied!' : 'Share link'}
+            </button>
             <button className="button button-secondary" onClick={() => navigate('/market/exchange')}>
               Exchange
             </button>
@@ -486,6 +526,37 @@ export default function MarketCompetitors() {
             accentColor="#7c3aed"
             body="Direct car-specific competitor at MVP stage. No data layer, no order book, no secondary market yet. We share the same thesis — our advantage is the data moat already built."
           />
+        </div>
+
+        {/* Share strip */}
+        <div style={{
+          padding: '14px 20px',
+          border: '1px solid var(--border)',
+          borderRadius: '6px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+          background: 'var(--surface)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '8.5pt', color: 'var(--text-muted)' }}>Share this page:</span>
+            <code style={{
+              fontSize: '8.5pt',
+              padding: '3px 8px',
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '3px',
+              color: 'var(--text)',
+              userSelect: 'all',
+            }}>
+              {SHARE_URL}
+            </code>
+          </div>
+          <button className="button button-primary" onClick={handleShare}>
+            {copied ? 'Copied!' : 'Copy link'}
+          </button>
         </div>
 
         {/* CTA */}
