@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 
 interface Business {
   id: string;
@@ -74,7 +75,7 @@ type TabType = 'setup' | 'invites' | 'submissions';
 
 export default function RestorationIntake() {
   const navigate = useNavigate();
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('submissions');
 

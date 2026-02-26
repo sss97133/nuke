@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import VehicleCritiqueManager from '../components/management/VehicleCritiqueManager';
 import '../design-system.css';
 
@@ -21,7 +22,7 @@ export default function BusinessIntelligence() {
   const [metrics, setMetrics] = useState<BusinessMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'critiques' | 'analytics'>('overview');
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
 
   useEffect(() => {
     checkAuth();

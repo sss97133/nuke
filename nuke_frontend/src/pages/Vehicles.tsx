@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 // AppLayout now provided globally by App.tsx
 import GarageVehicleCard from '../components/vehicles/GarageVehicleCard';
 import VehicleRelationshipManager from '../components/VehicleRelationshipManager';
@@ -82,7 +83,7 @@ const VehiclesInner: React.FC = () => {
     previously_owned: VehicleRelationship[];
   }>({ owned: [], contributing: [], interested: [], discovered: [], curated: [], consigned: [], previously_owned: [] });
   const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   // Default to "Owned" so users land on "their stuff" first.

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { useNavigate } from 'react-router-dom';
 
 interface ReferenceDocument {
@@ -29,7 +30,7 @@ interface ReferenceDocument {
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [documents, setDocuments] = useState<ReferenceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
