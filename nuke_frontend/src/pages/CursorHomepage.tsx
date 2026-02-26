@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useStatsPanelData } from '../hooks/useStatsPanelData';
 import { useFeedFilterOptions } from '../hooks/useFeedFilterOptions';
@@ -34,7 +35,9 @@ const CursorHomepage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [serverFilteredCount, setServerFilteredCount] = useState<number | null>(null); // Exact count from DB when filters active
-  const [session, setSession] = useState<any>(undefined);
+  // Initialize from cache so the personalized feed fires on first render
+  // instead of waiting for an async getSession() round-trip.
+  const [session, setSession] = useState<any>(() => readCachedSession() ?? null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('ALL'); // Default to ALL - no time filtering
   const [salesPeriod, setSalesPeriod] = useState<SalesTimePeriod>('today'); // For "sold" stats display
   const [viewMode, setViewMode] = useState<ViewMode>('grid'); // Always grid mode
@@ -549,20 +552,18 @@ const CursorHomepage: React.FC = () => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+  // Load feed when session is known. Session initializes from localStorage cache
+  // synchronously, so this fires on first render rather than after an async
+  // getSession() round-trip. Also re-fires on login/logout.
+  // Note: session is never `undefined` now — it starts as the cached value or null.
+  const prevSessionIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    // Load feed immediately - most recent vehicles, no filters
+    const nextId = session?.user?.id ?? null;
+    if (prevSessionIdRef.current === nextId) return; // skip if same user
+    prevSessionIdRef.current = nextId;
     setPage(0);
     setHasMore(true);
     loadHypeFeed(0, false);
-  }, []); // Load once on mount - no filters, no dependencies
-
-  // Also reload when session changes (user logs in/out, or session resolves for anon)
-  useEffect(() => {
-    if (session !== undefined) {
-      setPage(0);
-      setHasMore(true);
-      loadHypeFeed(0, false);
-    }
   }, [session]);
 
   // Refetch feed when ANY server-pushable filter changes (year, make, price, source, status, forSale, etc.)
