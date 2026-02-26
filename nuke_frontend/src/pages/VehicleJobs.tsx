@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 
 type LocationPreference = 'on_site' | 'drop_off' | 'either';
 type JobStatus = 'draft' | 'listed' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
@@ -50,7 +51,7 @@ export default function VehicleJobs() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
 
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);
 
   const [loading, setLoading] = useState(true);

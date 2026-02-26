@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getSupabaseFunctionsUrl } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 
 interface FileUpload {
   id: string;
@@ -37,7 +38,7 @@ interface ExtractedVehicle {
 
 export default function ImportDataPage() {
   const navigate = useNavigate();
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [loading, setLoading] = useState(true);
   const [uploads, setUploads] = useState<FileUpload[]>([]);
   const [urlInput, setUrlInput] = useState('');

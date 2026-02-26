@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
 import ShopFinancials from './ShopFinancials';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
@@ -29,7 +30,7 @@ type CapsuleTab =
   | 'photos';
 
 const Capsule: React.FC = () => {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [, setUserProfile] = useState<any>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as CapsuleTab | null;

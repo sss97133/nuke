@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { Check, X, Pencil, SkipForward, ArrowLeft, CheckCircle } from 'lucide-react';
 
 interface QueueItem {
@@ -27,7 +28,7 @@ export default function CurationQueue() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [stats, setStats] = useState({ approved: 0, rejected: 0, corrected: 0 });
 
   useEffect(() => {

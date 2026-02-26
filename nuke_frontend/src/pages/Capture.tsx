@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { readCachedSession } from '../utils/cachedSession';
 import { UniversalImageUpload } from '../components/UniversalImageUpload';
 
 const Capture: React.FC = () => {
   const navigate = useNavigate();
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(() => readCachedSession());
   const [loading, setLoading] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
