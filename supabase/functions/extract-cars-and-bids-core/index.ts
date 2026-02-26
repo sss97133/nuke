@@ -23,6 +23,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
+import { parseLocation } from "../_shared/parseLocation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -651,6 +652,8 @@ serve(async (req) => {
     if (norm.model) extracted.model = norm.model;
     if (norm.transmission) extracted.transmission = norm.transmission;
 
+    const parsedLoc = parseLocation(extracted.location);
+
     // Prepare vehicle data (use actual column names from vehicles table)
     const vehicleData: Record<string, any> = {
       year: extracted.year,
@@ -678,7 +681,11 @@ serve(async (req) => {
         extracted.sellerNotes ? `**Seller Notes:**\n${extracted.sellerNotes}` : null,
         extracted.description,
       ].filter(Boolean).join('\n\n') || null,
-      location: extracted.location,
+      listing_location: parsedLoc.clean,
+      listing_location_raw: parsedLoc.raw,
+      listing_location_source: 'carsandbids',
+      listing_location_confidence: parsedLoc.confidence,
+      listing_location_observed_at: new Date().toISOString(),
       // sale_price = final sale amount; high_bid = bid that didn't result in sale
       // C&B: 'sold' = auction ended + reserve met, 'reserve_not_met' = ended without sale
       sale_price: extracted.auctionStatus === 'sold' ? extracted.currentBid : null,
@@ -815,6 +822,29 @@ serve(async (req) => {
         vehicleId = insertedVehicle!.id;
         created = true;
         console.log(`✅ C&B: Created new vehicle: ${vehicleId}`);
+      }
+    }
+
+    // Write location observation
+    if (vehicleId && parsedLoc.clean) {
+      try {
+        await supabase.from("vehicle_location_observations").insert({
+          vehicle_id: vehicleId,
+          source_type: "listing",
+          source_platform: "carsandbids",
+          source_url: listingUrlCanonical,
+          observed_at: new Date().toISOString(),
+          location_text_raw: parsedLoc.raw,
+          location_text_clean: parsedLoc.clean,
+          city: parsedLoc.city,
+          region_code: parsedLoc.state,
+          postal_code: parsedLoc.zip,
+          precision: parsedLoc.city ? "city" : "region",
+          confidence: parsedLoc.confidence,
+          metadata: {},
+        });
+      } catch (locErr) {
+        console.warn("⚠️ Failed to write vehicle_location_observations:", locErr);
       }
     }
 

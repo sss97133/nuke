@@ -45,10 +45,10 @@ Nuke is a vertically-integrated data platform:
 3. **Distribution** - Production TypeScript SDK, RESTful API, webhooks for real-time events. An API that can be used in any workflow, human or agent. Third parties build on Nuke.
 
 **In-House Technology:**
-- **YONO** ("You Only Nuke Once") - Proprietary vehicle image classification trained on 100K+ labeled images
-- **Ralph Wiggum** - Autonomous extraction coordinator managing queue health, error triage, and priority routing
-- **Observation Architecture** - Source-agnostic, bitemporal event store with confidence scoring per data point
-- **Nuke SDK** - Production TypeScript client for B2B integration
+- **YONO** [ⓘ](#popup-yono) ("You Only Nuke Once") — In-house vehicle image intelligence. EfficientNet-B0 backbone with 5 structured training phases. Purpose-built classification for condition grading, panel analysis, and spec identification from photos. Active development — a training structure more than a finished product.
+- **Ralph Wiggum** [ⓘ](#popup-ralph) — Extraction orchestration layer: coordinated scripts and edge functions that run continuous ingestion cycles, monitor source health, triage failures, and drive discovery snowball. The autonomous glue keeping the pipeline running 24/7.
+- **Observation Architecture** [ⓘ](#popup-obs) — Every data point stored as an immutable observation: source, timestamp, confidence score (0.0–1.0), and full provenance chain. When multiple sources confirm the same fact, confidence compounds. Data never overwrites — only supersedes with audit trail. 80 registered sources across 9 categories.
+- **Nuke SDK** [ⓘ](#popup-sdk) — TypeScript client (1,309 lines) covering vehicle lookup, observation ingestion, batch import, webhooks, and valuations. Functional; developer documentation is a work in progress.
 
 ---
 
@@ -64,7 +64,9 @@ Our AI analysis of {{ANALYSIS_COUNT}} vehicles with community sentiment data rev
 | Positive (0.6-0.8) | $20,000 |
 | Very Positive (0.8+) | $25,000 |
 
-**Vehicles with strong positive community sentiment sell at nearly 2x the price of negatively-perceived vehicles.** This intelligence doesn't exist anywhere else.
+**Vehicles with strong positive community sentiment sell at [nearly 2x the price](#popup-sentiment-proof) of negatively-perceived vehicles.** This intelligence doesn't exist anywhere else.
+
+[View methodology & analysis →](#popup-sentiment)
 
 ---
 
@@ -74,15 +76,14 @@ Nuke does not compete with existing players. It integrates with everyone via API
 
 | Player | Their Role | Nuke's Relationship |
 |---|---|---|
-| Carfax | Title history | Future data source (~$700/mo available). We already enrich far beyond what they cover using free public sources. |
 | Hagerty | Insurance + valuation | Data customer. Better valuations improve their pricing. |
 | BaT / Mecum / RM | Auction houses | We send them qualified leads on commission. |
 | Dealers / Shops | Buy/sell/service | API customers. Data they can't get anywhere else. |
 | Lenders / Insurers | Finance vehicles | Data licensing. Collateral valuation, risk pricing. |
 
-**The granular data we're after is simply available - in comments, forums, shops, registries. No one has built the database and pipeline to accept it. That's Nuke.**
+**The granular data we're after is simply available — in comments, forums, shops, registries. No one has built the database and pipeline to accept it. That's Nuke.** Higher-order views — bid velocity signals, cross-vehicle trend analysis, auction outcome prediction — are the next layer being established on top of this foundation.
 
-**"We don't make money if YOU don't make money."**
+**We earn when the ecosystem earns.**
 
 ---
 
@@ -94,9 +95,9 @@ Nuke does not compete with existing players. It integrates with everyone via API
 | Dec 2025 | 9,697 | Pipeline activation |
 | Jan 2026 | 196,417 | Autonomous operation begins |
 | Feb 1-8, 2026 | 561,994 | Setting the foundation for autonomous |
-| Last 24 hours | {{DAILY_RATE}} | Ongoing autonomous ingestion |
+| **Total as of {{GENERATED_DATE}}** | **{{VEHICLE_COUNT}}** | **Autonomous pipeline running** |
 
-**Feb 1-8 we set the foundation for autonomous.** The platform added more vehicles in those 8 days than in all prior months combined; from that base, autonomous extraction scales without additional human capital.
+**Feb 1-8 we set the foundation for autonomous.** The platform added more vehicles in those 8 days than in all prior months combined; from that base, autonomous extraction scales without additional human capital. Records vary in completeness — the pipeline prioritizes breadth first, depth on enrichment passes.
 
 ---
 
@@ -116,7 +117,7 @@ We offer an **API** that plugs into any workflow—human or agent. The platform 
 
 **Skylar Williams** - Founder & CEO
 
-Sole founder and architect of Nuke Ltd and the Nuke platform. Designed and built the entire technology stack: {{EDGE_FUNCTION_COUNT}} microservices, {{TABLE_COUNT}}-table database architecture, proprietary ML pipeline (YONO), autonomous extraction coordinator (Ralph Wiggum), and production TypeScript SDK. The platform processes {{DAILY_RATE}}+ vehicles per day with zero additional headcount.
+Sole founder and architect of Nuke Ltd and the Nuke platform. Designed and built the entire technology stack: {{EDGE_FUNCTION_COUNT}} microservices, {{TABLE_COUNT}}-table database architecture, proprietary ML pipeline (YONO), autonomous extraction coordinator (Ralph Wiggum), and production TypeScript SDK. The platform ingests, classifies, and structures vehicle data autonomously — zero additional headcount.
 
 **Nuke Ltd** - Nevada corporation (2025). 676 Wells Rd, Boulder City, NV 89005. [nuke.ag](https://www.nuke.ag)
 

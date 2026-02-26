@@ -5,23 +5,23 @@
 
 ## CURRENTLY ACTIVE
 
-### Location Pipeline Fix + Geocode Backfill — ACTIVE 2026-02-26 18:00
-- **Task**: Fix BAT/C&B/CL extractors to populate listing_location_* fields + write vehicle_location_observations. Running geocode backfill script for 28k existing records.
-- **Touching**: extract-bat-core, extract-cars-and-bids-core, process-cl-queue, _shared/parseLocation.ts (NEW), geocode-vehicle-locations (NEW), scripts/geocode-backfill.mjs (NEW)
-- **Do not touch**: vehicles table schema (no migrations needed — columns already exist)
+### Image Bundle Review UX — IN PROGRESS 2026-02-26 (terminal: vehicle-profile-ui)
+- **Task**: Build bundle-grouped gallery + review queue for Dave's GMC K2500 (vehicle a90c008a)
+- **Files touching**: src/components/images/, src/pages/VehicleProfile.tsx, src/pages/vehicle-profile/
+- **Prior work**: EXIF backfill complete (580 images clean), daemon EXIF format fixed
+- **Status**: Starting UI implementation per plan at ~/.claude/plans/delightful-seeking-narwhal.md
+- **DO NOT**: touch reprocess-image-exif, photo-sync-orchestrator, photo-auto-sync-daemon.py
 
-### SDK v1.3.1 + api-v1-vision — COMPLETED 2026-02-26
-- Deployed api-v1-vision to Supabase. Committed vision.ts. SDK v1.3.1 already live on npm.
-- See DONE.md for details.
+### VehicleHeader Transfer Badge — COMPLETED 2026-02-26 19:00
+- transfer-automator, transfer-advance, transfer-email-webhook, transfer-sms-webhook, transfer-status-api deployed
+- VehicleHeader.tsx: drift fixes + transfer status badge (milestone label, progress %, days stale, buyer handle)
+- Backfill cron (job 190) running every 2 min. Committed 6e346eba7, pushed, Vercel deploying.
 
-Format:
-```
-### [Task Name] — ACTIVE [DATE TIME]
-- **Task**: What you're doing (1-2 sentences)
-- **Touching**: Which files / edge functions / areas
-```
-
-Remove your entry when done. Add results to DONE.md.
+### YONO Hierarchical Training — BACKGROUND JOBS 2026-02-26 12:30
+- **Task**: Two background jobs running — Tier 2 training (PID in /tmp/hier_tier2_training.log) + Supabase export (PID in training-data/supabase_export.pid)
+- **Tier 2 training**: `python train_hierarchical.py --tier 2` — american (20 makes, 25 epochs on MPS, ~14min/epoch), then german, japanese, british, italian
+- **Export**: `python export_supabase_training.py --resume` — fetching batches 101+ from Supabase, 300s psql timeout
+- **DO NOT**: kill these processes, edit train_hierarchical.py or export_supabase_training.py, or touch training-data/images/
 
 ---
 
@@ -34,51 +34,20 @@ Remove your entry when done. Add results to DONE.md.
 
 ---
 
-## COMPLETED THIS WEEK (reference)
+## COMPLETED THIS SESSION (reference)
 
-### Agent Safety & Pipeline Documentation — COMPLETED 2026-02-25
-- TOOLS.md, pipeline_registry (63 entries), column comments (86), CHECK constraints (6 columns)
-- release_stale_locks() + queue_lock_health view + hourly cron job 188
-- Released 375 stuck records on deploy (367 vehicle_images since Dec 2025)
+### process-url-drop FB share URL fix — COMPLETED 2026-02-26
+- Fixed share URL regex misclassification (extracted "share" as fbIdentifier)
+- When relay offline: early return with facebook_share lead + needs_relay:true
+- Bulk-updated 10 existing bad leads in discovery_leads
+- Committed a2178d2e1, deployed
 
-### Cars & Bids Extractor Rewrite — COMPLETED 2026-02-25
-- extract-cars-and-bids-core: direct HTML parsing, cache-first markdown, all fields, sale_price fix
+### YONO Hierarchical Inference — COMPLETED 2026-02-26
+- HierarchicalYONO class, server.py lifespan handler, hier_family.onnx exported
+- yono-classify edge function updated (yono_source field)
+- Committed 969de03c7, pushed, deployed
 
-### FB Marketplace Sprint — COMPLETED 2026-02-25
-- HTML fallback, residential-IP scraper, seller blocklist, refine-fb-listing (og: tags + bingbot fetch)
-- Discovery gap fixed, CL private-seller filter
-
-### Nuke.ag + Rebrand — COMPLETED 2026-02-24
-- Marque → Nuke complete, nuke.ag live, /offering dynamic investor page, contact inbox
-
-### Acquisition Pipeline — COMPLETED 2026-02-19
-- Market proof page, CL discovery, batch processing, acquisition dashboard
-
-### Extraction Quality Sprint — ACTIVE 2026-02-26
-- **Task**: Fix extractor field gaps + mass re-queue for backfill. PCarMarket color/engine/tx deployed. 18K C&B + 25K Bonhams + 13K B-J queued. Auditing RMSothebys/Gooding/BaT snapshot backfill, quality gates.
-- **Touching**: import-pcarmarket-listing (deployed), import_queue (bulk inserts), extract-rmsothebys, extract-gooding
-- **Coordinate**: Do NOT modify the 24,978 Bonhams + 18,261 C&B + 13,602 B-J pending items I just queued
-
-### data_quality_score Backfill — ACTIVE 2026-02-26
-- **Task**: Check column type, fix trigger to store 0-100, backfill 1.25M vehicle records in batches, set up cron
-- **Touching**: vehicles table (data_quality_score column), DB triggers, pg_cron schedules
-
-### YONO FastAPI Sidecar + Training Export — ACTIVE 2026-02-26 15:45
-- **Task**: Build server.py (FastAPI sidecar), export_supabase_training.py, train_hierarchical.py — the 3 files needed to unblock SDK v1.3.0
-- **Touching**: yono/server.py, yono/scripts/export_supabase_training.py, yono/scripts/train_hierarchical.py, supabase/functions/yono-classify/index.ts
-- **Do not touch**: analyze-image (will modify after sidecar is proven working)
-
-### Market Exchange Backend Integration — ACTIVE 2026-02-26 16:10
-- **Task**: Wire exchange backend end-to-end — NAV pricing from real vehicle data, fractional platform listings, order flow validation, mark-to-market updates
-- **Touching**: supabase/functions/calculate-market-indexes, place-market-order, trading, market_funds/market_segments/share_holdings/market_orders tables
-- **Do not touch**: vehicles table (read-only), YONO files, bonhams import_queue records
-
-### VehicleHeader Transfer Badge + Backfill — ACTIVE 2026-02-26 16:15
-- **Task**: 1) Fix VehicleHeader.tsx drift (dead code, duplicate useMemos, owner badge), 2) Add transfer status badge (current milestone, progress, days stale), 3) Run transfer backfill for 170k sold auctions
-- **Touching**: VehicleHeader.tsx, ownership_transfers/transfer_milestones (read), new edge fn transfer-status-api
-- **Do not touch**: YONO files (other agent), import_queue (other agent), vehicles.data_quality_score (other agent)
-
-### Frontend Perf Sprint — ACTIVE 2026-02-26 18:30
-- **Task**: Eliminating page load waterfalls across the app. Completed: SubdomainRouter, useSession, vendor chunk split, VehicleProfile auth-gate. Next: lazy loading images, TECHNICAL_EXHIBITS markdown bundle fix.
-- **Touching**: nuke_frontend/src — useSession.ts, SubdomainRouter.tsx, VehicleProfile.tsx, vite.config.ts, utils/cachedSession.ts
-- **Do not touch**: Any edge functions, backend, DB migrations
+### data_quality_score Backfill — COMPLETED 2026-02-26
+- Fixed trigger (was storing 0.0-1.0 decimal as INTEGER → all zeros), now stores 0-100
+- Backfilled 6,517 records manually; cron job 211 runs every minute via quick_quality_backfill(500)
+- ~1.247M remaining, auto-completing at ~500/min (~40 hrs to finish)

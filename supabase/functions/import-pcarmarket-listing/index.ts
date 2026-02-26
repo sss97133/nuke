@@ -36,6 +36,10 @@ interface PCarMarketListing {
   location?: string;
   reserveStatus?: string;
   isMemorabillia?: boolean;
+  color?: string;
+  interiorColor?: string;
+  engine?: string;
+  transmission?: string;
 }
 
 // Validate VIN - reject obvious placeholders
@@ -541,6 +545,15 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
       // Description
       listing.description = jsonData.description || null;
 
+      // Color, engine, transmission (may be in vehicle sub-object or top-level)
+      listing.color = jsonData.vehicle?.exterior_color || jsonData.vehicle?.color ||
+                      jsonData.exterior_color || jsonData.color || null;
+      listing.interiorColor = jsonData.vehicle?.interior_color || jsonData.interior_color || null;
+      listing.engine = jsonData.vehicle?.engine || jsonData.vehicle?.engine_description ||
+                       jsonData.engine || jsonData.engine_description || null;
+      listing.transmission = jsonData.vehicle?.transmission || jsonData.vehicle?.gearbox ||
+                             jsonData.transmission || jsonData.gearbox || null;
+
       // Memorabilia detection
       listing.isMemorabillia = jsonData.vehicle === null ||
                                jsonData.lot_number?.startsWith('M-') ||
@@ -567,6 +580,16 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
         if (winningBid) {
           listing.buyerUsername = winningBid.username;
           listing.buyer = winningBid.username;
+        }
+      }
+
+      // URL fallback if jsonData.vehicle was null (memorabilia or unusual listings)
+      if (!listing.year || !listing.make || !listing.model) {
+        const urlIdentity = parsePCarMarketIdentityFromUrl(url);
+        if (urlIdentity) {
+          listing.year = listing.year || urlIdentity.year;
+          listing.make = listing.make || urlIdentity.make;
+          listing.model = listing.model || urlIdentity.model;
         }
       }
 
@@ -685,6 +708,18 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
           }
           if (!listing.vin && llm.vin && llm.vin.length >= 6 && isValidVin(llm.vin)) {
             listing.vin = llm.vin.toUpperCase();
+          }
+          if (!listing.color && llm.exterior_color) {
+            listing.color = llm.exterior_color;
+          }
+          if (!listing.interiorColor && llm.interior_color) {
+            listing.interiorColor = llm.interior_color;
+          }
+          if (!listing.engine && llm.engine) {
+            listing.engine = llm.engine;
+          }
+          if (!listing.transmission && llm.transmission) {
+            listing.transmission = llm.transmission;
           }
         }
       }
@@ -826,6 +861,10 @@ Deno.serve(async (req: Request) => {
       auction_end_date: listing.auctionEndDate || null,
       auction_outcome: listing.auctionOutcome || null,
       description: listing.description || listing.title || null,
+      color: listing.color || null,
+      interior_color: listing.interiorColor || null,
+      engine_type: listing.engine || null,
+      transmission: listing.transmission || null,
       profile_origin: 'PCARMARKET_IMPORT',
       discovery_source: 'PCARMARKET',
       discovery_url: listing.url,

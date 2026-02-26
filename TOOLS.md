@@ -134,6 +134,10 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Release stale locked records | `SELECT release_stale_locks()` | SQL function — releases locks older than 30 min |
 | Check system health | `system-health-monitor` | |
 | Monitor extraction health | `extraction-watchdog` | Alerts on failures |
+| **Data quality report (all sources)** | `data-quality-monitor` with `{"action":"report"}` | Per-source YMM%, VIN%, price%, grade A-F |
+| **Data quality alerts only** | `data-quality-monitor` with `{"action":"alerts"}` | Only sources with issues |
+| **Snapshot quality metrics to DB** | `data-quality-monitor` with `{"action":"snapshot"}` | Writes to source_quality_snapshots (cron runs at 2am UTC) |
+| **Query live quality view** | `SELECT * FROM source_quality_current` | Live per-source stats (slow on full table) |
 | Process queued imports | `continuous-queue-processor` | **Don't call directly** — runs on cron |
 
 ---

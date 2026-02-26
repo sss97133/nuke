@@ -3,7 +3,56 @@
 **Append-only. Add entries when completing significant work.**
 Agents read this to avoid rebuilding things that already exist.
 
+### data_quality_score Backfill — COMPLETED 2026-02-26
+
+**What was built:**
+- Fixed `trg_update_vehicle_quality_score` trigger: was storing raw 0.0-1.0 decimal into INTEGER column (all truncated to 0). Now stores `ROUND(compute_vehicle_quality_score(NEW) * 100)::INTEGER` (0-100 scale).
+- Backfilled ~6,517 records manually in 300-500 row batches via psql (pooler timeout ~2min enforced; 300 rows ~safe).
+- Cron job `quality-score-backfill` (job 211) confirmed active: runs every minute via `quick_quality_backfill(500)` function — auto-completes remaining ~1.247M records at ~500/min = ~720K/day, done in ~40hrs.
+
+**Grade distribution of first 6,517 scored records:**
+- A (80-100): 2,546 (38.8%) — year + make + model + extras
+- B (60-79): 3,224 (49.1%) — year + make + model, some extras
+- C (40-59): 292 (4.4%) — partial identity fields
+- D (20-39): 45 (0.7%) — minimal data
+- F (0-19): 456 (6.9%) — mostly deleted/stub records
+
+### Location Pipeline Fix + Geocode Backfill — COMPLETED 2026-02-26
+
+**What was built:**
+- `_shared/parseLocation.ts` — new shared utility that parses "City, ST 12345" / "City, State ZipCode" strings into `{city, state, zip, clean, raw, confidence}`. Wraps normalizeListingLocation, strips zip before regex check to avoid false rejections.
+- `extract-bat-core`: now uses `parseLocation()`, writes `listing_location_raw/source/confidence/observed_at` on insert + update. Writes row to `vehicle_location_observations` after each extraction.
+- `extract-cars-and-bids-core`: fixed `location:` → `listing_location:` (was writing to wrong column). Added all `listing_location_*` fields. Writes `vehicle_location_observations`.
+- `process-cl-queue`: upgraded `normalizeListingLocation` → `parseLocation`. Added `vehicle_location_observations` write on insert + update paths.
+- `geocode-vehicle-locations` edge function: batch geocoder for backfill. Uses `fb_marketplace_locations` lookup first (instant), Nominatim fallback (1 req/sec). Returns `{processed, geocoded_from_lookup, geocoded_from_nominatim, failed}`.
+- `scripts/geocode-backfill.mjs`: local Node.js script for overnight backfill of 28k existing vehicles. Running as background process (PID 92797, log: /tmp/geocode-backfill.log).
+
+**Schema used (no migrations needed — all columns already exist):**
+- `vehicles.listing_location`, `listing_location_raw`, `listing_location_source`, `listing_location_confidence`, `listing_location_observed_at` — now populated by BAT, C&B, CL extractors
+- `vehicles.gps_latitude`, `vehicles.gps_longitude` — being filled by backfill script
+- `vehicle_location_observations` — now written on every extraction with city/state/confidence
+
+**Current state:**
+- Backfill running: ~28k vehicles, 100% Nominatim success rate, ~8.5 hours to complete
+- Monitor: `tail -f /tmp/geocode-backfill.log`
+- Verify results: `SELECT COUNT(*) FROM vehicles WHERE gps_latitude IS NOT NULL;`
+
 ## 2026-02-26
+
+### [transfers] Transfer status badge live in VehicleHeader
+- `transfer-status-api` edge function: GET/POST returns sanitized transfer state (milestone, progress, parties)
+- `VehicleHeader.tsx`: badge shows current milestone label, progress %, days stale (≥7), buyer @handle with ◇ if unclaimed
+- Badge color: blue=in_progress, amber=stalled, green=completed
+- Committed 6e346eba7, deployed, Vercel building
+
+### [transfers] Ownership transfer automation framework
+- `transfer-automator`: seeds from auction_events close, ghost shell resolution, 28 milestones with deadlines
+- `transfer-advance`: AI classifies email/SMS signals → advances milestones (Haiku + keyword fallback)
+- `transfer-email-webhook`: Resend inbound → t-{10hex}@nuke.ag inbox routing
+- `transfer-sms-webhook`: Twilio inbound → buyer/seller phone routing, TwiML ACK
+- DB triggers: auction close → auto-create transfer; identity claim → upgrade ghost shell to real user
+- Crons: staleness sweep every 4h (job 189); backfill 170k sold auctions in batches of 100 every 2min (job 190)
+- 138 existing transfers backfilled with inbox_email
 
 ### [vision] api-v1-vision deployed + SDK v1.3.1 nuke.vision live on npm
 - api-v1-vision edge function: POST /classify (YONO, $0), /analyze (YONO+cloud), /batch (100 images)
@@ -221,3 +270,34 @@ Start a new date section if today's date isn't already here.
 - [perf] **useSession**: ref guard on fetchProfile — eliminates duplicate profiles query from getSession + INITIAL_SESSION double-fire
 - [perf] **useNotificationBadge/useCashBalance**: user-scoped channel names (notification_badge:{userId}, balance:{userId})
 - [perf] **VehicleProfile**: extracted readCachedSession() to utils/cachedSession.ts; initialize session + authChecked from cache — loadVehicle() no longer blocked on async getSession() round-trip
+
+### YONO Hierarchical Inference — COMPLETED 2026-02-26
+- `HierarchicalYONO` class added to `yono.py` — Tier 1 (8-family) + Tier 2 (per-family make) cascade with flat fallback
+- `server.py` updated — lifespan handler, loads hierarchical model, /health reports tier1/tier2/flat state
+- `models/hier_family.onnx` exported — 8-class family classifier (45.8% val_acc, epoch 19/25)
+- `yono-classify` edge function updated — preserves inference path as `yono_source` field ("hierarchical"|"flat_fallback"|"flat")
+- Tier 2 training running in background (american: 20 makes, 22.9K images; german/british/etc. queued)
+- Supabase export resumed in background (100 batches done, resuming from offset 200K with 300s timeout fix)
+- YONO server live on :8472 with hierarchical support
+
+## 2026-02-26 (EXIF pipeline fix + image timeline)
+- [data] **EXIF backfill**: Fixed chronological ordering for Dave's GMC K2500 (a90c008a) — 580 images now have correct taken_at
+  - 62 images: updated via photo_sync_items.photos_date_taken (exact millisecond precision from Apple Photos sync)
+  - 78 images: updated via local Photos library using osxphotos (real camera timestamps + GPS)
+  - 250 images: BaT listing scrapes — taken_at updated from BaT CDN URL path (/uploads/2025/10/) → Oct 2025
+  - All BaT images marked exif_status: 'stripped' (correct — BaT CDN strips user EXIF)
+- [fix] **reprocess-image-exif edge function**: Fixed 2 crash bugs — null GPS dereference (structured.location.latitude), wrong column names (gps_latitude → latitude/longitude)
+- [fix] **reprocess-image-exif**: BaT images with no EXIF now marked 'stripped' instead of silently failing
+- [data] **Timeline integrity**: Oct 11 orphaned timeline_event_id fixed; images confirmed linked to 6 events
+- [result] Final bundle state: Sep 25 (146), Oct 01 BaT listing (251), Oct 11 inspection (1), Oct 18 documentation (102), Feb 10 work session (78)
+
+## 2026-02-26 (frontend perf: auth-gate waterfalls + bundle optimization)
+- [perf] **Auth-gate waterfall elimination**: 17 pages total fixed — session state initialized from localStorage cache synchronously
+  - VehicleProfile, Profile, CursorHomepage, Vehicles, Library, Capture, VehicleJobs, Capsule, CurationQueue, RestorationIntake, BusinessIntelligence, ImportDataPage (batch 1+2)
+  - Dashboard, AdminMissionControl, AdminVerifications, SocialWorkspace, DeveloperDashboard, MarketDashboard, VaultPage, Portfolio, InvoiceManager, UnlinkedReceipts, PersonalPhotoLibrary (batch 3)
+  - Added `nuke_frontend/src/utils/cachedSession.ts` — shared utility to read Supabase session from localStorage synchronously
+- [perf] **Vendor bundle split**: recharts+d3 moved to separate 'charts' chunk — vendor.js reduced 813K → 393K
+- [perf] **Double profile fetch eliminated**: useSession.ts useRef guard prevents INITIAL_SESSION + getSession() dual fetch
+- [perf] **Lazy markdown loading**: InvestorOffering + OrganizationOfferingTab — 6 static `?raw` imports converted to dynamic per-tab imports (~378K now loaded on-demand)
+- [fix] **User-scoped realtime channels**: notification_badge + cash balance channels now scoped by userId
+- [fix] **SubdomainRouter synchronous init**: eliminated loading gate for non-storefront domains

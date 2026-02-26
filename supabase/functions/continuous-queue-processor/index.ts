@@ -147,6 +147,17 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     minDelay: 1500,
     maxDelay: 3000,
   },
+  ecr: {
+    // ECR /details/ pages — vehicle-level pages, JS-rendered, login-gated for most fields.
+    // extract-vehicle-data-ai uses Firecrawl + AI and can pull make/model/color/location from
+    // URL structure and og: meta tags even without login.
+    // NOTE: /collection/, /profile/, /dealer/ URLs are NOT vehicle listings and should never
+    // reach this processor — they should be routed to scrape-ecr-collection-inventory.
+    pattern: "%exclusivecarregistry.com/details/%",
+    extractor: "extract-vehicle-data-ai",
+    minDelay: 2000,
+    maxDelay: 4000,
+  },
 };
 
 function randomDelay(minMs: number, maxMs: number): Promise<void> {
@@ -172,6 +183,7 @@ function detectSource(url: string): string | null {
   if (url.includes("goodingco.com")) return "gooding";
   if (url.includes("gaaclassiccars.com")) return "gaa";
   if (url.includes("ebay.com")) return "ebay";
+  if (url.includes("exclusivecarregistry.com/details/")) return "ecr";
   return null;
 }
 

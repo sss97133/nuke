@@ -11,6 +11,7 @@ const VehicleMailbox = React.lazy(() => import('../../../components/VehicleMailb
 const VehicleJobs = React.lazy(() => import('../../../pages/VehicleJobs'));
 const WiringPlan = React.lazy(() => import('../../../pages/WiringPlan'));
 const InvestorDealPortal = React.lazy(() => import('../../../pages/InvestorDealPortal'));
+const VehiclePortfolio = React.lazy(() => import('../../../pages/VehiclePortfolio'));
 
 const VehicleModuleRoutes = () => {
   return (
@@ -24,6 +25,7 @@ const VehicleModuleRoutes = () => {
         <Route path="/:vehicleId/edit" element={<EditVehicle />} />
         <Route path="/:vehicleId/mailbox" element={<VehicleMailbox />} />
         <Route path="/:vehicleId/invest" element={<InvestorDealPortal />} />
+        <Route path="/:vehicleId/portfolio" element={<VehiclePortfolio />} />
         <Route path="/:vehicleId/wiring" element={<WiringPlan />} />
         {/* Legacy: keep /jobs as alias but steer users to mailbox-first workflow */}
         <Route path="/:vehicleId/jobs" element={<Navigate to="../mailbox" replace />} />

@@ -1,0 +1,12 @@
+{
+  "hier_family": {
+    "american": 0,
+    "british": 1,
+    "french": 2,
+    "german": 3,
+    "italian": 4,
+    "japanese": 5,
+    "other": 6,
+    "swedish": 7
+  }
+}

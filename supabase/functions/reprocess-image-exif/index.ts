@@ -51,9 +51,12 @@ serve(async (req) => {
       
       // Skip if it's just metadata about broken URLs or downloads (not real EXIF)
       const isMetadataOnly = exif.fixed || exif.broken_url || exif.downloaded_at || exif.original_source;
-      
+
+      // Skip if already fixed by photos-sync backfill (has real DateTimeOriginal from Apple Photos)
+      const alreadySynced = exif.exif_status === 'synced_from_photos' && exif.DateTimeOriginal;
+
       // Include if it doesn't have camera, location, or technical data (and isn't just metadata)
-      return !hasCamera && !hasLocation && !hasTechnical && !isMetadataOnly;
+      return !hasCamera && !hasLocation && !hasTechnical && !isMetadataOnly && !alreadySynced;
     });
 
     console.log(`Found ${images?.length || 0} images with missing or minimal EXIF data`);
@@ -87,13 +90,16 @@ serve(async (req) => {
         });
 
         if (!exifData) {
-          console.log(`No EXIF found for ${image.id}, using created_at as fallback`);
-          // Use created_at as best guess
+          console.log(`No EXIF found for ${image.id} — marking as stripped`);
+          // Preserve existing metadata, just mark exif_status
+          const existingExif = (image.exif_data && typeof image.exif_data === 'object') ? image.exif_data as any : {};
           await supabase
             .from('vehicle_images')
-            .update({ taken_at: image.created_at })
+            .update({
+              exif_data: { ...existingExif, exif_status: 'stripped' },
+            })
             .eq('id', image.id);
-          failed++;
+          fixed++;
           continue;
         }
 
@@ -181,14 +187,18 @@ serve(async (req) => {
         const takenAt = structured.DateTimeOriginal || image.created_at;
 
         // Update database
+        const updatePayload: Record<string, unknown> = {
+          exif_data: structured,
+          taken_at: takenAt,
+        };
+        if (structured.location?.latitude != null) {
+          updatePayload.latitude = structured.location.latitude;
+          updatePayload.longitude = structured.location.longitude;
+        }
+
         const { error: updateError } = await supabase
           .from('vehicle_images')
-          .update({
-            exif_data: structured,
-            taken_at: takenAt,
-            gps_latitude: structured.location.latitude,
-            gps_longitude: structured.location.longitude
-          })
+          .update(updatePayload)
           .eq('id', image.id);
 
         if (updateError) throw updateError;

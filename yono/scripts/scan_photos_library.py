@@ -55,7 +55,9 @@ def load_model():
 
     num_classes = len(labels)
     model = timm.create_model("efficientnet_b0", pretrained=False, num_classes=num_classes)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    ckpt = torch.load(MODEL_PATH, map_location=device, weights_only=False)
+    state_dict = ckpt['model_state_dict'] if isinstance(ckpt, dict) and 'model_state_dict' in ckpt else ckpt
+    model.load_state_dict(state_dict)
     model = model.to(device)
     model.eval()
 

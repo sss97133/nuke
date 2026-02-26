@@ -93,14 +93,57 @@ serve(async (req) => {
     }
 
     // ========================================================================
-    // 3. Call vision-analyze-image for the AI analysis
+    // 3. Tier 0: YONO local classifier (free, fast, ~4ms)
+    //    If YONO is confident (>0.7), record result and skip cloud call.
+    //    If YONO is uncertain or sidecar is down, proceed to Gemini/GPT.
+    // ========================================================================
+    let yonoResult: any = null
+    let yonoSkippedCloud = false
+    try {
+      const yonoResp = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/yono-classify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({ image_url }),
+          signal: AbortSignal.timeout(15000),
+        }
+      )
+      const yonoJson = await yonoResp.json()
+      if (yonoJson.available && yonoJson.make) {
+        yonoResult = yonoJson
+        const highConfidence = (yonoJson.confidence || 0) >= 0.70
+        console.log('[analyze-image] YONO result:', {
+          make: yonoJson.make,
+          confidence: yonoJson.confidence,
+          ms: yonoJson.ms,
+          skip_cloud: highConfidence,
+        })
+        if (highConfidence) {
+          yonoSkippedCloud = true
+        }
+      } else {
+        console.log('[analyze-image] YONO unavailable or no result:', yonoJson.reason || 'no make')
+      }
+    } catch (yonoErr) {
+      console.warn('[analyze-image] YONO call failed (non-blocking):', yonoErr)
+    }
+
+    // ========================================================================
+    // 4. Call vision-analyze-image for the AI analysis (skipped if YONO confident)
     // ========================================================================
     let appraiserResult: any = null
     let visionModel: string | null = null
     let visionCost: number = 0
     let visionUsage: any = null
 
-    try {
+    if (yonoSkippedCloud) {
+      console.log('[analyze-image] Skipping cloud vision — YONO confident:', yonoResult.make, yonoResult.confidence)
+    } else {
+      try {
       console.log('[analyze-image] Calling vision-analyze-image...')
       const visionResp = await fetch(
         `${Deno.env.get('SUPABASE_URL')}/functions/v1/vision-analyze-image`,
@@ -132,9 +175,10 @@ serve(async (req) => {
     } catch (visionErr) {
       console.error('[analyze-image] Vision analysis exception:', visionErr)
     }
+    } // end if (!yonoSkippedCloud)
 
     // ========================================================================
-    // 4. Gate SPID detection on appraiser result
+    // 5. Gate SPID detection on appraiser result
     // ========================================================================
     let spidData = null
     let spidResponse = null
@@ -317,6 +361,16 @@ serve(async (req) => {
     }
     if (appraiserResult) {
       metadataUpdate.appraiser = appraiserResult
+    }
+    if (yonoResult) {
+      metadataUpdate.yono = {
+        make: yonoResult.make,
+        confidence: yonoResult.confidence,
+        top5: yonoResult.top5,
+        is_vehicle: yonoResult.is_vehicle,
+        ms: yonoResult.ms,
+        skipped_cloud: yonoSkippedCloud,
+      }
     }
     if (spidData) {
       metadataUpdate.spid = spidData

@@ -94,6 +94,11 @@ serve(async (req) => {
           extractorUrl = supabaseUrl + '/functions/v1/extract-specialty-builder';
         } else if (normalizedUrl.includes('vanguardmotorsales.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
+        } else if (normalizedUrl.includes('exclusivecarregistry.com/details/')) {
+          // ECR detail pages — vehicle-level pages, partially login-gated.
+          // extract-vehicle-data-ai uses Firecrawl + AI to pull make/model/color/location
+          // from URL structure and og: meta tags even without an ECR account.
+          extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         } else {
           extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         }

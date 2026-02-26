@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { extractAndCacheFavicon } from '../_shared/extractFavicon.ts'
-import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts'
+import { parseLocation } from '../_shared/parseLocation.ts'
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts'
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 
@@ -577,7 +577,7 @@ Return JSON only (no markdown):
 
         // Create new vehicle if not found (REFITTED - minimal insert)
         if (!vehicleId) {
-          const loc = normalizeListingLocation((data as any)?.location || null)
+          const loc = parseLocation((data as any)?.location || null)
           const norm = normalizeVehicleFields({ make: finalMake, model: finalModel, year: yearNum });
           const { data: newVehicle, error: vehicleError } = await supabase
             .from('vehicles')
@@ -645,6 +645,27 @@ Return JSON only (no markdown):
           if (newVehicle?.id) {
             vehicleId = newVehicle.id
             isNew = true
+
+            // Write location observation
+            if (loc.clean) {
+              supabase.from("vehicle_location_observations").insert({
+                vehicle_id: vehicleId,
+                source_type: "listing",
+                source_platform: "craigslist",
+                source_url: queueItem.listing_url,
+                observed_at: new Date().toISOString(),
+                location_text_raw: loc.raw,
+                location_text_clean: loc.clean,
+                city: loc.city,
+                region_code: loc.state,
+                postal_code: loc.zip,
+                precision: loc.city ? "city" : "region",
+                confidence: loc.confidence,
+                metadata: {},
+              }).then(({ error }) => {
+                if (error) console.warn("⚠️ Failed to write vehicle_location_observations:", error.message);
+              });
+            }
 
             // Persist extraction provenance for the listing (raw + parsed fields).
             const provenanceSnippets = extractProvenanceSnippets(rawDesc)
@@ -801,7 +822,7 @@ Return JSON only (no markdown):
           }
         } else {
           // Update existing vehicle
-          const loc = normalizeListingLocation((data as any)?.location || null)
+          const loc = parseLocation((data as any)?.location || null)
           await supabase
             .from('vehicles')
             .update({
@@ -824,6 +845,27 @@ Return JSON only (no markdown):
               listing_location_confidence: loc.clean ? 0.6 : null,
             })
             .eq('id', vehicleId)
+
+          // Write location observation (update path)
+          if (loc.clean) {
+            supabase.from("vehicle_location_observations").insert({
+              vehicle_id: vehicleId,
+              source_type: "listing",
+              source_platform: "craigslist",
+              source_url: queueItem.listing_url,
+              observed_at: new Date().toISOString(),
+              location_text_raw: loc.raw,
+              location_text_clean: loc.clean,
+              city: loc.city,
+              region_code: loc.state,
+              postal_code: loc.zip,
+              precision: loc.city ? "city" : "region",
+              confidence: loc.confidence ?? 0.6,
+              metadata: {},
+            }).then(({ error }) => {
+              if (error) console.warn("⚠️ Failed to write vehicle_location_observations:", error.message);
+            });
+          }
 
           await writeExtractionMetadata({
             vehicle_id: vehicleId,

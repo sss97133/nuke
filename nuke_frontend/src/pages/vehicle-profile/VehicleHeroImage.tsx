@@ -4,11 +4,11 @@ import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode }) => {
+  const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
   const [showGallery, setShowGallery] = useState(false);
-  const [fitMode] = useState<'cover' | 'contain'>('contain');
   const isMobile = useIsMobile();
-  
-  const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality: number = 90): string | null => {
+
+  const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality = 90): string | null => {
     try {
       const url = String(publicObjectUrl || '').trim();
       if (!url) return null;
@@ -16,61 +16,94 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
       const idx = url.indexOf(marker);
       if (idx < 0) return null;
       const base = url.slice(0, idx);
-      const path = url.slice(idx + marker.length);
+      const path = url.slice(idx + marker.length).split('?')[0];
       if (!path) return null;
-      const cleanPath = path.split('?')[0];
-      return `${base}/storage/v1/render/image/public/${cleanPath}?width=${encodeURIComponent(String(width))}&quality=${encodeURIComponent(String(quality))}`;
+      return `${base}/storage/v1/render/image/public/${path}?width=${width}&quality=${quality}`;
     } catch {
       return null;
     }
   };
 
-  // Get the source URL - just use it if it exists
   const src = leadImageUrl ? String(leadImageUrl).trim() : '';
-  
-  // Only return null if we have absolutely nothing
-  if (!src || src === 'undefined' || src === 'null' || src.length === 0) {
-    return null;
-  }
-  
-  // Build sources array - try to get render URL first for optimization, but always include original as fallback
-  const renderFallback = getSupabaseRenderUrl(src, 1600, 90);
-  // Always include original URL as fallback - ResilientImage will try render URL first, then fall back to original
-  const sources = renderFallback ? [renderFallback, src] : [src];
-  const finalSources = sources.filter(Boolean) as string[];
-  // Prefer the optimized render URL, but also include the original URL as a fallback.
-  // For CSS backgrounds, we can provide a layered list: if the first fails, the next can still show.
-  const hiResUrl = finalSources[0] || src;
-  const backgroundImageCss =
-    finalSources.length >= 2 ? `url(${finalSources[0]}), url(${finalSources[1]})` : `url(${hiResUrl})`;
+  if (!src || src === 'undefined' || src === 'null') return null;
+
+  const renderUrl = getSupabaseRenderUrl(src, 1600, 90);
+  const imgUrl = renderUrl || src;
 
   return (
     <>
-    <section className="section">
-      <div className="card" style={{ border: 'none', overflow: 'hidden' }}>
-        <div
-          className="hero-image"
-          onClick={() => isMobile && setShowGallery(true)}
-          style={{
-            width: '100%',
-            aspectRatio: '16/9',
-            maxHeight: '600px',
-            borderRadius: 'var(--radius-2)',
-            position: 'relative',
-            cursor: isMobile ? 'pointer' : 'default',
-            overflow: 'hidden',
-            backgroundColor: '#111',
-            backgroundImage: backgroundImageCss,
-            backgroundSize: fitMode,
-            backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat',
-          }}
-        >
-          {overlayNode ? <div style={{ position: 'relative', zIndex: 1 }}>{overlayNode}</div> : null}
+      <section className="section">
+        <div className="card" style={{ border: 'none', overflow: 'hidden' }}>
+          <div
+            style={{
+              width: '100%',
+              aspectRatio: '16/9',
+              maxHeight: '600px',
+              position: 'relative',
+              overflow: 'hidden',
+              borderRadius: 'var(--radius-2)',
+              backgroundColor: '#111',
+              cursor: isMobile ? 'pointer' : 'default',
+            }}
+            onClick={() => isMobile && setShowGallery(true)}
+          >
+            {/* Blurred backdrop — only shown in fit mode, fills empty sides */}
+            {fitMode === 'contain' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: '-30px', // extend past edges to hide blur fringe
+                  backgroundImage: `url(${imgUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  filter: 'blur(28px) brightness(0.45)',
+                }}
+              />
+            )}
+
+            {/* Main image */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: renderUrl ? `url(${renderUrl}), url(${src})` : `url(${src})`,
+                backgroundSize: fitMode,
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+              }}
+            />
+
+            {/* Overlay (auction banners etc) */}
+            {overlayNode && (
+              <div style={{ position: 'relative', zIndex: 1 }}>{overlayNode}</div>
+            )}
+
+            {/* Fit / Fill toggle */}
+            <button
+              onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'contain' : 'cover'); }}
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                right: '10px',
+                background: 'rgba(0,0,0,0.55)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 10px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                zIndex: 2,
+                backdropFilter: 'blur(6px)',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {fitMode === 'cover' ? 'Fit' : 'Fill'}
+            </button>
+          </div>
         </div>
-      </div>
-    </section>
-      
+      </section>
+
       {isMobile && showGallery && (
         <MobileImageGallery
           leadImageUrl={leadImageUrl}

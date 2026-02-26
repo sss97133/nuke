@@ -981,14 +981,36 @@ def create_vehicle_image_record(
     lon = str(metadata.get('longitude')) if metadata.get('longitude') else 'NULL'
     org_status = 'organized' if vehicle_id else 'unorganized'
 
-    # Build exif JSON
+    # Build exif JSON in structured format expected by the system
     exif = {}
+
+    # Camera info — nested format (exif.camera.make / exif.camera.model)
+    camera = {}
     if metadata.get('camera_make'):
-        exif['camera_make'] = metadata['camera_make']
+        camera['make'] = metadata['camera_make']
     if metadata.get('camera_model'):
-        exif['camera_model'] = metadata['camera_model']
+        camera['model'] = metadata['camera_model']
+    if camera:
+        exif['camera'] = camera
+
+    # Apple Photos UUID for traceability
     if metadata.get('uuid'):
         exif['photos_uuid'] = metadata['uuid']
+
+    # Real photo date from Photos library
+    if metadata.get('date_taken'):
+        exif['DateTimeOriginal'] = metadata['date_taken']
+        exif['exif_status'] = 'synced_from_photos'
+    else:
+        exif['exif_status'] = 'unknown'
+
+    # GPS — nested format (exif.location.latitude / longitude)
+    if metadata.get('latitude') and metadata.get('longitude'):
+        exif['location'] = {
+            'latitude': metadata['latitude'],
+            'longitude': metadata['longitude'],
+        }
+
     exif_json = json.dumps(exif).replace("'", "''") if exif else None
     exif_val = f"'{exif_json}'::jsonb" if exif_json else 'NULL'
 

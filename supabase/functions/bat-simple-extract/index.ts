@@ -187,7 +187,7 @@ function extractVin(html: string): string | null {
   if (chassisMatch) {
     const chassis = chassisMatch[1].trim();
     // Validate it looks like a chassis (at least 6 chars, alphanumeric)
-    if (chassis.length >= 6 && /^[A-Z0-9*-]+$/i.test(chassis)) {
+    if (chassis.length >= 6 && chassis.length <= 17 && /^[A-Z0-9*-]+$/i.test(chassis)) {
       return chassis;
     }
   }
