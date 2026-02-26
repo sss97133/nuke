@@ -108,10 +108,7 @@ yono/.image_cache/
 yono/.venv/
 training-data/
 
-# Desktop app binaries
-tools/nuke-desktop/
-tools/nuke-scanner/
-tools/nuke-sdk/
+# Tools - blender/make_logo_index are large generated assets
 tools/blender/
 tools/make_logo_index/
 
