@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const SHARE_URL  = 'https://nuke.ag/market/competitors';
-const SHARE_TEXT = 'Nuke vs. Rally — fractional vehicle ownership comparison. 1.25M vehicles with real transaction data vs. Hagerty appraisals.';
+const SHARE_TEXT = 'Nuke vs. Rally, TheCarCrowd, Fraction Motors — every fractional vehicle ownership platform compared. Real transaction data on 1.25M vehicles.';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -54,68 +54,54 @@ const COMPETITORS: Competitor[] = [
     tagline: 'Invest in iconic collectibles',
     founded: '2017',
     hq: 'New York, NY',
-    model: 'SEC-qualified individual asset offerings + secondary market',
-    minInvestment: '$2–$50/share',
-    vehiclesOffered: '~200–400 total offerings (cars + other)',
-    aum: '~$100M+ AUM',
-    regulatory: 'SEC Reg A+',
-    notes: 'Broadest secondary market liquidity. Covers cars, watches, wine, cards. Car selection is blue-chip only (Ferrari, Porsche, classic US muscle).',
-  },
-  {
-    id: 'collectable',
-    name: 'Collectable',
-    url: 'collectable.com',
-    tagline: 'Own a piece of history',
-    founded: '2020',
-    hq: 'New York, NY',
-    model: 'SEC-qualified fractional shares, trading windows',
-    minInvestment: '$5–$25/share',
-    vehiclesOffered: 'Limited vehicles (~20–50); focus on sports memorabilia',
+    model: 'SEC Reg A+, individual asset offerings + secondary market',
+    minInvestment: '$55–$125/share (cars)',
+    vehiclesOffered: '9 cars currently listed',
     aum: 'Undisclosed',
     regulatory: 'SEC Reg A+',
-    notes: 'Primarily sports memorabilia (cards, jerseys). Cars are a small slice. Trading is via periodic windows, not continuous.',
+    notes: '9 verified car listings: 1965 Mustang ($110K market cap), Saleen S7 ($420K), Ferrari Testarossa, Porsche 356, Lotus Esprit S1, BMW 850CSi, Lamborghini Jalpa, Ford GT, Aston Martin V8 Vantage. Multi-asset platform (cars share catalog with cards, comics, NFTs).',
   },
   {
-    id: 'otis',
-    name: 'Otis',
-    url: 'otis.com',
-    tagline: 'Invest in culture',
-    founded: '2018',
-    hq: 'New York, NY',
-    model: 'SEC-qualified fractional art/collectibles, secondary market via Otis Exchange',
-    minInvestment: '$25/share',
-    vehiclesOffered: 'Very limited vehicles; focus on art, sneakers, collectibles',
-    aum: 'Acquired by Collectors Holdings 2023',
-    regulatory: 'SEC Reg A+',
-    notes: 'Acquired by Collectors Holdings. Vehicle focus minimal. Known for art and pop-culture collectibles.',
+    id: 'carcrowd',
+    name: 'TheCarCrowd',
+    url: 'thecarcrowd.uk',
+    tagline: 'Fractional classic car investment',
+    founded: '2021',
+    hq: 'Newark, UK',
+    model: 'FCA-regulated, per-vehicle fractional shares + secondary market',
+    minInvestment: '£18.90–£220/share',
+    vehiclesOffered: '40+ under management; 3 live offerings',
+    aum: 'Undisclosed',
+    regulatory: 'FCA (UK)',
+    notes: 'Largest car-specific fractional platform by asset count. 12.6% avg annual returns claimed since 2021. Current live offers: Ferrari F430, Audi R8, Mercedes SLS. 4,000+ members. UK-only market.',
+  },
+  {
+    id: 'fractionmotors',
+    name: 'Fraction Motors',
+    url: 'fractionmotors.com',
+    tagline: 'Own a fraction of a collectible car',
+    founded: '2022',
+    hq: 'Birmingham, AL',
+    model: 'Solana blockchain tokenization — 100,000 tokens per vehicle',
+    minInvestment: 'Sub-$1 (Solana token fractions)',
+    vehiclesOffered: '5+ cars (Mustang, Chevelle, GT500, Beetle, Fiero)',
+    aum: 'Undisclosed / early stage',
+    regulatory: 'Unregulated (blockchain)',
+    notes: 'Car-specific, blockchain-native. Appraised values $24,700–$95,700. 100k fungible tokens per vehicle traded on Solana DEX. Accessible classics (Fiero, Chevelle, Beetle — not ultra-premium). iOS + Android app.',
   },
   {
     id: 'ccc',
     name: 'Classic Car Collective',
-    url: 'classiccarcollective.co.uk',
-    tagline: 'Collective investment in classic cars',
-    founded: '2019',
-    hq: 'London, UK',
-    model: 'Pooled fund — investors own fund shares, not individual vehicle fractions',
-    minInvestment: '£500',
-    vehiclesOffered: 'Fund-level (~40 vehicles)',
-    aum: '£2M–5M',
-    regulatory: 'FCA (UK)',
-    notes: 'UK only. Fund model means no individual vehicle exposure or secondary market trading. Quarterly valuations.',
-  },
-  {
-    id: 'apextrader',
-    name: 'Apex Trader',
-    url: '—',
-    tagline: 'Fractional collector car investing',
-    founded: '2022',
-    hq: 'US',
-    model: 'Individual vehicle fractions (early stage)',
-    minInvestment: 'TBD',
-    vehiclesOffered: '<10 vehicles (early stage)',
-    aum: 'Pre-launch / very early',
-    regulatory: 'Pre-regulatory',
-    notes: 'Early-stage, car-specific competitor. Small team, minimal liquidity, no secondary market yet.',
+    url: 'classiccarcollective.com',
+    tagline: 'Fractional classic car ownership',
+    founded: 'Unknown',
+    hq: 'Netherlands (EU)',
+    model: 'Password-gated platform, EUR-denominated',
+    minInvestment: 'Unknown (private)',
+    vehiclesOffered: 'Unknown (site is gated)',
+    aum: 'Unknown',
+    regulatory: 'EU (unknown specifics)',
+    notes: 'Netherlands-based, EUR-denominated. Shopify-powered storefront, fully password-gated — no public data on inventory or pricing. Not accessible to US investors.',
   },
 ];
 
@@ -125,100 +111,106 @@ const FEATURES: FeatureRow[] = [
     category: 'Data',
     feature: 'Proprietary price history',
     description: 'Real transaction data from multiple auction platforms',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'none', apextrader: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
   },
   {
     category: 'Data',
     feature: 'NAV from real transactions',
     description: 'Net Asset Value computed from actual market sales, not appraiser estimates',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'partial', apextrader: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'partial', fractionmotors: 'none', ccc: 'none' },
   },
   {
     category: 'Data',
     feature: 'Vehicle coverage',
-    description: 'Number of vehicles with price data',
-    scores: { nuke: 'strong', rally: 'partial', collectable: 'none', otis: 'none', ccc: 'none', apextrader: 'none' },
+    description: 'Tracked vehicles with price history (Nuke: 1.25M | Rally: 9 cars | TheCarCrowd: 40+ | Fraction: 5+)',
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'partial', fractionmotors: 'none', ccc: 'none' },
   },
   {
     category: 'Data',
     feature: 'Vision AI (condition/damage)',
     description: 'Automated photo analysis for condition, damage, modifications',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'none', apextrader: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
   },
   {
     category: 'Data',
     feature: 'Data API for developers',
     description: 'Programmatic access to vehicle data and market pricing',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'none', apextrader: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'partial', ccc: 'none' },
   },
   // Market structure
   {
     category: 'Market',
     feature: 'Continuous secondary market',
     description: 'Trade shares anytime with limit orders',
-    scores: { nuke: 'strong', rally: 'strong', collectable: 'partial', otis: 'strong', ccc: 'none', apextrader: 'none' },
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'partial', fractionmotors: 'partial', ccc: 'none' },
   },
   {
     category: 'Market',
     feature: 'Segment ETFs',
     description: 'Diversified exposure to vehicle categories (Porsche, Trucks, etc.)',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'partial', apextrader: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
   },
   {
     category: 'Market',
     feature: 'Individual vehicle fractions',
     description: 'Invest in a specific VIN',
-    scores: { nuke: 'strong', rally: 'strong', collectable: 'strong', otis: 'strong', ccc: 'none', apextrader: 'strong' },
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'strong', fractionmotors: 'strong', ccc: 'na' },
   },
   {
     category: 'Market',
     feature: 'Price-time priority order book',
-    description: 'True exchange-style matching (not periodic auction windows)',
-    scores: { nuke: 'strong', rally: 'strong', collectable: 'none', otis: 'partial', ccc: 'none', apextrader: 'none' },
+    description: 'True exchange-style matching (not periodic windows or fixed NAV)',
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
   },
   {
     category: 'Market',
     feature: 'Min investment < $10',
     description: 'Low barrier to entry for retail investors',
-    scores: { nuke: 'strong', rally: 'strong', collectable: 'partial', otis: 'none', ccc: 'none', apextrader: 'na' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'strong', ccc: 'na' },
   },
   // Vehicle focus
   {
     category: 'Vehicles',
     feature: 'Vehicle-exclusive focus',
     description: 'Platform dedicated to cars (not diluted by art/cards/sneakers)',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'strong', apextrader: 'strong' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'strong', fractionmotors: 'strong', ccc: 'strong' },
   },
   {
     category: 'Vehicles',
     feature: 'Working-class + blue chip',
     description: 'Covers trucks, project cars, barn finds — not just $500K Ferraris',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'partial', apextrader: 'partial' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'partial', fractionmotors: 'strong', ccc: 'na' },
   },
   {
     category: 'Vehicles',
     feature: 'Comps engine',
     description: 'Automated comparable sales analysis per vehicle',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'none', apextrader: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
   },
   // Platform
   {
     category: 'Platform',
     feature: 'Regulatory status',
-    description: 'SEC or equivalent qualification',
-    scores: { nuke: 'partial', rally: 'strong', collectable: 'strong', otis: 'strong', ccc: 'strong', apextrader: 'none' },
+    description: 'SEC, FCA, or equivalent qualification',
+    scores: { nuke: 'partial', rally: 'strong', carcrowd: 'strong', fractionmotors: 'none', ccc: 'partial' },
   },
   {
     category: 'Platform',
     feature: 'Mobile app',
     description: 'Native iOS/Android app',
-    scores: { nuke: 'none', rally: 'strong', collectable: 'strong', otis: 'strong', ccc: 'none', apextrader: 'none' },
+    scores: { nuke: 'none', rally: 'strong', carcrowd: 'none', fractionmotors: 'strong', ccc: 'none' },
+  },
+  {
+    category: 'Platform',
+    feature: 'US market access',
+    description: 'Available to US-based investors',
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', fractionmotors: 'strong', ccc: 'none' },
   },
   {
     category: 'Platform',
     feature: 'Provenance tracking',
     description: 'Service records, ownership history, title chain',
-    scores: { nuke: 'strong', rally: 'none', collectable: 'none', otis: 'none', ccc: 'none', apextrader: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
   },
 ];
 
@@ -233,24 +225,24 @@ const TIER_CONFIG: Record<Tier, { label: string; bg: string; color: string }> = 
 
 const NUKE_ADVANTAGES = [
   {
-    title: '1.25M vehicles with real price history',
-    body: 'Rally prices assets using Hagerty valuations and third-party appraisers. Nuke NAV is computed from actual auction transactions across BaT, Cars & Bids, Mecum, Bonhams, Gooding, RM Sotheby\'s, and 10+ more. When a Porsche 911 sells, our NAV updates.',
+    title: '1.25M vehicles vs. 9 cars (Rally) / 40 cars (TheCarCrowd)',
+    body: 'Rally has 9 verified car listings. TheCarCrowd has 40+ under management. Nuke tracks 1.25M vehicles with real transaction history across BaT, Cars & Bids, Mecum, Bonhams, Gooding, RM Sotheby\'s, and 10+ more sources. That\'s not a rounding difference — it\'s a different category of product.',
+  },
+  {
+    title: 'Real transactions, not Hagerty appraisals',
+    body: 'Rally prices its assets using Hagerty valuations and third-party appraisers — estimates from humans who look at comps and write a number. Nuke NAV is computed from actual auction closes. When a matching Porsche 911SC sells for $47K at BaT, our NAV updates. No appraiser, no lag, no subjectivity.',
   },
   {
     title: 'YONO: vision AI trained on collector cars',
-    body: 'No competitor uses computer vision to assess condition, detect damage, or flag modifications. YONO runs on every photo at $0/image — giving Nuke a condition signal that appraisers charge $500–2000 to produce manually.',
+    body: 'No competitor uses computer vision to assess condition, detect damage, or flag modifications. YONO runs on every photo at $0/image — giving Nuke a condition signal that appraisers charge $500–2,000 to produce manually. TheCarCrowd hires human experts. We train models.',
   },
   {
-    title: 'Segment ETFs grounded in real market data',
-    body: 'Rally offers individual vehicles. We offer both — plus diversified segment funds (PORS, TRUK, SQBD) with NAV computed from the full market cap of that vehicle category, updated from real transactions every 4 hours.',
+    title: 'Segment ETFs — a product nobody else offers',
+    body: 'Every competitor offers individual vehicle fractions. Rally (9 cars), TheCarCrowd (3 live offerings), Fraction Motors (5 cars). Nuke also offers segment ETFs — diversified funds across PORS, TRUK, SQBD, Y79 — with NAV computed from real market cap of that entire vehicle category. No one else does this.',
   },
   {
-    title: 'Data moat compounds over time',
-    body: 'Every extraction run adds more transaction history. Every YONO inference adds more training data. Every vehicle profile adds more provenance. Rally\'s data advantage is static (they own ~300 cars). Ours grows automatically.',
-  },
-  {
-    title: 'API-first for the next generation of tools',
-    body: 'No competitor exposes a developer API. Nuke\'s data layer powers the exchange AND is the product — insurance companies, lenders, and builders all need vehicle pricing data. Rally has no B2B play.',
+    title: 'Data moat compounds. Their inventory doesn\'t.',
+    body: 'Every extraction run adds transaction history. Every YONO inference adds training data. Every vehicle profile adds provenance. Rally\'s data is static — they curated 9 cars. TheCarCrowd has 40. Nuke\'s coverage grows automatically with every auction that closes anywhere in the world.',
   },
 ];
 
@@ -306,7 +298,7 @@ export default function MarketCompetitors() {
               Fractional Vehicle Ownership — Market Landscape
             </h1>
             <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
-              How Nuke compares against Rally, Collectable, Otis, and other platforms
+              How Nuke compares against Rally (9 cars), TheCarCrowd (40+ cars, UK), Fraction Motors (Solana), and Classic Car Collective (EU)
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -500,31 +492,31 @@ export default function MarketCompetitors() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
           <SummaryCard
             title="vs. Rally"
-            verdict="Data beats curation"
+            verdict="9 cars vs. 1.25M vehicles"
             color="rgba(37,99,235,0.12)"
             accentColor="#1d4ed8"
-            body="Rally picks blue-chip cars using human judgment. Nuke has transaction history on 1.25M vehicles. Rally's moat is brand. Ours is data — and data compounds."
+            body="Rally has 9 verified car listings (Mustang, Saleen S7, Porsche 356, Ferrari Testarossa, etc.) priced via Hagerty appraisals. Nuke has transaction history on 1.25M vehicles from real auction closes. Rally's moat is brand. Ours is data — and data compounds."
           />
           <SummaryCard
-            title="vs. Collectable / Otis"
-            verdict="Car-native vs generalist"
+            title="vs. TheCarCrowd"
+            verdict="US access + real data"
             color="rgba(16,185,129,0.12)"
             accentColor="#059669"
-            body="Both platforms treat cars as one asset class among many. No vehicle-specific infrastructure — no YONO, no comps, no auction data. Generic collectible platforms can't win on vehicle depth."
+            body="TheCarCrowd is the most serious car-specific competitor — FCA-regulated, 40+ assets, 12.6% claimed avg annual return since 2021. But UK-only, no US access, no continuous order book, no transaction data. Their NAV comes from expert valuations, not market closes."
+          />
+          <SummaryCard
+            title="vs. Fraction Motors"
+            verdict="Data layer vs. blockchain"
+            color="rgba(245,158,11,0.12)"
+            accentColor="#b45309"
+            body="Fraction Motors (Solana) is car-specific and accessible (sub-$1 fractions, Fiero/Chevelle/Beetle). But unregulated, 5 cars, no auction data, no comps, no order book. Interesting tech bet. Not an investment platform yet."
           />
           <SummaryCard
             title="vs. Classic Car Collective"
-            verdict="Individual exposure + liquidity"
-            color="rgba(245,158,11,0.12)"
-            accentColor="#b45309"
-            body="CCC is a UK fund with pooled exposure. No individual vehicle, no secondary market, no continuous pricing. Quarterly valuations from a human committee. We have a live order book."
-          />
-          <SummaryCard
-            title="vs. Apex Trader"
-            verdict="Infrastructure vs early stage"
+            verdict="Transparent vs. gated"
             color="rgba(139,92,246,0.12)"
             accentColor="#7c3aed"
-            body="Direct car-specific competitor at MVP stage. No data layer, no order book, no secondary market yet. We share the same thesis — our advantage is the data moat already built."
+            body="CCC (Netherlands) is password-gated — no public inventory, no pricing, no SEC/FCA data available. EUR-denominated, not accessible to US investors. Unknown vehicle count. The entire platform is opaque by design."
           />
         </div>
 
