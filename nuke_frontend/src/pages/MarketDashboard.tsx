@@ -263,6 +263,9 @@ export default function MarketDashboard() {
             <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>
               Portfolio
             </button>
+            <button className="button button-secondary" onClick={() => navigate('/market/competitors')}>
+              vs. Competition
+            </button>
             <button className="button button-secondary" onClick={() => navigate('/')}>
               Back
             </button>
