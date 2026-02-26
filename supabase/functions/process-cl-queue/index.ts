@@ -129,6 +129,76 @@ serve(async (req) => {
       return Array.from(new Set(out.map((x) => x.trim()))).filter(Boolean).slice(0, 5)
     }
 
+    // Extract expert notes from raw CL description using Claude.
+    // Returns a clean, structured assessment instead of raw junk text.
+    const extractExpertNotes = async (rawDesc: string | null, ctx: {
+      year: number, make: string | null, model: string | null,
+      mileage?: number | null, color?: string | null, transmission?: string | null,
+      asking_price?: number | null
+    }): Promise<{
+      notes: string | null,
+      supplemental: { color?: string, transmission?: string, engine?: string, condition?: string }
+    }> => {
+      if (!rawDesc || rawDesc.length < 30) return { notes: null, supplemental: {} }
+      const apiKey = Deno.env.get('ANTHROPIC_API_KEY') || ''
+      if (!apiKey) return { notes: null, supplemental: {} }
+
+      const carDesc = [ctx.year, ctx.make, ctx.model].filter(Boolean).join(' ')
+      const knownFields = [
+        ctx.mileage ? `${ctx.mileage.toLocaleString()} miles` : null,
+        ctx.color ? `color: ${ctx.color}` : null,
+        ctx.transmission ? `transmission: ${ctx.transmission}` : null,
+        ctx.asking_price ? `asking $${ctx.asking_price.toLocaleString()}` : null,
+      ].filter(Boolean).join(', ')
+
+      const prompt = `You are an expert classic car buyer evaluating a Craigslist listing for a ${carDesc}.
+${knownFields ? `Already captured from structured fields: ${knownFields}.` : ''}
+
+Seller wrote:
+---
+${rawDesc.slice(0, 1500)}
+---
+
+Return JSON only (no markdown):
+{
+  "notes": "2-3 sentence expert assessment. Be specific about condition, issues, notable features, and seller signals. Skip generic filler. No fluff.",
+  "supplemental": {
+    "color": "exterior color if clearly stated and not already captured, else null",
+    "transmission": "manual/automatic if clearly stated and not already captured, else null",
+    "engine": "engine description if stated (e.g. '350 V8', '454 big block'), else null",
+    "condition": "excellent/good/fair/poor based on description, else null"
+  }
+}`
+
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 512,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        })
+        if (!response.ok) return { notes: null, supplemental: {} }
+        const result = await response.json()
+        const text = result.content?.[0]?.text || ''
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) return { notes: null, supplemental: {} }
+        const parsed = JSON.parse(jsonMatch[0])
+        return {
+          notes: parsed.notes || null,
+          supplemental: parsed.supplemental || {}
+        }
+      } catch {
+        return { notes: null, supplemental: {} }
+      }
+    }
+
     const writeExtractionMetadata = async (args: {
       vehicle_id: string
       source_url: string
@@ -241,7 +311,6 @@ serve(async (req) => {
     // Track execution time to avoid timeout (Edge Functions have 60s limit, or 400s on paid plans)
     const startTime = Date.now()
     const maxExecutionTime = 50000 // 50 seconds - leave 10s buffer for response
-    const skipImageProcessingAfter = 40000 // Skip images after 40s to save time
 
     // PARALLEL PROCESSING: Process listings in batches of 5 for 5x throughput
     const CONCURRENCY_LIMIT = 5
@@ -413,6 +482,23 @@ serve(async (req) => {
         const scrapedModelIsClean = scrapedModel && scrapedModel.length < 30 && !/[-–—]/.test(scrapedModel)
         const finalModel = (scrapedModelIsClean ? scrapedModel : null) || hintModel || null
 
+        // AI expert extraction from description - fills gaps, generates clean notes
+        const expertResult = await extractExpertNotes(rawDesc, {
+          year: yearNum,
+          make: finalMake,
+          model: finalModel,
+          mileage: data.mileage || null,
+          color: data.color || null,
+          transmission: data.transmission || null,
+          asking_price: (data as any)?.asking_price || (data as any)?.price || null,
+        })
+        const expertNotes = expertResult.notes
+        // Fill gaps from AI extraction only if attrgroup didn't capture them
+        if (!data.color && expertResult.supplemental.color) data.color = expertResult.supplemental.color
+        if (!data.transmission && expertResult.supplemental.transmission) data.transmission = expertResult.supplemental.transmission
+        if (!(data as any).engine && expertResult.supplemental.engine) (data as any).engine = expertResult.supplemental.engine
+        console.log(`  🧠 Expert notes: ${expertNotes ? expertNotes.slice(0, 80) + '...' : 'none'}`)
+
         // Validate required fields
         if (!yearNum || isNaN(yearNum) || yearNum < 1958 || yearNum > 1991) {
           await supabase
@@ -446,8 +532,21 @@ serve(async (req) => {
         let vehicleId: string | null = null
         let isNew = false
 
+        // Try to find by discovery_url (most precise - handles re-runs on stuck entries)
+        {
+          const { data: existing } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('discovery_url', queueItem.listing_url)
+            .maybeSingle()
+          if (existing) {
+            vehicleId = existing.id
+            isNew = false
+          }
+        }
+
         // Try to find by VIN
-        if (data.vin) {
+        if (!vehicleId && data.vin) {
           const { data: existing } = await supabase
             .from('vehicles')
             .select('id')
@@ -487,7 +586,12 @@ serve(async (req) => {
               make: norm.make ?? finalMake,
               model: norm.model ?? finalModel,
               asking_price: (data as any)?.asking_price || (data as any)?.price || null,
-              description: rawDesc || null,
+              mileage: data.mileage || null,
+              color: data.color || null,
+              transmission: data.transmission || null,
+              fuel_type: data.fuel_type || null,
+              body_style: data.body_style || null,
+              description: expertNotes || null,
               discovery_source: 'craigslist_scrape',
               discovery_url: queueItem.listing_url,
               listing_source: 'craigslist',
@@ -509,8 +613,12 @@ serve(async (req) => {
                 listing_posted_at: (data as any)?.listing_posted_at || null,
                 listing_updated_at: (data as any)?.listing_updated_at || null,
                 raw_description: rawDesc || null,
+                expert_notes: expertNotes || null,
                 scraper: 'craigslist-queue',
-                scraper_version: 'v1'
+                scraper_version: 'v1',
+                title_status: data.title_status || null,
+                cylinders: data.cylinders || null,
+                drivetrain: data.drivetrain || null,
               },
               is_public: true,
               status: 'active',
@@ -690,134 +798,6 @@ serve(async (req) => {
             } else {
 }
 
-            // Download and upload images (skip if running low on time)
-            const elapsedForImages = Date.now() - startTime
-            if (data.images && data.images.length > 0 && elapsedForImages < skipImageProcessingAfter) {
-              console.log(`  📸 Downloading ${data.images.length} images...`)
-              let imagesUploaded = 0
-              
-              for (let i = 0; i < data.images.length; i++) {
-                // Check time before each image
-                const elapsedBeforeImage = Date.now() - startTime
-                if (elapsedBeforeImage > skipImageProcessingAfter) {
-                  console.log(`  ⏰ Skipping remaining ${data.images.length - i} images (time limit approaching)`)
-                  break
-                }
-                
-                const imageUrl = data.images[i]
-                try {
-                  const imageResponse = await fetch(imageUrl, {
-                    signal: AbortSignal.timeout(5000) // Reduced from 10s to 5s
-                  })
-                  
-                  if (!imageResponse.ok) continue
-                  
-                  const imageBlob = await imageResponse.blob()
-                  const arrayBuffer = await imageBlob.arrayBuffer()
-                  const uint8Array = new Uint8Array(arrayBuffer)
-                  
-                  const ext = imageUrl.match(/\.(jpg|jpeg|png|webp)$/i)?.[1] || 'jpg'
-                  const fileName = `${Date.now()}_${i}.${ext}`
-                  const storagePath = `vehicles/${vehicleId}/images/craigslist_scrape/${fileName}`
-                  
-                  const { error: uploadError } = await supabase.storage
-                    .from(STORAGE_BUCKET)
-                    .upload(storagePath, uint8Array, {
-                      contentType: `image/${ext}`,
-                      cacheControl: '3600',
-                      upsert: false
-                    })
-                  
-                  if (uploadError) continue
-                  
-                  const { data: { publicUrl } } = supabase.storage
-                    .from(STORAGE_BUCKET)
-                    .getPublicUrl(storagePath)
-                  
-                  // Create ghost user for photographer
-                  const photographerFingerprint = `CL-Photographer-${queueItem.listing_url}`
-                  let ghostUserId: string | null = null
-                  
-                  const { data: existingGhost } = await supabase
-                    .from('ghost_users')
-                    .select('id')
-                    .eq('device_fingerprint', photographerFingerprint)
-                    .maybeSingle()
-                  
-                  if (existingGhost?.id) {
-                    ghostUserId = existingGhost.id
-                  } else {
-                    const { data: newGhost } = await supabase
-                      .from('ghost_users')
-                      .insert({
-                        device_fingerprint: photographerFingerprint,
-                        camera_make: 'Unknown',
-                        camera_model: 'Craigslist Listing',
-                        display_name: `Craigslist Photographer`,
-                        total_contributions: 0
-                      })
-                      .select('id')
-                      .single()
-                    
-                    if (newGhost?.id) {
-                      ghostUserId = newGhost.id
-                    }
-                  }
-
-                  const { data: imageData, error: imageInsertError } = await supabase
-                    .from('vehicle_images')
-                    .insert({
-                      vehicle_id: vehicleId,
-                      image_url: publicUrl,
-                      user_id: ghostUserId || importUserId,
-                      is_primary: i === 0,
-                      source: 'craigslist_scrape',
-                      taken_at: data.posted_date || new Date().toISOString(),
-                      exif_data: {
-                        source_url: imageUrl,
-                        discovery_url: queueItem.listing_url,
-                        imported_by_user_id: importUserId,
-                        imported_at: new Date().toISOString(),
-                        attribution_note: 'Photographer unknown - images from Craigslist listing. Original photographer can claim with proof.',
-                        claimable: true,
-                        device_fingerprint: photographerFingerprint
-                      }
-                    })
-                    .select('id')
-                    .single()
-                  
-                  if (imageInsertError) {
-                    console.warn(`    ⚠️ Failed to create image record ${i + 1}: ${imageInsertError.message}`)
-                    continue
-                  }
-                  
-                  // Create device attribution if ghost user exists
-                  if (ghostUserId && imageData?.id) {
-                    await supabase
-                      .from('device_attributions')
-                      .insert({
-                        image_id: imageData.id,
-                        device_fingerprint: photographerFingerprint,
-                        ghost_user_id: ghostUserId,
-                        uploaded_by_user_id: importUserId,
-                        attribution_source: 'craigslist_listing_unknown_photographer',
-                        confidence_score: 50
-                      })
-                  }
-                  
-                  imagesUploaded++
-                  // Reduced delay from 500ms to 200ms
-                  await new Promise(resolve => setTimeout(resolve, 200))
-                  
-                } catch (imgError) {
-                  console.warn(`    ⚠️ Error processing image ${i + 1}:`, imgError)
-                }
-              }
-              
-              console.log(`  📸 Uploaded ${imagesUploaded} images`)
-            } else if (data.images && data.images.length > 0) {
-              console.log(`  ⏰ Skipping ${data.images.length} images (time limit approaching)`)
-            }
           }
         } else {
           // Update existing vehicle
@@ -826,8 +806,12 @@ serve(async (req) => {
             .from('vehicles')
             .update({
               asking_price: data.asking_price || data.price || null,
-              description: rawDesc || null,
+              description: expertNotes || null,
               mileage: data.mileage || null,
+              color: data.color || null,
+              transmission: data.transmission || null,
+              fuel_type: data.fuel_type || null,
+              body_style: data.body_style || null,
               listing_source: 'craigslist',
               listing_url: queueItem.listing_url,
               listing_posted_at: (data as any)?.listing_posted_at || null,
@@ -880,31 +864,37 @@ serve(async (req) => {
             }
           })
 
-          // Mark as complete for updated vehicles
-          await supabase
-            .from('craigslist_listing_queue')
-            .update({
-              status: 'complete',
-              vehicle_id: vehicleId,
-              processed_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', queueItem.id)
-
-          // Link vehicle back to acquisition_pipeline if a matching entry exists
-          if (vehicleId) {
-            await supabase
-              .from('acquisition_pipeline')
-              .update({ vehicle_id: vehicleId })
-              .eq('discovery_url', queueItem.listing_url)
-              .is('vehicle_id', null)
-          }
-
-          console.log(`  ✅ Updated: ${yearNum} ${finalMake} ${finalModel}`)
-          return { status: 'updated', vehicleId: vehicleId || undefined }
         }
 
-        // Mark as complete for new vehicles
+        // Store images once — only if none exist yet for this vehicle
+        if (data.images && data.images.length > 0 && vehicleId) {
+          const { count: existingImageCount } = await supabase
+            .from('vehicle_images')
+            .select('id', { count: 'exact', head: true })
+            .eq('vehicle_id', vehicleId)
+          if (!existingImageCount || existingImageCount === 0) {
+            const imageRecords = (data.images as string[]).map((imageUrl: string, i: number) => ({
+              vehicle_id: vehicleId,
+              image_url: imageUrl,
+              user_id: importUserId,
+              is_primary: i === 0,
+              is_external: true,
+              source: 'craigslist_listing',
+              source_url: queueItem.listing_url,
+              exif_data: {
+                source_url: imageUrl,
+                discovery_url: queueItem.listing_url,
+                imported_at: new Date().toISOString(),
+                attribution_note: 'Images from Craigslist listing. Photographer can claim with proof.',
+                claimable: true,
+              }
+            }))
+            const { error: imgError } = await supabase.from('vehicle_images').insert(imageRecords)
+            if (!imgError) console.log(`  📸 Stored ${imageRecords.length} external image URLs`)
+          }
+        }
+
+        // Mark as complete
         await supabase
           .from('craigslist_listing_queue')
           .update({
@@ -924,8 +914,61 @@ serve(async (req) => {
             .is('vehicle_id', null)
         }
 
-        console.log(`  ✅ Created: ${yearNum} ${finalMake} ${finalModel}`)
-        return { status: 'created', vehicleId: vehicleId || undefined }
+        // Upsert seller profile if phone was extracted
+        const extractedPhone: string | null = (data as any).phone || null
+        if (extractedPhone) {
+          const clRegion = (queueItem.listing_url.match(/https?:\/\/([^.]+)\.craigslist\.org/) || [])[1] || null
+
+          const { data: existingSeller } = await supabase
+            .from('pipeline_sellers')
+            .select('id, listing_count, regions_seen')
+            .eq('phone', extractedPhone)
+            .maybeSingle()
+
+          let sellerId: string | null = null
+
+          if (existingSeller) {
+            sellerId = existingSeller.id
+            const regions = existingSeller.regions_seen || []
+            if (clRegion && !regions.includes(clRegion)) regions.push(clRegion)
+            await supabase
+              .from('pipeline_sellers')
+              .update({
+                listing_count: (existingSeller.listing_count || 0) + 1,
+                region_count: regions.length,
+                regions_seen: regions,
+                last_seen_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingSeller.id)
+          } else {
+            const { data: newSeller } = await supabase
+              .from('pipeline_sellers')
+              .insert({
+                phone: extractedPhone,
+                listing_count: 1,
+                region_count: clRegion ? 1 : 0,
+                regions_seen: clRegion ? [clRegion] : [],
+                platforms_seen: ['craigslist'],
+                first_seen_at: new Date().toISOString(),
+                last_seen_at: new Date().toISOString(),
+              })
+              .select('id')
+              .maybeSingle()
+            sellerId = newSeller?.id || null
+          }
+
+          if (sellerId) {
+            await supabase
+              .from('acquisition_pipeline')
+              .update({ seller_id: sellerId, seller_contact: extractedPhone })
+              .eq('discovery_url', queueItem.listing_url)
+            console.log(`  📞 Seller linked: ${extractedPhone} (${clRegion || 'unknown region'})`)
+          }
+        }
+
+        console.log(`  ✅ ${isNew ? 'Created' : 'Updated'}: ${yearNum} ${finalMake} ${finalModel}`)
+        return { status: isNew ? 'created' : 'updated', vehicleId: vehicleId || undefined }
 
       } catch (error: any) {
         console.error(`  ❌ Error processing ${queueItem.listing_url}:`, error)
@@ -2066,6 +2109,29 @@ break
     if (vinMatch?.[1]) {
       data.vin = vinMatch[1]
       data.extraction_confidence['vin'] = 0.6
+    }
+  }
+
+  // Phone extraction: tel: link first, then description text
+  const telLink = doc.querySelector('a[href^="tel:"]')
+  if (telLink) {
+    const digits = (telLink.getAttribute('href') || '').replace(/\D/g, '')
+    const normalized = digits.length === 11 && digits[0] === '1' ? digits.slice(1) : digits
+    if (normalized.length === 10) data.phone = normalized
+  }
+  if (!data.phone && typeof data.description === 'string') {
+    const phonePatterns = [
+      /\((\d{3})\)\s*(\d{3})[-.\s](\d{4})/,
+      /\b(\d{3})[-.\s](\d{3})[-.\s](\d{4})\b/,
+      /\b1[-.\s]?(\d{3})[-.\s]?(\d{3})[-.\s]?(\d{4})\b/,
+    ]
+    for (const pattern of phonePatterns) {
+      const match = data.description.match(pattern)
+      if (match) {
+        const digits = match[0].replace(/\D/g, '')
+        const normalized = digits.length === 11 && digits[0] === '1' ? digits.slice(1) : digits
+        if (normalized.length === 10) { data.phone = normalized; break }
+      }
     }
   }
 
