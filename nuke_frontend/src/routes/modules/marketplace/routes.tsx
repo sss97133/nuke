@@ -17,6 +17,7 @@ const MarketDashboard = React.lazy(() => import('../../../pages/MarketDashboard'
 const ContractStation = React.lazy(() => import('../../../pages/ContractStation'));
 const MarketMap = React.lazy(() => import('../../../components/market/MarketMap'));
 const BidMarketDashboard = React.lazy(() => import('../../../pages/BidMarketDashboard'));
+const MarketCompetitors = React.lazy(() => import('../../../pages/MarketCompetitors'));
 
 const LazyFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '9pt' }}>
@@ -44,6 +45,7 @@ const MarketplaceModuleRoutes = () => {
         <Route path="/contracts" element={<ContractStation />} />
         <Route path="/contracts/:contractId" element={<ContractStation />} />
         <Route path="/bids" element={<BidMarketDashboard />} />
+        <Route path="/competitors" element={<MarketCompetitors />} />
       </Routes>
     </Suspense>
   );
