@@ -35,7 +35,11 @@ export default defineConfig({
               id.includes('/zustand/') ||
               id.includes('/tunnel-rat/')
             ) return 'vendor';
-            if (id.includes('react-dom') || id.includes('/react/') || id.includes('recharts') || id.includes('d3-')) return 'vendor';
+            // recharts + d3 are only used on a few pages (VehicleProfile, BidMarketDashboard,
+            // ContractStation, admin analytics) — keep them out of vendor so pages that
+            // don't use charts don't pay the ~200 kB download cost.
+            if (id.includes('recharts') || id.includes('d3-')) return 'charts';
+            if (id.includes('react-dom') || id.includes('/react/')) return 'vendor';
             if (id.includes('@supabase/')) return 'supabase';
             if (id.includes('pdfjs-dist')) return 'pdf';
             if (id.includes('three')) return 'three';

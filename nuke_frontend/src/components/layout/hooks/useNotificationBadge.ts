@@ -11,7 +11,7 @@ export function useNotificationBadge(userId: string | undefined) {
     const timer = setTimeout(() => loadCount(userId), 100);
 
     const channel = supabase
-      .channel('notification_badge')
+      .channel(`notification_badge:${userId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${userId}` },

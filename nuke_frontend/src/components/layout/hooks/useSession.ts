@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 
 // Read the Supabase session synchronously from localStorage so that returning
@@ -26,6 +26,9 @@ export function useSession() {
   const [session, setSession] = useState<any>(() => readCachedSession());
   const [loading, setLoading] = useState<boolean>(() => readCachedSession() === null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  // Guard against the double-fetch that happens because both getSession() and
+  // onAuthStateChange(INITIAL_SESSION) resolve nearly simultaneously on mount.
+  const fetchedForUserId = useRef<string | null>(null);
 
   useEffect(() => {
     // Verify/refresh the cached session in the background.  For users who had
@@ -52,6 +55,8 @@ export function useSession() {
   }, []);
 
   const fetchProfile = async (userId: string) => {
+    if (fetchedForUserId.current === userId) return;
+    fetchedForUserId.current = userId;
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -59,8 +64,9 @@ export function useSession() {
         .eq('id', userId)
         .single();
       if (!error && data) setUserProfile(data);
+      else if (error) fetchedForUserId.current = null; // allow retry on transient error
     } catch {
-      // silent
+      fetchedForUserId.current = null;
     }
   };
 
