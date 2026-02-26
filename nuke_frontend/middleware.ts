@@ -14,8 +14,8 @@ export const config = {
 };
 
 const OG = {
-  title:       'Nuke vs. Rally — Fractional Vehicle Ownership Comparison',
-  description: 'Feature-by-feature: Nuke, Rally, Collectable, Otis, Classic Car Collective. Nuke has real transaction data from 1.25M vehicles. Rally uses Hagerty appraisals.',
+  title:       'Nuke vs. Rally vs. TheCarCrowd — Fractional Vehicle Ownership Compared',
+  description: 'Every fractional car platform compared: Rally (9 cars), TheCarCrowd (40+ cars, UK, FCA), Fraction Motors (Solana). Nuke has real transaction data on 1.25M vehicles. No one else does.',
   url:         'https://nuke.ag/market/competitors',
 };
 
