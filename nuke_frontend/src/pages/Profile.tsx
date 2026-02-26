@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
@@ -35,35 +35,39 @@ import EditableField from '../components/editable/EditableField';
 import { ProfileService } from '../services/profileService';
 import { ProfileActivityService } from '../services/profileActivityService';
 import type { ProfileData, ProfileEditForm } from '../types/profile';
-import ContributionTimeline from '../components/profile/ContributionTimeline';
-import ProfessionalToolbox from '../components/profile/ProfessionalToolbox';
-import VehicleCollection from '../components/profile/VehicleCollection';
-import PublicImageGallery from '../components/profile/PublicImageGallery';
-import KnowledgeLibrary from '../components/profile/KnowledgeLibrary';
-import ActivityTimeline from '../components/profile/ActivityTimeline';
-import { ProfileVerification } from '../components/ProfileVerification';
-import ChangePasswordForm from '../components/auth/ChangePasswordForm';
-import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
-import LivePlayer from '../components/profile/LivePlayer';
-import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
-import MyOrganizations from './MyOrganizations';
-import MyAuctions from './MyAuctions';
-import PublicAuctionTrackRecord from '../components/profile/PublicAuctionTrackRecord';
-import VehicleMergeInterface from '../components/vehicle/VehicleMergeInterface';
-import MemelordPanel from '../components/profile/MemelordPanel';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
-import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
-import ShopFinancials from './ShopFinancials';
-import TechInbox from '../components/profile/TechInbox';
-import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
-import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
-import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
-import { ProfileCommentsTab } from '../components/profile/ProfileCommentsTab';
-import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
 import { getUserProfileData } from '../services/profileStatsService';
-import ConnectedPlatforms from '../components/bidding/ConnectedPlatforms';
-import SocialConnections from '../components/profile/SocialConnections';
+
+// Overview tab — loaded immediately
+import ContributionTimeline from '../components/profile/ContributionTimeline';
+import KnowledgeLibrary from '../components/profile/KnowledgeLibrary';
+import LivePlayer from '../components/profile/LivePlayer';
+import MemelordPanel from '../components/profile/MemelordPanel';
+import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
+
+// Tab-specific — loaded on demand
+const ProfessionalToolbox = React.lazy(() => import('../components/profile/ProfessionalToolbox'));
+const VehicleCollection = React.lazy(() => import('../components/profile/VehicleCollection'));
+const PublicImageGallery = React.lazy(() => import('../components/profile/PublicImageGallery'));
+const ActivityTimeline = React.lazy(() => import('../components/profile/ActivityTimeline'));
+const ProfileVerification = React.lazy(() => import('../components/ProfileVerification').then(m => ({ default: m.ProfileVerification })));
+const ChangePasswordForm = React.lazy(() => import('../components/auth/ChangePasswordForm'));
+const DatabaseDiagnostic = React.lazy(() => import('../components/debug/DatabaseDiagnostic'));
+const OrganizationAffiliations = React.lazy(() => import('../components/profile/OrganizationAffiliations'));
+const MyOrganizations = React.lazy(() => import('./MyOrganizations'));
+const MyAuctions = React.lazy(() => import('./MyAuctions'));
+const PublicAuctionTrackRecord = React.lazy(() => import('../components/profile/PublicAuctionTrackRecord'));
+const VehicleMergeInterface = React.lazy(() => import('../components/vehicle/VehicleMergeInterface'));
+const PersonalPhotoLibrary = React.lazy(() => import('./PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
+const ShopFinancials = React.lazy(() => import('./ShopFinancials'));
+const TechInbox = React.lazy(() => import('../components/profile/TechInbox'));
+const ProfileListingsTab = React.lazy(() => import('../components/profile/ProfileListingsTab').then(m => ({ default: m.ProfileListingsTab })));
+const ProfileBidsTab = React.lazy(() => import('../components/profile/ProfileBidsTab').then(m => ({ default: m.ProfileBidsTab })));
+const ProfileCommentsTab = React.lazy(() => import('../components/profile/ProfileCommentsTab').then(m => ({ default: m.ProfileCommentsTab })));
+const ProfileSuccessStoriesTab = React.lazy(() => import('../components/profile/ProfileSuccessStoriesTab').then(m => ({ default: m.ProfileSuccessStoriesTab })));
+const ConnectedPlatforms = React.lazy(() => import('../components/bidding/ConnectedPlatforms'));
+const SocialConnections = React.lazy(() => import('../components/profile/SocialConnections'));
 
 const Profile: React.FC = () => {
   const { userId, externalIdentityId } = useParams<{ userId?: string; externalIdentityId?: string }>();
@@ -793,6 +797,7 @@ const Profile: React.FC = () => {
         </div>
 
         {/* Main content area */}
+        <Suspense fallback={null}>
         <div className="profile-content">
             {activeTab === 'overview' && (
               <div className="section">
@@ -1060,6 +1065,7 @@ const Profile: React.FC = () => {
               </div>
             )}
         </div>
+        </Suspense>
       </div>
     </div>
   );
