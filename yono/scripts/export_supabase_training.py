@@ -38,7 +38,7 @@ for line in (NUKE_DIR / ".env").read_text().splitlines():
 
 SUPABASE_URL = os.environ["VITE_SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-PG_CONN = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+PG_CONN = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 
 YONO_DIR = Path(__file__).parent.parent
 OUTPUT_DIR = NUKE_DIR / "training-data" / "images"
@@ -76,9 +76,12 @@ def fetch_page_psql(after_id: str, limit: int) -> list:
         LIMIT {limit}
     ) TO STDOUT WITH CSV HEADER;
     """
+    env = os.environ.copy()
+    env["PGOPTIONS"] = "-c statement_timeout=120000"  # 2 min override for large scans
     result = subprocess.run(
         ["psql", PG_CONN, "-t", "-c", sql],
-        capture_output=True, text=True, timeout=60
+        capture_output=True, text=True, timeout=130,
+        env=env,
     )
     if result.returncode != 0:
         print(f"  psql error: {result.stderr[:200]}")
