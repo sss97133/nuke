@@ -4,6 +4,42 @@ Autonomous extraction system for collector vehicle data. Pipeline: **Link → En
 
 ---
 
+## ORIENT BEFORE YOU ACT
+
+Read these three files at the start of every session — they tell you where the project is, what exists, and what others are doing:
+
+```bash
+cat PROJECT_STATE.md          # Current sprint focus, active work, what's paused
+tail -60 DONE.md              # What was recently built (prevents rebuilding)
+cat .claude/ACTIVE_AGENTS.md  # What other agents are currently working on
+```
+
+Register yourself in `ACTIVE_AGENTS.md` when you start, remove yourself when done.
+Append completed work to `DONE.md`.
+
+**Context pressure**: If you see a context compression warning or sense the session is near its limit, call `claude-handoff "what you were doing, what's done, what's next"` immediately. Don't wait until it freezes.
+
+---
+
+## BEFORE YOU BUILD ANYTHING — READ TOOLS.md
+
+**`TOOLS.md` in this directory is the canonical tool registry.**
+It maps every common intent to the existing edge function that handles it.
+Building a duplicate tool creates data forks, breaks pipeline tracking, and wastes money.
+
+```bash
+# Check if a tool already exists for your task
+cat /Users/skylar/nuke/TOOLS.md
+
+# Check who owns a database field before writing to it
+# (query from psql or Supabase MCP)
+SELECT owned_by, description, do_not_write_directly, write_via
+FROM pipeline_registry
+WHERE table_name = 'vehicles' AND column_name = 'nuke_estimate';
+```
+
+---
+
 ## MULTI-AGENT COORDINATION (READ FIRST)
 
 **You are likely one of multiple Claude agents working concurrently.** Before starting any significant work:
