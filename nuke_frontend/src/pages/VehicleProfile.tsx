@@ -1748,13 +1748,24 @@ const VehicleProfile: React.FC = () => {
       // OPTIMIZED: Try RPC first for fast loading, fallback to direct query if RPC fails
       let rpcData = null;
       let rpcError = null;
-      
+
       // Only try RPC if vehicleId is a UUID (RPC expects UUID, not VIN)
       if (isUUID) {
-        const rpcResult = await supabase
-          .rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId });
+        // Wrap RPC in a timeout so a hung connection never leaves the page in an infinite
+        // "Loading vehicle..." state. 8 s is generous; the RPC normally responds in <1 s.
+        const rpcTimeoutMs = 8000;
+        const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: new Error('get_vehicle_profile_data timed out') }), rpcTimeoutMs)
+        );
+        const rpcResult = await Promise.race([
+          supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }),
+          timeoutPromise,
+        ]);
         rpcData = rpcResult.data;
         rpcError = rpcResult.error;
+        if (rpcError?.message?.includes('timed out')) {
+          console.warn('[VehicleProfile] RPC timed out after', rpcTimeoutMs, 'ms — falling back to direct query');
+        }
       }
 
       let vehicleData;
