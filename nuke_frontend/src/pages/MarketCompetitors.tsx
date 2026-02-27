@@ -551,31 +551,50 @@ export default function MarketCompetitors() {
           </button>
         </div>
 
-        {/* CTA */}
-        <div style={{
-          padding: '20px',
-          border: '2px solid var(--accent, #2563eb)',
-          borderRadius: '6px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          background: 'rgba(37,99,235,0.04)',
-        }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: '10pt' }}>Ready to trade?</div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+        {/* CTA — two tracks: invest/trade + investor inquiry */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+          <div style={{
+            padding: '20px',
+            border: '2px solid var(--accent, #2563eb)',
+            borderRadius: '6px',
+            background: 'rgba(37,99,235,0.04)',
+          }}>
+            <div style={{ fontWeight: 800, fontSize: '10pt', marginBottom: '6px' }}>Ready to trade?</div>
+            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
               Invest in segment ETFs (PORS, TRUK, SQBD, Y79) or browse individual vehicle offerings.
             </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
+                Go to Exchange
+              </button>
+              <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>
+                Portfolio
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
-              Go to Exchange
-            </button>
-            <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>
-              Portfolio
-            </button>
+
+          <div style={{
+            padding: '20px',
+            border: '1px solid var(--border)',
+            borderRadius: '6px',
+            background: 'var(--surface)',
+          }}>
+            <div style={{ fontWeight: 800, fontSize: '10pt', marginBottom: '6px' }}>Investor inquiry?</div>
+            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
+              Access the full data room: business plan, revenue model, technical exhibits, and information memorandum.
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="button button-primary" onClick={() => navigate('/offering')}>
+                Investor Data Room
+              </button>
+              <a
+                href="mailto:info@nuke.ag?subject=Investment%20Inquiry"
+                className="button button-secondary"
+                style={{ textDecoration: 'none' }}
+              >
+                Email us
+              </a>
+            </div>
           </div>
         </div>
 
