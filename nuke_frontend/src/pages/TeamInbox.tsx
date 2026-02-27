@@ -131,14 +131,24 @@ function roleColor(role: string) {
   return ROLE_COLORS[role] || '#6b7280';
 }
 
-function getInitials(name: string | null, email: string): string {
-  if (name) {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-  return email.slice(0, 2).toUpperCase();
+function getAvatarColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return `hsl(${Math.abs(hash) % 360}, 55%, 45%)`;
 }
+
+function getInitials(name: string | null, email: string): string {
+  if (name) return name.charAt(0).toUpperCase();
+  return email.split('@')[0].charAt(0).toUpperCase();
+}
+
+const CarIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4, opacity: 0.6 }}>
+    <path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h12l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/>
+    <circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/>
+  </svg>
+);
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -209,22 +219,18 @@ function UnreadBadge({ count }: { count: number }) {
 
 function SenderAvatar({ name, email, size = 36 }: { name: string | null; email: string; size?: number }) {
   const initials = getInitials(name, email);
-  // Deterministic color from email string
-  let hash = 0;
-  for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash);
-  const hue = Math.abs(hash) % 360;
   return (
     <div style={{
       width: size,
       height: size,
       borderRadius: '50%',
-      background: `hsl(${hue}, 55%, 42%)`,
+      background: getAvatarColor(email),
       color: '#fff',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: size < 30 ? '10px' : '13px',
-      fontWeight: 700,
+      fontSize: size <= 36 ? '14px' : '16px',
+      fontWeight: 600,
       fontFamily: 'var(--font-family)',
       flexShrink: 0,
       letterSpacing: '0.02em',
@@ -459,8 +465,12 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                     transition: 'background 0.1s',
                   }}
                 >
+                  {/* Sender avatar */}
+                  <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 12, flexShrink: 0 }}>
+                    <SenderAvatar name={email.from_name} email={email.from_address} size={36} />
+                  </div>
                   {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingLeft: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingLeft: 10 }}>
                     {/* Row 1: sender + time */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                       <span style={{
@@ -555,7 +565,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
             }}>
               {/* Sender row */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <SenderAvatar name={selected.from_name} email={selected.from_address} size={40} />
+                <SenderAvatar name={selected.from_name} email={selected.from_address} size={48} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>
                     {selected.from_name || selected.from_address}
@@ -693,6 +703,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                           fontFamily: 'var(--font-mono)',
                         }}
                       >
+                        <CarIcon />
                         {url}
                       </a>
                     </div>
@@ -705,6 +716,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
             <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
               {selected.body_html ? (
                 <div
+                  className="email-body"
                   dangerouslySetInnerHTML={{ __html: selected.body_html }}
                   style={{
                     fontSize: '15px',
@@ -739,6 +751,21 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                     <div key={i} style={{ fontSize: '13px', color: 'var(--text)', padding: '2px 0' }}>
                       {att.filename} <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>({att.content_type})</span>
                     </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Image attachment thumbnails */}
+              {selected.attachments?.filter((a: any) => a.content_type?.startsWith('image/') && a.url).length > 0 && (
+                <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: 12 }}>
+                  {selected.attachments.filter((a: any) => a.content_type?.startsWith('image/') && a.url).map((att: any, i: number) => (
+                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={att.url}
+                        alt={att.filename || 'attachment'}
+                        style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }}
+                      />
+                    </a>
                   ))}
                 </div>
               )}
@@ -1409,7 +1436,7 @@ export default function TeamInbox() {
 
   return (
     <>
-      {/* Scoped styles for responsive behavior */}
+      {/* Scoped styles for responsive behavior + email body rendering */}
       <style>{`
         @media (max-width: 768px) {
           .inbox-middle-pane { width: 100% !important; max-width: 100% !important; min-width: 0 !important; border-right: none !important; }
@@ -1419,6 +1446,12 @@ export default function TeamInbox() {
         }
         .inbox-mobile-tabbar { display: none; }
         .inbox-email-row:hover { background: var(--surface-hover) !important; }
+        .email-body img { max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0; display: block; }
+        .email-body a { color: var(--primary, #3b82f6); text-decoration: underline; }
+        .email-body p { margin: 0 0 12px; }
+        .email-body table { max-width: 100%; border-collapse: collapse; }
+        .email-body td, .email-body th { padding: 6px 8px; border: 1px solid var(--border); }
+        .email-body blockquote { border-left: 3px solid var(--border); margin: 0 0 12px 0; padding-left: 12px; color: var(--text-muted); }
       `}</style>
 
       <div style={{
