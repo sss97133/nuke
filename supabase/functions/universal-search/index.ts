@@ -230,6 +230,8 @@ serve(async (req) => {
         .select(VEHICLE_SELECT)
         .eq('year', year)
         .eq('is_public', true)
+        .not('make', 'is', null)
+        .not('model', 'is', null)
         .order('updated_at', { ascending: false })
         .limit(sanitizedLimit);
 
@@ -316,6 +318,9 @@ serve(async (req) => {
               .from('vehicles')
               .select(VEHICLE_SELECT)
               .eq('is_public', true)
+              .not('year', 'is', null)
+              .not('make', 'is', null)
+              .not('model', 'is', null)
               .textSearch('search_vector', tsqueryStr, { type: 'plain', config: 'english' })
               .limit(vehicleLimit);
 
@@ -333,7 +338,11 @@ serve(async (req) => {
           let ilikeQuery = supabase
             .from('vehicles')
             .select(VEHICLE_SELECT)
-            .eq('is_public', true);
+            .eq('is_public', true)
+            // Filter stub vehicles (no year/make/model) from search results
+            .not('year', 'is', null)
+            .not('make', 'is', null)
+            .not('model', 'is', null);
 
           if (yearMatch) {
             // "1973 Porsche 911" → year=1973 AND (make|model ILIKE '%porsche 911%')

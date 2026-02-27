@@ -57,11 +57,14 @@ serve(async (req) => {
       return jsonResponse({ error: "Provide 'q' (search query), 'make', or 'model'" }, 400);
     }
 
-    // Build query
+    // Build query — filter stubs (no year/make/model) from inventory
     let query = supabase
       .from("vehicles")
       .select("id, vin, year, make, model, trim, color, interior_color, sale_price, mileage, transmission, engine_size, body_style, auction_source, created_at", { count: "estimated" })
-      .eq("is_public", true);
+      .eq("is_public", true)
+      .not("year", "is", null)
+      .not("make", "is", null)
+      .not("model", "is", null);
 
     // Full-text search
     if (q) {

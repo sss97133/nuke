@@ -120,11 +120,15 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           
           const [vehicles, orgs, externalIdentities] = await Promise.all([
             // Only search vehicles if it doesn't look like a username
+            // Filter stubs (no year/make/model) from autocomplete suggestions
             !looksLikeUsername
               ? supabase
                   .from('vehicles')
                   .select('id, year, make, model')
                   .eq('is_public', true)
+                  .not('year', 'is', null)
+                  .not('make', 'is', null)
+                  .not('model', 'is', null)
                   .or(`make.ilike.%${querySafe}%,model.ilike.%${querySafe}%`)
                   .limit(3)
               : Promise.resolve({ data: [], error: null }),
@@ -280,6 +284,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     // Fast-path: VIN lookup — 17-char alphanumeric (no I, O, Q)
     const looksLikeVin = /^[A-HJ-NPR-Z0-9]{17}$/i.test(trimmedQuery);
     if (looksLikeVin) {
+      setIsSearching(true);
       try {
         const { data: vehicleByVin } = await supabase
           .from('vehicles')
@@ -290,8 +295,15 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           navigate(`/vehicle/${vehicleByVin.id}`);
           return;
         }
+        // VIN not found — return clear message instead of falling through to garbled results
+        onSearchResults(
+          [],
+          `VIN "${trimmedQuery.toUpperCase()}" not found in the Nuke database. Use the VIN Lookup button on the search page for partial VIN search, or try searching by year/make/model.`
+        );
+        setIsSearching(false);
+        return;
       } catch {
-        // ignore; fall through to regular search
+        // Network error — fall through to regular search
       }
     }
 
