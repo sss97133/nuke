@@ -33,6 +33,7 @@ const operations: AdminNavItem[] = [
   { label: 'Live Analysis', to: '/admin/live-analysis' },
   { label: 'Batch Analysis', to: '/admin/batch-analysis' },
   { label: 'Extraction Monitor', to: '/admin/extraction-monitor' },
+  { label: 'Data Quality', to: '/admin/data-quality', description: 'Field completion rates + enrichment workforce' },
   { label: 'Extraction Review', to: '/admin/extraction-review' },
 ];
 
