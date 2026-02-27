@@ -1,4 +1,22 @@
-# NEXT SESSION — COO SPRINT DIRECTIVE (Updated 2026-02-27 14:37 AST)
+# NEXT SESSION — COO SPRINT DIRECTIVE (Updated 2026-02-27 14:50 AST)
+
+## 🔴 TOP-LINE REALITY: 29.9 MILLION MISSING DATA POINTS
+
+> "There's millions of missing data points that could have been extracted. We need to be fixing that."
+
+The database has **1,241,184 vehicles** but is **83.2% empty**. Average field coverage is 16.8%. This is the #1 problem.
+
+| Category | Missing | Root Cause |
+|----------|---------|------------|
+| Extractable (on listing pages) | 6.9M points | Extractors skip secondary fields |
+| Enrichable (make/model/year lookup) | 13.1M points | No spec reference table built |
+| Computed (our value-add scores) | 3.9M points | Scoring functions broken/incomplete |
+| **TOTAL** | **29.9M points** | **Nobody was assigned to fix it** |
+
+Worst offenders: engine_liters 0.1%, signal_score 0.2%, deal_score 0.7%, asking_price 0.9%.
+See full audit: #185
+
+---
 
 ## ⛔ CEO MANDATE: EVERY VP NEEDS A DETECTIVE
 
@@ -118,7 +136,28 @@ Spin up a NEW agent for each task. Do NOT serialize. Do NOT pick up unrelated wo
 
 ## PRIORITY STACK
 
-### TIER 0: DETECTIVE SYSTEM ARCHITECTURE (CTO + VP Platform)
+### TIER 0A: DATA REMEDIATION — 29.9M MISSING POINTS (VP Vehicle Intel + VP Extraction)
+
+#### #185 — Phase 1: Spec Enrichment Pipeline (VP Vehicle Intel) [P0 — HIGHEST LEVERAGE]
+**What:** Build a `vehicle_specs_reference` table from NHTSA/EPA data + our own 220K vehicles that already have specs. Then backfill: horsepower, torque, mpg, fuel_type, drivetrain, engine_type, engine_liters, body_style, weight, wheelbase, seats, doors.
+**Why highest leverage:** One lookup per (make, model, year) fills 13 fields at once across 1.15M vehicles. That's ~13M data points from one pipeline.
+**Data sources:** NHTSA vPIC API (free VIN decode + specs), EPA fuel economy API (free MPG), plus mine our own data where we already have specs for common make/model/year combos.
+**Time estimate:** 2-3 sessions to build reference table + backfill cron.
+
+#### #185 — Phase 2: Re-Extraction Pipeline (VP Extraction) [P0]
+**What:** For the 85.5% of vehicles that have `listing_url`, re-visit the page and extract VIN, mileage, description, images, color, interior_color, transmission. DON'T overwrite existing data.
+**Why:** 6.9M extractable data points are sitting on listing pages we already have URLs for.
+**Implementation:** New `re-extract-missing-fields` edge function. Query vehicles with `listing_url IS NOT NULL AND (vin IS NULL OR mileage IS NULL OR primary_image_url IS NULL)`. Use `archiveFetch` to get cached page. Parse missing fields only.
+**Time estimate:** 2-3 sessions.
+
+#### #185 — Phase 3: Fix Computed Scores (VP Vehicle Intel) [P0]
+**What:** signal_score at 0.2% and deal_score at 0.7% means the scoring pipelines are basically broken. Investigate and fix:
+- Is `compute-vehicle-valuation-backfill` (cron 300) actually running? Check cron.job_run_details.
+- Does the signal_score function exist? Is it wired to a cron?
+- Does deal_score have the data dependencies it needs to compute?
+**Time estimate:** 1 session to diagnose, 1 session to fix and backfill.
+
+### TIER 0B: DETECTIVE SYSTEM ARCHITECTURE (CTO + VP Platform)
 
 #### #184 — CTO + VP Platform: Build Detective Infrastructure [P0]
 **What:** Create `detective_audit_log` table, `_shared/detective.ts` utility, wire Telegram alerts.
@@ -179,15 +218,27 @@ Likely addressed by the performance commits. Verify. If still broken, fix.
 ## PARALLELIZATION MAP
 
 ```
-Agent 1 (CTO + Platform)  → #184 detective infrastructure  [TIER 0, independent]
-Agent 2 (CPO)              → #173 shareable profiles        [TIER 1, independent]
-Agent 3 (VP Extraction)    → #182 duplicate hero images     [TIER 1, independent]
-Agent 4 (VP Extraction)    → #183 BJ 0% images             [TIER 1, independent]
-Agent 5 (VP Platform)      → #181 quality alerting          [TIER 1, independent]
-Agent 6 (VP Platform)      → verify #175/#177/#178/#179     [TIER 2, independent]
-Agent 7 (VP Platform)      → #180 email pipeline            [TIER 3, blocked on CEO]
-Agent 8 (VP Platform)      → #174 health check endpoint     [TIER 3, independent]
-Agent 9 (VP Vehicle Intel) → #173 data quality uplift       [TIER 1, independent]
+--- TIER 0A: DATA REMEDIATION (the real work) ---
+Agent A (VP Vehicle Intel)  → #185 Phase 1: spec enrichment pipeline  [HIGHEST LEVERAGE]
+Agent B (VP Extraction)     → #185 Phase 2: re-extraction pipeline    [6.9M extractable points]
+Agent C (VP Vehicle Intel)  → #185 Phase 3: fix computed scores       [signal_score 0.2%, deal_score 0.7%]
+
+--- TIER 0B: DETECTIVE INFRASTRUCTURE ---
+Agent 1 (CTO + Platform)    → #184 detective infrastructure           [enables self-diagnosis]
+
+--- TIER 1: CRITICAL OPEN ISSUES ---
+Agent 2 (CPO)               → #173 shareable profiles                 [CEO screaming for days]
+Agent 3 (VP Extraction)     → #182 duplicate hero images              [CEO spotted on homepage]
+Agent 4 (VP Extraction)     → #183 BJ 0% images                      [2,736 vehicles, 0 images]
+Agent 5 (VP Platform)       → #181 quality alerting                   [wire to Telegram]
+
+--- TIER 2: VERIFICATION ---
+Agent 6 (VP Platform)       → verify #175/#177/#178/#179 are live     [production check]
+
+--- TIER 3: REMAINING ---
+Agent 7 (VP Platform)       → #180 email pipeline                     [blocked on CEO Gmail]
+Agent 8 (VP Platform)       → #174 health check endpoint             [diagnostic RPC]
+Agent 9 (VP Vehicle Intel)  → #173 data quality uplift               [Skylar's 250 vehicles]
 ```
 
 No dependencies. All start immediately. Detective checks run FIRST for each VP before task work.
@@ -214,7 +265,7 @@ No dependencies. All start immediately. Detective checks run FIRST for each VP b
 - agent_tasks RLS: blocks remote inserts via anon key — use service role key
 - Telegram bot: @Nukeagpbot, chatId: 7587296683
 - Gmail for alerts: `toymachine91@gmail.com`
-- 18K+ vehicles, 33M images, 2,736 Barrett-Jackson vehicles with 0% images
+- 1,241,184 vehicles, 33M images, 83.2% empty fields, 29.9M missing data points
 
 ## DONE PROTOCOL
 
@@ -227,6 +278,6 @@ When you complete a task:
 
 ---
 
-**COO DIRECTIVE: The CEO wants self-diagnosing VPs, not reactive firefighting. Build the detectives. Fix the open issues. Every VP proves their value by catching problems before the CEO does.**
+**COO DIRECTIVE: 29.9M missing data points is the existential problem. Data remediation is TIER 0. Build the spec enrichment pipeline, fix the re-extraction pipeline, fix the broken scoring functions. Every VP proves their value by filling fields, not building features.**
 
-Filed by COO (Perplexity Computer) at 2026-02-27T18:37:00Z
+Filed by COO (Perplexity Computer) at 2026-02-27T18:50:00Z
