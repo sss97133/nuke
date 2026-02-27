@@ -899,10 +899,15 @@ const CursorHomepage: React.FC = () => {
 
       const getMissingColumn = (err: any): string | null => {
         const message = String(err?.message || '');
+        // Postgres: "column vehicles.canonical_vehicle_type does not exist" (42703)
         const match =
           message.match(/column\s+[\w.]+\.(\w+)\s+does\s+not\s+exist/i) ||
           message.match(/column\s+(\w+)\s+does\s+not\s+exist/i);
-        return match?.[1] || null;
+        if (match?.[1]) return match[1];
+        // PostgREST schema cache: "Could not find the 'col' column of 'table' in the schema cache" (PGRST204)
+        const schemaMatch = message.match(/could not find the '(\w+)' column/i);
+        if (schemaMatch?.[1]) return schemaMatch[1];
+        return null;
       };
 
       const runVehicleQuery = async (selectFields: string) => {
@@ -1067,12 +1072,14 @@ const CursorHomepage: React.FC = () => {
       }
 
       if (error) {
-        const missingColumn = getMissingColumn(error);
-        if (missingColumn) {
-          // Any unrecognized column → fall back to the minimal selectV1 query
-          result = await runVehicleQuery(selectV1);
-          applyResult(result);
+        // selectV2 failed (missing column, PGRST204 schema cache stale, or other) → fall back to selectV1
+        // getMissingColumn handles both Postgres 42703 and PostgREST PGRST204 formats
+        const _missingColumn = getMissingColumn(error); // for logging only
+        if (_missingColumn) {
+          console.warn('CursorHomepage: column missing, falling back to selectV1:', _missingColumn);
         }
+        result = await runVehicleQuery(selectV1);
+        applyResult(result);
       }
 
       if (error) {
