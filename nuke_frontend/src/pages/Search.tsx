@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import IntelligentSearch from '../components/search/IntelligentSearch';
 import SearchResults from '../components/search/SearchResults';
+import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { aiGateway } from '../lib/aiGateway';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -64,6 +65,31 @@ export default function Search() {
   const [answerSources, setAnswerSources] = useState<Array<{ title: string; href?: string }>>([]);
   const [answerRequestId, setAnswerRequestId] = useState(0);
   const [showWorkstation, setShowWorkstation] = useState(false);
+
+  // Featured vehicles for empty state
+  const [featuredVehicles, setFeaturedVehicles] = useState<Array<{
+    id: string;
+    year: number | null;
+    make: string | null;
+    model: string | null;
+    primary_image_url: string | null;
+    sale_price: number | null;
+  }>>([]);
+
+  useEffect(() => {
+    if (searchQuery) return;
+    supabase
+      .from('vehicles')
+      .select('id,year,make,model,primary_image_url,sale_price')
+      .eq('is_public', true)
+      .not('primary_image_url', 'is', null)
+      .not('year', 'is', null)
+      .order('sale_price', { ascending: false, nullsFirst: false })
+      .limit(24)
+      .then(({ data }) => {
+        if (data) setFeaturedVehicles(data);
+      });
+  }, [searchQuery]);
 
   // VIN search state
   const [vinInput, setVinInput] = useState('');
@@ -1041,21 +1067,11 @@ export default function Search() {
         </div>
       )}
 
-      {/* No-query empty state */}
+      {/* No-query empty state — featured vehicles */}
       {!searchQuery && !loading && (
-        <div style={{
-          textAlign: 'center',
-          padding: '64px 24px',
-          color: '#999',
-        }}>
-          <div style={{ fontSize: '42px', marginBottom: '12px', opacity: 0.3 }}>N</div>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#555', marginBottom: '8px' }}>
-            Search Nuke
-          </div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '24px' }}>
-            Find vehicles, organizations, people, and more
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '0 0 48px' }}>
+          {/* Quick-search suggestions */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '32px' }}>
             {['Porsche 911', '1967 Mustang', 'LS swap', 'Barn find', 'Ferrari'].map(term => (
               <a
                 key={term}
@@ -1077,6 +1093,41 @@ export default function Search() {
               </a>
             ))}
           </div>
+
+          {/* Featured vehicles grid */}
+          {featuredVehicles.length > 0 && (
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
+                Top Vehicles by Value
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                gap: '12px',
+              }}>
+                {featuredVehicles.map(v => (
+                  <VehicleCardDense
+                    key={v.id}
+                    vehicle={{
+                      id: v.id,
+                      year: v.year ?? undefined,
+                      make: v.make ?? undefined,
+                      model: v.model ?? undefined,
+                      primary_image_url: v.primary_image_url ?? undefined,
+                      sale_price: v.sale_price ?? undefined,
+                    }}
+                    viewMode="gallery"
+                    showSocial={false}
+                    showPriceChange={false}
+                    showPriceOverlay={true}
+                    showDetailOverlay={true}
+                    infoDense={true}
+                    thumbnailFit="cover"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
