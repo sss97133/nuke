@@ -759,7 +759,11 @@ function buildVehicleRecord(extracted: ExtractionResult): Record<string, any> {
     description: extracted.description,
     sale_price: extracted.sale_price,
     sale_date: extracted.sale_date,
-    sale_status: extracted.auction_status === "sold" ? "sold" : (extracted.auction_status === "upcoming" ? "available" : extracted.auction_status),
+    sale_status: extracted.auction_status === "sold" ? "sold"
+      : extracted.auction_status === "upcoming" ? "available"
+      : extracted.auction_status === "unsold" ? "not_sold"
+      : extracted.auction_status === "withdrawn" ? "ended"
+      : "ended",
     auction_end_date: extracted.sale_date,
     auction_outcome: extracted.auction_status === "sold"
       ? "sold"
