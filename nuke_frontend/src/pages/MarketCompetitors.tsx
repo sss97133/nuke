@@ -44,7 +44,7 @@ const COMPETITORS: Competitor[] = [
     vehiclesOffered: '1.25M tracked',
     aum: '—',
     regulatory: 'MVP',
-    notes: 'Only platform with proprietary transaction data across 15+ auction sources. NAV computed from real market data, not appraiser estimates.',
+    notes: 'Only platform with proprietary transaction data across 15+ auction sources. NAV computed from real market closes, not appraiser estimates.',
     isNuke: true,
   },
   {
@@ -54,40 +54,40 @@ const COMPETITORS: Competitor[] = [
     tagline: 'Invest in iconic collectibles',
     founded: '2017',
     hq: 'New York, NY',
-    model: 'SEC Reg A+, individual asset offerings + secondary market',
-    minInvestment: '$55–$125/share (cars)',
-    vehiclesOffered: '9 cars currently listed',
+    model: 'SEC Reg A+, individual asset IPOs + secondary market',
+    minInvestment: '$14.25–$212.50/share',
+    vehiclesOffered: '9 cars ($2.07M total market cap)',
     aum: 'Undisclosed',
     regulatory: 'SEC Reg A+',
-    notes: '9 verified car listings: 1965 Mustang ($110K market cap), Saleen S7 ($420K), Ferrari Testarossa, Porsche 356, Lotus Esprit S1, BMW 850CSi, Lamborghini Jalpa, Ford GT, Aston Martin V8 Vantage. Multi-asset platform (cars share catalog with cards, comics, NFTs).',
+    notes: '9 verified car listings: BMW 850CSi ($142.5K, $14.25/share), Porsche 356 Speedster ($425K, $212.50/share), Ford GT ($320K), Aston Martin V8 Vantage ($297.5K), 1985 Ferrari Testarossa ($165K), Lamborghini Jalpa ($135K), Ford Mustang ($82.5K), Lotus Esprit ($77.7K). Saleen S7 ($420K) already exited. Multi-asset: cars share catalog with cards, comics, NFTs, wine.',
   },
   {
     id: 'carcrowd',
     name: 'TheCarCrowd',
     url: 'thecarcrowd.uk',
-    tagline: 'Fractional classic car investment',
+    tagline: 'Fractional classic car syndicates',
     founded: '2021',
     hq: 'Newark, UK',
-    model: 'FCA-regulated, per-vehicle fractional shares + secondary market',
-    minInvestment: '£18.90–£220/share',
-    vehiclesOffered: '40+ under management; 3 live offerings',
+    model: 'FCA-regulated car syndicates, 3–8 investors per vehicle',
+    minInvestment: '£25,000–£35,000/allocation',
+    vehiclesOffered: '15 vehicles (12 active, 3 planned)',
     aum: 'Undisclosed',
     regulatory: 'FCA (UK)',
-    notes: 'Largest car-specific fractional platform by asset count. 12.6% avg annual returns claimed since 2021. Current live offers: Ferrari F430, Audi R8, Mercedes SLS. 4,000+ members. UK-only market.',
+    notes: 'UK-only, accredited-investor level minimums (£25K–£35K per slot). Active: Ferrari F430, Audi R8 V10 manual, Mercedes SLS, Lamborghini Gallardo (1 of 250 gated 6-speed), Porsche 996 GT3 RS (15.53% projected annual return), Aston Martin V12 Vantage. Planned: Ferrari 360 CS, Ferrari 348 TB, Lamborghini Diablo SV. 3–5 year hold, CGT-free structure.',
   },
   {
     id: 'fractionmotors',
     name: 'Fraction Motors',
     url: 'fractionmotors.com',
-    tagline: 'Own a fraction of a collectible car',
+    tagline: 'Blockchain-tokenized collector cars',
     founded: '2022',
     hq: 'Birmingham, AL',
-    model: 'Solana blockchain tokenization — 100,000 tokens per vehicle',
-    minInvestment: 'Sub-$1 (Solana token fractions)',
-    vehiclesOffered: '5+ cars (Mustang, Chevelle, GT500, Beetle, Fiero)',
+    model: 'Solana tokenization — 100,000 tokens per vehicle',
+    minInvestment: 'Sub-$1 (fraction of 0.247–0.957 SOL)',
+    vehiclesOffered: '5 cars ($284.4K total appraised)',
     aum: 'Undisclosed / early stage',
     regulatory: 'Unregulated (blockchain)',
-    notes: 'Car-specific, blockchain-native. Appraised values $24,700–$95,700. 100k fungible tokens per vehicle traded on Solana DEX. Accessible classics (Fiero, Chevelle, Beetle — not ultra-premium). iOS + Android app.',
+    notes: '5 verified listings: 1965 Mustang K-Code ($95.7K, VIN 5R08K133254), 1969 Chevelle SS 396 L78 ($66.5K), 2012 Shelby GT500 ($58.4K), 1958 VW Beetle ($39.1K), 1988 Pontiac Fiero GT ($24.7K). All still available. 100k Solana tokens/car. iOS + Android app. No secondary market liquidity data yet.',
   },
   {
     id: 'ccc',
@@ -96,12 +96,12 @@ const COMPETITORS: Competitor[] = [
     tagline: 'Fractional classic car ownership',
     founded: 'Unknown',
     hq: 'Netherlands (EU)',
-    model: 'Password-gated platform, EUR-denominated',
-    minInvestment: 'Unknown (private)',
-    vehiclesOffered: 'Unknown (site is gated)',
+    model: 'Password-gated, EUR-denominated, Shopify storefront',
+    minInvestment: 'Unknown — site fully gated',
+    vehiclesOffered: 'Unknown — site fully gated',
     aum: 'Unknown',
-    regulatory: 'EU (unknown specifics)',
-    notes: 'Netherlands-based, EUR-denominated. Shopify-powered storefront, fully password-gated — no public data on inventory or pricing. Not accessible to US investors.',
+    regulatory: 'EU (unverified)',
+    notes: 'Netherlands-based. Entire platform is password-protected — no public inventory, pricing, or terms. EUR-denominated, US investors cannot access. No SEC/FCA filing found. Treat as opaque until further data.',
   },
 ];
 
@@ -164,9 +164,9 @@ const FEATURES: FeatureRow[] = [
   },
   {
     category: 'Market',
-    feature: 'Min investment < $10',
-    description: 'Low barrier to entry for retail investors',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'strong', ccc: 'na' },
+    feature: 'Min investment < $25',
+    description: 'Accessible to retail investors (Rally: $14.25/share; CarCrowd: £25,000/slot; Fraction: <$1)',
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', fractionmotors: 'strong', ccc: 'na' },
   },
   // Vehicle focus
   {
@@ -225,24 +225,24 @@ const TIER_CONFIG: Record<Tier, { label: string; bg: string; color: string }> = 
 
 const NUKE_ADVANTAGES = [
   {
-    title: '1.25M vehicles vs. 9 cars (Rally) / 40 cars (TheCarCrowd)',
-    body: 'Rally has 9 verified car listings. TheCarCrowd has 40+ under management. Nuke tracks 1.25M vehicles with real transaction history across BaT, Cars & Bids, Mecum, Bonhams, Gooding, RM Sotheby\'s, and 10+ more sources. That\'s not a rounding difference — it\'s a different category of product.',
+    title: '1.25M vehicles vs. 9 (Rally) / 15 (TheCarCrowd) / 5 (Fraction Motors)',
+    body: 'Rally has 9 verified car listings totaling $2.07M in fractional market cap. TheCarCrowd has 15 UK-only syndicates. Fraction Motors has 5 Solana-tokenized cars worth $284K appraised. Nuke tracks 1.25M vehicles with real transaction history across BaT, Cars & Bids, Mecum, Bonhams, Gooding, RM Sotheby\'s, and 10+ more. That\'s not a rounding difference — it\'s a different category of product.',
   },
   {
-    title: 'Real transactions, not Hagerty appraisals',
-    body: 'Rally prices its assets using Hagerty valuations and third-party appraisers — estimates from humans who look at comps and write a number. Nuke NAV is computed from actual auction closes. When a matching Porsche 911SC sells for $47K at BaT, our NAV updates. No appraiser, no lag, no subjectivity.',
+    title: 'Real auction closes, not appraisals and projections',
+    body: 'Rally prices its 9 cars using Hagerty valuations. Fraction Motors uses third-party appraisals ($24.7K–$95.7K per car). TheCarCrowd projects 15.53% annual growth on their Porsche 996 GT3 RS based on market forecasts. Nuke NAV is computed from actual auction closes. When a matching 911SC sells at BaT, our NAV updates immediately. No appraiser, no lag, no projection.',
   },
   {
-    title: 'YONO: vision AI trained on collector cars',
-    body: 'No competitor uses computer vision to assess condition, detect damage, or flag modifications. YONO runs on every photo at $0/image — giving Nuke a condition signal that appraisers charge $500–2,000 to produce manually. TheCarCrowd hires human experts. We train models.',
+    title: 'YONO: vision AI — no competitor has this',
+    body: 'Rally\'s 9 cars are photographed and appraised by hand. TheCarCrowd uses expert valuers on each syndicate. Fraction Motors relies on CARFAX and appraisals. No competitor uses computer vision to assess condition, detect damage, or flag modifications. YONO runs on every photo at $0/image — a condition signal appraisers charge $500–$2,000 to produce.',
   },
   {
-    title: 'Segment ETFs — a product nobody else offers',
-    body: 'Every competitor offers individual vehicle fractions. Rally (9 cars), TheCarCrowd (3 live offerings), Fraction Motors (5 cars). Nuke also offers segment ETFs — diversified funds across PORS, TRUK, SQBD, Y79 — with NAV computed from real market cap of that entire vehicle category. No one else does this.',
+    title: 'Segment ETFs — nobody else offers this',
+    body: 'Every competitor sells individual vehicle fractions: Rally\'s $14.25 BMW share, TheCarCrowd\'s £25K Ferrari slot, Fraction Motors\' Solana tokens. Nuke also offers segment ETFs (PORS, TRUK, SQBD, Y79) with NAV computed from the real market cap of entire vehicle categories — diversification without picking a single car.',
   },
   {
-    title: 'Data moat compounds. Their inventory doesn\'t.',
-    body: 'Every extraction run adds transaction history. Every YONO inference adds training data. Every vehicle profile adds provenance. Rally\'s data is static — they curated 9 cars. TheCarCrowd has 40. Nuke\'s coverage grows automatically with every auction that closes anywhere in the world.',
+    title: 'TheCarCrowd requires £25,000 minimum. Rally: $14.25. Nuke: $1.',
+    body: 'TheCarCrowd syndicates are 3–8 slots at £25,000–£35,000 each — UK-only, accredited-investor territory. Fraction Motors is technically sub-$1 but is unregulated Solana tokens with no secondary market liquidity data. Rally is $14.25/share minimum for cars. Nuke is $1 minimum, US market, with a live order book.',
   },
 ];
 
@@ -298,7 +298,7 @@ export default function MarketCompetitors() {
               Fractional Vehicle Ownership — Market Landscape
             </h1>
             <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
-              How Nuke compares against Rally (9 cars), TheCarCrowd (40+ cars, UK), Fraction Motors (Solana), and Classic Car Collective (EU)
+              Rally: 9 cars, $2.07M market cap · TheCarCrowd: 15 vehicles, £25K min, UK-only · Fraction Motors: 5 cars, $284K appraised, Solana · vs. Nuke: 1.25M vehicles tracked
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -492,31 +492,31 @@ export default function MarketCompetitors() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
           <SummaryCard
             title="vs. Rally"
-            verdict="9 cars vs. 1.25M vehicles"
+            verdict="$2.07M in 9 cars vs. 1.25M vehicles"
             color="rgba(37,99,235,0.12)"
             accentColor="#1d4ed8"
-            body="Rally has 9 verified car listings (Mustang, Saleen S7, Porsche 356, Ferrari Testarossa, etc.) priced via Hagerty appraisals. Nuke has transaction history on 1.25M vehicles from real auction closes. Rally's moat is brand. Ours is data — and data compounds."
+            body="Rally's entire car portfolio: 9 vehicles, $2.07M total market cap, $14.25–$212.50/share. Priced via Hagerty appraisals. Their Saleen S7 ($420K) already exited. Nuke has transaction history on 1.25M vehicles from real closes. Rally's moat is brand. Ours is data."
           />
           <SummaryCard
             title="vs. TheCarCrowd"
-            verdict="US access + real data"
+            verdict="£25,000 minimum. UK only. No US."
             color="rgba(16,185,129,0.12)"
             accentColor="#059669"
-            body="TheCarCrowd is the most serious car-specific competitor — FCA-regulated, 40+ assets, 12.6% claimed avg annual return since 2021. But UK-only, no US access, no continuous order book, no transaction data. Their NAV comes from expert valuations, not market closes."
+            body="15 vehicles, £25K–£35K per syndicate slot (3–8 investors per car). FCA-regulated, 3–5 year hold, CGT-free — serious product, wrong market. UK-only, no US access, no continuous order book, no transaction data. Their Porsche 996 GT3 RS projects 15.53% annual growth — from a human forecast, not auction data."
           />
           <SummaryCard
             title="vs. Fraction Motors"
-            verdict="Data layer vs. blockchain"
+            verdict="5 cars, $284K appraised, no exits yet"
             color="rgba(245,158,11,0.12)"
             accentColor="#b45309"
-            body="Fraction Motors (Solana) is car-specific and accessible (sub-$1 fractions, Fiero/Chevelle/Beetle). But unregulated, 5 cars, no auction data, no comps, no order book. Interesting tech bet. Not an investment platform yet."
+            body="5 Solana-tokenized cars: 1965 Mustang K-Code ($95.7K), 1969 Chevelle SS ($66.5K), 2012 GT500 ($58.4K), 1958 Beetle ($39.1K), 1988 Fiero ($24.7K). All still available — no sells, no exits, no secondary market liquidity data. Unregulated. iOS/Android app. Accessible cars, thin platform."
           />
           <SummaryCard
             title="vs. Classic Car Collective"
-            verdict="Transparent vs. gated"
+            verdict="Fully gated — no data available"
             color="rgba(139,92,246,0.12)"
             accentColor="#7c3aed"
-            body="CCC (Netherlands) is password-gated — no public inventory, no pricing, no SEC/FCA data available. EUR-denominated, not accessible to US investors. Unknown vehicle count. The entire platform is opaque by design."
+            body="Netherlands-based, EUR-denominated, Shopify storefront — fully password-protected. No public inventory, no pricing, no regulatory filing found. Not accessible to US investors. Cannot verify vehicle count, returns, or business model."
           />
         </div>
 

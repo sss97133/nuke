@@ -15,7 +15,7 @@ export const config = {
 
 const OG = {
   title:       'Nuke vs. Rally vs. TheCarCrowd — Fractional Vehicle Ownership Compared',
-  description: 'Every fractional car platform compared: Rally (9 cars), TheCarCrowd (40+ cars, UK, FCA), Fraction Motors (Solana). Nuke has real transaction data on 1.25M vehicles. No one else does.',
+  description: 'Real numbers: Rally has 9 cars ($2.07M market cap). TheCarCrowd has 15 UK syndicates at £25K minimum. Fraction Motors has 5 Solana-tokenized cars ($284K appraised). Nuke tracks 1.25M vehicles from real auction data.',
   url:         'https://nuke.ag/market/competitors',
 };
 
