@@ -1,6 +1,7 @@
 // src/routes/modules/vehicle/routes.tsx
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { ProtectedRoute } from '../../../components/auth/ProtectedRoute';
 
 const VehicleProfile = React.lazy(() => import('../../../pages/VehicleProfile'));
 const VehiclesDashboard = React.lazy(() => import('../../../pages/VehiclesDashboard'));
@@ -17,24 +18,28 @@ const VehicleModuleRoutes = () => {
   return (
     <Suspense fallback={<div style={{ padding: '20px' }}>Loading...</div>}>
       <Routes>
+        {/* Public: browse vehicle list + individual profiles */}
         <Route path="/" element={<VehiclesDashboard />} />
         <Route path="/list" element={<VehiclesDashboard />} />
         <Route path="/list/legacy" element={<VehiclesLegacy />} />
-        <Route path="/add" element={<AddVehicle />} />
         <Route path="/:vehicleId" element={<VehicleProfile />} />
-        <Route path="/:vehicleId/edit" element={<EditVehicle />} />
-        <Route path="/:vehicleId/mailbox" element={<VehicleMailbox />} />
-        <Route path="/:vehicleId/invest" element={<InvestorDealPortal />} />
-        <Route path="/:vehicleId/portfolio" element={<VehiclePortfolio />} />
-        <Route path="/:vehicleId/wiring" element={<WiringPlan />} />
+
+        {/* Protected: write / owner-only actions */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/add" element={<AddVehicle />} />
+          <Route path="/:vehicleId/edit" element={<EditVehicle />} />
+          <Route path="/:vehicleId/mailbox" element={<VehicleMailbox />} />
+          <Route path="/:vehicleId/invest" element={<InvestorDealPortal />} />
+          <Route path="/:vehicleId/portfolio" element={<VehiclePortfolio />} />
+          <Route path="/:vehicleId/wiring" element={<WiringPlan />} />
+          <Route path="/:vehicleId/work" element={<VehicleJobs />} />
+        </Route>
+
         {/* Legacy: keep /jobs as alias but steer users to mailbox-first workflow */}
         <Route path="/:vehicleId/jobs" element={<Navigate to="../mailbox" replace />} />
-        {/* Work items page (legacy utility) */}
-        <Route path="/:vehicleId/work" element={<VehicleJobs />} />
       </Routes>
     </Suspense>
   );
 };
 
 export default VehicleModuleRoutes;
-

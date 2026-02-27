@@ -13,6 +13,7 @@ import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/layout/AppLayout';
 import { DomainRoutes } from './routes/DomainRoutes';
 import ErrorBoundary from './components/ErrorBoundary';
+import { AuthErrorBoundary } from './components/auth/AuthErrorBoundary';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 
 const queryClient = new QueryClient({
@@ -35,6 +36,7 @@ export default function App() {
               <GlobalUploadStatus />
 
               <ErrorBoundary>
+                <AuthErrorBoundary>
                 <AppLayout>
                   <Routes>
                     {/* Hub: tabbed homepage (Garage, Feed, Map, Market) */}
@@ -43,6 +45,7 @@ export default function App() {
                     <Route path="/*" element={<DomainRoutes />} />
                   </Routes>
                 </AppLayout>
+                </AuthErrorBoundary>
               </ErrorBoundary>
 
               <UploadProgressBar />

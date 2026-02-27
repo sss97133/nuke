@@ -1,6 +1,7 @@
 // src/routes/modules/organization/routes.tsx
 import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { ProtectedRoute } from '../../../components/auth/ProtectedRoute';
 
 const Organizations = React.lazy(() => import('../../../pages/Organizations'));
 const OrganizationProfile = React.lazy(() => import('../../../pages/OrganizationProfile'));
@@ -17,10 +18,15 @@ const OrganizationModuleRoutes = () => {
   return (
     <Suspense fallback={<LazyFallback />}>
       <Routes>
+        {/* Public: browse orgs + view org profiles */}
         <Route path="/" element={<Organizations />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/create" element={<CreateOrganization />} />
         <Route path="/:orgId" element={<OrganizationProfile />} />
+
+        {/* Protected: user-specific org actions */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/create" element={<CreateOrganization />} />
+        </Route>
       </Routes>
     </Suspense>
   );

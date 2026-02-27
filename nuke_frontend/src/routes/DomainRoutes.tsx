@@ -1,6 +1,7 @@
 // src/routes/DomainRoutes.tsx
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
@@ -85,7 +86,8 @@ export const DomainRoutes = () => {
   return (
     <Suspense fallback={<div className="p-4 text-center">Loading module...</div>}>
       <Routes>
-        {/* Auth */}
+
+        {/* ── Auth ──────────────────────────────────────────────────────── */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Login />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
@@ -93,21 +95,25 @@ export const DomainRoutes = () => {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dropbox-callback" element={<DropboxCallback />} />
 
-        {/* Static / legal pages */}
+        {/* ── Static / legal ────────────────────────────────────────────── */}
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/eula" element={<EULA />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
 
-        {/* Domain Modules */}
+        {/* ── Domain Modules ────────────────────────────────────────────── */}
+        {/* Vehicle + Organization modules have internal ProtectedRoute gates */}
         <Route path="/vehicle/*" element={<VehicleRoutes />} />
         <Route path="/org/*" element={<OrganizationRoutes />} />
+        {/* Dealer module: all routes protected (handled inside the module) */}
         <Route path="/dealer/*" element={<DealerRoutes />} />
+        {/* Admin module: RequireAdmin gate inside the module */}
         <Route path="/admin/*" element={<AdminRoutes />} />
+        {/* Marketplace: mix of public + protected (handled inside the module) */}
         <Route path="/market/*" element={<MarketplaceRoutes />} />
 
-        {/* Legacy Route Compatibility Shims */}
+        {/* ── Legacy Route Compatibility Shims ─────────────────────────── */}
         <Route path="/vehicles" element={<Navigate to="/vehicle/list" replace />} />
         <Route path="/add-vehicle" element={<Navigate to="/vehicle/add" replace />} />
         <Route path="/dashboard" element={<Navigate to="/org/dashboard" replace />} />
@@ -119,37 +125,22 @@ export const DomainRoutes = () => {
         <Route path="/data-diagnostic" element={<Navigate to="/admin/data-diagnostic" replace />} />
         <Route path="/test-contributions" element={<Navigate to="/admin/test-contributions" replace />} />
 
-        {/* Legacy user pages (used by header nav / profile capsule) */}
-        <Route path="/capture" element={<Capture />} />
-        <Route path="/debrief" element={<DailyDebrief />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/profile/:userId" element={<Profile />} />
-        <Route path="/profile/external/:externalIdentityId" element={<Profile />} />
-        <Route path="/capsule" element={<Capsule />} />
-        <Route path="/library" element={<Library />} />
+        {/* ── Public pages ─────────────────────────────────────────────── */}
+        {/* Search: public browse */}
+        <Route path="/search" element={<Search />} />
+        {/* Public auction listings */}
         <Route path="/auctions" element={<AuctionMarketplace />} />
-        <Route path="/auctions/create" element={<CreateAuctionListing />} />
-        {/* Legacy shim: some pages still navigate to /list-vehicle */}
-        <Route path="/list-vehicle" element={<CreateAuctionListing />} />
-        {/* Auction listing detail (internal/native) */}
         <Route path="/auction/:listingId" element={<AuctionListing />} />
         <Route path="/listings/:listingId" element={<AuctionListing />} />
-        <Route path="/invoices" element={<InvoiceManager />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/claim-identity" element={<ClaimExternalIdentity />} />
+        {/* Community pages */}
         <Route path="/bat-members" element={<BaTMembers />} />
         <Route path="/members" element={<BaTMembers />} />
-        <Route path="/search" element={<Search />} />
-
-        {/* Import Data */}
-        <Route path="/import" element={<ImportDataPage />} />
-
-        {/* Settings */}
-        <Route path="/settings/api-keys" element={<ApiKeysPage />} />
-        <Route path="/settings/webhooks" element={<WebhooksPage />} />
-        <Route path="/settings/usage" element={<UsageDashboardPage />} />
-
-        {/* Developers / Documentation */}
+        {/* Public profile views (with userId = public; without = own profile, guarded below) */}
+        <Route path="/profile/:userId" element={<Profile />} />
+        <Route path="/profile/external/:externalIdentityId" element={<Profile />} />
+        {/* Investor offering / data room — semi-public fundraising page */}
+        <Route path="/offering" element={<InvestorOffering />} />
+        {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/docs" element={<DevelopersPage />} />
         <Route path="/docs/api" element={<DevelopersPage />} />
@@ -157,56 +148,74 @@ export const DomainRoutes = () => {
         <Route path="/api" element={<ApiLanding />} />
         <Route path="/api/landing" element={<ApiLanding />} />
         <Route path="/developers/signup" element={<DeveloperSignup />} />
-        <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
-
-        {/* Investor Offering Portal (Data Room) */}
-        <Route path="/offering" element={<InvestorOffering />} />
-
-
-        {/* Business Management */}
-        <Route path="/business/settings" element={<BusinessSettings />} />
-        <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
-
-        {/* Tech Capture - "Techs Take Photos, We Do the Rest" */}
+        {/* Transfer party page — public, token-accessible */}
+        <Route path="/t/:transferId" element={<TransferPartyPage />} />
+        {/* Tech capture & restoration intake — used by shops/techs, not end users */}
         <Route path="/tech" element={<TechCapture />} />
         <Route path="/tech/upload" element={<TechShareUpload />} />
-
-        {/* Restoration Intake - Telegram photo intake for shops */}
         <Route path="/restoration" element={<RestorationIntake />} />
         <Route path="/intake" element={<RestorationIntake />} />
 
-        {/* Curation & receipts */}
-        <Route path="/curation-queue" element={<CurationQueue />} />
-        <Route path="/curation/queue" element={<Navigate to="/curation-queue" replace />} />
-        <Route path="/review/ai-detections" element={<Navigate to="/curation-queue" replace />} />
-        <Route path="/receipts/unlinked" element={<UnlinkedReceipts />} />
-
-        {/* Acquisition Pipeline */}
-        <Route path="/pipeline" element={<AcquisitionPipeline />} />
-        <Route path="/acquisitions" element={<AcquisitionPipeline />} />
-
-        {/* Team Inbox */}
-        <Route path="/inbox" element={<TeamInbox />} />
-
-        {/* Predictions (betting) */}
-        <Route path="/predictions" element={<BettingPage />} />
-        <Route path="/predictions/:id" element={<MarketDetail />} />
-        <Route path="/predictions/live" element={<LiveAuctionView />} />
-
-        {/* Hub convenience routes → redirect to homepage tabs */}
+        {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
         <Route path="/map" element={<Navigate to="/?tab=map" replace />} />
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
+        {/* ── Protected routes (require sign-in) ───────────────────────── */}
+        <Route element={<ProtectedRoute />}>
+          {/* Own profile (no userId = current user's profile) */}
+          <Route path="/profile" element={<Profile />} />
 
-        {/* Transfer party page — public, token-accessible */}
-        <Route path="/t/:transferId" element={<TransferPartyPage />} />
+          {/* Personal workspace */}
+          <Route path="/capture" element={<Capture />} />
+          <Route path="/library" element={<Library />} />
+          <Route path="/capsule" element={<Capsule />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/debrief" element={<DailyDebrief />} />
+          <Route path="/inbox" element={<TeamInbox />} />
 
-        {/* Stripe Connect */}
-        <Route path="/stripe-connect" element={<StripeConnect />} />
-        <Route path="/stripe-connect/store/:accountId" element={<StripeConnectStore />} />
+          {/* Content / data management */}
+          <Route path="/import" element={<ImportDataPage />} />
+          <Route path="/invoices" element={<InvoiceManager />} />
+          <Route path="/curation-queue" element={<CurationQueue />} />
+          <Route path="/curation/queue" element={<Navigate to="/curation-queue" replace />} />
+          <Route path="/review/ai-detections" element={<Navigate to="/curation-queue" replace />} />
+          <Route path="/receipts/unlinked" element={<UnlinkedReceipts />} />
 
-        {/* Fallback */}
+          {/* Auction creation */}
+          <Route path="/auctions/create" element={<CreateAuctionListing />} />
+          <Route path="/list-vehicle" element={<CreateAuctionListing />} />
+
+          {/* Acquisition pipeline */}
+          <Route path="/pipeline" element={<AcquisitionPipeline />} />
+          <Route path="/acquisitions" element={<AcquisitionPipeline />} />
+
+          {/* Identity & social */}
+          <Route path="/claim-identity" element={<ClaimExternalIdentity />} />
+
+          {/* Predictions / betting */}
+          <Route path="/predictions" element={<BettingPage />} />
+          <Route path="/predictions/:id" element={<MarketDetail />} />
+          <Route path="/predictions/live" element={<LiveAuctionView />} />
+
+          {/* Settings */}
+          <Route path="/settings/api-keys" element={<ApiKeysPage />} />
+          <Route path="/settings/webhooks" element={<WebhooksPage />} />
+          <Route path="/settings/usage" element={<UsageDashboardPage />} />
+
+          {/* Developer dashboard (authenticated SDK users) */}
+          <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
+
+          {/* Business management */}
+          <Route path="/business/settings" element={<BusinessSettings />} />
+          <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
+
+          {/* Stripe Connect */}
+          <Route path="/stripe-connect" element={<StripeConnect />} />
+          <Route path="/stripe-connect/store/:accountId" element={<StripeConnectStore />} />
+        </Route>
+
+        {/* ── Fallback ─────────────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
