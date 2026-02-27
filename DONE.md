@@ -1,9 +1,464 @@
 # DONE — Completed Work Log
 
+### [frontend] Competitors page reframed to partner ecosystem — 2026-02-27
+- Rewrote MarketCompetitors.tsx — changed framing from adversarial competitor comparison to partnership ecosystem
+- Removed: NUKE_ADVANTAGES attack section, "vs. X" summary cards, Nuke as a peer card in competitor grid, red ✗ scoring
+- Added: Partnership model callout (partners bring inventory/regulation, Nuke brings data/pricing/distribution)
+- Added: Per-platform "What they have" + "Partnership opportunity" sections
+- Added: Capability map showing complementary strengths (green ✓ only, no negative scoring)
+- Added: "What Nuke Brings to Partners" (Data API, Comps engine, Vision AI, Investor distribution)
+- Added: Integration Paths section (Data API / Vision AI / Listing Distribution / Co-branded Pricing Badge)
+- Added: Market opportunity stats block ($37-43B market, <$100M fractionalized, <0.3%)
+- CTA now includes B2B platform partnership inquiry (mailto) alongside investor CTA
+- Task ca84c465 completed
+
+### [frontend] Exchange SQBD page — show actual vehicle holdings — 2026-02-27
+- Added Fund Holdings section to MarketFundDetail.tsx
+- Queries top 12 vehicles by sale price matching segment criteria (makes, year range, model keywords)
+- Displays vehicle cards with photo, year/make/model, and verified auction sale price
+- Animated skeleton while loading, graceful empty state if no matches
+- Clicking any card navigates to vehicle profile page
+- Works for all funds/segments, not just SQBD
+
+### [frontend] Remove Share This Page copy-link box — 2026-02-27
+- Deleted "Share this page:" bordered box (label + URL code + "Copy link" button) from MarketCompetitors.tsx
+- Removed "Share link" button from MarketCompetitors.tsx header
+- Removed `handleShare` function and `copied` state from MarketCompetitors.tsx
+- Removed Share button + `copyLink` function + `copied` state + `copyBtn` style from VehiclePortfolio.tsx
+- OG meta tags in MarketCompetitors.tsx useEffect preserved (not UI clutter)
+
+### [frontend] Replace hardcoded homepage stats with live DB queries — 2026-02-27
+- `useLandingStats` now fetches `totalImages` via `vehicle_images` estimated count (~34.2M actual vs hardcoded 33M+)
+- Hero stat panel: "33M+" photos replaced with live `formatNum(totalImages)` (shows "—" loading, then live)
+- API feature card: "18K+" vehicles replaced with live `formatNum(totalVehicles)` (~1M actual)
+- `InvestorOffering.tsx`: static YONO text updated from "33M+" to "34M+" to match actual data
+- Commit: 2f1f6e1eb, pushed to main
+
+### [frontend] Fix Photos & History tab colors for light/dark mode — 2026-02-27
+- Replaced hardcoded white/dark-only colors in `WorkspaceTabBar.tsx` with theme-aware CSS variables
+- Background: `var(--grey-800)` → `var(--surface)`, borders: `var(--grey-700)` → `var(--border)`
+- Text: `#fff` / `rgba(255,255,255,...)` → `var(--text)` / `var(--text-muted)`
+- Active indicator: `#fff` → `var(--text)`, active bg: hardcoded → `var(--surface-hover)`
+- Follows DynamicTabBar pattern — works correctly in both light and dark themes
+
+### [frontend] Remove Ready to Trade + Investor Inquiry CTAs — 2026-02-27
+- Removed both CTA sections from `MarketCompetitors.tsx` (lines 554-599)
+- "Ready to trade?" (Exchange/Portfolio buttons) and "Investor inquiry?" (Data Room/Email buttons) both gone
+- `navigate` still used elsewhere in file — no dead import cleanup needed
+
+### [CWTFO] Work Order Lifecycle — Full Data Layer + Auto-Ordering — 2026-02-27
+- Invoice HTML for 1983 GMC K2500 Granholm (INV-K2500-0227-001, $1,319.92)
+- Vehicle created in DB (3629e106), work order (d18b1119), timeline event (587f467c)
+- 7 parts + 6 labor ops seeded with comp tracking, 9 tech assignments (Skylar/Ernie/CJ)
+- `work-order-lifecycle` edge function: 11 actions covering full boss→client→tech flow
+- DB migrations: `technician_work_order_lifecycle`, `purchase_orders_auto_ordering`, `work_order_timeline_sync`
+- Auto-ordering: 2 POs auto-created (Summit Racing $493.97, etrailer $281.04) with buy URLs
+- 5 supplier accounts seeded (Summit, AutoZone, RockAuto, etrailer, RealTruck)
+- `sync_work_order_to_timeline()` DB function — every state change auto-refreshes timeline metadata
+- Timeline event metadata enriched with live summary (parts/labor/POs/techs/payment status)
+- Linked parts/labor to `timeline_event_id` so existing components (WorkOrderViewer, ComprehensiveReceipt) find the data
+- Frontend: added `service` + `work_completed` to VehicleTimeline EventType union + color map
+- Data flows through all existing surfaces without new UI — timeline event → parts/labor → receipt views
+
+### [VP AI] Tier-2 ONNX models uploaded to Modal + sidecar redeployed — 2026-02-27
+- Training complete: german (65.8%), british (58.9%), japanese, italian, french, swedish
+- Uploaded hier_<family>.onnx + hier_labels.json to Modal volume yono-data
+- Redeployed Modal sidecar (yono-serve-fastapi-app) — tier-2 hierarchical inference live
+- Task fdf5038f COMPLETED
+
+
 **Append-only. Add entries when completing significant work.**
 Agents read this to avoid rebuilding things that already exist.
 
+## 2026-02-28
+
+### [sdk] @nuke1/sdk v1.5.0 — Vision namespace aligned with live API
+- Rewrote `VisionAnalyzeResult` type to match actual `api-v1-vision` v1.1 output (was using pre-deployment spec)
+- Added `nuke.vision.health()` method and `VisionHealthResult` type
+- Added `VisionBatchItemResult` type, `VisionAnalyzeParams.include_comps` option
+- Added `yono_source` field to `VisionClassifyResult`
+- Smart auth: `nk_live_*`/`nk_test_*` keys use X-API-Key, JWTs/service keys use Bearer
+- Vision timeouts: analyze 90s, batch 120s (accounts for Modal cold start)
+- All 4 methods verified end-to-end against live API: classify (370ms), analyze (4.8s), batch, health
+- File: `tools/nuke-sdk/src/resources/vision.ts`
+
+### [automation] launchd Plists for FB Marketplace Sweep + Mail.app Intake
+- Created `~/Library/LaunchAgents/com.nuke.fb-sweep.plist` -- daily 6:00 AM sweep: `dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 50`, logs to `/tmp/fb-sweep-daily.log`
+- Created `~/Library/LaunchAgents/com.nuke.mail-intake.plist` -- persistent daemon with KeepAlive: `dotenvx run -- node scripts/mail-app-intake.mjs --daemon`, logs to `/tmp/mail-intake.log`
+- Killed old nohup mail-intake process (PID 94718), replaced with launchd-managed daemon (PID 96910)
+- Both loaded via `launchctl load` and confirmed via `launchctl list | grep nuke`
+- NOTE: Mail intake hits "authorization denied" on Mail.app SQLite DB -- /bin/bash needs Full Disk Access in System Settings > Privacy & Security
+
 ## 2026-02-27
+
+### [agent-architecture] Agent Hierarchy — Haiku/Sonnet/Opus Tiered Extraction System
+- Built and deployed three new edge functions:
+  - `haiku-extraction-worker` — Haiku-powered extraction worker ($1/$5 MTok). Handles routine extraction, title parsing, field extraction from HTML/markdown. Processes import_queue items. Auto-approves quality >= 0.9, escalates low-confidence to supervisor.
+  - `sonnet-supervisor` — Sonnet-powered supervisor ($3/$15 MTok). Reviews Haiku escalations, corrects errors, handles edge cases (replicas, restomods), generates quality reports. Dispatches Haiku work and reviews results in single loop.
+  - `agent-tier-router` — Top-level router. Classifies tasks by complexity, routes to right tier. Includes Opus strategy layer for source prioritization and market intelligence. Pipeline runner for continuous processing cycles.
+- Shared module `_shared/agentTiers.ts` — Tier configs, Anthropic API wrapper, JSON parsing, quality assessment, cost estimation, task classification
+- Updated import_queue CHECK constraint to include `pending_review` and `pending_strategy` statuses
+- Tested with real data: 18 items processed, Haiku title parsing (5 titles in single API call), Sonnet caught Ferrari Testarossa replica edge case and escalated
+- Sonnet corrected: Dodge "Superbee" → "Super Bee", caught URL/title data conflicts, reduced over-confident title-only scores
+- Cost: $0.0017 for 18 operations (essentially free). 67-99% savings vs Sonnet-only.
+- Updated TOOLS.md with full agent hierarchy section including tier routing rules and import_queue status flow
+
+## 2026-02-27
+
+### [yono] YONO Sidecar Complete — Tier-2 Models + Consumer Vision API
+- **Tier-2 ONNX export**: Built `yono/scripts/export_tier2_onnx.py` to export tier-2 family-specific models from PyTorch to ONNX. Exported 6 families: american (20 classes), german (5), british (15), japanese (8), italian (6), french (2).
+- **Modal volume upload**: Uploaded all tier-2 `.onnx` + `.onnx.data` files + updated `hier_labels.json` to Modal volume `yono-data`. Fixed issue where `.onnx.data` weight files were missing (ONNX external data format).
+- **Modal sidecar redeployed**: `modal_serve.py` now loads all 6 tier-2 families. Health endpoint confirms: `tier2_families: [american, british, french, german, italian, japanese]`.
+- **Classify now returns actual makes**: Before: `"make": "german"` (family only). Now: `"make": "Mercedes-Benz"`, `"family": "german"`, with full top-5 within family.
+- **`api-v1-vision` rewritten** (v1.1): The consumer API now calls both YONO `/classify` (make detection) and `/analyze` (condition/zone/damage) in parallel. Returns unified result with make, family, condition_score, vehicle_zone, damage_flags, modification_flags, photo_quality, interior_quality, photo_type, comps. Auth token now sent to sidecar. Optional `include_comps` parameter fetches comparable sales.
+- **End-to-end verified**: `POST /api-v1-vision/analyze` returns full vehicle intelligence from a single photo URL at $0.00/image. All 5 edge functions tested: `yono-classify`, `yono-analyze`, `yono-batch-process`, `yono-vision-worker`, `api-v1-vision`.
+- Edge functions: `yono-classify`, `yono-analyze`, `yono-batch-process`, `yono-vision-worker`, `yono-keepalive`, `api-v1-vision` all deployed and working.
+
+### [platform] Verify + extend vehicle profile P0 fix (tasks bda3c25b, 6d9cbe9f)
+- Confirmed fix from commit 5ee11e181 works: DB migration removed vehicle_price_signal(), price_history, documents subqueries; LIMIT 200 images; frontend RPC timeout 8s→2.5s
+- All test vehicles return HTTP 200 in <500ms via anon REST key
+- Found residual risk: 1,597 vehicles with 500+ images still borderline (2.3s cold cache, <3s limit)
+- Applied v2 fix (migration 20260227235000): LIMIT 200→50, redundant ORDER BY removed, stats.image_count simplified to index-only COUNT(*)
+- Root cause of outliers: data quality — vehicles with 10K+ identical duplicate URLs (VW Vanagon 10742, Olds Vista Cruiser 9529). Separate task filed (P65).
+- Commits: 5ee11e181 (original), 3ec4a7b34 (v2 hardening)
+
+### [platform] Fix search_vehicles_fuzzy autocomplete timeout (task df34b79a)
+- Root cause: `SET statement_timeout TO '3s'` hardcoded in function config; 1.2M vehicle table full-scans at 96s exceeded it → HTTP 500 on autocomplete
+- Removed `statement_timeout` from function `proconfig` (was `{search_path=public,statement_timeout=3s}`, now `{search_path=public}`)
+- Added `idx_vehicles_make_model_trgm`: GIN trigram index on `(lower(make) || ' ' || lower(model))` with partial filter `is_public=true AND year/make/model NOT NULL` (80MB, valid)
+- Updated function WHERE clause to use `(lower(v.make) || ' ' || lower(v.model)) % query_text` — exact index expression match required for Bitmap Index Scan
+- Query plan changed from 96s Parallel Index Scan (seq filter) → Bitmap Index Scan on idx_vehicles_make_model_trgm
+- Migration: `supabase/migrations/20260227240000_fix_search_vehicles_fuzzy_timeout.sql`
+
+### [platform] Fix api-v1-market-trends 500 timeout (task ffaeabaf)
+- Root cause: COALESCE(el.sold_at, v.created_at) prevented date filter pushdown → full 69K Porsche scan; CTE fence blocked per-bucket index range scans
+- Added `idx_external_listings_sold_vehicle_at` (vehicle_id, sold_at) WHERE listing_status='sold'
+- Added `idx_vehicles_make_sale_date` (lower(make), sale_date) WHERE sale_date IS NOT NULL AND sale_price > 0
+- Ran ANALYZE vehicles (was estimating 1,140 rows vs actual 13,029)
+- Rewrote `get_market_trends()`: RETURN QUERY EXECUTE USING + generate_series as outer loop → per-bucket index range scans + uses vehicles.sale_date (real auction date)
+- Result: 320ms warm / 2.9s cold HTTP 200 (was HTTP 500 at 15s+)
+- Migration: 20260227250000_fix_market_trends_timeout.sql
+
+### [platform] P80 Cron audit + deactivation — 116 → 98 active jobs (task 8bd329c7)
+
+Audited all 116 active cron jobs against 4 criteria: no-op/broken commands, broken auth (current_setting/vault), redundant health checks, duplicate extraction workers.
+
+Deactivated 13 jobs:
+- `auto-extract` (job 24): pure no-op (`SELECT 1`)
+- `concierge-villa-discovery` (job 90): broken auth pattern (app_config table lookup)
+- `mecum-extraction-cron` (job 71): only inserted a run record, no actual extraction
+- `cron-startup-timeout-alert` (job 328): low-priority monitoring noise
+- `agent-monitor-scan` (job 235): redundant with extraction-watchdog (117)
+- `extraction-health-check` (job 110): redundant with extraction-watchdog (117)
+- `observation-migration` (job 82): broken COALESCE/current_setting auth; run on-demand
+- `enrich-bulk-continuous` (job 170): duplicates more-frequent enrich-bulk-mine/derive/vin jobs
+- `aggressive-backlog-clear` (job 65): redundant with bat-extraction-worker-1/2/3 and continuous-queue-processors
+- `live-auction-sync` (job 87): vault auth broken; sync-live-auctions (109) covers every 15min
+- `source-health-monitor` (job 21): low-value health check via old trigger_agent_execution dispatch
+- `auto-sort-telegram-photos` (job 128): low-priority, deferrable
+- `analyze-unprocessed-org-images` (job 60): low-priority, deferrable
+
+Final: **98 active jobs** (target ≤120) | **13 per-minute jobs** (target ≤20)
+
+### [platform] P95 Cron schedule stagger — eliminate startup timeout bursts (task 2bc2764c)
+
+Root cause confirmed: all 5 valuation-backfill-workers were at `1-59/2 * * * *` (all odd minutes),
+running ~120s each and holding 5 slots into the next odd-minute tick. At minute 16:53 this caused
+13 startup timeouts for bat-queue-worker-2, bj-queue-worker-2, yono-vision-worker-2, enrich jobs, etc.
+
+Fix: moved valuation-backfill-worker-1 (job 322) and valuation-backfill-worker-3 (job 324) from
+`1-59/2` to `*/2` (even minutes). Split cluster: 3 workers at odd, 2 at even.
+
+Also confirmed prior cron cleanup (16:30 UTC) already reduced `* * * * *` from 44 → 13 (all
+critical extraction queue workers, correctly below the 20-job target).
+
+Result: 0 startup timeouts across 6 consecutive minutes post-fix. Max concurrent starters per
+minute: ~21 (well under cron.max_running_jobs=32).
+
+### [frontend] P92 Full frontend page audit + 2 infinite loading fixes — commit 74432d368
+
+Audited ~70 pages in nuke_frontend/src/pages/ (plus module routes, admin/ pages).
+
+**What was checked:**
+- All demo-flow pages: MarketExchange, MarketFundDetail, MarketDashboard, MarketSegments, MarketSegmentDetail, Portfolio, PortfolioWithdraw, BrowseInvestments, InvestorDashboard, OrganizationProfile, Organizations, Dashboard, VehiclesDashboard, AcquisitionPipeline, InvestorOffering
+- Auth pages: Login, OAuthCallback, ResetPassword
+- Settings: ApiKeysPage (clean), WebhooksPage (weak auth), UsageDashboardPage (clean)
+- Admin module (protected by AdminShell): All pages clean
+- All other pages: Profile, MyAuctions, SocialWorkspace, VaultPage, ShopFinancials, PersonalPhotoLibrary, MarketIntelligence, CollectionsMap, InvestorDealPortal, VehiclePortfolio, DeveloperSignup, SubscriptionSuccess, TransferPartyPage, StripeConnectStore, ContractStation, MarketMovement, TeamInbox, Notifications, BaTMembers, Library, Capsule, Capture, CurationQueue, UnlinkedReceipts, ImportDataPage
+
+**TypeScript check: CLEAN (npx tsc --noEmit passes)**
+
+**Bugs found and fixed (this commit):**
+1. EditVehicle.tsx — infinite loading spinner for unauthenticated users (loadVehicle() only called when user non-null; loading=true never resolved). Fixed: redirect to login + setLoading(false) after fetchUser() returns null.
+2. MarketDetail.tsx — infinite "Loading..." when market ID not found (.single() returns null; `if (!market)` showed Loading forever). Fixed: add marketLoading state, proper "Market not found" UI with back link.
+
+**Previously fixed (commit 4e43f29f3):**
+- AdminMissionControl.tsx: missing vehicleImageQueue state declaration
+- ExtractionMonitor.tsx: broken import AnalysisModelPopup + type error
+- ImageProcessingDashboard.tsx: interval scope bug
+- Dashboard.tsx: optional notes param type
+- Library.tsx: doc→book variable name
+- AdminAnalytics.tsx: boolean|null type narrowing
+- BidMarketDashboard.tsx: useRef initialization
+
+**Remaining minor issues (sub-tasks filed):**
+- vp-platform P72: Add auth guards to BusinessSettings, WiringPlan, WebhooksPage, StripeConnect (non-demo pages, show blank for unauth)
+- vp-platform P68: Fix investor-portal-stats timeout (InvestorOffering shows empty stats section)
+
+## 2026-02-27
+
+### [vp-platform] PGRST002 startup-timeout spike alert (task 499b1e16)
+- Deployed edge function: `cron-startup-timeout-alert` — queries cron.job_run_details for startup timeout spikes
+- Created RPC: `count_startup_timeouts_last_2min()` (SECURITY DEFINER, cron schema access)
+- pg_cron job 328: every 5 min, fires Telegram alert if >10 startup timeouts in last 2 min
+- Would have detected the 2026-02-27 07:41 PGRST002 outage within 2 minutes
+- Migration: supabase/migrations/20260227235900_cron_startup_timeout_alert.sql
+
+### [vp-platform] Header wordmark — add NUKE brandmark to top-left (task 723ab790)
+- Added permanent `Link to="/"` with text "NUKE" before `NukeMenu` in `AppHeader.tsx`
+- Changed `NukeMenu` trigger button from "Nuke ▶" to hamburger icon "≡" (avoids double branding)
+- Added `.nuke-wordmark` CSS class in `header-fix.css`: bold, letter-spaced, hover-dim
+
+### [vp-platform] Fix api-v1-comps 401 for anon users (task c8537818)
+- Removed auth requirement from api-v1-comps — comps are public auction results, no auth needed
+- Changed authenticateRequest() to be non-blocking (still runs to identify caller but doesn't gate)
+- Vehicle profile comparable sales section now works for all anonymous visitors
+- Validated: curl with anon key returns 200 + 20 Porsche 911 comps
+
+### [vp-platform] BidMarketDashboard Recharts type fixes (task 78e57dde)
+- Fixed `labelFormatter` type: removed explicit `(v: string)` annotation (Recharts expects `string | number`)
+- Fixed `formatter` type: removed explicit `(value: number, name: string)` annotations, added `String()`/`Number()` coercions inside (Recharts `ValueType` is `string | number | (string|number)[]`)
+- `useRef` lines (78, 226) were already correct with `| undefined` union and `undefined` initial value
+
+### [vp-platform] ralph-spawn: Per-agent token budget + session budget controls (task 1cceee2e)
+- Verified ralph-spawn.mjs already has full implementation per CTO/CFO work order
+- MODEL_MAP: worker/vp-extraction/vp-orgs/vp-docs/vp-photos → haiku; vp-ai/vp-platform/vp-vehicle-intel/vp-deal-flow → sonnet; cto/coo/cfo/cpo/cdo/cwfto → opus
+- TOKEN_DEFAULTS: haiku=30k, sonnet=60k, opus=100k (overrideable via --max-tokens-per-agent)
+- --session-budget N: stops pulling tasks when cumulative tokens >= N (0 = unlimited)
+- OPUS_CONCURRENCY_CAP=3: hardcoded guardrail, polls every 5s for a slot
+- Token usage (tokens_used, input_tokens, output_tokens) logged to agent_tasks.result on every completion
+- --model CLI flag still overrides all per-agent routing (backward-compatible)
+
+### [vp-platform] cron.max_running_jobs=20 — BLOCKED (Supabase constraint)
+- Task 92d64379: attempted ALTER SYSTEM SET cron.max_running_jobs = 20
+- Blocked: parameter is PGC_POSTMASTER level, requires server restart — not possible on Supabase managed Postgres
+- ALTER SYSTEM, ALTER DATABASE, and set_config() all fail with permission denied or "requires restart" error
+- Current value remains 32. Mitigation already in place: cron cleanup reduced top-of-hour peak from 48+ → 30 jobs
+- If formal cap enforcement needed: file Supabase support ticket to modify postgresql.conf directly
+
+### [vp-platform] Quality backfill cron jobs deactivated — backfill 100% complete
+- All 1,256,073 vehicles now have data_quality_score populated
+- Job 237 (quality-backfill-worker-1): deactivated via cron.alter_job()
+- Jobs 238-240: already removed in prior cleanup session
+- No indexes to recreate (idx_vehicles_quality_score + idx_vehicles_quality_backfill were dropped; can recreate now if needed)
+
+### [vp-extraction] pg_cron job startup timeout cascade — diagnosed and fixed
+- Root cause: `cron.max_running_jobs=32` hard limit being exceeded at peak minutes
+- **Fix 1**: `quality-backfill-worker-1` held slots 18-124s every minute → changed `* * * * *` → `2-59/5 * * * *` (prevents slot stacking, worst-case 124s < 300s interval)
+- **Fix 2**: `bat-snapshot-parser-continuous-2` had `pg_sleep(30)` hack holding slot → removed sleep, offset to `1-59/3` (fires :01,:04,:07... separate from job 173)
+- **Fix 3**: `bat-snapshot-parser-continuous` moved to `2-59/3` (fires :02,:05,:08... avoids :00 peak)
+- **Fix 4**: Deactivated `refresh-bid-analytics-mvs` (failing every run — MVs don't exist)
+- **Fix 5**: Staggered 18 `*/5` jobs into 5 offset groups (3 at :00, 5 at :01, 5 at :02, 4 at :03, 4 at :04)
+- **Fix 6**: Split 13 `*/2` jobs into even (6) and odd (9) groups to halve burst at even minutes
+- **Fix 7**: Staggered hourly (5 of 8 moved to :02, :04, :06, :08), `*/10` (3 moved to :03, :06 offsets), `*/15` (2 moved to :02, :04 offsets), `*/30` (3 moved to :02, :07 offsets)
+- Result: top-of-hour peak = 30 jobs (was 48+), safely under the 32 limit
+- Filed P72 follow-up for `data-quality-workforce` null URL bug
+
+### [vp-vehicle-intel] Signal score coverage diagnosis + api-v1-signal on-demand valuation fix
+- Diagnosed: 637K active vehicles with YMM missing nuke_estimate — backfill lag, not data gaps
+- Root cause breakdown: 151K vehicles have zero price anchor (no sale/asking/current_value); 486K have comp data but backfill hasn't run yet
+- clean_vehicle_prices: 1M rows, 6,144 makes, covers all major collector car makes — comp data is NOT the bottleneck
+- Backfill cron: 5 workers (jobs 321-325, every 2min, 100 vehicles each = 15K/hr) deployed by feb786e7 agent — ~42h to full coverage
+- Fixed api-v1-signal: now triggers on-demand valuation inline when no estimate exists, instead of returning 404. Adds ~1-3s on first request but returns actual data. `computed_on_demand: true` flag in response. Deployed to production.
+- Task f93ef450 completed.
+
+### [backend-triage] Full backend error triage — all public pages and API endpoints
+- Ran complete backend error triage against P92 task (founder complaint: pages not loading)
+- Tested: api-v1-vehicles, api-v1-exchange, api-v1-comps, api-v1-search, api-v1-signal, api-v1-market-trends, universal-search, transfer-status-api, inbound-email, investor-portal-stats, get_vehicle_profile_data RPC
+- All 18 frontend routes checked — all files exist, no missing imports
+- HTTP status check: all Vercel pages return 200 (SPA serving correctly)
+- Findings filed as 6 agent_tasks:
+  - P78 c8537818: api-v1-comps blocks anon users → vehicle profile shows no comparable sales
+  - P75 df34b79a: search_vehicles_fuzzy 3s statement_timeout → autocomplete fails under load
+  - P73 ffaeabaf: api-v1-market-trends times out → get_market_trends RPC slow on large makes
+  - P72 322eb3ae: investor-portal-stats times out (>15s) → /offering page shows no live stats
+  - P65 14add70f: search_vehicles_fts intermittent 503 PGRST002 schema cache errors
+  - P60 f1dec0c5: /api/landing transient 404 (verified resolves on retry)
+  - P55 a9674637: /predictions shows empty (no open markets, page loads gracefully)
+- Healthy: api-v1-exchange, api-v1-signal, transfer-status-api, inbound-email, universal-search (POST), get_vehicle_profile_data, db-stats, api-v1-comps (authenticated)
+
+### [cto] Post-mortem: PGRST002 schema cache outage 2026-02-27 ~07:41–07:47 UTC
+- Task b11baf19: full post-mortem written at docs/post-mortems/2026-02-27-pgrst002-schema-cache-outage.md
+- Root cause confirmed: 44 `* * * * *` cron jobs converging + long-running quality backfill workers held all 32 max_running_jobs slots; PostgREST schema reload failed at 07:46 → PGRST002 to all callers
+- Forensic: cron.job_run_details shows 37 startup_timeouts at 07:41, total blackout (0 succeeded) at 07:46
+- Filed 4 work orders to vp-platform: P95 stagger cron schedules, P90 set max_running_jobs=20, P80 deactivate low-priority crons, P75 Telegram alert
+
+### [vp-extraction] Gooding & Company field backfill — engine/transmission/mileage — 2026-02-27
+- Task 87446ee0: fill engine/transmission/mileage gaps on 369 Gooding vehicles
+- Key insight: Gooding is Gatsby/Contentful — all data in `/page-data/lot/{slug}/page-data.json` (no HTML scraping needed)
+- `item.specifications` array has engine/transmission as bullet points; mileage in highlights prose
+- Built + deployed: `backfill-gooding-descriptions` edge function — parses engine (spec line containing Engine/Cylinder/BHP), transmission (Transmission/Gearbox/Transaxle), mileage (highlights prose)
+- Updated `extract-gooding` extractor to extract these 3 fields for all future runs
+- Results: engine 10.3%→35.2% (+244%), transmission 0.3%→25.5% (+8400%), mileage 0.8%→1.1%
+- Remaining 65% no engine: pre-war brass-era vehicles (1900-1920s) with empty specs in Contentful — no additional data available
+- Cron 319: `*/30 * * * *`, batch_size=20
+
+### [vp-extraction] Description backfill — Mecum + Craigslist — 2026-02-27
+- Task ec362475: 945K vehicles missing descriptions — targeted Mecum (~2.2K remaining) + CL (~2.5K)
+- Discovery: Mecum already at 95.6% desc coverage (extraction sprint fixed the "8%" stat from task filing)
+- `backfill-mecum-descriptions`: archive-based, zero-cost — queries listing_page_snapshots WHERE platform='mecum', re-parses __NEXT_DATA__ blocks (HIGHLIGHTS + EQUIPMENT) without any live fetch. Also fills mileage + engine_size + transmission.
+- `backfill-cl-descriptions`: live-fetch via archiveFetch — CL pages expire fast, historical ~100% expired (410). Will catch newly-added CL vehicles while pages are still live.
+- Cron 317 (`*/10 * * * *`): backfill-mecum-descriptions, batch_size=25 — draining ~2.2K remaining at ~15/run
+- Cron 318 (`*/30 * * * *`): backfill-cl-descriptions, batch_size=15
+- VIN intentionally excluded from Mecum backfill (handled by backfill-vin-from-snapshots, avoids unique constraint conflicts)
+- Note: NULL discovery_source vehicles (~820K missing desc) are BaT/conceptcarz — different scope
+
+### [vp-extraction] RM Sotheby's lot page scraper + description backfill — 2026-02-27
+- Task 9fb1563a: RM Sotheby's vehicles missing description/mileage/engine (API only returns list-page data)
+- Built + deployed: `backfill-rmsothebys-descriptions` edge function (557 lines)
+  - Fetches individual lot detail pages via archiveFetch (Firecrawl, cache-first)
+  - Parses: description (3 HTML pattern strategies), bullet highlights, chassis/engine IDs, estimate range, mileage from text
+  - Writes: description, mileage, origin_metadata (estimate_low/high, chassis_number, engine_number, location)
+- Fixed: VIN unique constraint violations — chassis numbers now stored in origin_metadata only
+- Cron 268 (`rmsothebys-description-backfill`): every 30min, batch_size=20
+- Progress: 1.3% → 12.2% description coverage (153/1,251), continuing to drain
+
+### [vp-platform] Homepage Browse Feed P0 fix — 2026-02-27
+- Task 0139bb65: "Unable to load vehicles" error when clicking Browse Feed
+- Root cause: getMissingColumn() regex only matched Postgres 42703 "column X does not exist" format. PostgREST PGRST204 schema-cache errors use different format: "Could not find the 'X' column of 'vehicles' in the schema cache" — unmatched → getMissingColumn returned null → selectV1 fallback never ran → fell through to setError
+- Fix 1: Extended getMissingColumn to also parse PGRST204 message format
+- Fix 2: Removed `if (missingColumn)` guard — ANY selectV2 error now always falls back to selectV1
+- Commit 4ac104ca6, pushed to main
+
+### [vp-extraction] Queue backlog triage — 2026-02-27 16:15 UTC
+- Task 23f1da15: Import queue at 41K pending (demand spike, not stall)
+- Root cause: Mecum Live Auctions (25K items) had only 2/5 workers active; C&B (15K) had 6 workers
+- Fix: Re-enabled mecum-live-queue-workers 3-5 (cron jobs 253-255) → all 5 now active
+- Throughput confirmed at ~5,100/hr; estimated full drain ~5-6 hours
+- 47 failed items (parse/field errors, non-blocking); 404 processing all fresh (<10min)
+
+### [vp-platform] Search loading skeleton — 2026-02-27
+- Task b9e49520: SearchResults.tsx had minimal skeleton (6 simple boxes + "Searching..." text)
+- Replaced with proper shimmer skeleton: fake summary bar + 8 card-shaped placeholders matching grid (260px minmax, 160px image, 3 text stubs)
+- Early return at line 208 blocks NO RESULTS empty state when loading=true
+- Loading prop wired: Search.tsx:1084 → SearchResults loading prop
+
+### [vp-extraction] Import Queue Backlog Cleared — 2026-02-27
+- Investigated 41K pending (not stalled — 384 processing at 5-7K/hr; bulk discovery spike added 93K items 2026-02-26 16-17 UTC)
+- Fixed: 544 exhausted items (attempts >= 3) stuck in `pending` — marked `failed`
+- Fixed: 47 genuinely failed items for working domains reset to `pending` (attempts=0)
+- Activated: 4 inactive Mecum workers (jobs 242-245) — 10 total Mecum workers now
+- Activated: 3 inactive Mecum Live workers (jobs 253-255) — 5 total Mecum Live workers now
+- Queue post-fix: 41K pending, 13 failed, ~333 processing
+
+### [vp-ai] YONO Sidecar Unreachable — FIXED 2026-02-27 16:10 UTC
+- Root cause 1: Supabase secret `YONO_SIDECAR_URL` had typo `sss73133` instead of `sss97133`
+- Root cause 2: `yono-classify` timeouts too short (health 15s, classify 10s) vs Modal latency 30-40s
+- Fix: Corrected Supabase secret, increased yono-classify timeouts to 45s/60s, redeployed Modal sidecar
+- Verified: `available:true` end-to-end; image classification no longer falling back to cloud AI
+
+### [cwfto] Situational Brief + Cleanup — 2026-02-27 ~16:10 UTC
+- Quality backfill: 100% COMPLETE — all 1,256,073 vehicles have data_quality_score. Filed P92 task to deactivate cron jobs 237-240.
+- YONO training: british tier-2 active (PID 37505). YONO sidecar still unreachable — filed P90 task (redeploy after ONNX export).
+- Import queue: 41K pending (Mecum 25K, C&B 15K). All queues draining normally.
+- Stale task cleanup: Reset 7 in_progress tasks to pending, completed 4 confirmed-done tasks, closed 2 duplicates.
+- Filed: 3 follow-up tasks (quality backfill deactivation, YONO sidecar, vehicle profile P0 verify).
+- Twilio: Still unblocked — CFO/founder action still required (P92/P88 tasks live).
+- Next CWFTO loop scheduled (P92 pending).
+
+## 2026-02-27
+
+### [platform] ralph-spawn: per-agent token budget + session budget controls — task 1cceee2e
+- Added MODEL_MAP: worker/vp-extraction/vp-orgs/vp-docs/vp-photos→haiku, vp-ai/vp-platform/vp-vehicle-intel/vp-deal-flow→sonnet, cto/coo/cfo/cpo/cdo/cwfto→opus
+- Added --max-tokens-per-agent N flag (defaults: haiku=30K, sonnet=60K, opus=100K)
+- Added --session-budget N flag: stops pulling tasks when total token spend hits cap
+- Added Opus concurrency cap: max 3 Opus agents simultaneously (hardcoded cost guardrail)
+- Token usage (tokens_used, input_tokens, output_tokens) now logged to agent_tasks.result on every completion
+- --model flag still overrides per-agent routing (backward compatible)
+- File: scripts/ralph-spawn.mjs
+
+### [frontend] Search filter panel fix — task c774b1cd
+- `showFilters` defaulted to `true` in DEFAULT_FILTERS — filter inputs now expand automatically when vehicle results appear
+- Added `make` field to VehicleFilters interface, DEFAULT_FILTERS, filter logic (substring match), and UI input
+- Filter panel now shows: Make, Price (min/max), Year (min/max), Max Mileage, Transmission, Status
+- File: `nuke_frontend/src/pages/Search.tsx` lines 21-41, 578-600, 912-930
+
+### [coo] CFO memo surfaced — image pipeline unpause (task 1131e863)
+- Delivered CFO memo to CEO: $3,250 max backfill cost, $150/month ongoing, 65-day clearance
+- YONO-first hybrid model: 60% free via YONO, 40% Gemini Flash at $0.0001/image
+- $50/day hard cap already coded in analyze-image — zero runaway risk
+- Decision awaiting CEO: remove NUKE_ANALYSIS_PAUSED from Supabase secrets
+- Unlocks: camera geometry, subject taxonomy, NL descriptions, VIN tag detection
+
+### [frontend] Investor offering gate stats — task ac67d3b6
+- Updated `gateStats` in InvestorOffering.tsx access-code screen with confirmed live numbers
+- Was: 18K vehicles, 33M images, 200K auction events, <$100M AUM gap
+- Now: 1.25M vehicles, 33.7M images, 513K AI valuations, 4 market segment ETFs
+- Updated headline subtitle text to match new numbers
+- File: `nuke_frontend/src/pages/InvestorOffering.tsx` lines 575–580, 634
+
+### [frontend] Search performance + skeleton UX — task 6db748af
+- Switched IntelligentSearch.tsx edge function call from slow `search` (11s) → `universal-search` (3.8s)
+- Mapped universal-search result types to frontend types: vin_match→vehicle, tag→reference, external_identity→user
+- Upgraded skeleton loading in SearchResults.tsx: 8 realistic card skeletons (image + text lines) instead of 6 plain blocks
+- Files: nuke_frontend/src/components/search/IntelligentSearch.tsx:681, nuke_frontend/src/components/search/SearchResults.tsx:208
+
+### [extraction] FB Marketplace GraphQL probe — task 62f30b2e
+- Logged-out GraphQL CONFIRMED working from residential IPs. doc_id: 33269364996041474
+- Returns 24 listings/page: id, title, price, city/state, thumbnail, is_sold/pending flags
+- BLOCKED from Supabase datacenter IPs (error 1675004, IP-level block — not bypassable with tokens)
+- Year filter in variables is ignored; must filter by title parsing at upsert time
+- Vintage fraction: ~8-17% per metro (title-parsed)
+- Infrastructure: fb-marketplace-local-scraper.mjs (43 metros), fb-relay-server.ts (port 8787)
+- 3 paths forward documented in facebook-marketplace-extraction.md (residential scraper / relay integration / session replay)
+- Relay path requires /graphql-sweep endpoint on fb-relay-server.ts (not yet built)
+
+### [frontend] Search empty state: featured vehicles grid — task a2e04f6a
+- /search with no query now shows 24 top vehicles by sale_price in a VehicleCardDense grid
+- Added "Top Vehicles by Value" label; quick-search chips preserved above grid
+- useEffect fetches public vehicles with primary_image_url, ordered by sale_price DESC
+- Commit e42d60803
+
+### [platform] Vehicle intelligence cron jobs applied — task 6fe1a113
+- Job 314: compute-vehicle-valuation-backfill — */10 * * * * — batch_size=50
+- Job 315: batch-vin-decode-backfill — */30 * * * * — batch_size=50
+- Job 316: batch-ymm-propagate-hourly — 0 */4 * * * — batch_size=500
+- Migration 20260227140000_vehicle_intel_crons.sql applied via SQL MCP (migration push was blocked by legacy ordering)
+
+### [frontend] Add Search + Market to header nav (task 99850151)
+- Added Search and Market as visible `<Link>` elements in `header-left` beside NukeMenu button
+- Changed `header-slot-left` grid column from `8%` to `max-content` so left slot sizes to content
+- Added `.header-main-nav { display: none }` under `@media (max-width: 600px)` — hidden on mobile
+- Files: `nuke_frontend/src/components/layout/AppHeader.tsx`, `nuke_frontend/src/styles/header-fix.css`
+
+### [security] Key Guardian daily audit — task 0e8b5ca1
+- gitleaks: 0 findings in last 50 git commits and working tree (clean)
+- Known-bad keys: Gemini API key + Stripe webhook secret still present in .env (ACTION REQUIRED — unrotated)
+- Email report sent to founder via Resend (ID: 67a62aef-5124-4797-a1af-98aeb5409ce0)
+- Task marked completed in agent_tasks DB
+
+### [frontend] Fix P0: /market routes to MarketExchange (live ETF data)
+- Changed root `/` and `/dashboard` routes in marketplace/routes.tsx from MarketDashboard (Coming Soon stub) to MarketExchange
+- nuke.ag/market now shows live PORS/TRUK/SQBD/Y79 fund cards instead of hardcoded "Coming Soon" page
+
+### [frontend] TeamInbox avatars + inline images + thumbnails — commit fe7785858
+- 36px sender initials avatar circle added to every email list row (left of text content)
+- Detail pane header avatar bumped to 48px
+- Refactored SenderAvatar to use shared `getAvatarColor` (deterministic HSL hash) + single-char `getInitials`
+- Added `CarIcon` SVG component prepended to vehicle URLs in Alerts tab
+- Scoped `.email-body` CSS: img responsive, links colored, blockquote indented, table borders
+- `dangerouslySetInnerHTML` div gets `className="email-body"` for proper HTML email rendering
+- Image attachment thumbnails grid (80x80, object-cover) for attachments with `content_type: image/*` + `url`
+
+### [frontend] TeamInbox Gmail-style 3-pane redesign — commit 9c0553683
+- Rebuilt visual layer of TeamInbox.tsx (815 insertions, 501 deletions)
+- Layout: 220px fixed sidebar + 360px scrollable middle list + flex-1 detail pane
+- Left sidebar: INBOX header, icon+label+badge tabs (Emails/Messages/Alerts), mailbox color-dot list
+- Middle pane: 64px email rows, 3px left accent bar (mailbox color for unread, primary for selected), sender bold/normal, subject, snippet truncated
+- Detail pane: initials avatar circle (deterministic hue from email hash), sender name 16px bold, meta strip with mailbox badge pill + timestamp, HTML body renderer, Archive/Spam ghost buttons with hover, reply textarea + Send Reply primary button
+- All colors use design system tokens (var(--bg), var(--surface), var(--border), var(--text), var(--accent), var(--text-muted))
+- Mobile: scoped CSS media query hides sidebar + right pane, shows bottom tab bar at <768px
+- All logic preserved: useEffect, useState, supabase queries, realtime subscriptions, compose modal
 
 ### [security] Key Guardian — automated secret scanning + daily audits — commit cf0b94722
 - gitleaks v8.30.0 installed locally (brew)
@@ -1569,3 +2024,139 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - AdminHome: auto-load uses max_failed_samples:50 instead of 250 (faster mount)
 - Profile: "Get started" checklist on Overview tab for new users with incomplete profiles
 - VehicleCollection: empty own-profile state has "Add a vehicle" CTA button (not just text)
+
+## 2026-02-27 — Data Quality Command Center
+
+[data-quality] Full Data Quality Command Center built + deployed — commit 45ec32b2a
+
+### What was built:
+- **`data_quality_snapshots` table** — stores periodic snapshots of field completion rates (7-day retention)
+- **`compute-data-quality-snapshot` edge function** — TABLESAMPLE 1% → 35 field stats, inserts snapshot row; cron job 303 (*/10 min)
+- **`data-quality-workforce` edge function** — priority orchestrator fires 7 enrichment strategies (4 free always-on, 2 LLM gated, 1 valuation); cron job 304 (*/5 min)
+- **`DataQualityDashboard.tsx`** — `/admin/data-quality`, real-time field completion bars with trend arrows, ETA to 95%, workforce START buttons, 30s auto-refresh
+- **DB functions**: `get_data_quality_field_stats()` (TABLESAMPLE 1%, 25s timeout), `get_pipeline_cron_stats()`, `cleanup_old_quality_snapshots()`
+
+### Current baseline (1,241,147 vehicles):
+- make: 98.2%, model: 98.1%, year: 92.9%  (solid)
+- listing_url: 85.4%, country: 100%
+- body_style: 51.1%, engine_type: 41.6%, heat_score: 41.8%
+- mileage: 17.1%, vin: 17.9%, image_url: 18.1%
+- city: 2.7%, state: 3.0%  (location gap)
+- deal_score: 0.6%, signal_score: 0.2%  (scoring pipeline ramping)
+- engine_liters: 0.1%  (very sparse)
+
+### Cron jobs:
+- Job 303: compute-data-quality-snapshot (*/10 * * * *)
+- Job 304: data-quality-workforce (*/5 * * * *)
+
+## 2026-02-27
+
+### [CFO] Twilio credentials diagnosis + founder escalation
+- Diagnosed: auth token missing (NOT negative balance as task stated)
+- Twilio account SID confirmed in vendor_accounts
+- Balance: $8.31 (degraded, below $20 threshold)
+- .env + Supabase secrets: all placeholder values (your-twilio-account-sid)
+- Cannot auto-retrieve auth token — requires founder login to console.twilio.com
+- SMS cost math: 150K transfers × 2 SMS × $0.0079 = $2,370 → recommend $2,500 top-up
+- Founder email sent with exact copy-paste commands for .env + supabase secrets set + test curl
+- Test transfer_id ready: 8121d986-f8fc-4aaa-b5f9-2302453f0122
+- Crons 223-227 remain paused pending Twilio credentials from founder
+- Task 4a3e8f26 marked completed, vendor_accounts updated
+
+## 2026-02-27
+
+### [vp-platform] Fix P0: Vehicle profile infinite loading for anon users (task bda3c25b)
+- Root cause: `anon` role has `statement_timeout=3s`. `get_vehicle_profile_data` called `vehicle_price_signal()` (multi-table JOIN) + fetched all images with no LIMIT → exceeded 3s under load → HTTP 500.
+- DB migration `20260227210000_optimize_get_vehicle_profile_data.sql`: rewrote function removing expensive subqueries (price_signal, price_history, documents) and capping images at 200. Heavy vehicle: 1.9s → 0.9s (well under 3s limit).
+- Frontend: reduced RPC client timeout 8s → 2.5s so client fallback fires before DB kills. Also expanded error message check and switched fallback from `select('*')` to explicit columns.
+- Both test vehicles now return HTTP 200 in <1s via anon key. Commit 5ee11e181.
+
+## 2026-02-27
+
+### [transfers] Transfer System UI — operator dashboard + buyer/seller pages
+- `/admin/transfers`: Operator dashboard listing 32,762 in_progress transfers, sorted by overdue milestone count
+  - Inline expand → full milestone checklist with ✓ Done buttons → calls `transfer-advance:advance_manual`
+  - Quick links to buyer/seller views per transfer
+  - "Log a Deal" modal for private sales → `transfer-automator:seed_from_listing`
+  - Filter by status (in_progress/completed/stalled/cancelled), search by vehicle/handle, pagination
+- `/t/:transferId`: Public buyer/seller page, token-accessible (no login required)
+  - Vehicle image, price, milestone timeline with completion dates
+  - Confirm buttons on current milestone
+  - Free-form "Send an update" signal box → `transfer-advance:ingest_signal` (AI classifies)
+  - Inbox email contact footer
+- AdminShell nav: Transfers added as primary nav item
+- Commit: `0f4d8bf09`
+
+## 2026-02-27
+
+### [auth] Auth guard map + enforcement (task e6aa28b8)
+- Created `ProtectedRoute` component: shows loading state while auth resolves (prevents null-user crashes), then redirects unauthenticated users to `/login?returnUrl=...`
+- Created `RequireAdmin` component: auth + admin role check; on non-admin redirects to `/org/dashboard`
+- Created `AuthErrorBoundary`: class-based boundary at App root catches RLS / 401 errors that escape pages → shows friendly "sign in required" card instead of blank page
+- Annotated DomainRoutes.tsx with full public / protected / admin route map (60+ routes)
+- Protected in vehicle module: `/vehicle/add`, `/:id/edit`, `/:id/mailbox`, `/:id/invest`, `/:id/portfolio`, `/:id/wiring`, `/:id/work`
+- Protected in org module: `/org/dashboard`, `/org/create` (browse + profiles stay public)
+- Protected in marketplace module: `/market/investor/dashboard`, `/market/portfolio`, `/market/builder`, `/market/contracts`, `/market/bids`
+- Protected entire dealer module: `/dealer/*`
+- Gated admin module with `RequireAdmin` at route level (stops lazy chunks from loading for non-admins)
+- Commit: `86c279ee5`
+
+### [cwfto] Situational Brief — 2026-02-27 ~18:30 UTC
+- **P0 FOUND AND MITIGATED**: 30-minute UPDATE on vehicles (`SET auction_source = 'barrett-jackson'`) from normalize-slugs migration was blocking PostgREST schema cache reload. Another agent retrying DROP/CREATE INDEX caused AccessExclusive lock cascade → PGRST002 outage on ALL REST API calls.
+- Cancelled 12+ DDL lock-waiters across 4 rounds
+- Paused valuation cron jobs 321-325 (run_valuation_batch_by_quality) to reduce lock contention
+- Closed stale task: YONO sidecar unreachable (29ede778) — confirmed healthy (tier1 OK, flat=276, zone=41, uptime=463s)
+- Reset YONO sidecar redeploy (da504643) to pending — tier-2 training still active (japanese epoch 1/25)
+- Filed 3 tasks: P97 vehicles lock fix, P88 re-enable valuation crons, P80 batch migration rule for CTO
+- Scheduled next CWFTO loop (P92)
+
+### [fb-marketplace] Comprehensive GraphQL probe + v2 scraper + 5-city production sweep
+- **Probe 1**: Tested LSD token, fb_dtsg, User-Agent, doc_ids, full response schema mapping
+  - KEY FINDING: No tokens required (LSD, dtsg, cookies) -- GraphQL works bare
+  - KEY FINDING: Any User-Agent works (Chrome, Bingbot, Googlebot, curl, empty)
+  - KEY FINDING: Zero pagination overlap across 10 pages (240 listings)
+  - Full listing schema mapped: 30+ fields, presence rates documented
+- **Probe 2**: Tested count, radius, price, year, make filters, cross-city, deep pagination
+  - Price filter: WORKS accurately
+  - Year filter: BROKEN (effectively ignored -- must filter by title parsing)
+  - Make filter: BROKEN (effectively ignored)
+  - Radius: WORKS (5km to 500km tested)
+  - Max count per page: 24 (hard cap, requesting more still returns 24)
+- **v2 scraper**: Rewrote `fb-marketplace-local-scraper.mjs`
+  - Removed LSD token fetch (unnecessary HTTP request per city)
+  - Batch upserts instead of individual queries
+  - Expanded to 55 US metros (from 43)
+  - Rate limit retry logic
+  - Status mapping (is_sold/is_pending)
+- **Production sweep**: 5 cities x 10 pages = 1,200 listings scanned
+  - Austin: 21 vintage, Detroit: 31, LA: 44, Chicago: 28, Miami: 20
+  - Total: 144 vintage listings upserted, 0 errors, 0 rate limits
+  - National vintage rate: ~12% of all vehicle listings
+- Updated `facebook-marketplace-extraction.md` with all findings
+- Diagnostic scripts: `scripts/fb-graphql-probe.mjs`, `scripts/fb-graphql-probe-2.mjs`
+
+## 2026-02-27 (VP AI — YONO Sidecar Fix)
+- [yono] Fixed sidecar "modal-http: invalid function call" — root causes: (1) `@modal.concurrent(max_inputs=10)` is incompatible with `@modal.asgi_app()` in Modal 1.3.2 — removed it; (2) stale 529KB tier-2 ONNX stubs (graph-only, missing .data weight files) crashed containers on startup — deleted from volume; (3) added try/except around ONNX model loading so future incomplete uploads can't crash the server
+- [yono] Sidecar redeployed at https://sss97133--yono-serve-fastapi-app.modal.run — /health 200 OK, /classify working (Land Rover correctly identified via british family tier-2 hierarchical inference)
+- [yono] Tier-2 families live: american, british, german, japanese, italian, french (6/7 — Swedish still training PID 89338, watcher PID 7390 + PID 796 will auto-upload when done)
+- [yono] URL typo documented: task description said sss73133 but actual workspace is sss97133 — .env and Supabase secrets are correct
+
+## 2026-02-27 (VP Extraction — Fix primary_image_url on vehicle creation)
+
+### Task: 5ed3e3b9-bbfd-473e-b522-4c3e9225e30d
+**Priority:** 88
+**Problem:** 1,671/1,684 vehicles created in last 24h had `primary_image_url = NULL`
+**Root cause:** `extract-cars-and-bids-core` and `extract-bat-core` were creating vehicles with image galleries (inserted to `vehicle_images` table) but not setting the `primary_image_url` field on the vehicle record itself. This requires backfill operations and breaks discovery thumbnails.
+
+**Fix applied:**
+- `extract-cars-and-bids-core/index.ts`: Added `primary_image_url: extracted.images.length > 0 ? extracted.images[0] : null` to vehicleData
+- `extract-bat-core/index.ts`: Added `primary_image_url: images.length > 0 ? images[0] : null` to insertPayload
+- Both deployed successfully
+
+**Impact:** 
+- New vehicles created by these extractors will now automatically have primary_image_url set from first image
+- Eliminates need for backfill scripts
+- Enables immediate display of vehicle thumbnails in search/discovery UI
+- Prevents the 1,671+ vehicles NULL state from recurring
+
+**Status:** COMPLETED ✓

@@ -1273,6 +1273,8 @@ serve(async (req) => {
         drivetrain: essentials.drivetrain || null,
         engine_size: essentials.engine || null,
         body_style: bestBodyStyle || null,
+        // Set primary image from extracted gallery
+        primary_image_url: images.length > 0 ? images[0] : null,
         extractor_version: EXTRACTOR_VERSION,
       };
 
