@@ -526,6 +526,11 @@ def fastapi_app():
             "uptime_s": round(time.time() - started_at, 1),
         }
 
+    _FETCH_HEADERS = {
+        "User-Agent": "Mozilla/5.0 (compatible; NukeVision/1.0; +https://nuke.ag)",
+        "Accept": "image/*,*/*",
+    }
+
     @api.post("/classify")
     async def classify(body: dict):
         image_url = body.get("image_url")
@@ -534,10 +539,14 @@ def fastapi_app():
             return {"error": "Missing image_url"}
 
         t0 = time.perf_counter()
-        async with httpx.AsyncClient(timeout=20) as client:
-            resp = await client.get(image_url)
-            resp.raise_for_status()
-            image_bytes = resp.content
+        try:
+            async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+                resp = await client.get(image_url, headers=_FETCH_HEADERS)
+                resp.raise_for_status()
+                image_bytes = resp.content
+        except Exception as e:
+            return {"error": f"Image fetch failed: {e}", "image_url": image_url,
+                    "make": None, "confidence": 0, "top5": [], "ms": 0}
 
         tensor = _preprocess(image_bytes)
         result = _classify(tensor, top_k=top_k)
@@ -555,8 +564,8 @@ def fastapi_app():
             url = item.get("image_url", "")
             top_k = item.get("top_k", 5)
             try:
-                async with httpx.AsyncClient(timeout=20) as client:
-                    resp = await client.get(url)
+                async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+                    resp = await client.get(url, headers=_FETCH_HEADERS)
                     resp.raise_for_status()
                     tensor = _preprocess(resp.content)
                     result = _classify(tensor, top_k=top_k)
@@ -579,8 +588,8 @@ def fastapi_app():
 
         t0 = time.perf_counter()
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
-                resp = await client.get(image_url)
+            async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+                resp = await client.get(image_url, headers=_FETCH_HEADERS)
                 resp.raise_for_status()
                 image_bytes = resp.content
 
@@ -604,8 +613,8 @@ def fastapi_app():
             url = item.get("image_url", "")
             t0 = time.perf_counter()
             try:
-                async with httpx.AsyncClient(timeout=20) as client:
-                    resp = await client.get(url)
+                async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+                    resp = await client.get(url, headers=_FETCH_HEADERS)
                     resp.raise_for_status()
                     result = _analyze_image(resp.content)
                     return {**result, "ms": round((time.perf_counter() - t0) * 1000, 1), "image_url": url}
