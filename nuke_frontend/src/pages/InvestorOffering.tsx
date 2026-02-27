@@ -165,7 +165,7 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
           <li>Engine bay analysis</li>
           <li>Spec identification from photos</li>
         </ol>
-        <p><strong>Current status:</strong> Phase 5 of 5 complete. EfficientNet-B0 model trained and exported to ONNX. Production sidecar deployed (FastAPI on Modal). The full classification pipeline is operational — zone detection, hierarchical make/family classification, and condition scoring are running. Inference: ~4ms per image on dedicated hardware. The model improves continuously as labeled data accumulates from our 33M+ image database.</p>
+        <p><strong>Current status:</strong> Phase 5 of 5 complete. EfficientNet-B0 model trained and exported to ONNX. Production sidecar deployed (FastAPI on Modal). The full classification pipeline is operational — zone detection, hierarchical make/family classification, and condition scoring are running. Inference: ~4ms per image on dedicated hardware. The model improves continuously as labeled data accumulates from our 34M+ image database.</p>
         <p><strong>Why domain-specific matters:</strong> Generic object detection can't distinguish a patina'd original from surface rust, or a stock interior from a period-correct restore. YONO is trained specifically on vehicles — that domain specificity is what makes it useful for valuation context rather than just image sorting.</p>
       </div>
     ),
@@ -573,10 +573,10 @@ export default function InvestorOffering() {
   if (phase === 'gate') {
     // Key stats shown publicly before gate — visible before access code
     const gateStats = [
-      { label: 'Vehicles tracked', value: '18,000+', note: 'collector & collector-adjacent' },
-      { label: 'Images indexed', value: '33M+', note: 'from 15+ auction sources' },
-      { label: 'Auction events', value: '200K+', note: 'with real transaction prices' },
-      { label: 'Platform AUM gap', value: '<$100M', note: 'in a $37B annual market' },
+      { label: 'Vehicles indexed', value: '1.25M', note: 'collector & adjacent, growing daily' },
+      { label: 'Vehicle images', value: '33.7M', note: 'from 15+ auction & marketplace sources' },
+      { label: 'Nuke AI valuations', value: '513K', note: 'confidence-weighted, source-traced' },
+      { label: 'Market segment ETFs', value: '4', note: 'fractional exposure to collector segments' },
     ];
 
     return (
@@ -631,7 +631,7 @@ export default function InvestorOffering() {
             margin: 0,
             lineHeight: 1.6,
           }}>
-            33 million vehicle images. Real transaction prices across 15+ auction platforms.
+            1.25M vehicles. 33.7M images. 513K AI valuations. Real transaction prices across 15+ auction platforms.
             Fractional ownership with NAV grounded in actual auction closes — not appraisals.
           </p>
         </div>

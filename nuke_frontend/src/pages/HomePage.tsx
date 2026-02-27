@@ -13,18 +13,22 @@ function useLandingStats() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase
-      .from('portfolio_stats_cache')
-      .select('total_vehicles')
-      .eq('id', 'global')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (cancelled || !data) return;
-        setStats((prev) => ({
-          ...prev,
-          totalVehicles: Number(data.total_vehicles) || null,
-        }));
+    Promise.all([
+      supabase
+        .from('portfolio_stats_cache')
+        .select('total_vehicles')
+        .eq('id', 'global')
+        .maybeSingle(),
+      supabase
+        .from('vehicle_images')
+        .select('*', { count: 'estimated', head: true }),
+    ]).then(([cacheRes, imagesRes]) => {
+      if (cancelled) return;
+      setStats({
+        totalVehicles: cacheRes.data ? Number(cacheRes.data.total_vehicles) || null : null,
+        totalImages: imagesRes.count != null ? imagesRes.count : null,
       });
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -67,7 +71,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
 
   const statItems = [
     { value: formatNum(landingStats.totalVehicles), label: 'vehicles tracked' },
-    { value: '33M+', label: 'photos indexed' },
+    { value: formatNum(landingStats.totalImages), label: 'photos indexed' },
     { value: '50+', label: 'data sources' },
   ];
 
@@ -86,7 +90,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     },
     {
       title: 'API & SDK',
-      desc: 'Programmatic access to 18K+ vehicle profiles. Build your own tools on top of the Nuke dataset.',
+      desc: `Programmatic access to ${formatNum(landingStats.totalVehicles) !== '—' ? formatNum(landingStats.totalVehicles) : '1M+'} vehicle profiles. Build your own tools on top of the Nuke dataset.`,
     },
   ];
 
