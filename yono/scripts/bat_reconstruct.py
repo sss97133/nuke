@@ -121,6 +121,16 @@ def get_bat_candidates(limit: int = 100, skip_existing: bool = True) -> list:
           )
         """
 
+    # Drive from bat_listings (small table, indexed) to avoid 28M-row scan on vehicle_images
+    existing_clause = ""
+    if skip_existing:
+        existing_clause = """
+          AND bl.vehicle_id NOT IN (
+              SELECT vehicle_id FROM vehicle_reconstructions
+              WHERE reconstruction_quality NOT IN ('failed', 'pending')
+          )
+        """
+
     sql = f"""
     COPY (
         SELECT
@@ -129,12 +139,12 @@ def get_bat_candidates(limit: int = 100, skip_existing: bool = True) -> list:
             v.make,
             v.model,
             COUNT(vi.id) AS img_count
-        FROM vehicles v
-        JOIN vehicle_images vi ON vi.vehicle_id = v.id
-        WHERE v.listing_source = 'bat'
-          AND vi.image_url IS NOT NULL
-          {existing_filter}
-        GROUP BY v.id
+        FROM bat_listings bl
+        JOIN vehicles v ON v.id = bl.vehicle_id
+        JOIN vehicle_images vi ON vi.vehicle_id = bl.vehicle_id
+        WHERE vi.image_url IS NOT NULL
+          {existing_clause}
+        GROUP BY v.id, v.year, v.make, v.model
         HAVING COUNT(vi.id) >= {MIN_IMAGES}
         ORDER BY COUNT(vi.id) DESC
         LIMIT {limit}
@@ -144,15 +154,37 @@ def get_bat_candidates(limit: int = 100, skip_existing: bool = True) -> list:
     return rows
 
 
+EXTERIOR_ZONES = (
+    "ext_front", "ext_front_driver", "ext_front_passenger",
+    "ext_driver_side", "ext_passenger_side",
+    "ext_rear", "ext_rear_driver", "ext_rear_passenger",
+    "ext_roof",
+)
+
+
 def get_vehicle_images(vehicle_id: str, limit: int = MAX_IMAGE_DL) -> list:
-    """Get image URLs for a vehicle, preferring exterior shots."""
+    """
+    Get image URLs for a vehicle, preferring exterior shots for COLMAP.
+
+    Priority order:
+    1. Images with exterior zone classification (best for SfM — overlapping angles)
+    2. All images if no zone data available yet
+
+    COLMAP needs images that overlap in 3D space. Interior/detail shots don't
+    overlap with exterior shots, so mixing them kills the reconstruction.
+    """
+    zones_str = ", ".join(f"'{z}'" for z in EXTERIOR_ZONES)
+
     sql = f"""
     COPY (
-        SELECT id, image_url
+        SELECT id, image_url, vehicle_zone
         FROM vehicle_images
         WHERE vehicle_id = '{vehicle_id}'
           AND image_url IS NOT NULL
           AND image_url != ''
+        ORDER BY
+          CASE WHEN vehicle_zone IN ({zones_str}) THEN 0 ELSE 1 END,
+          id
         LIMIT {limit}
     ) TO STDOUT WITH CSV HEADER;
     """
@@ -243,30 +275,25 @@ def run_colmap(image_dir: Path, output_dir: Path, vehicle_id: str) -> dict:
         "feature_extractor",
         "--database_path", str(db_path),
         "--image_path", str(image_dir),
-        "--ImageReader.single_camera", "1",
-        "--SiftExtraction.use_gpu", "0",  # MPS not supported by COLMAP's CUDA SIFT
-        "--SiftExtraction.num_threads", "4",
+        # Note: don't use single_camera — BaT images have mixed dimensions
+        "--FeatureExtraction.use_gpu", "0",  # MPS not supported by COLMAP's CUDA SIFT
+        "--FeatureExtraction.num_threads", "4",
     ], "feature_extractor")
     if not ok:
         return {"quality": "failed", "n_images_registered": 0, "n_points3d": 0, "camera_poses": {}}
 
-    # Step 2: Sequential matcher (good for ordered BaT photo sequences)
-    print(f"  [COLMAP] Sequential matching...")
-    ok = run([
-        "sequential_matcher",
+    # Step 2: Exhaustive matching — BaT photos are unordered listing shots,
+    # not video sequences. Sequential matching fails because adjacent images
+    # (by filename) show completely different zones. Exhaustive matching
+    # checks all N*(N-1)/2 pairs and finds the overlapping exterior shots.
+    # ~100 images = 4950 pairs, ~2min. For >100 images use vocab-tree.
+    print(f"  [COLMAP] Exhaustive matching (unordered photos)...")
+    run([
+        "exhaustive_matcher",
         "--database_path", str(db_path),
-        "--SequentialMatching.overlap", "10",  # match each image to 10 neighbors
-        "--SiftMatching.use_gpu", "0",
-        "--SiftMatching.num_threads", "4",
-    ], "sequential_matcher")
-    if not ok:
-        # Fallback to exhaustive matching on failure (slower but more robust)
-        print(f"  [COLMAP] Falling back to exhaustive matching...")
-        run([
-            "exhaustive_matcher",
-            "--database_path", str(db_path),
-            "--SiftMatching.use_gpu", "0",
-        ], "exhaustive_matcher")
+        "--FeatureMatching.use_gpu", "0",
+        "--FeatureMatching.num_threads", "4",
+    ], "exhaustive_matcher")
 
     # Step 3: Sparse reconstruction
     print(f"  [COLMAP] Running sparse mapper...")
@@ -276,7 +303,9 @@ def run_colmap(image_dir: Path, output_dir: Path, vehicle_id: str) -> dict:
         "--image_path", str(image_dir),
         "--output_path", str(sparse_dir),
         "--Mapper.num_threads", "4",
-        "--Mapper.init_min_num_inliers", "25",
+        "--Mapper.init_min_num_inliers", "15",
+        "--Mapper.abs_pose_min_num_inliers", "15",
+        "--Mapper.min_num_matches", "10",
     ], "mapper")
 
     if not ok:
@@ -437,17 +466,40 @@ def reconstruct_vehicle(vehicle: dict, work_dir: Path, skip_colmap: bool = False
     # Work directory for this vehicle
     vehicle_work = work_dir / vehicle_id
     image_dir = vehicle_work / "images"
+    colmap_output = vehicle_work / "colmap_output"
 
-    # Download images
+    # Clean stale COLMAP DB so re-runs start fresh
+    stale_db = colmap_output / "colmap.db"
+    if stale_db.exists():
+        stale_db.unlink()
+
+    # Download images (skip existing files to speed up re-runs)
     t0 = time.time()
-    downloaded = download_images(image_rows, image_dir)
-    print(f"  Downloaded {len(downloaded)} images in {time.time()-t0:.1f}s")
+    existing = {f.name for f in image_dir.glob("*.jpg")} if image_dir.exists() else set()
+    if existing:
+        print(f"  Reusing {len(existing)} existing images")
+        downloaded = sorted(image_dir.glob("*.jpg"))
+    else:
+        downloaded = download_images(image_rows, image_dir)
+        print(f"  Downloaded {len(downloaded)} images in {time.time()-t0:.1f}s")
 
     if len(downloaded) < 10:
         print(f"  Too few successful downloads, skipping")
         result = {"quality": "failed", "n_images_registered": 0, "n_points3d": 0, "camera_poses": {}}
         store_reconstruction(vehicle_id, result)
         return result
+
+    # Log zone coverage — exterior images are what COLMAP needs
+    exterior_count = sum(1 for r in image_rows if r.get("vehicle_zone", "") in EXTERIOR_ZONES)
+    null_zone_count = sum(1 for r in image_rows if not r.get("vehicle_zone"))
+    if null_zone_count > 0:
+        print(f"  Zone data: {len(image_rows) - null_zone_count} classified, "
+              f"{null_zone_count} unclassified (run zone classifier first for best results)")
+    if exterior_count > 0:
+        print(f"  Exterior images: {exterior_count}/{len(image_rows)} — good for COLMAP overlap")
+    elif null_zone_count == len(image_rows):
+        print(f"  WARNING: No zone data — using random {len(image_rows)} images. "
+              f"COLMAP may fail due to mixed zones (interior+exterior+detail).")
 
     if skip_colmap:
         print("  --skip-colmap: skipping COLMAP, storing placeholder")

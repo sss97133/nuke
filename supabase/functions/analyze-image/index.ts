@@ -35,6 +35,36 @@ serve(async (req) => {
     )
   }
 
+  // Daily budget cap — checked before any processing or status changes
+  {
+    const DAILY_BUDGET_CAP = Number(Deno.env.get('ANALYZE_IMAGE_DAILY_CAP') || '50')
+    try {
+      const budgetClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SERVICE_ROLE_KEY') ?? '',
+        { auth: { persistSession: false, detectSessionInUrl: false } }
+      )
+      const { data: spendRows } = await budgetClient
+        .from('ai_scan_sessions')
+        .select('ai_model_cost')
+        .gte('created_at', new Date(new Date().toDateString()).toISOString())
+      const today_spend = (spendRows || []).reduce(
+        (sum: number, row: any) => sum + (Number(row.ai_model_cost) || 0),
+        0
+      )
+      if (today_spend >= DAILY_BUDGET_CAP) {
+        console.warn(`[analyze-image] Daily budget cap reached: $${today_spend.toFixed(4)} >= $${DAILY_BUDGET_CAP}`)
+        return new Response(
+          JSON.stringify({ paused: true, reason: 'daily_budget_cap_reached', today_spend, cap: DAILY_BUDGET_CAP }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+        )
+      }
+    } catch (budgetErr) {
+      // Non-blocking: if budget check fails, allow processing to continue
+      console.warn('[analyze-image] Budget cap check failed (non-blocking):', budgetErr)
+    }
+  }
+
   try {
     const startedAt = Date.now()
     const supabase = createClient(
@@ -93,7 +123,67 @@ serve(async (req) => {
     }
 
     // ========================================================================
-    // 3. Tier 0: YONO local classifier (free, fast, ~4ms)
+    // 3. Fetch vehicle context (year/make/model/description/color/vin)
+    //    Used to ground both YONO and vision-analyze-image so they analyze
+    //    a KNOWN vehicle, not a mystery car.
+    // ========================================================================
+    let vehicleContext: string = 'general'
+    if (vehicle_id) {
+      try {
+        // Fetch vehicle identity
+        const { data: vehicleRow } = await supabase
+          .from('vehicles')
+          .select('year, make, model, description, interior_color, vin, transmission')
+          .eq('id', vehicle_id)
+          .maybeSingle()
+
+        if (vehicleRow) {
+          const parts: string[] = [
+            vehicleRow.year && vehicleRow.make && vehicleRow.model
+              ? `${vehicleRow.year} ${vehicleRow.make} ${vehicleRow.model}`
+              : null,
+            vehicleRow.vin ? `VIN: ${vehicleRow.vin}` : null,
+            vehicleRow.transmission ? `Transmission: ${vehicleRow.transmission}` : null,
+            vehicleRow.interior_color ? `Interior: ${vehicleRow.interior_color}` : null,
+            vehicleRow.description ? vehicleRow.description.substring(0, 400) : null,
+          ].filter(Boolean) as string[]
+
+          // Pull findings from already-analyzed images of this vehicle
+          // This lets each image benefit from what previous images revealed
+          const { data: priorImages } = await supabase
+            .from('vehicle_images')
+            .select('ai_scan_metadata')
+            .eq('vehicle_id', vehicle_id)
+            .eq('ai_processing_status', 'completed')
+            .not('ai_scan_metadata', 'is', null)
+            .limit(8)
+
+          if (priorImages && priorImages.length > 0) {
+            const priorFindings: string[] = []
+            for (const img of priorImages) {
+              const meta = img.ai_scan_metadata as any
+              const desc = meta?.appraiser?.description || meta?.tier_1_analysis?.condition_glance
+              const zone = meta?.appraiser?.subject
+              const damage = meta?.appraiser?.visible_damage
+              const notes = meta?.appraiser?.condition_notes
+              if (desc) priorFindings.push(desc.substring(0, 120))
+              else if (zone && notes) priorFindings.push(`${zone}: ${notes.substring(0, 80)}`)
+            }
+            if (priorFindings.length > 0) {
+              parts.push(`Previously observed across ${priorImages.length} images: ${priorFindings.slice(0, 4).join(' / ')}`)
+            }
+          }
+
+          vehicleContext = parts.join(' | ')
+          console.log('[analyze-image] Vehicle context built:', vehicleContext.substring(0, 150))
+        }
+      } catch (ctxErr) {
+        console.warn('[analyze-image] Failed to fetch vehicle context (non-blocking):', ctxErr)
+      }
+    }
+
+    // ========================================================================
+    // 4. Tier 0: YONO local classifier (free, fast, ~4ms)
     //    If YONO is confident (>0.7), record result and skip cloud call.
     //    If YONO is uncertain or sidecar is down, proceed to Gemini/GPT.
     // ========================================================================
@@ -153,7 +243,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${serviceRoleKey}`,
           },
-          body: JSON.stringify({ image_url }),
+          body: JSON.stringify({ image_url, context: vehicleContext }),
           signal: AbortSignal.timeout(90000),
         }
       )

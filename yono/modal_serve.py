@@ -123,6 +123,82 @@ def _load_onnx_models():
     return flat_sess, flat_labels, flat_input, tier1_sess, tier1_input, family_labels, tier2, tier2_labels, tier2_input
 
 
+def _load_zone_classifier():
+    """Load Florence-2 zone classifier head (ZoneClassifierHead).
+
+    Architecture: Florence-2-base encoder → ZoneClassifierHead (768 → 512 → 256 → 41 zones)
+    Weights: yono_zone_head.safetensors (2.1MB, from volume)
+    Labels:  yono_zone_classifier_labels.json
+
+    Returns dict with {head, zone_codes, hidden_size, device} or None if unavailable.
+    """
+    import json
+    import torch
+    from torch import nn
+
+    device = torch.device("cpu")
+
+    head_path = Path(f"{MODELS_DIR}/yono_zone_head.safetensors")
+    labels_path = Path(f"{MODELS_DIR}/yono_zone_classifier_labels.json")
+    config_path = Path(f"{MODELS_DIR}/yono_zone_config.json")
+
+    if not (head_path.exists() and labels_path.exists()):
+        print("[YONO] Zone classifier files not found — skipping.")
+        return None
+
+    try:
+        from safetensors.torch import load_file as safetensors_load
+
+        with open(labels_path) as f:
+            labels_data = json.load(f)
+        zone_codes = labels_data["zone_codes"]
+        n_zones = len(zone_codes)
+
+        hidden_size = 768
+        if config_path.exists():
+            with open(config_path) as f:
+                cfg = json.load(f)
+            hidden_size = cfg.get("hidden_size", 768)
+            n_zones = cfg.get("n_zones", n_zones)
+
+        class ZoneClassifierHead(nn.Module):
+            """Matches ZoneClassifierHead from train_zone_classifier.py."""
+            def __init__(self, hidden_size: int = 768, n_zones: int = 41, dropout: float = 0.2):
+                super().__init__()
+                self.net = nn.Sequential(
+                    nn.LayerNorm(hidden_size),
+                    nn.Linear(hidden_size, 512),
+                    nn.GELU(),
+                    nn.Dropout(dropout),
+                    nn.Linear(512, 256),
+                    nn.GELU(),
+                    nn.Dropout(dropout),
+                    nn.Linear(256, n_zones),
+                )
+
+            def forward(self, image_features):
+                x = image_features.mean(dim=1)
+                return self.net(x)
+
+        head = ZoneClassifierHead(hidden_size=hidden_size, n_zones=n_zones)
+        state_dict = safetensors_load(head_path)
+        head.load_state_dict(state_dict)
+        head = head.to(device)
+        head.eval()
+        print(f"[YONO] Zone classifier loaded: {n_zones} zones, val_acc=72.8%")
+
+        return {
+            "head": head,
+            "zone_codes": zone_codes,
+            "hidden_size": hidden_size,
+            "device": device,
+        }
+
+    except Exception as e:
+        print(f"[YONO] Zone classifier load failed: {e}")
+        return None
+
+
 def _load_vision_analyzer():
     """Load Florence-2 + fine-tuned condition head.
 
@@ -297,6 +373,9 @@ def fastapi_app():
      tier1_sess, tier1_input, family_labels,
      tier2, tier2_labels, tier2_input) = _load_onnx_models()
 
+    # ---- Load zone classifier ----
+    _zone = _load_zone_classifier()
+
     # ---- Load vision analyzer (Florence-2 + fine-tuned head) ----
     _vision = _load_vision_analyzer()
 
@@ -361,9 +440,32 @@ def fastapi_app():
         return {"make": None, "confidence": 0.0, "top5": [],
                 "source": "unavailable", "is_vehicle": False}
 
+    # ---- Zone classification helper ----
+    def _classify_zone(features) -> tuple[str, float]:
+        """Run zone classifier head on Florence-2 image features.
+
+        Returns (zone_code, confidence). Falls back to 'other'/0.0 if not loaded.
+        """
+        import torch
+
+        if _zone is None:
+            return "other", 0.0
+
+        with torch.no_grad():
+            zone_head = _zone["head"]
+            zone_codes = _zone["zone_codes"]
+            logits = zone_head(features)
+            probs = torch.softmax(logits, dim=-1)[0]
+            idx = int(probs.argmax().item())
+            return zone_codes[idx], float(probs[idx])
+
     # ---- Vision analysis helpers ----
     def _analyze_finetuned(image_bytes: bytes) -> dict:
-        """Fine-tuned Florence-2 head: fast (encode only, no generation)."""
+        """Fine-tuned Florence-2 head: fast (encode only, no generation).
+
+        Uses both VisionHead (condition/damage/mods/photo_type/interior_quality)
+        and ZoneClassifierHead (41-class zone) on shared Florence-2 features.
+        """
         import torch
 
         v = _vision
@@ -403,11 +505,19 @@ def fastapi_app():
                 if p >= 0.4
             ]
 
-        vehicle_zone = v["photo_type_to_zone"].get(photo_type, "other")
+        # Use zone classifier if available; fall back to photo_type→zone mapping
+        if _zone is not None:
+            vehicle_zone, zone_confidence = _classify_zone(features)
+            zone_source = "zone_classifier_v1"
+        else:
+            vehicle_zone = v["photo_type_to_zone"].get(photo_type, "other")
+            zone_confidence = 0.7
+            zone_source = "photo_type_heuristic"
 
         return {
             "vehicle_zone": vehicle_zone,
-            "zone_confidence": 0.7,   # derived from photo_type classification
+            "zone_confidence": zone_confidence,
+            "zone_source": zone_source,
             "surface_coord_u": None,
             "surface_coord_v": None,
             "condition_score": cond_score,
@@ -420,7 +530,11 @@ def fastapi_app():
         }
 
     def _analyze_zeroshot(image_bytes: bytes) -> dict:
-        """Zero-shot Florence-2: slower (caption generation), used as fallback."""
+        """Zero-shot Florence-2: slower (caption generation), used as fallback.
+
+        Uses zone classifier on image features when available; falls back to
+        photo_type keyword heuristic otherwise.
+        """
         import torch
 
         v = _vision
@@ -432,9 +546,13 @@ def fastapi_app():
         ).to(v["device"])
 
         with torch.no_grad():
+            # Encode image for zone classifier (reuse features)
+            pixel_values = inputs["pixel_values"]
+            features = v["model"]._encode_image(pixel_values)
+
             generated_ids = v["model"].generate(
                 input_ids=inputs["input_ids"],
-                pixel_values=inputs["pixel_values"],
+                pixel_values=pixel_values,
                 max_new_tokens=200,
                 do_sample=False,
                 num_beams=2,
@@ -487,11 +605,19 @@ def fastapi_app():
             else:
                 interior_quality = 3
 
-        vehicle_zone = v["photo_type_to_zone"].get(photo_type, "other")
+        # Use zone classifier if available; fall back to photo_type heuristic
+        if _zone is not None:
+            vehicle_zone, zone_confidence = _classify_zone(features)
+            zone_source = "zone_classifier_v1"
+        else:
+            vehicle_zone = v["photo_type_to_zone"].get(photo_type, "other")
+            zone_confidence = 0.5
+            zone_source = "photo_type_heuristic"
 
         return {
             "vehicle_zone": vehicle_zone,
-            "zone_confidence": 0.5,
+            "zone_confidence": zone_confidence,
+            "zone_source": zone_source,
             "surface_coord_u": None,
             "surface_coord_v": None,
             "condition_score": condition_score,
@@ -524,6 +650,8 @@ def fastapi_app():
             "flat_classes": len(flat_labels) if flat_labels else 0,
             "vision_available": _vision is not None,
             "vision_mode": _vision.get("vision_mode") if _vision else None,
+            "zone_classifier": _zone is not None,
+            "zone_classes": len(_zone["zone_codes"]) if _zone else 0,
             "uptime_s": round(time.time() - started_at, 1),
         }
 

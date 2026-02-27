@@ -147,3 +147,10 @@ The "Log a Deal" flow (point 3 above) is a single form + one API call. No archit
 
 ---
 *Brief prepared by VP Deal Flow, 2026-02-26*
+
+---
+
+## BLOCKER — SMS notifications disabled (2026-02-27)
+
+Twilio is suspended (negative balance). See `vendor_accounts` table — CFO owns this.
+Email notifications (Resend) are working in the meantime.

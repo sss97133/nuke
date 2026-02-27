@@ -31,9 +31,17 @@ import type { RequestOptions } from '../types';
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export interface VisionClassifyResult {
-  /** Best make prediction */
+  /** Best make prediction (e.g. 'Porsche', 'Ford') */
   make: string | null;
-  /** Confidence score 0.0–1.0 */
+  /**
+   * Vehicle family/origin group — hierarchical classification above make.
+   * Values: 'american' | 'german' | 'japanese' | 'british' | 'italian' | 'french' | 'swedish' | null
+   * Null when tier-2 hierarchical model is not loaded or confidence is low.
+   */
+  family: string | null;
+  /** Confidence score for family prediction, 0.0–1.0. Null when family is null. */
+  family_confidence: number | null;
+  /** Confidence score 0.0–1.0 for make prediction */
   confidence: number;
   /** Top-K predictions as [make, confidence] pairs */
   top5: Array<[string, number]>;
@@ -50,12 +58,21 @@ export interface VisionClassifyResult {
 }
 
 export interface VisionAnalyzeResult {
-  /** Make prediction */
+  /** Best make prediction (e.g. 'Porsche', 'Ford') */
   make: string | null;
-  /** Classification confidence 0.0–1.0 */
+  /**
+   * Vehicle family/origin group from YONO's hierarchical classifier.
+   * Values: 'american' | 'german' | 'japanese' | 'british' | 'italian' | 'french' | 'swedish' | null
+   */
+  family: string | null;
+  /** Confidence score for family prediction, 0.0–1.0. Null when family is null. */
+  family_confidence: number | null;
+  /** Classification confidence 0.0–1.0 for make prediction */
   confidence: number;
-  /** Top-K make predictions */
+  /** Top-K make predictions as [make, confidence] pairs */
   top5: Array<[string, number]>;
+  /** Whether the image appears to contain a vehicle */
+  is_vehicle: boolean | null;
   /** Image category: exterior | interior | engine | undercarriage | document | damage */
   category: string | null;
   /** Detailed subject taxonomy (e.g. 'exterior.panel.door.front.driver') */
@@ -76,6 +93,7 @@ export interface VisionAnalyzeResult {
   /** YONO classification details */
   yono: {
     make: string;
+    family: string | null;
     confidence: number;
     ms: number;
   } | null;
@@ -95,7 +113,7 @@ export interface VisionBatchItem {
 }
 
 export interface VisionBatchResult {
-  results: Array<Omit<VisionClassifyResult, 'elapsed_ms'> & { image_url: string }>;
+  results: Array<Omit<VisionClassifyResult, 'elapsed_ms' | 'source'> & { image_url: string; error?: string }>;
   count: number;
   errors: number;
   cost_usd: number;

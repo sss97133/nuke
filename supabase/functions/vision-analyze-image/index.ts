@@ -6,8 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Unified prompt shared by both Gemini and GPT paths
-const VISION_PROMPT = `You are analyzing a vehicle photograph for a professional appraisal system.
+// Build the analysis prompt, injecting vehicle context when known
+function buildPrompt(context: string): string {
+  const isGeneral = !context || context === 'general'
+  const vehicleBlock = isGeneral
+    ? ''
+    : `\nKNOWN VEHICLE IDENTITY:\n${context}\n\nUse this identity to anchor your analysis. Do not try to identify the vehicle — it is already known. Focus on: which specific panel/zone is shown, condition of that area, any damage, whether visible parts/colors/modifications are consistent with the known spec, and anything that deviates from factory or documented state.\n`
+
+  return `You are analyzing a vehicle photograph for a professional appraisal system.${vehicleBlock}`
+    + VISION_PROMPT_BODY
+}
+
+// Core prompt body (coordinate system, taxonomy, output schema)
+const VISION_PROMPT_BODY = `
 
 COORDINATE SYSTEM:
 The vehicle's center (0,0,0) is at the geometric center of the vehicle based on its length, width, and height.
@@ -157,7 +168,7 @@ async function runGemini(imageUrl: string, context: string): Promise<any> {
     return { _gemini_error: 'no_api_key' }
   }
 
-  const prompt = VISION_PROMPT + `\n\nContext: ${context}`
+  const prompt = buildPrompt(context)
 
   try {
     // Download image and convert to base64
@@ -251,7 +262,7 @@ async function runGPT(imageUrl: string, context: string): Promise<any> {
     return { category: 'error', subject: 'api_key_missing', description: 'No OpenAI API key available' }
   }
 
-  const prompt = VISION_PROMPT + `\n\nContext: ${context}`
+  const prompt = buildPrompt(context)
 
   try {
     const res = await callOpenAiChatCompletions({

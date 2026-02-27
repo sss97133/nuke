@@ -7,8 +7,8 @@ const About: React.FC = () => {
       <div style={{ background: 'var(--white)', border: '2px solid var(--border-medium)', padding: 'var(--space-6)' }}>
           
           {/* Header */}
-          <h1 style={{ fontSize: '16pt', fontWeight: 'bold', marginBottom: 'var(--space-4)', borderBottom: '2px solid var(--border-medium)', paddingBottom: 'var(--space-2)' }}>
-            About NUKE Platform
+          <h1 style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 'var(--space-4)', borderBottom: '2px solid var(--border-medium)', paddingBottom: 'var(--space-2)' }}>
+            About Nuke
           </h1>
 
           {/* Executive Summary */}

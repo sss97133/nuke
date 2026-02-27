@@ -60,12 +60,9 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Claimed and completed pre-existing CFO Twilio task (f49f82f7).
 - REMOVED: session complete
 
-### VP Docs — SDK README + OpenAPI + Quickstart — 2026-02-27
-- Rewriting tools/nuke-sdk/README.md (v1.4.0 — signal, vision, search, comps, all resources)
-- Adding api-v1-export + api-v1-exchange to docs/api/openapi.yaml
-- Creating docs/QUICKSTART.md (zero-to-first-call guide)
-- Touching: tools/nuke-sdk/README.md, docs/api/openapi.yaml, docs/QUICKSTART.md
-- DO NOT touch: SDK source files, edge functions, DB
+### VP Docs — SDK README + OpenAPI + Quickstart — 2026-02-27 — COMPLETED
+- Rewrote tools/nuke-sdk/README.md, fixed docs/api/openapi.yaml (21 paths, Vision misplacement fixed), created docs/QUICKSTART.md
+- REMOVED: session complete
 
 ### Frontend Worker — Admin + Onboarding UX — COMPLETED 2026-02-27
 - Login overhaul, admin route fixes, first-run onboarding. See DONE.md. Commit 5a62f7c34.
@@ -262,17 +259,14 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Touching: nuke_frontend/src/components/vehicles/VehicleCardDense.tsx, nuke_frontend/src/pages/Search.tsx
 - DO NOT: modify backend APIs (already working)
 
-### Frontend Worker — Vehicle Profile Page UX Fixes — 2026-02-27
-- Task: Fix all UI/UX issues on vehicle profile page (all 4 tabs)
-- Touching: nuke_frontend/src/pages/VehicleProfile.tsx, nuke_frontend/src/pages/vehicle-profile/*, nuke_frontend/src/components/vehicle/*
-- DO NOT: modify SimilarSalesSection.tsx core logic or VehicleComparablesTab.tsx structure
+### Frontend Worker — Vehicle Profile Page UX Fixes — COMPLETED 2026-02-27
+- Commit 475c6ce1b pushed to main. 10 files changed (tabs, hero, comps, specs, basic info, similar sales).
 
 ### Frontend Worker — Global UX Audit + Polish — 2026-02-27
 - Full site audit: navigation, homepage, empty states, loading states, mobile, typography
 - Touching: HomePage.tsx, AppHeader.tsx, NukeMenu.tsx, MobileBottomNav.tsx, AppLayout.tsx, AppFooter.tsx, CursorHomepage.tsx, Search.tsx (empty/loading states only)
 - DO NOT: modify Search.tsx main search logic, VehicleCardDense.tsx, VehicleProfile tabs
 
-### Frontend Worker — Org Profile + Offering Page UX — 2026-02-27
-- Task: Fix org profile + offering page UX issues found by founder
-- Touching: nuke_frontend/src/pages/OrganizationProfile.tsx, nuke_frontend/src/pages/InvestorOffering.tsx, nuke_frontend/src/pages/MarketCompetitors.tsx
-- DO NOT: modify backend APIs, edge functions, DB schema
+### Frontend Worker — Org Profile + Offering Page UX — COMPLETED 2026-02-27
+- Commit d24aa0ad0 pushed to main, Vercel deploying
+- Fixed: offering gate landing page, org profile alerts→toasts, loading skeleton, business-docs visibility, verification badge, competitors CTA

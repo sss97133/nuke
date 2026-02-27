@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ps:*)",
+      "Bash(grep:*)",
+      "Bash(dotenvx run:*)",
+      "Bash(supabase functions:*)"
+    ]
+  }
+}

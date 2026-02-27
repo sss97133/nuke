@@ -1509,15 +1509,15 @@ Return ONLY valid JSON in this format:
     if (organizationId) {
       const { data: existingOrg } = await supabase
         .from('businesses')
-        .select('id, type, business_name')
+        .select('id, entity_type, business_name')
         .eq('id', organizationId)
         .maybeSingle();
-      
+
       if (!existingOrg) {
         console.warn(`Provided organization_id ${organizationId} not found, will create new organization`);
         organizationId = null;
       } else {
-        businessType = (existingOrg.type === 'auction_house' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
+        businessType = (existingOrg.entity_type === 'auction_house' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
         console.log(`Using provided organization: ${existingOrg.business_name} (${businessType})`);
       }
     }
@@ -1560,7 +1560,7 @@ Return ONLY valid JSON in this format:
 
       if (existingOrg) {
         organizationId = existingOrg.id;
-        businessType = (existingOrg.type === 'auction_house' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
+        businessType = (existingOrg.entity_type === 'auction_house' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
         console.log(`Found existing business: ${existingOrg.business_name} (${organizationId})`);
         
         // Update inventory counts if we have them
@@ -1601,9 +1601,8 @@ Return ONLY valid JSON in this format:
           .from('businesses')
           .insert({
             business_name: normalizedDealer.name,
-            type: businessType,
             // Auction houses are a first-class organization type (do not bucket into "other")
-            business_type: businessType === 'auction_house' ? 'auction_house' : 'dealership',
+            entity_type: businessType === 'auction_house' ? 'auction_house' : 'dealer',
             description: normalizedDealer.description,
             address: normalizedDealer.address,
             city: normalizedDealer.city,

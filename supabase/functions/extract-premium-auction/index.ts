@@ -16,8 +16,8 @@ const corsHeaders = {
 // Mapping of site types to their extractor functions
 const SITE_EXTRACTORS: Record<string, string> = {
   carsandbids: "extract-cars-and-bids-core",
-  bat: "bat-simple-extract",
-  bringatrailer: "bat-simple-extract",
+  bat: "complete-bat-import",
+  bringatrailer: "complete-bat-import",
   hagerty: "extract-hagerty-listing",
   pcarmarket: "import-pcarmarket-listing",
   ebaymotors: "extract-ebay-motors",

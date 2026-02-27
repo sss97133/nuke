@@ -227,7 +227,7 @@ serve(async (req) => {
             email: extracted.email || null,
             dealer_license: extracted.dealer_license || null,
             license_type: extracted.dealer_license ? 'dealer_license' : null,
-            business_type: (extracted.business_type === 'auction_house' ? 'auction_house' : 'dealer'),
+            entity_type: (extracted.business_type === 'auction_house' ? 'auction_house' : 'dealer'),
             description: extracted.description || null,
             specialties: extracted.specialties || [],
             inventory_url: extracted.inventory_url || null,
@@ -943,8 +943,7 @@ async function findOrCreateOrganizationWithGeographicLogic(
     .insert({
       business_name: dealerData.name,
       // Auction houses are a first-class organization type (do not bucket into "other")
-      business_type: dealerData.business_type === 'auction_house' ? 'auction_house' : 'dealership',
-      type: dealerData.business_type, // Store in type field if it exists
+      entity_type: dealerData.business_type === 'auction_house' ? 'auction_house' : 'dealer',
       website: dealerData.website,
       phone: dealerData.phone,
       email: dealerData.email,

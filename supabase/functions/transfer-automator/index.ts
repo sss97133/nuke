@@ -175,6 +175,9 @@ async function seedFromAuction(supabase: ReturnType<typeof createClient>, body: 
     .update({ current_transfer_id: transfer.id })
     .eq('id', vehicle_id);
 
+  // Notify parties — fire-and-forget, never blocks the seed response
+  fireAndForgetNotify(transfer.id, 'seeded');
+
   console.log(`[transfer-automator] seeded transfer ${transfer.id} for vehicle ${vehicle_id}`);
 
   return json({
@@ -257,6 +260,9 @@ async function seedFromListing(supabase: ReturnType<typeof createClient>, body: 
     .from('vehicles')
     .update({ current_transfer_id: transfer.id })
     .eq('id', vehicle_id);
+
+  // Notify parties — fire-and-forget, never blocks the seed response
+  fireAndForgetNotify(transfer.id, 'seeded');
 
   return json({ transfer_id: transfer.id, vehicle_id, milestones_seeded: milestones.length, created: true });
 }
@@ -426,6 +432,22 @@ async function resolveUserFromIdentity(
     .eq('id', identity_id)
     .single();
   return data?.claimed_by_user_id ?? null;
+}
+
+// Fire-and-forget call to notify-transfer-parties.
+// Never awaited at call sites — a notification failure must never break a seed.
+function fireAndForgetNotify(transfer_id: string, event: string, milestone_type?: string): void {
+  const url = `${SUPABASE_URL}/functions/v1/notify-transfer-parties`;
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify({ transfer_id, event, milestone_type }),
+  }).catch((err) => {
+    console.warn(`[transfer-automator] notify-transfer-parties failed (non-fatal):`, err);
+  });
 }
 
 function json(body: unknown, status = 200) {

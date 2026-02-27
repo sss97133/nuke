@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotenvx run:*)",
+      "mcp__supabase__execute_sql",
+      "Bash(PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql:*)"
+    ]
+  }
+}

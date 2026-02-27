@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotenvx run:*)",
+      "Bash(PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql:*)",
+      "Bash(open:*)",
+      "Bash(cp:*)",
+      "Bash(supabase functions:*)"
+    ]
+  }
+}

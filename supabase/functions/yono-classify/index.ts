@@ -55,11 +55,13 @@ serve(async (req) => {
       );
     }
 
-    // Ping sidecar health first (fast timeout)
+    // Ping sidecar health first.
+    // Timeout must cover Modal cold start (10-15s for Florence-2).
+    // min_containers=1 keeps sidecar warm but container restarts still happen ~once/day.
     let sidecarAvailable = false;
     try {
       const healthResp = await fetch(`${SIDECAR_URL}/health`, {
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(15000),
       });
       sidecarAvailable = healthResp.ok;
     } catch {

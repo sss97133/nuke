@@ -1,20 +1,31 @@
-# Auto-Checkpoint — 2026-02-26 18:48:47
+# Auto-Checkpoint — 2026-02-27 07:33:06
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
-cfb69b3ff feat: shareable competitor page — Vercel Edge Middleware OG tags + share button
-20d895f5c feat: add 'vs. Competition' nav link to MarketDashboard header
+5a62f7c34 fix(admin/ux): overhaul login UX, admin routing, and first-run onboarding
+a5ebb07b8 fix(ux): global navigation, homepage, mobile, loading states polish
 
 ## Uncommitted Changes
 .claude/ACTIVE_AGENTS.md
 .claude/HANDOFF.md
+.claude/VP_DEAL_FLOW_TRANSFER_BRIEF.md
+.claude/agents/cdo/CLAUDE.md
+.claude/agents/cfo/CLAUDE.md
+.claude/agents/coo/CLAUDE.md
+.claude/agents/cpo/CLAUDE.md
+.claude/agents/cto/CLAUDE.md
+.claude/agents/cwfto/CLAUDE.md
+.claude/agents/vp-ai/CLAUDE.md
+.claude/agents/vp-deal-flow/CLAUDE.md
+.claude/agents/vp-docs/CLAUDE.md
+.claude/agents/vp-extraction/CLAUDE.md
+.claude/agents/vp-orgs/CLAUDE.md
+.claude/agents/vp-photos/CLAUDE.md
+.claude/agents/vp-platform/CLAUDE.md
+.claude/agents/vp-vehicle-intel/CLAUDE.md
+.claude/agents/worker/CLAUDE.md
 DONE.md
-mcp-server
-scripts/geocode-backfill.mjs
-scripts/iphoto-intake.mjs
-yono/modal_serve.py
-yono/scripts/bat_reconstruct.py
-yono/server.py
+TOOLS.md
 
 ## Staged
 none

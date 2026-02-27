@@ -12,7 +12,7 @@ const SIDECAR_URL =
 serve(async () => {
   try {
     const resp = await fetch(`${SIDECAR_URL}/health`, {
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(30000),
     });
     const health = resp.ok ? await resp.json() : null;
     return new Response(

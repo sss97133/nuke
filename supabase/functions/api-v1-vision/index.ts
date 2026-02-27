@@ -106,6 +106,8 @@ async function handleClassify(body: any, t0: number): Promise<Response> {
   if (yonoResult) {
     return json({
       make: yonoResult.make,
+      family: yonoResult.family ?? null,
+      family_confidence: yonoResult.family_confidence ?? null,
       confidence: yonoResult.confidence,
       top5: yonoResult.top5,
       is_vehicle: yonoResult.is_vehicle,
@@ -119,8 +121,11 @@ async function handleClassify(body: any, t0: number): Promise<Response> {
   // Fallback: no sidecar or error
   return json({
     make: null,
+    family: null,
+    family_confidence: null,
     confidence: 0,
     top5: [],
+    is_vehicle: false,
     source: "unavailable",
     cost_usd: 0,
     error: "YONO sidecar not available. Start with: ./scripts/yono-server-start.sh",
@@ -165,8 +170,11 @@ async function handleAnalyze(body: any, supabase: any, t0: number): Promise<Resp
 
   return json({
     make: yonoResult?.make ?? cloudResult?.make ?? null,
+    family: yonoResult?.family ?? null,
+    family_confidence: yonoResult?.family_confidence ?? null,
     confidence: yonoResult?.confidence ?? 0,
     top5: yonoResult?.top5 ?? [],
+    is_vehicle: yonoResult?.is_vehicle ?? null,
     category: cloudResult?.category ?? null,
     subject: cloudResult?.subject ?? null,
     description: cloudResult?.description ?? null,
@@ -174,7 +182,7 @@ async function handleAnalyze(body: any, supabase: any, t0: number): Promise<Resp
     visible_damage: cloudResult?.visible_damage ?? null,
     camera_position: cloudResult?.camera_position ?? null,
     yono: yonoResult
-      ? { make: yonoResult.make, confidence: yonoResult.confidence, ms: yonoResult.ms }
+      ? { make: yonoResult.make, family: yonoResult.family ?? null, confidence: yonoResult.confidence, ms: yonoResult.ms }
       : null,
     source: cloudResult ? "yono+cloud" : yonoResult ? "yono" : "unavailable",
     cost_usd: cloudCost,
@@ -204,6 +212,8 @@ async function handleBatch(body: any, t0: number): Promise<Response> {
         return {
           image_url: img.image_url,
           make: yonoResult.make,
+          family: yonoResult.family ?? null,
+          family_confidence: yonoResult.family_confidence ?? null,
           confidence: yonoResult.confidence,
           top5: yonoResult.top5,
           is_vehicle: yonoResult.is_vehicle,
@@ -231,6 +241,8 @@ async function callYono(
   topK: number = 5
 ): Promise<{
   make: string;
+  family: string | null;
+  family_confidence: number | null;
   confidence: number;
   top5: Array<[string, number]>;
   is_vehicle: boolean;

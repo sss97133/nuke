@@ -196,8 +196,14 @@ function parseSellerField(sellerText: string): string | null {
 function parsePCarMarketIdentityFromUrl(url: string): { year: number; make: string; model: string } | null {
   try {
     const u = new URL(url);
-    // Pattern: /auction/YEAR-slug (slug may or may not end with a numeric dedup suffix)
-    const pathMatch = u.pathname.match(/\/auction\/(\d{4})-(.+?)\/?$/i);
+
+    // Pattern 1: /auction/YEAR-slug (slug may or may not end with a numeric dedup suffix)
+    // Pattern 2: /marketplace-YEAR-make-model... (e.g. /marketplace-2005-land-rover-range-rover)
+    let pathMatch = u.pathname.match(/\/auction\/(\d{4})-(.+?)\/?$/i);
+    if (!pathMatch) {
+      // Try marketplace slug pattern: /marketplace-YEAR-rest-of-slug
+      pathMatch = u.pathname.match(/\/marketplace-(\d{4})-(.+?)\/?$/i);
+    }
     if (!pathMatch?.[1] || !pathMatch?.[2]) return null;
 
     const year = Number(pathMatch[1]);

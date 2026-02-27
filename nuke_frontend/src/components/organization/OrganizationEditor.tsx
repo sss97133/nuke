@@ -15,7 +15,7 @@ interface OrganizationEditorProps {
 interface OrgData {
   business_name: string;
   legal_name?: string;
-  business_type?: string;
+  entity_type?: string;
   description?: string;
   website?: string;
   email?: string;
@@ -61,7 +61,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
       setFormData({
         business_name: data.business_name || '',
         legal_name: data.legal_name || '',
-        business_type: data.business_type || '',
+        entity_type: data.entity_type || '',
         description: data.description || '',
         website: data.website || '',
         email: data.email || '',
@@ -240,8 +240,8 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                 </label>
                 <select
                   className="form-input"
-                  value={formData.business_type || ''}
-                  onChange={(e) => handleChange('business_type', e.target.value)}
+                  value={formData.entity_type || ''}
+                  onChange={(e) => handleChange('entity_type', e.target.value)}
                   style={{ fontSize: '9pt', width: '100%' }}
                 >
                   <option value="">Select type...</option>

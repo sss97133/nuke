@@ -246,6 +246,62 @@ Deno.serve(async (req) => {
 
         console.log(`Vehicle transaction ${transactionId} fee paid: $${amountCents / 100}`)
 
+        // Advance ownership_transfer payment_confirmed milestone (fire-and-forget)
+        // This connects System B (vehicle_transactions / Stripe) to System A (ownership_transfers)
+        // per the CTO architectural decision: vehicle_transactions is a fee record within the transfer
+        const transferId = session.metadata?.transfer_id || null
+        if (transferId) {
+          try {
+            await fetch(`${Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')}/functions/v1/transfer-advance`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')}`
+              },
+              body: JSON.stringify({
+                action: 'advance_manual',
+                transfer_id: transferId,
+                milestone_type: 'payment_confirmed',
+                notes: `Facilitation fee paid via Stripe - Session ${session.id} - $${amountCents / 100}`,
+              }),
+              signal: AbortSignal.timeout(30000),
+            })
+            console.log(`[stripe-webhook] Advanced payment_confirmed milestone for transfer ${transferId}`)
+          } catch (err) {
+            console.error('[stripe-webhook] Failed to advance transfer milestone (non-fatal):', err)
+          }
+        } else {
+          // Try to look up transfer_id from vehicle_transactions if not in metadata
+          try {
+            const { data: txRecord } = await supabase
+              .from('vehicle_transactions')
+              .select('ownership_transfer_id')
+              .eq('id', transactionId)
+              .maybeSingle()
+
+            const resolvedTransferId = txRecord?.ownership_transfer_id
+            if (resolvedTransferId) {
+              await fetch(`${Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')}/functions/v1/transfer-advance`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')}`
+                },
+                body: JSON.stringify({
+                  action: 'advance_manual',
+                  transfer_id: resolvedTransferId,
+                  milestone_type: 'payment_confirmed',
+                  notes: `Facilitation fee paid via Stripe - Session ${session.id} - $${amountCents / 100}`,
+                }),
+                signal: AbortSignal.timeout(30000),
+              })
+              console.log(`[stripe-webhook] Advanced payment_confirmed milestone for transfer ${resolvedTransferId} (resolved from vehicle_transactions)`)
+            }
+          } catch (err) {
+            console.error('[stripe-webhook] Failed to resolve/advance transfer milestone (non-fatal):', err)
+          }
+        }
+
         // Trigger document generation
         try {
           await fetch(`${Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')}/functions/v1/generate-transaction-documents`, {

@@ -16,6 +16,49 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+// Compute SHA-256 hash of image bytes — used for exact duplicate detection
+async function computeSha256(bytes: Uint8Array): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Fetch image bytes and compute file_hash. Returns null if fetch fails or times out.
+async function tryComputeFileHash(url: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok) return null;
+    return await computeSha256(new Uint8Array(await resp.arrayBuffer()));
+  } catch {
+    return null;
+  }
+}
+
+// Fire-and-forget: record image appearance in image_source_appearances.
+// Non-blocking — intake must not fail if this fails.
+function recordSourceAppearance(params: {
+  imageId: string;
+  canonicalImageId: string;
+  phash: string | null;
+  source: string | null;
+  sourceUrl: string | null;
+  vehicleId: string | null;
+}): void {
+  supabase.from("image_source_appearances").insert({
+    image_id: params.imageId,
+    canonical_image_id: params.canonicalImageId,
+    phash: params.phash,
+    source: params.source || "image_intake",
+    source_url: params.sourceUrl,
+    vehicle_id: params.vehicleId,
+    seen_at: new Date().toISOString(),
+  }).then(({ error }) => {
+    if (error) console.error("image_source_appearances insert failed (non-fatal):", error.message);
+  });
+}
+
 interface ImageInput {
   url: string;
   takenAt?: string;
@@ -321,20 +364,66 @@ serve(async (req) => {
           status = "pending";
         }
 
+        // Hash + dedup check (non-blocking on failure)
+        let fileHash: string | null = null;
+        let isDuplicate = false;
+        let duplicateOf: string | null = null;
+        try {
+          fileHash = await tryComputeFileHash(img.url);
+          if (fileHash) {
+            const { data: hashMatch } = await supabase
+              .from("vehicle_images")
+              .select("id")
+              .eq("file_hash", fileHash)
+              .maybeSingle();
+            if (hashMatch) {
+              isDuplicate = true;
+              duplicateOf = hashMatch.id;
+            }
+          }
+        } catch (dedupErr) {
+          console.error("Dedup check failed (non-fatal):", dedupErr);
+        }
+
         // Insert image record
         if (vehicleId) {
-          await supabase.from("vehicle_images").insert({
+          const insertPayload: Record<string, unknown> = {
             vehicle_id: vehicleId,
             image_url: img.url,
-            category: "work", // Default category
+            category: "work",
             caption: analysis.description,
+            source: "image_intake",
             metadata: {
               source: "image_intake",
               taken_at: img.takenAt,
               ai_confidence: analysis.confidence,
               ai_hints: analysis.hints,
             },
-          });
+          };
+          if (fileHash) insertPayload.file_hash = fileHash;
+          if (isDuplicate) {
+            insertPayload.is_duplicate = true;
+            insertPayload.duplicate_of = duplicateOf;
+          }
+
+          const { data: insertedImage } = await supabase
+            .from("vehicle_images")
+            .insert(insertPayload)
+            .select("id, source, source_url, phash")
+            .maybeSingle();
+
+          // Fire-and-forget: record appearance in image_source_appearances
+          if (insertedImage) {
+            const canonicalId = isDuplicate && duplicateOf ? duplicateOf : insertedImage.id;
+            recordSourceAppearance({
+              imageId: insertedImage.id,
+              canonicalImageId: canonicalId,
+              phash: insertedImage.phash ?? null,
+              source: insertedImage.source ?? "image_intake",
+              sourceUrl: insertedImage.source_url ?? img.url,
+              vehicleId,
+            });
+          }
         } else {
           // Store in pending queue
           await supabase.from("pending_image_assignments").upsert({

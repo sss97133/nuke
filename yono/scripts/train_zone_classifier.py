@@ -324,8 +324,31 @@ def train(args):
 
     best_val_acc = 0.0
     global_step = 0
+    start_epoch = 1
 
-    for epoch in range(1, args.epochs + 1):
+    # Resume from checkpoint if requested
+    if args.resume:
+        resume_path = Path(args.resume)
+        if not resume_path.exists():
+            # Try resolving relative to OUTPUTS_DIR
+            resume_path = OUTPUTS_DIR / args.resume
+        if not resume_path.exists():
+            print(f"ERROR: checkpoint not found: {args.resume}")
+            sys.exit(1)
+        print(f"\nResuming from: {resume_path}")
+        ckpt = torch.load(resume_path, map_location=device, weights_only=False)
+        head.load_state_dict(ckpt["head_state_dict"])
+        optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        start_epoch = ckpt["epoch"] + 1
+        best_val_acc = ckpt.get("val_acc", 0.0)
+        # Advance scheduler to match where we left off
+        steps_done = (start_epoch - 1) * len(train_loader)
+        for _ in range(steps_done):
+            scheduler.step()
+        global_step = steps_done
+        print(f"Resumed at epoch {start_epoch}, best_val_acc={best_val_acc:.1%}, global_step={global_step}")
+
+    for epoch in range(start_epoch, args.epochs + 1):
         model.train()
         head.train()
         epoch_losses = []
@@ -448,6 +471,8 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=LR)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--resume", type=str, default=None,
+                        help="Path to checkpoint .pt file to resume from (e.g. checkpoint_epoch10.pt)")
     args = parser.parse_args()
 
     BATCH_SIZE = args.batch_size

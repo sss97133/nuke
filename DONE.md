@@ -5,6 +5,45 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [frontend] Vehicle profile page — comprehensive UX quality pass — commit 475c6ce1b
+- VehicleProfileTabs: rewrote tab bar with human-readable labels (Overview/Media/Specs/Comps/Taxonomy/Bids), URL deep-linking via ?tab=, hover states, comps count badge
+- VehicleComparablesTab: fixed double padding (card wrapper + SimilarSalesSection both had padding)
+- VehicleDescriptionTab: replaced hardcoded 320px grid column with responsive CSS classes
+- VehicleSpecsTab + VehicleTaxonomyTab: 'Not specified' null fallback → '—'
+- VehicleMediaTab: added flex column layout
+- VehicleBasicInfo: replaced noisy red MISSING badge for transmission/mileage/color with muted 'Unknown' (VIN/Year keep MISSING — identity fields)
+- VehicleHeroImage: SVG placeholder when no photo; image container dark bg uses design token
+- SimilarSalesSection: fixed '0d ago' bug (now 'Today'/'Yesterday'), improved empty state, added container padding, fixed skeleton height
+- VehicleProfile: replaced hardcoded colors (#1a1a1a, #333, #999) with design tokens; back button navigates(-1) not wrong route
+
+### [frontend] Org profile + offering page UX improvements — commit d24aa0ad0
+- InvestorOffering (/offering): replaced bare access-code gate with compelling landing showing 4 key stats, value prop headline, competitor context strip; added "Contact to Invest" CTA in portal header; fixed tab overflow; increased body text to 10pt; updated YONO status to reflect Phase 5 + deployed sidecar
+- OrganizationProfile (/org/:id): removed "Business docs" red button from all orgs (only owners now); skeleton loading state; toast notifications replacing all alert() calls; fix tab font var; verification badge in header
+- MarketCompetitors (/market/competitors): split CTA into trade + investor inquiry cards with /offering link
+
+### [docs] SDK README + OpenAPI + Quickstart — VP Docs
+- Rewrote `tools/nuke-sdk/README.md` (v1.4.0): install, 3 quick examples (search, vision, signal), full API reference for all 14 resources, types table, rate limits, error handling, changelog link
+- Fixed `docs/api/openapi.yaml`: Vision paths were misplaced inside `components` section — moved to proper `paths` block. Added `api-v1-export` + `api-v1-exchange` endpoints. Added `MarketFund` + `VehicleOffering` schemas. Bumped spec version to 1.4.0. Now 21 documented paths, 29 operationIds.
+- Created `docs/QUICKSTART.md`: zero-to-first-call guide with VIN lookup, comps, batch vision, signal scoring, bulk export, error handling, rate limits, REST API examples
+
+### [extraction] BaT extraction queue unblocked — 119,300 pending items now draining
+- Root cause: `process-bat-extraction-queue` edge function was NOT deployed (returned 404/NOT_FOUND on all invocations)
+- `aggressive-backlog-clear` cron (job 65, every 10min) was firing correctly but hitting dead endpoint
+- Fix: Deployed `process-bat-extraction-queue` via `supabase functions deploy`
+- Added dedicated cron job 260 (`bat-extraction-queue-worker`, `*/2 * * * *`) for more frequent firing
+- Confirmed function now processes: `{"success":true,"processed":1,"completed":1}` on first invocation
+- Queue: 119,300 pending items, oldest Dec 20, 2025. Drain rate: ~36/hr from crons (function processes 1 item/call by design)
+- Note: `claim_bat_extraction_queue_batch` RPC provides atomic claim preventing double-processing
+
+### [extraction] PCarMarket URL slug YMM fallback — deployed
+- Problem: 50 items/run failing with "Missing required fields (year, make, model)"
+- Root cause: `parsePCarMarketIdentityFromUrl()` only matched `/auction/YEAR-slug` pattern, not `/marketplace-YEAR-make-model`
+- Fix: Added second regex in `parsePCarMarketIdentityFromUrl()` — tries `/marketplace-(\d{4})-(.+?)` if `/auction/` pattern fails
+- Handles compound makes (land rover, mercedes-benz, aston martin, alfa romeo, rolls-royce) correctly
+- Example: `/marketplace-2005-land-rover-range-rover` → `{ year: 2005, make: 'land rover', model: 'range rover' }`
+- Deployed: `import-pcarmarket-listing` via `supabase functions deploy`
+- File: `supabase/functions/import-pcarmarket-listing/index.ts` (lines 202-206)
+
 ### [frontend/perf] Auth waterfall elimination — commit 05000c396
 - Created `nuke_frontend/src/contexts/AuthContext.tsx`: single global `getSession()` at app boot, initialised synchronously from localStorage (Supabase `sb-{ref}-auth-token`). Returns `loading=false` on first render for returning users.
 - Updated `useAuth` hook: now reads from AuthContext, zero network calls per mount

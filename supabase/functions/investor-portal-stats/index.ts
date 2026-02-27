@@ -47,7 +47,7 @@ interface InvestorStats {
 }
 
 async function getStats(): Promise<InvestorStats> {
-  const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+  const dbUrl = Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL");
   if (!dbUrl) throw new Error("SUPABASE_DB_URL not set");
 
   const { Pool } = await import("https://deno.land/x/postgres@v0.19.3/mod.ts");

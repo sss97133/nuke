@@ -20,7 +20,7 @@ const corsHeaders = {
  * Uses the Pool connection from deno-postgres to bypass PostgREST.
  */
 async function getBigCounts(): Promise<Record<string, number>> {
-  const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+  const dbUrl = Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL");
   if (!dbUrl) {
     return {};
   }
@@ -55,7 +55,7 @@ async function getBigCounts(): Promise<Record<string, number>> {
 }
 
 async function getQueueStats(): Promise<Record<string, number>> {
-  const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+  const dbUrl = Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL");
   if (!dbUrl) return {};
 
   try {
@@ -95,7 +95,7 @@ interface ExtractionReality {
  * Queries: bat_listings, external_listings, vehicles (by source), listing_page_snapshots.
  */
 async function getExtractionReality(): Promise<ExtractionReality | null> {
-  const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+  const dbUrl = Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL");
   if (!dbUrl) return null;
 
   try {
