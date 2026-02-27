@@ -19,12 +19,11 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
-### Worker — Import Queue Cleanup + Task Triage — 2026-02-27 11:49 UTC
-- Reset 243 failed PCarMarket records to pending (extractor fix was deployed)
-- Closed stale/superseded tasks: BAT queue stall (2), YONO sidecar unreachable (2), source-census audit
-- Fixed malformed import_queue URLs: 44 port-80 BaT URLs (deduped/fixed), N/A + /carfax suffix junk
-- Touching: import_queue (data fixes), agent_tasks (status updates)
-- DO NOT: touch any edge functions or cron jobs
+### Worker — Import Queue Cleanup + Task Triage — 2026-02-27 11:49 UTC — COMPLETED
+- Failed queue: 381 → 0 (100% cleared via skip/fix/reset)
+- 243 PCarMarket records reset to pending, 44 port-80 BaT URLs fixed
+- 8 stale tasks closed, agent type registry cleaned + REGISTRY.md updated
+- REMOVED: session complete
 
 ### VP Platform — Resend Inbound Email Audit + alerts@nuke.ag wiring — 2026-02-27 12:00 UTC — COMPLETED
 - Audited Resend inbound config: pipeline IS working (5 real emails in contact_inbox)

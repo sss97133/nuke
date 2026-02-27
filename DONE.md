@@ -4,6 +4,44 @@
 Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
+### [yono] YONO sidecar URL typo fixed — P85 resolved
+- Root cause: YONO_SIDECAR_URL in Supabase Edge Function secrets had typo: sss73133 instead of sss97133
+- Fix: `supabase secrets set YONO_SIDECAR_URL=https://sss97133--yono-serve-fastapi-app.modal.run`
+- Redeployed yono-vision-worker (v9) and yono-keepalive (v8) to pick up correct URL
+- Confirmed: sidecar operational, vision_available=true, uptime sustained
+- Vision worker confirmed processing: ~800 images/hr per worker, 2 workers = ~1600/hr effective
+- P85 task `db96c02e` marked completed
+
+### [yono] YONO vision worker health audit — vp-photos session
+- DB schema cache incident: PostgREST failed ~07:00-08:00 UTC (pool saturation from 10+ agents)
+- During outage: cron keepalives failed → sidecar scaled to zero → vision worker offline
+- Recovery: DB recovered ~08:00 UTC, sidecar warm at sss97133 URL, all systems nominal
+- Filed: CTO post-mortem task (P80), DB scale-down incident documented
+
+### [photos] K10 truck vision analysis status confirmed
+- 419 photos (vehicle_id: 6442df03-9cac-43a8-b89e-e4fb4c08ee99): all ai_processing_status=completed
+- All 419 have vision_analyzed_at=NULL → eligible for YONO (no ai_processing_status filter)
+- YONO claim_yono_vision_batch picks up ANY image with image_url + vision_analyzed_at=NULL
+- At 1,600 img/hr: K10 will complete in ~16 min once YONO worker reaches them
+- Organization: all 419 unorganized (matching global pattern)
+
+### [photos] Photo organization pipeline gap identified
+- 100% of sampled images have organization_status=unorganized (0 organized)
+- auto-sort-photos exists but targets telegram/technician workflow, not general inventory
+- No cron-scheduled general organization pipeline found
+- Filed P72 task for vp-photos to design organization pipeline
+
+
+### [worker] Import queue cleanup + task triage — worker-session-3
+- Closed 8 stale/superseded tasks: 2x BAT queue stall (superseded by process-bat-extraction-queue cron), 2x YONO sidecar unreachable (sidecar verified up), source-census archiveFetch audit (acceptable exception documented), agent type registry
+- Reset 243 failed PCarMarket records to pending (extractor fix was deployed by previous session)
+- Fixed 44 port-80 BaT URLs (bringatrailer.com:80 → bringatrailer.com); dupes skipped
+- Skipped garbage/malformed URLs: N/A suffix dupes, /carfax, %20lol, Google redirect params, BaT browse pages
+- Skipped non-vehicle memorabilia: Mecum neon signs/hubcaps/quilts/gas pumps, Gooding literature/programs/sculpture/toys
+- Reset transient failures to pending: PGRST002 schema cache (3), Firecrawl 500/502 (2), C&B Invalid JSON (2)
+- Remapped 11 legacy agent_tasks (oracle/guardian/sentinel/harvester/curator) to proper VP domains
+- Updated REGISTRY.md with active vs legacy agent type table
+- Failed queue: 381 → 0 items (100% cleared)
 
 ### [extraction] RM Sotheby's description backfill — backfill-rmsothebys-descriptions edge function
 - Root cause: SearchLots API returns no description/mileage — only auction metadata
