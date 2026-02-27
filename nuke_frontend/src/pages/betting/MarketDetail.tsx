@@ -33,6 +33,7 @@ export default function MarketDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [market, setMarket] = useState<Market | null>(null);
+  const [marketLoading, setMarketLoading] = useState(true);
   const [userBets, setUserBets] = useState<Bet[]>([]);
   const [balance, setBalance] = useState(0);
   const [betAmount, setBetAmount] = useState('');
@@ -48,12 +49,14 @@ export default function MarketDetail() {
   }, [id, user]);
 
   async function loadMarket() {
+    setMarketLoading(true);
     const { data } = await supabase
       .from('betting_markets')
       .select('*')
       .eq('id', id)
       .single();
     setMarket(data);
+    setMarketLoading(false);
   }
 
   async function loadUserData() {
@@ -114,8 +117,17 @@ export default function MarketDetail() {
     loadUserData();
   }
 
-  if (!market) {
+  if (marketLoading) {
     return <div className="p-8 text-center">Loading...</div>;
+  }
+
+  if (!market) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-gray-600 mb-4">Market not found.</p>
+        <Link to="/predictions" className="text-blue-600 hover:underline">← Back to markets</Link>
+      </div>
+    );
   }
 
   const pool = market.total_yes_amount + market.total_no_amount;

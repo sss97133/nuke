@@ -127,6 +127,10 @@ const EditVehicle: React.FC = () => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      if (!user) {
+        navigate(`/login?returnUrl=${encodeURIComponent(window.location.pathname)}`, { replace: true });
+        setLoading(false);
+      }
     };
     fetchUser();
   }, []);
