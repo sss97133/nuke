@@ -5,23 +5,93 @@
 
 ## INTER-VP BRIEFS (read before starting work)
 
-### 📋 VP Deal Flow → VP Extraction — 2026-02-26
-190 pipeline entries have null asking_price → all score 40/FAIR. CL price scraping stalled.
+### 📋 VP Deal Flow → VP Extraction — 2026-02-26 (RESOLVED 2026-02-27)
+190 pipeline entries had null asking_price → all scored 40/FAIR.
+**Resolution**: backfill-cl-asking-price deployed, 190 → 93 null (51% reduction). Remaining 93 are expired listings (410 gone) or $1 placeholders. Cron 259 runs daily.
 **File**: `.claude/VP_DEAL_FLOW_TO_EXTRACTION_BRIEF.md`
 
-### 📋 VP Intel → VP Extraction — 2026-02-26
+### 📋 VP Intel → VP Extraction — 2026-02-26 (RESPONDED 2026-02-27)
 Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring pipeline.
 **File**: `.claude/VP_INTEL_TO_EXTRACTION_BRIEF.md`
+**Response**: `.claude/EXTRACTION_TO_VP_INTEL_BRIEF.md` — root causes identified, B-J queue draining (~13h), RM/Gooding need individual page scraping (separate task)
 
 ---
 
 ## CURRENTLY ACTIVE
 
-### VP Extraction — CL Price Backfill COMPLETED — 2026-02-27 05:10 UTC
-- DONE: backfill-cl-asking-price deployed + ran (190 → 93 null, 51% reduction)
-- DONE: 2 agent_tasks completed (queue assessment: 3793/hr drain rate, ~25h ETA)
-- DONE: Cron 259 added (daily 6 AM UTC, batch_size 30)
+### Frontend Worker — Market/Portfolio UI Fixes — 2026-02-27
+- Fixing all UI/UX issues on Market Exchange, Market Dashboard, and Portfolio pages
+- Touching: nuke_frontend/src/pages/MarketExchange.tsx, MarketDashboard.tsx, MarketFundDetail.tsx, Portfolio.tsx
+- DO NOT: modify api-v1-exchange edge function core logic
+
+### COO — Session triage + work order routing — 2026-02-27 11:30 UTC — COMPLETED
+- Checked all VP inboxes (all clear)
+- Reviewed YONO training state: zone DONE (72.8%), german tier-2 epoch ~5/25 (PID 28401), watcher PID 7390 live
+- Reviewed pending tasks: 19 pending, 3 in_progress
+- Filed 5 work orders: CFO Twilio (P90), VP Extraction RM Sotheby's + Gooding scrapers (P80 each), VP Deal Flow suppress_notifications (P78), VP Platform transfer UI (P75)
+- Cancelled 1 duplicate ONNX task (be95e3aa — fdf5038f already in_progress)
 - REMOVED: session complete
+
+### CTO Session — Architecture Review + Work Orders — 2026-02-27 11:30 UTC — COMPLETED
+- Reviewed ralph-spawn, YONO sidecar, archiveFetch violations, agent type registry
+- Filed 7 agent_tasks (see DONE.md)
+- Processed CFO recommendation task bcf6d537
+- REMOVED: session complete
+
+### Worker Agent — Multi-task sprint — 2026-02-27 07:35 UTC
+- Task 1: 1977ede1 (P90) — YONO ACTIVE_AGENTS update — DONE
+- Task 2: 363eca02 (P85) — YONO sidecar unreachable — IN PROGRESS
+- Task 3: 78505a8b (P80) — Import queue backlog — NEXT
+- Touching: ACTIVE_AGENTS.md, YONO sidecar health check, import queue investigation
+- DO NOT: kill training PIDs 7390/28401/23678
+
+### Worker — BaT Queue Unblock + PCarMarket Fix — COMPLETED 2026-02-27
+- P0: Deployed process-bat-extraction-queue (was missing, caused 2-month stall). Added cron job 260 (bat-extraction-queue-worker, */2 * * * *). 119,300 pending items now draining.
+- P1: Fixed import-pcarmarket-listing parsePCarMarketIdentityFromUrl() to handle /marketplace-YEAR-make-model URL pattern. Deployed.
+- REMOVED: session complete
+
+### Frontend Worker — Map Bug Fixes — COMPLETED 2026-02-27
+- Fixed random jitter (deterministic hash), cluster icon black-on-black, businesses column bug. Commit 1ad6c89c7.
+
+### CFO — Cost Analysis + Task Filing — COMPLETED 2026-02-27 11:45 UTC
+- Twilio: diagnosed as unconfigured credentials (not negative balance). Filed P88 founder action task.
+- Pipeline unpause: filed P80 CEO memo — $3,250 capped cost, $150/month ongoing.
+- Token budget: filed P75 CTO task — Haiku/Sonnet/Opus tiering model.
+- Claimed and completed pre-existing CFO Twilio task (f49f82f7).
+- REMOVED: session complete
+
+### VP Docs — SDK README + OpenAPI + Quickstart — 2026-02-27
+- Rewriting tools/nuke-sdk/README.md (v1.4.0 — signal, vision, search, comps, all resources)
+- Adding api-v1-export + api-v1-exchange to docs/api/openapi.yaml
+- Creating docs/QUICKSTART.md (zero-to-first-call guide)
+- Touching: tools/nuke-sdk/README.md, docs/api/openapi.yaml, docs/QUICKSTART.md
+- DO NOT touch: SDK source files, edge functions, DB
+
+### Frontend Worker — Admin + Onboarding UX — COMPLETED 2026-02-27
+- Login overhaul, admin route fixes, first-run onboarding. See DONE.md. Commit 5a62f7c34.
+
+### VP Extraction — RM Sotheby's Lot Page Scraper — 2026-02-27
+- Building: `backfill-rmsothebys-descriptions` edge function
+- Touching: supabase/functions/backfill-rmsothebys-descriptions/, supabase/functions/extract-rmsothebys/
+- Approach: Firecrawl to fetch individual lot pages, parse description + highlights + chassis info
+- DO NOT: touch extract-rmsothebys (enhancement goes in new backfill function)
+
+### VP Orgs — Cron Gap Fix — 2026-02-27
+- Fixing 3 missing cron jobs: classic_seller_queue worker, ECR refresh, compute-org-seller-stats
+- Deploying process-classic-seller-queue (restore from archive)
+- Touching: supabase/functions/process-classic-seller-queue/, supabase/migrations/
+- Areas: organizations, classic_seller_queue, organization_seller_stats, ECR collections
+
+### VP Extraction — FB GraphQL Probe — 2026-02-27 07:20 UTC — COMPLETED
+- Key finding: GraphQL works from residential IPs (doc_id 33269364996041474), blocked from Supabase datacenter (1675004)
+- Created facebook-marketplace-extraction.md with full findings + 3 paths forward
+- Updated DONE.md
+
+### Frontend Performance Worker — Auth Waterfall Elimination — COMPLETED 2026-02-27
+- Created AuthContext (global single getSession), updated useAuth, useSession, 14 pages
+- Commit: 05000c396
+- REMOVED: session complete
+
 
 ### Worker — Stub Vehicle Filter — COMPLETED 2026-02-27
 - Task: d1c9187e (P97) + 3827a50b (P85, CDO audit) — BOTH COMPLETED
@@ -34,45 +104,53 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - REMOVED: session complete
 
 
-### VP AI — Zone Training Resume + Sidecar Fix — 2026-02-27 04:52 UTC
-- Task: fdf5038f — PIDs 12814+39959 were dead, restarted both
-- Zone classifier: RESUMED from epoch 10 checkpoint, now training epoch 11/15, PID 7241
-  - Log: yono/outputs/zone_classifier/training.log
-  - DO NOT kill PID 7241
-- Tier2 watcher: RESTARTED, watching PID 7241, PID 7390
-  - Will train german/british/japanese/italian/french/swedish then export ONNX
+### VP AI — Zone Training Resume + Sidecar Fix — 2026-02-27 04:52 UTC — UPDATED 07:35 UTC
+- Task: fdf5038f — ZONE CLASSIFIER COMPLETE
+- Zone classifier PID 7241: FINISHED (epoch 15/15, best val_acc=72.8%)
+  - Saved: yono_zone_classifier.pt, yono_zone_head.safetensors, yono_zone_config.json
+  - Log: yono/outputs/zone_classifier/training.log (complete)
+- Tier2 watcher PID 7390: ACTIVE — zone done, now running tier-2 families sequentially
+  - PID 28401: train_hierarchical.py --tier 2 --family german (in progress ~02:21 UTC start)
+  - PID 23678: train_hierarchical.py --all (separate legacy process, also active)
+  - Remaining families after german: british, japanese, italian, french, swedish
+  - Then --export runs for all ONNX files
   - Log: yono/outputs/hierarchical/tier2_remaining.log
-  - DO NOT kill PID 7390
-- YONO sidecar: redeployed to Modal, confirmed operational (edge function source=yono_vision)
-- Next after zone+tier2 done: upload ONNX to Modal volume yono-data, redeploy sidecar
+  - DO NOT kill PID 7390 or PID 28401 or PID 23678
+- YONO sidecar: needs health check (task 363eca02, P85 unreachable)
+- Next after tier2+export: upload ONNX to Modal volume yono-data, redeploy sidecar
 
 
-### VP Deal Flow — Transfer System Coordination — 2026-02-26
-- Audited full transfer pipeline. Brief at `.claude/VP_DEAL_FLOW_TRANSFER_BRIEF.md`
-- Coordinating with CPO, CTO, CFO, VP Platform
-- Touching: no files yet — in coordination phase
+### VP Deal Flow — Transfer System Wiring — 2026-02-27 11:30 UTC (THIS SESSION)
+- Tasks: Twilio credential check, cron 223-227 status, stripe-checkout→transfer-automator wiring
+- Key finding: ownership_transfers table MISSING columns used by deployed functions (inbox_email, buyer/seller access tokens, phones, emails) — building migration
+- Key finding: Twilio secrets ARE set in Supabase (encrypted hashes present), local .env has placeholders (irrelevant)
+- Touching: supabase/migrations/ (new transfer columns migration), supabase/functions/stripe-checkout, supabase/functions/stripe-webhook
+- DO NOT: re-enable crons 223-227 without suppress_notifications param (would fire 300K emails to historical buyers)
 
 
 
 
-### YONO Vision V2 — BACKGROUND TRAINING (RESTARTED 2026-02-27 04:52 UTC)
+### YONO Vision V2 — TIER-2 TRAINING IN PROGRESS (2026-02-27 updated 07:35 UTC)
 - All 4 phases + zone system done. Florence2 v2 COMPLETE (yono_vision_v2_head.safetensors saved).
-- **Zone classifier PID 7241**: resuming from epoch 10 checkpoint → training epoch 11-15
-  - val_acc best=72.8%, ~31min/epoch, ETA complete ~02:30 UTC (5 epochs remain)
-  - DO NOT interrupt. Log: yono/outputs/zone_classifier/training.log
-- **Watcher PID 7390**: watching PID 7241, will train tier-2 families after zone finishes
-  - Families: german, british, japanese, italian, french, swedish (american already done)
-  - Then runs --export for all ONNX files
+- **Zone classifier PID 7241**: COMPLETE — epoch 15/15 done, val_acc=72.8%
+  - Saved: yono_zone_classifier.pt, yono_zone_head.safetensors, yono_zone_config.json
+- **Tier-2 training PID 28401**: train_hierarchical.py --tier 2 --family german (ACTIVE, started ~02:21)
+  - Full pipeline PID 23678: train_hierarchical.py --all (also active)
+  - DO NOT kill PID 7390 (watcher), PID 28401 (german training), or PID 23678 (--all training)
   - Log: yono/outputs/hierarchical/tier2_remaining.log
-  - Next step after export: upload ONNX files to Modal volume yono-data
-  - DO NOT kill PID 7390 or PID 7241
+  - Remaining: british, japanese, italian, french, swedish → then --export ONNX
+  - Next step after export: upload ONNX files to Modal volume yono-data, redeploy sidecar
 - **Zone labeling**: COMPLETE (2764/2764 records labeled)
-- **Resume support**: added --resume flag to yono/scripts/train_zone_classifier.py
+- **Sidecar**: unreachable (task P85 363eca02) — worker investigating
 
-### [vp-platform] Platform health check complete — 2026-02-27 03:00 UTC
-- Fixed 4 broken cron commands (jobs 128, 186, 213, 235) using stale current_setting() calls
-- Quality backfill 237-240 confirmed ACTIVE (COO note was stale — already re-enabled)
-- Filed incident P70 (bat-snapshot timeout) and P60 (mecum-live 50% fail rate)
+### [vp-platform] Platform health + task sprint — 2026-02-27 05:20 UTC — COMPLETE
+- Fixed 4 broken cron commands (jobs 128, 186, 213, 235) using stale current_setting() calls [prior session]
+- Quality backfill 237-240 confirmed ACTIVE [prior session]
+- **This session:** 3 agent_tasks completed (P97 stub filter, P85 quality backfill timeouts, P78 DB load)
+- Quality backfill: fixed batch size 300→75, switched JOIN to ANY() — all workers succeeding <60s
+- DB load: deactivated treemap-refresh (job 175), auto-duplicate-cleanup (job 43), dedup-vehicles-batch (job 258)
+- Stub filter: deployed search + universal-search edge functions with ilike fallback YMM filters, fixed Search.tsx nearby query
+- reconcile_listing_status: reduced batch 50→10 items to fit 2min pg_cron window
 
 ### Extraction Quality Sprint — ACTIVE 2026-02-26→27 (context compressed 2x)
 - **Phase 1-3**: Mecum description 0→60%+, Bonhams 0→66%, routing fixes, Gooding workers added
@@ -183,3 +261,18 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Frontend needs to display prominently in VehicleCardDense.tsx and Search.tsx
 - Touching: nuke_frontend/src/components/vehicles/VehicleCardDense.tsx, nuke_frontend/src/pages/Search.tsx
 - DO NOT: modify backend APIs (already working)
+
+### Frontend Worker — Vehicle Profile Page UX Fixes — 2026-02-27
+- Task: Fix all UI/UX issues on vehicle profile page (all 4 tabs)
+- Touching: nuke_frontend/src/pages/VehicleProfile.tsx, nuke_frontend/src/pages/vehicle-profile/*, nuke_frontend/src/components/vehicle/*
+- DO NOT: modify SimilarSalesSection.tsx core logic or VehicleComparablesTab.tsx structure
+
+### Frontend Worker — Global UX Audit + Polish — 2026-02-27
+- Full site audit: navigation, homepage, empty states, loading states, mobile, typography
+- Touching: HomePage.tsx, AppHeader.tsx, NukeMenu.tsx, MobileBottomNav.tsx, AppLayout.tsx, AppFooter.tsx, CursorHomepage.tsx, Search.tsx (empty/loading states only)
+- DO NOT: modify Search.tsx main search logic, VehicleCardDense.tsx, VehicleProfile tabs
+
+### Frontend Worker — Org Profile + Offering Page UX — 2026-02-27
+- Task: Fix org profile + offering page UX issues found by founder
+- Touching: nuke_frontend/src/pages/OrganizationProfile.tsx, nuke_frontend/src/pages/InvestorOffering.tsx, nuke_frontend/src/pages/MarketCompetitors.tsx
+- DO NOT: modify backend APIs, edge functions, DB schema

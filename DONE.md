@@ -5,6 +5,99 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [frontend/perf] Auth waterfall elimination — commit 05000c396
+- Created `nuke_frontend/src/contexts/AuthContext.tsx`: single global `getSession()` at app boot, initialised synchronously from localStorage (Supabase `sb-{ref}-auth-token`). Returns `loading=false` on first render for returning users.
+- Updated `useAuth` hook: now reads from AuthContext, zero network calls per mount
+- Updated `useSession` (AppLayout): delegates session/loading to AuthContext, profile fetch only
+- Wrapped `App.tsx` in `<AuthProvider>` as outermost provider
+- Fixed 14 pages: Vehicles, DeveloperDashboard, AddVehicle, InvoiceManager, ApiKeysPage, MarketSegments, MarketFundDetail, SocialWorkspace (7 inline getSession calls), DataDiagnostic, DealerBulkEditor, Dashboard, Search, RestorationIntake, Profile
+- Before: N pages x async getSession() waterfall per mount. After: 1 getSession() at app start, all pages read from context synchronously
+
+### [cfo] CFO session — Twilio diagnosis + pipeline unpause + token budget — 2026-02-27
+- Twilio 401 root cause: NOT negative balance. Credentials were never configured — .env has placeholder values ("your-twilio-account-sid"). Twilio error 20003: invalid username.
+- Filed P88 task to COO for founder action (real Twilio account + credentials required). SMS cost estimate: $0.0079/SMS, 150K backfill = ~$1,185.
+- Claimed and completed pre-existing CFO Twilio task (id: f49f82f7).
+- Filed P80 CEO memo (via COO): Unpause analyze-image in YONO-first hybrid mode. Cost: $3,250 total capped ($50/day x 65 days), $150/month ongoing. Vs $2,000/month cloud-only. Wait for PIDs 7241+7390 to finish, then remove NUKE_ANALYSIS_PAUSED.
+- Filed P75 CTO recommendation: ralph-spawn token budget — Haiku for workers ($0.056/task), Sonnet for VPs ($0.525/task), Opus for strategy ($5.25/task). 22-task run at mixed model = ~$14 vs $115 all-Opus. Annual savings vs all-Opus: ~$72K.
+- Updated CFO cost model in .claude/CFO_IMAGE_PIPELINE_COST_MODEL.md (prior version already comprehensive — no changes needed).
+
+### [frontend] Map bug fixes — 2026-02-27
+- Removed Math.random() jitter from UnifiedMap.tsx geo() — replaced with deterministic hash-based offset (simpleHash). Same location always renders at same spot. Commit 1ad6c89c7.
+- Added custom cluster icons (blue/white for vehicles, amber/black for query) via makeClusterIcon() + iconCreateFunction prop. Eliminates black-on-black cluster count bubble visibility issue.
+- GPS priority was already correct (gps_latitude first, geo() fallback). Verified and left intact.
+- Fixed pre-existing bug: businesses Supabase select was fetching 'type' column (doesn't exist) instead of 'entity_type'.
+
+### [coo] Executive triage + work order routing — 2026-02-27 11:30 UTC
+- Reviewed all VP inboxes (all empty)
+- Confirmed YONO training: zone classifier DONE (72.8% val_acc), german tier-2 epoch ~5/25, watcher PID 7390 active
+- Task snapshot: 19 pending, 3 in_progress (VP-AI ONNX upload, VP-Photos brief, curator dedup)
+- Filed 5 new work orders:
+  - f49f82f7: CFO P90 — Twilio negative balance blocking transfer SMS
+  - 9fb1563a: VP-Extraction P80 — RM Sotheby's individual listing scraper
+  - 87446ee0: VP-Extraction P80 — Gooding individual listing scraper
+  - 6deef460: VP-Deal-Flow P78 — add suppress_notifications before re-enabling backfill crons
+  - d4149eb7: VP-Platform P75 — Transfer System UI (operator dashboard + buyer/seller pages)
+- Cancelled duplicate ONNX task be95e3aa (fdf5038f already in_progress)
+- Key gap identified + filed: FB Marketplace probe had no task — filed 62f30b2e (VP-Extraction P82) for logged-out GraphQL path probe
+- Note: VP Extraction already active on RM Sotheby's (per ACTIVE_AGENTS.md) — 9fb1563a is redundant, will self-resolve
+
+### [cto] Architecture review + work orders — 2026-02-27 11:30 UTC
+
+Filed 7 agent_tasks from CTO architecture review:
+- P80 vp-platform: ralph-spawn token budget controls (MODEL_MAP, --max-tokens-per-agent, --session-budget, Opus cap 3, token logging)
+- P75 vp-ai: YONO Modal sidecar Bearer token auth (modal_serve.py middleware + yono-classify + yono-analyze updated)
+- P70 vp-extraction: crawl-bat-active archiveFetch violation fix
+- P70 vp-extraction: sync-live-auctions archiveFetch violation fix
+- P60 vp-extraction: extract-gooding sitemap fetch audit
+- P55 vp-extraction: source-census audit (classify as acceptable health-check or fix)
+- P50 vp-platform: Agent type registry audit + remap
+
+Processed CFO cost model task (bcf6d537): CTO approved model tiering (Haiku=workers, Sonnet=VPs, Opus=exec). Deferred model_hint DB column — MODEL_MAP in code sufficient. Added Opus concurrency cap of 3 to work order.
+
+### [extraction] FB Marketplace GraphQL probe — 2026-02-27 07:20 UTC
+
+**Finding: Logged-out GraphQL works from residential IPs, blocked from Supabase datacenter IPs.**
+
+Key results:
+- `doc_id: 33269364996041474` with `viewer.marketplace_feed_stories.edges` — CONFIRMED WORKING from residential
+- LSD token extractable from marketplace HTML (changes per request, session-specific)
+- 24 listings per page, full pagination via `end_cursor`, zero overlap between pages
+- Tested: Austin TX, Seattle WA, Chicago IL — all work with 24 listings
+- Datacenter IP block: `Rate limit exceeded (1675004)` — IP-level, not session-level
+- FB serves 1.1MB to residential, 460KB stripped response to datacenter IPs
+- `vehicle_info` field NOT returned in logged-out GraphQL (year/make/model must be parsed from title)
+
+Existing infrastructure confirmed working:
+- `scripts/fb-marketplace-local-scraper.mjs` — local scraper (GraphQL + 43 metro areas configured)
+- `scripts/fb-relay-server.ts` — relay architecture exists, relay currently offline
+
+Created: `facebook-marketplace-extraction.md` — full technical reference with 3 paths forward
+
+### [platform] Platform health sprint — 2026-02-27 05:30 UTC
+
+**Stubs from inventory (P97 — task d1c9187e):**
+- 24K stub vehicles (no year/make/model) were leaking into public search
+- Fixed search edge function ilike fallback (added YMM null filters)
+- Applied migration 20260227060000 — updated search_vehicles_fulltext, search_vehicles_fuzzy, search_vehicles_fts
+- Created vehicles_inventory view (is_public=true AND year/make/model NOT NULL)
+- Fixed Search.tsx nearby query to filter YMM nulls
+- Deployed search + universal-search edge functions
+
+**Quality backfill timeout fix (P85 — task b769a800):**
+- Workers 237-240 timing out every run (batch 150-300 rows, JOIN on temp table = 2min lock wait)
+- Fix 1: Reduced batch size to 50 rows, switched from JOIN to = ANY(array)
+- Fix 2: Added SET LOCAL lock_timeout = '5s' + EXCEPTION handler to fail fast on contention
+- All 4 workers now succeeding: W1=<15s, W2=~17s, W3=~32s, W4=~48s
+- Rate: ~12K rows/hour across 4 shards (queue draining in parallel)
+
+**DB load / cron cleanup (P78 — task 946fdae8):**
+- Deactivated 3 crons causing heavy DB load:
+  - treemap-refresh (job 175): 10x CONCURRENT mat view refreshes, each 17min — every 30min = always failing
+  - auto-duplicate-cleanup (job 43): hitting statement timeout 3/4 runs
+  - dedup-vehicles-batch (job 258): lock contention on vehicle_images + vehicles, 100% fail rate
+- Fixed reconcile_listing_status(): reduced batch 50→10 items, removed SET LOCAL statement_timeout (doesn't override pg_cron parent timeout)
+- Net result: 3 fewer constant statement timeouts every 10-30 minutes
+
 ### [intel] Similar Sales feature — vehicle profile Comps tab — 2026-02-27
 - Built `SimilarSalesSection.tsx` — card grid showing 5-20 comparable sold vehicles
   - Platform badges (Bring a Trailer, Barrett-Jackson, Mecum, etc.) with brand colors
@@ -1162,3 +1255,15 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Added `GET /api-v1-vehicles/by-vin/:vin` endpoint — exact or partial VIN, public vehicles only
 - Added `search_vehicles_by_partial_vin()` DB function (migration 20260227050000) — uses `lower(vin) LIKE lower(...)` to correctly hit the `vehicles_vin_trgm_idx` trigram GIN index (plain ILIKE caused btree scan → timeout on large table)
 - Fixed IntelligentSearch: exact 17-char VIN not in DB now shows clear "not found" message instead of falling through to irrelevant text search results
+
+### [frontend] Admin + Onboarding UX overhaul — commit 5a62f7c34
+- Login: Sign in/Create account tabs at top (was buried text link at bottom), explicit button labels
+- Login: Design system CSS vars for toggle colors (was hardcoded hex), fixed autocomplete attrs
+- Login: Post-login redirect goes to / now (was /vehicles → wasted redirect chain)
+- OAuth callback: same fix — / not /vehicles
+- Admin routes: /admin/proxy-bids + /admin/unified-scrapers (both were 404, now routed + in nav)
+- AdminHome: Ralph loading state shows "loading…"/"asking LLM…" text, not morphing button label
+- AdminHome: "Refresh" button replaces "Snapshot" (auto-load already runs snapshot on mount)
+- AdminHome: auto-load uses max_failed_samples:50 instead of 250 (faster mount)
+- Profile: "Get started" checklist on Overview tab for new users with incomplete profiles
+- VehicleCollection: empty own-profile state has "Add a vehicle" CTA button (not just text)
