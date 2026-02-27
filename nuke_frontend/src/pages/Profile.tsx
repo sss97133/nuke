@@ -1,35 +1,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { readCachedSession } from '../utils/cachedSession';
-
-// Simple auth hook to work with existing session-based auth.
-// Initializes from the localStorage cache synchronously so the profile page
-// doesn't wait for an async getUser() round-trip before loading data.
-const useAuth = () => {
-  const cached = readCachedSession();
-  const [user, setUser] = useState<any>(cached?.user ?? null);
-  const [loading, setLoading] = useState(!cached);
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
-    };
-
-    getUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  return { user, loading };
-};
+import { useAuth } from '../hooks/useAuth';
 // AppLayout now provided globally by App.tsx
 import EditableField from '../components/editable/EditableField';
 import { ProfileService } from '../services/profileService';
@@ -805,6 +777,56 @@ const Profile: React.FC = () => {
         <div className="profile-content">
             {activeTab === 'overview' && (
               <div className="section">
+                {/* First-run onboarding checklist (own profile, not complete) */}
+                {isOwnProfile && !isProfileComplete && (
+                  <div style={{
+                    marginBottom: 'var(--space-4)',
+                    border: '2px solid var(--border-light)',
+                    backgroundColor: 'var(--white)',
+                    padding: 'var(--space-4)',
+                    borderRadius: '0px',
+                  }}>
+                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-3)' }}>
+                      Get started
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                      {!profileData.completion?.avatar_uploaded && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '8pt' }}>
+                          <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
+                          <button
+                            style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
+                            onClick={() => setShowProfileDetails(true)}
+                          >
+                            Upload a profile photo
+                          </button>
+                        </div>
+                      )}
+                      {!profileData.completion?.bio_added && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '8pt' }}>
+                          <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
+                          <button
+                            style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
+                            onClick={() => setShowProfileDetails(true)}
+                          >
+                            Add a bio
+                          </button>
+                        </div>
+                      )}
+                      {!profileData.completion?.first_vehicle_added && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '8pt' }}>
+                          <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
+                          <button
+                            style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
+                            onClick={() => navigate('/vehicle/add')}
+                          >
+                            Add your first vehicle
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Comprehensive Profile Stats (BaT-style) */}
                 {comprehensiveData?.stats && (
                   <div style={{ marginBottom: 'var(--space-4)' }}>

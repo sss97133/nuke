@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminNotificationService, type AdminDashboardStats } from '../../services/adminNotificationService';
 import { supabase } from '../../lib/supabase';
@@ -9,14 +9,16 @@ type Card = {
   title: string;
   description: string;
   to: string;
+  countKey?: string;
 };
 
 const cards: Card[] = [
-  { title: 'Inbox', description: 'Email inbox — privacy, legal, info, investors @nuke.ag', to: '/admin/inbox' },
+  { title: 'Inbox', description: 'Email inbox — privacy, legal, info, investors @nuke.ag', to: '/admin/inbox', countKey: 'inboxUnread' },
+  { title: 'Agent Inbox', description: 'Inter-agent messages — VP to VP and system alerts', to: '/admin/agent-inbox', countKey: 'agentInboxUnread' },
+  { title: 'Reviews', description: 'Contributor onboarding, queues, and admin review tools', to: '/admin/reviews', countKey: 'reviewsPending' },
+  { title: 'Verifications', description: 'User verification review and status changes', to: '/admin/verifications', countKey: 'verificationsPending' },
+  { title: 'Ownership Verifications', description: 'Ownership documentation review dashboard', to: '/admin/ownership-verifications', countKey: 'ownershipPending' },
   { title: 'Identity Claims', description: 'Review and approve user identity claims (446K seeds)', to: '/admin/identity-claims' },
-  { title: 'Reviews', description: 'Contributor onboarding, queues, and admin review tools', to: '/admin/reviews' },
-  { title: 'Verifications', description: 'User verification review and status changes', to: '/admin/verifications' },
-  { title: 'Ownership Verifications', description: 'Ownership documentation review dashboard', to: '/admin/ownership-verifications' },
   { title: 'Mission Control', description: 'Batch ops and system actions', to: '/admin/mission-control' },
   { title: 'System Status', description: 'Health, pipeline, and operational telemetry', to: '/admin/status' },
   { title: 'Price Tools', description: 'Bulk edit and CSV import', to: '/admin/price-editor' },
@@ -25,13 +27,32 @@ const cards: Card[] = [
   { title: 'NL Query', description: 'Ask questions and see live SQL results', to: '/admin/query-console' },
 ];
 
+type CardCounts = {
+  inboxUnread: number;
+  agentInboxUnread: number;
+  reviewsPending: number;
+  verificationsPending: number;
+  ownershipPending: number;
+};
+
+type OpData = {
+  importQueuePending: number;
+  importQueueFailed: number;
+  agentTasksPending: number;
+  agentTasksByType: { agent_type: string; count: number }[];
+};
+
 export default function AdminHome() {
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [ralphLoading, setRalphLoading] = useState(false);
+  const [ralphLoadMode, setRalphLoadMode] = useState<'auto' | 'snapshot' | 'explain'>('auto');
   const [ralphError, setRalphError] = useState<string | null>(null);
   const [ralphData, setRalphData] = useState<any | null>(null);
   const [ralphUpdatedAt, setRalphUpdatedAt] = useState<Date | null>(null);
+  const [cardCounts, setCardCounts] = useState<CardCounts | null>(null);
+  const [opData, setOpData] = useState<OpData | null>(null);
+  const ralphLoadingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,9 +71,97 @@ export default function AdminHome() {
     };
   }, []);
 
-  const loadRalph = async (mode: 'snapshot' | 'explain') => {
-    if (ralphLoading) return;
+  // Auto-load Ralph snapshot on mount (fast: just counts, no LLM)
+  useEffect(() => {
+    if (ralphLoadingRef.current) return;
+    ralphLoadingRef.current = true;
     setRalphLoading(true);
+    setRalphLoadMode('auto');
+    setRalphError(null);
+    supabase.functions.invoke('ralph-wiggum-rlm-extraction-coordinator', {
+      body: { action: 'dry_run', max_failed_samples: 50 }
+    }).then(({ data, error }) => {
+      if (error) {
+        setRalphError(error?.message || 'Failed to load Ralph snapshot');
+      } else {
+        setRalphData(data || null);
+        setRalphUpdatedAt(new Date());
+      }
+    }).catch((e: any) => {
+      setRalphError(e?.message || 'Failed to load Ralph snapshot');
+    }).finally(() => {
+      setRalphLoading(false);
+      ralphLoadingRef.current = false;
+    });
+  }, []);
+
+  // Load live counts for cards + operational pulse
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchCounts() {
+      try {
+        const [
+          { count: inboxUnread },
+          { count: agentInboxUnread },
+          { count: reviewsPending },
+          { count: verificationsPending },
+          { count: ownershipPending },
+          { count: importPending },
+          { count: importFailed },
+          { count: agentTasksPending },
+          { data: tasksByType },
+        ] = await Promise.all([
+          supabase.from('contact_inbox').select('*', { count: 'exact', head: true }).eq('status', 'unread'),
+          supabase.from('agent_messages').select('*', { count: 'exact', head: true }).eq('to_role', 'founder').is('read_at', null),
+          supabase.from('admin_notifications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('secure_documents').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
+          supabase.from('ownership_verifications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('import_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('import_queue').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+          supabase.from('agent_tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('agent_tasks').select('agent_type').eq('status', 'pending'),
+        ]);
+
+        if (cancelled) return;
+
+        // Summarize agent tasks by type
+        const typeMap: Record<string, number> = {};
+        for (const row of (tasksByType || [])) {
+          const t = String(row.agent_type || 'unknown');
+          typeMap[t] = (typeMap[t] || 0) + 1;
+        }
+        const agentTasksByType = Object.entries(typeMap)
+          .map(([agent_type, count]) => ({ agent_type, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        setCardCounts({
+          inboxUnread: inboxUnread ?? 0,
+          agentInboxUnread: agentInboxUnread ?? 0,
+          reviewsPending: reviewsPending ?? 0,
+          verificationsPending: verificationsPending ?? 0,
+          ownershipPending: ownershipPending ?? 0,
+        });
+        setOpData({
+          importQueuePending: importPending ?? 0,
+          importQueueFailed: importFailed ?? 0,
+          agentTasksPending: agentTasksPending ?? 0,
+          agentTasksByType,
+        });
+      } catch {
+        // ignore — operational data is nice-to-have
+      }
+    }
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  const loadRalph = async (mode: 'snapshot' | 'explain') => {
+    if (ralphLoadingRef.current) return;
+    ralphLoadingRef.current = true;
+    setRalphLoading(true);
+    setRalphLoadMode(mode);
     setRalphError(null);
     try {
       const action = mode === 'snapshot' ? 'dry_run' : 'brief';
@@ -67,6 +176,7 @@ export default function AdminHome() {
       setRalphData(null);
     } finally {
       setRalphLoading(false);
+      ralphLoadingRef.current = false;
     }
   };
 
@@ -100,9 +210,14 @@ export default function AdminHome() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-            {ralphUpdatedAt && (
+            {ralphLoading && (
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                {ralphLoadMode === 'explain' ? 'asking LLM…' : 'loading…'}
+              </div>
+            )}
+            {!ralphLoading && ralphUpdatedAt && (
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                updated {ralphUpdatedAt.toLocaleTimeString()}
+                {ralphUpdatedAt.toLocaleTimeString()}
               </div>
             )}
             <Link className="button button-secondary" to="/admin/ralph">
@@ -114,21 +229,21 @@ export default function AdminHome() {
               onClick={() => void loadRalph('snapshot')}
               title="No LLM call — just counts + top failure patterns"
             >
-              Snapshot
+              Refresh
             </button>
             <button
               className="button"
               disabled={ralphLoading}
               onClick={() => void loadRalph('explain')}
-              title="LLM-generated coordination brief"
+              title="LLM-generated coordination brief (slower)"
             >
-              {ralphLoading ? 'Working…' : 'Explain'}
+              Explain
             </button>
           </div>
         </div>
 
         {ralphError && (
-          <div style={{ marginTop: 'var(--space-3)', fontSize: '8pt', color: '#b91c1c' }}>
+          <div style={{ marginTop: 'var(--space-3)', fontSize: '8pt', color: 'var(--error, #b91c1c)' }}>
             {ralphError}
           </div>
         )}
@@ -197,35 +312,110 @@ export default function AdminHome() {
         <AuctionTrendsDashboard />
       </div>
 
+      {/* Operational pulse */}
+      <div style={{
+        marginTop: 'var(--space-6)',
+        borderRadius: '0px',
+        border: '2px solid var(--border-light)',
+        backgroundColor: 'var(--white)',
+        padding: 'var(--space-4)'
+      }}>
+        <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-3)' }}>Operational pulse</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', fontSize: '8pt' }}>
+          <div>
+            <span style={{ color: 'var(--text-muted)' }}>import_queue </span>
+            {opData == null ? (
+              <span style={{ color: 'var(--text-muted)' }}>…</span>
+            ) : (
+              <>
+                <span style={{ color: opData.importQueuePending > 0 ? 'var(--text)' : 'var(--text-muted)' }}>
+                  {opData.importQueuePending.toLocaleString()} pending
+                </span>
+                {' / '}
+                <span style={{ color: opData.importQueueFailed > 0 ? '#b91c1c' : 'var(--text-muted)' }}>
+                  {opData.importQueueFailed.toLocaleString()} failed
+                </span>
+              </>
+            )}
+          </div>
+          <div>
+            <span style={{ color: 'var(--text-muted)' }}>agent_tasks </span>
+            {opData == null ? (
+              <span style={{ color: 'var(--text-muted)' }}>…</span>
+            ) : (
+              <span style={{ color: opData.agentTasksPending > 0 ? '#b45309' : 'var(--text-muted)' }}>
+                {opData.agentTasksPending.toLocaleString()} pending
+              </span>
+            )}
+          </div>
+          <div>
+            <span style={{ color: 'var(--text-muted)' }}>agent_inbox </span>
+            {cardCounts == null ? (
+              <span style={{ color: 'var(--text-muted)' }}>…</span>
+            ) : (
+              <span style={{ color: cardCounts.agentInboxUnread > 0 ? '#b45309' : 'var(--text-muted)' }}>
+                {cardCounts.agentInboxUnread.toLocaleString()} unread
+              </span>
+            )}
+          </div>
+        </div>
+        {opData != null && opData.agentTasksByType.length > 0 && (
+          <div style={{ marginTop: 'var(--space-3)', fontSize: '8pt', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            {opData.agentTasksByType.map(({ agent_type, count }) => (
+              <span key={agent_type} style={{ fontFamily: 'monospace' }}>
+                {agent_type}:{count}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
         gap: 'var(--space-4)',
         marginTop: 'var(--space-6)'
       }}>
-        {cards.map((c) => (
-          <Link
-            key={c.to}
-            to={c.to}
-            style={{
-              display: 'block',
-              borderRadius: '0px',
-              border: '2px solid var(--border-light)',
-              backgroundColor: 'var(--white)',
-              padding: 'var(--space-4)',
-              transition: 'all 0.12s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--grey-50)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--white)';
-            }}
-          >
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>{c.title}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>{c.description}</div>
-          </Link>
-        ))}
+        {cards.map((c) => {
+          const count = c.countKey ? (cardCounts?.[c.countKey as keyof CardCounts] ?? null) : null;
+          const hasAlert = count != null && count > 0;
+          return (
+            <Link
+              key={c.to}
+              to={c.to}
+              style={{
+                display: 'block',
+                borderRadius: '0px',
+                border: hasAlert ? '2px solid #b91c1c' : '2px solid var(--border-light)',
+                backgroundColor: 'var(--white)',
+                padding: 'var(--space-4)',
+                transition: 'all 0.12s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--grey-50)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--white)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>{c.title}</div>
+                {count != null && (
+                  <div style={{
+                    fontSize: '8pt',
+                    fontWeight: 600,
+                    color: count > 0 ? '#b91c1c' : 'var(--text-muted)',
+                    fontFamily: 'monospace',
+                    flexShrink: 0,
+                  }}>
+                    {count > 0 ? `${count} pending` : 'clear'}
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>{c.description}</div>
+            </Link>
+          );
+        })}
       </div>
 
       <div style={{

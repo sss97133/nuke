@@ -17,7 +17,7 @@ const OAuthCallback = () => {
       } catch {
         // ignore
       }
-      return '/vehicles';
+      return '/';
     };
 
     const handleOAuthCallback = async () => {
