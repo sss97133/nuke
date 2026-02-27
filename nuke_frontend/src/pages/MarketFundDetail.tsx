@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 import { CashBalanceService } from '../services/cashBalanceService';
 
 type FundRow = {
@@ -54,6 +55,8 @@ const formatPct = (value: number | null) => {
 export default function MarketFundDetail() {
   const { symbol } = useParams();
   const navigate = useNavigate();
+  // useAuth reads from global AuthContext — synchronous, no getSession() call needed
+  const { session, user } = useAuth();
 
   const [fund, setFund] = useState<FundRow | null>(null);
   const [cashCents, setCashCents] = useState<number>(0);
@@ -77,7 +80,6 @@ export default function MarketFundDetail() {
         if (!symbol) return;
 
         // Use api-v1-exchange for fund data + cached stats (avoids slow market_segment_stats RPC)
-        const { data: { session } } = await supabase.auth.getSession();
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -96,8 +98,8 @@ export default function MarketFundDetail() {
         }
 
         setFund(json.fund);
-        if (session?.user) {
-          const bal = await CashBalanceService.getUserBalance(session.user.id);
+        if (user?.id) {
+          const bal = await CashBalanceService.getUserBalance(user.id);
           setCashCents(bal?.available_cents || 0);
         }
       } catch (e: any) {
@@ -105,7 +107,7 @@ export default function MarketFundDetail() {
         setError(e?.message || 'Failed to load market fund');
       }
     })();
-  }, [symbol]);
+  }, [symbol, session]);
 
   const handleBuy = async () => {
     if (!fund) return;
@@ -136,10 +138,9 @@ export default function MarketFundDetail() {
         `Invested ${formatUSD2(amountCents / 100)} into ${fund.symbol}. Shares issued: ${Number(first?.shares_issued || 0).toFixed(6)}`
       );
 
-      // Refresh cash
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const bal = await CashBalanceService.getUserBalance(session.user.id);
+      // Refresh cash balance using user from context
+      if (user?.id) {
+        const bal = await CashBalanceService.getUserBalance(user.id);
         setCashCents(bal?.available_cents || 0);
       }
     } catch (e: any) {

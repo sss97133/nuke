@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { readCachedSession } from '../utils/cachedSession';
+import { useAuth } from '../hooks/useAuth';
 import GrokTerminal from '../components/GrokTerminal';
 
 interface Vehicle {
@@ -140,6 +140,9 @@ function useResizable(initialWidth: number, minWidth: number, maxWidth: number, 
 }
 
 export default function SocialWorkspace() {
+  // useAuth reads from global AuthContext — synchronous for returning users
+  const { user: authUser, session } = useAuth();
+
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [recentImages, setRecentImages] = useState<VehicleImage[]>([]);
   const [suggestions, setSuggestions] = useState<ContentSuggestion[]>([]);
@@ -147,8 +150,8 @@ export default function SocialWorkspace() {
   const [composeText, setComposeText] = useState('');
   const [composeImages, setComposeImages] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
-  const [loading, setLoading] = useState(() => readCachedSession() === null);
-  const [userId, setUserId] = useState<string | null>(() => readCachedSession()?.user?.id ?? null);
+  const [loading, setLoading] = useState(!authUser);
+  const [userId, setUserId] = useState<string | null>(() => authUser?.id ?? null);
   const [posting, setPosting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -167,11 +170,12 @@ export default function SocialWorkspace() {
   const rightPanel = useResizable(320, 240, 440, 'right');
 
   useEffect(() => {
-    loadUserData();
-  }, []);
+    if (authUser) loadUserData();
+    else setLoading(false);
+  }, [authUser?.id]);
 
   const loadUserData = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authUser;
     if (!user) {
       setLoading(false);
       return;
@@ -249,7 +253,7 @@ export default function SocialWorkspace() {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -304,7 +308,7 @@ export default function SocialWorkspace() {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -368,7 +372,7 @@ export default function SocialWorkspace() {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -408,7 +412,7 @@ export default function SocialWorkspace() {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -439,7 +443,7 @@ export default function SocialWorkspace() {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -469,7 +473,7 @@ export default function SocialWorkspace() {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -504,7 +508,7 @@ export default function SocialWorkspace() {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({

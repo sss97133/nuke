@@ -11,7 +11,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { readCachedSession } from '../utils/cachedSession';
+import { useAuth } from '../hooks/useAuth';
 
 interface Business {
   id: string;
@@ -75,7 +75,8 @@ type TabType = 'setup' | 'invites' | 'submissions';
 
 export default function RestorationIntake() {
   const navigate = useNavigate();
-  const [session, setSession] = useState<any>(() => readCachedSession());
+  // useAuth reads from global AuthContext — synchronous for returning users
+  const { session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('submissions');
 
@@ -98,17 +99,15 @@ export default function RestorationIntake() {
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<WorkSubmission | null>(null);
 
-  // Load initial data
+  // Load initial data when auth resolves
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        loadBusinessData(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-  }, []);
+    if (session?.user?.id) {
+      loadBusinessData(session.user.id);
+    } else if (session !== undefined) {
+      // Auth checked and no session
+      setLoading(false);
+    }
+  }, [session?.user?.id]);
 
   const loadBusinessData = useCallback(async (userId: string) => {
     try {

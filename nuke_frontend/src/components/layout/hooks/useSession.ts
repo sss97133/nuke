@@ -1,38 +1,30 @@
-import { useState, useEffect, useRef } from 'react';
+/**
+ * useSession — layout-level session + user profile hook.
+ *
+ * Delegates session/loading to the global AuthContext so there is exactly ONE
+ * `getSession()` call in the whole app (inside AuthProvider). This hook only
+ * adds profile-fetching on top.
+ */
+import { useState, useEffect, useRef, useContext } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { readCachedSession } from '../../../utils/cachedSession';
+import { AuthContext } from '../../../contexts/AuthContext';
 
 export function useSession() {
-  const [session, setSession] = useState<any>(() => readCachedSession());
-  const [loading, setLoading] = useState<boolean>(() => readCachedSession() === null);
+  // Read auth state from the global provider — no extra getSession() call
+  const { session, loading } = useContext(AuthContext);
   const [userProfile, setUserProfile] = useState<any>(null);
-  // Guard against the double-fetch that happens because both getSession() and
-  // onAuthStateChange(INITIAL_SESSION) resolve nearly simultaneously on mount.
+  // Guard against duplicate fetches when userId hasn't changed
   const fetchedForUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    // Verify/refresh the cached session in the background.  For users who had
-    // a valid cached token, loading is already false and the page is visible.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-      if (session?.user) fetchProfile(session.user.id);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setLoading(false);
-        if (session?.user) {
-          fetchProfile(session.user.id);
-        } else {
-          setUserProfile(null);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
+    const userId = session?.user?.id;
+    if (userId) {
+      fetchProfile(userId);
+    } else {
+      setUserProfile(null);
+      fetchedForUserId.current = null;
+    }
+  }, [session?.user?.id]);
 
   const fetchProfile = async (userId: string) => {
     if (fetchedForUserId.current === userId) return;

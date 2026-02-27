@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 import vinDecoderService from '../services/vinDecoder';
 // import * as XLSX from 'xlsx'; // Optional dependency - install with: npm install xlsx
 
@@ -27,18 +28,15 @@ const DealerBulkEditor: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  // useAuth reads from global AuthContext — synchronous, no getSession() needed
+  const { session } = useAuth();
+
   const [vehicles, setVehicles] = useState<BulkVehicle[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [organization, setOrganization] = useState<any>(null);
-  const [session, setSession] = useState<any>(null);
   const [aiParsing, setAiParsing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  useEffect(() => {
-    loadSession();
-  }, []);
 
   useEffect(() => {
     if (orgId && session) {
@@ -46,11 +44,6 @@ const DealerBulkEditor: React.FC = () => {
       loadInventory();
     }
   }, [orgId, session]);
-
-  const loadSession = async () => {
-    const { data: { session: s } } = await supabase.auth.getSession();
-    setSession(s);
-  };
 
   const loadOrganization = async () => {
     const { data } = await supabase

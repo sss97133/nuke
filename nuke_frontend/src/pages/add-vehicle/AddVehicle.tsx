@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getSupabaseFunctionsUrl } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 import { uploadQueue } from '../../services/globalUploadQueue';
 import { TimelineEventService } from '../../services/timelineEventService';
 // AppLayout now provided globally by App.tsx
@@ -77,13 +78,15 @@ interface AddVehicleProps {
   onSuccess?: (vehicleId: string) => void;
 }
 
-const AddVehicle: React.FC<AddVehicleProps> = ({ 
+const AddVehicle: React.FC<AddVehicleProps> = ({
   mode = 'page',
   onClose,
-  onSuccess 
+  onSuccess
 }) => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
+  // Read user from global AuthContext — synchronous for returning users, no getUser() call
+  const { user: authUser } = useAuth();
+  const [user, setUser] = useState<any>(() => authUser ?? null);
 
   // Form state using custom hook
   const {
@@ -137,19 +140,10 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   const [vinMatchedVehicle, setVinMatchedVehicle] = useState<{ id: string; year: number; make: string; model: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Get current user
+  // Sync user state when global auth resolves (handles returning users + sign-in)
   useEffect(() => {
-    const getUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
-      } catch (error) {
-        console.error('Error getting user:', error);
-        setSubmitError('Failed to authenticate user');
-      }
-    };
-    getUser();
-  }, []);
+    if (authUser) setUser(authUser);
+  }, [authUser]);
 
   // Note: Do NOT return early here based on isMobile.
   // We must call all hooks in this component before any conditional return

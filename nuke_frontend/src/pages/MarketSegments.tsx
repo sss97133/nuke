@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 
 type SegmentSubcategory = {
   id: string;
@@ -56,18 +57,14 @@ const getDefinitionSubcategory = (r: SegmentIndexRow) => {
 
 export default function MarketSegments() {
   const navigate = useNavigate();
+  // Read from global AuthContext — synchronous, no getSession() needed
+  const { user } = useAuth();
+  const hasSession = Boolean(user);
   const [rows, setRows] = useState<SegmentIndexRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [managerFilter, setManagerFilter] = useState<'all' | 'ai' | 'human'>('all');
-  const [hasSession, setHasSession] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setHasSession(Boolean(data.session?.user));
-    });
-  }, []);
 
   useEffect(() => {
     (async () => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { readCachedSession } from '../utils/cachedSession';
+import { useAuth } from '../hooks/useAuth';
 
 interface Invoice {
   id: string;
@@ -37,8 +37,10 @@ interface Invoice {
 }
 
 const InvoiceManager: React.FC = () => {
+  // useAuth reads from global AuthContext — no getUser() / getSession() needed
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(() => readCachedSession() === null);
+  const [loading, setLoading] = useState(!user);
   const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'unpaid' | 'paid'>('all');
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [myVehicles, setMyVehicles] = useState<Array<{ id: string; year: number | null; make: string | null; model: string | null; trim: string | null }>>([]);
@@ -53,10 +55,9 @@ const InvoiceManager: React.FC = () => {
   }, [filter]);
 
   useEffect(() => {
+    if (!user?.id) return;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
         const { data, error } = await supabase
           .from('vehicles')
           .select('id, year, make, model, trim, created_at')
@@ -78,7 +79,7 @@ const InvoiceManager: React.FC = () => {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id]);
 
   const loadInvoices = async () => {
     setLoading(true);

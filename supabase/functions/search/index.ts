@@ -418,6 +418,9 @@ serve(async (req: Request) => {
         .from("vehicles")
         .select("id, year, make, model, color, description, created_at, updated_at, is_for_sale, city, state")
         .eq("is_public", true)
+        .not("year", "is", null)
+        .not("make", "is", null)
+        .not("model", "is", null)
         .or(vehicleOr || `make.ilike.%${safe}%,model.ilike.%${safe}%,description.ilike.%${safe}%`)
         .limit(vehicleFetchLimit);
 
@@ -513,7 +516,7 @@ serve(async (req: Request) => {
     if (vehicleIds.length > 0) {
       const { data: vMeta } = await supabase
         .from("vehicles")
-        .select("id, city, state, is_for_sale")
+        .select("id, city, state, is_for_sale, sale_price, asking_price, mileage, transmission, vin, image_count, event_count")
         .in("id", vehicleIds);
       (vMeta || []).forEach((v: any) => {
         vehicleMetaById[String(v.id)] = v;
@@ -586,7 +589,15 @@ serve(async (req: Request) => {
           make: v.make,
           model: v.model,
           color: v.color,
+          vin: vMeta?.vin ?? v.vin ?? undefined,
           for_sale: vMeta?.is_for_sale ?? v.is_for_sale,
+          is_for_sale: vMeta?.is_for_sale ?? v.is_for_sale,
+          sale_price: vMeta?.sale_price ?? v.sale_price ?? undefined,
+          asking_price: vMeta?.asking_price ?? v.asking_price ?? undefined,
+          mileage: vMeta?.mileage ?? v.mileage ?? undefined,
+          transmission: vMeta?.transmission ?? v.transmission ?? undefined,
+          image_count: vMeta?.image_count ?? undefined,
+          event_count: vMeta?.event_count ?? undefined,
           city: vMeta?.city ?? undefined,
           state: vMeta?.state ?? undefined,
           fts_relevance: usedFts ? v.relevance : undefined,

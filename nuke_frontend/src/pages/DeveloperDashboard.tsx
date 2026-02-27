@@ -10,7 +10,6 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { readCachedSession } from '../utils/cachedSession';
 
 interface ApiKeyInfo {
   id: string;
@@ -26,11 +25,13 @@ interface ApiKeyInfo {
 }
 
 export default function DeveloperDashboard() {
-  const { user, loading: authLoading } = useAuth();
+  // useAuth now reads from global AuthContext — zero network calls on mount
+  const { user, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [keys, setKeys] = useState<ApiKeyInfo[]>([]);
-  const [loading, setLoading] = useState(() => readCachedSession() === null);
+  // loading starts true only when there is no cached session (new/incognito user)
+  const [loading, setLoading] = useState(!session);
   const [newKeyName, setNewKeyName] = useState('');
   const [creatingKey, setCreatingKey] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -52,12 +53,13 @@ export default function DeveloperDashboard() {
   }, [user, authLoading]);
 
   const fetchKeys = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    // Use cached session from context — no extra network call
+    const token = session?.access_token;
+    if (!token) return;
 
     const { data, error } = await supabase.functions.invoke('api-keys-manage', {
       method: 'GET',
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!error && data?.keys) {
@@ -69,13 +71,13 @@ export default function DeveloperDashboard() {
   const handleCreateKey = async (name?: string) => {
     setCreatingKey(true);
     setError(null);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    const token = session?.access_token;
+    if (!token) return;
 
     const { data, error: err } = await supabase.functions.invoke('api-keys-manage', {
       method: 'POST',
       body: { name: name || newKeyName || 'API Key' },
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (err || !data?.key) {
@@ -89,12 +91,12 @@ export default function DeveloperDashboard() {
   };
 
   const handleRevokeKey = async (keyId: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    const token = session?.access_token;
+    if (!token) return;
 
     await supabase.functions.invoke(`api-keys-manage/${keyId}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     fetchKeys();
   };

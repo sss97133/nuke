@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
+import { useAuthContext } from '../contexts/AuthContext';
 // AppLayout now provided globally by App.tsx
 import GarageVehicleCard from '../components/vehicles/GarageVehicleCard';
 import VehicleRelationshipManager from '../components/VehicleRelationshipManager';
@@ -72,7 +73,10 @@ type VehiclesTab =
 
 const VehiclesInner: React.FC = () => {
   usePageTitle('Vehicles');
-  
+
+  // Read from global AuthContext — no network call needed, initialised at app boot
+  const { session: authSession } = useAuthContext();
+
   const [vehicleRelationships, setVehicleRelationships] = useState<{
     owned: VehicleRelationship[];
     contributing: VehicleRelationship[];
@@ -83,7 +87,9 @@ const VehiclesInner: React.FC = () => {
     previously_owned: VehicleRelationship[];
   }>({ owned: [], contributing: [], interested: [], discovered: [], curated: [], consigned: [], previously_owned: [] });
   const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<any>(() => readCachedSession());
+  // Initialise from AuthContext synchronously, keep a local copy so that the
+  // onAuthStateChange subscription below can still update it.
+  const [session, setSession] = useState<any>(() => authSession ?? readCachedSession());
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   // Default to "Owned" so users land on "their stuff" first.
@@ -172,20 +178,19 @@ const VehiclesInner: React.FC = () => {
   const urlSearchQuery = searchParams.get('search') || '';
 
   useEffect(() => {
-    checkAuth();
-    
+    // No checkAuth() call needed — session comes from global AuthContext.
+
     // URL params for tab selection removed - categorize tab no longer exists
-    
+
     // Handle search query from URL
     if (urlSearchQuery) {
       setSearchTerm(urlSearchQuery);
     }
-    
-    // Listen for auth state changes
+
+    // Still subscribe so that sign-in / sign-out within this tab updates state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        loadVehicleRelationships(); // Reload vehicle relationships when auth state changes
+      (_event, s) => {
+        setSession(s);
       }
     );
 
@@ -265,11 +270,6 @@ const VehiclesInner: React.FC = () => {
       setMyOrganizations(orgs || []);
     })();
   }, [session?.user?.id]);
-
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    setSession(session);
-  };
 
   const loadVehicleRelationships = async () => {
     if (!session?.user?.id) {

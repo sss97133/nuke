@@ -211,21 +211,39 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: '48px 24px',
+        padding: '64px 24px',
         flexDirection: 'column',
-        gap: '16px',
-        background: 'var(--surface)',
-        border: '2px solid #e5e7eb',
-        borderRadius: '8px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        gap: '20px',
       }}>
-        <div className="spinner" style={{ width: '32px', height: '32px', borderWidth: '3px' }}></div>
-        <p style={{ 
-          fontSize: '14px',
-          color: '#6b7280',
+        {/* Skeleton cards */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '16px',
+          width: '100%',
+          marginBottom: '8px',
+        }}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} style={{
+              height: '220px',
+              background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'skeleton-shimmer 1.5s infinite',
+              borderRadius: '8px',
+            }} />
+          ))}
+        </div>
+        <style>{`
+          @keyframes skeleton-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+          }
+        `}</style>
+        <p style={{
+          fontSize: '9pt',
+          color: '#9ca3af',
           margin: 0,
           fontWeight: 500,
-          fontFamily: 'system-ui, -apple-system, sans-serif'
         }}>
           Searching...
         </p>
@@ -235,105 +253,101 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
   return (
     <div className="search-results" style={{ padding: '0' }}>
-      {/* Search Summary */}
-      <div style={{
-        background: 'var(--surface)',
-        border: '2px solid #000',
-        borderRadius: '0px',
-        padding: '12px 16px',
-        marginBottom: '16px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <h2 style={{ 
-            margin: 0, 
-            fontSize: '10pt', 
-            fontWeight: 700, 
-            color: '#000',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}>
-            Search Results
-          </h2>
-          <div style={{
-            fontSize: '8pt',
-            color: '#666',
-            fontWeight: 600
-          }}>
-            {filteredAndSortedResults.length} {filteredAndSortedResults.length === 1 ? 'result' : 'results'}
+      {/* Search Summary header — only show if we have results or a summary message */}
+      {(results.length > 0 || searchSummary) && (
+        <div style={{
+          background: 'var(--surface)',
+          border: '2px solid #000',
+          borderRadius: '0px',
+          padding: '10px 14px',
+          marginBottom: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Left: result count + summary */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+              {results.length > 0 && (
+                <span style={{ fontSize: '10pt', fontWeight: 800, color: '#000' }}>
+                  {filteredAndSortedResults.length}
+                </span>
+              )}
+              {results.length > 0 && filterBy !== 'all' && (
+                <span style={{ fontSize: '8pt', color: '#666' }}>of {results.length}</span>
+              )}
+              {results.length > 0 && (
+                <span style={{ fontSize: '8pt', color: '#444', fontWeight: 600 }}>
+                  {filterBy === 'all' ? 'results' : (typeLabels[filterBy] || filterBy).toLowerCase()}
+                  {searchQuery ? ` for "${searchQuery}"` : ''}
+                </span>
+              )}
+              {results.length === 0 && searchSummary && (
+                <span style={{ fontSize: '8pt', color: '#666' }}>{searchSummary}</span>
+              )}
+            </div>
+
+            {/* Right: type filter pills */}
+            {results.length > 0 && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {filterBy !== 'all' && (
+                  <button
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '7.5pt',
+                      fontWeight: 700,
+                      border: '2px solid #000',
+                      background: '#000',
+                      color: '#fff',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setFilterBy('all')}
+                  >
+                    All
+                  </button>
+                )}
+                {(['vehicle', 'organization', 'shop', 'auction', 'user', 'part', 'timeline_event', 'image', 'document', 'reference', 'source'] as SearchFilter[]).map(type => {
+                  const count = typeCounts[type] || 0;
+                  if (count === 0) return null;
+                  const isActive = filterBy === type;
+                  return (
+                    <button
+                      key={type}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: isActive ? '#000' : 'var(--surface)',
+                        border: `2px solid ${isActive ? '#000' : '#d1d5db'}`,
+                        padding: '3px 8px',
+                        borderRadius: '0px',
+                        fontSize: '7.5pt',
+                        fontWeight: 700,
+                        color: isActive ? '#fff' : '#374151',
+                        cursor: 'pointer',
+                        transition: 'all 0.1s ease',
+                      }}
+                      onClick={() => { setFilterBy(type); setViewMode('cards'); }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.borderColor = '#000';
+                          e.currentTarget.style.background = '#f9fafb';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.borderColor = '#d1d5db';
+                          e.currentTarget.style.background = 'var(--surface)';
+                        }
+                      }}
+                    >
+                      <span>{typeLabels[type] || type}</span>
+                      <span style={{ opacity: 0.7, fontWeight: 600 }}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-        <p style={{ 
-          margin: '0 0 12px 0', 
-          color: '#666',
-          fontSize: '8pt',
-          lineHeight: '1.4'
-        }}>
-          {searchSummary}
-        </p>
-        {searchQuery && Object.keys(typeCounts).length > 0 && (
-          <p style={{ margin: '0 0 8px 0', color: '#444', fontSize: '8pt', fontWeight: 600 }}>
-            {Object.entries(typeCounts)
-              .filter(([, c]) => c > 0)
-              .map(([type]) => typeLabels[type] || type)
-              .join(' · ')}{' '}
-            for "{searchQuery}"
-          </p>
-        )}
-
-        {/* Quick Stats */}
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          flexWrap: 'wrap',
-          alignItems: 'center'
-        }}>
-          {(['vehicle', 'organization', 'shop', 'part', 'user', 'timeline_event', 'image', 'document', 'auction', 'reference', 'source'] as SearchFilter[]).map(type => {
-            const count = typeCounts[type] || 0;
-            if (count === 0) return null;
-            const isActive = filterBy === type;
-
-            return (
-              <button
-                key={type}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: 'var(--surface)',
-                  border: `2px solid ${isActive ? '#3b82f6' : '#e5e7eb'}`,
-                  padding: '4px 8px',
-                  borderRadius: '0px',
-                  fontSize: '8pt',
-                  fontWeight: 600,
-                  color: '#000',
-                  transition: 'all 0.12s ease',
-                  cursor: 'pointer'
-                }}
-                onClick={() => {
-                  setFilterBy(type);
-                  setViewMode('cards');
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.background = '#eff6ff';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = isActive ? '#3b82f6' : '#e5e7eb';
-                  e.currentTarget.style.background = '#ffffff';
-                }}
-              >
-                <span style={{ 
-                  fontSize: '8pt',
-                  fontWeight: 700,
-                  color: '#000'
-                }}>{getTypeIcon(type)}</span>
-                <span style={{ fontWeight: 600 }}>{count}</span>
-                <span style={{ color: '#6b7280', textTransform: 'capitalize' }}>{type.replace('_', ' ')}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      )}
 
       {showBazaar && bazaarGroups.length > 0 && (
         <div style={{
@@ -440,228 +454,128 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
         </div>
       )}
 
-      {/* Controls */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px',
-        flexWrap: 'wrap',
-        gap: '16px',
-        padding: '8px 12px',
-        background: 'var(--surface)',
-        border: '2px solid #000',
-        borderRadius: '0px'
-      }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '8pt', fontWeight: 700, color: '#000' }}>View:</span>
-          {(['cards', 'list'] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              style={{
-                padding: '4px 12px',
-                fontSize: '8pt',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                height: '24px',
-                border: '2px solid #000',
-                borderRadius: '0px',
-                background: viewMode === mode ? '#000' : '#fff',
-                color: viewMode === mode ? '#fff' : '#000',
-                cursor: 'pointer',
-                transition: 'all 0.12s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (viewMode !== mode) {
-                  e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.background = '#eff6ff';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (viewMode !== mode) {
-                  e.currentTarget.style.borderColor = '#d1d5db';
-                  e.currentTarget.style.background = '#ffffff';
-                }
-              }}
-            >
-              {mode}
-            </button>
-          ))}
-          {bazaarGroups.length > 0 && (
-            <button
-              onClick={() => setShowBazaar((prev) => !prev)}
-              style={{
-                padding: '4px 8px',
-                fontSize: '8pt',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                height: '24px',
-                border: '2px solid #000',
-                borderRadius: '0px',
-                background: showBazaar ? '#eff6ff' : '#fff',
-                color: '#000',
-                cursor: 'pointer'
-              }}
-            >
-              {showBazaar ? 'Hide lanes' : 'Show lanes'}
-            </button>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontSize: '8pt', fontWeight: 700, color: '#000' }}>Filter:</span>
-            <select
-              value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value as any)}
-              style={{ 
-                fontSize: '8pt', 
-                padding: '4px 8px', 
-                height: '24px',
-                border: '2px solid #000',
-                borderRadius: '0px',
-                background: 'var(--surface)',
-                color: '#000',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'border-color 0.12s ease'
-              }}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
-            >
-              <option value="all">All Types</option>
-              <option value="vehicle">Vehicles</option>
-              <option value="organization">Organizations</option>
-              <option value="shop">Shops</option>
-              <option value="user">Users</option>
-              <option value="part">Parts/Tools</option>
-              <option value="timeline_event">Events</option>
-              <option value="image">Images</option>
-              <option value="document">Documents</option>
-              <option value="auction">Auctions</option>
-              <option value="reference">References</option>
-              <option value="source">Sources</option>
-            </select>
+      {/* Controls — only show when there are results */}
+      {filteredAndSortedResults.length > 0 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px',
+          flexWrap: 'wrap',
+          gap: '8px',
+        }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            {(['cards', 'list'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '7.5pt',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  border: '2px solid #000',
+                  borderRadius: '0px',
+                  background: viewMode === mode ? '#000' : '#fff',
+                  color: viewMode === mode ? '#fff' : '#000',
+                  cursor: 'pointer',
+                  letterSpacing: '0.3px',
+                }}
+              >
+                {mode === 'cards' ? 'Grid' : 'List'}
+              </button>
+            ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontSize: '8pt', fontWeight: 700, color: '#000' }}>Sort:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              style={{ 
-                fontSize: '8pt', 
-                padding: '4px 8px', 
-                height: '24px',
-                border: '2px solid #000',
-                borderRadius: '0px',
-                background: 'var(--surface)',
-                color: '#000',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'border-color 0.12s ease'
-              }}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
-            >
-              <option value="relevance">Relevance</option>
-              <option value="date">Date (newest)</option>
-              <option value="price_asc">Price (low → high)</option>
-              <option value="price_desc">Price (high → low)</option>
-              <option value="year_desc">Year (newest first)</option>
-              <option value="year_asc">Year (oldest first)</option>
-              <option value="location">Location</option>
-            </select>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <span style={{ fontSize: '7.5pt', fontWeight: 600, color: '#666' }}>Sort</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                style={{
+                  fontSize: '7.5pt',
+                  padding: '3px 6px',
+                  border: '2px solid #000',
+                  borderRadius: '0px',
+                  background: 'var(--surface)',
+                  color: '#000',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="relevance">Relevance</option>
+                <option value="date">Newest</option>
+                <option value="price_asc">Price ↑</option>
+                <option value="price_desc">Price ↓</option>
+                <option value="year_desc">Year ↓</option>
+                <option value="year_asc">Year ↑</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Results */}
       {filteredAndSortedResults.length === 0 ? (
         <div style={{
           textAlign: 'center',
-          padding: '48px 16px',
-          background: 'var(--surface)',
-          border: '2px solid #000',
-          borderRadius: '0px'
+          padding: '56px 24px',
         }}>
-          <div style={{ fontSize: '32pt', marginBottom: '16px' }}>🔍</div>
-          <h3 style={{ 
-            fontSize: '10pt', 
-            fontWeight: 700,
-            marginBottom: '8px',
-            color: '#000',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}>
-            No Results Found
-          </h3>
-          <p style={{ 
-            fontSize: '9pt',
-            color: '#666',
-            margin: '0 0 24px 0',
-            maxWidth: '400px',
-            marginLeft: 'auto',
-            marginRight: 'auto'
-          }}>
-            We couldn't find anything matching "{searchQuery}"
-          </p>
           <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            maxWidth: '300px',
-            margin: '0 auto',
-            textAlign: 'left'
+            fontSize: '11pt',
+            fontWeight: 700,
+            color: '#111',
+            marginBottom: '8px',
           }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, color: '#000', marginBottom: '4px' }}>Try:</div>
-            <ul style={{ 
-              margin: 0, 
-              paddingLeft: '20px',
-              fontSize: '8pt',
-              color: '#666',
-              listStyle: 'disc'
-            }}>
-              <li>Check your spelling</li>
-              <li>Use more general terms</li>
-              <li>Try different keywords</li>
-              <li>Remove filters</li>
-            </ul>
-            {searchQuery.length > 0 && (
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, color: '#000', marginBottom: '8px' }}>Popular Searches:</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
-                  {['C10', 'BMW 2002', 'Squarebody', 'Restoration'].map(term => (
-                    <button
-                      key={term}
-                      onClick={() => window.location.href = `/search?q=${encodeURIComponent(term)}`}
-                      style={{
-                        padding: '4px 12px',
-                        fontSize: '8pt',
-                        fontWeight: 600,
-                        border: '2px solid #000',
-                        borderRadius: '0px',
-                        background: 'white',
-                        color: '#000',
-                        cursor: 'pointer',
-                        transition: 'all 0.12s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#000';
-                        e.currentTarget.style.color = '#fff';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'white';
-                        e.currentTarget.style.color = '#000';
-                      }}
-                    >
-                      {term}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            No results for &ldquo;{searchQuery}&rdquo;
+          </div>
+          <p style={{
+            fontSize: '9pt',
+            color: '#888',
+            margin: '0 0 28px 0',
+          }}>
+            Try different keywords, check spelling, or search by make and model.
+          </p>
+          {filterBy !== 'all' && (
+            <button
+              onClick={() => setFilterBy('all')}
+              style={{
+                padding: '6px 14px',
+                fontSize: '8pt',
+                fontWeight: 700,
+                border: '2px solid #000',
+                background: '#fff',
+                color: '#000',
+                cursor: 'pointer',
+                marginBottom: '20px',
+              }}
+            >
+              Remove type filter
+            </button>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '400px', margin: '0 auto' }}>
+            {['Porsche 911', '1967 Mustang', 'C10', 'Ferrari 308', 'BMW 2002'].map(term => (
+              <a
+                key={term}
+                href={`/search?q=${encodeURIComponent(term)}`}
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '8pt',
+                  fontWeight: 600,
+                  border: '2px solid #e5e7eb',
+                  background: 'white',
+                  color: '#444',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.1s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#000'; e.currentTarget.style.color = '#000'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = '#444'; }}
+              >
+                {term}
+              </a>
+            ))}
           </div>
         </div>
       ) : (
@@ -669,8 +583,8 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           {viewMode === 'cards' && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '16px'
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+              gap: '12px'
             }}>
               {filteredAndSortedResults.map(result => (
                 result.type === 'vehicle' ? (
