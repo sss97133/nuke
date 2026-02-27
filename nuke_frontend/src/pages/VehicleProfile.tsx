@@ -1752,8 +1752,9 @@ const VehicleProfile: React.FC = () => {
       // Only try RPC if vehicleId is a UUID (RPC expects UUID, not VIN)
       if (isUUID) {
         // Wrap RPC in a timeout so a hung connection never leaves the page in an infinite
-        // "Loading vehicle..." state. 8 s is generous; the RPC normally responds in <1 s.
-        const rpcTimeoutMs = 8000;
+        // "Loading vehicle..." state. 2.5 s fires before the anon DB statement_timeout (3 s),
+        // ensuring the client falls back to the fast direct query before the server errors out.
+        const rpcTimeoutMs = 2500;
         const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
           setTimeout(() => resolve({ data: null, error: new Error('get_vehicle_profile_data timed out') }), rpcTimeoutMs)
         );
@@ -1763,8 +1764,8 @@ const VehicleProfile: React.FC = () => {
         ]);
         rpcData = rpcResult.data;
         rpcError = rpcResult.error;
-        if (rpcError?.message?.includes('timed out')) {
-          console.warn('[VehicleProfile] RPC timed out after', rpcTimeoutMs, 'ms — falling back to direct query');
+        if (rpcError?.message?.includes('timed out') || rpcError?.message?.includes('statement timeout') || rpcError?.message?.includes('canceling')) {
+          console.warn('[VehicleProfile] RPC timed out / cancelled — falling back to direct query');
         }
       }
 
@@ -1775,11 +1776,11 @@ const VehicleProfile: React.FC = () => {
         console.warn('[VehicleProfile] RPC error details:', rpcError);
         console.warn('[VehicleProfile] RPC data:', rpcData);
         
-        // Fallback to direct query
+        // Fallback to direct query — use explicit columns (not select(*)) for speed
         try {
           const { data, error } = await supabase
             .from('vehicles')
-            .select('*')
+            .select('id,year,make,model,vin,primary_image_url,sale_price,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,horsepower,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,purchase_price,msrp,completion_percentage,displacement,exterior_color,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,sale_date,ownership_verified,ownership_verified_at,data_quality_score,source_platform,discovery_source')
             .eq('id', vehicleId)
             .single();
 
