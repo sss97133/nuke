@@ -55,15 +55,48 @@ const ST: Record<string, [number, number]> = {
   'wisconsin': [43.8, -88.8], 'wyoming': [43.1, -107.6], 'district of columbia': [38.9, -77.0],
 };
 
+// Deterministic hash — same string always produces the same number
+function simpleHash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return h;
+}
+
 function geo(loc: string): [number, number] | null {
   const l = loc.toLowerCase();
   for (const [s, c] of Object.entries(ST)) {
     if (l.includes(s)) {
-      return [c[0] + (Math.random() - 0.5) * 1.5, c[1] + (Math.random() - 0.5) * 1.5];
+      // Deterministic offset based on location string so the same city/state
+      // always renders at the same spot. No more jitter on reload.
+      // Offset range: ±0.75° (~83 km at equator) — enough to spread same-state
+      // vehicles across a visible area while staying within state boundaries.
+      const h = simpleHash(loc);
+      const latOff = ((h & 0xff) / 255 - 0.5) * 1.5;
+      const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * 1.5;
+      return [c[0] + latOff, c[1] + lngOff];
     }
   }
   return null;
 }
+
+// --- Custom cluster icon — white count on blue pill, visible on dark basemap ---
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeClusterIcon(bg: string, textColor: string) {
+  return (cluster: any): L.DivIcon => {
+    const count: number = cluster.getChildCount();
+    const size = count < 10 ? 32 : count < 100 ? 40 : 48;
+    const fontSize = count < 100 ? 13 : 11;
+    return L.divIcon({
+      html: `<div style="background:${bg};color:${textColor};width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-family:Arial,sans-serif;line-height:1">${count}</div>`,
+      className: '',
+      iconSize: [size, size] as [number, number],
+      iconAnchor: [size / 2, size / 2] as [number, number],
+    });
+  };
+}
+
+const createClusterCustomIcon = makeClusterIcon('rgba(59,130,246,0.92)', '#ffffff');
+const createQueryClusterIcon  = makeClusterIcon('rgba(245,158,11,0.92)', '#000000');
 
 // --- Vehicle fields for display ---
 const BASE_FIELDS = 'id,year,make,model,trim,listing_location,bat_location,location,gps_latitude,gps_longitude,primary_image_url';
@@ -252,10 +285,10 @@ export default function UnifiedMap() {
 
   // ---- Load businesses ----
   useEffect(() => {
-    supabase.from('businesses').select('id, business_name, latitude, longitude, type')
+    supabase.from('businesses').select('id, business_name, latitude, longitude, entity_type')
       .not('latitude', 'is', null).not('longitude', 'is', null).limit(1000)
       .then(({ data }) => {
-        if (data) setBiz(data.map((b: any) => ({ id: b.id, name: b.business_name || 'Business', lat: b.latitude, lng: b.longitude, type: b.type })));
+        if (data) setBiz(data.map((b: any) => ({ id: b.id, name: b.business_name || 'Business', lat: b.latitude, lng: b.longitude, type: b.entity_type })));
       });
   }, []);
 
@@ -426,7 +459,13 @@ export default function UnifiedMap() {
 
         {/* Base vehicles */}
         {showVehicles && !hasQuery && (
-          <MarkerClusterGroup chunkedLoading maxClusterRadius={60} showCoverageOnHover={false} disableClusteringAtZoom={13}>
+          <MarkerClusterGroup
+            chunkedLoading
+            maxClusterRadius={60}
+            showCoverageOnHover={false}
+            disableClusteringAtZoom={13}
+            iconCreateFunction={createClusterCustomIcon}
+          >
             {vehicles.map(v => (
               <Marker key={`v${v.id}`} position={[v.lat, v.lng]} icon={VEHICLE_ICON}>
                 <Popup maxWidth={280} minWidth={260}><VehicleCard v={v} accent="#3B82F6" /></Popup>
@@ -450,7 +489,13 @@ export default function UnifiedMap() {
 
         {/* Query results */}
         {queryResults.length > 0 && (
-          <MarkerClusterGroup chunkedLoading maxClusterRadius={50} showCoverageOnHover={false} disableClusteringAtZoom={13}>
+          <MarkerClusterGroup
+            chunkedLoading
+            maxClusterRadius={50}
+            showCoverageOnHover={false}
+            disableClusteringAtZoom={13}
+            iconCreateFunction={createQueryClusterIcon}
+          >
             {queryResults.map(v => (
               <Marker key={`q${v.id}`} position={[v.lat, v.lng]} icon={QUERY_ICON}>
                 <Popup maxWidth={280} minWidth={260}><VehicleCard v={v} accent="#F59E0B" /></Popup>
