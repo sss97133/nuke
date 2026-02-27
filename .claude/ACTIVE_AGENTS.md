@@ -19,6 +19,14 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
+### Stripe Connect Agent — Full Integration Build — 2026-02-27
+- Building: stripe-connect-account, stripe-connect-products, stripe-connect-checkout edge functions
+- Updating: stripe-webhook/index.ts (V2 account events + subscription events)
+- Creating: DB migration 20260227160000_stripe_connect.sql
+- Frontend: StripeConnect.tsx, StripeConnectStore.tsx pages
+- Routing: DomainRoutes.tsx (stripe-connect routes), AdminShell.tsx (nav link)
+- DO NOT touch these files concurrently
+
 ### Worker — Import Queue Cleanup + Task Triage — 2026-02-27 11:49 UTC — COMPLETED
 - Failed queue: 381 → 0 (100% cleared via skip/fix/reset)
 - 243 PCarMarket records reset to pending, 44 port-80 BaT URLs fixed

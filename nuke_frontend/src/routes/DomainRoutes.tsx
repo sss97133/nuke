@@ -73,6 +73,11 @@ const DevelopersPage = React.lazy(() => import('../pages/developers'));
 const ApiLanding = React.lazy(() => import('../pages/ApiLanding'));
 const DeveloperSignup = React.lazy(() => import('../pages/DeveloperSignup'));
 const DeveloperDashboard = React.lazy(() => import('../pages/DeveloperDashboard'));
+
+// Stripe Connect
+const StripeConnect = React.lazy(() => import('../pages/StripeConnect'));
+const StripeConnectStore = React.lazy(() => import('../pages/StripeConnectStore'));
+
 export const DomainRoutes = () => {
   return (
     <Suspense fallback={<div className="p-4 text-center">Loading module...</div>}>
@@ -190,6 +195,10 @@ export const DomainRoutes = () => {
         <Route path="/map" element={<Navigate to="/?tab=map" replace />} />
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
+
+        {/* Stripe Connect */}
+        <Route path="/stripe-connect" element={<StripeConnect />} />
+        <Route path="/stripe-connect/store/:accountId" element={<StripeConnectStore />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
