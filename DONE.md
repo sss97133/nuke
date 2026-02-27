@@ -5,6 +5,20 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [stripe] Full Stripe Connect Integration — commit 5528063ab
+- stripe-connect-account edge function: create V2 connected accounts, onboarding links, live status check
+- stripe-connect-products edge function: create products on connected accounts, list with expanded prices
+- stripe-connect-checkout edge function: direct charge (5% platform fee), subscription, billing portal
+- stripe-webhook updated: V2 thin event parsing (requirements.updated, capability_status_updated), stripe_subscriptions upsert, all previous handlers preserved
+- DB: stripe_connect_accounts (user_id FK, RLS), stripe_subscriptions tables (migration 20260227160000)
+- Frontend StripeConnect.tsx: create account, onboarding, status dashboard, product management, store link
+- Frontend StripeConnectStore.tsx: public storefront, product cards, Buy Now → Stripe Checkout, success state
+- Routes: /stripe-connect, /stripe-connect/store/:accountId in DomainRoutes.tsx
+- AdminShell nav: "Stripe Connect" added to Tools section
+- All 4 functions deployed, frontend build clean (✓ built in 11.86s), pushed to main
+
+## 2026-02-27
+
 ## 2026-02-27
 
 ### [vehicle-intel] VP Vehicle Intel session audit — deployed missing functions, filed cron tasks
