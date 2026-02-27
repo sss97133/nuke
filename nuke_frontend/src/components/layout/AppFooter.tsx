@@ -3,12 +3,16 @@ import { Link } from 'react-router-dom';
 
 export const AppFooter: React.FC = () => (
   <footer className="app-footer">
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'center', fontSize: '8pt' }}>
-      <span>Nuke © 2026</span>
-      <Link to="/about" style={{ color: 'inherit', textDecoration: 'underline' }}>About</Link>
-      <Link to="/privacy" style={{ color: 'inherit', textDecoration: 'underline' }}>Privacy Policy</Link>
-      <Link to="/terms" style={{ color: 'inherit', textDecoration: 'underline' }}>Terms of Service</Link>
-      <Link to="/data-deletion" style={{ color: 'inherit', textDecoration: 'underline' }}>Data Deletion</Link>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+      <span style={{ color: 'var(--text-secondary)' }}>Nuke &copy; 2026</span>
+      <span style={{ color: 'var(--border)', userSelect: 'none' }}>·</span>
+      <Link to="/about" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>About</Link>
+      <Link to="/privacy" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Privacy</Link>
+      <Link to="/terms" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Terms</Link>
+      <Link to="/data-deletion" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Data Deletion</Link>
+      <span style={{ color: 'var(--border)', userSelect: 'none' }}>·</span>
+      <Link to="/api" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>API</Link>
+      <Link to="/offering" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Investors</Link>
     </div>
   </footer>
 );

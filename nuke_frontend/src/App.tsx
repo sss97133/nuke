@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ToastProvider as OldToastProvider } from './hooks/useToast';
 import { UploadStatusProvider } from './contexts/UploadStatusContext';
@@ -11,6 +12,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/layout/AppLayout';
 import { DomainRoutes } from './routes/DomainRoutes';
+import ErrorBoundary from './components/ErrorBoundary';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 
 const queryClient = new QueryClient({
@@ -22,6 +24,9 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+    {/* AuthProvider is outermost so every hook and page reads from the same
+        single cached session — no per-component getSession() calls needed. */}
+    <AuthProvider>
     <ThemeProvider>
       <ToastProvider>
         <OldToastProvider>
@@ -29,14 +34,16 @@ export default function App() {
             <Router>
               <GlobalUploadStatus />
 
-              <AppLayout>
-                <Routes>
-                  {/* Hub: tabbed homepage (Garage, Feed, Map, Market) */}
-                  <Route path="/" element={<Suspense fallback={null}><HomePage /></Suspense>} />
-                  {/* Domain modules + legacy shims */}
-                  <Route path="/*" element={<DomainRoutes />} />
-                </Routes>
-              </AppLayout>
+              <ErrorBoundary>
+                <AppLayout>
+                  <Routes>
+                    {/* Hub: tabbed homepage (Garage, Feed, Map, Market) */}
+                    <Route path="/" element={<Suspense fallback={<div style={{ height: '100vh', background: 'var(--bg)' }} />}><HomePage /></Suspense>} />
+                    {/* Domain modules + legacy shims */}
+                    <Route path="/*" element={<DomainRoutes />} />
+                  </Routes>
+                </AppLayout>
+              </ErrorBoundary>
 
               <UploadProgressBar />
             </Router>
@@ -47,6 +54,7 @@ export default function App() {
         </OldToastProvider>
       </ToastProvider>
     </ThemeProvider>
+    </AuthProvider>
     </QueryClientProvider>
   );
 }

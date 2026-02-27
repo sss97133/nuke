@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import type { CashBalance } from './hooks/useCashBalance';
 
 interface Props {
@@ -196,6 +197,20 @@ export const ProfileBalancePill: React.FC<Props> = ({
                 {item.label}
               </button>
             ))}
+            <button
+              onClick={async () => {
+                setShowMenu(false);
+                try {
+                  await supabase.auth.signOut();
+                  navigate('/');
+                } catch {
+                  // ignore
+                }
+              }}
+              style={{ color: 'var(--error)', fontWeight: 600, borderTop: '1px solid var(--border)' }}
+            >
+              Sign out
+            </button>
           </div>
         </>
       )}

@@ -8,6 +8,7 @@
    DESIGN PRINCIPLES
    ================================================
    - Font sizes: 8px-11px only (strict)
+   - UNIT: Always px. Never pt. (8pt ≠ 8px — pt renders at 1.333× px)
    - Colors: Moderate contrast (no pure black/white)
    - Spacing: 4px base unit
    - Borders: 2px solid
@@ -104,6 +105,34 @@
   --heat-5: #047857;
   --heat-6: #065f46;
   --heat-border: rgba(0, 0, 0, 0.12);
+
+  /* ── Legacy token aliases — DO NOT USE IN NEW CODE ────────────────────
+     These exist so the 92 components still importing design-system.css
+     don't break during migration. Remove each alias when the component
+     it serves has been migrated to the canonical tokens above.
+     Tracked in Phase 3 of the design system remediation.
+     ──────────────────────────────────────────────────────────────────── */
+  --text-muted: var(--text-secondary);
+  --border-light: var(--border);
+  --border-medium: var(--border);
+  --border-dark: var(--border-focus);
+  --font-size-small: var(--fs-8);
+  --font-size: var(--fs-9);
+  --white: #ffffff;
+  --grey-50: #fafafa;
+  --grey-100: #f5f5f5;
+  --grey-200: #eeeeee;
+  --grey-300: #e0e0e0;
+  --grey-400: #bdbdbd;
+  --grey-500: #9e9e9e;
+  --grey-600: #757575;
+  --grey-700: #616161;
+  --grey-800: #424242;
+  --grey-900: #212121;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  --leading-tight: 1.1;
+  --leading-normal: 1.2;
 }
 
 :root[data-theme="dark"] {
@@ -133,6 +162,29 @@
   --heat-5: rgba(22, 130, 93, 0.78);
   --heat-6: rgba(22, 130, 93, 0.92);
   --heat-border: rgba(255, 255, 255, 0.10);
+
+  /* ── Legacy token aliases (dark mode remaps) — DO NOT USE IN NEW CODE ── */
+  --text-muted: var(--text-secondary);
+  --border-light: var(--border);
+  --border-medium: var(--border);
+  --border-dark: var(--border-focus);
+  --font-size-small: var(--fs-8);
+  --font-size: var(--fs-9);
+  --white: var(--surface);
+  --grey-50: var(--bg);
+  --grey-100: var(--bg);
+  --grey-200: var(--surface);
+  --grey-300: var(--surface-hover);
+  --grey-400: var(--border);
+  --grey-500: var(--text-disabled);
+  --grey-600: var(--text-secondary);
+  --grey-700: var(--text-secondary);
+  --grey-800: var(--text);
+  --grey-900: var(--text);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  --leading-tight: 1.1;
+  --leading-normal: 1.2;
 }
 
 /* ================================================
@@ -477,6 +529,81 @@ body {
   color: var(--surface);
 }
 
+/* Shared base — all .btn-* extend this implicitly via the component */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-family);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  border-radius: var(--radius);
+  text-decoration: none;
+  white-space: nowrap;
+  border: 2px solid transparent;
+}
+
+.btn-base:disabled,
+.btn-base[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Sizes */
+.btn-xs { padding: 1px 6px;  font-size: var(--fs-8); }
+.btn-sm { padding: 3px 8px;  font-size: var(--fs-9); }
+.btn-md { padding: 6px 12px; font-size: var(--fs-10); }
+
+/* Variants */
+.btn-secondary {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.btn-danger {
+  border-color: var(--error);
+  background: var(--error-dim);
+  color: var(--error);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--error);
+  color: var(--surface);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+.btn-tag {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-radius: 2px;
+}
+.btn-tag:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.btn-tag.active {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+
 /* ================================================
    CARD SYSTEM
    ================================================ */
@@ -621,5 +748,25 @@ select:focus {
 .font-normal { font-weight: 400; }
 
 .uppercase { text-transform: uppercase; }
+
+/* ================================================
+   MOBILE BOTTOM NAV — override deprecated design-system.css rules
+   ================================================ */
+@media (max-width: 768px) {
+  /* Fix font-size: use px, not pt */
+  .mobile-bottom-nav-item {
+    font-size: var(--fs-10) !important; /* 10px — readable and fits 5 items */
+    min-height: 44px; /* WCAG 2.5.5 minimum touch target */
+    /* Remove the 1fr flex to allow items to size naturally with content */
+    flex: 1;
+    padding: 0 4px;
+  }
+
+  /* Ensure active item uses theme accent for clarity */
+  .mobile-bottom-nav-item.active {
+    color: var(--text) !important;
+    font-weight: 700 !important;
+  }
+}
 
 

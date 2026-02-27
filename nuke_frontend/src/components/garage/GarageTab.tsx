@@ -43,7 +43,24 @@ export default function GarageTab() {
   }
 
   if (loading) {
-    return <div style={{ padding: 'var(--space-5)', color: 'var(--text-muted)', fontSize: 'var(--font-size)' }}>Loading garage...</div>;
+    return (
+      <div style={{ padding: 'var(--space-5)' }}>
+        {/* Skeleton rows */}
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            style={{
+              height: 80,
+              marginBottom: 'var(--space-4)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 2,
+              opacity: 0.8,
+            }}
+          />
+        ))}
+      </div>
+    );
   }
 
   if (error) {
