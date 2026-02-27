@@ -1,0 +1,66 @@
+title = "Nuke Key Guardian"
+
+[allowlist]
+  description = "Allowlist"
+  paths = [
+    '''.env\.example''',
+    '''\.env\.vault''',
+    '''node_modules''',
+    '''\.git/''',
+    '''/tmp/''',
+  ]
+  regexes = [
+    '''PLACEHOLDER''',
+    '''your-.*-key''',
+    '''<your-''',
+    '''sk_test_51SKWCO''',  # already-rotated test keys known to be in history
+  ]
+
+[[rules]]
+  id = "stripe-secret-key"
+  description = "Stripe Secret Key"
+  regex = '''sk_(live|test)_[0-9a-zA-Z]{24,}'''
+  tags = ["key", "stripe"]
+
+[[rules]]
+  id = "stripe-restricted-key"
+  description = "Stripe Restricted Key"
+  regex = '''rk_(live|test)_[0-9a-zA-Z]{24,}'''
+  tags = ["key", "stripe"]
+
+[[rules]]
+  id = "stripe-webhook-secret"
+  description = "Stripe Webhook Secret"
+  regex = '''whsec_[0-9a-zA-Z]{32,}'''
+  tags = ["key", "stripe"]
+
+[[rules]]
+  id = "google-api-key"
+  description = "Google API Key"
+  regex = '''AIza[0-9A-Za-z\-_]{35}'''
+  tags = ["key", "google"]
+
+[[rules]]
+  id = "resend-api-key"
+  description = "Resend API Key"
+  regex = '''re_[0-9a-zA-Z]{32,}'''
+  tags = ["key", "resend"]
+
+[[rules]]
+  id = "supabase-service-role"
+  description = "Supabase Service Role Key"
+  regex = '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_-]{50,}'''
+  tags = ["key", "supabase"]
+
+[[rules]]
+  id = "twilio-auth-token"
+  description = "Twilio Auth Token"
+  regex = '''[0-9a-f]{32}'''
+  entropy = 3.5
+  tags = ["key", "twilio"]
+
+[[rules]]
+  id = "modal-token"
+  description = "Modal Token"
+  regex = '''ak-[0-9a-zA-Z]{32,}'''
+  tags = ["key", "modal"]
