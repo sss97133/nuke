@@ -56,8 +56,87 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
-    const vehicleId = pathParts[pathParts.length - 1];
-    const isSpecificVehicle = vehicleId && vehicleId !== 'api-v1-vehicles';
+    const lastPart = pathParts[pathParts.length - 1];
+    const secondToLast = pathParts[pathParts.length - 2];
+
+    // Detect /by-vin/:vin route
+    const isByVinRoute = secondToLast === 'by-vin' || lastPart === 'by-vin';
+    const vinParam = secondToLast === 'by-vin' ? lastPart : null;
+
+    const vehicleId = lastPart && lastPart !== 'api-v1-vehicles' && lastPart !== 'by-vin' ? lastPart : null;
+    const isSpecificVehicle = !!vehicleId && !isByVinRoute;
+
+    // GET /api/v1/vehicles/by-vin/:vin - Look up vehicle(s) by VIN
+    if (req.method === "GET" && isByVinRoute) {
+      if (!vinParam) {
+        return new Response(
+          JSON.stringify({ error: "VIN is required. Use GET /api-v1-vehicles/by-vin/{vin}" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const vinClean = vinParam.trim().toUpperCase();
+
+      // Support both exact 17-char VINs and partial VINs (at least 5 chars)
+      if (vinClean.length < 5) {
+        return new Response(
+          JSON.stringify({ error: "VIN must be at least 5 characters" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const isExactVin = vinClean.length === 17;
+
+      let data: any[] | null;
+      let error: any;
+
+      if (isExactVin) {
+        // Exact 17-char VIN: btree index handles this fine
+        const result = await supabase
+          .from("vehicles")
+          .select(`
+            id, year, make, model, trim, series, vin, mileage,
+            color, interior_color, transmission, engine_type,
+            drivetrain, body_style, sale_price, is_public,
+            created_at, updated_at, primary_image_url, discovery_url
+          `)
+          .eq("is_public", true)
+          .ilike("vin", vinClean)
+          .limit(10);
+        data = result.data;
+        error = result.error;
+      } else {
+        // Partial VIN: use RPC which writes lower(vin) LIKE lower('%...%')
+        // This correctly uses the vehicles_vin_trgm_idx trigram index
+        // (plain ILIKE causes the planner to pick btree → seq scan timeout)
+        const result = await supabase.rpc("search_vehicles_by_partial_vin", {
+          partial_vin: vinClean,
+          row_limit: 10,
+        });
+        data = result.data;
+        error = result.error;
+      }
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "No vehicles found for VIN", vin: vinClean, data: [] }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // For exact VIN hit, return enriched single result
+      const single = isExactVin && data.length === 1;
+      const response = single
+        ? { data: data[0], vin: vinClean }
+        : { data, vin: vinClean, count: data.length };
+
+      return new Response(
+        JSON.stringify(response),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // GET /api/v1/vehicles - List vehicles
     // GET /api/v1/vehicles/:id - Get single vehicle
@@ -103,13 +182,33 @@ serve(async (req) => {
         const offset = (page - 1) * limit;
         const mine = url.searchParams.get("mine") === "true";
 
+        // Filter parameters
+        const makeFilter = url.searchParams.get("make");
+        const modelFilter = url.searchParams.get("model");
+        const yearFilter = url.searchParams.get("year");
+        const yearMinFilter = url.searchParams.get("year_min");
+        const yearMaxFilter = url.searchParams.get("year_max");
+        const vinFilter = url.searchParams.get("vin");
+        const priceMinFilter = url.searchParams.get("price_min");
+        const priceMaxFilter = url.searchParams.get("price_max");
+        const transmissionFilter = url.searchParams.get("transmission");
+        const mileageMaxFilter = url.searchParams.get("mileage_max");
+        const sortBy = url.searchParams.get("sort") || "created_at";
+        const sortDir = url.searchParams.get("sort_dir") === "asc";
+        const allowedSortFields = ["created_at", "year", "sale_price", "mileage", "updated_at"];
+        const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "created_at";
+
         let query = supabase
           .from("vehicles")
           .select(`
             id, year, make, model, trim, series, vin, mileage,
             color, transmission, body_style, sale_price,
             purchase_price, is_public, created_at, owner_id, primary_image_url
-          `, { count: "estimated" });
+          `, { count: "estimated" })
+          // Filter stub vehicles (no year/make/model) from inventory listings
+          .not("year", "is", null)
+          .not("make", "is", null)
+          .not("model", "is", null);
 
         if (mine && !isServiceRole) {
           query = query.eq("owner_id", userId);
@@ -121,8 +220,45 @@ serve(async (req) => {
           query = query.or(`owner_id.eq."${safeUserId}",is_public.eq.true`);
         }
 
+        // Apply filters — these were entirely missing (P0 bug: ?make=Porsche was ignored)
+        if (makeFilter) query = query.ilike("make", `%${makeFilter}%`);
+        if (modelFilter) query = query.ilike("model", `%${modelFilter}%`);
+        if (yearFilter) {
+          const year = parseInt(yearFilter, 10);
+          if (!isNaN(year)) query = query.eq("year", year);
+        }
+        if (yearMinFilter) {
+          const yearMin = parseInt(yearMinFilter, 10);
+          if (!isNaN(yearMin)) query = query.gte("year", yearMin);
+        }
+        if (yearMaxFilter) {
+          const yearMax = parseInt(yearMaxFilter, 10);
+          if (!isNaN(yearMax)) query = query.lte("year", yearMax);
+        }
+        if (vinFilter) {
+          const cleanVin = vinFilter.trim().toUpperCase();
+          if (cleanVin.length === 17) {
+            query = query.eq("vin", cleanVin);
+          } else {
+            query = query.ilike("vin", `%${cleanVin}%`);
+          }
+        }
+        if (priceMinFilter) {
+          const priceMin = parseFloat(priceMinFilter);
+          if (!isNaN(priceMin)) query = query.gte("sale_price", priceMin);
+        }
+        if (priceMaxFilter) {
+          const priceMax = parseFloat(priceMaxFilter);
+          if (!isNaN(priceMax)) query = query.lte("sale_price", priceMax);
+        }
+        if (transmissionFilter) query = query.ilike("transmission", `%${transmissionFilter}%`);
+        if (mileageMaxFilter) {
+          const mileageMax = parseInt(mileageMaxFilter, 10);
+          if (!isNaN(mileageMax)) query = query.lte("mileage", mileageMax);
+        }
+
         const { data, error, count } = await query
-          .order("created_at", { ascending: false })
+          .order(safeSortBy, { ascending: sortDir })
           .range(offset, offset + limit - 1);
 
         if (error) {
