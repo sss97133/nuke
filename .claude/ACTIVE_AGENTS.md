@@ -17,17 +17,34 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
-### Worker — Vehicle Deduplication — 2026-02-26
-- Task: 3f77edb7 — dedup vehicles by listing_url (1.07M rows → ~39K distinct)
-- Building merge PL/pgSQL function + dedup edge function
-- Touching: supabase/functions/dedup-vehicles/ (new), vehicle_merge_proposals table
-- DO NOT: modify vehicles table directly without checking merged_into_vehicle_id
+### VP Extraction — CL Price Backfill COMPLETED — 2026-02-27 05:10 UTC
+- DONE: backfill-cl-asking-price deployed + ran (190 → 93 null, 51% reduction)
+- DONE: 2 agent_tasks completed (queue assessment: 3793/hr drain rate, ~25h ETA)
+- DONE: Cron 259 added (daily 6 AM UTC, batch_size 30)
+- REMOVED: session complete
+
+### Worker — Stub Vehicle Filter — COMPLETED 2026-02-27
+- Task: d1c9187e (P97) + 3827a50b (P85, CDO audit) — BOTH COMPLETED
+- Filtered ~97K stub vehicles (no YMM) from all inventory/search endpoints
+- Migration: 20260227060000_filter_stub_vehicles_from_inventory.sql applied
+- Deployed: api-v1-search, api-v1-vehicles, universal-search edge functions
+- Frontend: IntelligentSearch.tsx autocomplete updated
+- DB: search_vehicles_fts, search_vehicles_fulltext, search_vehicles_fuzzy updated
+- Committed 5257d97f9, pushed to main
+- REMOVED: session complete
 
 
-### VP AI — Tier-2 ONNX Upload & Modal Redeploy — 2026-02-26 23:06
-- Task: fdf5038f — waiting for PID 12814 (zone) + PID 39959 (tier2 watcher) to complete
-- Will: upload tier-2 ONNX to Modal volume yono-data, redeploy sidecar, validate
-- DO NOT: kill PID 12814 or PID 39959
+### VP AI — Zone Training Resume + Sidecar Fix — 2026-02-27 04:52 UTC
+- Task: fdf5038f — PIDs 12814+39959 were dead, restarted both
+- Zone classifier: RESUMED from epoch 10 checkpoint, now training epoch 11/15, PID 7241
+  - Log: yono/outputs/zone_classifier/training.log
+  - DO NOT kill PID 7241
+- Tier2 watcher: RESTARTED, watching PID 7241, PID 7390
+  - Will train german/british/japanese/italian/french/swedish then export ONNX
+  - Log: yono/outputs/hierarchical/tier2_remaining.log
+  - DO NOT kill PID 7390
+- YONO sidecar: redeployed to Modal, confirmed operational (edge function source=yono_vision)
+- Next after zone+tier2 done: upload ONNX to Modal volume yono-data, redeploy sidecar
 
 
 ### VP Deal Flow — Transfer System Coordination — 2026-02-26
@@ -38,18 +55,19 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 
 
-### YONO Vision V2 — BACKGROUND TRAINING 2026-02-26
+### YONO Vision V2 — BACKGROUND TRAINING (RESTARTED 2026-02-27 04:52 UTC)
 - All 4 phases + zone system done. Florence2 v2 COMPLETE (yono_vision_v2_head.safetensors saved).
-- **Zone classifier PID 12814**: train_zone_classifier.py — epoch 5/15, val_acc ~69%, ~31min/epoch
+- **Zone classifier PID 7241**: resuming from epoch 10 checkpoint → training epoch 11-15
+  - val_acc best=72.8%, ~31min/epoch, ETA complete ~02:30 UTC (5 epochs remain)
   - DO NOT interrupt. Log: yono/outputs/zone_classifier/training.log
-- **Watcher PID 39959**: wait_then_train_hier_tier2.sh — waiting for zone (PID 12814) to finish
-  - Will train tier-2 families: german, british, japanese, italian, french, swedish (american already done)
+- **Watcher PID 7390**: watching PID 7241, will train tier-2 families after zone finishes
+  - Families: german, british, japanese, italian, french, swedish (american already done)
   - Then runs --export for all ONNX files
   - Log: yono/outputs/hierarchical/tier2_remaining.log
   - Next step after export: upload ONNX files to Modal volume yono-data
-  - DO NOT kill PID 39959 or PID 12814
-- **Watcher PID 80532**: wait_then_train_zones.sh — stale, zone already running; may relaunch zone on finish (low risk, checkpoint exists)
+  - DO NOT kill PID 7390 or PID 7241
 - **Zone labeling**: COMPLETE (2764/2764 records labeled)
+- **Resume support**: added --resume flag to yono/scripts/train_zone_classifier.py
 
 ### [vp-platform] Platform health check complete — 2026-02-27 03:00 UTC
 - Fixed 4 broken cron commands (jobs 128, 186, 213, 235) using stale current_setting() calls
@@ -153,11 +171,11 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Checking 4 Corvette listings (Seattle, Portland, Sacramento x2)
 - No file writes — read-only research task
 
-### VP Intel — Comparable Sales Feature — 2026-02-27 06:00
-- Task: Build "Similar Sales" section for vehicle profile pages (top user request)
-- Creating: VehicleSimilarSales.tsx component + API endpoint
-- Editing: VehicleProfile.tsx (add Similar Sales tab)
-- DO NOT: modify vehicle profile layout structure (just adding new tab)
+### VP Intel — Comparable Sales Feature — COMPLETED 2026-02-27
+- Built SimilarSalesSection.tsx (nuke_frontend/src/components/vehicle/)
+- Enhanced api-v1-comps edge function: get_auction_comps() DB function + direct fetch RPC
+- Updated VehicleComparablesTab.tsx: Similar Sales first, user-submitted comps below
+- 9/10 results from auction_events with platform/date/image/link; 0.6s (make/model params) or 3.5s (vehicle_id)
 
 ### VP Platform — Search UI Fixes — 2026-02-27 03:50 UTC
 - Task: Fix search results UI to show actual data (tier ratings, observation counts, filters, VIN search)

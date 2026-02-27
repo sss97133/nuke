@@ -3,6 +3,464 @@
 **Append-only. Add entries when completing significant work.**
 Agents read this to avoid rebuilding things that already exist.
 
+## 2026-02-27
+
+### [intel] Similar Sales feature — vehicle profile Comps tab — 2026-02-27
+- Built `SimilarSalesSection.tsx` — card grid showing 5-20 comparable sold vehicles
+  - Platform badges (Bring a Trailer, Barrett-Jackson, Mecum, etc.) with brand colors
+  - Sold date (relative: "2yr ago"), mileage, thumbnail image, listing URL
+  - Summary stats bar: avg/median/range price across all comps
+  - Show more/fewer toggle at 6+ results
+- Enhanced `api-v1-comps` edge function:
+  - New param: `vehicle_id` (resolves canonical make/model/year via pk lookup)
+  - Added `auction_events` as primary data source via `get_auction_comps()` DB function
+  - `get_auction_comps()`: plpgsql JOIN of vehicles+auction_events, uses `idx_vehicles_make_model` + `idx_auction_events_vehicle`, 8s internal timeout
+  - Calls RPC via direct `fetch()` to PostgREST (avoids Supabase JS client timeout issues)
+  - Fallback: `vehicles.sale_price` for records without auction events
+  - Performance: 0.6s (make/model/year params), ~3.5s (vehicle_id with pk lookup)
+- Updated `VehicleComparablesTab.tsx`: Similar Sales section first, user-submitted comps below
+- `get_auction_comps` DB function created (SECURITY DEFINER, plpgsql, 8s timeout)
+
+### [platform] Stub vehicle filter — inventory accuracy fix — 2026-02-27
+- Problem: ~97K stub vehicles (is_public=true, no year/make/model) polluting all search/inventory
+- Solution: Added `year/make/model IS NOT NULL` filter to all inventory read paths
+- DB: Updated `search_vehicles_fts`, `search_vehicles_fulltext`, `search_vehicles_fuzzy` functions
+- DB: Created `vehicles_inventory` view (public vehicles with minimum data — use for future queries)
+- Edge functions deployed: `api-v1-search`, `api-v1-vehicles`, `universal-search`
+- Frontend: `IntelligentSearch.tsx` autocomplete now filters stubs
+- Migration: `20260227060000_filter_stub_vehicles_from_inventory.sql`
+- Audit findings by platform: C&B 99.9%, Barrett-Jackson 99.9%, BaT 94.3%, Mecum 91.8%,
+  Bonhams 19.1% (extraction sprint ongoing), User Submission 13.5% (expected)
+- Stubs remain in DB and surface automatically once extraction fills YMM
+- Tasks completed: d1c9187e (P97 vp-platform), 3827a50b (P85 cdo audit)
+- Commit: 5257d97f9
+
+### [extraction] CL asking price backfill + queue assessment — 2026-02-27 05:00 UTC
+- Built and deployed `backfill-cl-asking-price` edge function
+  - Scrapes individual CL listing pages to extract asking price via `<span class="price">` and JSON-LD
+  - 500ms delay between requests (CL rate limit avoidance)
+  - Handles expired listings (410) gracefully, rejects junk prices ($1 placeholders)
+  - Triggers batch-market-proof after successful updates
+- Ran 10 batches of 25 entries = 250 entries processed
+  - 97 null prices → prices restored (190 → 93 remaining, 51% reduction)
+  - 93 remaining: ~60 expired 410s, ~25 $1 placeholder prices (unfixable), ~8 rate-limited
+- Created cron job 259 (daily 6 AM UTC) to keep CL prices current
+- Completed 2 agent_tasks: c8259c99 + 041380bf (queue backlog assessment)
+  - Actual drain rate: 3,793/hr (not 384/hr as estimated — that was per-worker, not system total)
+  - ETA to clear backlog: ~25h (not 91h)
+  - BaT nearly complete (144 pending), MecumLive 33.8K, C&B 27K, B-J 15.4K
+
+### [yono] Zone classifier + tier2 watcher restarted — 2026-02-27 04:52 UTC
+- Zone classifier (PIDs 12814+39959) were dead since last session
+- Added --resume flag to yono/scripts/train_zone_classifier.py (loads head+optimizer state, advances LR schedule)
+- Resumed zone training from epoch 10 checkpoint: PID 7249/7241, epoch 11/15, best_val_acc=72.8%
+- Restarted tier2 watcher: PID 7390, watching zone PID 7241, will train german/british/japanese/italian/french/swedish + ONNX export
+- YONO sidecar (Modal): confirmed operational via edge function test; redeployed for freshness. Direct curl from dev machine gets 404 (Modal IP restriction) but edge functions work fine.
+- Vision workers 247+248 confirmed active and succeeding every 2 min
+- iPhoto library scan (PID 23805): completed 2026-02-25, results in yono/library_scan/scan_results.json
+
+### [platform] INCIDENT fix: bat-snapshot-parser statement timeout (jobs 173/174) — 2026-02-27 03:43 UTC
+- Root cause: `parse_bat_snapshots_bulk()` cursor scanned 367K rows (59GB table) to find 291 unprocessed rows — `(metadata->>'parsed_at') IS NULL` filter had no index; pg_cron's 120s timeout killed every run before any row was processed
+- Fix: created partial index `idx_lps_bat_unparsed_fetched` (16KB, covers only unparsed BAT rows) → query plan switched from SeqScan to Index Scan
+- Also reduced batch size 300→100 in cron jobs 173/174 for safety margin
+- Migration: `20260227040000_bat_snapshot_parser_index_fix.sql`
+
+### [cwfto] Situational brief — 2026-02-27 03:40 UTC
+- 1.25M vehicles, 101K import queue pending, 18.5% quality backfill (231K/1.25M)
+- Zone classifier PID 12814 alive at epoch 9/15 (~3hrs remaining); replied to COO watchdog
+- YONO sidecar unreachable (vp-ai task P85 in_progress)
+- DB statement timeouts on simple queries — under heavy extraction + backfill load
+- Filed 3 follow-up tasks: DB load investigation (vp-platform P78), queue backlog verification (vp-extraction P78), dedup incident tasks (vp-platform P30)
+- Scheduled next CWFTO loop (P92)
+
+### [db] observation_sources completeness audit — COMPLETED 2026-02-27
+- Audited all active sources (auction_events, listing_page_snapshots) against observation_sources
+- Found 2 missing: `collecting-cars` (122 auction_events, collecting-cars-discovery edge fn) and `broad-arrow` (1 event, extract-broad-arrow edge fn)
+- Added both with base_trust_score=0.80, category=auction
+- Documented 4 slug normalization mismatches in notes (bringatrailer→bat, cars_and_bids→cars-and-bids, hagerty→hagerty-marketplace, ecr→exclusive-car-registry)
+- Total sources: 90 → 92
+
+### [platform] mecum-live-queue-worker connection pool incident — COMPLETED 2026-02-27
+- INCIDENT: jobs 251-255 (mecum-live-queue-workers 1-5) experiencing ~50% startup timeout failures
+- Root cause: 40 active minute-frequency crons saturating connection pool
+- mecumlive queue: 34k pending items (NOT empty — workers genuinely needed)
+- Fix: deactivated workers 3, 4, 5 (jobs 253, 254, 255) — kept workers 1 and 2 active
+- Total active minute-frequency crons reduced: 40 → 37
+- Net throughput unchanged: 2 reliable workers = 5 workers at 50% failure rate
+
+### [docs] OCR pipeline startup brief + stale-lock bug fix — COMPLETED 2026-02-27
+- Pipeline status: 259 complete, 656 skipped, 1 pending (unlocked), 0 failed
+- 50% of complete items linked to vehicles; 0 deals linked (link-document-entities not matching deals)
+- Skipped breakdown: 653 low-confidence `other`, 3 vehicle-image false-positives (no deal_document_id), 3 real docs (2 registration + 1 title) at confidence 0-15 — flagged for manual review
+- Fixed bug: stale-lock cleanup cron (job 256) was missing `pending` status — a locked-pending item could never self-recover. Fixed to include `pending` in the covered statuses.
+- Manually unlocked stale receipt item `69dc746e` (locked since 02:17 UTC, over 1h stale)
+- Vault (vault_attestations): 0 entries — not yet populated
+- Both OCR crons active and healthy: job 250 (worker-batch, */5min), job 256 (stale-lock-cleanup, */3min)
+
+### [worker] Exponential backoff for failed extractions — COMPLETED 2026-02-27
+- Added retry logic to `process-import-queue` failure paths (extractor failure + catch block)
+- Transient errors (timeout, rate_limited, blocked): 10 min base delay × 2^attempts, max 8 attempts, cap 2 hours
+- Non-transient errors (extraction_failed, browser_crash, bad_data): 5 min base × 2^attempts, max 5 attempts, cap 2 hours
+- Non-vehicle pages (skipped) remain terminal (no retry)
+- Increased `p_max_attempts` in claim from 3 → 8 to allow retries to run
+- `next_attempt_at` set on retry; claim RPCs already respect it (WHERE next_attempt_at IS NULL OR next_attempt_at <= NOW())
+- `continuous-queue-processor` already had full backoff — no change needed there
+- Deployed: `process-import-queue`
+
+### [worker] BAT extractor consolidation — COMPLETED 2026-02-27
+- Canonical flow confirmed: `complete-bat-import` → `extract-bat-core` + `extract-auction-comments`
+- Fixed `extract-premium-auction`: was routing bat/bringatrailer to deprecated `bat-simple-extract`, now routes to `complete-bat-import`
+- Fixed `crawl-bat-active`: was calling `bat-simple-extract` directly, now calls `complete-bat-import`
+- Updated `_shared/approved-extractors.ts`: added `bat-simple-extract` and `bat-extract` to `DEPRECATED_BAT_EXTRACTORS`; added `ENTRY: 'complete-bat-import'` to `APPROVED_BAT_EXTRACTORS`
+- Updated `TOOLS.md`: corrected 3 references that pointed to deprecated `bat-simple-extract`
+- Deployed: `extract-premium-auction`, `crawl-bat-active`
+- Note: `bat-extract` and `bat-simple-extract` functions still exist (not deleted) but all live callers now route to `complete-bat-import`
+
+### [vp-platform] API bulk export endpoint — COMPLETED 2026-02-27
+- Deployed `api-v1-export` edge function at `/functions/v1/api-v1-export`
+- Formats: `format=csv` (attachment), `format=json` (paginated), `format=ndjson` (streaming-friendly)
+- Parquet: returns helpful 422 with pandas conversion hint (`pd.read_json(..., lines=True).to_parquet(...)`)
+- Cursor-based pagination via `?cursor=<last_id>` — O(1) vs OFFSET, scales to full dataset
+- Rate limits: service-role 100K rows, API key 10K rows, user JWT 5K rows per request
+- Field selection: `?fields=id,year,make,model,vin,sale_price` (24 fields available)
+- All filters: make, model, year/year_min/year_max, price_min/max, vin, transmission, mileage_max, drivetrain, body_style, quality_min
+- Unlocks Priya's $200-800/month enterprise tier. Task 4ae51478 completed.
+
+### [vp-extraction] Scrapling Evaluation — NO-GO — COMPLETED 2026-02-27
+
+- **Question**: Should we adopt Scrapling (adaptive selectors, StealthyFetcher, Camoufox) for extraction pipeline?
+- **Verdict: NO-GO**. Three decisive reasons:
+  1. **Language mismatch**: Python-only. Our pipeline is 100% Deno/TypeScript edge functions. Requires separate Python microservice (Modal/Railway) = new infra + latency + failure mode.
+  2. **Wrong failure mode**: Our extractors fail on JSON/API structure changes, not CSS selector breaks. Bonhams uses JSON-LD; Mecum uses `__NEXT_DATA__` JSON. Scrapling's adaptive selectors don't help.
+  3. **StealthyFetcher economics**: `archiveFetch()` cache-first already makes Firecrawl cheap. Python StealthyFetcher service would cost more than the Firecrawl it replaces.
+- **Revisit**: Python forum scraper (Rennlist, TheSamba) OR Scrapling v1.0 stable.
+- Task 9080e841 completed in agent_tasks.
+
+### [vp-orgs] Startup brief / domain audit — COMPLETED 2026-02-27
+- 4,003 orgs: 1,831 collection, 1,729 other, 107 dealer, 75 auction_house
+- Critical gaps identified: organization_seller_stats (1 entry, stale Feb 14), organization_inventory (0 rows), classic_seller_queue (109 pending, no cron processor), ECR data (45 days stale, no refresh cron)
+- Working: enrich-organizations-daily (job 69), seller-intel-rollup (job 214, every 4h), bat-seller-monitor-sweep (job 166, every 6h)
+- Sellers extremely thin: 7 pipeline_sellers, 9 seller_sightings total, 0 org-to-seller linkage
+- Needs: cron for compute-org-seller-stats, cron for classic_seller_queue drain, ECR refresh schedule, org-to-seller bridge
+
+### [vp-platform] Search UI: Fix F tier / 0 observations — COMPLETED 2026-02-27
+
+- **Root cause**: universal-search returned only year/make/model in metadata; VehicleCardDense calculated F tier for all results
+- **universal-search**: Added 20+ vehicle fields to SELECT; FTS path now enriches limited RPC results with second IN query; `buildVehicleMetadata()` uses comment_count→event_count proxy, primary_image_url→image_count
+- **SearchResults.tsx**: Passes vin, sale_price, current_value, asking_price, mileage, transmission, profile_origin, ownership_verified, view_count, image_count, event_count to VehicleCardDense; list view shows key specs row (price, VIN, mileage, transmission)
+- **Result**: BaT imports with comments now score C/B tier; vehicles with VIN+price score D/E; images display when primary_image_url is set
+- Deployed to Supabase. Commit: 2ffdb4a6d
+
+### [cpo] SDK v1.4.0 — nuke.signal.score() — COMPLETED 2026-02-27
+
+- **`api-v1-signal` edge function** deployed to Supabase. GET by `vehicle_id` or `vin`.
+- Reads from `nuke_estimates` (521K rows, 8.3K with deal_score, all 521K with heat_score).
+- Computes `price_vs_market` live: `(asking_price - estimated_value) / estimated_value * 100` (negative = below market = good deal).
+- Derives `comp_count` from `signal_weights.comps.sourceCount`.
+- Translates internal labels (`plus_3` → `strong_buy`, `minus_3` → `overpriced`) to consumer-facing names.
+- Returns 404 with actionable hint when no estimate exists.
+- **SDK changes**: `signal.ts` resource + `SignalScore`/`SignalScoreParams` types + wired into `Nuke` client.
+- **Version**: `@nuke1/sdk` bumped `1.3.1` → `1.4.0`.
+- **Docs**: `CHANGELOG.md` created, `openapi.yaml` updated with `/api-v1-signal` path + `SignalScore` schema.
+- **Validated**: live endpoint returns correct data (2006 LR3, $600 sale price, $7100 estimated, -91.55% below market ✓).
+
+### [vp-platform] P0: Search/API Filtering Completely Broken — FIXED 2026-02-27
+
+**Root cause 1 — api-v1-vehicles**: `?make=Porsche&model=911&year=1973` params were read but **never applied** as query filters. Fixed by adding full filter chain: `make`, `model`, `year`, `year_min`, `year_max`, `vin`, `price_min`, `price_max`, `transmission`, `mileage_max`, `sort`, `sort_dir`.
+
+**Root cause 2 — universal-search**: FTS "strategy 2" (raw `search_vector @@ to_tsquery`) at relevance=0.8 returned noise (e.g. "997" matching Austin-Healey Sprite 997cc descriptions); filtered to relevance >= 0.85. Over-aggressive year+make+model dedup collapsed distinct cars — replaced with ID-only dedup. Always-run ILIKE fallback merged with FTS for reliable make/model matching.
+
+**Verified**: `?make=Porsche&model=911&year=1973` → 665 correct results; "porsche 997 gt3" → actual GT3s; "Ford" → 113K Fords.
+- Files: `supabase/functions/api-v1-vehicles/index.ts`, `supabase/functions/universal-search/index.ts`
+
+### [vp-platform] P1: Search Filters — COMPLETED 2026-02-27
+
+- Added vehicle search filters to `Search.tsx` (task 212b6ecc)
+- **Filter panel**: price range (min/max), year range, max mileage, transmission (auto/manual/any), for-sale vs sold toggle — appears whenever vehicle results are present
+- **Enrichment**: post-search Supabase query fetches `sale_price, mileage, transmission, is_for_sale, city, state` for all vehicle result IDs; merged into result metadata
+- **Filtering**: client-side, computed via `useMemo` on enriched results; active filter count badge + "Clear all" button
+- **Sort**: added Price (asc/desc) and Year (asc/desc) options to `SearchResults.tsx` sort dropdown
+- TypeScript clean (tsc --noEmit passes)
+- Files: `nuke_frontend/src/pages/Search.tsx`, `nuke_frontend/src/components/search/SearchResults.tsx`
+
+### [vp-platform] P0: Market Dashboard timeout — COMPLETED 2026-02-27
+
+- `MarketDashboard.tsx` was querying `market_segments_index` view directly → statement timeout every load
+- Investor (James) had rejected platform based on the broken page ($0 AUM + timeout error)
+- Fix: replaced entire page with professional "Coming Soon" placeholder — no DB queries, no errors
+- Route `/market` and `/market/dashboard` still live, CTA buttons link to working `MarketExchange` page
+- Task 4317301c marked complete in agent_tasks
+
+### [vp-platform] Platform Health Check + Cron Config Fixes — COMPLETED 2026-02-27 ~03:00 UTC
+
+**Health Summary:**
+- 160 cron jobs total (146 active, 14 intentionally inactive)
+- Zero stale queue locks
+- Quality backfill workers 237-240: ACTIVE, making progress (~97K rows across 4 shards, ~1.05M remaining)
+- Import queue: 102,911 pending, actively processing
+
+**Fixed 4 broken cron jobs** (all using stale `current_setting()` config — `app.supabase_url`/`app.service_role_key`/`app.settings.*` not set in DB):
+- Job 213 (exchange-pricing-cycle): Was returning NULL URL → fixed to hardcoded URL + `get_service_role_key_for_cron()`
+- Job 235 (agent-monitor-scan): Was throwing "unrecognized config param" → fixed same way
+- Job 186 (paper-trade-autopilot): Same broken pattern → fixed
+- Job 128 (auto-sort-telegram-photos): Same broken pattern → fixed
+
+**Incident tickets filed:**
+- P70: bat-snapshot-parser-continuous (jobs 173/174) — ~19% failure rate from statement timeout in `parse_bat_snapshots_bulk()`
+- P60: mecum-live-queue-workers (251-255) — ~50% failure rate from connection pool saturation (45 minute-frequency crons total)
+
+### [worker] Extraction Metrics Logging — COMPLETED 2026-02-27
+
+- Created `extraction_metrics` table: per-invocation rows with extractor_name, source, run_id, source_url, vehicle_id, success, latency_ms, error_type, error_message, http_status
+- Created `extraction_metrics_hourly` view: hourly rollups with success rate %, avg/p50/p95 latency, and jsonb error_breakdown per extractor+source
+- Created `extraction_metrics_24h` view: 24h health summary ordered by failure count
+- Created `supabase/functions/_shared/extractionMetrics.ts`: `ExtractionMetricsLogger` class (startItem/recordSuccess/recordFailure/flush), `logExtractionMetric` quick helper, `categorizeError` function
+- Updated `continuous-queue-processor`: uses `ExtractionMetricsLogger` per extractor, times each item fetch, records success/failure with categorized error type and HTTP status, batch-flushes to DB at end of run
+- Migration: `supabase/migrations/20260227020000_extraction_metrics.sql`
+
+### [vp-extraction] Extraction Queue Snapshot + Next Optimization Target — COMPLETED
+
+**Queue Depths (02:50 UTC Feb 27)**
+
+| Source     | Pending | Rate/hr | ETA      | Error Rate        |
+|------------|---------|---------|----------|-------------------|
+| mecum      | 16,934  | 521     | ~33 hrs  | 2 failed (~0%)    |
+| b-j        | 17,966  | 626     | ~29 hrs  | 0 failed          |
+| pcarmarket | 2,587   | 128     | ~20 hrs  | 50 failed (1.9%)  |
+| bat        | 1,603   | 745     | ~2.2 hrs | 2 failed (~0%)    |
+| bonhams    | 14      | 43      | ~0.3 hrs | 0 failed          |
+| gooding    | 15      | 113     | ~0.1 hrs | 2 failed          |
+| c&b        | 0       | —       | CLEARED  | —                 |
+
+**Description Coverage (sample of 50 recent items per source)**
+- mecum: 100% — Phase 2 fix verified working
+- BaT: 100%
+- PCarMarket: 100%
+- B-J: 44/48 = 91.7%
+- Bonhams: 20/22 = 90.9%
+- Gooding: not measurable via queue (vehicle_id not written back to import_queue rows)
+- C&B: not measurable (queue cleared)
+
+**Secondary Finding: bat_extraction_queue stalled**
+- 119,160 pending items, 0 processing — oldest items from Dec 20, 2025 (2+ months idle)
+- `process-bat-extraction-queue` function exists but no active cron firing it
+- Step 2 of BaT pipeline (comment extraction) completely stalled
+
+**Next Optimization Target: PCarMarket URL-slug fallback parsing**
+- 50 failures all "Missing required fields (year, make, model)"
+- Year/make/model IS in the URL slug: e.g. `/marketplace-2005-land-rover-range-rover`
+- Fix: add URL slug regex fallback in `import-pcarmarket-listing` before quality gate
+
+## 2026-02-26
+
+### [worker] Rate limiting on public endpoints — 2026-02-26
+- Created `supabase/functions/_shared/rateLimit.ts` — reusable fixed-window rate limiter backed by Postgres
+- Migration `20260226250000_rate_limits_table.sql`: `rate_limits` table + `rate_limit_increment()` SECURITY DEFINER RPC + `rate_limits_cleanup()`
+- `universal-search`: 60 req/min per IP (60s window)
+- `map-vehicles`: 120 req/min per IP (60s window — higher for map tile interactions)
+- Fail-open on DB errors (never blocks users due to RL infra issues)
+- Adds `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers to all responses
+- Returns 429 with `Retry-After` when limit exceeded
+- Both functions deployed
+
+## 2026-02-27
+
+### [cdo] Data Quality Audit — 2026-02-27
+- **Scale confirmed**: 1,254,455 vehicles (pg_class), 33,742,616 images, 11.6M auction comments
+- **Quality backfill progress**: 100,200 vehicles scored across 4 workers (8% of corpus). Scored vehicles trend 80-86/100 avg — scoring function is well-calibrated.
+- **Score distribution** (gooding, fully scored 369 vehicles): p25=80, p50=90, p75=90, p90=90 — high scores when data present
+- **Cross-source averages**: gooding 86.2, barrett-jackson 83.3, mecum 79.9
+- **Grade F sources**: bonhams (25,202 vehicles, 12.4% YMM — worst single source), ecr_collection_text (24,995 vehicles, 0.04% YMM), forum_build_extraction (9,321 vehicles, 4.3% YMM), thesamba (83 vehicles, 49.4% YMM)
+- **Grade D**: facebook_marketplace (3,655 vehicles, 60.1% YMM coverage)
+- **Missing fields across all sources**: ~92K null year, ~25K null make, ~28K null model — dominated by bonhams + ecr_collection_text + __unknown__ source
+- **Top 3 levers**: (1) Bonhams YMM re-parse (+22K scoreable vehicles), (2) backfill completion ETA ~30hr, (3) ecr_collection_text/forum_build cleanup or YMM extraction from text
+
+### [worker] Health check endpoint — 2026-02-27
+- Deployed `supabase/functions/health` edge function (no-verify-jwt)
+- 3 parallel checks: DB connection ping, recent extractions (last 1h + 24h with rate drop detection), queue depth (pending/processing/stuck with high-depth warn)
+- Returns `status: ok|degraded|down` + structured per-check detail JSON
+- HTTP 200 for ok/degraded, 503 for down
+- Validated: DB ok 516ms, 182 extractions/last-1h, queue=113k items (degraded, matches known backlog)
+
+### [vp-ai] YONO sidecar URL verification + fix — 2026-02-27
+- **Root cause found**: URL typo — `sss73133` (wrong) vs `sss97133` (correct) Modal workspace slug
+- **Sidecar confirmed alive**: `https://sss97133--yono-serve-fastapi-app.modal.run/health` → 200 OK, `uptime_s=696`, `vision_mode=finetuned_v2`, `flat_classes=276`
+- **yono-classify confirmed working**: end-to-end test returned `make=british, conf=0.57, ms=313ms, available=true, source=yono`
+- **YONO_SIDECAR_URL in Supabase**: explicitly set to `https://sss97133--yono-serve-fastapi-app.modal.run` (confirmed)
+- **Fixed**: `yono/scripts/upload_tier2_to_modal.sh` had `sss73133` typo → corrected to `sss97133`
+- **Note**: `modal deploy` CLI output shows wrong URL (`sss73133`) — display bug, actual workspace slug is `sss97133`
+
+### [vp-extraction] Import queue backlog investigation — 2026-02-27
+- Alert fired: extractable count hit 1,000 (threshold 500)
+- Investigation confirmed: NOT stalled. 100+ active workers, 1,305 items/hr, 0 stale locks
+- Failures: 59 total, all quality gate rejections (missing year/make/model) — expected behavior
+- Extractable breakdown: Other 638, Cars & Bids 360, BaT 2
+- ETA to clear: ~48min — self-resolving demand spike, no action taken
+
+### [cpo] SDK v1.3.0 — YONO Vision shipped — 2026-02-27
+- **Release scope**: `nuke.vision.classify()`, `nuke.vision.analyze()`, `nuke.vision.batch()` — all live
+- **`family` field added**: `api-v1-vision` now passes through `family` + `family_confidence` from YONO's tier-2 hierarchical classifier on all 3 routes (classify/analyze/batch)
+- **SDK types updated**: `VisionClassifyResult` and `VisionAnalyzeResult` now include `family`, `family_confidence`, `is_vehicle`
+- **`CHANGELOG.md` created**: `tools/nuke-sdk/CHANGELOG.md` with full v1.3.0 + v1.3.1 entries, historical v1.0–1.2 entries
+- **OpenAPI spec updated**: `docs/api/openapi.yaml` — Vision tag added, `/api-v1-vision/classify`, `/analyze`, `/batch` endpoints fully documented
+- **Work order filed**: `agent_tasks` id `00c0e808-ce31-4474-8032-73837903126a` — SDK v1.4.0: `nuke.signal.score()` market signal scoring (priority 85)
+- **Next feature decision**: Signal score over comps — "Is this a good deal?" is the monetization unlock; comps is second
+
+## 2026-02-26
+
+### [cfo] Image Pipeline Unpause Cost Model — 2026-02-26
+- Built full decision matrix: YONO-first hybrid strategy vs. full cloud vs. stay paused
+- Key finding: $64K figure was wrong. Current Gemini-Flash pipeline = $0.0001/image (20x cheaper)
+- Actual backfill cost: $3,250 (capped at $50/day × 65 days) for 32M images
+- YONO covers: make/family classification (yono-classify, $0) + zone/condition/damage (yono-vision-worker, already running, not paused)
+- Cloud still needed for: camera geometry, subject taxonomy, description, VIN/SPID detection
+- Recommended threshold: 70% confidence (35-40% cloud escalation rate)
+- Monthly ongoing: $130-180/month vs $2,000/month cloud-only
+- Full model: `.claude/CFO_IMAGE_PIPELINE_COST_MODEL.md`
+- Email recommendation sent to CEO
+
+### [worker] RLS Audit — vehicles, vehicle_observations, auction_comments — 2026-02-26
+- **vehicle_observations**: RLS was completely disabled — enabled it + added `vo_service_role_all` (ALL for service_role) and `vo_authenticated_read` (SELECT for authenticated users on public/owned vehicles)
+- **vehicles.allow_vehicle_inserts**: dropped — it was `{public}` role with `WITH CHECK = true` (anon inserts). Replaced with `vehicles_authenticated_insert` scoped to `{authenticated}` + `auth.uid() IS NOT NULL`
+- **vehicles.vehicles_delete_policy**: changed from `{public}` to `{authenticated}` role
+- **auction_comments**: already secure — no changes needed
+- Migration: `supabase/migrations/20260226240000_rls_audit_core_tables.sql` applied directly to DB
+
+## 2026-02-27
+
+### [cto] Architecture Review: Modal Sidecar + Agent Infrastructure — 2026-02-27
+
+**MODAL SIDECAR (yono/modal_serve.py):**
+- `@modal.asgi_app()` + FastAPI: APPROVED — correct long-term pattern for multi-endpoint model serving
+- `min_containers=1` at $0.06/hr idle: APPROVED — cold start is 10-15s (Florence-2), keepwarm justified
+- Model storage split: Florence-2 in image (fast cold start), ONNX in volume (hot-swap on training updates) — APPROVED
+- CONCERN #1 (Medium): No auth on Modal endpoint — raw URL is unauthenticated. Work order issued to VP AI: add bearer token middleware before SDK v1.3.0 launch.
+- CONCERN #2 (Low): `/analyze/batch` runs up to 20 Florence-2 inferences via `asyncio.gather` — no semaphore. Single CPU core will serialize them anyway, but add `asyncio.Semaphore(5)` before high-volume pipeline use.
+
+**AGENT INFRASTRUCTURE (.claude/agents/ + ralph-spawn.mjs + agent-monitor):**
+- Atomic claim state machine (pending → claimed → in_progress → completed): APPROVED
+- File-based persona system (CLAUDE.md per role): APPROVED — version-controlled, diffable, zero DB overhead
+- ralph-spawn.mjs concurrency pool: APPROVED — correct pull-from-queue pattern
+- agent-monitor deduplication (line 156: checks existing pending before insert): APPROVED — no flood risk
+- CONCERN #3 (HIGH): No per-agent token budget. 100 turns × Sonnet pricing = up to $20/agent on complex tasks. With 22+ pending tasks at concurrency 5, single run could hit $100-400. Work order issued to CFO + VP Platform.
+- CONCERN #4 (Medium): Unregistered agent types in queue — "sentinel", "guardian", "curator", "harvester", "oracle" have no personas in `.claude/agents/`. Ralph-spawn falls back to worker persona. May be intentional (worker-class agents), but no persona = no domain knowledge injection.
+- CONCERN #5 (Low): DONE.md and ACTIVE_AGENTS.md have concurrent write race with >1 agent. Acceptable now. If concurrency >5, move state tracking fully to agent_tasks table.
+
+**Work Orders Issued:** VP AI (auth middleware), CFO+VP Platform (token budget), VP AI (semaphore for batch analyze)
+
+### [worker] vehicle_observations compound indexes — 2026-02-27
+- EXPLAIN ANALYZE confirmed vehicle timeline query scanning 369K rows, taking 9.8s
+- Created `idx_observations_vehicle_time`: `(vehicle_id, observed_at DESC) WHERE vehicle_id IS NOT NULL`
+- Created `idx_observations_kind_time`: `(kind, ingested_at DESC)`
+- Both CONCURRENTLY (no table lock). Table columns: `kind` (not observation_type), `ingested_at` (not created_at)
+- Vehicle timeline query now uses compound index directly (no sort, no filter scan)
+
+
+
+### [vp-platform] Admin panel overhaul — 2026-02-27
+- `AdminHome.tsx`: Ralph Brief auto-loads snapshot on mount (no button click needed)
+- `AdminHome.tsx`: Operational pulse block shows import_queue pending/failed, agent_tasks pending by type, agent inbox unread — live, refreshes every 30s
+- `AdminHome.tsx`: Cards show live pending/unread counts with red alert borders when non-zero
+- `AdminShell.tsx`: Nav badges on Inbox, Agent Inbox, Reviews, Verifications, Ownership Verifications — red count chips, refresh every 60s
+- New page `AdminAgentInbox.tsx` at `/admin/agent-inbox` — reads agent_messages from Supabase, role filters (to/from), unread toggle, thread view, mark-read via agent-email edge function
+- Routes + nav wired for `/admin/agent-inbox`
+
+
+
+### [cto] ralph-spawn: Multi-Agent Parallel Task Executor — 2026-02-27
+- Built `scripts/ralph-spawn.mjs` — orchestrates parallel Claude Code sessions against `agent_tasks` queue
+- Uses `@anthropic-ai/claude-agent-sdk` `query()` function (no TTY issues, native async iteration)
+- Atomic task claiming: `status='pending'` → `claimed` → `in_progress` → `completed/failed` prevents double-execution
+- Concurrency pool: up to N workers (default 5) pull from queue, claim tasks, spawn agents, drain
+- Persona loading: reads `.claude/agents/{role}/CLAUDE.md` as system prompt `append`; falls back to `worker` persona
+- Options: `permissionMode: 'bypassPermissions'`, `settingSources: ['project', 'user']`, `maxTurns: 100`
+- CLI flags: `--concurrency N`, `--agent <type>`, `--dry-run`, `--list`, `--max-tasks N`, `--model <name>`
+- 22 pending tasks in queue ready to execute
+- Run: `dotenvx run -- node scripts/ralph-spawn.mjs --concurrency 5`
+- Committed: `6ed85a0e9`
+
+
+
+### [vp-ai] YONO Post-Sidecar Brief + Tier-2 Upload Script — 2026-02-27
+- Assessed live training state: zone classifier PID 12814 (epoch 8/15), tier-2 watcher PID 39959 standing by
+- PID 34496 confirmed complete (hier_american_best.pt + hier_family_best.pt in outputs/hierarchical/)
+- Built `yono/scripts/upload_tier2_to_modal.sh`: polls for "=== DONE ===" in tier2_remaining.log, uploads all hier_*.onnx + hier_labels.json to Modal volume yono-data /models/, prompts redeploy
+- Filed work order fdf5038f-7eb5-40ab-9b3b-3154f9da175a (vp-ai, priority 85) for upload execution ~5-6h from now
+- Image pipeline unpause deferred: requires CFO cost model coordination + CEO approval (tier-2 + zone must complete first)
+
+### [coo] All-hands CEO Briefing — 2026-02-26
+- Executed startup sequence: inbox, queue health, PID verification, cron status
+- Identified 3 status corrections vs CEO brief: quality backfill (237-240) paused not running; PID 34496 done (zone classifier 12814 + watcher 39959 continuing); geocode PID changed 8523→54824
+- Created 5 new all-hands tasks: vp-deal-flow, vp-orgs, vp-photos, vp-docs, vp-vehicle-intel
+- Dispatched work orders to all 14 cabinet members via agent email system
+- Sent CEO real email brief with corrections and open questions
+- Import queue state: 105K pending, 341 processing (mecum 51.8K, C&B 29.2K, B-J 18.4K)
+
+### [infra] pgBouncer Connection Pooling — Transaction Mode
+- **Secret set**: `NUKE_DB_POOL_URL` = `postgresql://postgres.qkgaybvrernstplzjaam:[password]@aws-0-us-west-1.pooler.supabase.com:6543/postgres` (pgBouncer transaction mode)
+- **Note**: `SUPABASE_DB_URL` prefix is now blocked by Supabase CLI/API, so pooler URL uses `NUKE_DB_POOL_URL`
+- **4 edge functions updated** to prefer `NUKE_DB_POOL_URL || SUPABASE_DB_URL`:
+  - `agent-email` — added `prepare: false` to postgres.js client (required for transaction mode; postgres.js prepares by default)
+  - `db-stats` — 3 connection sites updated
+  - `investor-portal-stats` — updated
+  - `map-vehicles` — updated
+- **All 4 deployed** via `supabase functions deploy`
+- deno-postgres `Pool` (used by db-stats, investor-portal-stats, map-vehicles) does not use prepared statements with template literals — transaction mode compatible without changes
+
+
+
+### [docs] Document OCR Pipeline — Storage Bug + Re-extraction + Cron Setup
+- **Storage bug fixed**: `getImageAsBase64` in `document-ocr-worker` was hardcoding `deal-documents` bucket for all signed URLs. Items with full `vehicle-images` HTTPS URLs now try direct fetch first, fallback to signed URL via regex-parsed bucket name.
+- **RLS fixed**: `document_ocr_queue` had RLS enabled with no policies. New-style `sb_secret_...` key doesn't bypass RLS through PostgREST. Applied `allow_all` universal policy — function now sees all 916 rows.
+- **Ollama backfill**: discovered ALL 486 "complete" items were extracted by ollama (llama3.2-vision:11b) which returned empty data. Re-queued 384 poorly-extracted items (null vin AND null make) back to `pending` with higher priority (10 for vehicle-ID docs, 5 for others).
+- **Cron added**: `document-ocr-worker-batch` — runs every 5min, batch_size=3, processes pending items with Claude Sonnet.
+- **Stale lock cleanup cron**: `document-ocr-stale-lock-cleanup` — runs every 3min, resets items stuck in classifying/extracting/linking for >5min back to pending.
+- **Verified**: Claude Sonnet now being used (`extraction_provider: "anthropic"`), vehicle linking working (cost_sheet linked to vehicle_id).
+- **Queue status**: ~280 pending, 105 complete, 529 skipped, processing at ~3 items/5min.
+
+
+
+### [deal-flow] Transfer System — Cross-Department Architecture + Notifications
+- **Audit**: found ownership_transfers (30K rows), all stalled at step 1, zero vehicle_transactions rows, no party notification
+- **Migrations applied**:
+  - `add_ownership_transfer_tokens` — buyer_access_token + seller_access_token on ownership_transfers (unique indexed, auto-populated all 30K rows)
+  - `link_vehicle_transactions_to_ownership_transfers` — ownership_transfer_id FK on vehicle_transactions
+- **Brief**: `.claude/VP_DEAL_FLOW_TRANSFER_BRIEF.md` — full cross-department coordination doc with CTO/CFO/CPO/VP Platform decisions
+- **`notify-transfer-parties`** deployed — outbound SMS (Twilio) + email (Resend) for seeded/milestone_advanced/stalled/overdue; fire-and-forget, never blocks
+- **`transfer-automator`** updated — calls notify-transfer-parties after both seedFromAuction and seedFromListing
+- **Note**: Twilio 401 — env creds need setting in Supabase secrets; Resend email confirmed working
+- **Remaining**: stripe-checkout-transfer function + payment_confirmed milestone wiring (VP Deal Flow)
+- **VP Platform tasks**: /admin/transfers dashboard, /t/:token buyer-seller page, Log a Deal modal (see brief)
+
+### YONO Modal Sidecar — Florence-2 Vision Deployed 2026-02-27
+- Updated `yono/modal_serve.py`: added `/analyze` and `/analyze/batch` endpoints
+  - Uses fine-tuned Florence-2 VehicleVisionHead (`finetuned_v2` mode)
+  - Returns: vehicle_zone, zone_confidence, condition_score, damage_flags, modification_flags, interior_quality, photo_quality
+  - Photo_type → zone mapping (ext_front, ext_rear, ext_driver_side, int_dashboard, mech_engine_bay, etc.)
+  - Zero-shot fallback for when fine-tuned head fails to load
+- Uploaded to Modal volume (yono-data): `yono_vision_v2_head.safetensors`, `yono_vision_v2_config.json`, `hier_family.onnx.data`
+- Florence-2-base pre-baked into Modal image (`_download_florence2` run_function)
+- URL: `https://sss97133--yono-serve-fastapi-app.modal.run`
+- Set `YONO_SIDECAR_URL` in Supabase secrets and local .env
+- Validated: yono-classify (ms=40), yono-analyze (mode=finetuned_v2, ms=9-10s on CPU)
+- Old warm container draining naturally (within 10min of inactivity)
+
+## 2026-02-26 (Rally RD competitor import)
+
+### Rally RD Fractional Ownership Cars — IMPORTED 2026-02-26
+- Created `scrape_sources` entry for Rally Rd. (id: 36a0b276-0710-4472-a886-869a807ea090)
+  - url: https://www.rallyrd.com, source_type: marketplace, pattern: `rallyrd\.com`
+  - `scrape_config` tags it as `fractional_ownership` competitor
+- `observation_sources` already had rally-rd entry (id: ac3abc03-bf47-4fd1-8812-f26a293350f2)
+- Inserted 9 vehicles into `import_queue` (all status=pending, source_id auto-linked, priority=10)
+  - `raw_data` carries: platform, competitor:true, fractional_ownership:true, market_cap, share_price, provenance, mileage
+  - 1955 Porsche 356 Speedster, 1965 Ford Mustang Fastback ($110K market cap), 1977 Lotus Esprit S1 (James Bond)
+  - 1978 Aston Martin V8 Vantage Oscar India (URL had false-positive 'art' filter, manually overridden)
+  - 1985 Ferrari Testarossa (Don Johnson/MJ/Elton John/Dr. Dre), 1988 Lamborghini Jalpa (Rocky IV)
+  - 1994 BMW 850CSi (1 of 225 NA), 2003 Saleen S7 ($420K market cap), 2005 Ford GT (371 miles)
+- No pre-existing rallyrd.com data found in DB
+- No `competitor_platforms` table exists; data stored via standard scrape_sources + import_queue
+
 ## 2026-02-26 (YONO sidecar + agent infrastructure session)
 
 ### YONO FastAPI Sidecar — SHIPPED TO MODAL — COMPLETED 2026-02-26
@@ -635,3 +1093,72 @@ SELECT * FROM v_extraction_quality ORDER BY pct_all_key_fields DESC;
 | gooding  | 1,317   | 187     | ~7      |
 
 All descriptions now being extracted correctly. Bonhams: Firecrawl fires for every uncached page, both Footnotes AND inline body parsed.
+
+## 2026-02-26
+
+### [competitors] Insert fractional ownership competitor data into import_queue
+- Rally Rd: Updated 9 existing records with full VINs, specs, tickers, market_cap, share_price, fractional ownership data
+  - Cars: '55 Porsche 356 Speedster, '65 Mustang Fastback, '77 Lotus Esprit S1, '82 Aston Martin V8 Vantage, '85 Ferrari Testarossa, '88 Lamborghini Jalpa, '94 BMW 850CSi, '03 Saleen S7, '06 Ford GT
+  - Corrected year: Aston Martin 1978→1982, Ford GT 2005→2006 (per VIN decode)
+- TheCarCrowd: Created scrape_source (id: 34c7812c) + inserted 15 UK syndicate vehicles (2 fundraising, 9 active, 3 planned)
+- Fraction Motors: Created scrape_source (id: 8d85dde9) + inserted 5 Solana-tokenized vehicles with VINs + SOL token pricing
+- Total: 9 updated, 20 inserted (15 TCC + 5 FM), 2 new scrape_sources
+
+## 2026-02-26 — Competitor Intelligence
+
+### [market] Competitor comparison page — MarketCompetitors.tsx
+- Built /market/competitors page with real scraped data (not guesses)
+- Vercel Edge Middleware for OG tags (Twitter/LinkedIn/iMessage link previews)
+- Share button with navigator.share / clipboard fallback
+
+### [market] Competitor research — 3 deep passes
+Pass 1: Identified real competitors (dropped Collectable/Otis/Apex Trader — not car platforms)
+Pass 2: Scraped Rally WP API (9 cars, VINs, market caps, share prices), TheCarCrowd (15 UK syndicates), Fraction Motors (5 Solana cars with VINs)
+Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCarCrowd own site says NOT FCA-regulated/12.5% fees, MCQ Markets added as new competitor, market size $1.38B total/<$100M AUM combined
+
+### [db] 29 competitor vehicles imported to import_queue
+- 9 Rally (VINs, specs, market caps, share prices — all verified)
+- 15 TheCarCrowd UK syndicates (Ferrari F430, Porsche 996 GT3 RS, Audi R8, Mercedes SLS, etc.)
+- 5 Fraction Motors (VINs: Mustang K-Code, Chevelle SS, GT500, Beetle, Fiero)
+- scrape_sources created for TheCarCrowd + Fraction Motors
+- All tagged: competitor:true, fractional_ownership:true
+
+### [comms] Briefed 4 teams
+- VP Extraction: process 29 import_queue records, VINs listed
+- VP Vehicle Intel: use Rally/Fraction Motors prices to validate our NAV accuracy
+- CPO: market wide open (<0.3% fractionalized), SDK opportunity outlined
+- VP Deal Flow: competitor secondary market structures + Rally SEC precedent
+
+## 2026-02-27
+
+### [deal-flow] Transfer system startup audit — Task 840e4012
+- Audited full transfer-automator pipeline (seed_from_auction, seed_from_listing, staleness_sweep, get_transfer, update_contacts)
+- Confirmed notify-transfer-parties + transfer-advance both live
+- Transfer state: 31,887 total (30,164 in_progress, 1,723 completed), 47,072 overdue milestones
+- 150,353 sold auction_events still missing transfers (82.5% of 182,251 total sold)
+- Crons 223-227 (transfer-backfill-1 through 5): deactivated, ALL call backfill_transfers_for_sold_auctions(100)
+- Assessment: NOT safe to re-enable — would trigger ~300K outbound emails to historical auction buyers/sellers
+- Required fix before re-enable: add suppress_notifications param to transfer-automator seed_from_auction
+- Blocker: Twilio suspended (negative balance, CFO owns); email (Resend) working
+- No duplicate transfers found — idempotency is clean
+- Minor bug: get_transfer returns [object Object] on missing transfer (String(error) on Supabase error object)
+
+## 2026-02-27
+
+### [extraction] Import queue backlog investigation — Task 68c9b395
+- Investigated 101,935 pending items in import_queue
+- **Verdict: Not a stall — was a demand spike.** Bulk ingestion on 2026-02-26 16:00 UTC added 71,174 items in one hour (Extraction Quality Sprint)
+- Queue actively draining: ~50/min, ~57,900/day completions; net drain ~28K/day
+- No stale locks, only 95 failed items (all normal quality gate rejections: missing year/make/model)
+- Platform breakdown: Mecum 51K, C&B 28K, B-J 17.5K, PCarMarket 2.5K, BaT 1.1K
+- Mecum workers 3-5 intentionally disabled — rate limiting issue (214 rate-limited skipped items confirms this)
+- C&B/B-J cron startup timeouts (~20-30% miss rate) are pg_cron cold-start issue, not data failures
+- ETA to clear backlog: ~3.5 days at current drain rate
+
+## 2026-02-27
+
+[platform] VIN search capability (P1 task 4bcca72a)
+- Added dedicated "VIN Lookup" toggle widget to Search page — supports full 17-char VINs and partial (≥5 char) prefix/substring search
+- Added `GET /api-v1-vehicles/by-vin/:vin` endpoint — exact or partial VIN, public vehicles only
+- Added `search_vehicles_by_partial_vin()` DB function (migration 20260227050000) — uses `lower(vin) LIKE lower(...)` to correctly hit the `vehicles_vin_trgm_idx` trigram GIN index (plain ILIKE caused btree scan → timeout on large table)
+- Fixed IntelligentSearch: exact 17-char VIN not in DB now shows clear "not found" message instead of falling through to irrelevant text search results
