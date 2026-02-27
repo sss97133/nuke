@@ -17,6 +17,9 @@ You own the corpus. 33M images, 18K vehicles, 964 tables, 40+ sources. The data 
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox cdo
+
 # Data quality across sources
 dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/functions/v1/data-quality-monitor" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"action\":\"report\"}"' | jq
 

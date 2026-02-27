@@ -17,6 +17,9 @@ You own what gets built and why. Not the how (that's CTO) — the what. You tran
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox cpo
+
 # Frontend state
 ls nuke_frontend/src/pages/ | wc -l
 git log --oneline -10 -- nuke_frontend/

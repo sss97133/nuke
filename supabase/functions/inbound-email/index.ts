@@ -19,7 +19,42 @@ const VALID_ADDRESSES = [
   "investors@nuke.ag",
   "support@nuke.ag",
   "hello@nuke.ag",
+  // Agent addresses — routed to agent_messages
+  "coo@nuke.ag",
+  "cto@nuke.ag",
+  "cfo@nuke.ag",
+  "cpo@nuke.ag",
+  "cdo@nuke.ag",
+  "cwfto@nuke.ag",
+  "vp-ai@nuke.ag",
+  "vp-extraction@nuke.ag",
+  "vp-platform@nuke.ag",
+  "vp-vehicle-intel@nuke.ag",
+  "vp-deal-flow@nuke.ag",
+  "vp-orgs@nuke.ag",
+  "vp-photos@nuke.ag",
+  "vp-docs@nuke.ag",
+  "worker@nuke.ag",
 ];
+
+// Map email address → agent role
+const EMAIL_TO_ROLE: Record<string, string> = {
+  "coo@nuke.ag": "coo",
+  "cto@nuke.ag": "cto",
+  "cfo@nuke.ag": "cfo",
+  "cpo@nuke.ag": "cpo",
+  "cdo@nuke.ag": "cdo",
+  "cwfto@nuke.ag": "cwfto",
+  "vp-ai@nuke.ag": "vp-ai",
+  "vp-extraction@nuke.ag": "vp-extraction",
+  "vp-platform@nuke.ag": "vp-platform",
+  "vp-vehicle-intel@nuke.ag": "vp-vehicle-intel",
+  "vp-deal-flow@nuke.ag": "vp-deal-flow",
+  "vp-orgs@nuke.ag": "vp-orgs",
+  "vp-photos@nuke.ag": "vp-photos",
+  "vp-docs@nuke.ag": "vp-docs",
+  "worker@nuke.ag": "worker",
+};
 
 Deno.serve(async (req) => {
   // Only accept POST
@@ -154,6 +189,23 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Stored email ${emailId} as ${inserted.id}`);
+
+    // Route to agent_messages if addressed to an agent
+    const agentRole = EMAIL_TO_ROLE[nukeAddress];
+    if (agentRole) {
+      const senderName = fromName || fromAddress.split("@")[0];
+      await supabase.from("agent_messages").insert({
+        from_role: "founder",
+        to_role: agentRole,
+        from_email: fromAddress,
+        to_email: nukeAddress,
+        subject: data.subject || "(no subject)",
+        body: bodyText || bodyHtml || "(no body)",
+        sent_via: "resend",
+        metadata: { contact_inbox_id: inserted.id, sender_name: senderName },
+      });
+      console.log(`[inbound-email] Routed to agent_messages for role: ${agentRole}`);
+    }
 
     return new Response(
       JSON.stringify({

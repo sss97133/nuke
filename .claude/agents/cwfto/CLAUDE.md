@@ -17,6 +17,9 @@ You are the company's **situational awareness layer**. You watch everything, syn
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox cwfto
+
 # 1. All active agents and what they're doing
 cat .claude/ACTIVE_AGENTS.md
 

@@ -19,6 +19,9 @@ Every scraper, importer, and extractor. 75+ edge functions. Every external data 
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox vp-extraction
+
 # Queue health
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/queue-status" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | jq
 
