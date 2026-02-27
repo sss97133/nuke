@@ -1,12 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppLayoutContext } from './AppLayoutContext';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const VehicleTabBar: React.FC = () => {
   const { vehicleTabs, activeVehicleId, closeVehicleTab, setActiveVehicleTab } = useAppLayoutContext();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   if (vehicleTabs.length === 0) return null;
+
+  // On mobile, hide the tab bar when only one tab is open — it wastes 32px
+  // showing a single tab title that's already visible in the page header.
+  if (isMobile && vehicleTabs.length <= 1) return null;
 
   return (
     <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>

@@ -1054,6 +1054,8 @@ const VehicleTimeline: React.FC<{
                         </div>
                       )}
 
+                      {/* Scrollable container for months header + day grid */}
+                      <div style={{ overflowX: 'auto', minWidth: 0 }}>
                       {/* Months header positioned above everything */}
                       <div style={{ marginBottom: '4px' }}>
                         <div
@@ -1094,7 +1096,7 @@ const VehicleTimeline: React.FC<{
                       {/* Timeline grid */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', minWidth: 0 }}>
                         {/* Timeline grid column */}
-                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                        <div style={{ minWidth: 0 }}>
 
 
                       {/* Vertical Day Grid: Weekday labels + 7 rows × 53 columns */}
@@ -1301,6 +1303,7 @@ const VehicleTimeline: React.FC<{
                       })()}
                         </div>
                       </div>
+                      </div>{/* end scrollable container */}
                     </div>
                   );
                 })()}
