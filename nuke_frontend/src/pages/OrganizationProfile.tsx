@@ -289,6 +289,14 @@ export default function OrganizationProfile() {
   
   const navigate = useNavigate();
 
+  // Toast notification system — replaces alert() calls
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [images, setImages] = useState<OrgImage[]>([]);
   const [vehicles, setVehicles] = useState<OrgVehicle[]>([]);
@@ -548,7 +556,7 @@ export default function OrganizationProfile() {
     if (files.length === 0) return;
 
     if (!session?.user?.id) {
-      alert('Please log in to upload images');
+      showToast('Please log in to upload images', 'error');
       return;
     }
 
@@ -719,10 +727,10 @@ export default function OrganizationProfile() {
         console.log('No timeline events returned after reload');
       }
 
-      alert(`Uploaded ${files.length} image(s) successfully!`);
+      showToast(`Uploaded ${files.length} image(s) successfully!`, 'success');
     } catch (error: any) {
       console.error('Upload failed:', error);
-      alert('Upload failed: ' + error.message);
+      showToast('Upload failed: ' + error.message, 'error');
     } finally {
       setUploadingImages(false);
       if (imageInputRef.current) {
@@ -1618,10 +1626,10 @@ export default function OrganizationProfile() {
 
       // Remove from local state
       setImages(images.filter(img => img.id !== imageId));
-      alert('Image deleted successfully');
+      showToast('Image deleted', 'success');
     } catch (error: any) {
       console.error('Error deleting image:', error);
-      alert(`Failed to delete: ${error.message}`);
+      showToast(`Failed to delete: ${error.message}`, 'error');
     }
   };
 
@@ -1654,10 +1662,10 @@ export default function OrganizationProfile() {
 
       // Reload images
       loadOrganization();
-      alert('Primary image updated');
+      showToast('Primary image updated', 'success');
     } catch (error: any) {
       console.error('Error setting primary:', error);
-      alert(`Failed: ${error.message}`);
+      showToast(`Failed: ${error.message}`, 'error');
     }
   };
 
@@ -1686,26 +1694,26 @@ export default function OrganizationProfile() {
       if (!response.ok) throw new Error('Scan failed');
 
       const result = await response.json();
-      alert(`Scan complete! Found: ${result.tags?.length || 0} tags, ${result.inventory?.length || 0} inventory items`);
-      
+      showToast(`Scan complete — ${result.tags?.length || 0} tags found`, 'success');
+
       // Reload to show tags
       loadOrganization();
     } catch (error: any) {
       console.error('Error scanning image:', error);
-      alert(`Scan failed: ${error.message}`);
+      showToast(`Scan failed: ${error.message}`, 'error');
     }
   };
 
   const handleAddArticle = async (articleUrl: string) => {
     if (!session?.user?.id || !organizationId) {
-      alert('Please log in to add articles');
+      showToast('Please log in to add articles', 'error');
       return;
     }
 
     try {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       if (!currentSession) {
-        alert('Session expired. Please log in again.');
+        showToast('Session expired — please log in again', 'error');
         return;
       }
 
@@ -1732,15 +1740,15 @@ export default function OrganizationProfile() {
 
       const result = await response.json();
       if (result.success) {
-        alert('Article added to timeline! Images extracted and timeline event created.');
+        showToast('Article added to timeline', 'success');
         // Reload timeline events
         loadOrganization();
       } else {
-        alert(`Failed: ${result.error || 'Unknown error'}`);
+        showToast(`Failed: ${result.error || 'Unknown error'}`, 'error');
       }
     } catch (error: any) {
       console.error('Error adding article:', error);
-      alert(`Failed to add article: ${error.message}`);
+      showToast(`Failed to add article: ${error.message}`, 'error');
     }
   };
 
@@ -1753,7 +1761,7 @@ export default function OrganizationProfile() {
     const documentFile = fileInputRef.current?.files?.[0];
 
     if (!documentFile) {
-      alert('Please select a document file');
+      showToast('Please select a document file', 'error');
       return;
     }
 
@@ -1804,14 +1812,14 @@ export default function OrganizationProfile() {
           });
       }
 
-      alert('Ownership claim submitted. Awaiting review.');
+      showToast('Ownership claim submitted — awaiting review', 'success');
       setShowOwnershipModal(false);
       setSelectedFileName('');
       loadOrganization();
 
     } catch (error: any) {
       console.error('Ownership submission error:', error);
-      alert(`Failed: ${error.message}`);
+      showToast(`Failed: ${error.message}`, 'error');
     }
   };
 
@@ -1856,15 +1864,46 @@ export default function OrganizationProfile() {
 
   if (loading) {
     return (
-      <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-        <div className="text">Loading organization...</div>
+      <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
+        {/* Skeleton header */}
+        <div style={{
+          background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
+          padding: '10px 20px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+            <div style={{ width: 28, height: 28, background: 'var(--grey-300)', borderRadius: 2 }} />
+            <div style={{ width: 200, height: 18, background: 'var(--grey-300)', borderRadius: 2 }} />
+            <div style={{ width: 80, height: 16, background: 'var(--grey-200)', borderRadius: 2 }} />
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ width: 120, height: 13, background: 'var(--grey-200)', borderRadius: 2 }} />
+            <div style={{ width: 80, height: 13, background: 'var(--grey-200)', borderRadius: 2 }} />
+          </div>
+        </div>
+        {/* Skeleton hero */}
+        <div style={{ height: 180, background: 'var(--grey-200)' }} />
+        {/* Skeleton tabs */}
+        <div style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)', padding: '0 16px', display: 'flex', gap: '4px' }}>
+          {[100, 70, 60, 80, 90].map((w, i) => (
+            <div key={i} style={{ width: w, height: 36, background: 'var(--grey-200)', margin: '4px 0', borderRadius: 2 }} />
+          ))}
+        </div>
+        {/* Skeleton body */}
+        <div style={{ padding: '16px', display: 'grid', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: 'var(--border-light)' }}>
+            {[0,1,2,3].map(i => <div key={i} style={{ background: 'var(--white)', height: 64 }} />)}
+          </div>
+          <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', height: 200, borderRadius: 2 }} />
+          <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', height: 120, borderRadius: 2 }} />
+        </div>
         {!organizationId && (
-          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '8pt' }}>
+          <div style={{ textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)', padding: '20px' }}>
             No organization ID found in URL
           </div>
         )}
         {loadError && (
-          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '8pt' }}>
+          <div style={{ textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)', padding: '20px' }}>
             {loadError}
           </div>
         )}
@@ -1921,12 +1960,47 @@ export default function OrganizationProfile() {
     : ((organization as any)?.logo_url || null);
 
   return (
-    <div style={{ 
-      background: 'var(--bg, #f5f5f5)', 
+    <div style={{
+      background: 'var(--bg, #f5f5f5)',
       color: 'var(--text, #2a2a2a)',
       minHeight: '100vh',
       width: '100%'
     }}>
+      {/* Toast notifications */}
+      {toasts.length > 0 && ReactDOM.createPortal(
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 99999,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          pointerEvents: 'none',
+        }}>
+          {toasts.map(toast => (
+            <div
+              key={toast.id}
+              style={{
+                padding: '10px 16px',
+                background: toast.type === 'success' ? '#1a472a' : toast.type === 'error' ? '#7f1d1d' : '#1a1a2e',
+                color: '#fff',
+                fontSize: '9pt',
+                fontFamily: 'var(--font-family)',
+                fontWeight: 500,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                maxWidth: '320px',
+                pointerEvents: 'all',
+                animation: 'fadeIn 0.15s ease',
+              }}
+            >
+              {toast.message}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+
       {/* HEADER */}
       <div style={{
         position: 'sticky',
@@ -1969,6 +2043,22 @@ export default function OrganizationProfile() {
               background: 'var(--grey-50)',
             }}>
               {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
+            </span>
+          )}
+
+          {/* Verification badge */}
+          {organization.verification_level && organization.verification_level !== 'none' && organization.verification_level !== 'unverified' && (
+            <span style={{
+              fontSize: '7pt',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              padding: '2px 8px',
+              border: '1px solid #c8e6c9',
+              background: '#e8f5e9',
+              color: '#2e7d32',
+            }}>
+              {organization.verification_level === 'verified' ? 'Verified' : organization.verification_level}
             </span>
           )}
 
@@ -2079,7 +2169,7 @@ export default function OrganizationProfile() {
                 padding: '8px 12px',
                 fontSize: '9pt',
                 cursor: 'pointer',
-                fontFamily: 'Arial, sans-serif',
+                fontFamily: 'var(--font-family)',
                 textTransform: 'capitalize',
                 color: activeTab === tab ? 'var(--accent)' : 'var(--text)'
               }}
@@ -2135,50 +2225,33 @@ export default function OrganizationProfile() {
             </div>
             )}
 
-            {/* Business docs for advisors / investment board — always visible on org overview */}
-            {organization && organizationId && (
+            {/* Business docs for advisors — only show for owners or when data room has been granted */}
+            {organization && organizationId && (isOwner || dataRoomAccessGranted) && (
               <div style={{
                 marginBottom: '16px',
-                padding: '16px 20px',
+                padding: '12px 16px',
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
-                borderRadius: '8px',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
+                justifyContent: 'space-between',
                 gap: 12,
               }}>
                 <div>
-                  <div style={{ fontSize: '11pt', fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-                    Business docs for investment board
+                  <div style={{ fontSize: '9pt', fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>
+                    Business documents
                   </div>
-                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                    Deck, business plan, data room — what advisors need to show the board.
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    Deck, business plan, data room
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (isOwner || dataRoomAccessGranted) {
-                      setActiveTab('offering');
-                    } else {
-                      setShowDataRoomGate(true);
-                    }
-                  }}
-                  style={{
-                    padding: '10px 18px',
-                    background: 'var(--error, #dc2626)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 8,
-                    fontWeight: 600,
-                    fontSize: '10pt',
-                    cursor: 'pointer',
-                  }}
+                  onClick={() => setActiveTab('offering')}
+                  className="button button-secondary button-small"
+                  style={{ fontSize: '8pt', padding: '4px 12px', whiteSpace: 'nowrap' }}
                 >
-                  {isOwner || dataRoomAccessGranted ? 'View business docs' : 'Request access'}
+                  View docs
                 </button>
               </div>
             )}

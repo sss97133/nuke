@@ -165,7 +165,7 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
           <li>Engine bay analysis</li>
           <li>Spec identification from photos</li>
         </ol>
-        <p><strong>Current status:</strong> Active development. Phase 3 of 5 complete. The architecture and training pipeline are established; the models improve as labeled data accumulates from our 33M+ image database. Not all classification layers are production-deployed — this is a training structure in progress, not a finished product.</p>
+        <p><strong>Current status:</strong> Phase 5 of 5 complete. EfficientNet-B0 model trained and exported to ONNX. Production sidecar deployed (FastAPI on Modal). The full classification pipeline is operational — zone detection, hierarchical make/family classification, and condition scoring are running. Inference: ~4ms per image on dedicated hardware. The model improves continuously as labeled data accumulates from our 33M+ image database.</p>
         <p><strong>Why domain-specific matters:</strong> Generic object detection can't distinguish a patina'd original from surface rust, or a stock interior from a period-correct restore. YONO is trained specifically on vehicles — that domain specificity is what makes it useful for valuation context rather than just image sorting.</p>
       </div>
     ),
@@ -571,34 +571,118 @@ export default function InvestorOffering() {
 
   // === RENDER: ACCESS CODE GATE ===
   if (phase === 'gate') {
+    // Key stats shown publicly before gate — visible before access code
+    const gateStats = [
+      { label: 'Vehicles tracked', value: '18,000+', note: 'collector & collector-adjacent' },
+      { label: 'Images indexed', value: '33M+', note: 'from 15+ auction sources' },
+      { label: 'Auction events', value: '200K+', note: 'with real transaction prices' },
+      { label: 'Platform AUM gap', value: '<$100M', note: 'in a $37B annual market' },
+    ];
+
     return (
       <div style={{
-        padding: 'var(--space-6)',
-        maxWidth: '500px',
-        margin: '80px auto',
+        minHeight: '100vh',
+        background: 'var(--bg, #f5f5f5)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        padding: '48px 20px 40px',
       }}>
+        {/* Top wordmark */}
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <div style={{
+            fontSize: '11pt',
+            fontWeight: 'bold',
+            letterSpacing: '4px',
+            textTransform: 'uppercase',
+            color: 'var(--text)',
+          }}>
+            NUKE
+          </div>
+          <div style={{
+            fontSize: '9pt',
+            color: 'var(--text-muted)',
+            marginTop: '4px',
+            letterSpacing: '1px',
+          }}>
+            Collector Vehicle Data Platform
+          </div>
+        </div>
+
+        {/* Headline */}
+        <div style={{
+          maxWidth: '680px',
+          textAlign: 'center',
+          marginBottom: '36px',
+        }}>
+          <h1 style={{
+            fontSize: '22pt',
+            fontWeight: 800,
+            margin: '0 0 12px 0',
+            color: 'var(--text)',
+            lineHeight: 1.15,
+          }}>
+            The data infrastructure for<br />collector vehicle investing
+          </h1>
+          <p style={{
+            fontSize: '11pt',
+            color: 'var(--text-muted)',
+            margin: 0,
+            lineHeight: 1.6,
+          }}>
+            33 million vehicle images. Real transaction prices across 15+ auction platforms.
+            Fractional ownership with NAV grounded in actual auction closes — not appraisals.
+          </p>
+        </div>
+
+        {/* Public stats grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '1px',
+          background: 'var(--border-light)',
+          border: '1px solid var(--border-medium)',
+          marginBottom: '36px',
+          width: '100%',
+          maxWidth: '560px',
+        }}>
+          {gateStats.map((s, i) => (
+            <div key={i} style={{
+              background: 'var(--white)',
+              padding: '20px 24px',
+            }}>
+              <div style={{ fontSize: '20pt', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
+                {s.value}
+              </div>
+              <div style={{ fontSize: '9pt', fontWeight: 600, color: 'var(--text)', marginTop: '4px' }}>
+                {s.label}
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {s.note}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Gate box */}
         <div style={{
           background: 'var(--white)',
           border: '2px solid var(--border-medium)',
-          padding: 'var(--space-8)',
+          padding: '28px 32px',
+          width: '100%',
+          maxWidth: '400px',
         }}>
-          {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
-            <h1 style={{
-              fontSize: '16pt',
-              fontWeight: 'bold',
-              margin: 0,
-              letterSpacing: '1px',
-            }}>
-              NUKE
-            </h1>
-            <div style={{
-              fontSize: '9pt',
-              color: 'var(--text-muted)',
-              marginTop: 'var(--space-2)',
-            }}>
-              Investment Offering Portal
-            </div>
+          <div style={{
+            fontSize: '8pt',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            color: 'var(--text-muted)',
+            marginBottom: '16px',
+            textAlign: 'center',
+          }}>
+            Investor Data Room
           </div>
 
           {/* Access Code Input */}
@@ -621,10 +705,10 @@ export default function InvestorOffering() {
               placeholder="Enter your access code"
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '10px 12px',
                 border: `2px solid ${codeError ? 'var(--error)' : 'var(--border-medium)'}`,
                 fontFamily: 'var(--font-family)',
-                fontSize: '10pt',
+                fontSize: '11pt',
                 background: 'var(--grey-50)',
                 boxSizing: 'border-box',
               }}
@@ -641,7 +725,7 @@ export default function InvestorOffering() {
             onClick={handleAccessCode}
             style={{
               width: '100%',
-              padding: '10px',
+              padding: '12px',
               background: '#1a1a1a',
               color: '#fff',
               border: '2px solid #1a1a1a',
@@ -660,13 +744,33 @@ export default function InvestorOffering() {
             fontSize: '7pt',
             color: 'var(--text-disabled)',
             textAlign: 'center',
-            marginTop: 'var(--space-4)',
-            lineHeight: '1.5',
+            marginTop: '14px',
+            lineHeight: '1.6',
           }}>
-            This portal contains confidential information.<br />
-            Access is logged and monitored. Unauthorized access is prohibited.<br />
-            Contact info@nuke.ag for access credentials.
+            Access is logged and monitored.<br />
+            Contact <a href="mailto:info@nuke.ag" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>info@nuke.ag</a> for credentials.
           </div>
+        </div>
+
+        {/* Competitor context strip */}
+        <div style={{
+          marginTop: '32px',
+          maxWidth: '560px',
+          width: '100%',
+          padding: '14px 20px',
+          background: 'var(--white)',
+          border: '1px solid var(--border-light)',
+          fontSize: '8pt',
+          color: 'var(--text-muted)',
+          lineHeight: 1.7,
+          textAlign: 'center',
+        }}>
+          The entire fractional vehicle market is under $100M AUM — less than 0.3% fractionalized.
+          Rally raised $112M, has 9 cars, and was SEC-fined $350K in 2023.
+          Nuke tracks 1.25M vehicles with real transaction prices. The gap is the opportunity.{' '}
+          <a href="/market/competitors" style={{ color: 'var(--text)', textDecoration: 'underline', fontWeight: 600 }}>
+            Full competitive analysis →
+          </a>
         </div>
       </div>
     );
@@ -848,19 +952,41 @@ export default function InvestorOffering() {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '8px',
       }}>
         <div>
-          <div style={{ fontSize: '8pt', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-            NUKE INVESTOR DATA ROOM
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '10pt', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase' }}>
+              NUKE
+            </span>
+            <span style={{ fontSize: '8pt', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' }}>
+              Investor Data Room
+            </span>
           </div>
-          <div style={{ fontSize: '7pt', color: 'var(--text-disabled)', marginTop: '2px' }}>
-            Session: {sessionId.substring(0, 8)} | Viewer: {viewerName} | Since: {accessGrantedAt ? new Date(accessGrantedAt).toLocaleTimeString() : ''}
+          <div style={{ fontSize: '7pt', color: 'var(--text-disabled)', marginTop: '3px' }}>
+            {viewerName && <span>{viewerName}{viewerOrg ? ` · ${viewerOrg}` : ''} · </span>}
+            Session {sessionId.substring(0, 8)} · {accessGrantedAt ? new Date(accessGrantedAt).toLocaleTimeString() : ''}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
+          <a
+            href="mailto:info@nuke.ag?subject=Nuke%20Investment%20Inquiry"
+            style={{
+              fontSize: '8pt',
+              fontWeight: 600,
+              padding: '5px 12px',
+              background: '#1a1a1a',
+              color: '#fff',
+              textDecoration: 'none',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Contact to Invest
+          </a>
           <div style={{
             fontSize: '7pt',
-            padding: '3px 8px',
+            padding: '4px 10px',
             background: '#e8f5e9',
             color: '#2e7d32',
             border: '1px solid #c8e6c9',
@@ -878,22 +1004,26 @@ export default function InvestorOffering() {
         gap: 0,
         marginBottom: 'var(--space-4)',
         borderBottom: '2px solid var(--border-medium)',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch' as any,
       }}>
         {(Object.entries(DOCUMENTS) as [DocTab, typeof DOCUMENTS[DocTab]][]).map(([key, d]) => (
           <button
             key={key}
             onClick={() => setActiveDoc(key)}
             style={{
-              padding: '8px 16px',
+              padding: '10px 16px',
               background: activeDoc === key ? 'var(--white)' : 'var(--grey-100)',
               border: activeDoc === key ? '2px solid var(--border-medium)' : '1px solid var(--border-light)',
               borderBottom: activeDoc === key ? '2px solid var(--white)' : 'none',
               marginBottom: activeDoc === key ? '-2px' : '0',
-              fontSize: '8pt',
+              fontSize: '9pt',
               fontWeight: activeDoc === key ? 'bold' : 'normal',
               cursor: 'pointer',
               fontFamily: 'var(--font-family)',
-              letterSpacing: '0.5px',
+              letterSpacing: '0.3px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             {d.title}
@@ -904,21 +1034,22 @@ export default function InvestorOffering() {
         ))}
 
         {/* Export PDF button */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', flexShrink: 0, paddingLeft: '8px' }}>
           <button
             onClick={handleExportPDF}
             disabled={exportRequested}
             style={{
-              padding: '6px 14px',
+              padding: '8px 16px',
               background: exportRequested ? 'var(--grey-200)' : '#1a1a1a',
               color: exportRequested ? 'var(--text-muted)' : '#fff',
               border: '1px solid var(--border-medium)',
-              fontSize: '7pt',
+              fontSize: '8pt',
               fontWeight: 'bold',
               letterSpacing: '1px',
               textTransform: 'uppercase',
               cursor: exportRequested ? 'default' : 'pointer',
               fontFamily: 'var(--font-family)',
+              whiteSpace: 'nowrap',
             }}
           >
             {exportRequested ? 'PDF Generated' : 'Export PDF'}
@@ -930,21 +1061,22 @@ export default function InvestorOffering() {
       <div style={{
         background: 'var(--white)',
         border: '2px solid var(--border-medium)',
-        padding: 'var(--space-8) var(--space-10)',
+        padding: '32px 48px',
         minHeight: '600px',
       }}>
         {/* Document title bar */}
         <div style={{
-          fontSize: '7pt',
-          color: 'var(--text-disabled)',
+          fontSize: '8pt',
+          color: 'var(--text-muted)',
           borderBottom: '1px solid var(--border-light)',
-          paddingBottom: 'var(--space-2)',
-          marginBottom: 'var(--space-6)',
+          paddingBottom: '8px',
+          marginBottom: '24px',
           display: 'flex',
           justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
-          <span>{doc.subtitle}</span>
-          <span>Nuke - {new Date().toLocaleDateString()}</span>
+          <span style={{ fontWeight: 500 }}>{doc.subtitle}</span>
+          <span style={{ color: 'var(--text-disabled)' }}>Nuke · {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
         </div>
 
         {/* Rendered Markdown */}
@@ -990,15 +1122,16 @@ export default function InvestorOffering() {
               ),
               p: ({ children }) => (
                 <p style={{
-                  fontSize: '9pt', lineHeight: '1.7',
+                  fontSize: '10pt', lineHeight: '1.75',
                   marginBottom: 'var(--space-3)',
+                  color: 'var(--text)',
                 }}>
                   {children}
                 </p>
               ),
               ul: ({ children }) => (
                 <ul style={{
-                  fontSize: '9pt', lineHeight: '1.7',
+                  fontSize: '10pt', lineHeight: '1.75',
                   marginLeft: 'var(--space-6)',
                   marginBottom: 'var(--space-3)',
                 }}>
@@ -1007,7 +1140,7 @@ export default function InvestorOffering() {
               ),
               ol: ({ children }) => (
                 <ol style={{
-                  fontSize: '9pt', lineHeight: '1.7',
+                  fontSize: '10pt', lineHeight: '1.75',
                   marginLeft: 'var(--space-6)',
                   marginBottom: 'var(--space-3)',
                 }}>
