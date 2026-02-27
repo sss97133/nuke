@@ -134,10 +134,34 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
 
   if (loading) {
     return (
-      <div className="app-layout compact win95">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading...</p>
+      <div className="app-layout compact win95" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        {/* Placeholder header keeps layout stable while auth resolves */}
+        <div
+          style={{
+            height: 40,
+            background: 'var(--surface)',
+            borderBottom: '2px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 8px',
+          }}
+        >
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', letterSpacing: 1 }}>NUKE</span>
+        </div>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          <div className="loading-spinner" />
+          <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'Arial, sans-serif' }}>
+            Loading...
+          </span>
         </div>
       </div>
     );
