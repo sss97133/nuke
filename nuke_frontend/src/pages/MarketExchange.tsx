@@ -130,9 +130,19 @@ export default function MarketExchange() {
         </div>
 
         {error && (
-          <div style={{ marginTop: '16px', padding: '12px', border: '2px solid var(--border)', background: 'var(--surface)' }}>
-            <div style={{ fontWeight: 700, marginBottom: '4px' }}>Error</div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{error}</div>
+          <div style={{ marginTop: '16px', padding: '16px', border: '2px solid #f59e0b', background: 'rgba(245, 158, 11, 0.08)' }}>
+            <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '10pt' }}>⚠️ BETA — Under Construction</div>
+            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              The market exchange is in development. Current status:
+            </div>
+            <ul style={{ fontSize: '9pt', color: 'var(--text-muted)', margin: '0', paddingLeft: '20px' }}>
+              <li>Fund structure exists, pricing engine functional</li>
+              <li>Awaiting SEC Reg A+ filing (12-18 months)</li>
+              <li>No active trading until regulatory compliance complete</li>
+            </ul>
+            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '12px', fontStyle: 'italic' }}>
+              Technical error: {error}
+            </div>
           </div>
         )}
 
