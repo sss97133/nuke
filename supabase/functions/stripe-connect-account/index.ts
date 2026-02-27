@@ -4,18 +4,22 @@
  *   POST { action: "create" }    — create V2 connected account
  *   POST { action: "get_link" }  — create onboarding account link
  *   POST { action: "status" }    — retrieve account status from Stripe directly
+ *
+ * SECURITY: All actions require a valid JWT (authenticated user).
+ *   - "create" and "get_link" require the caller to be authenticated.
+ *   - "status" additionally validates that the requested account belongs to the caller.
+ *   - "get_link" additionally validates ownership before issuing an onboarding link.
  */
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import Stripe from 'https://esm.sh/stripe@17?target=deno'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
+// CORS: restrict to nuke.ag origin only
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://nuke.ag',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-
-// TODO: set STRIPE_WEBHOOK_SECRET in Supabase secrets
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -31,15 +35,29 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')!
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')!
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')!
     const sb = createClient(supabaseUrl, serviceRoleKey)
 
-    // Get the calling user from Authorization header
+    // --- AUTH GUARD: every action requires an authenticated user ---
     const authHeader = req.headers.get('Authorization') || ''
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')!
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { 'content-type': 'application/json', ...corsHeaders } }
+      )
+    }
+
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     })
-    const { data: { user } } = await userClient.auth.getUser()
+    const { data: { user }, error: authError } = await userClient.auth.getUser()
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required — invalid or expired token' }),
+        { status: 401, headers: { 'content-type': 'application/json', ...corsHeaders } }
+      )
+    }
 
     const body = await req.json()
     const { action } = body
@@ -78,17 +96,17 @@ Deno.serve(async (req) => {
         },
       })
 
-      // Store mapping in DB
-      const userId = user?.id || null
+      // Store mapping in DB — always tied to authenticated user.id
       await sb.from('stripe_connect_accounts').insert({
-        user_id: userId,
+        user_id: user.id,
         stripe_account_id: account.id,
         display_name: displayName,
         contact_email: contactEmail,
       })
 
+      // Return only safe fields — never return the full Stripe account object
       return new Response(
-        JSON.stringify({ account_id: account.id, account }),
+        JSON.stringify({ account_id: account.id }),
         { headers: { 'content-type': 'application/json', ...corsHeaders } }
       )
     }
@@ -100,6 +118,21 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({ error: 'account_id is required' }),
           { status: 400, headers: { 'content-type': 'application/json', ...corsHeaders } }
+        )
+      }
+
+      // OWNERSHIP CHECK: verify this account belongs to the calling user
+      const { data: ownedAccount } = await sb
+        .from('stripe_connect_accounts')
+        .select('id')
+        .eq('stripe_account_id', accountId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!ownedAccount) {
+        return new Response(
+          JSON.stringify({ error: 'Account not found or access denied' }),
+          { status: 403, headers: { 'content-type': 'application/json', ...corsHeaders } }
         )
       }
 
@@ -131,6 +164,21 @@ Deno.serve(async (req) => {
         )
       }
 
+      // OWNERSHIP CHECK: verify this account belongs to the calling user
+      const { data: ownedAccount } = await sb
+        .from('stripe_connect_accounts')
+        .select('id')
+        .eq('stripe_account_id', stripeAccountId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!ownedAccount) {
+        return new Response(
+          JSON.stringify({ error: 'Account not found or access denied' }),
+          { status: 403, headers: { 'content-type': 'application/json', ...corsHeaders } }
+        )
+      }
+
       const account = await (stripeClient as any).v2.core.accounts.retrieve(stripeAccountId, {
         include: ['configuration.merchant', 'requirements'],
       })
@@ -141,13 +189,13 @@ Deno.serve(async (req) => {
       const onboardingComplete =
         requirementsStatus !== 'currently_due' && requirementsStatus !== 'past_due'
 
+      // Return only safe, derived fields — do NOT return the full Stripe account object
       return new Response(
         JSON.stringify({
           account_id: stripeAccountId,
           readyToProcessPayments,
           onboardingComplete,
           requirementsStatus,
-          account,
         }),
         { headers: { 'content-type': 'application/json', ...corsHeaders } }
       )
@@ -158,9 +206,10 @@ Deno.serve(async (req) => {
       { status: 400, headers: { 'content-type': 'application/json', ...corsHeaders } }
     )
   } catch (error: any) {
-    console.error('[stripe-connect-account] error:', error)
+    console.error('[stripe-connect-account] error:', error?.message || String(error))
+    // Do not leak internal error details to clients
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'content-type': 'application/json', ...corsHeaders } }
     )
   }
