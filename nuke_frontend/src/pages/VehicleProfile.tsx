@@ -4097,13 +4097,13 @@ const VehicleProfile: React.FC = () => {
   return (
       <div>
         {/* Back navigation */}
-        <div style={{ padding: '6px 8px', fontSize: '9pt' }}>
+        <div style={{ padding: '8px 12px 4px', maxWidth: '1600px', margin: '0 auto' }}>
           <button
             className="button button-secondary"
-            onClick={() => navigate('/vehicle/list')}
-            style={{ fontSize: '8pt', padding: '2px 8px' }}
+            onClick={() => navigate(-1)}
+            style={{ fontSize: '11px', padding: '4px 12px', letterSpacing: '0.01em' }}
           >
-            &larr; Back to Vehicles
+            &larr; Back
           </button>
         </div>
 
@@ -4252,10 +4252,10 @@ const VehicleProfile: React.FC = () => {
         <div style={{
           display: 'flex',
           alignItems: 'stretch',
-          background: '#1a1a1a',
-          borderTop: '1px solid #333',
-          borderBottom: '2px solid #000',
-          height: 30,
+          background: 'var(--grey-900)',
+          borderTop: '1px solid var(--grey-800)',
+          borderBottom: '2px solid var(--grey-900)',
+          height: 32,
           position: 'sticky',
           top: 0,
           zIndex: 10,
@@ -4269,18 +4269,25 @@ const VehicleProfile: React.FC = () => {
                 onClick={() => setActiveWorkspaceTab(t.id as WorkspaceTabId)}
                 title={t.helper}
                 style={{
-                  padding: '0 20px',
+                  padding: '0 18px',
                   fontSize: '11px',
-                  fontFamily: 'Arial, sans-serif',
-                  fontWeight: 600,
-                  letterSpacing: '0.5px',
+                  fontFamily: 'var(--font-family)',
+                  fontWeight: active ? 700 : 500,
+                  letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                   border: 'none',
                   borderBottom: active ? '2px solid #fff' : '2px solid transparent',
-                  background: active ? '#2a2a2a' : 'transparent',
-                  color: active ? '#fff' : '#999',
+                  background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
                   marginBottom: '-2px',
+                  transition: 'color 0.1s, background 0.1s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.85)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)';
                 }}
               >
                 {t.label}
@@ -4291,7 +4298,7 @@ const VehicleProfile: React.FC = () => {
 
         {/* Main Content - Tab-filtered workspace */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
-          <React.Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '11px' }}>Loading...</div>}>
+          <React.Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>Loading...</div>}>
             {renderWorkspaceContent()}
           </React.Suspense>
         </div>
@@ -4388,7 +4395,7 @@ const VehicleProfile: React.FC = () => {
               </button>
             </div>
             <div style={{ padding: '16px' }}>
-              <React.Suspense fallback={<div style={{ padding: '12px', color: '#999' }}>Loading...</div>}>
+              <React.Suspense fallback={<div style={{ padding: '12px', color: 'var(--text-muted)' }}>Loading...</div>}>
                 <VehicleOwnershipPanel
                   vehicle={vehicle}
                   session={session}

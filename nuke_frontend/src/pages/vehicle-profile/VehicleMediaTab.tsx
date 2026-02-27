@@ -21,7 +21,7 @@ const VehicleMediaTab: React.FC<VehicleMediaTabProps> = ({
   permissions
 }) => {
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading gallery...</div>}>
         <ImageGallery
           vehicleId={vehicle.id}

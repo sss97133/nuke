@@ -37,7 +37,7 @@ const VehicleComparablesTab: React.FC<VehicleComparablesTabProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Primary: Automated Similar Sales from auction_events + vehicles */}
-      <div className="card" style={{ padding: '24px' }}>
+      <div className="card">
         <SimilarSalesSection
           vehicleId={vehicle.id}
           vehicleYear={vehicle.year}

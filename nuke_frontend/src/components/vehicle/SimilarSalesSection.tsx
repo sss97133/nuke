@@ -61,12 +61,18 @@ function formatPrice(price: number): string {
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays < 1) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
   if (diffDays < 30) return `${diffDays}d ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+  const months = Math.floor(diffDays / 30);
+  if (months < 12) return `${months}mo ago`;
   const years = Math.floor(diffDays / 365);
+  const remMonths = Math.floor((diffDays - years * 365) / 30);
+  if (remMonths > 0) return `${years}yr ${remMonths}mo ago`;
   return `${years}yr ago`;
 }
 
@@ -149,18 +155,18 @@ export function SimilarSalesSection({
 
   if (loading) {
     return (
-      <div style={{ padding: '24px' }}>
-        <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: 'var(--text)' }}>
+      <div style={{ padding: '20px 20px 16px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '16px', color: 'var(--text)' }}>
           Similar Sales
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
           {[1, 2, 3].map((i) => (
             <div key={i} style={{
-              height: '140px',
-              borderRadius: '8px',
-              backgroundColor: 'var(--bg)',
+              height: '100px',
+              borderRadius: '6px',
+              backgroundColor: 'var(--surface)',
               border: '1px solid var(--border-light)',
-              animation: 'pulse 1.5s ease-in-out infinite',
+              opacity: 0.6,
             }} />
           ))}
         </div>
@@ -178,20 +184,21 @@ export function SimilarSalesSection({
 
   if (sales.length === 0) {
     return (
-      <div style={{ padding: '24px', textAlign: 'center' }}>
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>—</div>
-        <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text)', marginBottom: '4px' }}>
+      <div style={{ padding: '32px 24px', textAlign: 'center' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>
           No comparable sales found
         </div>
-        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          No sold {vehicleYear} {vehicleMake} {vehicleModel} (±2yr) in the database yet.
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+          No sold {vehicleYear ?? ''} {vehicleMake ?? ''} {vehicleModel ?? ''} (±2 years) in our database yet.
+          <br />
+          More comps are added daily as auctions close.
         </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div style={{ padding: '20px 20px 16px' }}>
       {/* Header + Stats */}
       <div style={{
         display: 'flex',
@@ -202,16 +209,17 @@ export function SimilarSalesSection({
         gap: '12px',
       }}>
         <div>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '3px' }}>
             Similar Sales
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            {vehicleYear - 2}–{vehicleYear + 2} {vehicleMake} {vehicleModel} · {sales.length} sold
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            {vehicleYear != null ? `${vehicleYear - 2}–${vehicleYear + 2} ` : ''}{vehicleMake} {vehicleModel}
+            {' '}&middot; {sales.length} sold
           </div>
         </div>
 
         {summary && (
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <StatPill label="Avg" value={formatPrice(summary.avg_price)} accent />
             <StatPill label="Median" value={formatPrice(summary.median_price)} />
             <StatPill label="Range" value={`${formatPrice(summary.min_price)} – ${formatPrice(summary.max_price)}`} />
@@ -222,8 +230,8 @@ export function SimilarSalesSection({
       {/* Sales Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-        gap: '12px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '10px',
         marginBottom: '12px',
       }}>
         {displayedSales.map((sale, i) => (
@@ -239,14 +247,15 @@ export function SimilarSalesSection({
             style={{
               background: 'none',
               border: '1px solid var(--border-light)',
-              borderRadius: '6px',
-              padding: '6px 16px',
-              fontSize: '13px',
+              borderRadius: '4px',
+              padding: '5px 16px',
+              fontSize: '12px',
               color: 'var(--text-muted)',
               cursor: 'pointer',
+              letterSpacing: '0.02em',
             }}
           >
-            {showAll ? `Show fewer` : `Show all ${sales.length} sales`}
+            {showAll ? 'Show fewer' : `Show all ${sales.length} sales`}
           </button>
         </div>
       )}
