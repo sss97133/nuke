@@ -3,34 +3,78 @@
 
 ---
 
+## INTER-VP BRIEFS (read before starting work)
+
+### 📋 VP Deal Flow → VP Extraction — 2026-02-26
+190 pipeline entries have null asking_price → all score 40/FAIR. CL price scraping stalled.
+**File**: `.claude/VP_DEAL_FLOW_TO_EXTRACTION_BRIEF.md`
+
+### 📋 VP Intel → VP Extraction — 2026-02-26
+Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring pipeline.
+**File**: `.claude/VP_INTEL_TO_EXTRACTION_BRIEF.md`
+
+---
+
 ## CURRENTLY ACTIVE
 
-### YONO Vision V2 — BACKGROUND TRAINING 2026-02-26
-- All 4 phases + zone system done. Background processes still running.
-- **Training PID 68092**: train_florence2.py — epoch 3/10, loss 3.86, cond_acc 75%
-  - DO NOT interrupt. Saves to yono/models/yono_vision_v2_head.safetensors when done.
-- **Watcher PID 80532**: wait_then_train_zones.sh — auto-launches zone classifier when PID 68092 finishes
-  - Zone training will start automatically: train_zone_classifier.py --epochs 15
-  - Logs: yono/outputs/zone_classifier/training.log
-- **Zone labeling**: COMPLETE (2764/2764 records labeled)
-- **server.py fix**: `_zone_classifier` global declaration bug fixed
+### Worker — Vehicle Deduplication — 2026-02-26
+- Task: 3f77edb7 — dedup vehicles by listing_url (1.07M rows → ~39K distinct)
+- Building merge PL/pgSQL function + dedup edge function
+- Touching: supabase/functions/dedup-vehicles/ (new), vehicle_merge_proposals table
+- DO NOT: modify vehicles table directly without checking merged_into_vehicle_id
 
-### Extraction Quality Sprint — ACTIVE 2026-02-26 (continued after context compression)
-- **Phase 1** (earlier): CQP routing fixes: mecum→extract-mecum, ebay→extract-ebay-motors, gooding sourceIds. C&B 7-day cache TTL removed.
-- **Phase 2** (this session): **CRITICAL DESCRIPTION FIXES**:
-  - **extract-mecum**: Added `parseBlocksDescription()` — parses HIGHLIGHTS + EQUIPMENT from Gutenberg blocks (post.content was always empty!). Description rate 0%→60%+. Quality 0.73→0.93.
-  - **extract-bonhams Phase 2**: Footnotes parsing, markdown title fallback, vehicle_id top-level fix.
-  - **extract-bonhams Phase 3**: Firecrawl trigger fixed (`!hasLotContent` only — React shell always has JSON-LD + 120KB, old `(!hasJsonLd || html.length < 5000)` was always false). Added inline body extraction (paragraphs between lot title H2 and `## Additional information`). Result: **0% → 66% description rate**, avg 3,564 chars.
-  - **35K Mecum backfill**: Reset mecum items completed before 2026-02-20 to pending for re-extraction.
-  - **Crons added**: 231-232 (mecum-queue-worker-4,5), 233-234 (gooding-queue-worker-1,2)
-  - **Crons removed**: 229, 230 (bad re_enrich workers)
-- **Current queue**: mecum 54.5K/828hr (~66h), C&B 30.5K/984hr (~31h), B-J 22.7K/1931hr (~12h), PCar 5K/157hr (~32h), BaT 3.6K/832hr (~4h), Bonhams 2.4K/573hr (~4h), Gooding 1.3K/187hr (~7h)
+
+### VP AI — Tier-2 ONNX Upload & Modal Redeploy — 2026-02-26 23:06
+- Task: fdf5038f — waiting for PID 12814 (zone) + PID 39959 (tier2 watcher) to complete
+- Will: upload tier-2 ONNX to Modal volume yono-data, redeploy sidecar, validate
+- DO NOT: kill PID 12814 or PID 39959
+
+
+### VP Deal Flow — Transfer System Coordination — 2026-02-26
+- Audited full transfer pipeline. Brief at `.claude/VP_DEAL_FLOW_TRANSFER_BRIEF.md`
+- Coordinating with CPO, CTO, CFO, VP Platform
+- Touching: no files yet — in coordination phase
+
+
+
+
+### YONO Vision V2 — BACKGROUND TRAINING 2026-02-26
+- All 4 phases + zone system done. Florence2 v2 COMPLETE (yono_vision_v2_head.safetensors saved).
+- **Zone classifier PID 12814**: train_zone_classifier.py — epoch 5/15, val_acc ~69%, ~31min/epoch
+  - DO NOT interrupt. Log: yono/outputs/zone_classifier/training.log
+- **Watcher PID 39959**: wait_then_train_hier_tier2.sh — waiting for zone (PID 12814) to finish
+  - Will train tier-2 families: german, british, japanese, italian, french, swedish (american already done)
+  - Then runs --export for all ONNX files
+  - Log: yono/outputs/hierarchical/tier2_remaining.log
+  - Next step after export: upload ONNX files to Modal volume yono-data
+  - DO NOT kill PID 39959 or PID 12814
+- **Watcher PID 80532**: wait_then_train_zones.sh — stale, zone already running; may relaunch zone on finish (low risk, checkpoint exists)
+- **Zone labeling**: COMPLETE (2764/2764 records labeled)
+
+### [vp-platform] Platform health check complete — 2026-02-27 03:00 UTC
+- Fixed 4 broken cron commands (jobs 128, 186, 213, 235) using stale current_setting() calls
+- Quality backfill 237-240 confirmed ACTIVE (COO note was stale — already re-enabled)
+- Filed incident P70 (bat-snapshot timeout) and P60 (mecum-live 50% fail rate)
+
+### Extraction Quality Sprint — ACTIVE 2026-02-26→27 (context compressed 2x)
+- **Phase 1-3**: Mecum description 0→60%+, Bonhams 0→66%, routing fixes, Gooding workers added
+- **Phase 4 (this session — post-compression)**: Pipeline throughput fixes:
+  - **mecum-live-queue-workers 251-255**: Fixed broken JSON syntax (`current_setting()` → `get_service_role_key_for_cron()`). Were failing every tick since creation. Now draining 35K Mecum Live Auctions queue at 384/hr.
+  - **bat-snapshot-parser jobs 173-174**: Were running 80-110s (PL/pgSQL), holding slots past next tick, causing alternating all-fail minutes. Changed from `* * * * *` → `*/3 * * * *`.
+  - **Cascade fixed**: Per-minute jobs now 30 (was 32), 0 failures per minute (was all-fail every other minute).
+- **Current queue (2026-02-27 02:15)**: MecumLive 35K/384hr (~91h), C&B 30K/480hr (~62h), B-J 18.5K/318hr (~58h), Mecum 17.5K/372hr (~47h), PCar 2.7K/132hr (~21h), BaT 1.1K/318hr (~3.5h), Gooding ~30min, Bonhams ~30min
 - **DO NOT**: touch quality_backfill_state, recreate idx_vehicles_quality_score/backfill indexes; touch C&B snapshot cache logic; kill PIDs 34496 or 5727
+- **Quality backfill paused** (jobs 237-240 deactivated) — was causing 73% failure rate on mecum via row-lock contention. Re-enable after queues drain.
 
 ### Queue Coordinator — ACTIVE 2026-02-26 20:00 (this terminal)
-- **Crons added**: 217-222 (Mecum/PCarMarket workers), 228 (quality backfill v2 with DO block + temp table)
-- **DB changes**: Dropped idx_vehicles_quality_score + idx_vehicles_quality_backfill, created quality_backfill_state, quick_quality_backfill_v3
-- **DO NOT**: recreate the dropped quality score indexes (backfill in progress, takes 69hrs); touch quality_backfill_state
+- **Crons added**: 217-222 (Mecum/PCarMarket workers), 237-240 (quality backfill workers 1-4, sharded)
+- **DB changes**: Dropped idx_vehicles_quality_score + idx_vehicles_quality_backfill, created quality_backfill_state (now with range_min/range_max), quick_quality_backfill_v3
+- **Quality backfill sharding (2026-02-26 22:55)**: Job 228 replaced by 4 parallel workers (237-240)
+  - Worker 1 (job 237): id < 40000000..., no sleep, cursor at 03bc1ea8 (18750 done)
+  - Worker 2 (job 238): 40000000... ≤ id < 80000000..., sleep 15s, fresh
+  - Worker 3 (job 239): 80000000... ≤ id < c0000000..., sleep 30s, fresh
+  - Worker 4 (job 240): id ≥ c0000000..., sleep 45s, fresh (no upper bound)
+- **DO NOT**: recreate the dropped quality score indexes (backfill in progress); drop or reset quality_backfill_state rows
 
 ### Vehicle Profile Page — COMPLETED 2026-02-26
 - All 4 tabs finished. See DONE.md for details. Committed 5a915f327.
@@ -46,19 +90,20 @@
 - VehicleHeader.tsx: drift fixes + transfer status badge (milestone label, progress %, days stale, buyer handle)
 - Backfill cron (job 190) running every 2 min. Committed 6e346eba7, pushed, Vercel deploying.
 
-### YONO Training + Export — BACKGROUND JOBS 2026-02-26 (current session)
-- **Tier 2 training** PID 34496: `train_hierarchical.py --all` running since 2:00 AM, training on MPS
-  - Progress: tier 1 done (hier_family.onnx), american epoch 1+ done (12:32), continuing through german/japanese/etc
-  - DO NOT kill PID 34496
-- **Supabase export** PID 5727 (or check supabase_export.pid): ctid-based export, --skip-download mode
-  - Progress: ~27% (808K/2923K blocks), writing to training-data/images/batch_0103+
-  - ETA: ~1 hour to complete all 838K records
-  - DO NOT kill or restart this export
+### YONO Training + Export — COMPLETED 2026-02-26
+- PID 34496 (`train_hierarchical.py --all`): DONE — trained family + american, skipped others (insufficient data at time)
+  - hier_family_best.pt ✓, hier_american_best.pt ✓
+  - Remaining families handed off to PID 39959 (see YONO Vision V2 above)
+- Supabase image export PID 5727: DONE — training-data/images fully exported
 
-### YONO FastAPI Sidecar — COMPLETED 2026-02-26
+### YONO FastAPI Sidecar — COMPLETED 2026-02-27
 - Deployed to Modal: https://sss97133--yono-serve-fastapi-app.modal.run
-- YONO_SIDECAR_URL set in Supabase, yono-classify full round-trip validated
-- Both agent_tasks (P85 + P100) marked completed
+- Added /analyze + /analyze/batch endpoints (Florence-2 + finetuned_v2 head, 9-10s/image on CPU)
+- Uploaded yono_vision_v2_head.safetensors, yono_vision_v2_config.json, hier_family.onnx.data to Modal volume
+- Florence-2-base pre-baked into Modal image (fast cold start)
+- YONO_SIDECAR_URL set in Supabase + local .env
+- yono-classify: validated (make=american, ms=40.9)
+- yono-analyze: validated (zone=ext_driver_side, mode=finetuned_v2)
 
 ---
 
@@ -99,3 +144,24 @@
 - idx_vehicles_quality_score and idx_vehicles_quality_backfill DROPPED (required to get under 2min timeout)
 - Indexes will need RECREATING after backfill completes (~69 hours from now)
 - quality_backfill_state table tracks cursor (last_vehicle_id)
+
+
+### CWFTO — Brief COMPLETED 2026-02-27 03:40 UTC
+- Filed 3 follow-up tasks, COO replied, next loop scheduled (P92)
+
+### Craigslist Listing Verification — ACTIVE 2026-02-26
+- Checking 4 Corvette listings (Seattle, Portland, Sacramento x2)
+- No file writes — read-only research task
+
+### VP Intel — Comparable Sales Feature — 2026-02-27 06:00
+- Task: Build "Similar Sales" section for vehicle profile pages (top user request)
+- Creating: VehicleSimilarSales.tsx component + API endpoint
+- Editing: VehicleProfile.tsx (add Similar Sales tab)
+- DO NOT: modify vehicle profile layout structure (just adding new tab)
+
+### VP Platform — Search UI Fixes — 2026-02-27 03:50 UTC
+- Task: Fix search results UI to show actual data (tier ratings, observation counts, filters, VIN search)
+- Backend already returns image_count + event_count correctly
+- Frontend needs to display prominently in VehicleCardDense.tsx and Search.tsx
+- Touching: nuke_frontend/src/components/vehicles/VehicleCardDense.tsx, nuke_frontend/src/pages/Search.tsx
+- DO NOT: modify backend APIs (already working)
