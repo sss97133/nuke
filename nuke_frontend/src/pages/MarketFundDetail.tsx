@@ -29,6 +29,15 @@ type FundRow = {
   };
 };
 
+type HoldingVehicle = {
+  id: string;
+  year: number;
+  make: string;
+  model: string;
+  sale_price: number | null;
+  thumbnail: string | null;
+};
+
 const EXCHANGE_API = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-v1-exchange`;
 
 const formatUSD0 = (value: number) =>
@@ -84,6 +93,8 @@ export default function MarketFundDetail() {
   const [buying, setBuying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [holdings, setHoldings] = useState<HoldingVehicle[]>([]);
+  const [holdingsLoading, setHoldingsLoading] = useState(false);
 
   const parsedAmountUSD = useMemo(() => {
     const v = Number(amount);
@@ -126,6 +137,11 @@ export default function MarketFundDetail() {
           const bal = await CashBalanceService.getUserBalance(user.id);
           setCashCents(bal?.available_cents || 0);
         }
+
+        // Fetch representative vehicles from the segment universe
+        if (json.fund?.segment) {
+          fetchHoldings(json.fund.segment).catch(() => {});
+        }
       } catch (e: any) {
         console.error('Failed to load market fund:', e);
         setError('Unable to load fund data. Please try again.');
@@ -134,6 +150,45 @@ export default function MarketFundDetail() {
       }
     })();
   }, [symbol, session]);
+
+  const fetchHoldings = async (seg: NonNullable<FundRow['segment']>) => {
+    setHoldingsLoading(true);
+    try {
+      const { makes, year_min, year_max, model_keywords } = seg;
+
+      // Build query for vehicles matching segment criteria
+      let q = supabase
+        .from('vehicles')
+        .select('id, year, make, model, sale_price, vehicle_images(url, is_primary)')
+        .not('sale_price', 'is', null)
+        .order('sale_price', { ascending: false })
+        .limit(48);
+
+      if (makes && makes.length > 0) q = q.in('make', makes);
+      if (year_min) q = q.gte('year', year_min);
+      if (year_max) q = q.lte('year', year_max);
+      if (model_keywords && model_keywords.length > 0) {
+        const orFilter = model_keywords.map(kw => `model.ilike.%${kw}%`).join(',');
+        q = q.or(orFilter);
+      }
+
+      const { data, error: qErr } = await q;
+      if (qErr) throw qErr;
+
+      const processed: HoldingVehicle[] = (data || []).map((v: any) => {
+        const images: { url: string; is_primary: boolean }[] = v.vehicle_images || [];
+        const primary = images.find(i => i.is_primary);
+        const thumbnail = primary?.url || images[0]?.url || null;
+        return { id: v.id, year: v.year, make: v.make, model: v.model, sale_price: v.sale_price, thumbnail };
+      });
+
+      setHoldings(processed.slice(0, 12));
+    } catch (e) {
+      console.error('Failed to load holdings:', e);
+    } finally {
+      setHoldingsLoading(false);
+    }
+  };
 
   const handleBuy = async () => {
     if (!fund) return;
@@ -347,6 +402,137 @@ export default function MarketFundDetail() {
               {(fund?.stats?.vehicle_count || 0).toLocaleString()}
             </div>
           </div>
+        </div>
+
+        {/* Holdings section */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ fontSize: 'var(--fs-10)', fontWeight: 800 }}>Fund Holdings</span>
+              <span style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginLeft: '10px' }}>
+                {fund.stats?.vehicle_count
+                  ? `${fund.stats.vehicle_count.toLocaleString()} vehicles tracked in index`
+                  : 'Representative sample'}
+              </span>
+            </div>
+            {holdings.length > 0 && (
+              <span style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>
+                Showing top {holdings.length} by sale price
+              </span>
+            )}
+          </div>
+
+          {holdingsLoading ? (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: '10px',
+            }}>
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  background: 'var(--surface)',
+                  animation: 'pulse 1.5s ease-in-out infinite',
+                }}>
+                  <div style={{ height: '120px', background: 'var(--border)' }} />
+                  <div style={{ padding: '10px', display: 'grid', gap: '6px' }}>
+                    <div style={{ height: '12px', background: 'var(--border)', borderRadius: '2px', width: '80%' }} />
+                    <div style={{ height: '10px', background: 'var(--border)', borderRadius: '2px', width: '50%' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : holdings.length > 0 ? (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: '10px',
+            }}>
+              {holdings.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => navigate(`/vehicle/${v.id}`)}
+                  style={{
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    background: 'var(--surface)',
+                    padding: 0,
+                    display: 'block',
+                    width: '100%',
+                    transition: 'box-shadow 0.12s ease, border-color 0.12s ease',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.1)';
+                    e.currentTarget.style.borderColor = 'var(--primary)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                  }}
+                >
+                  {/* Image */}
+                  <div style={{
+                    height: '120px',
+                    background: 'var(--bg)',
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}>
+                    {v.thumbnail ? (
+                      <img
+                        src={v.thumbnail}
+                        alt={`${v.year} ${v.make} ${v.model}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 'var(--fs-9)',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 700,
+                      }}>
+                        {v.year} {v.make}
+                      </div>
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div style={{ padding: '10px' }}>
+                    <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, lineHeight: 1.3, marginBottom: '4px' }}>
+                      {v.year} {v.make} {v.model}
+                    </div>
+                    {v.sale_price ? (
+                      <div style={{ fontSize: 'var(--fs-9)', color: 'var(--success)', fontWeight: 800 }}>
+                        {formatUSD0(v.sale_price)}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>—</div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              padding: '32px',
+              textAlign: 'center',
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+              background: 'var(--surface)',
+              fontSize: 'var(--fs-9)',
+              color: 'var(--text-secondary)',
+            }}>
+              No vehicles currently match this segment's criteria.
+            </div>
+          )}
         </div>
 
         {/* Cards row */}
