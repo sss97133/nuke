@@ -1846,6 +1846,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 {(() => {
                   const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
                   if (!tierLabel) return null;
+                  const totalObservations = (vehicle.image_count || 0) + (vehicle.event_count || 0);
                   return (
                     <span
                       style={{ fontWeight: 700, cursor: 'pointer', position: 'relative' }}
@@ -1856,7 +1857,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>
                         {tierLabel}
                       </span>{' '}
-                      tier
+                      tier · {totalObservations} data {totalObservations === 1 ? 'point' : 'points'}
                     </span>
                   );
                 })()}
@@ -2702,6 +2703,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             {(() => {
               const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
               if (!tierLabel) return null;
+              const totalObservations = (vehicle.image_count || 0) + (vehicle.event_count || 0);
               return (
                 <span
                   style={{ fontWeight: 700, cursor: 'pointer' }}
@@ -2710,7 +2712,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 >
                   <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>{tierLabel}</span>{' '}
-                  tier
+                  tier · {totalObservations} data {totalObservations === 1 ? 'point' : 'points'}
                 </span>
               );
             })()}
