@@ -26,11 +26,12 @@ interface SearchResponse {
 
 interface IntelligentSearchProps {
   onSearchResults: (results: SearchResult[], summary: string) => void;
+  onSearchStart?: () => void;
   initialQuery?: string;
   userLocation?: { lat: number; lng: number };
 }
 
-const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }: IntelligentSearchProps) => {
+const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', userLocation }: IntelligentSearchProps) => {
   const navigate = useNavigate();
   const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
   const [query, setQuery] = useState(initialQuery);
@@ -259,6 +260,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     if (!searchQuery.trim()) return;
 
     const trimmedQuery = searchQuery.trim();
+    onSearchStart?.();
 
     // Fast-path: allow `/search?q=<uuid>` to jump directly to a vehicle profile.
     // Without this, UUIDs won't match make/model/description searches and you'll get "No Results Found".
@@ -813,7 +815,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     } finally {
       setIsSearching(false);
     }
-  }, [userLocation, onSearchResults]);
+  }, [userLocation, onSearchResults, onSearchStart]);
 
   // Update query when initialQuery changes
   useEffect(() => {

@@ -698,6 +698,7 @@ export default function Search() {
           initialQuery={searchQuery}
           userLocation={userLocation}
           onSearchResults={handleSearchResults}
+          onSearchStart={() => setLoading(true)}
         />
       </div>
 

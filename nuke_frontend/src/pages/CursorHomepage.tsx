@@ -1066,7 +1066,8 @@ const CursorHomepage: React.FC = () => {
 
       if (error) {
         const missingColumn = getMissingColumn(error);
-        if (missingColumn?.startsWith('canonical_') || missingColumn === 'engine') {
+        if (missingColumn) {
+          // Any unrecognized column → fall back to the minimal selectV1 query
           result = await runVehicleQuery(selectV1);
           applyResult(result);
         }

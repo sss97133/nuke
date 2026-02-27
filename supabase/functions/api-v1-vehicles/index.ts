@@ -267,7 +267,7 @@ serve(async (req) => {
 
         return new Response(
           JSON.stringify({
-            data,
+            vehicles: data,
             pagination: {
               page,
               limit,
