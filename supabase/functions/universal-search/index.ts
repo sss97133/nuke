@@ -117,8 +117,16 @@ serve(async (req) => {
     const rlHeaders = rateLimitHeaders(rl, RATE_LIMIT_CONFIG.maxRequests);
     // ──────────────────────────────────────────────────────────────────────────
 
-    const body: SearchRequest = await req.json().catch(() => ({} as any));
-    const { query = '', limit = 20, types, includeAI = true } = body;
+    // Support both GET (?query=...) and POST (JSON body)
+    const url = new URL(req.url);
+    const urlParams = url.searchParams;
+    const body: SearchRequest = req.method === 'GET' ? {} as any : await req.json().catch(() => ({} as any));
+
+    const query: string = urlParams.get('query') ?? body.query ?? '';
+    const limitRaw = urlParams.get('limit') ?? body.limit;
+    const limit: number = limitRaw ? Number(limitRaw) : 20;
+    const types: string[] | undefined = urlParams.get('types')?.split(',') ?? body.types;
+    const includeAI: boolean = urlParams.has('includeAI') ? urlParams.get('includeAI') !== 'false' : (body.includeAI ?? true);
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       return new Response(JSON.stringify({
