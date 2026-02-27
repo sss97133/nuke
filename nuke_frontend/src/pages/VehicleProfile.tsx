@@ -7,7 +7,6 @@ import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
 import { useAdminAccess } from '../hooks/useAdminAccess';
-import { useIsMobile } from '../hooks/useIsMobile';
 import { TimelineEventService } from '../services/timelineEventService';
 // Lazy-load heavy tab-specific and modal components
 const AddEventWizard = React.lazy(() => import('../components/AddEventWizard'));
@@ -203,8 +202,6 @@ const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useIsMobile();
-
   // All state hooks must be declared before any conditional returns
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   // Initialize session from localStorage cache so loadVehicle() doesn't have to
