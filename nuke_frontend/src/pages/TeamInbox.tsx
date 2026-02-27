@@ -132,7 +132,7 @@ function RolePill({ role }: { role: string }) {
     <span style={{
       display: 'inline-block',
       padding: '1px 6px',
-      fontSize: '7pt',
+      fontSize: '9px',
       fontFamily: 'monospace',
       fontWeight: 600,
       color: '#fff',
@@ -155,7 +155,7 @@ function StatusBadge({ status }: { status: InboxEmail['status'] }) {
   return (
     <span style={{
       padding: '1px 5px',
-      fontSize: '7pt',
+      fontSize: '9px',
       borderRadius: 2,
       fontFamily: 'monospace',
       ...styles[status],
@@ -178,7 +178,7 @@ function UnreadBadge({ count }: { count: number }) {
       borderRadius: 999,
       background: 'var(--error)',
       color: '#fff',
-      fontSize: '8pt',
+      fontSize: '11px',
       fontWeight: 700,
       fontFamily: 'monospace',
       lineHeight: 1,
@@ -328,7 +328,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                 onClick={() => setStatusFilter(f)}
                 style={{
                   padding: '2px 7px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   background: statusFilter === f ? 'var(--primary)' : 'transparent',
                   color: statusFilter === f ? '#fff' : 'var(--text-muted)',
                   border: '1px solid var(--border)',
@@ -349,7 +349,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
               onClick={() => setMailboxFilter('all')}
               style={{
                 padding: '2px 7px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 background: mailboxFilter === 'all' ? 'var(--grey-800)' : 'transparent',
                 color: mailboxFilter === 'all' ? '#fff' : 'var(--text-muted)',
                 border: '1px solid var(--border)',
@@ -368,7 +368,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   onClick={() => setMailboxFilter(addr)}
                   style={{
                     padding: '2px 7px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     background: mailboxFilter === addr ? (MAILBOX_COLORS[addr] || 'var(--grey-800)') : 'transparent',
                     color: mailboxFilter === addr ? '#fff' : (MAILBOX_COLORS[addr] || 'var(--text-muted)'),
                     border: `1px solid ${MAILBOX_COLORS[addr] || 'var(--border)'}`,
@@ -396,9 +396,9 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
           background: 'var(--bg)',
         }}>
           {loading ? (
-            <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: '9pt' }}>loading...</div>
+            <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: '12px' }}>loading...</div>
           ) : emails.length === 0 ? (
-            <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: '9pt' }}>
+            <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: '12px' }}>
               {alertsOnly ? 'No alert emails received' : 'No emails in this view'}
             </div>
           ) : (
@@ -422,7 +422,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
                     )}
                     <span style={{
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       color: email.status === 'unread' ? 'var(--text)' : 'var(--text-muted)',
                       fontWeight: email.status === 'unread' ? 600 : 400,
                       whiteSpace: 'nowrap',
@@ -434,7 +434,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                     <span style={{
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       padding: '1px 5px',
                       borderRadius: 2,
                       background: MAILBOX_COLORS[email.to_address] || 'var(--grey-800)',
@@ -443,14 +443,14 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                     }}>
                       {email.to_address.split('@')[0]}
                     </span>
-                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                       {timeAgo(email.received_at)}
                     </span>
                   </div>
                 </div>
 
                 <div style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   color: email.status === 'unread' ? 'var(--text)' : 'var(--text-muted)',
                   marginTop: 3,
                   whiteSpace: 'nowrap',
@@ -463,7 +463,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
 
                 {!selected && (
                   <div style={{
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-muted)',
                     marginTop: 2,
                     whiteSpace: 'nowrap',
@@ -478,7 +478,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   const urls = extractVehicleUrls(email.body_text);
                   return urls.length > 0 ? (
                     <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                         {urls.length} vehicle URL{urls.length !== 1 ? 's' : ''}
                       </span>
                     </div>
@@ -506,20 +506,20 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '10pt', color: 'var(--text)', fontWeight: 600, wordBreak: 'break-word' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 600, wordBreak: 'break-word' }}>
                     {selected.subject}
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 4 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 4 }}>
                     From: <span style={{ color: 'var(--text)' }}>
                       {selected.from_name ? `${selected.from_name} <${selected.from_address}>` : selected.from_address}
                     </span>
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     To: <span style={{ color: MAILBOX_COLORS[selected.to_address] || 'var(--text)' }}>
                       {selected.to_address}
                     </span>
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace' }}>
                     {new Date(selected.received_at).toLocaleString()}
                   </div>
                 </div>
@@ -530,7 +530,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                       <button
                         onClick={() => archiveEmail(selected.id)}
                         style={{
-                          fontSize: '8pt', padding: '2px 7px',
+                          fontSize: '11px', padding: '2px 7px',
                           background: 'var(--surface-hover)', color: 'var(--text-muted)',
                           border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
                         }}
@@ -540,7 +540,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                       <button
                         onClick={() => markSpam(selected.id)}
                         style={{
-                          fontSize: '8pt', padding: '2px 7px',
+                          fontSize: '11px', padding: '2px 7px',
                           background: 'var(--surface-hover)', color: 'var(--error)',
                           border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
                         }}
@@ -552,7 +552,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   <button
                     onClick={() => setSelected(null)}
                     style={{
-                      fontSize: '8pt', padding: '2px 7px',
+                      fontSize: '11px', padding: '2px 7px',
                       background: 'var(--surface-hover)', color: 'var(--text-muted)',
                       border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
                     }}
@@ -572,7 +572,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   borderBottom: '1px solid var(--border)',
                   background: 'var(--surface)',
                 }}>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 6, fontFamily: 'monospace', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 6, fontFamily: 'monospace', textTransform: 'uppercase' }}>
                     Vehicle URLs ({urls.length})
                   </div>
                   {urls.map((url, i) => (
@@ -582,7 +582,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           color: 'var(--primary)',
                           wordBreak: 'break-all',
                           textDecoration: 'none',
@@ -602,11 +602,11 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
               {selected.body_html ? (
                 <div
                   dangerouslySetInnerHTML={{ __html: selected.body_html }}
-                  style={{ fontSize: '10pt', color: 'var(--text)', lineHeight: 1.6, maxWidth: 700 }}
+                  style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, maxWidth: 700 }}
                 />
               ) : selected.body_text ? (
                 <pre style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   color: 'var(--text)',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
@@ -618,16 +618,16 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   {selected.body_text}
                 </pre>
               ) : (
-                <div style={{ color: 'var(--text-muted)', fontSize: '9pt' }}>(no body content)</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>(no body content)</div>
               )}
 
               {selected.attachments && selected.attachments.length > 0 && (
                 <div style={{ marginTop: 16, padding: '8px 12px', background: 'var(--surface)', borderRadius: 4, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>
                     Attachments ({selected.attachments.length})
                   </div>
                   {selected.attachments.map((att: any, i: number) => (
-                    <div key={i} style={{ fontSize: '9pt', color: 'var(--text)' }}>
+                    <div key={i} style={{ fontSize: '12px', color: 'var(--text)' }}>
                       {att.filename} ({att.content_type})
                     </div>
                   ))}
@@ -650,7 +650,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                     border: '1px solid var(--border)',
                     borderRadius: 3,
                     padding: 8,
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     fontFamily: 'monospace',
                     resize: 'vertical',
                     boxSizing: 'border-box',
@@ -658,7 +658,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                  <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                     Sending from {selected.to_address}
                   </span>
                   <button
@@ -666,7 +666,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                     disabled={sending || !replyText.trim()}
                     style={{
                       padding: '4px 14px',
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       background: replyText.trim() && !sending ? 'var(--primary)' : 'var(--surface-hover)',
                       color: replyText.trim() && !sending ? '#fff' : 'var(--text-muted)',
                       border: 'none',
@@ -743,19 +743,19 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
         boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <span style={{ fontSize: '10pt', fontWeight: 600, color: 'var(--text)' }}>New Message to Agent</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>New Message to Agent</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16 }}>×</button>
         </div>
 
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: '8pt', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>To Role</label>
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>To Role</label>
           <select
             value={toRole}
             onChange={e => setToRole(e.target.value)}
             style={{
               width: '100%',
               padding: '6px 8px',
-              fontSize: '9pt',
+              fontSize: '12px',
               background: 'var(--bg)',
               color: 'var(--text)',
               border: '1px solid var(--border)',
@@ -771,7 +771,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
         </div>
 
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: '8pt', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>Subject</label>
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>Subject</label>
           <input
             type="text"
             value={subject}
@@ -780,7 +780,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
             style={{
               width: '100%',
               padding: '6px 8px',
-              fontSize: '9pt',
+              fontSize: '12px',
               background: 'var(--bg)',
               color: 'var(--text)',
               border: '1px solid var(--border)',
@@ -793,7 +793,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: '8pt', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>Message</label>
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>Message</label>
           <textarea
             value={body}
             onChange={e => setBody(e.target.value)}
@@ -802,7 +802,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
             style={{
               width: '100%',
               padding: '6px 8px',
-              fontSize: '9pt',
+              fontSize: '12px',
               background: 'var(--bg)',
               color: 'var(--text)',
               border: '1px solid var(--border)',
@@ -817,7 +817,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{
-            padding: '5px 14px', fontSize: '9pt',
+            padding: '5px 14px', fontSize: '12px',
             background: 'var(--surface-hover)', color: 'var(--text-muted)',
             border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
           }}>
@@ -827,7 +827,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
             onClick={send}
             disabled={sending || !toRole || !subject.trim() || !body.trim()}
             style={{
-              padding: '5px 14px', fontSize: '9pt',
+              padding: '5px 14px', fontSize: '12px',
               background: toRole && subject.trim() && body.trim() && !sending ? 'var(--primary)' : 'var(--surface-hover)',
               color: toRole && subject.trim() && body.trim() && !sending ? '#fff' : 'var(--text-muted)',
               border: 'none', borderRadius: 2, cursor: 'pointer',
@@ -927,7 +927,7 @@ function MessagesTab() {
           onClick={() => setShowCompose(true)}
           style={{
             padding: '4px 12px',
-            fontSize: '8pt',
+            fontSize: '11px',
             background: 'var(--primary)',
             color: '#fff',
             border: 'none',
@@ -940,13 +940,13 @@ function MessagesTab() {
           + New Message
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '8pt' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px' }}>
           <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>to:</span>
           <select
             value={toFilter}
             onChange={e => setToFilter(e.target.value)}
             style={{
-              fontSize: '8pt', padding: '2px 6px',
+              fontSize: '11px', padding: '2px 6px',
               border: '1px solid var(--border)', borderRadius: 2,
               background: 'var(--bg)', color: 'var(--text)',
               fontFamily: 'monospace',
@@ -957,13 +957,13 @@ function MessagesTab() {
           </select>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '8pt' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px' }}>
           <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>from:</span>
           <select
             value={fromFilter}
             onChange={e => setFromFilter(e.target.value)}
             style={{
-              fontSize: '8pt', padding: '2px 6px',
+              fontSize: '11px', padding: '2px 6px',
               border: '1px solid var(--border)', borderRadius: 2,
               background: 'var(--bg)', color: 'var(--text)',
               fontFamily: 'monospace',
@@ -974,7 +974,7 @@ function MessagesTab() {
           </select>
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '8pt', cursor: 'pointer', fontFamily: 'monospace' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px', cursor: 'pointer', fontFamily: 'monospace' }}>
           <input
             type="checkbox"
             checked={unreadOnly}
@@ -984,12 +984,12 @@ function MessagesTab() {
         </label>
 
         {unreadCount > 0 && (
-          <span style={{ fontSize: '8pt', color: 'var(--error)', fontFamily: 'monospace', marginLeft: 4 }}>
+          <span style={{ fontSize: '11px', color: 'var(--error)', fontFamily: 'monospace', marginLeft: 4 }}>
             {unreadCount} unread (founder)
           </span>
         )}
 
-        <span style={{ fontSize: '8pt', color: 'var(--text-muted)', marginLeft: 'auto', fontFamily: 'monospace' }}>
+        <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto', fontFamily: 'monospace' }}>
           {loading ? '...' : `${messages.length} messages`}
         </span>
       </div>
@@ -1005,9 +1005,9 @@ function MessagesTab() {
           transition: 'width 0.15s ease',
         }}>
           {loading ? (
-            <div style={{ padding: 20, fontSize: '9pt', color: 'var(--text-muted)' }}>Loading...</div>
+            <div style={{ padding: 20, fontSize: '12px', color: 'var(--text-muted)' }}>Loading...</div>
           ) : messages.length === 0 ? (
-            <div style={{ padding: 20, fontSize: '9pt', color: 'var(--text-muted)' }}>No messages.</div>
+            <div style={{ padding: 20, fontSize: '12px', color: 'var(--text-muted)' }}>No messages.</div>
           ) : (
             messages.map(msg => (
               <div
@@ -1028,16 +1028,16 @@ function MessagesTab() {
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
                     )}
                     <RolePill role={msg.from_role} />
-                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>→</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                     <RolePill role={msg.to_role} />
                   </div>
-                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace', flexShrink: 0 }}>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', flexShrink: 0 }}>
                     {timeAgo(msg.created_at)}
                   </span>
                 </div>
                 <div style={{
                   marginTop: 4,
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: msg.read_at == null ? 600 : 400,
                   color: 'var(--text)',
                   whiteSpace: 'nowrap',
@@ -1049,7 +1049,7 @@ function MessagesTab() {
                 {!selected && (
                   <div style={{
                     marginTop: 2,
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-muted)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -1075,16 +1075,16 @@ function MessagesTab() {
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                 <div>
-                  <div style={{ fontSize: '9pt', fontWeight: 600, color: 'var(--text)' }}>{selected.subject}</div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{selected.subject}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                     <RolePill role={selected.from_role} />
-                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>→</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                     <RolePill role={selected.to_role} />
                     {selected.sent_via === 'resend' && (
-                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>(real email)</span>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>(real email)</span>
                     )}
                   </div>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'monospace' }}>
                     {new Date(selected.created_at).toLocaleString()}
                     {selected.thread_id && <span> · thread: {selected.thread_id.slice(0, 8)}</span>}
                   </div>
@@ -1092,7 +1092,7 @@ function MessagesTab() {
                 <button
                   onClick={() => { setSelected(null); setThread([]); }}
                   style={{
-                    all: 'unset', cursor: 'pointer', fontSize: '8pt',
+                    all: 'unset', cursor: 'pointer', fontSize: '11px',
                     color: 'var(--text-muted)', padding: '3px 8px',
                     border: '1px solid var(--border)', borderRadius: 2,
                   }}
@@ -1105,7 +1105,7 @@ function MessagesTab() {
             <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
               {thread.length > 1 ? (
                 <div>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: 12, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 12, fontFamily: 'monospace' }}>
                     {thread.length} messages in thread
                   </div>
                   {thread.map((m, idx) => (
@@ -1115,14 +1115,14 @@ function MessagesTab() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                         <RolePill role={m.from_role} />
-                        <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>→</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                         <RolePill role={m.to_role} />
-                        <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', marginLeft: 'auto' }}>
                           {timeAgo(m.created_at)}
                         </span>
                       </div>
                       <pre style={{
-                        fontSize: '8pt', color: 'var(--text)',
+                        fontSize: '11px', color: 'var(--text)',
                         whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                         lineHeight: 1.5, margin: 0, fontFamily: 'monospace',
                       }}>
@@ -1133,7 +1133,7 @@ function MessagesTab() {
                 </div>
               ) : (
                 <pre style={{
-                  fontSize: '8pt', color: 'var(--text)',
+                  fontSize: '11px', color: 'var(--text)',
                   whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   lineHeight: 1.6, margin: 0, fontFamily: 'monospace',
                 }}>
@@ -1206,7 +1206,7 @@ export default function TeamInbox() {
 
   if (authLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-muted)', fontSize: '12px' }}>
         Loading...
       </div>
     );
@@ -1241,7 +1241,7 @@ export default function TeamInbox() {
         <div style={{
           padding: '12px 12px 8px',
           borderBottom: '1px solid var(--border)',
-          fontSize: '9pt',
+          fontSize: '12px',
           fontWeight: 700,
           color: 'var(--text)',
           textTransform: 'uppercase',
@@ -1266,7 +1266,7 @@ export default function TeamInbox() {
                 border: 'none',
                 cursor: 'pointer',
                 textAlign: 'left',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontFamily: 'monospace',
                 fontWeight: activeTab === tab.key ? 600 : 400,
                 borderLeft: activeTab === tab.key ? '3px solid var(--primary)' : '3px solid transparent',
@@ -1278,7 +1278,7 @@ export default function TeamInbox() {
           ))}
         </nav>
 
-        <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', fontSize: '7pt', color: 'var(--text-muted)' }}>
+        <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', fontSize: '9px', color: 'var(--text-muted)' }}>
           nuke.ag mailboxes
         </div>
       </div>
