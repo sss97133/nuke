@@ -19,10 +19,46 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
-### Frontend Worker — Market/Portfolio UI Fixes — 2026-02-27
-- Fixing all UI/UX issues on Market Exchange, Market Dashboard, and Portfolio pages
-- Touching: nuke_frontend/src/pages/MarketExchange.tsx, MarketDashboard.tsx, MarketFundDetail.tsx, Portfolio.tsx
-- DO NOT: modify api-v1-exchange edge function core logic
+### VP AI — Zone Classifier + Bearer Auth + interior_quality — 2026-02-27 11:20 UTC — COMPLETE
+- Zone classifier: uploaded safetensors to Modal, redeployed, live (72.8% val_acc, 41 classes)
+- Bearer token auth: added to modal_serve.py, yono-classify, yono-analyze, yono-vision-worker
+- interior_quality + zone_source: columns added to vehicle_images, worker updated to write them
+- Task ba1593fd (TTLRM P88): COMPLETED — NO-GO, 3D reconstruction paper, not relevant to YONO
+- Task b6b693ab (Bearer auth P75): COMPLETED — deployed and verified
+- Upload script: fixed to include zone files + --zone-only + --no-deploy flags + auto redeploy
+- REMOVED: session complete
+
+### VP Vehicle Intel — Session Audit + Cron Gap Filing — 2026-02-27 11:40 UTC
+- Diagnosing: VIN decode, signal score, nuke_estimate, exchange health
+- Touching: agent_tasks (inserts only), DONE.md, ACTIVE_AGENTS.md
+- Key finding: batch-vin-decode NOT DEPLOYED, no crons for compute-vehicle-valuation or analyze-market-signals
+- DO NOT touch: compute-vehicle-valuation, analyze-market-signals functions
+
+### Worker Agent — Gmail Alert Poller — 2026-02-27
+- Building: `scripts/gmail-poller.mjs` (OAuth2 Gmail poller → process-alert-email)
+- Also building: `supabase/functions/gmail-alert-poller/index.ts` (edge function for cron)
+- Also creating: DB migration for `alert_email_log` table (if needed)
+- Touching: scripts/gmail-poller.mjs, supabase/functions/gmail-alert-poller/, supabase/migrations/
+- DO NOT: modify process-alert-email/index.ts
+
+### Frontend Worker — TeamInbox Page — 2026-02-27
+- Building: /nuke_frontend/src/pages/TeamInbox.tsx (unified team email/message communication hub)
+- Touching: nuke_frontend/src/pages/TeamInbox.tsx, nuke_frontend/src/routes/DomainRoutes.tsx, nuke_frontend/src/components/layout/NukeMenu.tsx
+- DO NOT: modify AdminInbox.tsx or AdminAgentInbox.tsx
+
+### VP Photos — Health Check + K10 Vision Audit — 2026-02-27 07:30 UTC
+- Checking: YONO vision worker (jobs 247+248), organization status, K10 photos, agent_tasks
+- Finding: DB pool saturated + PostgREST schema cache reload loop (system-wide incident)
+- yono-keepalive confirms sidecar operational (vision_available=true, uptime=190s)
+- yono-vision-worker deployed v8 at 11:32 UTC today — recently updated
+- K10 photos confirmed: ai_processing_status=completed, vision_analyzed_at=NULL, yono_queued_at=NULL
+  → YONO WILL pick these up (no ai_processing_status filter in claim_yono_vision_batch)
+- Touching: .claude/ACTIVE_AGENTS.md, DONE.md, agent_tasks (when DB recovers)
+- DO NOT: write to ai_processing_status, vision fields directly
+
+
+### Frontend Worker — Market/Portfolio UI Fixes — COMPLETED 2026-02-27
+- Fixed MarketDashboard, MarketExchange, MarketFundDetail, Portfolio. Commit b9ae1497c.
 
 ### COO — Session triage + work order routing — 2026-02-27 11:30 UTC — COMPLETED
 - Checked all VP inboxes (all clear)

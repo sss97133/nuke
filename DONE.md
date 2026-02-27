@@ -5,6 +5,35 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [market] Market Exchange, Fund Detail, Portfolio — comprehensive UX overhaul
+- **MarketDashboard** (/market): replaced "Coming Soon" placeholder with live data dashboard — real fund cards from api-v1-exchange, animated skeleton loading, platform AUM stats strip, CTAs
+- **MarketExchange** (/market/exchange): skeleton loading (4 animated cards), user-friendly error state with Refresh button (no raw error string), BETA badge properly styled, market cap formatted as $X.XXB/M/K, font sizes → CSS vars
+- **MarketFundDetail** (/market/exchange/:symbol): full skeleton loading (no flash of "Fund not found"), not-found state with CTA, removed "MVP: shares issued at NAV" dev note visible to investors, shares preview calculation, sign-in CTA for anon users, NAV hero strip, error/success use --error-dim/--success-dim backgrounds
+- **Portfolio** (/market/portfolio): h1/value cards use proper font sizes (var --fs-12), tabs refactored from 8 copy-paste blocks to single data-driven loop, empty shares state has "Browse Funds" CTA, removed alert() from org stocks click, raw px → CSS vars throughout
+- Commit: b9ae1497c
+
+### [yono] Zone classifier live + Bearer token auth + interior_quality — VP AI session
+- **Zone classifier uploaded to Modal**: yono_zone_head.safetensors (2.1MB), yono_zone_classifier_labels.json, yono_zone_config.json → `yono-data /models/`
+- **Zone classifier integrated in modal_serve.py**: `_load_zone_classifier()` loads ZoneClassifierHead (768→512→256→41 zones); used in both `_analyze_finetuned` and `_analyze_zeroshot` via `_classify_zone(features)` on shared Florence-2 encoder output
+- **Health endpoint**: now reports `zone_classifier: true, zone_classes: 41`
+- **zone_source field**: `zone_classifier_v1` (when ZoneClassifierHead active) vs `photo_type_heuristic` (fallback)
+- **DB migration applied**: `interior_quality smallint` + `zone_source text` added to vehicle_images (applied via port 5432, NOT VALID check constraint)
+- **yono-vision-worker updated**: now writes `interior_quality` and `zone_source` to vehicle_images on every analysis
+- **Bearer token auth**: `nuke-sidecar-secrets` Modal secret created, token stored in Supabase secrets + .env; `auth_middleware` added to modal_serve.py (GET /health exempt); yono-classify, yono-analyze, yono-vision-worker all pass `Authorization: Bearer $MODAL_SIDECAR_TOKEN`
+- **Verified**: GET /health → 200 (no auth), POST /classify no token → 401, POST /classify with token → 200
+- **Upload script rewritten**: `yono/scripts/upload_tier2_to_modal.sh` now includes zone files, --zone-only, --no-deploy flags, auto-runs `modal deploy` after upload
+- **Tasks completed**: ba1593fd (TTLRM eval, NO-GO), b6b693ab (Bearer auth, DONE)
+- **Training status**: German tier-2 running (PID 28401, epoch 4/25), watcher PID 7390 waiting; zone classifier DONE (72.8% val_acc)
+
+### [deal-flow] Transfer system audit + wiring — VP Deal Flow session
+- **Twilio status**: Local .env has placeholder values (your-twilio-account-sid). Supabase secrets were set to those placeholders = Twilio returns 401 invalid username. Filed CFO task (P92) to fund account + set real credentials.
+- **Crons 223-227**: NOT re-enabled. Would fire ~300K SMS/email to historical auction buyers/sellers. Two blockers: (1) Twilio not configured, (2) transfer-automator needs suppress_notifications param before backfill safe to run.
+- **stripe-webhook wired to transfer-automator**: On `checkout.session.completed` with purchase_type=vehicle_transaction → now calls transfer-advance:advance_manual for payment_confirmed milestone. Two paths: (a) transfer_id in session.metadata (preferred), (b) fallback lookup via vehicle_transactions.ownership_transfer_id FK.
+- **vehicle_transactions.ownership_transfer_id**: New FK column added via migration 20260227120000_vehicle_transactions_transfer_fk.sql. Links System B (Stripe facilitation fee) to System A (ownership_transfers milestone process).
+- **get_transfer bug fixed**: Was returning "{error: '[object Object]'}" — now properly extracts error.message from Supabase error objects. Deployed.
+- **Confirmed working**: ownership_transfers columns (inbox_email, buyer_access_token, seller_access_token, buyer_phone, buyer_email, seller_phone, seller_email) already exist in DB. Migration 20260227110000 documenting this for repo consistency.
+- **Schema cache note**: DB pool heavily saturated during session (PGRST002 on all PostgREST queries). Edge functions using direct Supabase client still functional. Will recover as cron activity reduces.
+
 ### [frontend] Vehicle profile page — comprehensive UX quality pass — commit 475c6ce1b
 - VehicleProfileTabs: rewrote tab bar with human-readable labels (Overview/Media/Specs/Comps/Taxonomy/Bids), URL deep-linking via ?tab=, hover states, comps count badge
 - VehicleComparablesTab: fixed double padding (card wrapper + SimilarSalesSection both had padding)
