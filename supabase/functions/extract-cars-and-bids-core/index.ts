@@ -667,6 +667,8 @@ serve(async (req) => {
       drivetrain: extracted.drivetrain,
       body_style: extracted.bodyStyle,
       title_status: extracted.titleStatus,
+      // Set primary image from extracted gallery
+      primary_image_url: extracted.images.length > 0 ? extracted.images[0] : null,
       // Rich description: all content sections combined
       description: [
         extracted.dougsTake ? `**Doug's Take:**\n${extracted.dougsTake}` : null,
