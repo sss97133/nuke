@@ -22,6 +22,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@anthropic-ai/claude-agent-sdk@~0.2.62",
         "npm:@anthropic-ai/sdk@~0.71.2",
         "npm:@mendable/firecrawl-js@^4.8.2",
         "npm:@mozilla/readability@0.6",

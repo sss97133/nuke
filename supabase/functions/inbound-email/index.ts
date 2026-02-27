@@ -123,9 +123,11 @@ Deno.serve(async (req) => {
     const toAddresses: string[] = Array.isArray(data.to) ? data.to : [data.to];
     const nukeAddress = toAddresses.find((addr: string) => addr.endsWith("@nuke.ag")) || toAddresses[0];
 
-    // Fetch full email content from Resend API
-    let bodyHtml: string | null = null;
-    let bodyText: string | null = null;
+    // Prefer body content from webhook payload directly (available immediately).
+    // Also attempt to fetch full email content from Resend API for headers and
+    // richer content — but fall back gracefully if the API key lacks read scope.
+    let bodyHtml: string | null = data.html || null;
+    let bodyText: string | null = data.text || null;
     let headers: Record<string, string> | null = null;
 
     try {
@@ -135,8 +137,9 @@ Deno.serve(async (req) => {
 
       if (emailRes.ok) {
         const emailContent = await emailRes.json();
-        bodyHtml = emailContent.html || null;
-        bodyText = emailContent.text || null;
+        // Prefer API response (richer) over webhook payload for content
+        bodyHtml = emailContent.html || bodyHtml;
+        bodyText = emailContent.text || bodyText;
         headers = emailContent.headers || null;
         // Use the API's from field if available (more reliable)
         if (emailContent.from) {
@@ -149,10 +152,10 @@ Deno.serve(async (req) => {
           }
         }
       } else {
-        console.warn(`Failed to fetch email content: ${emailRes.status} ${await emailRes.text()}`);
+        console.warn(`Failed to fetch email content: ${emailRes.status} — using webhook payload body`);
       }
     } catch (fetchErr) {
-      console.warn("Error fetching email content:", fetchErr);
+      console.warn("Error fetching email content (using webhook payload body):", fetchErr);
     }
 
     // Store in database

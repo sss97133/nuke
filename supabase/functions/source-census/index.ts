@@ -1,6 +1,13 @@
 // Source Census Function
 // Counts the universe size for any registered source
 // Usage: POST { "source": "bat" } or { "source": "all" }
+//
+// NOTE: archiveFetch NOT required here — this is a pure census/counting function.
+// All fetch() calls extract only numeric counts (e.g., "X Active Auctions") from
+// page HTML. The HTML content itself is discarded immediately after regex matching.
+// Nothing is stored except the final count numbers (recorded via record_census RPC).
+// Raw fetch() is acceptable for health-check / universe-count functions that do not
+// store or re-process scraped content. — audited 2026-02-27 worker-session-3
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
