@@ -43,22 +43,13 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Upload script: fixed to include zone files + --zone-only + --no-deploy flags + auto redeploy
 - REMOVED: session complete
 
-### VP Vehicle Intel — Session Audit + Cron Gap Filing — 2026-02-27 11:40 UTC
-- Diagnosing: VIN decode, signal score, nuke_estimate, exchange health
-- Touching: agent_tasks (inserts only), DONE.md, ACTIVE_AGENTS.md
-- Key finding: batch-vin-decode NOT DEPLOYED, no crons for compute-vehicle-valuation or analyze-market-signals
-- DO NOT touch: compute-vehicle-valuation, analyze-market-signals functions
-
-### VP Photos — Health Check + K10 Vision Audit — 2026-02-27 07:30 UTC
-- Checking: YONO vision worker (jobs 247+248), organization status, K10 photos, agent_tasks
-- Finding: DB pool saturated + PostgREST schema cache reload loop (system-wide incident)
-- yono-keepalive confirms sidecar operational (vision_available=true, uptime=190s)
-- yono-vision-worker deployed v8 at 11:32 UTC today — recently updated
-- K10 photos confirmed: ai_processing_status=completed, vision_analyzed_at=NULL, yono_queued_at=NULL
-  → YONO WILL pick these up (no ai_processing_status filter in claim_yono_vision_batch)
-- Touching: .claude/ACTIVE_AGENTS.md, DONE.md, agent_tasks (when DB recovers)
-- DO NOT: write to ai_processing_status, vision fields directly
-
+### VP Vehicle Intel — Session Audit + Cron Gap Filing — COMPLETED 2026-02-27 12:00 UTC
+- Deployed: batch-ymm-propagate + batch-vin-decode (both were undeployed)
+- Completed: agent_task 1489e336 (YMM propagation: 286 fields filled across 63 vehicles)
+- Filed: tasks 6fe1a113 (cron jobs P85), f93ef450 (signal coverage P75), 0e57d34a (VIN gap P60)
+- Exchange: confirmed healthy, 4 funds (PORS/SQBD/TRUK/Y79) updating correctly
+- Ran: 8x compute-vehicle-valuation batches manually (~400 new estimates)
+- REMOVED: session complete
 
 ### Frontend Worker — Market/Portfolio UI Fixes — COMPLETED 2026-02-27
 - Fixed MarketDashboard, MarketExchange, MarketFundDetail, Portfolio. Commit b9ae1497c.

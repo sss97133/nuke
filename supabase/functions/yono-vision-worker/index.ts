@@ -47,10 +47,11 @@ function json(body: unknown, status = 200) {
 
 async function checkSidecarVision(): Promise<boolean> {
   try {
-    // 15s timeout — Modal cold start takes 10-12s even with min_containers=1
-    // /health is public (no auth required)
+    // 45s timeout — Modal network from Supabase edge function to Modal can take 30-40s
+    // even when sidecar is warm (min_containers=1 ensures container is ready, but
+    // network routing can be slow). /health is public (no auth required).
     const resp = await fetch(`${SIDECAR_URL}/health`, {
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(45000),
     });
     if (!resp.ok) return false;
     const health = await resp.json();

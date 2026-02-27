@@ -4,6 +4,25 @@
 Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
+
+## 2026-02-27
+
+### [vehicle-intel] VP Vehicle Intel session audit — deployed missing functions, filed cron tasks
+- Deployed batch-ymm-propagate (was NOT deployed): filled 286 factory fields across 63 vehicles in first run
+- Deployed batch-vin-decode (was NOT deployed): dry run shows 37/50 candidates are pre-1981 non-standard VINs (NHTSA won't decode)
+- Completed agent_task 1489e336 (YMM propagation backfill P60): 63 vehicles updated, 286 fields filled
+- Key coverage finding: 513K/1.25M active vehicles have nuke_estimate (40.9%)
+- Exchange health: 4 NAVs updating correctly via update-exchange-prices (PORS/SQBD/TRUK/Y79)
+- Exchange full cycle confirms: ok, 4 navs updated, 0 offerings (no live trades, expected)
+- No crons found for compute-vehicle-valuation, batch-vin-decode, or analyze-market-signals
+- Manually ran 8 valuation batches x50 = ~400 new nuke_estimates computed this session
+- Filed 3 follow-up tasks:
+  - 6fe1a113 (P85, vp-platform): Apply 3 cron jobs via Supabase Dashboard SQL editor
+  - f93ef450 (P75): Signal score coverage — 59% missing, root cause is missing valuation cron
+  - 0e57d34a (P60): VIN decode gap — pre-1981 non-standard VINs, NHTSA can't decode
+- api-v1-exchange error was a false alarm: works with ?action=funds, default action=snapshot also works
+- Migration 20260227140000_vehicle_intel_crons.sql: written, NOT yet applied (migration ordering conflict)
+
 ### [yono] YONO sidecar URL typo fixed — P85 resolved
 - Root cause: YONO_SIDECAR_URL in Supabase Edge Function secrets had typo: sss73133 instead of sss97133
 - Fix: `supabase secrets set YONO_SIDECAR_URL=https://sss97133--yono-serve-fastapi-app.modal.run`
@@ -32,6 +51,14 @@ Agents read this to avoid rebuilding things that already exist.
 - Filed P72 task for vp-photos to design organization pipeline
 
 
+
+### [yono] Scaled YONO vision workers 2→4, Modal sidecar min_containers 1→2
+- Added cron workers 3+4 (jobs 286+287): */2 * * * * → same URL/auth pattern as jobs 247+248
+- Redeployed Modal sidecar (yono-serve) with min_containers=2 → always 2 warm containers
+- New throughput: 4 workers * ~1000 img/hr = 4000 img/hr combined
+- K10 (419 photos): ~6 min to complete at new rate (was ~13 min)
+- All 32M images: ~333 days (was 667 days at 2 workers)
+- To complete in 30 days: need 44 workers — filed as future consideration
 ### [worker] Import queue cleanup + task triage — worker-session-3
 - Closed 8 stale/superseded tasks: 2x BAT queue stall (superseded by process-bat-extraction-queue cron), 2x YONO sidecar unreachable (sidecar verified up), source-census archiveFetch audit (acceptable exception documented), agent type registry
 - Reset 243 failed PCarMarket records to pending (extractor fix was deployed by previous session)

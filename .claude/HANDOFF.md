@@ -1,7 +1,9 @@
-# Auto-Checkpoint — 2026-02-27 07:58:11
+# Auto-Checkpoint — 2026-02-27 08:04:29
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
+9c6c868d4 chore: import queue 381 failed → 0, agent task triage, type registry cleanup
+62a82cf38 chore(worker): import queue cleanup — 381 failures cleared, task triage
 74dbd54a7 feat(extraction): RM Sotheby's description backfill — 1.3% → 6.5% descriptions, cron job 268
 839752278 chore: Gmail poller complete — OAuth setup ready, cron job 265 active
 94d663e42 chore: Resend inbound audit complete — email body fix + alerts routing
@@ -22,12 +24,9 @@ b9ae1497c fix(market): comprehensive UX overhaul — Market Exchange, Fund Detai
 475c6ce1b fix(vehicle-profile): comprehensive UI/UX quality pass across all tabs
 d24aa0ad0 fix(pages): org profile + offering page UX improvements
 94905f224 chore: update ACTIVE_AGENTS + DONE for auth perf session
-05000c396 perf(auth): eliminate auth waterfall — global AuthContext with single cached getSession()
-1ad6c89c7 fix(map): deterministic marker placement, cluster icon contrast, GPS priority
-5a62f7c34 fix(admin/ux): overhaul login UX, admin routing, and first-run onboarding
-a5ebb07b8 fix(ux): global navigation, homepage, mobile, loading states polish
 
 ## Uncommitted Changes
+DONE.md
 mcp-server
 
 ## Staged
