@@ -21,14 +21,14 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
     try {
       setLoading(true);
       
-      // Load vehicles the user owns (user_id) or has verified ownership of
+      // Check both user_id and uploaded_by for vehicle ownership
       let query = supabase
         .from('vehicles')
         .select(`
           *,
           vehicle_images(image_url, is_primary)
         `)
-        .eq('user_id', userId);
+        .or(`user_id.eq.${userId},uploaded_by.eq.${userId},owner_id.eq.${userId}`);
 
       // For public profiles, only show public vehicles
       if (!isOwnProfile) {
