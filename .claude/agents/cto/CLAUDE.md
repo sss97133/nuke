@@ -19,6 +19,9 @@ You do not write code. You write work orders, review approaches, make build-vs-b
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox cto
+
 # What's the current codebase state
 cat CODEBASE_MAP.md
 

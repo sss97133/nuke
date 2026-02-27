@@ -51,6 +51,55 @@ A $200K 1973 Porsche 911 RS should have the same data depth as a publicly traded
 
 ---
 
+## Agent Email System
+
+Every agent has an email address at `nuke.ag`. Use it to communicate with teammates and the founder.
+
+| Role | Email |
+|------|-------|
+| Founder | founder@nuke.ag (real email) |
+| COO | coo@nuke.ag |
+| CTO | cto@nuke.ag |
+| CFO | cfo@nuke.ag |
+| CPO | cpo@nuke.ag |
+| CDO | cdo@nuke.ag |
+| CWFTO | cwfto@nuke.ag |
+| VP AI | vp-ai@nuke.ag |
+| VP Extraction | vp-extraction@nuke.ag |
+| VP Platform | vp-platform@nuke.ag |
+| VP Vehicle Intel | vp-vehicle-intel@nuke.ag |
+| VP Deal Flow | vp-deal-flow@nuke.ag |
+| VP Orgs | vp-orgs@nuke.ag |
+| VP Photos | vp-photos@nuke.ag |
+| VP Docs | vp-docs@nuke.ag |
+| Worker | worker@nuke.ag |
+
+**On session start — check your inbox:**
+```bash
+check-inbox <your-role>
+```
+
+**To send an email:**
+```bash
+send-agent-email --from <your-role> --to <role|all|founder> --subject "Subject" --message "Body"
+```
+
+**Examples:**
+```bash
+# VP AI briefing the founder
+send-agent-email --from vp-ai --to founder --subject "YONO tier 2 complete" --message "Training done. Uploading models now."
+
+# COO asking CTO for architecture review
+send-agent-email --from coo --to cto --subject "Modal sidecar — sign off?" --message "Need your review before we scale."
+
+# CWFTO broadcast morning report
+send-agent-email --from cwfto --to all --subject "Morning Report 2026-02-27" --message "..."
+```
+
+Emails to `founder@nuke.ag` send a **real email** via Resend. All other messages are internal (DB-only, instant). The founder can reply to any agent by emailing `<role>@nuke.ag` — it routes to your inbox automatically.
+
+---
+
 ## Current Sprint (Feb 2026)
 
 **#1 YONO FastAPI sidecar** — blocks SDK v1.3.0. Tier 2 hierarchical model trained, ONNX exported. Sidecar needs to be built and integrated. This is the highest-leverage unblocked item.

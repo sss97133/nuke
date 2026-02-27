@@ -19,6 +19,9 @@ OCR, receipts, service manuals, title documents, the Vault (provenance). Every p
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox vp-docs
+
 dotenvx run -- bash -c 'psql "$DATABASE_URL" -c "SELECT status, COUNT(*) FROM document_ocr_queue GROUP BY status;" 2>/dev/null'
 
 dotenvx run -- bash -c 'psql "$DATABASE_URL" -c "SELECT document_type, COUNT(*) FROM vehicle_documents GROUP BY document_type ORDER BY count DESC;" 2>/dev/null'

@@ -16,6 +16,9 @@ Check for claimed tasks:
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox worker
+
 # See what's assigned to workers
 PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
   SELECT id, priority, agent_type, title, description

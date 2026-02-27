@@ -15,6 +15,9 @@ Turning raw vehicle records into intelligence: valuations, scoring, market data,
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox vp-vehicle-intel
+
 # Vehicle completeness overview
 dotenvx run -- bash -c 'psql "$DATABASE_URL" -c "SELECT COUNT(*) total, COUNT(vin) with_vin, COUNT(nuke_estimate) with_valuation, COUNT(signal_score) with_signal, AVG(data_quality_score) avg_quality FROM vehicles WHERE status='"'"'active'"'"';" 2>/dev/null'
 

@@ -148,3 +148,6 @@ AGENT_COORDINATION.md
 # Analysis reports (generated per session)
 DATA_ANALYSIS_REPORT.md
 NukePhotoSync.app/
+yono/outputs/
+yono/models/*.safetensors
+yono/models/*.pt

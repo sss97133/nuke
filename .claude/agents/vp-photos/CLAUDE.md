@@ -19,6 +19,9 @@ Read `/Users/skylar/nuke/NUKE_COMPANY_BRIEF.md`. Read the Photos section of `/Us
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox vp-photos
+
 dotenvx run -- bash -c 'psql "$DATABASE_URL" -c "SELECT ai_processing_status, COUNT(*) FROM vehicle_images GROUP BY ai_processing_status ORDER BY count DESC;" 2>/dev/null'
 
 dotenvx run -- bash -c 'psql "$DATABASE_URL" -c "SELECT organization_status, COUNT(*) FROM vehicle_images GROUP BY organization_status ORDER BY count DESC;" 2>/dev/null'

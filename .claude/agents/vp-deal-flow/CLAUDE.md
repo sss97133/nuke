@@ -17,6 +17,9 @@ Transfers, transactions, the market exchange, payments, deal jackets, DocuSign, 
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox vp-deal-flow
+
 # Exchange state
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/api-v1-exchange" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | jq
 

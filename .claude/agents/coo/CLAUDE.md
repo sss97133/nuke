@@ -21,6 +21,9 @@ Run this immediately, before responding to anything:
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox coo
+
 # 1. System health
 dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/functions/v1/ralph-wiggum-rlm-extraction-coordinator" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"action\": \"brief\"}"' | jq
 

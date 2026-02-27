@@ -17,6 +17,9 @@ Everything that keeps the system running: edge function deployment, database hea
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox vp-platform
+
 # System health
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/system-health-monitor" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | jq
 
@@ -51,7 +54,10 @@ dotenvx run -- bash -c 'psql "$DATABASE_URL" -c "SELECT agent_type, COUNT(*) FRO
 
 ```bash
 # Deploy a function
-cd /Users/skylar/nuke && supabase functions deploy [name] --no-verify-jwt
+cd /Users/skylar/nuke
+
+# Check your inbox first
+check-inbox vp-platform && supabase functions deploy [name] --no-verify-jwt
 
 # Check logs
 supabase functions logs [name] --tail

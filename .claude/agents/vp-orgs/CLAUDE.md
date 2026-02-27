@@ -17,6 +17,9 @@ Dealers, auction houses, restoration shops, and collector identities. The who be
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox vp-orgs
+
 dotenvx run -- bash -c 'psql "$DATABASE_URL" -c "SELECT type, COUNT(*) FROM organizations GROUP BY type ORDER BY count DESC;" 2>/dev/null'
 
 dotenvx run -- bash -c 'psql "$DATABASE_URL" -c "SELECT COUNT(*) as total_orgs, COUNT(CASE WHEN updated_at > NOW()-INTERVAL '"'"'7 days'"'"' THEN 1 END) as updated_this_week FROM organizations;" 2>/dev/null'

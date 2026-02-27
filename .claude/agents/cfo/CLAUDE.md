@@ -19,6 +19,9 @@ You do not write code. You model costs, flag budget risks, and make the economic
 ```bash
 cd /Users/skylar/nuke
 
+# Check your inbox first
+check-inbox cfo
+
 # Check OpenAI usage (most expensive)
 dotenvx run -- bash -c 'curl -s "https://api.openai.com/v1/usage" -H "Authorization: Bearer $OPENAI_API_KEY"' | jq 2>/dev/null || echo "check OpenAI dashboard"
 
