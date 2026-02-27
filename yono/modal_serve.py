@@ -111,13 +111,16 @@ def _load_onnx_models():
         for family in family_labels:
             t2_path = Path(f"{MODELS_DIR}/hier_{family}.onnx")
             if t2_path.exists():
-                sess = ort.InferenceSession(str(t2_path), providers=["CPUExecutionProvider"])
-                tier2[family] = sess
-                tier2_input = sess.get_inputs()[0].name
-                tier2_labels[family] = sorted(
-                    all_labels.get(f"hier_{family}", {}),
-                    key=lambda k: all_labels[f"hier_{family}"][k]
-                )
+                try:
+                    sess = ort.InferenceSession(str(t2_path), providers=["CPUExecutionProvider"])
+                    tier2[family] = sess
+                    tier2_input = sess.get_inputs()[0].name
+                    tier2_labels[family] = sorted(
+                        all_labels.get(f"hier_{family}", {}),
+                        key=lambda k: all_labels[f"hier_{family}"][k]
+                    )
+                except Exception as e:
+                    print(f"[YONO] Skipping {family} tier-2 (load error: {e})")
         print(f"[YONO] Hierarchical: tier1={bool(tier1_sess)}, tier2={list(tier2.keys())}")
 
     return flat_sess, flat_labels, flat_input, tier1_sess, tier1_input, family_labels, tier2, tier2_labels, tier2_input
@@ -347,7 +350,6 @@ _MOD_KEYWORDS = {
     scaledown_window=600,    # keep warm 10 min after last request
     timeout=600,             # 10 min — batch of 20 images @ ~10s each needs ~200s
 )
-@modal.concurrent(max_inputs=10)
 @modal.asgi_app()
 def fastapi_app():
     import asyncio
