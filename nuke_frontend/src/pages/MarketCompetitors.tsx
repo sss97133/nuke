@@ -44,7 +44,7 @@ const COMPETITORS: Competitor[] = [
     vehiclesOffered: '1.25M tracked',
     aum: '—',
     regulatory: 'MVP',
-    notes: 'Only platform with proprietary transaction data across 15+ auction sources. NAV computed from real market closes, not appraiser estimates.',
+    notes: 'Only platform with proprietary transaction data across 15+ auction sources. NAV computed from real auction closes, not appraiser estimates. Covers every price tier from $5K barn finds to $500K Ferraris.',
     isNuke: true,
   },
   {
@@ -55,25 +55,39 @@ const COMPETITORS: Competitor[] = [
     founded: '2017',
     hq: 'New York, NY',
     model: 'SEC Reg A+, individual asset IPOs + secondary market',
-    minInvestment: '$14.25–$212.50/share',
-    vehiclesOffered: '9 cars ($2.07M total market cap)',
-    aum: 'Undisclosed',
-    regulatory: 'SEC Reg A+',
-    notes: '9 verified car listings: BMW 850CSi ($142.5K, $14.25/share), Porsche 356 Speedster ($425K, $212.50/share), Ford GT ($320K), Aston Martin V8 Vantage ($297.5K), 1985 Ferrari Testarossa ($165K), Lamborghini Jalpa ($135K), Ford Mustang ($82.5K), Lotus Esprit ($77.7K). Saleen S7 ($420K) already exited. Multi-asset: cars share catalog with cards, comics, NFTs, wine.',
+    minInvestment: '$14.25–$212.50/share (cars)',
+    vehiclesOffered: '9 active cars ($2.07M market cap)',
+    aum: '~$40M (all assets)',
+    regulatory: 'SEC Reg A+ · $350K SEC fine 2023',
+    notes: 'Raised $112M total ($175M valuation in 2021), now last round was $0.5M in June 2025 — growth stalled. ~200–250K users (flat since 2021). SEC fined $350K in July 2023 for operating an unregistered securities exchange (2018–2021, $5.8M in secondary trades, 20K investors). 9 car listings: BMW 850CSi ($14.25/share), Porsche 356 ($212.50/share), Saleen S7 already exited. Multi-asset: cars now compete with cards, wine, comics for catalog space.',
   },
   {
     id: 'carcrowd',
     name: 'TheCarCrowd',
     url: 'thecarcrowd.uk',
     tagline: 'Fractional classic car syndicates',
-    founded: '2021',
+    founded: '2019',
     hq: 'Newark, UK',
-    model: 'FCA-regulated car syndicates, 3–8 investors per vehicle',
-    minInvestment: '£25,000–£35,000/allocation',
-    vehiclesOffered: '15 vehicles (12 active, 3 planned)',
-    aum: 'Undisclosed',
-    regulatory: 'FCA (UK)',
-    notes: 'UK-only, accredited-investor level minimums (£25K–£35K per slot). Active: Ferrari F430, Audi R8 V10 manual, Mercedes SLS, Lamborghini Gallardo (1 of 250 gated 6-speed), Porsche 996 GT3 RS (15.53% projected annual return), Aston Martin V12 Vantage. Planned: Ferrari 360 CS, Ferrari 348 TB, Lamborghini Diablo SV. 3–5 year hold, CGT-free structure.',
+    model: 'Private syndicates per car — NOT FCA-regulated',
+    minInvestment: '£2,000–£5,000/slot',
+    vehiclesOffered: '40+ cars (UK syndicate model)',
+    aum: '~£2–8M (est.)',
+    regulatory: '⚠ Explicitly NOT FCA-regulated',
+    notes: 'Their own FAQs state: "not regulated by the UK Financial Conduct Authority." No FSCS protection. Raised ~$2.4M total equity. 7,000+ members. Fees: 12.5% curation upfront + ~3.91%/year + up to 10% of gains on exit — PistonHeads community calculates car must appreciate ~30% before investors break even. Returns (12.6% 2023, 12.7% 2024) are directors\' paper estimates — only 2 confirmed exits. UK-only, no US access.',
+  },
+  {
+    id: 'mcqmarkets',
+    name: 'MCQ Markets',
+    url: 'mcqmarkets.com',
+    tagline: 'Fractional ownership in exotic collector cars',
+    founded: '2022',
+    hq: 'US',
+    model: 'SEC Reg A+, individual car IPOs + secondary market',
+    minInvestment: '$20/share',
+    vehiclesOffered: 'Lamborghini Countach 5000QV, Lexus LFA, Ferrari 512 BBi',
+    aum: 'Early stage',
+    regulatory: 'SEC Reg A+',
+    notes: 'Direct US competitor. $20/share minimum — lowest of any SEC-regulated platform. Currently listing: 1986 Lamborghini Countach 5000QV, 2012 Lexus LFA, 1984 Ferrari 512 BBi. Raised $750K Reg CF round. Also launched McQueen Garage (Dogecoin blockchain) in June 2025. Motorsports/entertainment connections via co-founder Lachlan DeFrancesco.',
   },
   {
     id: 'fractionmotors',
@@ -82,26 +96,12 @@ const COMPETITORS: Competitor[] = [
     tagline: 'Blockchain-tokenized collector cars',
     founded: '2022',
     hq: 'Birmingham, AL',
-    model: 'Solana tokenization — 100,000 tokens per vehicle',
-    minInvestment: 'Sub-$1 (fraction of 0.247–0.957 SOL)',
+    model: 'Blockchain tokenization — 100,000 tokens per vehicle (USDC)',
+    minInvestment: 'Sub-$1',
     vehiclesOffered: '5 cars ($284.4K total appraised)',
-    aum: 'Undisclosed / early stage',
-    regulatory: 'Unregulated (blockchain)',
-    notes: '5 verified listings: 1965 Mustang K-Code ($95.7K, VIN 5R08K133254), 1969 Chevelle SS 396 L78 ($66.5K), 2012 Shelby GT500 ($58.4K), 1958 VW Beetle ($39.1K), 1988 Pontiac Fiero GT ($24.7K). All still available. 100k Solana tokens/car. iOS + Android app. No secondary market liquidity data yet.',
-  },
-  {
-    id: 'ccc',
-    name: 'Classic Car Collective',
-    url: 'classiccarcollective.com',
-    tagline: 'Fractional classic car ownership',
-    founded: 'Unknown',
-    hq: 'Netherlands (EU)',
-    model: 'Password-gated, EUR-denominated, Shopify storefront',
-    minInvestment: 'Unknown — site fully gated',
-    vehiclesOffered: 'Unknown — site fully gated',
-    aum: 'Unknown',
-    regulatory: 'EU (unverified)',
-    notes: 'Netherlands-based. Entire platform is password-protected — no public inventory, pricing, or terms. EUR-denominated, US investors cannot access. No SEC/FCA filing found. Treat as opaque until further data.',
+    aum: 'Undisclosed / minimal',
+    regulatory: '⚠ No SEC registration found',
+    notes: '5 cars: 1965 Mustang K-Code ($95.7K), 1969 Chevelle SS ($66.5K), 2012 GT500 ($58.4K), 1958 Beetle ($39.1K), 1988 Fiero ($24.7K). App launched June 2024 — 2 App Store ratings total. No SEC/FINRA filing found despite selling investment interests to retail. No disclosed funding. No press coverage. Blockchain model may bypass SEC registration but creates significant legal exposure.',
   },
 ];
 
@@ -111,106 +111,106 @@ const FEATURES: FeatureRow[] = [
     category: 'Data',
     feature: 'Proprietary price history',
     description: 'Real transaction data from multiple auction platforms',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
   },
   {
     category: 'Data',
     feature: 'NAV from real transactions',
-    description: 'Net Asset Value computed from actual market sales, not appraiser estimates',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'partial', fractionmotors: 'none', ccc: 'none' },
+    description: 'Net Asset Value from actual auction closes — not appraisals or director estimates',
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
   },
   {
     category: 'Data',
     feature: 'Vehicle coverage',
-    description: 'Tracked vehicles with price history (Nuke: 1.25M | Rally: 9 cars | TheCarCrowd: 40+ | Fraction: 5+)',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'partial', fractionmotors: 'none', ccc: 'none' },
+    description: 'Nuke: 1.25M · Rally: 9 cars · TheCarCrowd: 40+ · MCQ: 3 · Fraction: 5',
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'partial', mcqmarkets: 'none', fractionmotors: 'none' },
   },
   {
     category: 'Data',
     feature: 'Vision AI (condition/damage)',
     description: 'Automated photo analysis for condition, damage, modifications',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
   },
   {
     category: 'Data',
     feature: 'Data API for developers',
     description: 'Programmatic access to vehicle data and market pricing',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'partial', ccc: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
   },
   // Market structure
   {
     category: 'Market',
     feature: 'Continuous secondary market',
-    description: 'Trade shares anytime with limit orders',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'partial', fractionmotors: 'partial', ccc: 'none' },
+    description: 'Trade shares anytime (not periodic windows or illiquid bulletin boards)',
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'partial' },
   },
   {
     category: 'Market',
     feature: 'Segment ETFs',
     description: 'Diversified exposure to vehicle categories (Porsche, Trucks, etc.)',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
   },
   {
     category: 'Market',
     feature: 'Individual vehicle fractions',
     description: 'Invest in a specific VIN',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'strong', fractionmotors: 'strong', ccc: 'na' },
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'strong', mcqmarkets: 'strong', fractionmotors: 'strong' },
   },
   {
     category: 'Market',
     feature: 'Price-time priority order book',
-    description: 'True exchange-style matching (not periodic windows or fixed NAV)',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
+    description: 'True exchange-style matching — not periodic windows',
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'none' },
   },
   {
     category: 'Market',
     feature: 'Min investment < $25',
-    description: 'Accessible to retail investors (Rally: $14.25/share; CarCrowd: £25,000/slot; Fraction: <$1)',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', fractionmotors: 'strong', ccc: 'na' },
+    description: 'Nuke: $1 · MCQ: $20 · Rally: $14.25 · TheCarCrowd: £2,000 · Fraction: <$1',
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'strong' },
   },
   // Vehicle focus
   {
     category: 'Vehicles',
     feature: 'Vehicle-exclusive focus',
     description: 'Platform dedicated to cars (not diluted by art/cards/sneakers)',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'strong', fractionmotors: 'strong', ccc: 'strong' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'strong', mcqmarkets: 'strong', fractionmotors: 'strong' },
   },
   {
     category: 'Vehicles',
     feature: 'Working-class + blue chip',
     description: 'Covers trucks, project cars, barn finds — not just $500K Ferraris',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'partial', fractionmotors: 'strong', ccc: 'na' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'strong' },
   },
   {
     category: 'Vehicles',
     feature: 'Comps engine',
     description: 'Automated comparable sales analysis per vehicle',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
   },
   // Platform
   {
     category: 'Platform',
-    feature: 'Regulatory status',
-    description: 'SEC, FCA, or equivalent qualification',
-    scores: { nuke: 'partial', rally: 'strong', carcrowd: 'strong', fractionmotors: 'none', ccc: 'partial' },
+    feature: 'Regulatory compliance',
+    description: 'SEC Reg A+ or equivalent — verified, not just claimed',
+    scores: { nuke: 'partial', rally: 'partial', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'none' },
   },
   {
     category: 'Platform',
     feature: 'Mobile app',
     description: 'Native iOS/Android app',
-    scores: { nuke: 'none', rally: 'strong', carcrowd: 'none', fractionmotors: 'strong', ccc: 'none' },
+    scores: { nuke: 'none', rally: 'strong', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'strong' },
   },
   {
     category: 'Platform',
     feature: 'US market access',
-    description: 'Available to US-based investors',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', fractionmotors: 'strong', ccc: 'none' },
+    description: 'Available to US-based retail investors',
+    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'strong' },
   },
   {
     category: 'Platform',
     feature: 'Provenance tracking',
     description: 'Service records, ownership history, title chain',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', fractionmotors: 'none', ccc: 'none' },
+    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
   },
 ];
 
@@ -225,24 +225,24 @@ const TIER_CONFIG: Record<Tier, { label: string; bg: string; color: string }> = 
 
 const NUKE_ADVANTAGES = [
   {
-    title: '1.25M vehicles vs. 9 (Rally) / 15 (TheCarCrowd) / 5 (Fraction Motors)',
-    body: 'Rally has 9 verified car listings totaling $2.07M in fractional market cap. TheCarCrowd has 15 UK-only syndicates. Fraction Motors has 5 Solana-tokenized cars worth $284K appraised. Nuke tracks 1.25M vehicles with real transaction history across BaT, Cars & Bids, Mecum, Bonhams, Gooding, RM Sotheby\'s, and 10+ more. That\'s not a rounding difference — it\'s a different category of product.',
+    title: 'Rally raised $112M and has $40M in assets. Growth stalled in 2021.',
+    body: 'Rally raised $112M total ($175M valuation in Oct 2021). Their last round was $0.5M in June 2025 — a signal the company is in maintenance mode, not growth. ~200–250K users, flat since 2021. ~$40M AUM across all assets after $112M invested. And in July 2023, the SEC fined them $350K for operating an unregistered securities exchange from 2018–2021. Their 9 car listings are priced via Hagerty appraisals. Nuke prices from real auction closes.',
   },
   {
-    title: 'Real auction closes, not appraisals and projections',
-    body: 'Rally prices its 9 cars using Hagerty valuations. Fraction Motors uses third-party appraisals ($24.7K–$95.7K per car). TheCarCrowd projects 15.53% annual growth on their Porsche 996 GT3 RS based on market forecasts. Nuke NAV is computed from actual auction closes. When a matching 911SC sells at BaT, our NAV updates immediately. No appraiser, no lag, no projection.',
+    title: 'TheCarCrowd\'s own website: "not regulated by the FCA."',
+    body: 'Press articles describe TheCarCrowd as FCA-regulated. Their own FAQ page says: "TheCarCrowd Limited offer private syndicates... which are not regulated by the UK Financial Conduct Authority. Your capital is at risk and any funds deposited are not protected by the Financial Services Compensation Scheme." The FCA connection (via Kession Capital) applies only to their equity crowdfunding raises, not the car investments.',
   },
   {
-    title: 'YONO: vision AI — no competitor has this',
-    body: 'Rally\'s 9 cars are photographed and appraised by hand. TheCarCrowd uses expert valuers on each syndicate. Fraction Motors relies on CARFAX and appraisals. No competitor uses computer vision to assess condition, detect damage, or flag modifications. YONO runs on every photo at $0/image — a condition signal appraisers charge $500–$2,000 to produce.',
+    title: 'TheCarCrowd fees: 12.5% upfront + 3.91%/year + 10% of gains.',
+    body: 'PistonHeads forum community calculated that a TheCarCrowd syndicate car must appreciate approximately 30% before investors see any positive return after the 12.5% curation fee, ~4% annual operations fee over a 3–5 year hold, and 10% of any gains on exit. Their 12.6% average return (2023) is based on directors\' paper estimates — only 2 confirmed exits in 4+ years. The entire market is sub-$100M AUM.',
   },
   {
-    title: 'Segment ETFs — nobody else offers this',
-    body: 'Every competitor sells individual vehicle fractions: Rally\'s $14.25 BMW share, TheCarCrowd\'s £25K Ferrari slot, Fraction Motors\' Solana tokens. Nuke also offers segment ETFs (PORS, TRUK, SQBD, Y79) with NAV computed from the real market cap of entire vehicle categories — diversification without picking a single car.',
+    title: 'Fraction Motors: 2 App Store reviews. No SEC registration.',
+    body: 'Fraction Motors launched in June 2024 and has 2 App Store ratings. No SEC or FINRA filing found despite selling investment interests in tokenized vehicles to retail buyers. No disclosed funding. Zero press coverage. 5 cars listed totaling $284K appraised. Their blockchain model may bypass traditional securities law — or it may not, and they haven\'t tested it yet.',
   },
   {
-    title: 'TheCarCrowd requires £25,000 minimum. Rally: $14.25. Nuke: $1.',
-    body: 'TheCarCrowd syndicates are 3–8 slots at £25,000–£35,000 each — UK-only, accredited-investor territory. Fraction Motors is technically sub-$1 but is unregulated Solana tokens with no secondary market liquidity data. Rally is $14.25/share minimum for cars. Nuke is $1 minimum, US market, with a live order book.',
+    title: 'The entire market is under $100M AUM. It\'s wide open.',
+    body: 'The global fractional classic car investment market is estimated at $1.38B in 2024 (DataIntelo), growing to $4.13B by 2033. The total classic car market is $37–43B annually. All fractional platforms combined — Rally, TheCarCrowd, MCQ Markets, Fraction Motors — hold an estimated under $100M in AUM. Less than 0.3% of the market has been fractionalized. Nuke has 1.25M vehicles tracked with real data. The timing is early.',
   },
 ];
 
@@ -298,7 +298,7 @@ export default function MarketCompetitors() {
               Fractional Vehicle Ownership — Market Landscape
             </h1>
             <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
-              Rally: 9 cars, $2.07M market cap · TheCarCrowd: 15 vehicles, £25K min, UK-only · Fraction Motors: 5 cars, $284K appraised, Solana · vs. Nuke: 1.25M vehicles tracked
+              Rally: $112M raised, 9 cars, SEC fined 2023 · TheCarCrowd: NOT FCA-regulated per own site, 12.5% fee · MCQ: $20/share, SEC Reg A+ · Fraction: 2 app reviews, no SEC filing · Total market AUM: &lt;$100M
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -492,31 +492,31 @@ export default function MarketCompetitors() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
           <SummaryCard
             title="vs. Rally"
-            verdict="$2.07M in 9 cars vs. 1.25M vehicles"
+            verdict="$112M raised. $40M assets. SEC fine."
             color="rgba(37,99,235,0.12)"
             accentColor="#1d4ed8"
-            body="Rally's entire car portfolio: 9 vehicles, $2.07M total market cap, $14.25–$212.50/share. Priced via Hagerty appraisals. Their Saleen S7 ($420K) already exited. Nuke has transaction history on 1.25M vehicles from real closes. Rally's moat is brand. Ours is data."
+            body="9 cars, $2.07M fractional market cap, priced via Hagerty. $112M raised but last round was $0.5M in June 2025 — stalled growth. SEC fined $350K in 2023 for running an unregistered exchange. Only documented car exit returned 17% net (not annualized) on a Mustang Cobra R. Users flat at 200–250K since 2021."
           />
           <SummaryCard
             title="vs. TheCarCrowd"
-            verdict="£25,000 minimum. UK only. No US."
+            verdict="Claims FCA. Own site says otherwise."
             color="rgba(16,185,129,0.12)"
             accentColor="#059669"
-            body="15 vehicles, £25K–£35K per syndicate slot (3–8 investors per car). FCA-regulated, 3–5 year hold, CGT-free — serious product, wrong market. UK-only, no US access, no continuous order book, no transaction data. Their Porsche 996 GT3 RS projects 15.53% annual growth — from a human forecast, not auction data."
+            body='Their FAQ: "not regulated by the UK Financial Conduct Authority. Your capital is at risk and not protected by FSCS." 12.5% upfront fee + 3.91%/year + 10% of gains means ~30% appreciation needed to break even. Returns (12.6%) are directors\' paper estimates — 2 confirmed exits in 4 years. £2,000 minimum. UK-only.'
+          />
+          <SummaryCard
+            title="vs. MCQ Markets"
+            verdict="Closest US comp — $20 min, SEC Reg A+"
+            color="rgba(16,185,129,0.12)"
+            accentColor="#059669"
+            body="MCQ is the most direct US competitor: SEC Reg A+, $20/share, exotic cars (Lamborghini Countach 5000QV, Lexus LFA, Ferrari 512 BBi). $750K Reg CF raise. Early stage, small catalog. No transaction data, no comps engine, no segment ETFs. Nuke's data layer is the differentiator — MCQ picks cars the same way Rally does: by feel."
           />
           <SummaryCard
             title="vs. Fraction Motors"
-            verdict="5 cars, $284K appraised, no exits yet"
+            verdict="2 App Store reviews. No SEC filing."
             color="rgba(245,158,11,0.12)"
             accentColor="#b45309"
-            body="5 Solana-tokenized cars: 1965 Mustang K-Code ($95.7K), 1969 Chevelle SS ($66.5K), 2012 GT500 ($58.4K), 1958 Beetle ($39.1K), 1988 Fiero ($24.7K). All still available — no sells, no exits, no secondary market liquidity data. Unregulated. iOS/Android app. Accessible cars, thin platform."
-          />
-          <SummaryCard
-            title="vs. Classic Car Collective"
-            verdict="Fully gated — no data available"
-            color="rgba(139,92,246,0.12)"
-            accentColor="#7c3aed"
-            body="Netherlands-based, EUR-denominated, Shopify storefront — fully password-protected. No public inventory, no pricing, no regulatory filing found. Not accessible to US investors. Cannot verify vehicle count, returns, or business model."
+            body="5 cars ($284K total), launched June 2024, 2 App Store ratings. No SEC or FINRA registration found despite selling investment interests to retail. No disclosed funding. No press coverage. Blockchain model may bypass securities compliance — or may create significant legal exposure. Not a serious platform yet."
           />
         </div>
 
