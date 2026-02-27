@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { UserComparablesSection } from '../../components/vehicle/UserComparablesSection';
+import { SimilarSalesSection } from '../../components/vehicle/SimilarSalesSection';
 import type { Vehicle } from './types';
 
 interface VehicleComparablesTabProps {
@@ -12,7 +13,7 @@ const VehicleComparablesTab: React.FC<VehicleComparablesTabProps> = ({
   onCountChange
 }) => {
   useEffect(() => {
-    // Load count when component mounts and notify parent
+    // Load user-submitted comps count for the tab badge
     const loadCount = async () => {
       try {
         const { supabase } = await import('../../lib/supabase');
@@ -34,7 +35,18 @@ const VehicleComparablesTab: React.FC<VehicleComparablesTabProps> = ({
   }, [vehicle.id, onCountChange]);
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      {/* Primary: Automated Similar Sales from auction_events + vehicles */}
+      <div className="card" style={{ padding: '24px' }}>
+        <SimilarSalesSection
+          vehicleId={vehicle.id}
+          vehicleYear={vehicle.year}
+          vehicleMake={vehicle.make}
+          vehicleModel={vehicle.model}
+        />
+      </div>
+
+      {/* Secondary: Community-submitted comparables */}
       <UserComparablesSection
         vehicleId={vehicle.id}
         vehicleYear={vehicle.year}
@@ -46,4 +58,3 @@ const VehicleComparablesTab: React.FC<VehicleComparablesTabProps> = ({
 };
 
 export default VehicleComparablesTab;
-
