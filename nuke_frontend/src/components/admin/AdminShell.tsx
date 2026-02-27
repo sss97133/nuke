@@ -14,6 +14,7 @@ type NavCounts = Record<string, number>;
 
 const primary: AdminNavItem[] = [
   { label: 'Home', to: '/admin' },
+  { label: 'Transfers', to: '/admin/transfers', description: '32K in-progress transfers — advance milestones, log deals' },
   { label: 'Inbox', to: '/admin/inbox', countKey: 'inbox' },
   { label: 'Agent Inbox', to: '/admin/agent-inbox', countKey: 'agentInbox' },
   { label: 'Reviews', to: '/admin/reviews', description: 'Contributor onboarding, ownership review, queues', countKey: 'reviews' },

@@ -43,6 +43,7 @@ const AdminAgentInbox = React.lazy(() => import('../../../pages/admin/AdminAgent
 const ProxyBidOperations = React.lazy(() => import('../../../pages/admin/ProxyBidOperations'));
 const UnifiedScraperDashboard = React.lazy(() => import('../../../pages/admin/UnifiedScraperDashboard'));
 const DataQualityDashboard = React.lazy(() => import('../../../pages/admin/DataQualityDashboard'));
+const TransfersDashboard = React.lazy(() => import('../../../pages/admin/TransfersDashboard'));
 
 const LazyFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '12px' }}>
@@ -105,6 +106,7 @@ const AdminModuleRoutes = () => {
           <Route path="proxy-bids" element={<ProxyBidOperations />} />
           <Route path="unified-scrapers" element={<UnifiedScraperDashboard />} />
           <Route path="data-quality" element={<DataQualityDashboard />} />
+          <Route path="transfers" element={<TransfersDashboard />} />
         </Route>
       </Routes>
     </Suspense>
