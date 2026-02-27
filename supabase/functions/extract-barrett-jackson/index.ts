@@ -608,8 +608,8 @@ function extractImageUrls(html: string): string[] {
   }
 
   // Filter out non-vehicle images (venue maps, logos, site chrome)
-  const junkPatterns = ['/AuctionSites/', '/auctionsites/', '/Images/AuctionSites'];
-  return [...urls].filter(u => !junkPatterns.some(p => u.includes(p)));
+  const junkLower = ['/auctionsite', 'location_map', '/images/auctionsite'];
+  return [...urls].filter(u => !junkLower.some(p => u.toLowerCase().includes(p)));
 }
 
 // ─── Mileage extraction helper ──────────────────────────────────────────────

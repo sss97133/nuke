@@ -1,6 +1,7 @@
 -- Nuke Barrett-Jackson auction venue map images from vehicles.image_url and primary_image_url.
--- These are venue/map images (palm_beach.jpg, scottsdale.jpg, etc.) incorrectly set as vehicle photos.
--- Affects ~926 vehicles. Batched per CLAUDE.md batched migration principle.
+-- These are venue/map images (palm_beach.jpg, scottsdale.jpg, lv21_location_map.jpg, etc.)
+-- incorrectly set as vehicle photos. Catches both /AuctionSite/ and /AuctionSites/ variants.
+-- Batched per CLAUDE.md batched migration principle.
 
 DO $$
 DECLARE
@@ -8,14 +9,14 @@ DECLARE
   affected INT;
   total_fixed INT := 0;
 BEGIN
-  -- Clear image_url where it's a BJ AuctionSites map
+  -- Clear image_url where it's a BJ AuctionSite(s) map or location_map
   LOOP
     UPDATE vehicles
     SET image_url = NULL
     WHERE id IN (
       SELECT id FROM vehicles
-      WHERE image_url LIKE '%/AuctionSites/%'
-         OR image_url LIKE '%/auctionsites/%'
+      WHERE image_url ILIKE '%/AuctionSite%'
+         OR image_url ILIKE '%location_map%'
       LIMIT batch_size
     );
     GET DIAGNOSTICS affected = ROW_COUNT;
@@ -24,17 +25,17 @@ BEGIN
     PERFORM pg_sleep(0.1);
   END LOOP;
 
-  RAISE NOTICE 'Cleared % vehicles image_url with AuctionSites maps', total_fixed;
+  RAISE NOTICE 'Cleared % vehicles image_url with AuctionSite/location_map images', total_fixed;
 
-  -- Clear primary_image_url where it's a BJ AuctionSites map
+  -- Clear primary_image_url where it's a BJ AuctionSite(s) map or location_map
   total_fixed := 0;
   LOOP
     UPDATE vehicles
     SET primary_image_url = NULL
     WHERE id IN (
       SELECT id FROM vehicles
-      WHERE primary_image_url LIKE '%/AuctionSites/%'
-         OR primary_image_url LIKE '%/auctionsites/%'
+      WHERE primary_image_url ILIKE '%/AuctionSite%'
+         OR primary_image_url ILIKE '%location_map%'
       LIMIT batch_size
     );
     GET DIAGNOSTICS affected = ROW_COUNT;
@@ -43,7 +44,7 @@ BEGIN
     PERFORM pg_sleep(0.1);
   END LOOP;
 
-  RAISE NOTICE 'Cleared % vehicles primary_image_url with AuctionSites maps', total_fixed;
+  RAISE NOTICE 'Cleared % vehicles primary_image_url with AuctionSite/location_map images', total_fixed;
 END $$;
 
 -- Also nuke these from vehicle_images table (they're not vehicle photos)
@@ -57,8 +58,8 @@ BEGIN
     DELETE FROM vehicle_images
     WHERE id IN (
       SELECT id FROM vehicle_images
-      WHERE image_url LIKE '%/AuctionSites/%'
-         OR image_url LIKE '%/auctionsites/%'
+      WHERE image_url ILIKE '%/AuctionSite%'
+         OR image_url ILIKE '%location_map%'
       LIMIT batch_size
     );
     GET DIAGNOSTICS affected = ROW_COUNT;
@@ -67,5 +68,5 @@ BEGIN
     PERFORM pg_sleep(0.1);
   END LOOP;
 
-  RAISE NOTICE 'Deleted % vehicle_images rows with AuctionSites maps', total_deleted;
+  RAISE NOTICE 'Deleted % vehicle_images rows with AuctionSite/location_map images', total_deleted;
 END $$;
