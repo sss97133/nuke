@@ -304,10 +304,10 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 ### Frontend Worker — Vehicle Profile Page UX Fixes — COMPLETED 2026-02-27
 - Commit 475c6ce1b pushed to main. 10 files changed (tabs, hero, comps, specs, basic info, similar sales).
 
-### Frontend Worker — Global UX Audit + Polish — 2026-02-27
-- Full site audit: navigation, homepage, empty states, loading states, mobile, typography
-- Touching: HomePage.tsx, AppHeader.tsx, NukeMenu.tsx, MobileBottomNav.tsx, AppLayout.tsx, AppFooter.tsx, CursorHomepage.tsx, Search.tsx (empty/loading states only)
-- DO NOT: modify Search.tsx main search logic, VehicleCardDense.tsx, VehicleProfile tabs
+### Frontend Worker — Global UX Audit + Polish — 2026-02-27 — COMPLETED
+- pt→px typography purge (300+ files), skeleton loaders (AuctionMarketplace, MarketSegments, Dashboard, CursorHomepage), loading state improvements
+- Commits: a5ebb07b8 (pass 1), 944ba7704 (pass 2 merged), 10c63847c (TeamInbox fix)
+- REMOVED: session complete
 
 ### Frontend Worker — Org Profile + Offering Page UX — COMPLETED 2026-02-27
 - Commit d24aa0ad0 pushed to main, Vercel deploying
