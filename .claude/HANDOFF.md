@@ -1,7 +1,8 @@
-# Auto-Checkpoint — 2026-02-27 07:50:15
+# Auto-Checkpoint — 2026-02-27 07:58:11
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
+74dbd54a7 feat(extraction): RM Sotheby's description backfill — 1.3% → 6.5% descriptions, cron job 268
 839752278 chore: Gmail poller complete — OAuth setup ready, cron job 265 active
 94d663e42 chore: Resend inbound audit complete — email body fix + alerts routing
 90082cb51 chore: update DONE.md for global UX polish + typography pass
@@ -28,7 +29,6 @@ a5ebb07b8 fix(ux): global navigation, homepage, mobile, loading states polish
 
 ## Uncommitted Changes
 mcp-server
-supabase/migrations/20260227130000_vehicle_intel_crons.sql
 
 ## Staged
 none
