@@ -278,10 +278,12 @@ const VehiclesInner: React.FC = () => {
     }
 
     try {
-      // Use optimized RPC function for single-query performance
-      // Falls back to separate queries if RPC doesn't exist
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_user_vehicle_relationships', { p_user_id: session.user.id });
+      // Skip the RPC — it times out for users with many vehicles (json_agg of 250+ rows
+      // in PL/pgSQL exceeds the Supabase REST statement_timeout).
+      // Use direct parallel queries instead; use primary_image_url from vehicles to
+      // avoid fetching vehicle_images (which can be 19K+ rows for heavy users).
+      const rpcError = true; // always use fast path
+      const rpcData = null;
 
       if (rpcError) {
         console.error('[Vehicles] RPC fallback:', rpcError.message);
@@ -515,211 +517,108 @@ const VehiclesInner: React.FC = () => {
       // Fallback: RPC doesn't exist or failed - use separate queries
       console.warn('[Vehicles] RPC function not available, using fallback queries');
       
-      // Load vehicles and their relationships
-      // Get all vehicles the user uploaded (for "Uploaded" tab, not "Owned")
-      // Query vehicles first, then fetch images separately to avoid PostgREST relationship ambiguity
-      // Include discovery fields to identify URL-found vehicles
-      const [userVehiclesResult, uploadedVehiclesResult] = await Promise.all([
+      // Load vehicles and their relationships using parallel indexed queries.
+      // Uses primary_image_url from vehicles directly — no vehicle_images fetch needed.
+      const [userVehiclesResult, discoveredRelResult, verifiedOwnResult, permissionOwnResult] = await Promise.all([
         supabase
           .from('vehicles')
-          .select('*, discovery_url, discovery_source, profile_origin')
-          .eq('user_id', session.user.id),
+          .select('id,year,make,model,vin,color,mileage,created_at,user_id,uploaded_by,discovery_url,discovery_source,profile_origin,status,is_public,primary_image_url')
+          .or(`user_id.eq.${session.user.id},uploaded_by.eq.${session.user.id}`)
+          .order('created_at', { ascending: false }),
         supabase
-          .from('vehicles')
-          .select('*, discovery_url, discovery_source, profile_origin')
-          .eq('uploaded_by', session.user.id)
-      ]);
-      
-      // Combine results, deduplicate by id
-      const userVehicles = userVehiclesResult.data || [];
-      const uploadedVehicles = uploadedVehiclesResult.data || [];
-      const vehicleMap = new Map();
-      [...userVehicles, ...uploadedVehicles].forEach(v => {
-        if (!vehicleMap.has(v.id)) {
-          vehicleMap.set(v.id, v);
-        }
-      });
-      const userAddedVehicles = Array.from(vehicleMap.values());
-      const addedError = userVehiclesResult.error || uploadedVehiclesResult.error;
-      
-      // Fetch images separately for all vehicles
-      if (userAddedVehicles.length > 0) {
-        const vehicleIds = userAddedVehicles.map(v => v.id);
-        const { data: images } = await supabase
-          .from('vehicle_images')
-          .select('vehicle_id, image_url, is_primary, variants')
-          .in('vehicle_id', vehicleIds);
-        
-        // Attach images to vehicles
-        const imagesByVehicle = new Map();
-        (images || []).forEach(img => {
-          if (!imagesByVehicle.has(img.vehicle_id)) {
-            imagesByVehicle.set(img.vehicle_id, []);
-          }
-          imagesByVehicle.get(img.vehicle_id).push(img);
-        });
-        
-        userAddedVehicles.forEach(vehicle => {
-          vehicle.vehicle_images = imagesByVehicle.get(vehicle.id) || [];
-        });
-      }
-
-      // Get explicit relationships from discovered_vehicles table
-      // Query discovered_vehicles first, then fetch vehicles and images separately
-      let discoveredVehicles: any[] = [];
-      let discoveredError: any = null;
-      
-      const result = await supabase
-        .from('discovered_vehicles')
-        .select('relationship_type, vehicle_id, discovery_source, discovery_context')
-        .eq('user_id', session.user.id)
-        .eq('is_active', true);
-      
-      if (result.error && result.error.message?.includes('relationship_type')) {
-        // Column doesn't exist, query without it and default to 'interested'
-        console.warn('[Vehicles] relationship_type column missing, using fallback');
-        const fallback = await supabase
           .from('discovered_vehicles')
+          .select('vehicle_id,relationship_type,discovery_source,discovery_context')
+          .eq('user_id', session.user.id)
+          .eq('is_active', true),
+        supabase
+          .from('ownership_verifications')
           .select('vehicle_id')
           .eq('user_id', session.user.id)
-          .eq('is_active', true);
-        
-          discoveredVehicles = (fallback.data || []).map((dv: any) => ({
-            ...dv,
-            relationship_type: 'interested', // Default fallback
-            discovery_source: null,
-            discovery_context: null
-          }));
-        discoveredError = fallback.error;
-      } else {
-        discoveredVehicles = result.data || [];
-        discoveredError = result.error;
-      }
-      
-      // Fetch vehicles and images for discovered vehicles
-      if (discoveredVehicles.length > 0) {
-        const vehicleIds = discoveredVehicles.map(dv => dv.vehicle_id).filter(Boolean);
-        if (vehicleIds.length > 0) {
-          const { data: vehicles } = await supabase
-            .from('vehicles')
-            .select('*, discovery_url, discovery_source, profile_origin')
-            .in('id', vehicleIds);
-          
-          const { data: images } = await supabase
-            .from('vehicle_images')
-            .select('vehicle_id, image_url, is_primary, variants')
-            .in('vehicle_id', vehicleIds);
-          
-          // Attach vehicles and images to discovered vehicles
-          const vehiclesMap = new Map((vehicles || []).map(v => [v.id, v]));
-          const imagesByVehicle = new Map();
-          (images || []).forEach(img => {
-            if (!imagesByVehicle.has(img.vehicle_id)) {
-              imagesByVehicle.set(img.vehicle_id, []);
-            }
-            imagesByVehicle.get(img.vehicle_id).push(img);
-          });
-          
-          discoveredVehicles = discoveredVehicles.map(dv => {
-            const vehicle = vehiclesMap.get(dv.vehicle_id);
-            // Use discovery_source from discovered_vehicles, fallback to vehicle's discovery_source
-            const discoverySource = dv.discovery_source || vehicle?.discovery_source || 
-              (vehicle?.discovery_url?.includes('craigslist.org') ? 'Craigslist' :
-               vehicle?.discovery_url?.includes('marketplace') ? 'Marketplace' :
-               vehicle?.discovery_url?.includes('autotrader') ? 'AutoTrader' :
-               vehicle?.discovery_url?.includes('cars.com') ? 'Cars.com' :
-               vehicle?.discovery_url ? 'External URL' : null);
-            
-            return {
-              ...dv,
-              discovery_source: discoverySource,
-              vehicles: vehicle ? {
-                ...vehicle,
-                vehicle_images: imagesByVehicle.get(dv.vehicle_id) || []
-              } : null
-            };
-          });
-        }
-      }
+          .eq('status', 'approved'),
+        supabase
+          .from('vehicle_user_permissions')
+          .select('vehicle_id,role')
+          .eq('user_id', session.user.id)
+          .eq('is_active', true)
+          .in('role', ['owner', 'co_owner'])
+      ]);
 
-      // Get verified ownership (LEGAL ownership with documents)
-      // Query ownership_verifications first, then fetch vehicles and images separately
-      const { data: verifiedOwnershipsData, error: verifiedError } = await supabase
-        .from('ownership_verifications')
-        .select('vehicle_id')
-        .eq('user_id', session.user.id)
-        .eq('status', 'approved');
+      const userAddedVehicles = (userVehiclesResult.data || []).map(v => ({
+        ...v,
+        // Synthesize vehicle_images from primary_image_url so downstream code works
+        vehicle_images: v.primary_image_url
+          ? [{ image_url: v.primary_image_url, is_primary: true, variants: null }]
+          : []
+      }));
+      const addedError = userVehiclesResult.error;
 
-      // Get permission-based ownership (OWNER/CO_OWNER roles)
-      const { data: permissionOwnershipsData, error: permissionOwnershipsError } = await supabase
-        .from('vehicle_user_permissions')
-        .select('vehicle_id, role')
-        .eq('user_id', session.user.id)
-        .eq('is_active', true)
-        .in('role', ['owner', 'co_owner']);
-      
-      let verifiedOwnerships: any[] = [];
-      if (verifiedOwnershipsData && verifiedOwnershipsData.length > 0) {
-        const vehicleIds = verifiedOwnershipsData.map(ov => ov.vehicle_id).filter(Boolean);
-        const { data: vehicles } = await supabase
+      // Look up vehicles for discovered/ownership IDs if needed
+      const discoveredRels = discoveredRelResult.data || [];
+      const verifiedOwnershipIds = (verifiedOwnResult.data || []).map((r: any) => r.vehicle_id);
+      const permissionOwnershipRows = (permissionOwnResult.data || []);
+
+      // Batch-fetch vehicle details for ownership (typically tiny — 0-5 vehicles)
+      let verifiedVehicles: any[] = [];
+      let permissionVehicles: any[] = [];
+      let discoveredVehicleMap = new Map<string, any>();
+
+      const ownershipVehicleIds = [
+        ...verifiedOwnershipIds,
+        ...permissionOwnershipRows.map((r: any) => r.vehicle_id)
+      ].filter(Boolean);
+
+      const discoveredVehicleIds = discoveredRels.map((r: any) => r.vehicle_id).filter(Boolean);
+      const allExtraIds = [...new Set([...ownershipVehicleIds, ...discoveredVehicleIds])];
+
+      if (allExtraIds.length > 0) {
+        const { data: extraVehicles } = await supabase
           .from('vehicles')
-          .select('*')
-          .in('id', vehicleIds);
-        
-        const { data: images } = await supabase
-          .from('vehicle_images')
-          .select('vehicle_id, image_url, is_primary, variants')
-          .in('vehicle_id', vehicleIds);
-        
-        // Attach vehicles and images to ownerships
-        const vehiclesMap = new Map((vehicles || []).map(v => [v.id, v]));
-        const imagesByVehicle = new Map();
-        (images || []).forEach(img => {
-          if (!imagesByVehicle.has(img.vehicle_id)) {
-            imagesByVehicle.set(img.vehicle_id, []);
-          }
-          imagesByVehicle.get(img.vehicle_id).push(img);
+          .select('id,year,make,model,vin,color,mileage,created_at,status,is_public,primary_image_url,discovery_url,discovery_source')
+          .in('id', allExtraIds);
+
+        const extraMap = new Map((extraVehicles || []).map(v => [v.id, {
+          ...v,
+          vehicle_images: v.primary_image_url
+            ? [{ image_url: v.primary_image_url, is_primary: true, variants: null }]
+            : []
+        }]));
+
+        verifiedVehicles = verifiedOwnershipIds
+          .map((id: string) => extraMap.get(id))
+          .filter(Boolean)
+          .map((v: any) => ({ vehicle_id: v.id, vehicles: v }));
+
+        permissionVehicles = permissionOwnershipRows
+          .map((r: any) => ({ ...r, vehicles: extraMap.get(r.vehicle_id) }))
+          .filter((r: any) => r.vehicles);
+
+        discoveredRels.forEach((r: any) => {
+          const v = extraMap.get(r.vehicle_id);
+          if (v) discoveredVehicleMap.set(r.vehicle_id, v);
         });
-        
-        verifiedOwnerships = verifiedOwnershipsData.map(ov => ({
-          ...ov,
-          vehicles: vehiclesMap.get(ov.vehicle_id) ? {
-            ...vehiclesMap.get(ov.vehicle_id),
-            vehicle_images: imagesByVehicle.get(ov.vehicle_id) || []
-          } : null
-        }));
       }
 
-      let permissionOwnerships: any[] = [];
-      if (permissionOwnershipsData && permissionOwnershipsData.length > 0) {
-        const vehicleIds = permissionOwnershipsData.map((ov: any) => ov.vehicle_id).filter(Boolean);
-        const { data: vehicles } = await supabase
-          .from('vehicles')
-          .select('*')
-          .in('id', vehicleIds);
+      // Rewrite discovered_vehicles to shape expected by downstream code
+      const discoveredVehicles = discoveredRels.map((r: any) => {
+        const vehicle = discoveredVehicleMap.get(r.vehicle_id);
+        const discoverySource = r.discovery_source || vehicle?.discovery_source ||
+          (vehicle?.discovery_url?.includes('craigslist.org') ? 'Craigslist' :
+           vehicle?.discovery_url?.includes('marketplace') ? 'Marketplace' :
+           vehicle?.discovery_url?.includes('autotrader') ? 'AutoTrader' :
+           vehicle?.discovery_url?.includes('cars.com') ? 'Cars.com' :
+           vehicle?.discovery_url ? 'External URL' : null);
+        return { ...r, discovery_source: discoverySource, vehicles: vehicle || null };
+      });
 
-        const { data: images } = await supabase
-          .from('vehicle_images')
-          .select('vehicle_id, image_url, is_primary, variants')
-          .in('vehicle_id', vehicleIds);
+      const verifiedOwnerships = verifiedVehicles.map((r: any) => ({
+        vehicle_id: r.vehicle_id, vehicles: r.vehicles
+      }));
+      const permissionOwnerships = permissionVehicles;
 
-        const vehiclesMap = new Map((vehicles || []).map(v => [v.id, v]));
-        const imagesByVehicle = new Map();
-        (images || []).forEach(img => {
-          if (!imagesByVehicle.has(img.vehicle_id)) {
-            imagesByVehicle.set(img.vehicle_id, []);
-          }
-          imagesByVehicle.get(img.vehicle_id).push(img);
-        });
+      const discoveredError = discoveredRelResult.error;
+      const verifiedError = verifiedOwnResult.error;
+      const permissionOwnershipsError = permissionOwnResult.error;
 
-        permissionOwnerships = (permissionOwnershipsData || []).map((ov: any) => ({
-          ...ov,
-          vehicles: vehiclesMap.get(ov.vehicle_id) ? {
-            ...vehiclesMap.get(ov.vehicle_id),
-            vehicle_images: imagesByVehicle.get(ov.vehicle_id) || []
-          } : null
-        }));
-      }
       
       if (addedError) console.error('[Vehicles] added:', addedError.message);
       if (discoveredError) console.error('[Vehicles] discovered:', discoveredError.message);
