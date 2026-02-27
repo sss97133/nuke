@@ -2,6 +2,7 @@
 import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import AdminShell from '../../../components/admin/AdminShell';
+import { RequireAdmin } from '../../../components/auth/RequireAdmin';
 
 // Lazy-load every admin page — only the visited page gets downloaded
 const AdminHome = React.lazy(() => import('../../../pages/admin/AdminHome'));
@@ -55,6 +56,9 @@ const AdminModuleRoutes = () => {
   return (
     <Suspense fallback={<LazyFallback />}>
       <Routes>
+        {/* Route-level admin guard — stops chunk loading for non-admins.
+            AdminShell also enforces this at the component level. */}
+        <Route element={<RequireAdmin />}>
         <Route element={<AdminShell />}>
           <Route index element={<AdminHome />} />
 
@@ -108,6 +112,7 @@ const AdminModuleRoutes = () => {
           <Route path="data-quality" element={<DataQualityDashboard />} />
           <Route path="transfers" element={<TransfersDashboard />} />
         </Route>
+        </Route> {/* RequireAdmin */}
       </Routes>
     </Suspense>
   );

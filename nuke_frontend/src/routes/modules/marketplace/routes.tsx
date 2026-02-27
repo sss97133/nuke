@@ -1,6 +1,7 @@
 // src/routes/modules/marketplace/routes.tsx
 import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { ProtectedRoute } from '../../../components/auth/ProtectedRoute';
 
 const BrowseInvestments = React.lazy(() => import('../../../pages/BrowseInvestments'));
 const InvestorDashboardPage = React.lazy(() => import('../../../pages/InvestorDashboard'));
@@ -29,8 +30,9 @@ const MarketplaceModuleRoutes = () => {
   return (
     <Suspense fallback={<LazyFallback />}>
       <Routes>
-        <Route path="/" element={<MarketDashboard />} />
-        <Route path="/dashboard" element={<MarketDashboard />} />
+        {/* Public: market data, browsing, exchange */}
+        <Route path="/" element={<MarketExchange />} />
+        <Route path="/dashboard" element={<MarketExchange />} />
         <Route path="/map" element={<MarketMap />} />
         <Route path="/browse" element={<BrowseInvestments />} />
         <Route path="/exchange" element={<MarketExchange />} />
@@ -38,14 +40,18 @@ const MarketplaceModuleRoutes = () => {
         <Route path="/segments" element={<MarketSegments />} />
         <Route path="/segments/:slug" element={<DebugMarketSegment />} />
         <Route path="/movement" element={<MarketMovement />} />
-        <Route path="/investor/dashboard" element={<InvestorDashboardPage />} />
-        <Route path="/portfolio" element={<Portfolio />} />
-        <Route path="/portfolio/success" element={<CreditsSuccess />} />
-        <Route path="/builder" element={<BuilderDashboard />} />
-        <Route path="/contracts" element={<ContractStation />} />
-        <Route path="/contracts/:contractId" element={<ContractStation />} />
-        <Route path="/bids" element={<BidMarketDashboard />} />
         <Route path="/competitors" element={<MarketCompetitors />} />
+
+        {/* Protected: personal finance / account-specific views */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/investor/dashboard" element={<InvestorDashboardPage />} />
+          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/portfolio/success" element={<CreditsSuccess />} />
+          <Route path="/builder" element={<BuilderDashboard />} />
+          <Route path="/contracts" element={<ContractStation />} />
+          <Route path="/contracts/:contractId" element={<ContractStation />} />
+          <Route path="/bids" element={<BidMarketDashboard />} />
+        </Route>
       </Routes>
     </Suspense>
   );
