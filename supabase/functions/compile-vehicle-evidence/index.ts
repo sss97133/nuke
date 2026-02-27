@@ -86,7 +86,7 @@ Extract everything you can observe about this work session. Return ONLY valid JS
   "title": "Concise event title (e.g. 'Interior upholstery by Ernie's', 'Engine dyno at Desert Performance', 'Shipping pickup')",
   "event_type": "One of: ${VALID_EVENT_TYPES.join(', ')}",
   "vendor_name": "Business/shop name if visible, else null",
-  "vendor_type": "shop | dealership | shipping | self | unknown",
+  "vendor_type": "independent_shop | specialty_shop | body_shop | dealer | mobile_mechanic | diy | detailer | other",
   "cost_amount": 0.00,
   "line_items": [
     { "description": "Labor", "amount": 0.00 },
@@ -137,9 +137,11 @@ Rules:
     parsed.event_type = 'work_completed'
   }
 
-  const VALID_VENDOR_TYPES = ['shop', 'dealership', 'shipping', 'self', null]
+  // Must match timeline_events_service_provider_type_check constraint
+  const VALID_VENDOR_TYPES = ['dealer', 'independent_shop', 'mobile_mechanic', 'diy',
+    'specialty_shop', 'tire_shop', 'body_shop', 'detailer', 'other', null]
   const rawVendorType = parsed.vendor_type || null
-  const vendorType = VALID_VENDOR_TYPES.includes(rawVendorType) ? rawVendorType : null
+  const vendorType = VALID_VENDOR_TYPES.includes(rawVendorType) ? rawVendorType : 'other'
 
   return {
     title: parsed.title || `Work session — ${bundleDate}`,
@@ -352,27 +354,36 @@ serve(async (req) => {
         let eventId: string
 
         if (existingEvent) {
-          // Update existing event with synthesis data
-          const { data: updatedEvent } = await supabase
+          // Update existing event with synthesis data — always update title/type/description
+          // so pending_analysis stubs get promoted to real events
+          const updatePayload: any = {
+            title: synthesis.title,
+            event_type: synthesis.event_type,
+            description: synthesis.reasoning,
+            cost_amount: synthesis.cost_amount,
+            cost_currency: 'USD',
+            service_provider_name: synthesis.vendor_name,
+            service_provider_type: synthesis.vendor_type,
+            parts_mentioned: synthesis.parts_mentioned,
+            confidence_score: Math.round(synthesis.confidence * 100),
+            metadata: {
+              ...existingEvent.metadata,
+              synthesis_confidence: synthesis.confidence,
+              synthesis_reasoning: synthesis.reasoning,
+              has_document: synthesis.has_document,
+              line_items: synthesis.line_items,
+              bundle_auto_created: true,
+            },
+          }
+
+          const { data: updatedEvent, error: updateError } = await supabase
             .from('timeline_events')
-            .update({
-              cost_amount: synthesis.cost_amount,
-              cost_currency: 'USD',
-              service_provider_name: synthesis.vendor_name,
-              service_provider_type: synthesis.vendor_type,
-              parts_mentioned: synthesis.parts_mentioned,
-              confidence_score: Math.round(synthesis.confidence * 100),
-              metadata: {
-                ...existingEvent.metadata,
-                synthesis_confidence: synthesis.confidence,
-                synthesis_reasoning: synthesis.reasoning,
-                has_document: synthesis.has_document,
-                line_items: synthesis.line_items,
-              },
-            })
+            .update(updatePayload)
             .eq('id', existingEvent.id)
             .select('id')
             .single()
+
+          if (updateError) throw new Error(`Update failed for ${existingEvent.id}: ${updateError.message}`)
 
           eventId = existingEvent.id
           updated++

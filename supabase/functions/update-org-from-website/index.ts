@@ -163,7 +163,7 @@ serve(async (req) => {
     }
 
     // Infer business type from website content
-    if (!org.business_type || org.business_type === 'other') {
+    if (!org.entity_type || org.entity_type === 'other') {
       const pageText = doc.body?.textContent?.toLowerCase() || '';
       const title = doc.querySelector('title')?.textContent?.toLowerCase() || '';
       const h1 = doc.querySelector('h1')?.textContent?.toLowerCase() || '';
@@ -193,7 +193,7 @@ serve(async (req) => {
       }
       
       if (inferredType) {
-        updates.business_type = inferredType;
+        updates.entity_type = inferredType;
       }
     }
 
@@ -377,8 +377,8 @@ serve(async (req) => {
     // Extract business type from content
     const bodyText = doc.body?.textContent?.toLowerCase() || '';
     if (bodyText.includes('specialty shop') || bodyText.includes('service')) {
-      if (!org.business_type || org.business_type === 'unknown') {
-        updates.business_type = 'specialty_shop';
+      if (!org.entity_type || org.entity_type === 'unknown') {
+        updates.entity_type = 'specialty_shop';
       }
     }
 

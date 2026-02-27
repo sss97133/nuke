@@ -516,6 +516,84 @@ export interface MarketTrendsResponse {
   periods: MarketTrendsPeriod[];
 }
 
+// Signal Score Types
+
+/**
+ * Market signal score — answers "is this a good deal?"
+ * Combines comparable sales, pricing position, heat, and auction sentiment.
+ */
+export interface SignalScore {
+  vehicle_id: string;
+
+  /** Deal score 0–100. Higher = better deal. */
+  deal_score: number | null;
+  /**
+   * Human-readable deal label.
+   * - 'strong_buy' — significantly below market, high confidence
+   * - 'buy' — below market, worth pursuing
+   * - 'hold' — at market, neutral
+   * - 'pass' — above market or low confidence
+   * - 'overpriced' — meaningfully above comparable sales
+   */
+  deal_score_label: 'strong_buy' | 'buy' | 'hold' | 'pass' | 'overpriced' | null;
+
+  /** Heat score 0–100. Market demand intensity for this vehicle class. */
+  heat_score: number | null;
+  /** Heat label: 'cold' | 'warm' | 'hot' | 'fire' | 'volcanic' */
+  heat_score_label: string | null;
+
+  /** Estimated fair market value in USD */
+  estimated_value: number | null;
+  /** Lower bound of value range */
+  value_low: number | null;
+  /** Upper bound of value range */
+  value_high: number | null;
+
+  /**
+   * How this vehicle's listing price compares to estimated market value.
+   * Negative = priced BELOW market (better deal), positive = ABOVE market (overpriced).
+   * Expressed as a percentage. Null if no listing price is available.
+   * Example: -12 means the vehicle is listed 12% below estimated value.
+   */
+  price_vs_market: number | null;
+
+  /** Number of comparable sales used in the valuation */
+  comp_count: number | null;
+
+  /**
+   * Contribution weights for each signal factor (0.0–1.0 each).
+   * Shows what drove the score.
+   */
+  signal_weights: {
+    /** Weight given to comparable sales coverage */
+    comp_coverage: number | null;
+    /** Weight given to vehicle condition signals */
+    condition_signal: number | null;
+    /** Weight given to auction comment sentiment */
+    auction_sentiment: number | null;
+    /** Weight given to market trend / listing velocity */
+    listing_velocity: number | null;
+    /** Weight given to bid curve / price position signals */
+    price_position: number | null;
+  } | null;
+
+  /** Confidence score 0.0–1.0 (derived from comp count and data quality) */
+  confidence: number | null;
+  /** Model version used to compute the score */
+  model_version: string | null;
+  /** ISO timestamp when the score was last calculated */
+  calculated_at: string | null;
+  /** True if the score is older than the staleness threshold */
+  is_stale: boolean | null;
+}
+
+export interface SignalScoreParams {
+  /** Nuke vehicle UUID */
+  vehicle_id?: string;
+  /** 17-character VIN */
+  vin?: string;
+}
+
 // Search Types
 export interface SearchParams {
   q: string;

@@ -18,6 +18,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ExtractionMetricsLogger, categorizeError } from "../_shared/extractionMetrics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,7 +93,14 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     extractor: "extract-mecum",
     minDelay: 1500,
     maxDelay: 3000,
-    sourceIds: ["5bb6b479-9eaf-4e06-ba35-4d0ff86b9b7c", "aacb688b-41d4-407c-8d5e-348ce7f02a18"],
+    sourceIds: ["5bb6b479-9eaf-4e06-ba35-4d0ff86b9b7c"],
+  },
+  mecumlive: {
+    pattern: "%mecum.com/lots/%",
+    extractor: "extract-mecum",
+    minDelay: 1500,
+    maxDelay: 3000,
+    sourceIds: ["aacb688b-41d4-407c-8d5e-348ce7f02a18"],
   },
   barrettjackson: {
     pattern: "%barrett-jackson.com%",
@@ -175,6 +183,7 @@ function detectSource(url: string): string | null {
   if (url.includes("hagerty.com")) return "hagerty";
   if (url.includes("classic.com")) return "classic";
   if (url.includes("barnfinds.com")) return "barnfinds";
+  if (url.includes("mecum.com/lots/")) return "mecumlive";
   if (url.includes("mecum.com")) return "mecum";
   if (url.includes("barrett-jackson.com")) return "barrettjackson";
   if (url.includes("broadarrowauctions.com")) return "broadarrow";
@@ -207,11 +216,25 @@ serve(async (req) => {
     errors_truncated: false,
   };
 
+  // Per-extractor metrics loggers — flushed to extraction_metrics table at end of run
+  const extractorLoggers = new Map<string, ExtractionMetricsLogger>();
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, serviceKey);
     const authHeader = `Bearer ${serviceKey}`;
+
+    function getExtractorLogger(extractorName: string, sourceName: string): ExtractionMetricsLogger {
+      if (!extractorLoggers.has(extractorName)) {
+        extractorLoggers.set(extractorName, new ExtractionMetricsLogger(supabase, {
+          runId: workerId,
+          extractor: extractorName,
+          source: sourceName,
+        }));
+      }
+      return extractorLoggers.get(extractorName)!;
+    }
 
     const body = await req.json().catch(() => ({}));
     const batchSize = Math.min(body.batch_size || 10, 50);
@@ -323,6 +346,8 @@ serve(async (req) => {
         console.log(`Processing ${claimed.length} ${sourceName} items`);
 
         // Process each item
+        const extractorLogger = getExtractorLogger(config.extractor, sourceName);
+
         for (const item of claimed) {
           // Check runtime
           if (Date.now() - startTime > maxRuntimeMs) break;
@@ -331,10 +356,14 @@ serve(async (req) => {
           processedThisIteration++;
           metrics.by_source[sourceName].processed++;
 
-          try {
-            // Stealth delay
-            await randomDelay(config.minDelay, config.maxDelay);
+          // Stealth delay (not counted in extraction latency)
+          await randomDelay(config.minDelay, config.maxDelay);
 
+          // Start timer after delay — measures real extractor latency
+          const itemTimer = extractorLogger.startItem();
+          let lastHttpStatus: number | undefined;
+
+          try {
             // Call extractor
             const extractResponse = await fetch(
               `${supabaseUrl}/functions/v1/${config.extractor}`,
@@ -353,6 +382,7 @@ serve(async (req) => {
               }
             );
 
+            lastHttpStatus = extractResponse.ok ? undefined : extractResponse.status;
             const extractResult = await extractResponse.json().catch(() => ({ success: false, error: "Invalid JSON response" }));
 
             if (extractResult.success) {
@@ -362,6 +392,12 @@ serve(async (req) => {
                 extractResult.created_vehicle_ids?.[0] ||
                 extractResult.updated_vehicle_ids?.[0] ||
                 null;
+
+              // Record success metric
+              extractorLogger.recordSuccess(itemTimer, {
+                sourceUrl: item.listing_url,
+                vehicleId: vehicleId ?? undefined,
+              });
 
               // Mark complete
               await supabase
@@ -399,21 +435,20 @@ serve(async (req) => {
               const errDetail = typeof extractResult.error === 'string'
                 ? extractResult.error
                 : extractResult.error ? JSON.stringify(extractResult.error) : null;
-              const httpNote = extractResponse.ok ? '' : ` (HTTP ${extractResponse.status})`;
+              const httpNote = lastHttpStatus ? ` (HTTP ${lastHttpStatus})` : '';
               throw new Error(errDetail || `Extraction failed${httpNote}`);
             }
           } catch (e: any) {
+            // Record failure metric (always — success path doesn't throw)
+            extractorLogger.recordFailure(itemTimer, e, {
+              sourceUrl: item.listing_url,
+              httpStatus: lastHttpStatus,
+            });
+
             const errorMsg = e.message || String(e);
 
             // Categorize the failure for triage
-            const category = errorMsg.includes('RATE_LIMITED') || errorMsg.includes('429') ? 'rate_limited'
-              : errorMsg.includes('BLOCKED') || errorMsg.includes('403') || errorMsg.includes('Cloudflare') ? 'blocked'
-              : errorMsg.includes('REDIRECT') ? 'redirect'
-              : errorMsg.includes('timeout') || errorMsg.includes('Timeout') || errorMsg.includes('TIMEOUT') ? 'timeout'
-              : errorMsg.includes('INVALID_PAGE') ? 'invalid_page'
-              : errorMsg.includes('duplicate key') ? 'duplicate'
-              : errorMsg.includes('Missing required') ? 'missing_fields'
-              : 'extraction_failed';
+            const category = categorizeError(e);
 
             // Rate-limited and blocked errors should retry more aggressively
             const isTransient = category === 'rate_limited' || category === 'blocked' || category === 'timeout';
@@ -460,6 +495,12 @@ serve(async (req) => {
       }
     }
 
+    // Flush all extractor metrics to DB (non-blocking — don't let this fail the response)
+    const metricFlushes = Array.from(extractorLoggers.values()).map(logger =>
+      logger.flush().catch(e => console.error("[cqp] metrics flush error:", e?.message ?? e))
+    );
+    await Promise.allSettled(metricFlushes);
+
     const elapsedSeconds = (Date.now() - startTime) / 1000;
     const itemsPerHour = metrics.total_processed > 0
       ? Math.round((metrics.total_processed / elapsedSeconds) * 3600)
@@ -479,6 +520,10 @@ serve(async (req) => {
       }
     );
   } catch (e: any) {
+    // Best-effort flush before error response
+    await Promise.allSettled(
+      Array.from(extractorLoggers.values()).map(l => l.flush().catch(() => {}))
+    );
     return new Response(
       JSON.stringify({
         success: false,

@@ -270,54 +270,68 @@ function postProcessResult(result: any): { data: any; needsReview: boolean; revi
 
 // ─── IMAGE UTILITIES ───────────────────────────────────────────────────────
 
-async function getImageAsBase64(storagePath: string): Promise<{ base64: string; mediaType: string }> {
-  // If storagePath is a full URL, fetch directly
-  if (storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
-    const resp = await fetch(storagePath);
-    if (!resp.ok) throw new Error(`Cannot access image: ${storagePath}`);
-    const buffer = await resp.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    const chunkSize = 8192;
-    let binary = "";
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize) as unknown as number[]);
-    }
-    return { base64: btoa(binary), mediaType: resp.headers.get("content-type") || "image/jpeg" };
-  }
+// Matches Supabase storage URLs: .../storage/v1/object/public/<bucket>/<path>
+const SUPABASE_STORAGE_RE = /\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)$/;
 
-  // Get signed URL from Supabase Storage
-  const { data: signedData, error: signError } = await supabase.storage
-    .from('deal-documents')
-    .createSignedUrl(storagePath, 600); // 10 min expiry
-
-  if (signError || !signedData?.signedUrl) {
-    // Fallback: try public URL
-    const publicUrl = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/deal-documents/${storagePath}`;
-    const resp = await fetch(publicUrl);
-    if (!resp.ok) throw new Error(`Cannot access image: ${storagePath}`);
-    const buffer = await resp.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    const chunkSize = 8192;
-    let binary = "";
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize) as unknown as number[]);
-    }
-    return { base64: btoa(binary), mediaType: resp.headers.get("content-type") || "image/jpeg" };
-  }
-
-  const resp = await fetch(signedData.signedUrl);
-  if (!resp.ok) throw new Error(`Failed to fetch signed URL: ${resp.status}`);
-  const buffer = await resp.arrayBuffer();
+async function bufferToBase64(buffer: ArrayBuffer): Promise<string> {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 8192;
   let binary = "";
   for (let i = 0; i < bytes.length; i += chunkSize) {
     binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize) as unknown as number[]);
   }
-  return { base64: btoa(binary), mediaType: resp.headers.get("content-type") || "image/jpeg" };
+  return btoa(binary);
+}
+
+async function getImageAsBase64(storagePath: string): Promise<{ base64: string; mediaType: string }> {
+  // Full URL — try direct fetch first, fall back to signed URL for private buckets
+  if (storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
+    const resp = await fetch(storagePath);
+    if (resp.ok) {
+      const buffer = await resp.arrayBuffer();
+      return { base64: await bufferToBase64(buffer), mediaType: resp.headers.get("content-type") || "image/jpeg" };
+    }
+
+    // Direct fetch failed — likely a private bucket. Parse bucket/path and generate signed URL.
+    const match = storagePath.match(SUPABASE_STORAGE_RE);
+    if (match) {
+      const [, bucket, path] = match;
+      const { data: signedData } = await supabase.storage.from(bucket).createSignedUrl(path, 600);
+      if (signedData?.signedUrl) {
+        const signedResp = await fetch(signedData.signedUrl);
+        if (signedResp.ok) {
+          const buffer = await signedResp.arrayBuffer();
+          return { base64: await bufferToBase64(buffer), mediaType: signedResp.headers.get("content-type") || "image/jpeg" };
+        }
+      }
+    }
+
+    throw new Error(`Cannot access image: ${storagePath}`);
+  }
+
+  // Relative path — use deal-documents bucket (files live at e.g. "documents/2026/..." within this bucket)
+  const { data: signedData, error: signError } = await supabase.storage
+    .from("deal-documents")
+    .createSignedUrl(storagePath, 600);
+
+  if (signError || !signedData?.signedUrl) {
+    const publicUrl = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/deal-documents/${storagePath}`;
+    const resp = await fetch(publicUrl);
+    if (!resp.ok) throw new Error(`Cannot access image: ${storagePath}`);
+    const buffer = await resp.arrayBuffer();
+    return { base64: await bufferToBase64(buffer), mediaType: resp.headers.get("content-type") || "image/jpeg" };
+  }
+
+  const resp = await fetch(signedData.signedUrl);
+  if (!resp.ok) throw new Error(`Failed to fetch signed URL: ${resp.status}`);
+  const buffer = await resp.arrayBuffer();
+  return { base64: await bufferToBase64(buffer), mediaType: resp.headers.get("content-type") || "image/jpeg" };
 }
 
 function getImageUrl(storagePath: string): string {
+  if (storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
+    return storagePath;
+  }
   return `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/deal-documents/${storagePath}`;
 }
 
@@ -969,6 +983,7 @@ Deno.serve(async (req) => {
       const result = await processBatch(limit);
       return json({ ...result, mode: "batch", worker: WORKER_ID, duration_ms: Date.now() - startTime });
     }
+
 
     return json({ error: "Unknown mode. Use: classify, extract, process, batch, status" }, 400);
   } catch (err) {

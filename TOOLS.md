@@ -21,7 +21,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Extract any listing URL (unknown source) | `extract-vehicle-data-ai` | Handles generic AI extraction |
-| Extract Bring a Trailer listing | `bat-simple-extract` | Full BaT-specific parser |
+| Extract Bring a Trailer listing | `complete-bat-import` | Two-step: extract-bat-core + extract-auction-comments. **Do not use `bat-simple-extract` or `bat-extract` (deprecated).** |
 | Extract Cars & Bids listing | `extract-cars-and-bids-core` | Handles C&B structure |
 | Extract Hagerty Marketplace listing | `extract-hagerty-listing` | |
 | Extract PCarMarket listing | `import-pcarmarket-listing` | |
@@ -151,7 +151,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Monitor a BaT seller | `bat-seller-monitors` table | Insert record to start monitoring |
 | Monitor a BaT buyer | `bat-buyer-monitors` table | Insert record to start monitoring |
 | Parse BaT snapshot HTML | `bat-snapshot-parser` | Parses archived BaT pages |
-| Complete BaT import | `complete-bat-import` | Final step after extraction |
+| Extract a BaT listing (entry point) | `complete-bat-import` | Calls extract-bat-core + extract-auction-comments in sequence |
 
 ---
 
@@ -217,7 +217,7 @@ These are the most common "agent reimplementation" antipatterns. If you find you
 | A vehicle valuation calculator | `compute-vehicle-valuation` |
 | A comment sentiment analyzer | `discover-comment-data` |
 | A search endpoint | `universal-search` |
-| A BaT scraper | `bat-simple-extract` |
+| A BaT scraper | `complete-bat-import` |
 | A Craigslist scraper | `extract-craigslist` or `discover-cl-squarebodies` |
 | A Facebook scraper | `extract-facebook-marketplace` |
 | A market trend calculator | `calculate-market-trends` |

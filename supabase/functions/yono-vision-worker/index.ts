@@ -10,9 +10,15 @@
  * Cron: runs every 2 minutes via pg_cron (2 staggered workers).
  *
  * Fields written to vehicle_images:
- *   vehicle_zone, zone_confidence, condition_score, damage_flags,
- *   modification_flags, photo_quality_score, vision_analyzed_at,
+ *   vehicle_zone, zone_confidence, zone_source, condition_score, damage_flags,
+ *   modification_flags, interior_quality, photo_quality_score, vision_analyzed_at,
  *   vision_model_version, yono_queued_at (cleared on completion)
+ *
+ * zone_source values:
+ *   - zone_classifier_v1: ZoneClassifierHead (Florence-2, 41 classes, 72.8% val_acc)
+ *   - photo_type_heuristic: photo_type → zone mapping fallback
+ *
+ * interior_quality: 1-5 scale (null for non-interior photos)
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -168,11 +174,13 @@ serve(async (req) => {
         .update({
           vehicle_zone: result.vehicle_zone,
           zone_confidence: result.zone_confidence,
+          zone_source: result.zone_source ?? null,
           surface_coord_u: result.surface_coord_u ?? null,
           surface_coord_v: result.surface_coord_v ?? null,
           condition_score: result.condition_score,
           damage_flags: result.damage_flags,
           modification_flags: result.modification_flags,
+          interior_quality: result.interior_quality ?? null,
           photo_quality_score: result.photo_quality,
           vision_analyzed_at: now,
           vision_model_version: result.model,

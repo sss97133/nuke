@@ -35,9 +35,10 @@ const ROLE_DISPLAY: Record<string, string> = {
 const ALL_ROLES = Object.keys(ROLE_TO_EMAIL).filter(r => r !== "founder");
 
 function getSql() {
-  const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+  const dbUrl = Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL");
   if (!dbUrl) throw new Error("SUPABASE_DB_URL not set");
-  return postgres(dbUrl, { max: 1 });
+  // prepare: false is required for pgBouncer transaction mode
+  return postgres(dbUrl, { max: 1, prepare: false });
 }
 
 Deno.serve(async (req) => {

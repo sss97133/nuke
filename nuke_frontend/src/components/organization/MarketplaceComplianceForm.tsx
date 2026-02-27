@@ -122,7 +122,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
     try {
       const { data, error } = await supabase
         .from('businesses')
-        .select('legal_name, business_name, business_type, tax_id, registration_state, address, city, state, zip_code, country, phone, email, website, metadata')
+        .select('legal_name, business_name, entity_type, tax_id, registration_state, address, city, state, zip_code, country, phone, email, website, metadata')
         .eq('id', organizationId)
         .single<BusinessRecord>();
 
@@ -130,7 +130,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
       if (!data) throw new Error('Organization not found');
 
       setLegalName(data.legal_name || data.business_name || '');
-      setBusinessType(data.business_type || '');
+      setBusinessType((data as any).entity_type || '');
       setTaxId(data.tax_id || '');
       setRegistrationState(data.registration_state || '');
       setAddress(data.address || '');
@@ -221,7 +221,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
 
       const updatePayload: Record<string, any> = {
         legal_name: legalName.trim() || null,
-        business_type: businessType || null,
+        entity_type: businessType || null,
         tax_id: taxId.trim() || null,
         registration_state: registrationState.trim() || null,
         address: address.trim() || null,

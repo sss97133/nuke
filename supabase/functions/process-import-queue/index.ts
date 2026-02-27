@@ -25,7 +25,7 @@ serve(async (req) => {
 
     const { data: queueItems, error: queueError } = await supabase.rpc('claim_import_queue_batch', {
       p_batch_size: batch_size,
-      p_max_attempts: 3,
+      p_max_attempts: 8,
       p_priority_only: priority_only,
       p_source_id: source_id || null,
       p_worker_id: workerId,
@@ -210,11 +210,20 @@ serve(async (req) => {
           const isNonVehicle = errorMsg.includes('No vehicle data found') ||
             errorMsg.includes('could not find real vehicle data') ||
             errorMsg.includes('Missing required fields');
-          const status = isNonVehicle ? 'skipped' : 'failed';
 
-          // Auto-categorize failures
-          let failureCategory = null;
-          if (!isNonVehicle) {
+          if (isNonVehicle) {
+            await supabase.from('import_queue').update({
+              status: 'skipped',
+              error_message: `Non-vehicle page: ${errorMsg.slice(0, 200)}`,
+              attempts: item.attempts + 1,
+              failure_category: null,
+              locked_at: null,
+              locked_by: null,
+            }).eq('id', item.id);
+            results.push({ id: item.id, status: 'skipped', url, error: errorMsg });
+          } else {
+            // Auto-categorize failures
+            let failureCategory: string | null = null;
             if (errorMsg.includes('timeout') || errorMsg.includes('Timeout') || errorMsg.includes('504')) {
               failureCategory = 'timeout';
             } else if (errorMsg.includes('browser has been closed') || errorMsg.includes('page.goto')) {
@@ -228,17 +237,28 @@ serve(async (req) => {
             } else {
               failureCategory = 'extraction_failed';
             }
-          }
 
-          await supabase.from('import_queue').update({
-            status,
-            error_message: isNonVehicle ? `Non-vehicle page: ${errorMsg.slice(0, 200)}` : errorMsg,
-            attempts: item.attempts + 1,
-            failure_category: failureCategory,
-            locked_at: null,
-            locked_by: null,
-          }).eq('id', item.id);
-          results.push({ id: item.id, status, url, error: errorMsg });
+            // Exponential backoff: retry transient errors more aggressively
+            const isTransient = failureCategory === 'timeout' || failureCategory === 'rate_limited' || failureCategory === 'blocked';
+            const attempts = item.attempts ?? 0; // already incremented by claim RPC
+            const maxAttempts = isTransient ? 8 : 5;
+            const shouldFail = attempts >= maxAttempts;
+
+            await supabase.from('import_queue').update({
+              status: shouldFail ? 'failed' : 'pending',
+              error_message: errorMsg,
+              attempts: item.attempts + 1,
+              failure_category: failureCategory,
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: shouldFail
+                ? null
+                : new Date(
+                    Date.now() + Math.min(2 * 60 * 60 * 1000, (isTransient ? 10 : 5) * 60 * 1000 * Math.pow(2, attempts))
+                  ).toISOString(),
+            }).eq('id', item.id);
+            results.push({ id: item.id, status: shouldFail ? 'failed' : 'pending', url, error: errorMsg, retry_scheduled: !shouldFail });
+          }
         }
       } catch (error: any) {
         const errMsg = error?.message || String(error);
@@ -250,15 +270,26 @@ serve(async (req) => {
           failureCategory = 'browser_crash';
         }
 
+        // Exponential backoff: retry transient errors more aggressively
+        const isTransient = failureCategory === 'timeout';
+        const attempts = item.attempts ?? 0; // already incremented by claim RPC
+        const maxAttempts = isTransient ? 8 : 5;
+        const shouldFail = attempts >= maxAttempts;
+
         await supabase.from('import_queue').update({
-          status: 'failed',
+          status: shouldFail ? 'failed' : 'pending',
           error_message: errMsg.slice(0, 500),
           attempts: (item.attempts || 0) + 1,
           failure_category: failureCategory,
           locked_at: null,
           locked_by: null,
+          next_attempt_at: shouldFail
+            ? null
+            : new Date(
+                Date.now() + Math.min(2 * 60 * 60 * 1000, (isTransient ? 10 : 5) * 60 * 1000 * Math.pow(2, attempts))
+              ).toISOString(),
         }).eq('id', item.id);
-        results.push({ id: item.id, status: 'failed', url: item.listing_url, error: errMsg });
+        results.push({ id: item.id, status: shouldFail ? 'failed' : 'pending', url: item.listing_url, error: errMsg, retry_scheduled: !shouldFail });
       }
     }
 

@@ -407,29 +407,12 @@ serve(async (req) => {
       bestComps = allComps;
       matchStrategy = `make_year (${make} ${year || 'any'})`;
     } else {
-      // Widen search - remove model filter, try just make+year
-      const { data: wideComps } = await supabase.rpc('find_bat_comps', {
-        p_make: make,
-        p_model: null,
-        p_year: year || null,
-        p_year_range: 3,
-        p_limit: 200,
-      });
-
-      bestComps = (wideComps || []).filter((row: RawComp) => engineTierMatch(model, row.v_model)).map((row: RawComp) => ({
-        listing_id: row.listing_id,
-        vehicle_id: row.vehicle_id,
-        sale_price: row.sale_price,
-        bid_count: row.bid_count,
-        sale_date: row.sale_date,
-        year: row.v_year,
-        make: row.v_make,
-        model: row.v_model,
-        engine_size: row.v_engine_size,
-        listing_url: '',
-        match_tier: 'make_year' as const,
-      }));
-      matchStrategy = `wide_make_year (${make} +/-3yr)`;
+      // Wide fallback skipped — null-model queries across full make scan
+      // (e.g. all Chevrolets 1967-1973) take 30-60s and exceed timeouts.
+      // If we have zero comps here it means this make/model isn't in BaT data;
+      // score as low-confidence FAIR and move on.
+      bestComps = allComps;
+      matchStrategy = `no_comps (${make} ${year || 'any'})`;
     }
 
     console.log(`[market-proof] Match strategy: ${matchStrategy}, comps: ${bestComps.length}`);

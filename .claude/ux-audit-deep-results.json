@@ -1,0 +1,67 @@
+{
+  "timestamp": "2026-02-27T11:28:36.788Z",
+  "phase": "deep-audit",
+  "totalFindings": 10,
+  "findings": [
+    {
+      "page_name": "vehicle-profile",
+      "severity": 95,
+      "title": "Vehicle profile stuck in \"Loading vehicle...\" state for 12+ seconds",
+      "description": "Page shows loading spinner indefinitely. Supabase auth check or data fetch is not completing. Likely the RPC or .from(\"vehicles\") query is timing out or failing silently. Visitors get a perpetual loader — effectively a blank page. File: nuke_frontend/src/pages/VehicleProfile.tsx around line 1733-1795 (loadVehicle function). Check if api-v1-vehicles edge function is responsive."
+    },
+    {
+      "page_name": "market-exchange",
+      "severity": 95,
+      "title": "Market Exchange stuck in loading state for 10+ seconds",
+      "description": "\"Loading market dashboard...\" shown for 10+ seconds. The dashboard is timing out on a slow DB query. The P0 issue that caused the \"Coming Soon\" replacement seems to be recurring — data is not loading. Users and investors see a spinner indefinitely. File: nuke_frontend/src/pages/MarketDashboard.tsx or MarketExchange.tsx"
+    },
+    {
+      "page_name": "search-results",
+      "severity": 95,
+      "title": "Search \"porsche 911\" returns 0 results — database not being searched",
+      "description": "\"NO RESULTS FOUND\" for \"porsche 911\". We have 18k+ vehicles including Porsches. The search engine is not returning results — either the stub vehicle filter broke search, or universal-search edge function is not returning vehicles. This is catastrophic for the demo. Check universal-search edge function and the stub vehicle filter migration."
+    },
+    {
+      "page_name": "search",
+      "severity": 70,
+      "title": "VIN Lookup toggle not visible on search page",
+      "description": "VIN search was just built (P1 task) but VIN lookup section not visible on search page. Either not deployed or hidden. File: nuke_frontend/src/pages/Search.tsx"
+    },
+    {
+      "page_name": "homepage-nav",
+      "severity": 70,
+      "title": "Navigation has no logo or brand mark",
+      "description": "Nav shows only 3 text links (Home, +, Profile) with no logo/wordmark. Brand is invisible until scrolling past fold. File: nuke_frontend/src/components/layout/AppHeader.tsx or NukeMenu.tsx"
+    },
+    {
+      "page_name": "offering-gate",
+      "severity": 85,
+      "title": "Investor offering page is behind an access code gate with no live stats visible",
+      "description": "The /offering page shows only an \"ACCESS CODE\" login gate with no visible platform stats. Investors who are NOT given a code see nothing compelling — no proof of traction (vehicles, data points, users). The gate page itself needs key stats (vehicle count, data coverage, etc.) to be visible BEFORE the code is entered. File: nuke_frontend/src/pages/InvestorOffering.tsx"
+    },
+    {
+      "page_name": "offering",
+      "severity": 85,
+      "title": "Offering gate page shows zero traction data",
+      "description": "No $ figures, user counts, or vehicle counts on the offering page entry screen. Even behind a gate, first impressions matter. The email contact is there but no proof of scale. File: nuke_frontend/src/pages/InvestorOffering.tsx"
+    },
+    {
+      "page_name": "search-empty-state",
+      "severity": 85,
+      "title": "Search empty state shows nothing to explore",
+      "description": "No results page shows \"Enter a search query\" message and popular search terms but NO featured vehicles, no trending listings, no \"start here\" content. Users who land on /search with no query have nothing to click on. File: nuke_frontend/src/pages/Search.tsx. Fix: show 12 featured/recent vehicles in the results area when query is empty."
+    },
+    {
+      "page_name": "nav",
+      "severity": 85,
+      "title": "Navigation has no link to /search",
+      "description": "Search is not linked from the main navigation. Users cannot discover the search feature from the homepage. Nav only shows Home, +, Profile. File: nuke_frontend/src/components/layout/AppHeader.tsx or NukeMenu.tsx"
+    },
+    {
+      "page_name": "nav",
+      "severity": 85,
+      "title": "Navigation has no link to /market",
+      "description": "Market Exchange is not linked from the main navigation. Core investor product not discoverable from nav. File: nuke_frontend/src/components/layout/AppHeader.tsx or NukeMenu.tsx"
+    }
+  ]
+}

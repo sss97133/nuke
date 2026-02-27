@@ -23,7 +23,7 @@ info:
 
     Subscribe to real-time events by creating webhook endpoints. Events are delivered with
     HMAC-SHA256 signatures for verification.
-  version: 1.0.0
+  version: 1.4.0
   contact:
     name: Nuke Support
     url: https://nuke.ag/support
@@ -64,6 +64,23 @@ tags:
     description: Price trends by make/model/year
   - name: Search
     description: Full-text search across all entities
+  - name: Signal
+    description: Market signal scoring — the "is this a good deal?" endpoint. Combines comparable sales, price position, heat score, and auction sentiment into a single 0–100 deal score.
+  - name: Vision
+    description: |
+      Vehicle image classification and analysis powered by YONO — a locally-trained model
+      on Nuke's 33M-image corpus. Make classification costs $0.00/image. Full scene analysis
+      (category, angle, condition, camera position) uses Gemini/GPT-4o cloud fallback at
+      $0.0001–$0.004/image.
+  - name: Export
+    description: |
+      Bulk vehicle data export in CSV, JSON, or NDJSON format. Designed for data scientists,
+      ML pipelines, and enterprise customers. Up to 100K rows per request (service role) or
+      10K rows (API key) or 5K rows (user JWT).
+  - name: Exchange
+    description: |
+      Market exchange read API — funds, vehicle offerings, and holdings.
+      The Nuke market exchange enables fractional vehicle ownership backed by collector vehicle assets.
 
 paths:
   /api-v1-vehicles:
@@ -508,6 +525,93 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api-v1-signal:
+    get:
+      tags: [Signal]
+      summary: Get market signal score
+      description: |
+        Returns the market signal score for a vehicle — the "is this a good deal?" answer.
+
+        Combines comparable sales, listing price vs estimated market value, heat score,
+        and auction sentiment into a single 0–100 deal score with confidence-weighted
+        signal breakdown.
+
+        Requires an existing Nuke Estimate (`nuke_estimates` row). If none exists,
+        call `/api-v1-valuations` first to trigger computation.
+
+        **Use cases:**
+        - Dealer acquisition tools ("is this worth buying at asking price?")
+        - Insurance platforms ("what's the market risk on this vehicle?")
+        - Auction bidding tools ("when to bid and when to walk away")
+      operationId: getSignalScore
+      parameters:
+        - name: vehicle_id
+          in: query
+          description: Vehicle UUID (use this OR vin)
+          schema:
+            type: string
+            format: uuid
+        - name: vin
+          in: query
+          description: 17-character VIN (alternative to vehicle_id)
+          schema:
+            type: string
+            minLength: 17
+            maxLength: 17
+      responses:
+        '200':
+          description: Signal score data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SignalScore'
+              example:
+                data:
+                  vehicle_id: "b4f2e8a0-1234-4abc-9def-000000000001"
+                  deal_score: 87
+                  deal_score_label: "strong_buy"
+                  heat_score: 72
+                  heat_score_label: "hot"
+                  estimated_value: 48000
+                  value_low: 42000
+                  value_high: 55000
+                  price_vs_market: -12
+                  comp_count: 28
+                  signal_weights:
+                    comp_coverage: 0.45
+                    condition_signal: 0.18
+                    auction_sentiment: 0.05
+                    listing_velocity: 0.10
+                    price_position: 0.10
+                  confidence: 0.78
+                  model_version: "v1"
+                  calculated_at: "2026-02-27T00:00:00Z"
+                  is_stale: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No signal score exists for this vehicle yet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "No signal score available for this vehicle. Run a valuation first."
+                  vehicle_id:
+                    type: string
+                    format: uuid
+                  hint:
+                    type: string
+                    example: "Use nuke.valuations.get() to trigger a valuation, then retry."
+
   /api-v1-valuations:
     get:
       tags: [Valuations]
@@ -888,6 +992,580 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SearchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api-v1-vision/classify:
+    post:
+      tags: [Vision]
+      summary: Classify a vehicle image
+      description: |
+        Classify a vehicle image using YONO — a locally-trained model on Nuke's 33M-image corpus.
+        Returns make, family (origin group), confidence, top-5 predictions, and vehicle detection.
+
+        **Cost: $0.00/image.** YONO runs on dedicated inference infrastructure with no cloud AI fees.
+      operationId: visionClassify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_url]
+              properties:
+                image_url:
+                  type: string
+                  format: uri
+                  description: Publicly accessible URL of the vehicle image
+                  example: https://cdn.bringatrailer.com/vehicles/porsche-911.jpg
+                top_k:
+                  type: integer
+                  default: 5
+                  minimum: 1
+                  maximum: 20
+                  description: Number of top predictions to return
+      responses:
+        '200':
+          description: Classification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  make:
+                    type: string
+                    nullable: true
+                    description: Best make prediction
+                    example: Porsche
+                  family:
+                    type: string
+                    nullable: true
+                    description: Vehicle origin group (american, german, japanese, british, italian, french, swedish)
+                    example: german
+                  family_confidence:
+                    type: number
+                    format: float
+                    nullable: true
+                    description: Confidence score for family prediction (0.0–1.0)
+                    example: 0.97
+                  confidence:
+                    type: number
+                    format: float
+                    description: Make prediction confidence (0.0–1.0)
+                    example: 0.91
+                  top5:
+                    type: array
+                    description: Top-K predictions as [make, confidence] pairs
+                    items:
+                      type: array
+                      items:
+                        oneOf:
+                          - type: string
+                          - type: number
+                    example: [["Porsche", 0.91], ["BMW", 0.04], ["Mercedes-Benz", 0.02]]
+                  is_vehicle:
+                    type: boolean
+                    description: Whether the image appears to contain a vehicle
+                    example: true
+                  source:
+                    type: string
+                    enum: [yono, unavailable]
+                    description: Inference source
+                    example: yono
+                  ms:
+                    type: number
+                    description: YONO inference time in milliseconds
+                    example: 4.2
+                  cost_usd:
+                    type: number
+                    description: Cost in USD (always 0 for YONO)
+                    example: 0
+                  elapsed_ms:
+                    type: number
+                    description: Total request time in milliseconds
+                    example: 42
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api-v1-vision/analyze:
+    post:
+      tags: [Vision]
+      summary: Analyze a vehicle image
+      description: |
+        Full vehicle image analysis: YONO make classification + cloud scene analysis.
+
+        Returns make/family (YONO, free), plus category, subject taxonomy, condition notes,
+        and camera position (cloud, $0.0001–$0.004/image via Gemini or GPT-4o).
+
+        The `source` field indicates what ran:
+        - `yono` — YONO classification only (cloud analysis unavailable)
+        - `yono+cloud` — Both YONO + Gemini/GPT-4o analysis
+        - `unavailable` — YONO sidecar offline
+      operationId: visionAnalyze
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_url]
+              properties:
+                image_url:
+                  type: string
+                  format: uri
+                  description: Publicly accessible URL of the vehicle image
+                  example: https://cdn.bringatrailer.com/vehicles/porsche-911-door.jpg
+                vehicle_id:
+                  type: string
+                  format: uuid
+                  description: Optional vehicle ID for context-aware analysis
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  make:
+                    type: string
+                    nullable: true
+                    example: Porsche
+                  family:
+                    type: string
+                    nullable: true
+                    example: german
+                  family_confidence:
+                    type: number
+                    nullable: true
+                    example: 0.97
+                  confidence:
+                    type: number
+                    example: 0.91
+                  top5:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        oneOf:
+                          - type: string
+                          - type: number
+                  is_vehicle:
+                    type: boolean
+                    nullable: true
+                    example: true
+                  category:
+                    type: string
+                    nullable: true
+                    enum: [exterior, interior, engine, undercarriage, document, damage]
+                    example: exterior
+                  subject:
+                    type: string
+                    nullable: true
+                    description: Subject taxonomy key
+                    example: exterior.panel.door.front.driver
+                  description:
+                    type: string
+                    nullable: true
+                    description: Human-readable description of what is shown
+                    example: Left front door of a Porsche 911 showing minor surface rust on lower sill
+                  condition_notes:
+                    type: string
+                    nullable: true
+                    example: Surface rust on lower sill, paint fading on door handle
+                  visible_damage:
+                    type: boolean
+                    nullable: true
+                    example: true
+                  camera_position:
+                    type: object
+                    nullable: true
+                    properties:
+                      azimuth_deg:
+                        type: number
+                        description: "0=front, 90=driver side, 180=rear, 270=passenger side"
+                        example: 90
+                      elevation_deg:
+                        type: number
+                        description: Camera elevation relative to vehicle center
+                        example: 15
+                      distance_mm:
+                        type: number
+                        description: Estimated camera distance from vehicle center in mm
+                        example: 3500
+                      confidence:
+                        type: number
+                        example: 0.8
+                  yono:
+                    type: object
+                    nullable: true
+                    description: YONO classification details
+                    properties:
+                      make:
+                        type: string
+                        example: Porsche
+                      family:
+                        type: string
+                        nullable: true
+                        example: german
+                      confidence:
+                        type: number
+                        example: 0.91
+                      ms:
+                        type: number
+                        example: 4.2
+                  source:
+                    type: string
+                    enum: [yono, "yono+cloud", unavailable]
+                    example: "yono+cloud"
+                  cost_usd:
+                    type: number
+                    example: 0.0001
+                  elapsed_ms:
+                    type: number
+                    example: 1250
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api-v1-vision/batch:
+    post:
+      tags: [Vision]
+      summary: Batch classify vehicle images
+      description: |
+        Classify up to 100 vehicle images in a single request using YONO.
+        All classifications run locally — **cost: $0.00** regardless of batch size.
+
+        Results include per-image make, family, confidence, top-5, and is_vehicle.
+        Failed images are included in `results` with an `error` field.
+      operationId: visionBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images:
+                  type: array
+                  maxItems: 100
+                  description: Array of images to classify
+                  items:
+                    type: object
+                    required: [image_url]
+                    properties:
+                      image_url:
+                        type: string
+                        format: uri
+                      top_k:
+                        type: integer
+                        default: 5
+                        minimum: 1
+                        maximum: 20
+      responses:
+        '200':
+          description: Batch classification results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        image_url:
+                          type: string
+                        make:
+                          type: string
+                          nullable: true
+                        family:
+                          type: string
+                          nullable: true
+                        family_confidence:
+                          type: number
+                          nullable: true
+                        confidence:
+                          type: number
+                        top5:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              oneOf:
+                                - type: string
+                                - type: number
+                        is_vehicle:
+                          type: boolean
+                        ms:
+                          type: number
+                        cost_usd:
+                          type: number
+                        error:
+                          type: string
+                          description: Present only if this image failed
+                  count:
+                    type: integer
+                    example: 3
+                  errors:
+                    type: integer
+                    description: Number of images that failed
+                    example: 0
+                  cost_usd:
+                    type: number
+                    description: Always 0 for YONO batch
+                    example: 0
+                  elapsed_ms:
+                    type: number
+                    example: 142
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api-v1-export:
+    get:
+      tags: [Export]
+      summary: Bulk export vehicle data
+      description: |
+        Export vehicle records in CSV, JSON, or NDJSON format. Designed for data scientists,
+        ML pipelines, and enterprise customers.
+
+        **Row limits by auth tier:**
+        - Service role key: 100,000 rows/request
+        - API key: 10,000 rows/request
+        - User JWT: 5,000 rows/request
+
+        **Cursor pagination:** Use `cursor` (last vehicle `id` from previous response) for
+        efficient sequential pagination through large datasets.
+
+        **Partial fields:** Use `fields` to request only the columns you need — reduces
+        response size significantly for wide datasets.
+
+        **Parquet:** Not directly supported — export as NDJSON and convert:
+        `pd.read_json('data.ndjson', lines=True).to_parquet('data.parquet')`
+      operationId: exportVehicles
+      parameters:
+        - name: format
+          in: query
+          description: Output format
+          schema:
+            type: string
+            enum: [csv, json, ndjson]
+            default: json
+        - name: make
+          in: query
+          description: Filter by make (case-insensitive)
+          schema:
+            type: string
+            example: Porsche
+        - name: model
+          in: query
+          description: Filter by model (case-insensitive)
+          schema:
+            type: string
+            example: "911"
+        - name: year_min
+          in: query
+          description: Minimum model year
+          schema:
+            type: integer
+            example: 1970
+        - name: year_max
+          in: query
+          description: Maximum model year
+          schema:
+            type: integer
+            example: 1989
+        - name: fields
+          in: query
+          description: Comma-separated list of fields to include. Defaults to a standard set.
+          schema:
+            type: string
+            example: id,year,make,model,vin,sale_price,mileage
+        - name: limit
+          in: query
+          description: Maximum rows to return (capped by auth tier)
+          schema:
+            type: integer
+            default: 1000
+            maximum: 100000
+        - name: cursor
+          in: query
+          description: Cursor for pagination — vehicle `id` from last response (for sequential exports)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: |
+            Vehicle data in requested format.
+            - `application/json` — JSON array or wrapped object
+            - `text/csv` — RFC 4180 CSV with header row
+            - `application/x-ndjson` — one JSON object per line
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: Vehicle record with requested fields
+                  count:
+                    type: integer
+                    description: Number of records returned
+                  next_cursor:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: Pass as `cursor` in next request for continuation. Null when exhausted.
+                  fields:
+                    type: array
+                    items:
+                      type: string
+                    description: Fields included in each record
+            text/csv:
+              schema:
+                type: string
+                description: CSV with header row
+            application/x-ndjson:
+              schema:
+                type: string
+                description: Newline-delimited JSON (one object per line)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api-v1-exchange:
+    get:
+      tags: [Exchange]
+      summary: Market exchange snapshot
+      description: |
+        Returns market exchange data — funds, vehicle offerings, and holdings.
+
+        The `action` parameter controls which subset is returned:
+        - (none) — full snapshot: all funds + all offerings
+        - `funds` — all active market funds with stats
+        - `fund` — single fund detail (requires `symbol`)
+        - `offerings` — all vehicle offerings currently trading
+        - `holdings` — caller's holdings (requires authentication)
+
+        Stats are cached and refreshed every 15 minutes. Use `holdings` action to
+        get real-time position data for authenticated users.
+      operationId: getExchange
+      parameters:
+        - name: action
+          in: query
+          description: What to return. Omit for full snapshot.
+          schema:
+            type: string
+            enum: [funds, fund, offerings, holdings]
+        - name: symbol
+          in: query
+          description: Fund symbol — required when action=fund
+          schema:
+            type: string
+            example: PORS
+      responses:
+        '200':
+          description: Exchange data
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - description: Full snapshot (action omitted)
+                    type: object
+                    properties:
+                      funds:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MarketFund'
+                      offerings:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/VehicleOffering'
+                  - description: Funds list (action=funds)
+                    type: object
+                    properties:
+                      funds:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MarketFund'
+                  - description: Single fund (action=fund)
+                    $ref: '#/components/schemas/MarketFund'
+                  - description: Vehicle offerings (action=offerings)
+                    type: object
+                    properties:
+                      offerings:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/VehicleOffering'
+                  - description: Caller holdings (action=holdings)
+                    type: object
+                    properties:
+                      holdings:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            offering_id:
+                              type: string
+                              format: uuid
+                            shares:
+                              type: number
+                            value_usd:
+                              type: number
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Exchange]
+      summary: Market exchange actions (POST)
+      description: |
+        Same actions as GET but via POST body. Useful for actions with complex parameters
+        or where GET query string limits apply.
+
+        Request body mirrors GET query params: `{ "action": "fund", "symbol": "PORS" }`.
+      operationId: postExchange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [funds, fund, offerings, holdings]
+                symbol:
+                  type: string
+                  description: Fund symbol (for action=fund)
+      responses:
+        '200':
+          description: Exchange data (same structure as GET)
+          content:
+            application/json:
+              schema:
+                type: object
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1320,6 +1998,111 @@ components:
           type: integer
         pages:
           type: integer
+
+    SignalScore:
+      type: object
+      description: |
+        Market signal score — answers "is this a good deal?"
+        Combines comparable sales, heat score, pricing position, and auction sentiment.
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+        deal_score:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Deal score 0–100. Higher is a better deal.
+        deal_score_label:
+          type: string
+          nullable: true
+          enum: [strong_buy, buy, hold, pass, overpriced]
+          description: |
+            Consumer-friendly deal label.
+            - strong_buy: Significantly below market
+            - buy: Below market
+            - hold: At market
+            - pass: Above market or insufficient data
+            - overpriced: Meaningfully above comparable sales
+        heat_score:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Market demand intensity for this vehicle class.
+        heat_score_label:
+          type: string
+          nullable: true
+          enum: [cold, warm, hot, fire, volcanic]
+        estimated_value:
+          type: number
+          nullable: true
+          description: Estimated fair market value in USD
+        value_low:
+          type: number
+          nullable: true
+          description: Lower bound of value range in USD
+        value_high:
+          type: number
+          nullable: true
+          description: Upper bound of value range in USD
+        price_vs_market:
+          type: number
+          nullable: true
+          description: |
+            How the listing price compares to estimated market value, as a percentage.
+            Negative = priced BELOW market (better deal), positive = ABOVE market (overpriced).
+            Null if no listing price is available.
+          example: -12
+        comp_count:
+          type: integer
+          nullable: true
+          description: Number of comparable sales used in the valuation
+        signal_weights:
+          type: object
+          nullable: true
+          description: Contribution weights for each signal factor (0.0–1.0)
+          properties:
+            comp_coverage:
+              type: number
+              nullable: true
+              description: Weight given to comparable sales coverage
+            condition_signal:
+              type: number
+              nullable: true
+              description: Weight given to vehicle condition signals
+            auction_sentiment:
+              type: number
+              nullable: true
+              description: Weight given to auction comment sentiment
+            listing_velocity:
+              type: number
+              nullable: true
+              description: Weight given to market trend / listing velocity
+            price_position:
+              type: number
+              nullable: true
+              description: Weight given to bid curve / price position signals
+        confidence:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 1
+          description: Confidence score 0.0–1.0
+        model_version:
+          type: string
+          nullable: true
+          description: Model version used to compute the score
+        calculated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the score was last calculated
+        is_stale:
+          type: boolean
+          nullable: true
+          description: True if the score is older than the staleness threshold
 
     Valuation:
       type: object
@@ -1838,6 +2621,142 @@ components:
         details:
           type: string
 
+    MarketFund:
+      type: object
+      description: A Nuke market fund backed by a segment of collector vehicles
+      properties:
+        id:
+          type: string
+          format: uuid
+        symbol:
+          type: string
+          description: Trading symbol (e.g. PORS, TRUK, SQBD)
+          example: PORS
+        fund_type:
+          type: string
+          example: index
+        status:
+          type: string
+          enum: [active, paused, closed]
+          example: active
+        nav_share_price:
+          type: number
+          description: Net asset value per share in USD
+          example: 1.24
+        total_shares_outstanding:
+          type: number
+          example: 4000000
+        total_aum_usd:
+          type: number
+          description: Total assets under management in USD
+          example: 4960000
+        segment:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            slug:
+              type: string
+            name:
+              type: string
+              example: Porsche
+            description:
+              type: string
+              nullable: true
+            manager_type:
+              type: string
+            year_min:
+              type: integer
+              nullable: true
+            year_max:
+              type: integer
+              nullable: true
+            makes:
+              type: array
+              items:
+                type: string
+              nullable: true
+        stats:
+          type: object
+          properties:
+            vehicle_count:
+              type: integer
+              description: Number of vehicles in this fund's segment
+            market_cap_usd:
+              type: number
+              description: Total market cap for vehicles in this segment
+            change_7d_pct:
+              type: number
+              nullable: true
+              description: 7-day price change as a percentage
+            change_30d_pct:
+              type: number
+              nullable: true
+              description: 30-day price change as a percentage
+            stats_updated_at:
+              type: string
+              format: date-time
+              nullable: true
+
+    VehicleOffering:
+      type: object
+      description: A vehicle offered for fractional trading on the exchange
+      properties:
+        id:
+          type: string
+          format: uuid
+        vehicle_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, paused, sold, delisted]
+          example: active
+        current_share_price:
+          type: number
+          description: Current share price in USD
+          example: 12.50
+        total_shares:
+          type: number
+          description: Total shares issued for this vehicle
+          example: 10000
+        available_shares:
+          type: number
+          description: Shares available for purchase
+          example: 7500
+        vehicle:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            year:
+              type: integer
+              nullable: true
+            make:
+              type: string
+              nullable: true
+            model:
+              type: string
+              nullable: true
+            vin:
+              type: string
+              nullable: true
+            nuke_estimate:
+              type: number
+              nullable: true
+              description: Estimated market value in USD
+            sale_price:
+              type: number
+              nullable: true
+            primary_image_url:
+              type: string
+              format: uri
+              nullable: true
+
   responses:
     Unauthorized:
       description: Authentication required or invalid
@@ -1888,3 +2807,4 @@ components:
         Retry-After:
           schema:
             type: integer
+

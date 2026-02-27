@@ -1,13 +1,16 @@
 /**
- * Nuke Design System
- * 
- * Based on Windows 95 / macOS 10 aesthetic:
- * - Arial font family
- * - 10px and 12px font sizes only
- * - Light grey and white backgrounds
- * - Black text
- * - Tight spacing, minimal padding
- * - Classic UI patterns
+ * ╔══════════════════════════════════════════════════════════════════╗
+ * ║  DEPRECATED — DO NOT IMPORT IN NEW FILES                        ║
+ * ║                                                                  ║
+ * ║  The canonical system is:                                        ║
+ * ║    src/styles/unified-design-system.css  (loaded via index.css) ║
+ * ║                                                                  ║
+ * ║  This file is frozen. 92 legacy components still import it.     ║
+ * ║  Those are being migrated in Phase 3 of the design remediation. ║
+ * ║  Do not add new rules or new imports of this file.              ║
+ * ║                                                                  ║
+ * ║  ESLint will error if you import this file in new components.   ║
+ * ╚══════════════════════════════════════════════════════════════════╝
  */
 
 /* Color Palette */

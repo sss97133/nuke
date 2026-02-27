@@ -49,7 +49,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
       const updates: any = {};
       if (businessName) updates.business_name = businessName;
       if (legalName) updates.legal_name = legalName;
-      if (businessType) updates.business_type = businessType;
+      if (businessType) updates.entity_type = businessType;
       if (description) updates.description = description;
 
       if (Object.keys(updates).length > 0) {

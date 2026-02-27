@@ -27,12 +27,12 @@ type FundWithStats = {
   };
 };
 
-const formatUSD0 = (value: number) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  }).format(value);
+const formatLargeUSD = (value: number) => {
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+};
 
 const formatPct = (value: number | null) => {
   if (value === null || Number.isNaN(value)) return '—';
@@ -41,6 +41,26 @@ const formatPct = (value: number | null) => {
 };
 
 const EXCHANGE_API = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-v1-exchange`;
+
+function FundSkeleton() {
+  return (
+    <div style={{
+      padding: '18px',
+      border: '2px solid var(--border)',
+      borderRadius: '6px',
+      background: 'var(--surface)',
+      animation: 'pulse 1.5s ease-in-out infinite',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <div style={{ height: '18px', width: '60px', background: 'var(--border)', borderRadius: '3px' }} />
+        <div style={{ height: '14px', width: '30px', background: 'var(--border)', borderRadius: '3px' }} />
+      </div>
+      <div style={{ height: '14px', width: '80%', background: 'var(--border)', borderRadius: '3px', marginBottom: '12px' }} />
+      <div style={{ height: '12px', width: '100%', background: 'var(--border)', borderRadius: '3px', marginBottom: '6px' }} />
+      <div style={{ height: '16px', width: '40%', background: 'var(--border)', borderRadius: '3px' }} />
+    </div>
+  );
+}
 
 export default function MarketExchange() {
   const navigate = useNavigate();
@@ -55,7 +75,8 @@ export default function MarketExchange() {
       managerType: f.segment?.manager_type || 'ai',
       marketCap: f.stats.market_cap_usd,
       vehicleCount: f.stats.vehicle_count,
-      change7: f.stats.change_7d_pct
+      change7: f.stats.change_7d_pct,
+      change30: f.stats.change_30d_pct,
     }));
   }, [funds]);
 
@@ -65,11 +86,10 @@ export default function MarketExchange() {
         setLoading(true);
         setError(null);
 
-        // Single call to api-v1-exchange — returns funds with cached stats (no slow RPC)
         const { data: { session } } = await supabase.auth.getSession();
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         };
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
@@ -91,34 +111,47 @@ export default function MarketExchange() {
   }, []);
 
   const tileBg = (pct: number | null) => {
-    if (pct === null) return 'rgba(0,0,0,0.03)';
-    if (pct > 0) return 'rgba(16, 185, 129, 0.14)';
-    if (pct < 0) return 'rgba(220, 38, 38, 0.14)';
-    return 'rgba(0,0,0,0.03)';
+    if (pct === null) return 'var(--surface)';
+    if (pct > 0) return 'rgba(22, 130, 93, 0.06)';
+    if (pct < 0) return 'rgba(209, 52, 56, 0.06)';
+    return 'var(--surface)';
   };
-
-  if (loading) {
-    return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
-        Loading markets...
-      </div>
-    );
-  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
           <div>
-            <h1 style={{ fontSize: '12pt', margin: 0 }}>Market Exchange</h1>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Segment ETFs (AI-managed and human-managed) you can invest into.
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h1 style={{ fontSize: 'var(--fs-12)', margin: 0, fontWeight: 900 }}>Market Exchange</h1>
+              <span style={{
+                fontSize: 'var(--fs-8)',
+                fontWeight: 700,
+                padding: '2px 7px',
+                borderRadius: '3px',
+                border: '1.5px solid var(--border)',
+                color: 'var(--text-secondary)',
+                letterSpacing: '0.05em',
+              }}>
+                BETA
+              </span>
+            </div>
+            <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Collector vehicle segment ETFs — AI-managed, data-driven
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>
-              Portfolio
+              My Portfolio
             </button>
             <button className="button button-secondary" onClick={() => navigate('/market/competitors')}>
               vs. Competition
@@ -129,70 +162,165 @@ export default function MarketExchange() {
           </div>
         </div>
 
+        {/* Error state — generic, no technical details */}
         {error && (
-          <div style={{ marginTop: '16px', padding: '16px', border: '2px solid #f59e0b', background: 'rgba(245, 158, 11, 0.08)' }}>
-            <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '10pt' }}>⚠️ BETA — Under Construction</div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
-              The market exchange is in development. Current status:
+          <div style={{
+            marginBottom: '16px',
+            padding: '14px 16px',
+            border: '2px solid var(--border)',
+            borderRadius: '4px',
+            background: 'var(--surface)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+          }}>
+            <div>
+              <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, marginBottom: '4px' }}>
+                Unable to load market data
+              </div>
+              <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>
+                The market data service may be temporarily unavailable. Try refreshing.
+              </div>
             </div>
-            <ul style={{ fontSize: '9pt', color: 'var(--text-muted)', margin: '0', paddingLeft: '20px' }}>
-              <li>Fund structure exists, pricing engine functional</li>
-              <li>Awaiting SEC Reg A+ filing (12-18 months)</li>
-              <li>No active trading until regulatory compliance complete</li>
-            </ul>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '12px', fontStyle: 'italic' }}>
-              Technical error: {error}
-            </div>
+            <button
+              className="button button-secondary"
+              style={{ whiteSpace: 'nowrap' }}
+              onClick={() => window.location.reload()}
+            >
+              Refresh
+            </button>
           </div>
         )}
 
-        <div style={{ marginTop: '18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
-          {tiles.map((t) => (
-            <button
-              key={t.fund.id}
-              onClick={() => navigate(`/market/exchange/${t.fund.symbol}`)}
-              style={{
-                textAlign: 'left',
-                cursor: 'pointer',
-                padding: '14px',
-                border: '2px solid var(--border)',
-                borderRadius: '4px',
-                background: tileBg(t.change7),
-                transition: 'transform 0.12s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline' }}>
-                <div style={{ fontWeight: 800 }}>{t.fund.symbol}</div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{t.managerType.toUpperCase()}</div>
-              </div>
-              <div style={{ marginTop: '6px', fontWeight: 700 }}>{t.label}</div>
-              <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
-                {t.vehicleCount.toLocaleString()} vehicles • {formatUSD0(t.marketCap)} market cap
-              </div>
-              <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>7d</div>
-                <div style={{ fontWeight: 800 }}>{formatPct(t.change7)}</div>
-              </div>
-              <div style={{ marginTop: '8px', fontSize: '9pt', color: 'var(--text-muted)' }}>
-                NAV {t.fund.nav_share_price.toFixed(2)}
-              </div>
-            </button>
-          ))}
+        {/* Fund grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+          gap: '12px',
+          marginBottom: '32px',
+        }}>
+          {loading ? (
+            [1, 2, 3, 4].map(i => <FundSkeleton key={i} />)
+          ) : (
+            tiles.map((t) => (
+              <button
+                key={t.fund.id}
+                onClick={() => navigate(`/market/exchange/${t.fund.symbol}`)}
+                style={{
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  padding: '18px',
+                  border: '2px solid var(--border)',
+                  borderRadius: '6px',
+                  background: tileBg(t.change7),
+                  transition: 'transform 0.12s ease, box-shadow 0.12s ease',
+                  display: 'block',
+                  width: '100%',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {/* Symbol + type badge */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                  <span style={{ fontWeight: 900, fontSize: 'var(--fs-12)' }}>{t.fund.symbol}</span>
+                  <span style={{
+                    fontSize: 'var(--fs-8)',
+                    color: 'var(--text-secondary)',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    padding: '1px 5px',
+                    borderRadius: '3px',
+                  }}>
+                    {t.managerType.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* Name */}
+                <div style={{ fontSize: 'var(--fs-9)', fontWeight: 600, marginBottom: '12px' }}>
+                  {t.label}
+                </div>
+
+                {/* NAV */}
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: 'var(--fs-11)', fontWeight: 800 }}>
+                    ${t.fund.nav_share_price.toFixed(4)}
+                  </div>
+                  <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    NAV per share
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '8px',
+                  paddingTop: '10px',
+                  borderTop: '1px solid var(--border)',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>Market Cap</div>
+                    <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700 }}>
+                      {formatLargeUSD(t.marketCap)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>7d</div>
+                    <div style={{
+                      fontSize: 'var(--fs-9)',
+                      fontWeight: 700,
+                      color: t.change7 === null
+                        ? 'var(--text-secondary)'
+                        : t.change7 > 0 ? 'var(--success)' : t.change7 < 0 ? 'var(--error)' : 'var(--text)',
+                    }}>
+                      {formatPct(t.change7)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>Vehicles</div>
+                    <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700 }}>
+                      {t.vehicleCount.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>30d</div>
+                    <div style={{
+                      fontSize: 'var(--fs-9)',
+                      fontWeight: 700,
+                      color: t.change30 === null
+                        ? 'var(--text-secondary)'
+                        : t.change30 > 0 ? 'var(--success)' : t.change30 < 0 ? 'var(--error)' : 'var(--text)',
+                    }}>
+                      {formatPct(t.change30)}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Regulatory notice — clean, not alarming */}
+        <div style={{
+          padding: '14px 16px',
+          border: '1px solid var(--border)',
+          borderRadius: '4px',
+          background: 'var(--surface)',
+          fontSize: 'var(--fs-8)',
+          color: 'var(--text-secondary)',
+          lineHeight: 1.6,
+        }}>
+          <strong style={{ color: 'var(--text)' }}>Note:</strong> The Nuke Market Exchange is in beta.
+          Live trading is pending SEC Reg A+ filing (estimated 12-18 months). NAV data is updated every 15 minutes from verified auction records.
         </div>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-

@@ -227,7 +227,7 @@ serve(async (req) => {
         const results = await Promise.allSettled(
           batch.map(async (url) => {
             const response = await fetch(
-              `${Deno.env.get('SUPABASE_URL')}/functions/v1/bat-simple-extract`,
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/complete-bat-import`,
               {
                 method: 'POST',
                 headers: {

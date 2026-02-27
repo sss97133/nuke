@@ -1,28 +1,35 @@
 /**
  * APPROVED BAT EXTRACTION WORKFLOW
- * 
+ *
  * ⚠️ CRITICAL: Do NOT use deprecated functions for BaT extraction.
- * 
+ *
  * ✅ APPROVED WORKFLOW (use this):
- * 1. extract-bat-core (core data: HTML snapshot + clean identity + essentials/images/auction_events)
- * 2. extract-auction-comments (comments, bids)
- * 
+ * - complete-bat-import  ← single entry point; calls extract-bat-core then extract-auction-comments
+ *   OR call the two sub-functions directly:
+ *   1. extract-bat-core (core data: HTML snapshot + clean identity + essentials/images/auction_events)
+ *   2. extract-auction-comments (comments, bids)
+ *
  * ❌ DEPRECATED (DO NOT USE):
+ * - bat-simple-extract   ← replaced by complete-bat-import
+ * - bat-extract          ← replaced by complete-bat-import
  * - comprehensive-bat-extraction
  * - import-bat-listing
  * - bat-extract-complete-v1/v2/v3
- * - bat-simple-extract (for full extraction)
- * 
+ *
  * Documentation: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
  */
 
 export const APPROVED_BAT_EXTRACTORS = {
+  // Single entry point — orchestrates core + comments
+  ENTRY: 'complete-bat-import',
   // BaT-only core extractor (free mode, evidence-first, avoids polluted titles/models)
   CORE_DATA: 'extract-bat-core',
   COMMENTS: 'extract-auction-comments',
 } as const;
 
 export const DEPRECATED_BAT_EXTRACTORS = [
+  'bat-simple-extract',
+  'bat-extract',
   'comprehensive-bat-extraction',
   'import-bat-listing',
   'bat-extract-complete-v1',
