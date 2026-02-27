@@ -44,9 +44,6 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
         </div>
         <div className="card-body">
           <div className="text-small text-muted">No contributions yet this year.</div>
-          <div className="text-small" style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--grey-100)' }}>
-            DEBUG: Received {contributions?.length || 0} contributions
-          </div>
         </div>
       </div>
     );

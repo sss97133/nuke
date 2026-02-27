@@ -130,7 +130,25 @@ const Profile: React.FC = () => {
         }
       }
 
-      const targetUserId = userId || currentUserId;
+      // Resolve userId — could be a UUID or a username slug
+      let targetUserId = userId || currentUserId;
+
+      if (targetUserId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetUserId)) {
+        // Not a UUID — treat as username, resolve to UUID
+        const { data: profileLookup, error: lookupError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', targetUserId)
+          .single();
+
+        if (lookupError || !profileLookup) {
+          setError(`Profile "${targetUserId}" not found`);
+          setLoading(false);
+          return;
+        }
+        targetUserId = profileLookup.id;
+      }
+
       if (!targetUserId) {
         setError('No user ID provided');
         setLoading(false);

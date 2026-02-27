@@ -923,8 +923,10 @@ const CursorHomepage: React.FC = () => {
           }
           q = q.neq('status', 'deleted');
 
-          // Only show vehicles with images by default (hides ~550k incomplete records)
-          q = q.not('primary_image_url', 'is', null);
+          // Only show vehicles with images — UNLESS sorting by newest (so new extractions are visible)
+          if (sortBy !== 'newest') {
+            q = q.not('primary_image_url', 'is', null);
+          }
 
           // Only show vehicles with valid year/make/model
           q = q.not('year', 'is', null);
