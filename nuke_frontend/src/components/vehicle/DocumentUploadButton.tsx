@@ -33,7 +33,7 @@ export const DocumentUploadButton: React.FC<DocumentUploadButtonProps> = ({
         className={`button button-${variant}`}
         onClick={() => setShowUploader(true)}
         style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           padding: variant === 'inline' ? '4px 8px' : '8px 12px',
           display: 'flex',
           alignItems: 'center',

@@ -172,11 +172,11 @@ export default function AuctionCountdown({
   const getSizeStyles = () => {
     switch (size) {
       case 'small':
-        return { fontSize: '11pt', padding: '6px 10px' };
+        return { fontSize: '15px', padding: '6px 10px' };
       case 'large':
-        return { fontSize: '20pt', padding: '14px 20px' };
+        return { fontSize: '27px', padding: '14px 20px' };
       default:
-        return { fontSize: '14pt', padding: '10px 14px' };
+        return { fontSize: '19px', padding: '10px 14px' };
     }
   };
 
@@ -197,7 +197,7 @@ export default function AuctionCountdown({
         {/* Soft-close indicator */}
         {state?.is_soft_close_active && timeRemaining !== null && timeRemaining > 0 && (
           <div style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             color: '#ef4444',
             fontWeight: 600,
             marginBottom: '4px',
@@ -223,7 +223,7 @@ export default function AuctionCountdown({
         {/* Extension count */}
         {state?.extension_count && state.extension_count > 0 && (
           <div style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-muted)',
             marginTop: '4px'
           }}>
@@ -235,7 +235,7 @@ export default function AuctionCountdown({
       {/* Sync status */}
       {showSyncStatus && state && (
         <div style={{
-          fontSize: '7pt',
+          fontSize: '9px',
           color: 'var(--text-muted)',
           marginTop: '6px',
           display: 'flex',
@@ -270,10 +270,10 @@ export default function AuctionCountdown({
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Current bid
           </span>
-          <span style={{ fontSize: '10pt', fontWeight: 700 }}>
+          <span style={{ fontSize: '13px', fontWeight: 700 }}>
             ${(state.current_bid_cents / 100).toLocaleString()}
           </span>
         </div>

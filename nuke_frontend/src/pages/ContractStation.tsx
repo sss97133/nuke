@@ -33,10 +33,10 @@ export default function ContractStation() {
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ margin: 0, fontSize: '18pt', fontWeight: 900, marginBottom: '8px' }}>
+          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900, marginBottom: '8px' }}>
             Contract Station
           </h1>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
             Create and manage transparent investment contracts. Curate vehicles, organizations, projects, and users into investment packages.
           </div>
 
@@ -51,7 +51,7 @@ export default function ContractStation() {
                 background: 'transparent',
                 color: activeTab === 'marketplace' ? 'var(--primary)' : 'var(--text-muted)',
                 fontWeight: activeTab === 'marketplace' ? 700 : 400,
-                fontSize: '9pt',
+                fontSize: '12px',
                 cursor: 'pointer',
                 marginBottom: '-2px'
               }}
@@ -67,7 +67,7 @@ export default function ContractStation() {
                 background: 'transparent',
                 color: activeTab === 'builder' ? 'var(--primary)' : 'var(--text-muted)',
                 fontWeight: activeTab === 'builder' ? 700 : 400,
-                fontSize: '9pt',
+                fontSize: '12px',
                 cursor: 'pointer',
                 marginBottom: '-2px'
               }}
@@ -84,7 +84,7 @@ export default function ContractStation() {
                   background: 'transparent',
                   color: activeTab === 'my_contracts' ? 'var(--primary)' : 'var(--text-muted)',
                   fontWeight: activeTab === 'my_contracts' ? 700 : 400,
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   cursor: 'pointer',
                   marginBottom: '-2px'
                 }}

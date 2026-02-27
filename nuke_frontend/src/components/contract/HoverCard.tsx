@@ -73,7 +73,7 @@ export default function HoverCard({ children, content, width = 300, delay = 300,
             boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             pointerEvents: 'none',
             overflow: 'hidden',
-            fontSize: '9pt',
+            fontSize: '12px',
           }}
         >
           {content}
@@ -86,7 +86,7 @@ export default function HoverCard({ children, content, width = 300, delay = 300,
 /** Mini stat row for hover cards */
 export function HoverStat({ label, value, color }: { label: string; value: any; color?: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0', fontSize: '8pt' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0', fontSize: '11px' }}>
       <span style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span style={{ fontWeight: 700, color: color || 'var(--text)' }}>{value}</span>
     </div>

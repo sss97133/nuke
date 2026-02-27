@@ -167,7 +167,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              fontSize: '9pt',
+              fontSize: '12px',
               color: step === s ? 'var(--primary)' : 'var(--text-muted)',
               fontWeight: step === s ? 700 : 400
             }}
@@ -183,7 +183,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700
               }}
             >
@@ -201,7 +201,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
 
       {error && (
         <div className="card" style={{ marginBottom: '16px', border: '2px solid var(--danger, #ef4444)' }}>
-          <div className="card-body" style={{ color: 'var(--danger, #ef4444)', fontSize: '9pt' }}>
+          <div className="card-body" style={{ color: 'var(--danger, #ef4444)', fontSize: '12px' }}>
             {error}
           </div>
         </div>
@@ -216,7 +216,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
           <div className="card-body">
             <div style={{ display: 'grid', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Contract Name *
                 </label>
                 <input
@@ -229,7 +229,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Contract Symbol (Ticker) *
                 </label>
                 <input
@@ -240,13 +240,13 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                   maxLength={10}
                   style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px', textTransform: 'uppercase' }}
                 />
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   2-10 characters, uppercase letters/numbers
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Description
                 </label>
                 <textarea
@@ -259,7 +259,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Contract Type *
                 </label>
                 <select
@@ -279,7 +279,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                     Your Name (Curator) *
                   </label>
                   <input
@@ -292,7 +292,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                     Bio / Credentials
                   </label>
                   <textarea
@@ -306,7 +306,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Tags (comma-separated)
                 </label>
                 <input
@@ -359,8 +359,8 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
             <div className="card-body">
               <div style={{ display: 'grid', gap: '16px' }}>
                 <div>
-                  <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Contract Details</div>
-                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '16px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Contract Details</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '16px' }}>
                     <strong>Name:</strong> {contract.contract_name}<br/>
                     <strong>Symbol:</strong> {contract.contract_symbol}<br/>
                     <strong>Type:</strong> {contract.contract_type?.toUpperCase()}<br/>
@@ -369,15 +369,15 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Selected Assets</div>
-                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Selected Assets</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     {selectedAssets.length} assets selected
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Investment Terms</div>
-                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '16px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Investment Terms</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '16px' }}>
                     <strong>Minimum Investment:</strong> {contract.minimum_investment_cents ? formatCents(contract.minimum_investment_cents) : 'Not set'}<br/>
                     <strong>Management Fee:</strong> {contract.management_fee_pct}%<br/>
                     <strong>Transaction Fee:</strong> {contract.transaction_fee_pct}%<br/>

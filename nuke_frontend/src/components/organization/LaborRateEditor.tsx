@@ -82,14 +82,14 @@ export const LaborRateEditor: React.FC<LaborRateEditorProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-header">
-          <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
             Set Labor Rate - {organizationName}
           </h3>
         </div>
         <div className="card-body">
           <form onSubmit={handleSave}>
             <div style={{ marginBottom: '16px' }}>
-              <label className="form-label" style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
                 Hourly Labor Rate ($)
               </label>
               <input
@@ -100,10 +100,10 @@ export const LaborRateEditor: React.FC<LaborRateEditorProps> = ({
                 onChange={(e) => setLaborRate(e.target.value)}
                 placeholder="e.g. 125.00"
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
                 required
               />
-              <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                 This is your standard hourly labor rate for estimates and work orders.
               </div>
             </div>
@@ -113,7 +113,7 @@ export const LaborRateEditor: React.FC<LaborRateEditorProps> = ({
                 type="button"
                 onClick={onClose}
                 className="button button-secondary"
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
                 disabled={saving}
               >
                 Cancel
@@ -121,7 +121,7 @@ export const LaborRateEditor: React.FC<LaborRateEditorProps> = ({
               <button
                 type="submit"
                 className="button button-primary"
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
                 disabled={saving}
               >
                 {saving ? 'Saving...' : 'Save Labor Rate'}

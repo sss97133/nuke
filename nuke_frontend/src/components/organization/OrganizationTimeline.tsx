@@ -82,7 +82,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
         Loading timeline...
       </div>
     );
@@ -90,7 +90,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
 
   if (events.length === 0) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
         No work orders or events yet. Upload images or add data to create timeline entries.
       </div>
     );
@@ -132,7 +132,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               color: '#fff',
               position: 'relative',
@@ -141,12 +141,12 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
             }}>
               {new Date(date).getDate()}
             </div>
-            <div style={{ fontSize: '10pt', fontWeight: 600, color: 'var(--text)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
               {new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
             </div>
             {groupedEvents[date].length > 1 && (
               <div style={{
-                fontSize: '7pt',
+                fontSize: '9px',
                 padding: '2px 6px',
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
@@ -175,11 +175,11 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
             >
               {/* Event header */}
               <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                   {event.title}
                 </div>
                 {event.description && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                     {event.description}
                   </div>
                 )}
@@ -188,7 +188,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
               {/* Event metadata badges */}
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: event.image_urls?.length ? '10px' : '0' }}>
                 <div style={{
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   padding: '2px 6px',
                   borderRadius: '2px',
                   background: 'var(--accent-dim)',
@@ -201,7 +201,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
 
                 {event.profiles && (
                   <div style={{
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     padding: '2px 6px',
                     borderRadius: '2px',
                     background: 'var(--surface)',
@@ -214,7 +214,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
 
                 {event.cost_amount && (
                   <div style={{
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     padding: '2px 6px',
                     borderRadius: '2px',
                     background: '#d4edda',
@@ -227,7 +227,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
 
                 {event.labor_hours && (
                   <div style={{
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     padding: '2px 6px',
                     borderRadius: '2px',
                     background: '#d1ecf1',
@@ -267,7 +267,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
                       background: 'var(--surface)',
                       border: '1px solid var(--border)',
                       borderRadius: '2px',
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       color: 'var(--text-muted)',
                       fontWeight: 600
                     }}>

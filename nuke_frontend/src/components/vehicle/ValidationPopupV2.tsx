@@ -396,7 +396,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           background: 'var(--bg)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-            <span style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
               {fieldName.toUpperCase()}
             </span>
             {isEditing ? (
@@ -406,7 +406,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                 onChange={(e) => setEditedValue(e.target.value)}
                 autoFocus
                 style={{
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   fontWeight: 700,
                   padding: '4px 8px',
                   border: '2px solid var(--accent)',
@@ -421,7 +421,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                 }}
               />
             ) : (
-              <span style={{ fontSize: '10pt', fontWeight: 700 }}>
+              <span style={{ fontSize: '13px', fontWeight: 700 }}>
                 {fieldValue}
               </span>
             )}
@@ -433,7 +433,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                   onClick={handleSave}
                   disabled={saving}
                   className="button button-primary"
-                  style={{ fontSize: '8pt', padding: '4px 12px' }}
+                  style={{ fontSize: '11px', padding: '4px 12px' }}
                 >
                   {saving ? 'Saving...' : 'Save'}
                 </button>
@@ -443,7 +443,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                     setIsEditing(false);
                   }}
                   className="button"
-                  style={{ fontSize: '8pt', padding: '4px 12px' }}
+                  style={{ fontSize: '11px', padding: '4px 12px' }}
                 >
                   Cancel
                 </button>
@@ -452,7 +452,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               <button
                 onClick={() => setIsEditing(true)}
                 className="button"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                style={{ fontSize: '11px', padding: '4px 12px' }}
               >
                 Edit
               </button>
@@ -462,7 +462,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               style={{
                 background: 'transparent',
                 border: 'none',
-                fontSize: '16pt',
+                fontSize: '21px',
                 cursor: 'pointer',
                 padding: 0,
                 lineHeight: 1,
@@ -481,7 +481,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               padding: '6px 12px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface)',
-              fontSize: '7pt',
+              fontSize: '9px',
               color: 'var(--text-muted)',
               lineHeight: 1.4
             }}
@@ -535,19 +535,19 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         {/* Document previews - main focus */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: 'var(--text-muted)' }}>
               Loading...
             </div>
           ) : sources.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 {isVinField
                   ? 'No uploaded proof artifacts yet (title/registration/VIN plate). This does not explain where the VIN value came from.'
                   : 'No proof yet'}
               </div>
               <button
                 className="button button-primary"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                style={{ fontSize: '11px', padding: '4px 12px' }}
                 onClick={() => {
                   onClose();
                   window.dispatchEvent(new CustomEvent('trigger_image_upload', { detail: { vehicleId } }));
@@ -569,7 +569,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                   border: '1px solid var(--border)',
                   borderRadius: '4px'
                 }}>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Verified By
                   </div>
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -625,7 +625,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                         </div>
                         {/* Label */}
                         <span style={{ 
-                          fontSize: '6pt', 
+                          fontSize: '8px', 
                           color: 'var(--text-muted)', 
                           textAlign: 'center',
                           maxWidth: '60px',
@@ -637,7 +637,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                         </span>
                         {/* Confidence indicator */}
                         <span style={{ 
-                          fontSize: '6pt', 
+                          fontSize: '8px', 
                           color: getConfidenceColor(source.confidence_score),
                           fontWeight: 700
                         }}>
@@ -685,7 +685,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                         left: '8px',
                         background: 'rgba(0,0,0,0.75)',
                         padding: '4px 8px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         color: '#fff',
                         fontWeight: 700
                       }}>
@@ -697,7 +697,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                         right: '8px',
                         background: 'rgba(0,0,0,0.75)',
                         padding: '4px 8px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         color: getConfidenceColor(source.confidence_score),
                         fontWeight: 700
                       }}>
@@ -707,7 +707,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                         position: 'absolute',
                         bottom: '8px',
                         left: '8px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         color: 'var(--surface-glass)'
                       }}>
                         {new Date(source.created_at).toLocaleDateString()}
@@ -717,7 +717,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                   
                   {/* No image fallback - external sources or text-only */}
                   {!source.image_url && (
-                    <div style={{ padding: '12px', fontSize: '8pt' }}>
+                    <div style={{ padding: '12px', fontSize: '11px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                         {source.logo_url && (
                           <img 
@@ -736,7 +736,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                             target="_blank" 
                             rel="noreferrer"
                             style={{ 
-                              fontSize: '7pt', 
+                              fontSize: '9px', 
                               color: 'var(--accent)', 
                               textDecoration: 'none',
                               marginLeft: 'auto'
@@ -769,7 +769,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: '7pt'
+          fontSize: '9px'
         }}>
           <div style={{ display: 'flex', gap: '12px' }}>
             <span>{sources.length} source{sources.length !== 1 ? 's' : ''}</span>
@@ -782,7 +782,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                 padding: 0,
                 color: 'var(--text-muted)',
                 textDecoration: 'underline dotted',
-                fontSize: '7pt'
+                fontSize: '9px'
               }}
             >
               {uniqueValidators} validator{uniqueValidators !== 1 ? 's' : ''} *
@@ -796,7 +796,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                 padding: 0,
                 color: getConfidenceColor(confidence),
                 textDecoration: 'underline dotted',
-                fontSize: '7pt',
+                fontSize: '9px',
                 fontWeight: 700
               }}
             >
@@ -805,7 +805,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           </div>
           <button
             className="btn-utility"
-            style={{ fontSize: '7pt', padding: '2px 8px' }}
+            style={{ fontSize: '9px', padding: '2px 8px' }}
             onClick={() => {
               onClose();
               window.dispatchEvent(new CustomEvent('trigger_image_upload', { detail: { vehicleId } }));
@@ -833,10 +833,10 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>
             How Confidence is Calculated
           </h3>
-          <div style={{ fontSize: '9pt', lineHeight: 1.6, color: 'var(--text)' }}>
+          <div style={{ fontSize: '12px', lineHeight: 1.6, color: 'var(--text)' }}>
             <div style={{ marginBottom: '8px' }}>
               <strong>Algorithm:</strong>
             </div>
@@ -847,13 +847,13 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               <li>Multiple validators: +20% each</li>
               <li>Cross-verified data: +15%</li>
             </ul>
-            <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '8pt' }}>
+            <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '11px' }}>
               Your score: <strong>{confidence}%</strong> from {sources.length} source(s)
             </div>
           </div>
           <button
             className="button button-primary"
-            style={{ width: '100%', marginTop: '12px', fontSize: '8pt' }}
+            style={{ width: '100%', marginTop: '12px', fontSize: '11px' }}
             onClick={() => setShowConfidenceExplainer(false)}
           >
             Close
@@ -878,10 +878,10 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>
             What are Validators?
           </h3>
-          <div style={{ fontSize: '9pt', lineHeight: 1.6, color: 'var(--text)' }}>
+          <div style={{ fontSize: '12px', lineHeight: 1.6, color: 'var(--text)' }}>
             <p>Validators are sources that independently verify vehicle data:</p>
             <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
               <li><strong>External:</strong> Auction houses (BaT, Cars & Bids), dealers, manufacturers</li>
@@ -889,7 +889,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               <li><strong>Community:</strong> Cross-referencing public records</li>
             </ul>
             {uniqueValidators > 0 && (
-              <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '8pt' }}>
+              <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '11px' }}>
                 <strong>Current validators ({uniqueValidators}):</strong>
                 <ul style={{ paddingLeft: '16px', margin: '4px 0 0 0' }}>
                   {Array.from(new Set(sources.map(s => s.verified_by || s.source_name).filter(Boolean))).map((v, i) => (
@@ -898,13 +898,13 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                 </ul>
               </div>
             )}
-            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '8pt' }}>
+            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '11px' }}>
               Data becomes <strong>verified</strong> when 2+ validators confirm the same information.
             </div>
           </div>
           <button
             className="button button-primary"
-            style={{ width: '100%', marginTop: '12px', fontSize: '8pt' }}
+            style={{ width: '100%', marginTop: '12px', fontSize: '11px' }}
             onClick={() => setShowValidatorExplainer(false)}
           >
             Close
@@ -945,7 +945,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               borderRadius: '50%',
               width: '40px',
               height: '40px',
-              fontSize: '20pt',
+              fontSize: '27px',
               cursor: 'pointer',
               lineHeight: 1
             }}

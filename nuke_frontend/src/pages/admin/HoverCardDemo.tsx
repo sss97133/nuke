@@ -17,10 +17,10 @@ export default function HoverCardDemo() {
   return (
     <div style={{ padding: 'var(--space-6)', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ marginBottom: 'var(--space-6)' }}>
-        <h1 style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 'var(--space-2)' }}>
+        <h1 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 'var(--space-2)' }}>
           Hover Card Components Demo
         </h1>
-        <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           Hover over the examples below to see what each component looks like
         </p>
       </div>
@@ -33,13 +33,13 @@ export default function HoverCardDemo() {
           backgroundColor: 'var(--white)',
           marginBottom: 'var(--space-3)'
         }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
             ImageHoverPreview
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
             Shows medium-res image preview + extraction date on hover
           </div>
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             Image ID: <ImageHoverPreview imageUrl="https://example.com/image.jpg" imageId={exampleImageId}>
               <span style={{ fontFamily: 'monospace', textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
                 {exampleImageId.substring(0, 8)}...
@@ -50,7 +50,7 @@ export default function HoverCardDemo() {
             marginTop: 'var(--space-3)', 
             padding: 'var(--space-2)', 
             backgroundColor: 'var(--bg)', 
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)',
             fontFamily: 'monospace'
           }}>
@@ -73,13 +73,13 @@ export default function HoverCardDemo() {
           backgroundColor: 'var(--white)',
           marginBottom: 'var(--space-3)'
         }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
             AnalysisModelPopup
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
             Click model names to see what they search for and output
           </div>
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             Model: <AnalysisModelPopup modelName="gpt-4o">
               <span style={{ color: 'var(--accent)', textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
                 gpt-4o
@@ -90,7 +90,7 @@ export default function HoverCardDemo() {
             marginTop: 'var(--space-3)', 
             padding: 'var(--space-2)', 
             backgroundColor: 'var(--bg)', 
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)'
           }}>
             Click popup shows:
@@ -114,13 +114,13 @@ export default function HoverCardDemo() {
           backgroundColor: 'var(--white)',
           marginBottom: 'var(--space-3)'
         }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
             IDHoverCard - Vehicle
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
             Auto-detects vehicle IDs and shows vehicle info
           </div>
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             Vehicle ID: <IDHoverCard id={exampleVehicleId} type="vehicle">
               <span style={{ fontFamily: 'monospace', textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
                 {exampleVehicleId.substring(0, 8)}...
@@ -131,7 +131,7 @@ export default function HoverCardDemo() {
             marginTop: 'var(--space-3)', 
             padding: 'var(--space-2)', 
             backgroundColor: 'var(--bg)', 
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)'
           }}>
             Hover card shows:
@@ -153,13 +153,13 @@ export default function HoverCardDemo() {
           backgroundColor: 'var(--white)',
           marginBottom: 'var(--space-3)'
         }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
             IDHoverCard - User
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
             Auto-detects user IDs and shows user info
           </div>
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             User ID: <IDHoverCard id={exampleUserId} type="user">
               <span style={{ fontFamily: 'monospace', textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
                 {exampleUserId.substring(0, 8)}...
@@ -170,7 +170,7 @@ export default function HoverCardDemo() {
             marginTop: 'var(--space-3)', 
             padding: 'var(--space-2)', 
             backgroundColor: 'var(--bg)', 
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)'
           }}>
             Hover card shows:
@@ -192,13 +192,13 @@ export default function HoverCardDemo() {
           backgroundColor: 'var(--white)',
           marginBottom: 'var(--space-3)'
         }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
             IDText - Automatic Detection
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
             Automatically detects and makes IDs hoverable in any text
           </div>
-          <div style={{ fontSize: '8pt', fontFamily: 'monospace', padding: 'var(--space-2)', backgroundColor: 'var(--bg)', border: '1px solid var(--border-light)' }}>
+          <div style={{ fontSize: '11px', fontFamily: 'monospace', padding: 'var(--space-2)', backgroundColor: 'var(--bg)', border: '1px solid var(--border-light)' }}>
             <IDText>
               Image ID: {exampleImageId}, Vehicle: {exampleVehicleId}, User: {exampleUserId}, Short: {exampleShortId}
             </IDText>
@@ -207,7 +207,7 @@ export default function HoverCardDemo() {
             marginTop: 'var(--space-3)', 
             padding: 'var(--space-2)', 
             backgroundColor: 'var(--bg)', 
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)'
           }}>
             Automatically detects:
@@ -227,10 +227,10 @@ export default function HoverCardDemo() {
         backgroundColor: 'var(--white)',
         marginTop: 'var(--space-6)'
       }}>
-        <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
           Visual Style Guide
         </div>
-        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           <div style={{ marginBottom: 'var(--space-2)' }}>
             <strong>Hover Cards:</strong>
             <ul style={{ marginTop: 'var(--space-1)', paddingLeft: 'var(--space-4)' }}>

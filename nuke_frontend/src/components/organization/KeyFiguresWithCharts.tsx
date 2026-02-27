@@ -51,11 +51,11 @@ export default function KeyFiguresWithCharts() {
 
   return (
     <>
-      <h3 style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+      <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
         Key Figures (Live System - February 2026)
       </h3>
       <div style={{ overflowX: 'auto', marginBottom: 'var(--space-6)' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '8pt' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '11px' }}>
           <tbody>
             {KEY_FIGURES.map((row, idx) => (
               <tr
@@ -72,7 +72,7 @@ export default function KeyFiguresWithCharts() {
                     {row.value}
                     <span
                       style={{
-                        fontSize: '6pt',
+                        fontSize: '8px',
                         fontWeight: 700,
                         letterSpacing: '0.05em',
                         color: 'var(--success, #16a34a)',
@@ -100,7 +100,7 @@ export default function KeyFiguresWithCharts() {
                         minWidth: 220,
                       }}
                     >
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: 6 }}>Live — current trend</div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 6 }}>Live — current trend</div>
                       <MiniLineChart
                         series={seriesFromTrend(row.trend, row.label)}
                         width={200}

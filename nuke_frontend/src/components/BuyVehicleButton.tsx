@@ -62,7 +62,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
             border: '2px solid #000',
             background: '#000',
             color: '#fff',
-            fontSize: '10pt',
+            fontSize: '13px',
             fontWeight: 700,
             cursor: disabled ? 'not-allowed' : 'pointer',
             borderRadius: '0px',
@@ -79,11 +79,11 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
           background: 'var(--surface)',
           minWidth: '300px'
         }}>
-          <h4 style={{ fontSize: '10pt', marginBottom: '12px', margin: 0 }}>
+          <h4 style={{ fontSize: '13px', marginBottom: '12px', margin: 0 }}>
             Purchase {vehicleName}
           </h4>
           
-          <div style={{ fontSize: '9pt', marginBottom: '12px', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: '12px', marginBottom: '12px', color: 'var(--text-secondary)' }}>
             <div>Sale Price: <strong>${salePrice.toLocaleString()}</strong></div>
             <div>Facilitation Fee (2%): <strong>${facilitationFee}</strong></div>
           </div>
@@ -91,7 +91,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
           <div style={{ marginBottom: '12px' }}>
             <label style={{ 
               display: 'block', 
-              fontSize: '8pt', 
+              fontSize: '11px', 
               fontWeight: 700,
               marginBottom: '4px'
             }}>
@@ -107,7 +107,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
                 padding: '8px',
                 border: '2px solid var(--border)',
                 borderRadius: '0px',
-                fontSize: '9pt'
+                fontSize: '12px'
               }}
             />
           </div>
@@ -122,7 +122,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
                 border: '2px solid var(--border)',
                 background: 'var(--surface)',
                 color: 'var(--text)',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 borderRadius: '0px'
@@ -139,7 +139,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
                 border: '2px solid #000',
                 background: '#000',
                 color: '#fff',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 700,
                 cursor: loading ? 'wait' : 'pointer',
                 borderRadius: '0px'
@@ -149,7 +149,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
             </button>
           </div>
 
-          <p style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginTop: '8px', margin: 0 }}>
+          <p style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '8px', margin: 0 }}>
             You'll pay ${facilitationFee} now for paperwork & facilitation.
             The ${salePrice.toLocaleString()} purchase price is paid directly to seller after signing.
           </p>

@@ -57,7 +57,7 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
 
   if (loading) {
     return (
-      <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '10pt' }}>
+      <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '13px' }}>
         Loading intelligence data...
       </div>
     );
@@ -67,10 +67,10 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
     return (
       <div style={{ padding: '16px' }}>
         <div className="card" style={{ textAlign: 'center', padding: '32px' }}>
-          <div style={{ fontSize: '11pt', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
             Intelligence data is being computed for this collection.
           </div>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '8px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
             Check back soon — demographic, market, and capacity analysis is generated automatically.
           </div>
         </div>
@@ -100,7 +100,7 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         {/* Capacity Card */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
             Capacity Utilization
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -115,17 +115,17 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
                   strokeLinecap="round"
                 />
               </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14pt', fontWeight: 700, color: utilizationColor }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '19px', fontWeight: 700, color: utilizationColor }}>
                 {intel.capacity_utilization != null ? `${Math.round(intel.capacity_utilization)}%` : 'N/A'}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '10pt' }}>
+              <div style={{ fontSize: '13px' }}>
                 <span style={{ fontWeight: 700 }}>{intel.current_inventory || 0}</span>
                 <span style={{ color: 'var(--text-muted)' }}> / {intel.estimated_capacity || '?'} vehicles</span>
               </div>
               {intel.capacity_method && (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Method: {intel.capacity_method.replace(/_/g, ' ')}
                 </div>
               )}
@@ -135,21 +135,21 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
 
         {/* Demand Score Card */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
             Demand Score
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ fontSize: '32pt', fontWeight: 800, color: demandColor, lineHeight: 1 }}>
+            <div style={{ fontSize: '43px', fontWeight: 800, color: demandColor, lineHeight: 1 }}>
               {intel.demand_score != null ? Math.round(intel.demand_score) : '—'}
             </div>
-            <div style={{ fontSize: '10pt', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
               / 100
             </div>
           </div>
           {intel.demand_signals && Object.keys(intel.demand_signals).length > 0 && (
             <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {Object.entries(intel.demand_signals).map(([key, value]) => (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '8pt' }}>
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
                   <div style={{ width: '100px', color: 'var(--text-muted)' }}>
                     {key.replace(/_/g, ' ')}
                   </div>
@@ -168,26 +168,26 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         {/* Demographics */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
             Market Context
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {intel.metro_area && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Metro Area</div>
-                <div style={{ fontSize: '10pt', fontWeight: 600 }}>{intel.metro_area}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Metro Area</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>{intel.metro_area}</div>
               </div>
             )}
             {intel.metro_population != null && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Population</div>
-                <div style={{ fontSize: '10pt', fontWeight: 600 }}>{intel.metro_population.toLocaleString()}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Population</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>{intel.metro_population.toLocaleString()}</div>
               </div>
             )}
             {intel.zip_median_income != null && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Median Income</div>
-                <div style={{ fontSize: '10pt', fontWeight: 600 }}>${Math.round(intel.zip_median_income).toLocaleString()}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Median Income</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>${Math.round(intel.zip_median_income).toLocaleString()}</div>
               </div>
             )}
           </div>
@@ -195,26 +195,26 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
 
         {/* Nearby Activity */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
             Nearby Activity
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {intel.vehicles_within_25mi != null && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Vehicles within 25mi</div>
-                <div style={{ fontSize: '10pt', fontWeight: 600 }}>{intel.vehicles_within_25mi.toLocaleString()}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vehicles within 25mi</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>{intel.vehicles_within_25mi.toLocaleString()}</div>
               </div>
             )}
             {intel.competing_collections_25mi != null && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Competing Collections (25mi)</div>
-                <div style={{ fontSize: '10pt', fontWeight: 600 }}>{intel.competing_collections_25mi}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Competing Collections (25mi)</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>{intel.competing_collections_25mi}</div>
               </div>
             )}
             {intel.competing_dealers_25mi != null && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Dealers Nearby (25mi)</div>
-                <div style={{ fontSize: '10pt', fontWeight: 600 }}>{intel.competing_dealers_25mi}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Dealers Nearby (25mi)</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>{intel.competing_dealers_25mi}</div>
               </div>
             )}
           </div>
@@ -224,13 +224,13 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
       {/* Make Distribution */}
       {topMakes.length > 0 && (
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
             Make Distribution
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {topMakes.map(([make, count]) => (
               <div key={make} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '80px', fontSize: '9pt', fontWeight: 600, textAlign: 'right' }}>{make}</div>
+                <div style={{ width: '80px', fontSize: '12px', fontWeight: 600, textAlign: 'right' }}>{make}</div>
                 <div style={{ flex: 1, height: '16px', background: 'var(--gray-100)', borderRadius: '4px', overflow: 'hidden' }}>
                   <div style={{
                     width: `${(count / maxMakeCount) * 100}%`,
@@ -238,7 +238,7 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
                     background: 'var(--accent, #3B82F6)',
                     borderRadius: '4px',
                     display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px',
-                    fontSize: '8pt', color: '#fff', fontWeight: 600,
+                    fontSize: '11px', color: '#fff', fontWeight: 600,
                   }}>
                     {count}
                   </div>
@@ -252,7 +252,7 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
       {/* Era Distribution */}
       {topEras.length > 0 && (
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
             Era Distribution
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -262,7 +262,7 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
                 background: 'var(--gray-50)',
                 border: '1px solid var(--border)',
                 borderRadius: '6px',
-                fontSize: '9pt',
+                fontSize: '12px',
               }}>
                 <span style={{ fontWeight: 600 }}>{era}</span>
                 <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>{count}</span>
@@ -275,14 +275,14 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
       {/* AI Opportunity Summary */}
       {intel.opportunity_summary && (
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 600 }}>
             Opportunity Analysis
           </div>
-          <div style={{ fontSize: '10pt', lineHeight: 1.6, color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: '13px', lineHeight: 1.6, color: 'var(--text-primary)' }}>
             {intel.opportunity_summary}
           </div>
           {intel.calculated_at && (
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '12px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '12px' }}>
               Last updated: {new Date(intel.calculated_at).toLocaleDateString()}
             </div>
           )}

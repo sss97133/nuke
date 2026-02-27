@@ -29,7 +29,7 @@ export default function VaultPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto', paddingTop: '100px' }}>
-          <p style={{ fontSize: '10pt', color: 'var(--text-muted)' }}>Loading...</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading...</p>
         </div>
       </div>
     );
@@ -39,8 +39,8 @@ export default function VaultPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto', paddingTop: '100px' }}>
-          <h1 style={{ fontSize: '14pt', marginBottom: '12px' }}>Vehicle Storage Vault</h1>
-          <p style={{ fontSize: '10pt', color: 'var(--text-muted)', marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '19px', marginBottom: '12px' }}>Vehicle Storage Vault</h1>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
             Sign in to view your stored vehicles.
           </p>
           <button

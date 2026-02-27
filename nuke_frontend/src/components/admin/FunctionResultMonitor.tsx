@@ -63,7 +63,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
         marginTop: 'var(--space-3)',
         border: '2px solid var(--border)',
         backgroundColor: 'var(--white)',
-        fontSize: '8pt',
+        fontSize: '11px',
       }}
     >
       <div
@@ -82,11 +82,11 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
           <div style={{ fontWeight: 600, color: 'var(--text)' }}>{functionName}</div>
           {invocation && (
             <>
-              <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
                 {invocation.timestamp.toLocaleString()}
               </div>
               {invocation.duration && (
-                <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
                   {invocation.duration}ms
                 </div>
               )}
@@ -100,13 +100,13 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
               backgroundColor: getStatusColor(),
               color: getStatusTextColor(),
               fontWeight: 600,
-              fontSize: '8pt',
+              fontSize: '11px',
             }}
           >
             {getStatusText()}
           </div>
           {invocation && (
-            <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
               {expanded ? '▼' : '▶'}
             </div>
           )}
@@ -119,7 +119,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
           <div style={{ marginBottom: 'var(--space-3)' }}>
             <div
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 color: 'var(--text)',
                 marginBottom: 'var(--space-2)',
@@ -132,7 +132,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
                 padding: 'var(--space-2)',
                 backgroundColor: 'var(--grey-100)',
                 border: '1px solid var(--border-light)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontFamily: 'var(--font-mono)',
                 overflowX: 'auto',
               }}
@@ -145,7 +145,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
                 <pre
                   style={{
                     margin: 0,
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontFamily: 'var(--font-mono)',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
@@ -161,7 +161,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
           <div style={{ marginBottom: 'var(--space-3)' }}>
             <div
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 color: 'var(--text)',
                 marginBottom: 'var(--space-2)',
@@ -174,12 +174,12 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
                 padding: 'var(--space-2)',
                 backgroundColor: 'var(--grey-100)',
                 border: '1px solid var(--border-light)',
-                fontSize: '8pt',
+                fontSize: '11px',
               }}
             >
               <div style={{ marginBottom: 'var(--space-2)' }}>
                 <span style={{ fontWeight: 600 }}>URL:</span>{' '}
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8pt' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
                   {invocation.request.url}
                 </span>
               </div>
@@ -192,7 +192,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
                   <pre
                     style={{
                       margin: 0,
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       fontFamily: 'var(--font-mono)',
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
@@ -212,7 +212,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
           <div>
             <div
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 color: 'var(--text)',
                 marginBottom: 'var(--space-2)',
@@ -225,7 +225,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
                 padding: 'var(--space-2)',
                 backgroundColor: 'var(--grey-100)',
                 border: '1px solid var(--border-light)',
-                fontSize: '8pt',
+                fontSize: '11px',
               }}
             >
               <div>

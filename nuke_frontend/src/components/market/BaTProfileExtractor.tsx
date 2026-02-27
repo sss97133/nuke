@@ -193,15 +193,15 @@ export const BaTProfileExtractor: React.FC = () => {
       border: '1px solid var(--border)',
       borderRadius: '4px',
     }}>
-      <h3 style={{ fontSize: '10pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
+      <h3 style={{ fontSize: '13px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
         BaT Profile Extractor
       </h3>
-      <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
         Extract data from Bring a Trailer member profiles for market analysis and profile population.
       </p>
 
       <div style={{ marginBottom: 'var(--space-3)' }}>
-        <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+        <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
           BaT Profile URL
         </label>
         <input
@@ -212,7 +212,7 @@ export const BaTProfileExtractor: React.FC = () => {
           style={{
             width: '100%',
             padding: 'var(--space-2)',
-            fontSize: '8pt',
+            fontSize: '11px',
             border: '1px solid var(--border)',
             borderRadius: '4px',
             background: 'var(--surface-hover)',
@@ -225,7 +225,7 @@ export const BaTProfileExtractor: React.FC = () => {
         disabled={extracting || !batProfileUrl}
         style={{
           padding: 'var(--space-2) var(--space-4)',
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 'bold',
           background: extracting ? 'var(--text-muted)' : 'var(--accent)',
           color: 'var(--white)',
@@ -244,7 +244,7 @@ export const BaTProfileExtractor: React.FC = () => {
           background: 'var(--danger-light)',
           border: '1px solid var(--danger)',
           borderRadius: '4px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--danger)',
           marginBottom: 'var(--space-3)',
         }}>
@@ -260,10 +260,10 @@ export const BaTProfileExtractor: React.FC = () => {
           borderRadius: '4px',
           marginBottom: 'var(--space-3)',
         }}>
-          <h4 style={{ fontSize: '9pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
+          <h4 style={{ fontSize: '12px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
             Profile Data
           </h4>
-          <div style={{ fontSize: '8pt', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+          <div style={{ fontSize: '11px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
             <div><strong>Username:</strong> {extractedData.username}</div>
             <div><strong>Listings Found:</strong> {extractedData.listings.toLocaleString()}</div>
             <div><strong>Bids:</strong> {extractedData.bids.toLocaleString()}</div>
@@ -274,7 +274,7 @@ export const BaTProfileExtractor: React.FC = () => {
             {extractedData.location && <div><strong>Location:</strong> {extractedData.location}</div>}
             {extractedData.website && <div><strong>Website:</strong> <a href={extractedData.website} target="_blank" rel="noopener noreferrer">{extractedData.website}</a></div>}
           </div>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)', marginBottom: 0 }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)', marginBottom: 0 }}>
             ✓ Profile data and vehicles have been automatically extracted and imported.
           </p>
         </div>

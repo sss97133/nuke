@@ -109,11 +109,11 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px' }}>⚠️</span>
-          <span style={{ fontSize: '9pt', fontWeight: 600, color: '#92400e' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#92400e' }}>
             Incomplete profile
           </span>
           {issues.length > 0 && (
-            <span style={{ fontSize: '8pt', color: '#78350f' }}>
+            <span style={{ fontSize: '11px', color: '#78350f' }}>
               • Missing: {issues.join(', ')}
             </span>
           )}
@@ -128,7 +128,7 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
                   border: 'none',
                   padding: '4px 10px',
                   borderRadius: '4px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap'
@@ -150,7 +150,7 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
                   border: '1px solid #f59e0b',
                   padding: '4px 10px',
                   borderRadius: '4px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   cursor: isClaiming ? 'wait' : 'pointer',
                   whiteSpace: 'nowrap'

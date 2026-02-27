@@ -115,7 +115,7 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
             backgroundColor: 'rgba(220, 38, 38, 0.9)',
             color: 'white',
             padding: 'var(--space-2)',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 700,
             textAlign: 'center',
             borderBottom: '2px solid var(--border)'
@@ -184,10 +184,10 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
           >
             RESTRICTED ACCESS
           </div>
-          <p style={{ fontSize: '9pt', marginBottom: 'var(--space-2)' }}>
+          <p style={{ fontSize: '12px', marginBottom: 'var(--space-2)' }}>
             This image contains sensitive information ({sensitiveType || 'document'})
           </p>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Access limited to: Vehicle owner, uploader, and associated organizations
           </p>
         </div>
@@ -196,7 +196,7 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
           <button
             onClick={() => window.location.href = '/login'}
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
           >
             Sign In to Request Access
           </button>
@@ -206,7 +206,7 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
           <button
             onClick={onRequestAccess}
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
           >
             Request Access
           </button>

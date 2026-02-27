@@ -183,7 +183,7 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
               />
               <button
                 className="button button-primary"
-                style={{ fontSize: '9pt', padding: '8px 12px' }}
+                style={{ fontSize: '12px', padding: '8px 12px' }}
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
@@ -216,13 +216,13 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="form-input"
-                style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+                style={{ flex: 1, fontSize: '12px', padding: '6px 8px' }}
               />
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="form-select"
-                style={{ fontSize: '9pt', padding: '6px 8px' }}
+                style={{ fontSize: '12px', padding: '6px 8px' }}
               >
                 {documentTypes.map(type => (
                   <option key={type} value={type}>
@@ -289,7 +289,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onD
                 padding: '2px 6px',
                 background: 'var(--success-dim)',
                 color: 'var(--success)',
-                fontSize: '7pt',
+                fontSize: '9px',
                 borderRadius: '2px'
               }}>
                 PUBLIC
@@ -301,7 +301,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onD
                 padding: '2px 6px',
                 background: 'var(--primary-dim)',
                 color: 'var(--primary)',
-                fontSize: '7pt',
+                fontSize: '9px',
                 borderRadius: '2px'
               }}>
                 FACTORY
@@ -329,7 +329,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onD
                   style={{
                     padding: '2px 6px',
                     background: 'var(--grey-200)',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     borderRadius: '2px'
                   }}
                 >
@@ -344,21 +344,21 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onD
             <button
               onClick={onDownload}
               className="button button-secondary"
-              style={{ fontSize: '8pt', padding: '4px 8px' }}
+              style={{ fontSize: '11px', padding: '4px 8px' }}
             >
               View
             </button>
             <button
               onClick={onDelete}
               className="button button-secondary"
-              style={{ fontSize: '8pt', padding: '4px 8px' }}
+              style={{ fontSize: '11px', padding: '4px 8px' }}
             >
               Delete
             </button>
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', gap: '8px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+      <div style={{ display: 'flex', gap: '8px', fontSize: '9px', color: 'var(--text-muted)' }}>
         {document.view_count > 0 && <span>{document.view_count} views</span>}
         {document.download_count > 0 && <span>{document.download_count} downloads</span>}
         {document.link_count > 0 && <span>{document.link_count} vehicles</span>}
@@ -420,7 +420,7 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
           value={documentType}
           onChange={(e) => setDocumentType(e.target.value)}
           className="form-select"
-          style={{ fontSize: '9pt', padding: '6px 8px' }}
+          style={{ fontSize: '12px', padding: '6px 8px' }}
         >
           {DOCUMENT_TYPES.map(dt => (
             <option key={dt.value} value={dt.value}>{dt.label}</option>
@@ -432,14 +432,14 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="form-input"
-          style={{ fontSize: '10pt', padding: '8px' }}
+          style={{ fontSize: '13px', padding: '8px' }}
         />
         <textarea
           placeholder="Description (optional)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="form-input"
-          style={{ fontSize: '9pt', padding: '8px', minHeight: '60px', fontFamily: 'inherit' }}
+          style={{ fontSize: '12px', padding: '8px', minHeight: '60px', fontFamily: 'inherit' }}
         />
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <input
@@ -448,7 +448,7 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
             value={year || ''}
             onChange={(e) => setYear(e.target.value ? parseInt(e.target.value) : undefined)}
             className="form-input"
-            style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+            style={{ flex: 1, fontSize: '12px', padding: '6px 8px' }}
           />
           <input
             type="text"
@@ -456,7 +456,7 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
             value={make}
             onChange={(e) => setMake(e.target.value)}
             className="form-input"
-            style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+            style={{ flex: 1, fontSize: '12px', padding: '6px 8px' }}
           />
           <input
             type="text"
@@ -464,7 +464,7 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
             value={series}
             onChange={(e) => setSeries(e.target.value)}
             className="form-input"
-            style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+            style={{ flex: 1, fontSize: '12px', padding: '6px 8px' }}
           />
         </div>
         <input
@@ -473,10 +473,10 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           className="form-input"
-          style={{ fontSize: '9pt', padding: '6px 8px' }}
+          style={{ fontSize: '12px', padding: '6px 8px' }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
             <input
               type="checkbox"
               checked={isPublic}
@@ -484,7 +484,7 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
             />
             Make public (others can discover and use)
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
             <input
               type="checkbox"
               checked={isFactoryOriginal}
@@ -497,7 +497,7 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
           <button
             onClick={handleSubmit}
             className="button button-primary"
-            style={{ fontSize: '9pt', padding: '6px 12px' }}
+            style={{ fontSize: '12px', padding: '6px 12px' }}
             disabled={uploading || !title.trim()}
           >
             {uploading ? 'Uploading...' : 'Upload & Index'}
@@ -505,7 +505,7 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
           <button
             onClick={onCancel}
             className="button button-secondary"
-            style={{ fontSize: '9pt', padding: '6px 12px' }}
+            style={{ fontSize: '12px', padding: '6px 12px' }}
             disabled={uploading}
           >
             Cancel

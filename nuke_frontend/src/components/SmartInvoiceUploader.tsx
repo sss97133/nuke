@@ -405,11 +405,11 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
             zIndex: 1
           }}
         >
-          <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>📄 Upload Document</div>
+          <div style={{ fontSize: '15px', fontWeight: 'bold' }}>📄 Upload Document</div>
           <button 
             className="button button-small" 
             onClick={onClose}
-            style={{ fontSize: '14pt', padding: '4px 8px' }}
+            style={{ fontSize: '19px', padding: '4px 8px' }}
           >
             ×
           </button>
@@ -419,7 +419,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
           {/* Step 1: Category Selection */}
           {!doc && (
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
                 1. Select Document Type
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 'var(--space-2)' }}>
@@ -437,8 +437,8 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
                       transition: 'all 0.12s ease'
                     }}
                   >
-                    <div style={{ fontSize: '16pt' }}>{cat.icon}</div>
-                    <div style={{ fontSize: '8pt', fontWeight: 'bold', marginTop: '4px' }}>{cat.label}</div>
+                    <div style={{ fontSize: '21px' }}>{cat.icon}</div>
+                    <div style={{ fontSize: '11px', fontWeight: 'bold', marginTop: '4px' }}>{cat.label}</div>
                   </button>
                 ))}
               </div>
@@ -448,7 +448,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
           {/* Step 2: Upload */}
           {!doc && (
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
                 2. Upload File
               </div>
               <div
@@ -468,11 +468,11 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
                   transition: 'border-color 0.12s ease'
                 }}
               >
-                <div style={{ fontSize: '32pt', marginBottom: 'var(--space-2)', opacity: 0.5 }}>📎</div>
-                <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+                <div style={{ fontSize: '43px', marginBottom: 'var(--space-2)', opacity: 0.5 }}>📎</div>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
                   Drag & drop here
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
                   PDF, JPG, PNG, WebP (max 10MB)
                 </div>
                 <input 
@@ -481,7 +481,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
                   onChange={(e) => e.target.files && onDropFiles(e.target.files)}
                   style={{
                     padding: '8px 12px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     border: '2px solid var(--border)',
                     background: 'var(--surface)',
                     borderRadius: '2px',
@@ -495,13 +495,13 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
           {/* Step 3: Processing/Preview */}
           {doc && (
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
                 {status === 'preview' ? '3. Review & Save' : '3. Processing...'}
               </div>
               
               {/* Doc Info */}
               <div className="card" style={{ padding: 'var(--space-2)', background: 'var(--grey-50)', marginBottom: 'var(--space-2)' }}>
-                <div style={{ fontSize: '8pt', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <strong>{doc.fileName}</strong>
                     {doc.mimeType && <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>({doc.mimeType})</span>}
@@ -514,7 +514,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
 
               {/* Status */}
               {(status === 'uploading' || status === 'parsing') && (
-                <div style={{ padding: 'var(--space-3)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+                <div style={{ padding: 'var(--space-3)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
                   <div style={{ marginBottom: 'var(--space-2)' }}>{message}</div>
                   <div style={{ width: '100%', height: '4px', background: 'var(--grey-200)', borderRadius: '2px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: '60%', background: 'var(--accent)', animation: 'pulse 1.5s ease-in-out infinite' }} />
@@ -525,7 +525,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
               {/* Preview */}
               {parsed && status === 'preview' && (
                 <div className="card" style={{ padding: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-                  <div style={{ fontSize: '8pt', marginBottom: 'var(--space-2)' }}>
+                  <div style={{ fontSize: '11px', marginBottom: 'var(--space-2)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                       <div>
                         <strong>Vendor:</strong> {parsed.vendor_name || '—'}
@@ -542,7 +542,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
                     </div>
                   </div>
                   {parsed.items && parsed.items.length > 0 && (
-                    <div style={{ maxHeight: '150px', overflow: 'auto', fontSize: '7pt', border: '1px solid var(--border)', padding: 'var(--space-1)' }}>
+                    <div style={{ maxHeight: '150px', overflow: 'auto', fontSize: '9px', border: '1px solid var(--border)', padding: 'var(--space-1)' }}>
                       {parsed.items.map((item: any, i: number) => (
                         <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}>
                           {item.description} {item.quantity && `× ${item.quantity}`} {item.total_price && `— $${item.total_price.toFixed(2)}`}
@@ -555,14 +555,14 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
 
               {/* Error */}
               {status === 'error' && (
-                <div style={{ padding: 'var(--space-2)', background: '#fee', border: '1px solid #fcc', borderRadius: '2px', fontSize: '8pt', color: '#c00' }}>
+                <div style={{ padding: 'var(--space-2)', background: '#fee', border: '1px solid #fcc', borderRadius: '2px', fontSize: '11px', color: '#c00' }}>
                   ❌ {message}
                 </div>
               )}
 
               {/* Success */}
               {status === 'success' && valueDelta && (
-                <div style={{ padding: 'var(--space-2)', background: '#efe', border: '1px solid #cfc', borderRadius: '2px', fontSize: '8pt' }}>
+                <div style={{ padding: 'var(--space-2)', background: '#efe', border: '1px solid #cfc', borderRadius: '2px', fontSize: '11px' }}>
                   ✅ Saved! Value updated: <strong>{valueDelta.delta >= 0 ? '+' : ''}${valueDelta.delta.toLocaleString()}</strong> → ${valueDelta.newValue.toLocaleString()} ({valueDelta.confidence}% confidence)
                 </div>
               )}
@@ -572,7 +572,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
                 <button 
                   className="button button-primary" 
                   onClick={saveAll}
-                  style={{ width: '100%', padding: 'var(--space-2)', fontSize: '9pt', fontWeight: 'bold' }}
+                  style={{ width: '100%', padding: 'var(--space-2)', fontSize: '12px', fontWeight: 'bold' }}
                 >
                   💾 Save Document
                 </button>

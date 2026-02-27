@@ -240,7 +240,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           }
         `}</style>
         <p style={{
-          fontSize: '9pt',
+          fontSize: '12px',
           color: '#9ca3af',
           margin: 0,
           fontWeight: 500,
@@ -266,21 +266,21 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
             {/* Left: result count + summary */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
               {results.length > 0 && (
-                <span style={{ fontSize: '10pt', fontWeight: 800, color: '#000' }}>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: '#000' }}>
                   {filteredAndSortedResults.length}
                 </span>
               )}
               {results.length > 0 && filterBy !== 'all' && (
-                <span style={{ fontSize: '8pt', color: '#666' }}>of {results.length}</span>
+                <span style={{ fontSize: '11px', color: '#666' }}>of {results.length}</span>
               )}
               {results.length > 0 && (
-                <span style={{ fontSize: '8pt', color: '#444', fontWeight: 600 }}>
+                <span style={{ fontSize: '11px', color: '#444', fontWeight: 600 }}>
                   {filterBy === 'all' ? 'results' : (typeLabels[filterBy] || filterBy).toLowerCase()}
                   {searchQuery ? ` for "${searchQuery}"` : ''}
                 </span>
               )}
               {results.length === 0 && searchSummary && (
-                <span style={{ fontSize: '8pt', color: '#666' }}>{searchSummary}</span>
+                <span style={{ fontSize: '11px', color: '#666' }}>{searchSummary}</span>
               )}
             </div>
 
@@ -359,10 +359,10 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Workstation Lanes
               </div>
-              <div style={{ fontSize: '8pt', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: '#666' }}>
                 Jump into the slice you care about.
               </div>
             </div>
@@ -370,7 +370,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
               onClick={() => setShowBazaar(false)}
               style={{
                 padding: '4px 8px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
                 background: '#fff',
@@ -386,8 +386,8 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
               <div key={group.id} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                   <div>
-                    <div style={{ fontSize: '9pt', fontWeight: 700 }}>{group.title}</div>
-                    <div style={{ fontSize: '8pt', color: '#666' }}>{group.helper}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 700 }}>{group.title}</div>
+                    <div style={{ fontSize: '11px', color: '#666' }}>{group.helper}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {group.types.map((type) => {
@@ -403,7 +403,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                           }}
                           style={{
                             padding: '3px 6px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             fontWeight: 700,
                             border: `2px solid ${isActive ? '#3b82f6' : '#000'}`,
                             background: isActive ? '#eff6ff' : '#fff',
@@ -436,11 +436,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
-                          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{result.title}</div>
-                          <div style={{ fontSize: '7pt', color: '#666', whiteSpace: 'nowrap' }}>{typeLabels[result.type] || result.type}</div>
+                          <div style={{ fontSize: '11px', fontWeight: 700 }}>{result.title}</div>
+                          <div style={{ fontSize: '9px', color: '#666', whiteSpace: 'nowrap' }}>{typeLabels[result.type] || result.type}</div>
                         </div>
                         {result.description && (
-                          <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px' }}>
+                          <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
                             {String(result.description).slice(0, 120)}
                           </div>
                         )}
@@ -523,7 +523,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           padding: '56px 24px',
         }}>
           <div style={{
-            fontSize: '11pt',
+            fontSize: '15px',
             fontWeight: 700,
             color: '#111',
             marginBottom: '8px',
@@ -531,7 +531,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
             No results for &ldquo;{searchQuery}&rdquo;
           </div>
           <p style={{
-            fontSize: '9pt',
+            fontSize: '12px',
             color: '#888',
             margin: '0 0 28px 0',
           }}>
@@ -542,7 +542,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
               onClick={() => setFilterBy('all')}
               style={{
                 padding: '6px 14px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
                 background: '#fff',
@@ -561,7 +561,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 href={`/search?q=${encodeURIComponent(term)}`}
                 style={{
                   padding: '5px 12px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   border: '2px solid #e5e7eb',
                   background: 'white',
@@ -648,7 +648,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       color: 'white',
                       padding: '4px 10px',
                       borderRadius: '12px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 700,
                       zIndex: 10,
                       boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
@@ -702,7 +702,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '12pt',
+                    fontSize: '16px',
                     marginRight: '12px',
                     border: '2px solid #000',
                     flexShrink: 0
@@ -716,7 +716,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
                       <h4 style={{ 
                         margin: 0,
-                        fontSize: '9pt',
+                        fontSize: '12px',
                         fontWeight: 700,
                         color: '#000'
                       }}>
@@ -727,7 +727,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         color: '#fff',
                         padding: '2px 6px',
                         borderRadius: '0px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px'
@@ -740,22 +740,22 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     {result.type === 'vehicle' && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
                         {(result.metadata?.sale_price || result.metadata?.current_value || result.metadata?.asking_price) && (
-                          <span style={{ fontSize: '8pt', fontWeight: 700, color: '#000' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#000' }}>
                             ${((result.metadata?.sale_price || result.metadata?.current_value || result.metadata?.asking_price) || 0).toLocaleString()}
                           </span>
                         )}
                         {result.metadata?.vin && (
-                          <span style={{ fontSize: '7pt', color: '#666', fontFamily: 'monospace' }}>
+                          <span style={{ fontSize: '9px', color: '#666', fontFamily: 'monospace' }}>
                             {result.metadata.vin}
                           </span>
                         )}
                         {result.metadata?.mileage && (
-                          <span style={{ fontSize: '7pt', color: '#666' }}>
+                          <span style={{ fontSize: '9px', color: '#666' }}>
                             {result.metadata.mileage.toLocaleString()} mi
                           </span>
                         )}
                         {result.metadata?.transmission && (
-                          <span style={{ fontSize: '7pt', color: '#666' }}>{result.metadata.transmission}</span>
+                          <span style={{ fontSize: '9px', color: '#666' }}>{result.metadata.transmission}</span>
                         )}
                       </div>
                     )}
@@ -763,7 +763,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     <p
                       style={{
                         margin: '0 0 8px 0',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         color: '#666',
                         lineHeight: '1.4',
                         overflow: 'hidden',
@@ -782,7 +782,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         color: '#fff',
                         padding: '2px 6px',
                         borderRadius: '0px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 700
                       }}>
                         {Math.round(result.relevance_score * 100)}% match
@@ -793,7 +793,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           color: '#666'
                         }}>
                           <span>📍</span>
@@ -807,7 +807,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                           color: '#fff',
                           padding: '2px 6px',
                           borderRadius: '0px',
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           fontWeight: 700,
                           textTransform: 'uppercase'
                         }}>
@@ -821,7 +821,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'flex-end',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: '#666',
                     marginLeft: '12px',
                     flexShrink: 0
@@ -834,7 +834,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       })}
                     </div>
                     <div style={{
-                      fontSize: '12pt',
+                      fontSize: '16px',
                       color: '#000',
                       fontWeight: 700
                     }}>

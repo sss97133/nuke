@@ -226,7 +226,7 @@ export const UniversalFieldEditor: React.FC<UniversalFieldEditorProps> = ({
             autoFocus
             style={{
               width: '100%',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontFamily: '"MS Sans Serif", sans-serif',
               border: '1px solid var(--border)',
               borderRadius: '0px',
@@ -262,7 +262,7 @@ export const UniversalFieldEditor: React.FC<UniversalFieldEditorProps> = ({
             autoFocus
             style={{
               width: '100%',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontFamily: '"MS Sans Serif", sans-serif',
               border: `1px solid ${error ? 'var(--error)' : 'var(--border)'}`,
               borderRadius: '0px',
@@ -275,7 +275,7 @@ export const UniversalFieldEditor: React.FC<UniversalFieldEditorProps> = ({
         
         {/* Status indicator */}
         <span style={{
-          fontSize: '7pt',
+          fontSize: '9px',
           color: saving ? 'var(--warning)' : saved ? 'var(--success)' : error ? 'var(--error)' : 'transparent',
           whiteSpace: 'nowrap',
           minWidth: '40px'
@@ -293,7 +293,7 @@ export const UniversalFieldEditor: React.FC<UniversalFieldEditorProps> = ({
           background: 'var(--error)',
           color: 'var(--white)',
           padding: '4px 8px',
-          fontSize: '7pt',
+          fontSize: '9px',
           borderRadius: '2px',
           whiteSpace: 'nowrap',
           zIndex: 1000,

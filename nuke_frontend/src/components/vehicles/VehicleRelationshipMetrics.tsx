@@ -193,7 +193,7 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
 
   if (loading) {
     return (
-      <div style={{ fontSize: '7pt', color: '#9ca3af', padding: '4px 0' }}>
+      <div style={{ fontSize: '9px', color: '#9ca3af', padding: '4px 0' }}>
         Loading metrics...
       </div>
     );
@@ -213,7 +213,7 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
           background: '#f0f9ff',
           border: '1px solid #bfdbfe',
           borderRadius: '4px',
-          fontSize: '7pt'
+          fontSize: '9px'
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: '6px', color: '#1e40af' }}>
@@ -272,7 +272,7 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
             border: '1px solid #f59e0b',
             borderRadius: '2px'
           }}>
-            <div style={{ fontSize: '6pt', color: '#92400e', marginBottom: '2px' }}>
+            <div style={{ fontSize: '8px', color: '#92400e', marginBottom: '2px' }}>
               OWNER OPERATOR VALUE
             </div>
             <div style={{ fontWeight: 700, color: '#92400e' }}>
@@ -290,7 +290,7 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
           alignItems: 'center'
         }}>
           <span style={{ color: '#6b7280' }}>Total Cost:</span>
-          <span style={{ fontWeight: 700, fontSize: '8pt', color: '#1e40af' }}>
+          <span style={{ fontWeight: 700, fontSize: '11px', color: '#1e40af' }}>
             {formatCurrency(metrics.totalCost)}
           </span>
         </div>

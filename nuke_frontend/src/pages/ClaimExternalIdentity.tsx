@@ -141,7 +141,7 @@ const ClaimExternalIdentity: React.FC = () => {
           padding: 'var(--space-3) var(--space-4)',
           backgroundColor: 'var(--grey-100)',
           borderRadius: '4px',
-          fontSize: '9pt'
+          fontSize: '12px'
         }}>
           <div><strong>443K</strong> BaT identities</div>
           <div><strong>1K</strong> PCarMarket</div>
@@ -157,7 +157,7 @@ const ClaimExternalIdentity: React.FC = () => {
             className="form-input"
             value={searchPlatform}
             onChange={(e) => setSearchPlatform(e.target.value)}
-            style={{ width: 180, fontSize: '10pt', padding: '12px' }}
+            style={{ width: 180, fontSize: '13px', padding: '12px' }}
           >
             <option value="bat">Bring a Trailer</option>
             <option value="cars_and_bids">Cars & Bids</option>
@@ -170,10 +170,10 @@ const ClaimExternalIdentity: React.FC = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Your username..."
             autoFocus
-            style={{ flex: 1, fontSize: '14pt', padding: '12px 16px' }}
+            style={{ flex: 1, fontSize: '19px', padding: '12px 16px' }}
           />
           {searching && (
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>searching...</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>searching...</div>
           )}
         </div>
 
@@ -199,21 +199,21 @@ const ClaimExternalIdentity: React.FC = () => {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '11pt' }}>{identity.handle}</div>
+                    <div style={{ fontWeight: 700, fontSize: '15px' }}>{identity.handle}</div>
                     {identity.profile_url && (
                       <a
                         href={identity.profile_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        style={{ fontSize: '8pt', color: 'var(--text-muted)' }}
+                        style={{ fontSize: '11px', color: 'var(--text-muted)' }}
                       >
                         View on {PLATFORM_LABELS[identity.platform] || identity.platform}
                       </a>
                     )}
                   </div>
                   {identity.stats && (
-                    <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: '12px', color: 'var(--text-muted)' }}>
                       <div><strong style={{ color: 'var(--text)' }}>{formatNumber(identity.stats.comments)}</strong> comments</div>
                       <div><strong style={{ color: 'var(--text)' }}>{formatNumber(identity.stats.bids)}</strong> bids</div>
                       {identity.stats.wins > 0 && (
@@ -230,7 +230,7 @@ const ClaimExternalIdentity: React.FC = () => {
         {/* No results */}
         {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
           <div style={{ marginTop: 'var(--space-4)', textAlign: 'center', padding: 'var(--space-4)' }}>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               No "{searchQuery}" found on {PLATFORM_LABELS[searchPlatform] || searchPlatform}
             </div>
             <button
@@ -259,7 +259,7 @@ const ClaimExternalIdentity: React.FC = () => {
       {/* Claim Flow */}
       {selectedIdentity && (
         <div className="card" style={{ padding: 'var(--space-4)' }}>
-          <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: 'var(--space-3)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: 'var(--space-3)' }}>
             Claim: {selectedIdentity.handle}
           </div>
 
@@ -269,7 +269,7 @@ const ClaimExternalIdentity: React.FC = () => {
               padding: 'var(--space-3)',
               backgroundColor: 'var(--grey-50)',
               marginBottom: 'var(--space-4)',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               <strong>You'll inherit:</strong>
               <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 'var(--space-4)' }}>
@@ -283,7 +283,7 @@ const ClaimExternalIdentity: React.FC = () => {
           {/* Before claim started */}
           {!claimId && (
             <div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
                 Start your claim, then verify by adding a code to your profile.
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
@@ -300,7 +300,7 @@ const ClaimExternalIdentity: React.FC = () => {
           {/* After claim started - show verification options */}
           {claimId && verificationCode && (
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
                 Verify your claim
               </div>
 
@@ -311,7 +311,7 @@ const ClaimExternalIdentity: React.FC = () => {
                 borderRadius: '6px',
                 marginBottom: 'var(--space-3)'
               }}>
-                <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
                   Option 1: Add this code to your {PLATFORM_LABELS[selectedIdentity.platform] || selectedIdentity.platform} bio
                 </div>
                 <div style={{
@@ -320,14 +320,14 @@ const ClaimExternalIdentity: React.FC = () => {
                   border: '2px dashed var(--border-light)',
                   borderRadius: '4px',
                   fontFamily: 'monospace',
-                  fontSize: '14pt',
+                  fontSize: '19px',
                   textAlign: 'center',
                   userSelect: 'all',
                   letterSpacing: '2px'
                 }}>
                   {verificationCode}
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
                   We'll check your profile automatically. Once found, your claim is verified instantly.
                 </div>
               </div>
@@ -339,10 +339,10 @@ const ClaimExternalIdentity: React.FC = () => {
                 borderRadius: '6px',
                 marginBottom: 'var(--space-3)'
               }}>
-                <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
                   Option 2: Text us a screenshot
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Text a screenshot of your logged-in {PLATFORM_LABELS[selectedIdentity.platform] || selectedIdentity.platform} profile to <strong>(555) 123-4567</strong>
                 </div>
               </div>
@@ -353,10 +353,10 @@ const ClaimExternalIdentity: React.FC = () => {
                 border: '1px solid var(--border-light)',
                 borderRadius: '6px'
               }}>
-                <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
                   Option 3: Full verification (ID + face scan)
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Text a photo of your ID to <strong>(555) 123-4567</strong> for the highest confidence level.
                   This unlocks all features including proxy bidding.
                 </div>
@@ -370,7 +370,7 @@ const ClaimExternalIdentity: React.FC = () => {
                 }}>
                   Done
                 </button>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Claim ID: {claimId.slice(0, 8)}
                 </div>
               </div>

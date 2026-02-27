@@ -56,14 +56,14 @@ export const ClientWorkZone: React.FC<ClientWorkZoneProps> = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 700,
             color: 'var(--text)'
           }}>
             CLIENT WORK
           </span>
           <span style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)',
             background: 'var(--surface-hover)',
             padding: '2px 6px',
@@ -74,13 +74,13 @@ export const ClientWorkZone: React.FC<ClientWorkZoneProps> = ({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-muted)'
           }}>
             Sorted: Most Recent
           </span>
           <span style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-muted)',
             width: '50px',
             textAlign: 'right'

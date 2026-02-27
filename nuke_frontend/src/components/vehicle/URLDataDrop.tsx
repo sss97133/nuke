@@ -63,12 +63,12 @@ export const URLDataDrop: React.FC<URLDataDropProps> = ({ vehicleId, onDataImpor
   return (
     <div className="card">
       <div className="card-header">
-        <h4 style={{ fontSize: '10pt', fontWeight: 700, margin: 0 }}>
+        <h4 style={{ fontSize: '13px', fontWeight: 700, margin: 0 }}>
           Quick Data Import
         </h4>
       </div>
       <div className="card-body">
-        <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
           Paste a BaT/eBay/Craigslist URL to auto-fill vehicle data
         </div>
 
@@ -79,13 +79,13 @@ export const URLDataDrop: React.FC<URLDataDropProps> = ({ vehicleId, onDataImpor
             onChange={e => setUrl(e.target.value)}
             placeholder="https://bringatrailer.com/listing/..."
             className="form-input"
-            style={{ flex: 1, fontSize: '9pt' }}
+            style={{ flex: 1, fontSize: '12px' }}
           />
           <button
             onClick={handleURLPaste}
             disabled={parsing || !url.trim()}
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
           >
             {parsing ? 'PARSING...' : 'PARSE'}
           </button>
@@ -98,7 +98,7 @@ export const URLDataDrop: React.FC<URLDataDropProps> = ({ vehicleId, onDataImpor
             background: 'var(--grey-100)',
             border: '1px solid var(--border)',
             borderRadius: '4px',
-            fontSize: '9pt'
+            fontSize: '12px'
           }}>
             <div style={{ fontWeight: 700, marginBottom: '8px' }}>
               Extracted Data:
@@ -153,7 +153,7 @@ export const URLDataDrop: React.FC<URLDataDropProps> = ({ vehicleId, onDataImpor
             <button
               onClick={applyParsedData}
               className="button button-primary"
-              style={{ width: '100%', marginTop: '12px', fontSize: '9pt' }}
+              style={{ width: '100%', marginTop: '12px', fontSize: '12px' }}
             >
               APPLY TO THIS VEHICLE
             </button>
@@ -162,7 +162,7 @@ export const URLDataDrop: React.FC<URLDataDropProps> = ({ vehicleId, onDataImpor
 
         {/* Quick Examples */}
         <div style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-muted)',
           marginTop: '12px',
           padding: '8px',

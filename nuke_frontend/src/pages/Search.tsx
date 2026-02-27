@@ -727,7 +727,7 @@ export default function Search() {
             background: 'var(--surface)',
             border: '2px solid #000',
           }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
               Look up a vehicle by VIN (full 17-char or partial)
             </div>
             <form
@@ -743,7 +743,7 @@ export default function Search() {
                 style={{
                   flex: 1,
                   padding: '8px 10px',
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   fontFamily: 'monospace',
                   border: '2px solid #000',
                   background: '#fff',
@@ -757,7 +757,7 @@ export default function Search() {
                 disabled={vinSearching}
                 style={{
                   padding: '8px 16px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 700,
                   border: '2px solid #000',
                   background: '#000',
@@ -768,19 +768,19 @@ export default function Search() {
                 {vinSearching ? 'Searching...' : 'Look up'}
               </button>
             </form>
-            <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px' }}>
+            <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
               VIN characters: A–H, J–N, P, R–Z, 0–9 (no I, O, Q)
             </div>
 
             {vinError && (
-              <div style={{ marginTop: '10px', padding: '8px 12px', background: '#fff3f3', border: '1px solid #f00', fontSize: '8pt' }}>
+              <div style={{ marginTop: '10px', padding: '8px 12px', background: '#fff3f3', border: '1px solid #f00', fontSize: '11px' }}>
                 {vinError}
               </div>
             )}
 
             {vinResults.length > 1 && (
               <div style={{ marginTop: '12px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
                   {vinResults.length} vehicles matched — click to view
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -807,11 +807,11 @@ export default function Search() {
                         />
                       )}
                       <div>
-                        <div style={{ fontSize: '9pt', fontWeight: 700 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700 }}>
                           {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown vehicle'}
                         </div>
-                        <div style={{ fontSize: '8pt', fontFamily: 'monospace', color: '#666' }}>{v.vin || '—'}</div>
-                        {v.color && <div style={{ fontSize: '7pt', color: '#999' }}>{v.color}{v.mileage ? ` · ${v.mileage.toLocaleString()} mi` : ''}</div>}
+                        <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#666' }}>{v.vin || '—'}</div>
+                        {v.color && <div style={{ fontSize: '9px', color: '#999' }}>{v.color}{v.mileage ? ` · ${v.mileage.toLocaleString()} mi` : ''}</div>}
                       </div>
                     </a>
                   ))}
@@ -837,7 +837,7 @@ export default function Search() {
                   onClick={() => setVFilters(prev => ({ ...prev, showFilters: !prev.showFilters }))}
                   style={{
                     padding: '4px 10px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 700,
                     border: '2px solid #000',
                     background: vFilters.showFilters ? '#000' : '#fff',
@@ -853,7 +853,7 @@ export default function Search() {
                     onClick={() => setVFilters(prev => ({ ...DEFAULT_FILTERS, showFilters: prev.showFilters }))}
                     style={{
                       padding: '4px 8px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 700,
                       border: '1px solid #999',
                       background: '#fff',
@@ -865,7 +865,7 @@ export default function Search() {
                   </button>
                 )}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: '#666' }}>
                 {activeFilterCount > 0
                   ? `${displayVehicleCount} of ${vehicleCount} vehicles match filters`
                   : `${vehicleCount} vehicle${vehicleCount === 1 ? '' : 's'}`
@@ -878,23 +878,23 @@ export default function Search() {
 
                 {/* Price range */}
                 <div>
-                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price ($)</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price ($)</div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <input
                       type="number"
                       placeholder="Min"
                       value={vFilters.priceMin}
                       onChange={e => setVFilters(prev => ({ ...prev, priceMin: e.target.value }))}
-                      style={{ width: '80px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
                       min={0}
                     />
-                    <span style={{ fontSize: '8pt', color: '#999' }}>–</span>
+                    <span style={{ fontSize: '11px', color: '#999' }}>–</span>
                     <input
                       type="number"
                       placeholder="Max"
                       value={vFilters.priceMax}
                       onChange={e => setVFilters(prev => ({ ...prev, priceMax: e.target.value }))}
-                      style={{ width: '80px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
                       min={0}
                     />
                   </div>
@@ -902,24 +902,24 @@ export default function Search() {
 
                 {/* Year range */}
                 <div>
-                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Year</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Year</div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <input
                       type="number"
                       placeholder="From"
                       value={vFilters.yearMin}
                       onChange={e => setVFilters(prev => ({ ...prev, yearMin: e.target.value }))}
-                      style={{ width: '68px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
                       min={1886}
                       max={new Date().getFullYear() + 2}
                     />
-                    <span style={{ fontSize: '8pt', color: '#999' }}>–</span>
+                    <span style={{ fontSize: '11px', color: '#999' }}>–</span>
                     <input
                       type="number"
                       placeholder="To"
                       value={vFilters.yearMax}
                       onChange={e => setVFilters(prev => ({ ...prev, yearMax: e.target.value }))}
-                      style={{ width: '68px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
                       min={1886}
                       max={new Date().getFullYear() + 2}
                     />
@@ -928,24 +928,24 @@ export default function Search() {
 
                 {/* Mileage max */}
                 <div>
-                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Max Mileage</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Max Mileage</div>
                   <input
                     type="number"
                     placeholder="e.g. 50000"
                     value={vFilters.mileageMax}
                     onChange={e => setVFilters(prev => ({ ...prev, mileageMax: e.target.value }))}
-                    style={{ width: '100px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                    style={{ width: '100px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
                     min={0}
                   />
                 </div>
 
                 {/* Transmission */}
                 <div>
-                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Transmission</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Transmission</div>
                   <select
                     value={vFilters.transmission}
                     onChange={e => setVFilters(prev => ({ ...prev, transmission: e.target.value }))}
-                    style={{ padding: '4px 8px', fontSize: '8pt', border: '2px solid #000', background: '#fff', cursor: 'pointer' }}
+                    style={{ padding: '4px 8px', fontSize: '11px', border: '2px solid #000', background: '#fff', cursor: 'pointer' }}
                   >
                     <option value="">Any</option>
                     <option value="automatic">Automatic</option>
@@ -955,7 +955,7 @@ export default function Search() {
 
                 {/* For sale / sold */}
                 <div>
-                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {[
                       { val: '', label: 'All' },
@@ -968,7 +968,7 @@ export default function Search() {
                         onClick={() => setVFilters(prev => ({ ...prev, listingStatus: opt.val }))}
                         style={{
                           padding: '4px 8px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           fontWeight: 700,
                           border: '2px solid #000',
                           background: vFilters.listingStatus === opt.val ? '#000' : '#fff',
@@ -996,23 +996,23 @@ export default function Search() {
             border: '1px solid var(--border)',
             borderRadius: '0px'
           }}>
-            <div className="text font-bold" style={{ fontSize: '9pt', marginBottom: '8px' }}>Answer</div>
+            <div className="text font-bold" style={{ fontSize: '12px', marginBottom: '8px' }}>Answer</div>
             {answerLoading && (
-              <div className="text-small text-muted" style={{ fontSize: '8pt' }}>Thinking…</div>
+              <div className="text-small text-muted" style={{ fontSize: '11px' }}>Thinking…</div>
             )}
             {answerError && (
-              <div className="text-small" style={{ fontSize: '8pt', color: 'var(--danger)' }}>{answerError}</div>
+              <div className="text-small" style={{ fontSize: '11px', color: 'var(--danger)' }}>{answerError}</div>
             )}
             {!!answer && (
-              <div className="text" style={{ fontSize: '9pt', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{answer}</div>
+              <div className="text" style={{ fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{answer}</div>
             )}
 
             {answerSources.length > 0 && (
               <div style={{ marginTop: '12px' }}>
-                <div className="text-small text-muted" style={{ fontSize: '8pt', marginBottom: '6px' }}>Top sources in your results</div>
+                <div className="text-small text-muted" style={{ fontSize: '11px', marginBottom: '6px' }}>Top sources in your results</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {answerSources.slice(0, 5).map((s, idx) => (
-                    <div key={`${s.title}-${idx}`} className="text-small" style={{ fontSize: '8pt' }}>
+                    <div key={`${s.title}-${idx}`} className="text-small" style={{ fontSize: '11px' }}>
                       {s.href ? (
                         <a href={s.href} style={{ color: 'var(--text)', textDecoration: 'underline' }}>{s.title}</a>
                       ) : (
@@ -1047,11 +1047,11 @@ export default function Search() {
           padding: '64px 24px',
           color: '#999',
         }}>
-          <div style={{ fontSize: '32pt', marginBottom: '12px', opacity: 0.3 }}>N</div>
-          <div style={{ fontSize: '10pt', fontWeight: 700, color: '#555', marginBottom: '8px' }}>
+          <div style={{ fontSize: '42px', marginBottom: '12px', opacity: 0.3 }}>N</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#555', marginBottom: '8px' }}>
             Search Nuke
           </div>
-          <div style={{ fontSize: '9pt', color: '#888', marginBottom: '24px' }}>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '24px' }}>
             Find vehicles, organizations, people, and more
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '480px', margin: '0 auto' }}>
@@ -1061,7 +1061,7 @@ export default function Search() {
                 href={`/search?q=${encodeURIComponent(term)}`}
                 style={{
                   padding: '6px 14px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   border: '2px solid #e5e7eb',
                   background: '#fff',
@@ -1112,7 +1112,7 @@ export default function Search() {
                         onClick={() => jumpToFilter(lane.key as typeof resultFilter)}
                         style={{
                           padding: '3px 8px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           fontWeight: 700,
                           border: '2px solid #000',
                           background: '#fff',
@@ -1128,8 +1128,8 @@ export default function Search() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
                 {workspaceSections.map((section) => (
                   <div key={section.title} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
-                    <div style={{ fontSize: '9pt', fontWeight: 700 }}>{section.title}</div>
-                    <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px' }}>{section.helper}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 700 }}>{section.title}</div>
+                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>{section.helper}</div>
                     <div style={{ display: 'grid', gap: '6px' }}>
                       {section.actions.map((action) => (
                         <a
@@ -1147,9 +1147,9 @@ export default function Search() {
                             background: 'var(--surface)'
                           }}
                         >
-                          <span style={{ fontSize: '8pt', fontWeight: 600 }}>{action.label}</span>
+                          <span style={{ fontSize: '11px', fontWeight: 600 }}>{action.label}</span>
                           {typeof action.badge === 'number' && action.badge > 0 && (
-                            <span style={{ fontSize: '7pt', color: '#666' }}>{action.badge}</span>
+                            <span style={{ fontSize: '9px', color: '#666' }}>{action.badge}</span>
                           )}
                         </a>
                       ))}

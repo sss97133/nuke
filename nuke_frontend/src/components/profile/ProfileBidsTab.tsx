@@ -49,7 +49,7 @@ export const ProfileBidsTab: React.FC<ProfileBidsTabProps> = ({ bids, profileTyp
         padding: 'var(--space-6)',
         textAlign: 'center',
         color: 'var(--text-muted)',
-        fontSize: '8pt',
+        fontSize: '11px',
       }}>
         No bids yet
       </div>
@@ -110,7 +110,7 @@ export const ProfileBidsTab: React.FC<ProfileBidsTabProps> = ({ bids, profileTyp
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text-muted)',
                 }}>
                   No Image
@@ -123,7 +123,7 @@ export const ProfileBidsTab: React.FC<ProfileBidsTabProps> = ({ bids, profileTyp
               <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                 <div>
                   <h3 style={{
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     fontWeight: 'bold',
                     margin: 0,
                     marginBottom: '4px',
@@ -150,13 +150,13 @@ export const ProfileBidsTab: React.FC<ProfileBidsTabProps> = ({ bids, profileTyp
                       )
                     )}
                   </h3>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                     {formatDate(bid.created_at || bid.auction_end_date)}
                   </div>
                 </div>
                 {isWinner && (
                   <span style={{
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     padding: '2px 6px',
                     background: 'var(--success)',
                     color: 'var(--white)',
@@ -170,7 +170,7 @@ export const ProfileBidsTab: React.FC<ProfileBidsTabProps> = ({ bids, profileTyp
 
               {/* Bid Amount */}
               <div style={{
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 'bold',
                 color: isWinner ? 'var(--success)' : 'var(--text)',
               }}>

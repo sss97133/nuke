@@ -241,10 +241,10 @@ const CountdownTimer: React.FC<{ endTime: string | null }> = ({ endTime }) => {
 
   return (
     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
+      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' }}>
         Time Left
       </div>
-      <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace' }}>
+      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace' }}>
         {timeRemaining}
       </div>
     </div>
@@ -1898,12 +1898,12 @@ export default function OrganizationProfile() {
           <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', height: 120, borderRadius: 2 }} />
         </div>
         {!organizationId && (
-          <div style={{ textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)', padding: '20px' }}>
+          <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', padding: '20px' }}>
             No organization ID found in URL
           </div>
         )}
         {loadError && (
-          <div style={{ textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)', padding: '20px' }}>
+          <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', padding: '20px' }}>
             {loadError}
           </div>
         )}
@@ -1914,16 +1914,16 @@ export default function OrganizationProfile() {
   if (!organization) {
     return (
       <div style={{ padding: 'var(--space-8)', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
-        <div className="text" style={{ fontSize: '14pt', fontWeight: 700, marginBottom: 'var(--space-3)' }}>
+        <div className="text" style={{ fontSize: '19px', fontWeight: 700, marginBottom: 'var(--space-3)' }}>
           Organization Not Found
         </div>
         {loadError && (
-          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '9pt', marginBottom: 'var(--space-4)' }}>
+          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '12px', marginBottom: 'var(--space-4)' }}>
             {loadError}
           </div>
         )}
         {!loadError && (
-          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '9pt', marginBottom: 'var(--space-4)' }}>
+          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '12px', marginBottom: 'var(--space-4)' }}>
             The organization you're looking for doesn't exist or has been removed.
           </div>
         )}
@@ -1931,14 +1931,14 @@ export default function OrganizationProfile() {
           <button
             onClick={() => navigate('/org')}
             className="button button-secondary"
-            style={{ fontSize: '9pt', padding: '8px 16px' }}
+            style={{ fontSize: '12px', padding: '8px 16px' }}
           >
             Browse Organizations
           </button>
           <button
             onClick={() => navigate(-1)}
             className="button button-primary"
-            style={{ fontSize: '9pt', padding: '8px 16px' }}
+            style={{ fontSize: '12px', padding: '8px 16px' }}
           >
             Go Back
           </button>
@@ -1985,7 +1985,7 @@ export default function OrganizationProfile() {
                 padding: '10px 16px',
                 background: toast.type === 'success' ? '#1a472a' : toast.type === 'error' ? '#7f1d1d' : '#1a1a2e',
                 color: '#fff',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontFamily: 'var(--font-family)',
                 fontWeight: 500,
                 boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
@@ -2029,12 +2029,12 @@ export default function OrganizationProfile() {
           {organization.website && !headerLogoUrl && (
             <FaviconIcon url={organization.website} size={18} style={{ flexShrink: 0 }} />
           )}
-          <h1 style={{ fontSize: '15pt', fontWeight: 700, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>
             {displayName}
           </h1>
           {organization.business_type && (
             <span style={{
-              fontSize: '7pt',
+              fontSize: '9px',
               color: 'var(--text-muted)',
               textTransform: 'uppercase',
               letterSpacing: '1px',
@@ -2049,7 +2049,7 @@ export default function OrganizationProfile() {
           {/* Verification badge */}
           {organization.verification_level && organization.verification_level !== 'none' && organization.verification_level !== 'unverified' && (
             <span style={{
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -2065,13 +2065,13 @@ export default function OrganizationProfile() {
           {/* Stock ticker inline */}
           {organization.is_tradable && offering && (
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--success)', letterSpacing: '0.5px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--success)', letterSpacing: '0.5px' }}>
                 {organization.stock_symbol || 'ORG'}
               </span>
-              <span style={{ fontSize: '12pt', fontWeight: 700 }}>
+              <span style={{ fontSize: '16px', fontWeight: 700 }}>
                 ${offering.current_share_price.toFixed(2)}
               </span>
-              <button onClick={() => setShowTrade(true)} className="button button-primary button-small" style={{ fontSize: '7pt', padding: '3px 10px' }}>
+              <button onClick={() => setShowTrade(true)} className="button button-primary button-small" style={{ fontSize: '9px', padding: '3px 10px' }}>
                 Trade
               </button>
             </div>
@@ -2090,18 +2090,18 @@ export default function OrganizationProfile() {
               if (!isCreatorOwner) return null;
             }
             return (
-              <a href={`/profile/${organization.discovered_by}`} style={{ fontSize: '7pt', color: 'var(--text-muted)', textDecoration: 'none' }}>
+              <a href={`/profile/${organization.discovered_by}`} style={{ fontSize: '9px', color: 'var(--text-muted)', textDecoration: 'none' }}>
                 by {creatorName}
               </a>
             );
           })()}
           {organization.website && (
-            <a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+            <a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
               {organization.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
             </a>
           )}
           {organization.phone && (
-            <a href={`tel:${organization.phone}`} style={{ fontSize: '7pt', color: 'var(--text-muted)', textDecoration: 'none' }}>
+            <a href={`tel:${organization.phone}`} style={{ fontSize: '9px', color: 'var(--text-muted)', textDecoration: 'none' }}>
               {organization.phone}
             </a>
           )}
@@ -2109,14 +2109,14 @@ export default function OrganizationProfile() {
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
             {session && (
               <>
-                <button onClick={() => setShowWorkOrderForm(true)} className="button button-primary button-small" style={{ fontSize: '7pt', padding: '3px 10px' }}>
+                <button onClick={() => setShowWorkOrderForm(true)} className="button button-primary button-small" style={{ fontSize: '9px', padding: '3px 10px' }}>
                   Request Work
                 </button>
-                <button onClick={() => setShowContributeModal(true)} className="button button-secondary button-small" style={{ fontSize: '7pt', padding: '3px 10px' }}>
+                <button onClick={() => setShowContributeModal(true)} className="button button-secondary button-small" style={{ fontSize: '9px', padding: '3px 10px' }}>
                   Contribute
                 </button>
                 {!isOwner && (
-                  <button onClick={() => setShowOwnershipModal(true)} className="button button-secondary button-small" style={{ fontSize: '7pt', padding: '3px 10px' }}>
+                  <button onClick={() => setShowOwnershipModal(true)} className="button button-secondary button-small" style={{ fontSize: '9px', padding: '3px 10px' }}>
                     Claim
                   </button>
                 )}
@@ -2167,7 +2167,7 @@ export default function OrganizationProfile() {
                 border: 'none',
                 borderBottom: activeTab === tab ? '2px solid var(--accent)' : 'none',
                 padding: '8px 12px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 cursor: 'pointer',
                 fontFamily: 'var(--font-family)',
                 textTransform: 'capitalize',
@@ -2214,10 +2214,10 @@ export default function OrganizationProfile() {
                   padding: '12px 16px',
                   textAlign: 'center',
                 }}>
-                  <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>
+                  <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>
                     {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                   </div>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>
                     {stat.label}
                   </div>
                 </div>
@@ -2238,10 +2238,10 @@ export default function OrganizationProfile() {
                 gap: 12,
               }}>
                 <div>
-                  <div style={{ fontSize: '9pt', fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>
                     Business documents
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     Deck, business plan, data room
                   </div>
                 </div>
@@ -2249,7 +2249,7 @@ export default function OrganizationProfile() {
                   type="button"
                   onClick={() => setActiveTab('offering')}
                   className="button button-secondary button-small"
-                  style={{ fontSize: '8pt', padding: '4px 12px', whiteSpace: 'nowrap' }}
+                  style={{ fontSize: '11px', padding: '4px 12px', whiteSpace: 'nowrap' }}
                 >
                   View docs
                 </button>
@@ -2267,12 +2267,12 @@ export default function OrganizationProfile() {
                 borderLeft: '4px solid var(--blue-500)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Data coverage
                   </span>
                   {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
                     <span style={{
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 600,
                       color: 'var(--blue-600)',
                       background: 'rgba(59, 130, 246, 0.12)',
@@ -2284,14 +2284,14 @@ export default function OrganizationProfile() {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: '10pt', color: 'var(--text)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.5 }}>
                   {extractionCoverage.extracted != null && `${(extractionCoverage.extracted / 1000).toFixed(0)}k listings`}
                   {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
                     <span> · {extractionCoverage.queue_pending.toLocaleString()} in queue · <strong style={{ color: 'var(--blue-600)' }}>loading in…</strong></span>
                   )}
                 </div>
                 {extractionCoverage.metrics_note && (
-                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '6px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
                     {extractionCoverage.metrics_note}
                   </div>
                 )}
@@ -2358,7 +2358,7 @@ export default function OrganizationProfile() {
                 return (
                   <div className="card" style={{ marginBottom: '16px', borderTop: '3px solid var(--error)' }}>
                     <div className="card-header" style={{
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       fontWeight: 700,
                       display: 'flex',
                       alignItems: 'center',
@@ -2414,7 +2414,7 @@ export default function OrganizationProfile() {
             {(organization?.total_vehicles ?? 0) > 0 && (
             <div className="card" style={{ marginBottom: '16px' }}>
               <div className="card-header" style={{
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
@@ -2436,7 +2436,7 @@ export default function OrganizationProfile() {
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as OrgSortBy)}
-                      style={{ padding: '2px 4px', fontSize: '7pt', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                      style={{ padding: '2px 4px', fontSize: '9px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
                     >
                       <option value="newest">Newest</option>
                       <option value="oldest">Oldest</option>
@@ -2459,7 +2459,7 @@ export default function OrganizationProfile() {
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setThumbFitMode(thumbFitMode === 'square' ? 'original' : 'square'); }}
-                    style={{ padding: '1px 5px', fontSize: '7pt', border: '1px solid var(--border)', background: 'var(--grey-200)', color: 'var(--text)', cursor: 'pointer' }}
+                    style={{ padding: '1px 5px', fontSize: '9px', border: '1px solid var(--border)', background: 'var(--grey-200)', color: 'var(--text)', cursor: 'pointer' }}
                     title={thumbFitMode === 'square' ? 'Original aspect ratio' : 'Square crop'}
                   >
                     {thumbFitMode === 'square' ? '⊞' : '□'}
@@ -2468,7 +2468,7 @@ export default function OrganizationProfile() {
               </div>
               <div className="card-body">
                 {organization?.total_vehicles != null && organization.total_vehicles > vehicles.length && vehicles.length > 0 && (
-                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                     Showing first {vehicles.length.toLocaleString()} of {organization.total_vehicles.toLocaleString()} vehicles.
                   </div>
                 )}
@@ -2503,7 +2503,7 @@ export default function OrganizationProfile() {
                     
                     if (serviceVehicles.length === 0) {
                       return (
-                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
                           No vehicles currently in service. Service vehicles will appear here.
                         </div>
                       );
@@ -2586,7 +2586,7 @@ export default function OrganizationProfile() {
                   
                   if (productsForSale.length === 0) {
                     return (
-                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
                         No current inventory. Add vehicles to display them here.
                       </div>
                     );
@@ -2687,16 +2687,16 @@ export default function OrganizationProfile() {
 
             {/* Details */}
             <div className="card" style={{ marginBottom: '16px' }}>
-              <div className="card-header" style={{ fontSize: '9pt', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="card-header" style={{ fontSize: '12px', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Details</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   {isOwner && (
-                    <button className="button button-small button-secondary" onClick={() => setShowLocationPicker(true)} style={{ fontSize: '7pt', padding: '2px 8px' }}>
+                    <button className="button button-small button-secondary" onClick={() => setShowLocationPicker(true)} style={{ fontSize: '9px', padding: '2px 8px' }}>
                       {organization.latitude ? 'GPS' : 'Set Location'}
                     </button>
                   )}
                   {(isOwner || currentUserRole === 'moderator' || currentUserRole === 'contractor') && (
-                    <button onClick={() => setShowOrganizationEditor(true)} className="button button-small" style={{ fontSize: '7pt', padding: '2px 8px' }}>
+                    <button onClick={() => setShowOrganizationEditor(true)} className="button button-small" style={{ fontSize: '9px', padding: '2px 8px' }}>
                       Edit
                     </button>
                   )}
@@ -2704,42 +2704,42 @@ export default function OrganizationProfile() {
               </div>
               <div className="card-body">
                 {organization.description && (
-                  <p style={{ fontSize: '9pt', lineHeight: 1.5, margin: '0 0 12px 0', color: 'var(--text)' }}>
+                  <p style={{ fontSize: '12px', lineHeight: 1.5, margin: '0 0 12px 0', color: 'var(--text)' }}>
                     {organization.description}
                   </p>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '8pt' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
                   {organization.business_type && (
-                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Type</div><div style={{ fontWeight: 600 }}>{formatBusinessTypeLabel(organization.business_type) || organization.business_type}</div></div>
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Type</div><div style={{ fontWeight: 600 }}>{formatBusinessTypeLabel(organization.business_type) || organization.business_type}</div></div>
                   )}
                   {(organization.estimated_value || organization.current_value) && (
-                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Value</div><div style={{ fontWeight: 600 }}>{formatUsd(organization.estimated_value || organization.current_value || 0)}</div></div>
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Value</div><div style={{ fontWeight: 600 }}>{formatUsd(organization.estimated_value || organization.current_value || 0)}</div></div>
                   )}
                   {organization.address && (
-                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</div><div>{organization.city}{organization.state ? `, ${organization.state}` : ''}{organization.zip_code ? ` ${organization.zip_code}` : ''}</div></div>
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</div><div>{organization.city}{organization.state ? `, ${organization.state}` : ''}{organization.zip_code ? ` ${organization.zip_code}` : ''}</div></div>
                   )}
                   {organization.phone && (
-                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phone</div><a href={`tel:${organization.phone}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{organization.phone}</a></div>
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phone</div><a href={`tel:${organization.phone}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{organization.phone}</a></div>
                   )}
                   {organization.email && (
-                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</div><a href={`mailto:${organization.email}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{organization.email}</a></div>
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</div><a href={`mailto:${organization.email}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{organization.email}</a></div>
                   )}
                   {organization.website && (
-                    <div><div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Website</div><a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{organization.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></div>
+                    <div><div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Website</div><a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{organization.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></div>
                   )}
                   {organization.labor_rate && (
                     <div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Labor Rate</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Labor Rate</div>
                       <div style={{ fontWeight: 600 }}>
                         ${organization.labor_rate}/hr
-                        {isOwner && <button onClick={() => setShowLaborRateEditor(true)} style={{ marginLeft: '6px', fontSize: '7pt', padding: '1px 4px', background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer' }}>edit</button>}
+                        {isOwner && <button onClick={() => setShowLaborRateEditor(true)} style={{ marginLeft: '6px', fontSize: '9px', padding: '1px 4px', background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer' }}>edit</button>}
                       </div>
                     </div>
                   )}
                   {organization.latitude && organization.longitude && (
                     <div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.5px' }}>GPS</div>
-                      <a href={`https://www.google.com/maps?q=${organization.latitude},${organization.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: '8pt' }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>GPS</div>
+                      <a href={`https://www.google.com/maps?q=${organization.latitude},${organization.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: '11px' }}>
                         {organization.latitude.toFixed(4)}, {organization.longitude.toFixed(4)}
                       </a>
                     </div>
@@ -2747,7 +2747,7 @@ export default function OrganizationProfile() {
                 </div>
                 {!organization.labor_rate && isOwner && (
                   <div style={{ marginTop: '8px' }}>
-                    <button onClick={() => setShowLaborRateEditor(true)} className="button button-small button-secondary" style={{ fontSize: '7pt', padding: '2px 8px' }}>Set Labor Rate</button>
+                    <button onClick={() => setShowLaborRateEditor(true)} className="button button-small button-secondary" style={{ fontSize: '9px', padding: '2px 8px' }}>Set Labor Rate</button>
                   </div>
                 )}
               </div>
@@ -2757,22 +2757,22 @@ export default function OrganizationProfile() {
             {organization.is_tradable && offering && (
               <div className="card" style={{ marginBottom: '16px' }}>
                 <div className="card-header">Stock Information</div>
-                <div className="card-body" style={{ fontSize: '9pt' }}>
+                <div className="card-body" style={{ fontSize: '12px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Symbol</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Symbol</div>
                       <div style={{ fontWeight: 600 }}>{offering.stock_symbol}</div>
                     </div>
                     <div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Current Price</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Current Price</div>
                       <div style={{ fontWeight: 600 }}>${offering.current_share_price.toFixed(2)}</div>
                     </div>
                     <div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Total Shares</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Total Shares</div>
                       <div style={{ fontWeight: 600 }}>{offering.total_shares.toLocaleString()}</div>
                     </div>
                     <div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Market Cap</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Market Cap</div>
                       <div style={{ fontWeight: 600 }}>
                         ${(offering.current_share_price * offering.total_shares).toLocaleString()}
                       </div>
@@ -2801,7 +2801,7 @@ export default function OrganizationProfile() {
             <>
               {organization?.business_type === 'forum' && vehicles.length === 0 && (
                 <div style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   color: 'var(--text-muted)',
                   background: 'var(--gray-50)',
                   border: '1px solid var(--border)',
@@ -2826,10 +2826,10 @@ export default function OrganizationProfile() {
             <div className="card">
               <div className="card-header">Work Orders</div>
               <div className="card-body">
-                <div style={{ fontSize: '9pt', color: 'var(--grey-600)', textAlign: 'center', padding: '40px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--grey-600)', textAlign: 'center', padding: '40px' }}>
                   Receipt/work order browser coming soon
                   <br />
-                  <span style={{ fontSize: '8pt' }}>
+                  <span style={{ fontSize: '11px' }}>
                     View receipts in vehicle profiles for now
                   </span>
                 </div>
@@ -2863,7 +2863,7 @@ export default function OrganizationProfile() {
                 <button
                   onClick={() => imageInputRef.current?.click()}
                   className="button button-primary button-small"
-                  style={{ fontSize: '8pt', padding: '6px 12px' }}
+                  style={{ fontSize: '11px', padding: '6px 12px' }}
                   disabled={uploadingImages}
                 >
                   {uploadingImages ? 'Uploading...' : 'Upload Images'}
@@ -2880,23 +2880,23 @@ export default function OrganizationProfile() {
                   borderRadius: '8px',
                   background: 'var(--surface)'
                 }}>
-                  <div style={{ fontSize: '11pt', marginBottom: '12px', fontWeight: 600 }}>
+                  <div style={{ fontSize: '15px', marginBottom: '12px', fontWeight: 600 }}>
                     No images yet
                   </div>
-                  <div style={{ fontSize: '9pt', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '12px', marginBottom: '20px' }}>
                     Upload the first image to get started
                   </div>
                   {(canEdit || isOwner) ? (
                     <button
                       onClick={() => imageInputRef.current?.click()}
                       className="button button-primary"
-                      style={{ fontSize: '10pt', padding: '10px 24px' }}
+                      style={{ fontSize: '13px', padding: '10px 24px' }}
                       disabled={uploadingImages}
                     >
                       {uploadingImages ? 'Uploading...' : 'Upload Images'}
                     </button>
                   ) : (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       Contact the organization owner to add images
                     </div>
                   )}
@@ -2945,7 +2945,7 @@ export default function OrganizationProfile() {
                             color: 'var(--accent-bright)',
                             padding: '4px 8px',
                             borderRadius: '2px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             fontWeight: 700,
                             textTransform: 'capitalize'
                           }}>
@@ -2963,7 +2963,7 @@ export default function OrganizationProfile() {
                             color: 'var(--accent-bright)',
                             padding: '4px 8px',
                             borderRadius: '2px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             fontWeight: 700
                           }}>
                             PRIMARY
@@ -2980,7 +2980,7 @@ export default function OrganizationProfile() {
                             color: 'var(--accent-bright)',
                             padding: '4px 8px',
                             borderRadius: '2px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             fontWeight: 700,
                             display: 'flex',
                             alignItems: 'center',
@@ -3015,7 +3015,7 @@ export default function OrganizationProfile() {
                                   border: '1px solid var(--success)',
                                   borderRadius: '2px',
                                   padding: '4px 8px',
-                                  fontSize: '7pt',
+                                  fontSize: '9px',
                                   cursor: 'pointer',
                                   fontWeight: 600,
                                   color: 'var(--accent-bright)'
@@ -3038,7 +3038,7 @@ export default function OrganizationProfile() {
                                     border: '1px solid var(--border)',
                                     borderRadius: '2px',
                                     padding: '4px 8px',
-                                    fontSize: '7pt',
+                                    fontSize: '9px',
                                     cursor: 'pointer',
                                     fontWeight: 600
                                   }}
@@ -3056,7 +3056,7 @@ export default function OrganizationProfile() {
                                     border: '1px solid var(--border)',
                                     borderRadius: '2px',
                                     padding: '4px 8px',
-                                    fontSize: '7pt',
+                                    fontSize: '9px',
                                     cursor: 'pointer',
                                     fontWeight: 600
                                   }}
@@ -3077,7 +3077,7 @@ export default function OrganizationProfile() {
                                 border: '1px solid var(--border)',
                                 borderRadius: '2px',
                                 padding: '4px 8px',
-                                fontSize: '7pt',
+                                fontSize: '9px',
                                 cursor: 'pointer',
                                 fontWeight: 600,
                                 color: 'var(--error)'
@@ -3093,13 +3093,13 @@ export default function OrganizationProfile() {
                       {/* Image metadata */}
                       <div style={{ padding: '10px' }}>
                         {img.caption && (
-                          <div style={{ fontSize: '8pt', marginBottom: '6px', fontWeight: 600 }}>
+                          <div style={{ fontSize: '11px', marginBottom: '6px', fontWeight: 600 }}>
                             {img.caption}
               </div>
                         )}
 
                         {/* Date and location */}
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '6px' }}>
                           {img.taken_at ? new Date(img.taken_at).toLocaleDateString() : new Date(img.uploaded_at).toLocaleDateString()}
                           {img.location_name && ` · ${img.location_name}`}
             </div>
@@ -3107,7 +3107,7 @@ export default function OrganizationProfile() {
                         {/* EXIF data */}
                         {img.exif_data && Object.keys(img.exif_data).length > 0 && (
                           <div style={{
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             color: 'var(--text-secondary)',
                             background: 'var(--surface)',
                             padding: '6px',
@@ -3123,7 +3123,7 @@ export default function OrganizationProfile() {
                         {/* GPS coordinates */}
                         {(img.latitude || img.longitude) && (
           <div style={{
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             color: 'var(--accent)',
                             marginTop: '6px',
                             display: 'flex',
@@ -3138,7 +3138,7 @@ export default function OrganizationProfile() {
                         {/* AI Tags */}
                         {imageTags[img.id] && imageTags[img.id].length > 0 && (
                           <div style={{ marginTop: '8px' }}>
-                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600 }}>
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600 }}>
                               AI Tags
                             </div>
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -3146,7 +3146,7 @@ export default function OrganizationProfile() {
                                 <span
                                   key={idx}
                                   style={{
-                                    fontSize: '7pt',
+                                    fontSize: '9px',
                                     padding: '2px 6px',
                                     background: 'var(--accent-dim)',
                                     color: 'var(--accent)',
@@ -3178,7 +3178,7 @@ export default function OrganizationProfile() {
             </div>
             <div className="card-body">
               {contributors.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)', fontSize: '12px' }}>
                   {intelligence?.effectiveType === 'auction_house' ? 'No people yet' : 'No contributors yet'}
                 </div>
               ) : (
@@ -3202,18 +3202,18 @@ export default function OrganizationProfile() {
                         style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
                       />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700 }}>
                           {contributor.profiles?.full_name || contributor.profiles?.username}
                 </div>
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           @{contributor.profiles?.username} · {contributor.role}
                   </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '11pt', fontWeight: 700, color: 'var(--accent)' }}>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent)' }}>
                           {contributor.contribution_count}
                         </div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                           contributions
                         </div>
                       </div>
@@ -3225,7 +3225,7 @@ export default function OrganizationProfile() {
               {/* Attribution Timeline */}
               <div style={{ marginTop: '24px', borderTop: '2px solid var(--border)', paddingTop: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <h4 style={{ fontSize: '10pt', fontWeight: 700, margin: 0 }}>
+                  <h4 style={{ fontSize: '13px', fontWeight: 700, margin: 0 }}>
                     Contribution Timeline
                   </h4>
                   {session && (
@@ -3237,14 +3237,14 @@ export default function OrganizationProfile() {
                         }
                       }}
                       className="button button-secondary button-small"
-                      style={{ fontSize: '8pt' }}
+                      style={{ fontSize: '11px' }}
                     >
                       Add Article
                     </button>
                   )}
                 </div>
                 {timelineEvents.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                  <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '12px' }}>
                     No timeline events yet
                 </div>
                 ) : (
@@ -3266,18 +3266,18 @@ export default function OrganizationProfile() {
                             alt={event.profiles?.full_name}
                             style={{ width: '24px', height: '24px', borderRadius: '50%' }}
                           />
-                          <div style={{ fontSize: '8pt', fontWeight: 700 }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700 }}>
                             {event.profiles?.full_name || event.profiles?.username}
                           </div>
-                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                             {new Date(event.event_date).toLocaleDateString()}
                           </div>
                         </div>
-                        <div style={{ fontSize: '9pt', marginBottom: '2px' }}>
+                        <div style={{ fontSize: '12px', marginBottom: '2px' }}>
                           {event.title}
                         </div>
                         {event.description && (
-                          <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                             {event.description}
                           </div>
                         )}
@@ -3317,7 +3317,7 @@ export default function OrganizationProfile() {
                               href={event.documentation_urls[0]}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ fontSize: '7pt', color: 'var(--accent)', textDecoration: 'none' }}
+                              style={{ fontSize: '9px', color: 'var(--accent)', textDecoration: 'none' }}
                             >
                               View Source Article →
                             </a>
@@ -3377,11 +3377,11 @@ export default function OrganizationProfile() {
               borderRadius: '4px',
               marginBottom: 'var(--space-3)',
             }}>
-              <h3 style={{ fontSize: '10pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
                 Services Offered
               </h3>
               {comprehensiveData.website_mapping && (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
                   Services mapped from: <a href={comprehensiveData.website_mapping.website_url} target="_blank" rel="noopener noreferrer">{comprehensiveData.website_mapping.website_url}</a>
                 </div>
               )}
@@ -3402,21 +3402,21 @@ export default function OrganizationProfile() {
                       borderRadius: '4px',
                     }}
                   >
-                    <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
                       {service.service_name}
                     </div>
                     {service.service_category && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
                         {service.service_category.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                       </div>
                     )}
                     {service.description && (
-                      <div style={{ fontSize: '8pt', color: 'var(--text)', marginBottom: 'var(--space-2)', lineHeight: '1.5' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: 'var(--space-2)', lineHeight: '1.5' }}>
                         {service.description}
                       </div>
                     )}
                     {service.pricing_model && service.pricing_model !== 'unknown' && (
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--border)' }}>
                         <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Pricing:</div>
                         {service.pricing_model === 'fixed_price' && service.base_price && `$${service.base_price.toLocaleString()}`}
                         {service.pricing_model === 'hourly_rate' && service.hourly_rate && `$${service.hourly_rate.toLocaleString()}/hour`}
@@ -3426,7 +3426,7 @@ export default function OrganizationProfile() {
                       </div>
                     )}
                     {service.source_url && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
                         <a href={service.source_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
                           Source
                         </a>
@@ -3440,7 +3440,7 @@ export default function OrganizationProfile() {
                 padding: 'var(--space-6)',
                 textAlign: 'center',
                 color: 'var(--text-muted)',
-                fontSize: '8pt',
+                fontSize: '11px',
               }}>
                 No services defined yet. Services can be automatically discovered from your website or manually added.
               </div>
@@ -3459,45 +3459,45 @@ export default function OrganizationProfile() {
             {/* Data Source Connection (dealers/owners only) */}
             {isOwner && (
               <div className="card" style={{ marginBottom: '16px' }}>
-                <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
+                <div className="card-header" style={{ fontSize: '15px', fontWeight: 700 }}>
                   Connect Data Sources
                 </div>
                 <div className="card-body">
-                  <div style={{ fontSize: '9pt', marginBottom: '12px', color: 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: '12px', marginBottom: '12px', color: 'var(--text-secondary)' }}>
                     Import inventory, vehicles, and documents from external sources
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <a
                       href={`/dealer/${organization.id}/ai-assistant`}
                       className="button button-primary"
-                      style={{ fontSize: '9pt', textDecoration: 'none', display: 'inline-block' }}
+                      style={{ fontSize: '12px', textDecoration: 'none', display: 'inline-block' }}
                     >
                       AI Assistant
                     </a>
                     <a
                       href={`/dealer/${organization.id}/bulk-editor`}
                       className="button button-secondary"
-                      style={{ fontSize: '9pt', textDecoration: 'none', display: 'inline-block' }}
+                      style={{ fontSize: '12px', textDecoration: 'none', display: 'inline-block' }}
                     >
                       Bulk Editor
                     </a>
                     <button
                       onClick={() => setShowBaTImporter(true)}
                       className="button button-secondary"
-                      style={{ fontSize: '9pt' }}
+                      style={{ fontSize: '12px' }}
                     >
                       Import BaT Sales
                     </button>
                     <a
                       href={`/dealer/${organization.id}/dropbox-import`}
                       className="button button-secondary"
-                      style={{ fontSize: '9pt', textDecoration: 'none', display: 'inline-block' }}
+                      style={{ fontSize: '12px', textDecoration: 'none', display: 'inline-block' }}
                     >
                       Dropbox Import
                     </a>
                     <button
                       className="button button-secondary"
-                      style={{ fontSize: '9pt' }}
+                      style={{ fontSize: '12px' }}
                       disabled
                       title="Coming soon"
                     >
@@ -3505,7 +3505,7 @@ export default function OrganizationProfile() {
                     </button>
                     <button
                       className="button button-secondary"
-                      style={{ fontSize: '9pt' }}
+                      style={{ fontSize: '12px' }}
                       disabled
                       title="Coming soon"
                     >
@@ -3513,7 +3513,7 @@ export default function OrganizationProfile() {
                     </button>
                     <button
                       className="button button-secondary"
-                      style={{ fontSize: '9pt' }}
+                      style={{ fontSize: '12px' }}
                       disabled
                       title="Coming soon"
                     >
@@ -3647,40 +3647,40 @@ export default function OrganizationProfile() {
             borderRadius: '4px'
           }}>
             <div className="modal-header">
-              <h3 style={{ margin: 0, fontSize: '10pt' }}>Claim Organization Ownership</h3>
+              <h3 style={{ margin: 0, fontSize: '13px' }}>Claim Organization Ownership</h3>
             </div>
             <div className="modal-body">
               <form onSubmit={handleOwnershipSubmit}>
                 <div style={{ marginBottom: '8px' }}>
-                  <div style={{ marginBottom: '4px', fontSize: '9pt' }}>Document Type:</div>
-                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '9pt' }}>
+                  <div style={{ marginBottom: '4px', fontSize: '12px' }}>Document Type:</div>
+                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '12px' }}>
                     <input type="radio" value="business_license" defaultChecked name="verificationType" />
                     {' '}Business License
                   </label>
-                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '9pt' }}>
+                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '12px' }}>
                     <input type="radio" value="tax_id" name="verificationType" />
                     {' '}Tax ID / EIN
                   </label>
-                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '9pt' }}>
+                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '12px' }}>
                     <input type="radio" value="articles_incorporation" name="verificationType" />
                     {' '}Articles of Incorporation
                   </label>
-                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '9pt' }}>
+                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '12px' }}>
                     <input type="radio" value="dba_certificate" name="verificationType" />
                     {' '}DBA Certificate
                   </label>
-                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '9pt' }}>
+                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '12px' }}>
                     <input type="radio" value="lease_agreement" name="verificationType" />
                     {' '}Lease/Property Agreement
                   </label>
-                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '9pt' }}>
+                  <label style={{ display: 'block', marginBottom: '2px', fontSize: '12px' }}>
                     <input type="radio" value="utility_bill" name="verificationType" />
                     {' '}Utility Bill (business address)
                   </label>
                 </div>
 
                 <div style={{ marginBottom: '8px' }}>
-                  <div style={{ marginBottom: '4px', fontSize: '9pt' }}>Upload Document:</div>
+                  <div style={{ marginBottom: '4px', fontSize: '12px' }}>Upload Document:</div>
                   
                   {/* Hidden file input for ownership documents */}
                   <input
@@ -3727,19 +3727,19 @@ export default function OrganizationProfile() {
                   >
                     {selectedFileName ? (
                 <div>
-                        <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '4px', color: 'var(--accent)' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', color: 'var(--accent)' }}>
                           File selected
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           {selectedFileName}
                   </div>
                 </div>
                     ) : (
                       <div>
-                        <div style={{ fontSize: '9pt', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '12px', marginBottom: '4px' }}>
                           {isDragging ? 'Drop file here' : 'Drag & drop or click to choose'}
                 </div>
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           PDF or Image (JPG, PNG)
               </div>
           </div>
@@ -3752,14 +3752,14 @@ export default function OrganizationProfile() {
                     type="button"
                     onClick={() => setShowOwnershipModal(false)}
                     className="button button-secondary button-small"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     className="button button-primary"
-                    style={{ fontSize: '9pt' }}
+                    style={{ fontSize: '12px' }}
                   >
                     Submit
                   </button>
@@ -3816,7 +3816,7 @@ export default function OrganizationProfile() {
                 background: 'rgba(0,0,0,0.45)',
                 border: '1px solid rgba(255,255,255,0.18)',
                 color: 'var(--accent-bright)',
-                fontSize: '24pt',
+                fontSize: '32px',
                 width: '50px',
                 height: '50px',
                 borderRadius: '50%',
@@ -3859,7 +3859,7 @@ export default function OrganizationProfile() {
               borderRadius: '4px',
               marginTop: '12px',
               color: 'var(--accent-bright)',
-              fontSize: '9pt',
+              fontSize: '12px',
               maxWidth: '600px'
             }}>
               {lightboxImage.caption && (
@@ -3867,7 +3867,7 @@ export default function OrganizationProfile() {
                   {lightboxImage.caption}
               </div>
             )}
-              <div style={{ fontSize: '8pt', opacity: 0.8 }}>
+              <div style={{ fontSize: '11px', opacity: 0.8 }}>
                 {lightboxImage.taken_at ? new Date(lightboxImage.taken_at).toLocaleDateString() : new Date(lightboxImage.uploaded_at).toLocaleDateString()}
                 {lightboxImage.category && ` · ${lightboxImage.category.replace(/_/g, ' ')}`}
                 {lightboxImage.location_name && ` · ${lightboxImage.location_name}`}
@@ -3892,7 +3892,7 @@ export default function OrganizationProfile() {
                 background: 'rgba(0,0,0,0.45)',
                 border: '1px solid rgba(255,255,255,0.18)',
                 color: 'var(--accent-bright)',
-                fontSize: '24pt',
+                fontSize: '32px',
                 width: '50px',
                 height: '50px',
                 borderRadius: '50%',
@@ -3916,7 +3916,7 @@ export default function OrganizationProfile() {
               background: 'rgba(0,0,0,0.45)',
               border: '1px solid rgba(255,255,255,0.18)',
               color: 'var(--accent-bright)',
-              fontSize: '20pt',
+              fontSize: '27px',
               width: '40px',
               height: '40px',
               borderRadius: '50%',

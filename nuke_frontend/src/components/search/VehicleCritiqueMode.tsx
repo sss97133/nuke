@@ -202,7 +202,7 @@ export default function VehicleCritiqueMode({
       border: '2px solid var(--border)',
       padding: '12px',
       zIndex: 1000,
-      fontSize: '8pt'
+      fontSize: '11px'
     }}>
       <div style={{ color: '#c00', marginBottom: '8px' }}>
         Access Restricted
@@ -214,7 +214,7 @@ export default function VehicleCritiqueMode({
         type="button"
         onClick={onClose}
         className="button button-secondary"
-        style={{ fontSize: '8pt', padding: '2px 8px' }}
+        style={{ fontSize: '11px', padding: '2px 8px' }}
       >
         Close
       </button>
@@ -230,10 +230,10 @@ export default function VehicleCritiqueMode({
       boxShadow: '2px 2px 8px rgba(0,0,0,0.2)'
     }}>
       <form onSubmit={handleSubmit}>
-        <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '8px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>
           Vehicle Critique & Business Impact
           {vehicleData && (
-            <span style={{ fontSize: '8pt', fontWeight: 'normal', color: '#666', marginLeft: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#666', marginLeft: '8px' }}>
               {vehicleData.year} {vehicleData.make} {vehicleData.model}
             </span>
           )}
@@ -241,7 +241,7 @@ export default function VehicleCritiqueMode({
 
         {/* Category Selection */}
         <div style={{ marginBottom: '8px' }}>
-          <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '2px' }}>
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px' }}>
             Category
           </label>
           <select
@@ -253,7 +253,7 @@ export default function VehicleCritiqueMode({
             }))}
             style={{
               width: '100%',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontFamily: '"MS Sans Serif", sans-serif',
               border: '1px solid var(--border)',
               padding: '2px'
@@ -268,7 +268,7 @@ export default function VehicleCritiqueMode({
 
         {/* Subcategory Selection */}
         <div style={{ marginBottom: '8px' }}>
-          <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '2px' }}>
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px' }}>
             Subcategory *
           </label>
           <select
@@ -276,7 +276,7 @@ export default function VehicleCritiqueMode({
             onChange={(e) => setFormData(prev => ({ ...prev, subcategory: e.target.value }))}
             style={{
               width: '100%',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontFamily: '"MS Sans Serif", sans-serif',
               border: '1px solid var(--border)',
               padding: '2px'
@@ -292,7 +292,7 @@ export default function VehicleCritiqueMode({
 
         {/* Priority */}
         <div style={{ marginBottom: '8px' }}>
-          <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '2px' }}>
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px' }}>
             Priority
           </label>
           <select
@@ -300,7 +300,7 @@ export default function VehicleCritiqueMode({
             onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
             style={{
               width: '100%',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontFamily: '"MS Sans Serif", sans-serif',
               border: '1px solid var(--border)',
               padding: '2px'
@@ -316,10 +316,10 @@ export default function VehicleCritiqueMode({
         {/* Business Impact (if category is business_impact) */}
         {formData.category === 'business_impact' && (
           <div style={{ marginBottom: '8px', padding: '6px', background: '#f8f9fa', border: '1px solid #dee2e6' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 'bold', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>
               Business Impact Assessment
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '7pt' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '9px' }}>
               <div>
                 <label>Financial:</label>
                 <select
@@ -331,7 +331,7 @@ export default function VehicleCritiqueMode({
                       financialImpact: e.target.value as any
                     }
                   }))}
-                  style={{ width: '100%', fontSize: '7pt' }}
+                  style={{ width: '100%', fontSize: '9px' }}
                 >
                   <option value="neutral">Neutral</option>
                   <option value="negative">Loss</option>
@@ -349,7 +349,7 @@ export default function VehicleCritiqueMode({
                       timeImpact: e.target.value as any
                     }
                   }))}
-                  style={{ width: '100%', fontSize: '7pt' }}
+                  style={{ width: '100%', fontSize: '9px' }}
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -362,7 +362,7 @@ export default function VehicleCritiqueMode({
 
         {/* Description */}
         <div style={{ marginBottom: '8px' }}>
-          <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '2px' }}>
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px' }}>
             Description & Context *
           </label>
           <textarea
@@ -372,7 +372,7 @@ export default function VehicleCritiqueMode({
             rows={3}
             style={{
               width: '100%',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontFamily: '"MS Sans Serif", sans-serif',
               border: '1px solid var(--border)',
               padding: '4px',
@@ -387,7 +387,7 @@ export default function VehicleCritiqueMode({
             type="button"
             onClick={onClose}
             className="button button-secondary"
-            style={{ fontSize: '8pt', padding: '2px 8px' }}
+            style={{ fontSize: '11px', padding: '2px 8px' }}
           >
             Cancel
           </button>
@@ -396,7 +396,7 @@ export default function VehicleCritiqueMode({
             disabled={isSubmitting || !formData.description.trim() || !formData.subcategory}
             className="button button-primary"
             style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               padding: '2px 8px',
               opacity: (isSubmitting || !formData.description.trim() || !formData.subcategory) ? 0.5 : 1
             }}

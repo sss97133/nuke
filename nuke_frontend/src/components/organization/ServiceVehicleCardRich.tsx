@@ -134,7 +134,7 @@ export function ServiceVehicleCardRich({
         borderRadius: '4px',
         background: 'var(--card-bg)'
       }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Loading...</div>
+        <div style={{ height: 64, background: 'var(--border)', borderRadius: 2, opacity: 0.5 }} />
       </div>
     );
   }
@@ -185,7 +185,7 @@ export function ServiceVehicleCardRich({
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <span style={{ fontSize: '8pt', opacity: 0.3 }}>+</span>
+            <span style={{ fontSize: '11px', opacity: 0.3 }}>+</span>
           </div>
         ))}
       </div>
@@ -194,7 +194,7 @@ export function ServiceVehicleCardRich({
       <div style={{ padding: '12px' }}>
         {/* Vehicle Name */}
         <div style={{ 
-          fontSize: '8pt', 
+          fontSize: '11px', 
           fontWeight: 700, 
           color: 'var(--text-primary)',
           marginBottom: '4px'
@@ -207,7 +207,7 @@ export function ServiceVehicleCardRich({
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
             {stats.workTypes.map(type => (
               <span key={type} style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: '2px 6px',
                 borderRadius: '2px',
                 background: 'var(--accent-dim)',
@@ -228,26 +228,26 @@ export function ServiceVehicleCardRich({
           marginBottom: '8px'
         }}>
           <div>
-            <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--accent)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)' }}>
               {stats?.totalSessions || 0}
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Sessions
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)' }}>
               {stats?.totalHours || 0}h
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Hours
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--success, #22c55e)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success, #22c55e)' }}>
               {formatCurrency(stats?.estimatedCost || 0)}
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Est. Value
             </div>
           </div>
@@ -255,7 +255,7 @@ export function ServiceVehicleCardRich({
 
         {/* Timeline */}
         <div style={{ 
-          fontSize: '8pt', 
+          fontSize: '11px', 
           color: 'var(--text-secondary)',
           display: 'flex',
           justifyContent: 'space-between',

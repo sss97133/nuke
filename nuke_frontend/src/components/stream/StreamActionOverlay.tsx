@@ -143,7 +143,7 @@ export default function StreamActionOverlay({
               border: '1px solid rgba(255, 255, 255, 0.18)',
               padding: '8px 10px',
               maxWidth: '70%',
-              fontSize: '10pt',
+              fontSize: '13px',
               letterSpacing: '0.02em',
               textTransform: 'uppercase',
             }}

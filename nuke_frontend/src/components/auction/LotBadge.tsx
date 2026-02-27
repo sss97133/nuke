@@ -107,7 +107,7 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
           padding: '2px 6px',
           cursor: hasDetails ? 'pointer' : 'default',
           fontFamily: 'inherit',
-          fontSize: '7pt',
+          fontSize: '9px',
           color: isPast ? '#15803d' : isUpcoming ? '#1e40af' : '#92400e',
           fontWeight: 700,
           display: 'flex',
@@ -131,7 +131,7 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
         {isPast ? 'SOLD' : isUpcoming ? 'UPCOMING' : 'AUCTION'}
         {hasDetails && (
           <span style={{ 
-            fontSize: '6pt',
+            fontSize: '8px',
             transition: 'transform 0.12s ease',
             transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
             lineHeight: '1'
@@ -156,56 +156,56 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
             maxWidth: '250px',
             zIndex: 1000,
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            fontSize: '8pt',
+            fontSize: '11px',
           }}
           onClick={(e) => e.stopPropagation()}
         >
           {lotNumber && (
             <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
                 Lot Number
               </div>
-              <div style={{ fontWeight: 600, fontSize: '9pt' }}>
+              <div style={{ fontWeight: 600, fontSize: '12px' }}>
                 {lotNumber}
               </div>
             </div>
           )}
           {formattedDate && (
             <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
                 Date
               </div>
-              <div style={{ fontWeight: 600, fontSize: '9pt' }}>
+              <div style={{ fontWeight: 600, fontSize: '12px' }}>
                 {formattedDate}
               </div>
             </div>
           )}
           {location && (
             <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
                 Location
               </div>
-              <div style={{ fontWeight: 600, fontSize: '9pt' }}>
+              <div style={{ fontWeight: 600, fontSize: '12px' }}>
                 {location}
               </div>
             </div>
           )}
           {salePrice && (
             <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
                 Sold For
               </div>
-              <div style={{ fontWeight: 700, fontSize: '10pt', color: '#22c55e' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px', color: '#22c55e' }}>
                 {formatCurrency(salePrice)}
               </div>
             </div>
           )}
           {(estimateLow || estimateHigh) && (
             <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
                 Estimate
               </div>
-              <div style={{ fontWeight: 600, fontSize: '9pt' }}>
+              <div style={{ fontWeight: 600, fontSize: '12px' }}>
                 {estimateLow && estimateHigh
                   ? `${formatCurrency(estimateLow)} - ${formatCurrency(estimateHigh)}`
                   : estimateLow
@@ -226,7 +226,7 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
                 style={{
                   color: 'var(--accent)',
                   textDecoration: 'none',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                 }}
                 onMouseEnter={(e) => {

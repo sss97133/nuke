@@ -13,7 +13,7 @@ import '../design-system.css';
 
 const DashboardSkeleton: React.FC = () => (
   <div style={{ padding: '16px' }}>
-    <h1 style={{ fontSize: '12pt', fontWeight: 700, margin: '0 0 16px 0' }}>
+    <h1 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 16px 0' }}>
       Vehicles Dashboard
     </h1>
     <div style={{
@@ -25,7 +25,7 @@ const DashboardSkeleton: React.FC = () => (
       alignItems: 'center',
       justifyContent: 'center'
     }}>
-      <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
         Loading dashboard...
       </span>
     </div>
@@ -49,11 +49,11 @@ const EmptyDashboard: React.FC = () => (
     padding: '48px 16px',
     textAlign: 'center'
   }}>
-    <h1 style={{ fontSize: '12pt', fontWeight: 700, margin: '0 0 24px 0' }}>
+    <h1 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 24px 0' }}>
       Vehicles Dashboard
     </h1>
     <div style={{
-      fontSize: '11pt',
+      fontSize: '15px',
       fontWeight: 600,
       color: 'var(--text)',
       marginBottom: '8px'
@@ -61,7 +61,7 @@ const EmptyDashboard: React.FC = () => (
       No vehicles yet
     </div>
     <div style={{
-      fontSize: '9pt',
+      fontSize: '12px',
       color: 'var(--text-muted)',
       marginBottom: '24px'
     }}>
@@ -72,7 +72,7 @@ const EmptyDashboard: React.FC = () => (
       style={{
         display: 'inline-block',
         padding: '10px 20px',
-        fontSize: '9pt',
+        fontSize: '12px',
         fontWeight: 600,
         background: 'var(--primary)',
         color: 'white',
@@ -144,10 +144,10 @@ const VehiclesDashboard: React.FC = () => {
   if (!user) {
     return (
       <div style={{ padding: '48px 16px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '12pt', fontWeight: 700, margin: '0 0 24px 0' }}>
+        <h1 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 24px 0' }}>
           Vehicles Dashboard
         </h1>
-        <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '24px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '24px' }}>
           Sign in to view your vehicles dashboard.
         </div>
         <Link
@@ -155,7 +155,7 @@ const VehiclesDashboard: React.FC = () => {
           style={{
             display: 'inline-block',
             padding: '10px 20px',
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 600,
             background: 'var(--primary)',
             color: 'white',
@@ -176,7 +176,7 @@ const VehiclesDashboard: React.FC = () => {
   if (error) {
     return (
       <div style={{ padding: '16px' }}>
-        <h1 style={{ fontSize: '12pt', fontWeight: 700, margin: '0 0 16px 0' }}>
+        <h1 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 16px 0' }}>
           Vehicles Dashboard
         </h1>
         <div style={{
@@ -185,10 +185,10 @@ const VehiclesDashboard: React.FC = () => {
           border: '2px solid #fca5a5',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '9pt', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>
             Failed to load dashboard
           </div>
-          <div style={{ fontSize: '8pt', color: '#991b1b', marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', color: '#991b1b', marginBottom: '16px' }}>
             {error.message}
           </div>
           <button
@@ -196,7 +196,7 @@ const VehiclesDashboard: React.FC = () => {
             onClick={refresh}
             style={{
               padding: '8px 16px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               background: 'white',
               border: '1px solid #dc2626',
@@ -235,7 +235,7 @@ const VehiclesDashboard: React.FC = () => {
         marginBottom: '16px'
       }}>
         <h1 style={{
-          fontSize: '12pt',
+          fontSize: '16px',
           fontWeight: 700,
           margin: 0
         }}>
@@ -246,7 +246,7 @@ const VehiclesDashboard: React.FC = () => {
             to="/vehicle/list/legacy"
             style={{
               padding: '6px 12px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 600,
               background: 'var(--surface-hover)',
               color: 'var(--text-muted)',
@@ -262,7 +262,7 @@ const VehiclesDashboard: React.FC = () => {
             onClick={refresh}
             style={{
               padding: '6px 12px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 600,
               background: 'var(--surface-hover)',
               color: 'var(--text-muted)',

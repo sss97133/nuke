@@ -56,7 +56,7 @@ const MarkAsDuplicateButton: React.FC<Props> = ({ vehicleId, userId, onMarked })
         onClick={() => setShowForm(true)}
         className="button button-secondary"
         style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           padding: '4px 8px',
           whiteSpace: 'nowrap'
         }}
@@ -88,18 +88,18 @@ const MarkAsDuplicateButton: React.FC<Props> = ({ vehicleId, userId, onMarked })
         style={{ maxWidth: '400px', width: '100%' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
+        <div className="card-header" style={{ fontSize: '15px', fontWeight: 700 }}>
           Mark as Duplicate
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             Enter the vehicle ID that this is a duplicate of (the profile you want to keep).
           </div>
 
           <div>
             <label style={{
               display: 'block',
-              fontSize: '9pt',
+              fontSize: '12px',
               fontWeight: 600,
               marginBottom: '6px'
             }}>
@@ -113,13 +113,13 @@ const MarkAsDuplicateButton: React.FC<Props> = ({ vehicleId, userId, onMarked })
               style={{
                 width: '100%',
                 padding: '8px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
                 fontFamily: 'monospace'
               }}
             />
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               Tip: Open the primary vehicle profile and copy the ID from the URL
             </div>
           </div>
@@ -134,7 +134,7 @@ const MarkAsDuplicateButton: React.FC<Props> = ({ vehicleId, userId, onMarked })
             <button
               onClick={() => setShowForm(false)}
               className="button button-secondary"
-              style={{ flex: 1, fontSize: '9pt' }}
+              style={{ flex: 1, fontSize: '12px' }}
               disabled={submitting}
             >
               Cancel
@@ -142,7 +142,7 @@ const MarkAsDuplicateButton: React.FC<Props> = ({ vehicleId, userId, onMarked })
             <button
               onClick={handleSubmit}
               className="button button-primary"
-              style={{ flex: 1, fontSize: '9pt' }}
+              style={{ flex: 1, fontSize: '12px' }}
               disabled={submitting || !duplicateOfId.trim()}
             >
               {submitting ? 'Marking...' : 'Mark as Duplicate'}

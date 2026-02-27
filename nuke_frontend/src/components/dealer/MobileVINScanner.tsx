@@ -196,7 +196,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
             onClick={() => fileInputRef.current?.click()}
             disabled={scanning}
             className="button button-primary"
-            style={{ width: '100%', padding: '16px', fontSize: '11pt' }}
+            style={{ width: '100%', padding: '16px', fontSize: '15px' }}
           >
             {scanning ? 'SCANNING...' : 'SCAN VIN PLATE'}
           </button>
@@ -219,11 +219,11 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
               borderRadius: '4px',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                 Extracted VIN:
               </div>
               <div style={{ 
-                fontSize: '12pt', 
+                fontSize: '16px', 
                 fontWeight: 700, 
                 fontFamily: 'monospace',
                 letterSpacing: '2px'
@@ -236,7 +236,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
           {/* Candidate Vehicles */}
           {candidateVehicles.length > 0 && (
             <div>
-              <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '8px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
                 Select vehicle to update:
               </div>
               <div className="space-y-2">
@@ -252,10 +252,10 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
                     }}
                   >
                     <div className="card-body">
-                      <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700 }}>
                         {vehicle.year} {vehicle.make} {vehicle.model} {vehicle.trim || ''}
                       </div>
-                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         Current VIN: {vehicle.vin || 'NONE'}
                       </div>
                     </div>
@@ -270,7 +270,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
             <button
               onClick={() => updateVehicleVIN(matchedVehicle.id)}
               className="button button-primary"
-              style={{ width: '100%', padding: '16px', fontSize: '11pt' }}
+              style={{ width: '100%', padding: '16px', fontSize: '15px' }}
             >
               UPDATE VIN ON {matchedVehicle.year} {matchedVehicle.make} {matchedVehicle.model}
             </button>
@@ -278,7 +278,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
 
           {/* Instructions */}
           <div style={{ 
-            fontSize: '9pt', 
+            fontSize: '12px', 
             color: 'var(--text-muted)',
             textAlign: 'center',
             marginTop: '16px'

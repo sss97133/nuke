@@ -256,14 +256,14 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            <span style={{ fontSize: '10pt', fontWeight: 700 }}>Add Missing Images</span>
+            <span style={{ fontSize: '13px', fontWeight: 700 }}>Add Missing Images</span>
             <button
               type="button"
               onClick={handleClose}
               style={{
                 background: 'none',
                 border: 'none',
-                fontSize: '14pt',
+                fontSize: '19px',
                 cursor: 'pointer',
                 padding: '4px 8px'
               }}
@@ -272,10 +272,10 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
             </button>
           </div>
           <div style={{ padding: '24px', textAlign: 'center' }}>
-            <p style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
               To add images, please visit each vehicle's profile page directly.
             </p>
-            <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               {vehicleIds.length} vehicles need images
             </p>
           </div>
@@ -318,8 +318,8 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
           alignItems: 'center'
         }}>
           <div>
-            <div style={{ fontSize: '10pt', fontWeight: 700 }}>{config.title}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700 }}>{config.title}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               {fixedCount} of {vehicles.length} fixed • {remainingCount} remaining
             </div>
           </div>
@@ -329,7 +329,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '14pt',
+              fontSize: '19px',
               cursor: 'pointer',
               padding: '4px 8px'
             }}
@@ -354,7 +354,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
             padding: '10px 16px',
             background: '#fee2e2',
             color: '#991b1b',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}>
             {error}
           </div>
@@ -386,11 +386,11 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                     gap: '12px'
                   }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
                         {vehicle.year} {vehicle.make} {vehicle.model}
                       </div>
                       {vehicle.fixed ? (
-                        <div style={{ fontSize: '8pt', color: '#15803d', fontWeight: 500 }}>
+                        <div style={{ fontSize: '11px', color: '#15803d', fontWeight: 500 }}>
                           ✓ Fixed: {vehicle.currentValue}
                         </div>
                       ) : (
@@ -403,7 +403,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                           style={{
                             width: '100%',
                             padding: '8px 10px',
-                            fontSize: '9pt',
+                            fontSize: '12px',
                             border: '1px solid #d1d5db',
                             borderRadius: '3px',
                             background: '#fff'
@@ -423,7 +423,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                         disabled={saving || !values[vehicle.id]?.trim()}
                         style={{
                           padding: '8px 14px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           fontWeight: 600,
                           background: values[vehicle.id]?.trim() ? '#1e40af' : '#9ca3af',
                           color: '#fff',
@@ -456,7 +456,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
             onClick={handleClose}
             style={{
               padding: '8px 16px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               background: '#fff',
               border: '1px solid #d1d5db',
@@ -472,7 +472,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
             disabled={saving || !hasValues || remainingCount === 0}
             style={{
               padding: '8px 16px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               background: hasValues && remainingCount > 0 ? '#15803d' : '#9ca3af',
               color: '#fff',

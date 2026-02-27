@@ -1560,13 +1560,13 @@ const VehiclesInner: React.FC = () => {
                       style={{
                         width: '50px',
                         padding: '2px 4px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         border: '1px solid var(--border-light)',
                         background: 'var(--white)'
                       }}
                       title="Sidebar width (px)"
                     />
-                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>px</span>
+                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>px</span>
                   </div>
                 </>
               )}
@@ -1944,7 +1944,7 @@ const VehiclesInner: React.FC = () => {
                           color: 'inherit'
                         }}
                       >
-                        <div style={{ fontSize: '8pt', fontWeight: 700 }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700 }}>
                           {rel.vehicle.year} {rel.vehicle.make} {rel.vehicle.model}
                         </div>
                         <div className="vehicle-sidebar-mini">
@@ -1985,7 +1985,7 @@ const VehiclesInner: React.FC = () => {
           <div className="vehicle-library-main" role="region" aria-label="Vehicle list">
             <div className="vehicle-library-toolbar">
               <div className="vehicle-library-toolbar-left">
-                <div style={{ fontSize: '8pt', fontWeight: 700 }}>
+                <div style={{ fontSize: '11px', fontWeight: 700 }}>
                   {currentTabLabel} ({filteredRelationships.length})
                 </div>
                 <input
@@ -2059,7 +2059,7 @@ const VehiclesInner: React.FC = () => {
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <span style={{ fontSize: '8pt', fontWeight: 600 }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600 }}>
                     Filtering by: {healthFilter === 'healthy' ? 'Healthy (75%+)' : healthFilter === 'needs_work' ? 'Needs Work (50-74%)' : 'Critical (<50%)'}
                   </span>
                   <button
@@ -2068,7 +2068,7 @@ const VehiclesInner: React.FC = () => {
                     style={{
                       background: 'none',
                       border: 'none',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       color: 'inherit',
                       cursor: 'pointer',
                       textDecoration: 'underline'
@@ -2096,7 +2096,7 @@ const VehiclesInner: React.FC = () => {
               {currentRelationships.length === 0 && (
                 <div className="card">
                   <div className="card-body text-center" style={{ padding: '48px 24px' }}>
-                    <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '8px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
                       No vehicles yet
                     </div>
                     <div className="text-small" style={{ marginBottom: '16px' }}>
@@ -2120,7 +2120,7 @@ const VehiclesInner: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                       {groupedRelationships.map((group) => (
                         <div key={group.type}>
-                          <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>
                             {relationshipLabel(group.type)} ({group.items.length})
                           </div>
                           <div

@@ -142,7 +142,7 @@ export default function VehicleSearch() {
         height: '30px'
       }}>
         <span style={{ 
-          fontSize: '9pt', 
+          fontSize: '12px', 
           marginRight: '4px',
           color: '#999',
           fontFamily: '"MS Sans Serif", sans-serif',
@@ -162,7 +162,7 @@ export default function VehicleSearch() {
             flex: 1,
             border: 'none',
             outline: 'none',
-            fontSize: '9pt',
+            fontSize: '12px',
             fontFamily: '"MS Sans Serif", sans-serif',
             background: 'transparent',
             minWidth: 0,
@@ -175,7 +175,7 @@ export default function VehicleSearch() {
           onModelSelect={handleAIModelSelect}
           selectedProvider={selectedAIProvider}
         />
-        {loading && <span style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>...</span>}
+        {loading && <span style={{ fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>...</span>}
       </div>
 
       {/* Search Results Dropdown */}
@@ -227,7 +227,7 @@ export default function VehicleSearch() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '24pt',
+                    fontSize: '32px',
                     color: 'var(--text-muted)'
                   }}>
                     🚗
@@ -237,17 +237,17 @@ export default function VehicleSearch() {
 
               {/* Vehicle Info */}
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '4px' }}>
                   {result.year} {result.make} {result.model}
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {result.color && <span>{result.color} · </span>}
                   {result.mileage && <span>{result.mileage.toLocaleString()} mi</span>}
                   {result.vin && <span> · VIN: {result.vin.slice(-6)}</span>}
                 </div>
                 {result.is_for_sale && result.asking_price && (
                   <div style={{
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     fontWeight: 'bold',
                     color: '#008000',
                     marginTop: '4px'
@@ -275,7 +275,7 @@ export default function VehicleSearch() {
           textAlign: 'center',
           zIndex: 1000
         }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             No vehicles found for "{searchTerm}"
           </div>
         </div>

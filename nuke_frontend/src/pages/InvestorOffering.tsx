@@ -203,7 +203,7 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
         </ul>
         <p><strong>Conflict resolution:</strong> When multiple sources report different values for the same field, confidence scores determine precedence. A DMV record (0.95) supersedes a forum post (0.50) — but both are retained. Nothing is deleted.</p>
         <p><strong>Why this matters:</strong> Every valuation, every claim about a vehicle's history is traceable to source with a confidence score. This auditability is what makes the data licensable to insurers and lenders who require defensible data provenance — not just "the data says X" but "source Y with 0.95 confidence says X, corroborated by source Z."</p>
-        <p style={{ fontSize: '8pt', color: '#888', marginTop: '12px' }}>80 registered sources · 9 categories · 1.36M+ observations stored</p>
+        <p style={{ fontSize: '11px', color: '#888', marginTop: '12px' }}>80 registered sources · 9 categories · 1.36M+ observations stored</p>
       </div>
     ),
   },
@@ -239,7 +239,7 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
         </ol>
         <p><strong>Why auction comments?</strong> The BaT community is uniquely expert. A comment like "incorrect date-code battery, not matching numbers" from a marque specialist carries real price information — the kind of signal that doesn't appear in title history or standard vehicle data. The crowd knows things the record doesn't.</p>
         <p><strong>Average sentiment score across analyzed vehicles: 0.79</strong> (the community skews positive — enthusiasts bid on vehicles they're excited about).</p>
-        <p style={{ fontSize: '8pt', color: '#888', marginTop: '12px' }}>127K+ vehicles analyzed · 11.6M+ comments processed</p>
+        <p style={{ fontSize: '11px', color: '#888', marginTop: '12px' }}>127K+ vehicles analyzed · 11.6M+ comments processed</p>
       </div>
     ),
   },
@@ -248,7 +248,7 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
     body: (
       <div>
         <p>Across vehicles with both community sentiment scores and confirmed auction sale prices, the correlation is consistent across the full sentiment range:</p>
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px', fontSize: '8pt' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px', fontSize: '11px' }}>
           <thead>
             <tr style={{ background: '#f5f5f5' }}>
               <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>Sentiment</th>
@@ -592,7 +592,7 @@ export default function InvestorOffering() {
         {/* Top wordmark */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <div style={{
-            fontSize: '11pt',
+            fontSize: '15px',
             fontWeight: 'bold',
             letterSpacing: '4px',
             textTransform: 'uppercase',
@@ -601,7 +601,7 @@ export default function InvestorOffering() {
             NUKE
           </div>
           <div style={{
-            fontSize: '9pt',
+            fontSize: '12px',
             color: 'var(--text-muted)',
             marginTop: '4px',
             letterSpacing: '1px',
@@ -617,7 +617,7 @@ export default function InvestorOffering() {
           marginBottom: '36px',
         }}>
           <h1 style={{
-            fontSize: '22pt',
+            fontSize: '29px',
             fontWeight: 800,
             margin: '0 0 12px 0',
             color: 'var(--text)',
@@ -626,7 +626,7 @@ export default function InvestorOffering() {
             The data infrastructure for<br />collector vehicle investing
           </h1>
           <p style={{
-            fontSize: '11pt',
+            fontSize: '15px',
             color: 'var(--text-muted)',
             margin: 0,
             lineHeight: 1.6,
@@ -652,13 +652,13 @@ export default function InvestorOffering() {
               background: 'var(--white)',
               padding: '20px 24px',
             }}>
-              <div style={{ fontSize: '20pt', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
+              <div style={{ fontSize: '27px', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
                 {s.value}
               </div>
-              <div style={{ fontSize: '9pt', fontWeight: 600, color: 'var(--text)', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginTop: '4px' }}>
                 {s.label}
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {s.note}
               </div>
             </div>
@@ -674,7 +674,7 @@ export default function InvestorOffering() {
           maxWidth: '400px',
         }}>
           <div style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 'bold',
             textTransform: 'uppercase',
             letterSpacing: '2px',
@@ -688,7 +688,7 @@ export default function InvestorOffering() {
           {/* Access Code Input */}
           <div style={{ marginBottom: 'var(--space-4)' }}>
             <label style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 'bold',
               textTransform: 'uppercase',
               letterSpacing: '1px',
@@ -708,14 +708,14 @@ export default function InvestorOffering() {
                 padding: '10px 12px',
                 border: `2px solid ${codeError ? 'var(--error)' : 'var(--border-medium)'}`,
                 fontFamily: 'var(--font-family)',
-                fontSize: '11pt',
+                fontSize: '15px',
                 background: 'var(--grey-50)',
                 boxSizing: 'border-box',
               }}
               autoFocus
             />
             {codeError && (
-              <div style={{ fontSize: '8pt', color: 'var(--error)', marginTop: 'var(--space-1)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: 'var(--space-1)' }}>
                 {codeError}
               </div>
             )}
@@ -729,7 +729,7 @@ export default function InvestorOffering() {
               background: '#1a1a1a',
               color: '#fff',
               border: '2px solid #1a1a1a',
-              fontSize: '9pt',
+              fontSize: '12px',
               fontWeight: 'bold',
               letterSpacing: '1px',
               textTransform: 'uppercase',
@@ -741,7 +741,7 @@ export default function InvestorOffering() {
           </button>
 
           <div style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-disabled)',
             textAlign: 'center',
             marginTop: '14px',
@@ -760,7 +760,7 @@ export default function InvestorOffering() {
           padding: '14px 20px',
           background: 'var(--white)',
           border: '1px solid var(--border-light)',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-muted)',
           lineHeight: 1.7,
           textAlign: 'center',
@@ -792,7 +792,7 @@ export default function InvestorOffering() {
           padding: 'var(--space-8)',
         }}>
           <div style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             letterSpacing: '3px',
             textTransform: 'uppercase',
             color: 'var(--text-muted)',
@@ -801,7 +801,7 @@ export default function InvestorOffering() {
             NUKE / INVESTOR PORTAL
           </div>
           <h1 style={{
-            fontSize: '14pt',
+            fontSize: '19px',
             fontWeight: 'bold',
             margin: '0 0 var(--space-6) 0',
             borderBottom: '2px solid var(--border-medium)',
@@ -812,7 +812,7 @@ export default function InvestorOffering() {
 
           {/* Viewer Info */}
           <div style={{ marginBottom: 'var(--space-6)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 'var(--space-3)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 'var(--space-3)' }}>
               Viewer Information
             </div>
             <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
@@ -822,7 +822,7 @@ export default function InvestorOffering() {
                 onChange={e => setViewerName(e.target.value)}
                 style={{
                   padding: '6px 10px', border: '1px solid var(--border-medium)',
-                  fontSize: '9pt', fontFamily: 'var(--font-family)',
+                  fontSize: '12px', fontFamily: 'var(--font-family)',
                   background: 'var(--grey-50)',
                 }}
               />
@@ -833,7 +833,7 @@ export default function InvestorOffering() {
                 onChange={e => setViewerEmail(e.target.value)}
                 style={{
                   padding: '6px 10px', border: '1px solid var(--border-medium)',
-                  fontSize: '9pt', fontFamily: 'var(--font-family)',
+                  fontSize: '12px', fontFamily: 'var(--font-family)',
                   background: 'var(--grey-50)',
                 }}
               />
@@ -843,7 +843,7 @@ export default function InvestorOffering() {
                 onChange={e => setViewerOrg(e.target.value)}
                 style={{
                   padding: '6px 10px', border: '1px solid var(--border-medium)',
-                  fontSize: '9pt', fontFamily: 'var(--font-family)',
+                  fontSize: '12px', fontFamily: 'var(--font-family)',
                   background: 'var(--grey-50)',
                 }}
               />
@@ -853,7 +853,7 @@ export default function InvestorOffering() {
               gap: 'var(--space-2)',
               alignItems: 'center',
               marginTop: 'var(--space-3)',
-              fontSize: '9pt',
+              fontSize: '12px',
               cursor: 'pointer',
             }}>
               <input
@@ -873,7 +873,7 @@ export default function InvestorOffering() {
             padding: 'var(--space-4)',
             marginBottom: 'var(--space-6)',
           }}>
-            <div style={{ fontSize: '8pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 'var(--space-3)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 'var(--space-3)' }}>
               Please acknowledge the following:
             </div>
 
@@ -888,7 +888,7 @@ export default function InvestorOffering() {
                 gap: 'var(--space-3)',
                 alignItems: 'flex-start',
                 marginBottom: 'var(--space-3)',
-                fontSize: '9pt',
+                fontSize: '12px',
                 lineHeight: '1.5',
                 cursor: 'pointer',
               }}>
@@ -912,7 +912,7 @@ export default function InvestorOffering() {
               background: allChecked && viewerName && viewerEmail ? '#1a1a1a' : 'var(--grey-400)',
               color: '#fff',
               border: '2px solid transparent',
-              fontSize: '9pt',
+              fontSize: '12px',
               fontWeight: 'bold',
               letterSpacing: '1px',
               textTransform: 'uppercase',
@@ -924,7 +924,7 @@ export default function InvestorOffering() {
           </button>
 
           <div style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-disabled)',
             textAlign: 'center',
             marginTop: 'var(--space-4)',
@@ -957,14 +957,14 @@ export default function InvestorOffering() {
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '10pt', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase' }}>
               NUKE
             </span>
-            <span style={{ fontSize: '8pt', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' }}>
               Investor Data Room
             </span>
           </div>
-          <div style={{ fontSize: '7pt', color: 'var(--text-disabled)', marginTop: '3px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-disabled)', marginTop: '3px' }}>
             {viewerName && <span>{viewerName}{viewerOrg ? ` · ${viewerOrg}` : ''} · </span>}
             Session {sessionId.substring(0, 8)} · {accessGrantedAt ? new Date(accessGrantedAt).toLocaleTimeString() : ''}
           </div>
@@ -973,7 +973,7 @@ export default function InvestorOffering() {
           <a
             href="mailto:info@nuke.ag?subject=Nuke%20Investment%20Inquiry"
             style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               padding: '5px 12px',
               background: '#1a1a1a',
@@ -985,7 +985,7 @@ export default function InvestorOffering() {
             Contact to Invest
           </a>
           <div style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             padding: '4px 10px',
             background: '#e8f5e9',
             color: '#2e7d32',
@@ -1017,7 +1017,7 @@ export default function InvestorOffering() {
               border: activeDoc === key ? '2px solid var(--border-medium)' : '1px solid var(--border-light)',
               borderBottom: activeDoc === key ? '2px solid var(--white)' : 'none',
               marginBottom: activeDoc === key ? '-2px' : '0',
-              fontSize: '9pt',
+              fontSize: '12px',
               fontWeight: activeDoc === key ? 'bold' : 'normal',
               cursor: 'pointer',
               fontFamily: 'var(--font-family)',
@@ -1027,7 +1027,7 @@ export default function InvestorOffering() {
             }}
           >
             {d.title}
-            <span style={{ fontSize: '7pt', color: 'var(--text-disabled)', marginLeft: '6px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-disabled)', marginLeft: '6px' }}>
               {d.pages}
             </span>
           </button>
@@ -1043,7 +1043,7 @@ export default function InvestorOffering() {
               background: exportRequested ? 'var(--grey-200)' : '#1a1a1a',
               color: exportRequested ? 'var(--text-muted)' : '#fff',
               border: '1px solid var(--border-medium)',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 'bold',
               letterSpacing: '1px',
               textTransform: 'uppercase',
@@ -1066,7 +1066,7 @@ export default function InvestorOffering() {
       }}>
         {/* Document title bar */}
         <div style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-muted)',
           borderBottom: '1px solid var(--border-light)',
           paddingBottom: '8px',
@@ -1086,7 +1086,7 @@ export default function InvestorOffering() {
             components={{
               h1: ({ children }) => (
                 <h1 style={{
-                  fontSize: '16pt', fontWeight: 'bold',
+                  fontSize: '21px', fontWeight: 'bold',
                   borderBottom: '2px solid var(--border-medium)',
                   paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)',
                   marginTop: 'var(--space-6)',
@@ -1096,7 +1096,7 @@ export default function InvestorOffering() {
               ),
               h2: ({ children }) => (
                 <h2 style={{
-                  fontSize: '13pt', fontWeight: 'bold',
+                  fontSize: '17px', fontWeight: 'bold',
                   borderBottom: '1px solid var(--border-light)',
                   paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-3)',
                   marginTop: 'var(--space-6)',
@@ -1106,7 +1106,7 @@ export default function InvestorOffering() {
               ),
               h3: ({ children }) => (
                 <h3 style={{
-                  fontSize: '11pt', fontWeight: 'bold',
+                  fontSize: '15px', fontWeight: 'bold',
                   marginBottom: 'var(--space-2)', marginTop: 'var(--space-4)',
                 }}>
                   {children}
@@ -1114,7 +1114,7 @@ export default function InvestorOffering() {
               ),
               h4: ({ children }) => (
                 <h4 style={{
-                  fontSize: '10pt', fontWeight: 'bold',
+                  fontSize: '13px', fontWeight: 'bold',
                   marginBottom: 'var(--space-2)', marginTop: 'var(--space-3)',
                 }}>
                   {children}
@@ -1122,7 +1122,7 @@ export default function InvestorOffering() {
               ),
               p: ({ children }) => (
                 <p style={{
-                  fontSize: '10pt', lineHeight: '1.75',
+                  fontSize: '13px', lineHeight: '1.75',
                   marginBottom: 'var(--space-3)',
                   color: 'var(--text)',
                 }}>
@@ -1131,7 +1131,7 @@ export default function InvestorOffering() {
               ),
               ul: ({ children }) => (
                 <ul style={{
-                  fontSize: '10pt', lineHeight: '1.75',
+                  fontSize: '13px', lineHeight: '1.75',
                   marginLeft: 'var(--space-6)',
                   marginBottom: 'var(--space-3)',
                 }}>
@@ -1140,7 +1140,7 @@ export default function InvestorOffering() {
               ),
               ol: ({ children }) => (
                 <ol style={{
-                  fontSize: '10pt', lineHeight: '1.75',
+                  fontSize: '13px', lineHeight: '1.75',
                   marginLeft: 'var(--space-6)',
                   marginBottom: 'var(--space-3)',
                 }}>
@@ -1155,7 +1155,7 @@ export default function InvestorOffering() {
                   <table style={{
                     borderCollapse: 'collapse',
                     width: '100%',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                   }}>
                     {children}
                   </table>
@@ -1170,7 +1170,7 @@ export default function InvestorOffering() {
                   padding: '6px 10px',
                   textAlign: 'left',
                   fontWeight: 'bold',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                 }}>
                   {children}
                 </th>
@@ -1179,7 +1179,7 @@ export default function InvestorOffering() {
                 <td style={{
                   border: '1px solid var(--border-light)',
                   padding: '5px 10px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                 }}>
                   {children}
                 </td>
@@ -1192,7 +1192,7 @@ export default function InvestorOffering() {
                       background: 'var(--grey-100)',
                       border: '1px solid var(--border-light)',
                       padding: 'var(--space-4)',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       fontFamily: "'SF Mono', 'Cascadia Code', monospace",
                       overflowX: 'auto',
                       lineHeight: '1.5',
@@ -1206,7 +1206,7 @@ export default function InvestorOffering() {
                   <code style={{
                     background: 'var(--grey-100)',
                     padding: '1px 4px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontFamily: "'SF Mono', 'Cascadia Code', monospace",
                     border: '1px solid var(--border-light)',
                   }}>
@@ -1222,7 +1222,7 @@ export default function InvestorOffering() {
                   margin: 'var(--space-3) 0',
                   color: 'var(--text-muted)',
                   fontStyle: 'italic',
-                  fontSize: '9pt',
+                  fontSize: '12px',
                 }}>
                   {children}
                 </blockquote>
@@ -1249,7 +1249,7 @@ export default function InvestorOffering() {
                         borderRadius: '2px',
                         color: 'var(--primary)',
                         cursor: 'pointer',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontFamily: 'var(--font-family)',
                         padding: '1px 5px',
                         marginLeft: '4px',
@@ -1287,7 +1287,7 @@ export default function InvestorOffering() {
           borderTop: '1px solid var(--border-light)',
           paddingTop: 'var(--space-4)',
           marginTop: 'var(--space-8)',
-          fontSize: '7pt',
+          fontSize: '9px',
           color: 'var(--text-disabled)',
           textAlign: 'center',
           lineHeight: '1.6',
@@ -1334,14 +1334,14 @@ export default function InvestorOffering() {
               borderBottom: '2px solid var(--border-medium)',
               paddingBottom: 'var(--space-3)',
             }}>
-              <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold' }}>
                 {POPUP_CONTENT[popup.id]?.title ?? popup.id}
               </div>
               <button
                 onClick={closePopup}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '16pt', color: 'var(--text-muted)',
+                  fontSize: '21px', color: 'var(--text-muted)',
                   lineHeight: 1, padding: '0 4px', marginLeft: 'var(--space-4)',
                   flexShrink: 0,
                 }}
@@ -1351,7 +1351,7 @@ export default function InvestorOffering() {
             </div>
 
             {/* Content */}
-            <div style={{ fontSize: '9pt', lineHeight: '1.7' }}>
+            <div style={{ fontSize: '12px', lineHeight: '1.7' }}>
               {POPUP_CONTENT[popup.id]?.body ?? <p>Content coming soon.</p>}
             </div>
 
@@ -1362,7 +1362,7 @@ export default function InvestorOffering() {
               paddingTop: 'var(--space-4)',
             }}>
               <div style={{
-                fontSize: '7pt',
+                fontSize: '9px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
@@ -1372,7 +1372,7 @@ export default function InvestorOffering() {
                 Reader Notes
               </div>
               {popup.submitted ? (
-                <div style={{ fontSize: '8pt', color: '#2e7d32' }}>Note saved.</div>
+                <div style={{ fontSize: '11px', color: '#2e7d32' }}>Note saved.</div>
               ) : (
                 <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
@@ -1385,13 +1385,13 @@ export default function InvestorOffering() {
                         width: '100%',
                         padding: '6px 8px',
                         border: '1px solid var(--border-medium)',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         fontFamily: 'var(--font-family)',
                         resize: 'none',
                         boxSizing: 'border-box',
                       }}
                     />
-                    <div style={{ fontSize: '7pt', color: 'var(--text-disabled)', textAlign: 'right' }}>
+                    <div style={{ fontSize: '9px', color: 'var(--text-disabled)', textAlign: 'right' }}>
                       {popup.note.length}/150
                     </div>
                   </div>
@@ -1403,7 +1403,7 @@ export default function InvestorOffering() {
                       background: popup.note.trim() ? '#1a1a1a' : 'var(--grey-300)',
                       color: '#fff',
                       border: 'none',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 'bold',
                       letterSpacing: '1px',
                       textTransform: 'uppercase',

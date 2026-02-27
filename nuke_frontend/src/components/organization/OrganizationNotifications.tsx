@@ -136,7 +136,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
   };
 
   if (loading) {
-    return <div style={{ padding: '20px', fontSize: '9pt', color: 'var(--text-muted)' }}>Loading notifications...</div>;
+    return <div style={{ padding: '20px', fontSize: '12px', color: 'var(--text-muted)' }}>Loading notifications...</div>;
   }
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
@@ -149,7 +149,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
         alignItems: 'center',
         marginBottom: '16px'
       }}>
-        <h3 style={{ fontSize: '12pt', fontWeight: 700, margin: 0 }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>
           Notifications {unreadCount > 0 && `(${unreadCount})`}
         </h3>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -159,7 +159,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
               onClick={() => setFilter(f)}
               style={{
                 padding: '4px 8px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 border: filter === f ? '2px solid var(--accent)' : '1px solid var(--border)',
                 background: filter === f ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
                 cursor: 'pointer',
@@ -176,7 +176,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
         <div style={{
           padding: '40px',
           textAlign: 'center',
-          fontSize: '9pt',
+          fontSize: '12px',
           color: 'var(--text-muted)'
         }}>
           No notifications
@@ -213,13 +213,13 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       fontWeight: isUnread ? 700 : 600,
                       marginBottom: '4px'
                     }}>
                       {vehicle && `${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                       {notif.message}
                     </div>
                     {verification && (
@@ -229,7 +229,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                         background: 'var(--bg)',
                         border: '1px solid var(--border)',
                         borderRadius: '3px',
-                        fontSize: '7pt'
+                        fontSize: '9px'
                       }}>
                         {verification.proof_url && (
                           <div style={{ marginBottom: '4px' }}>
@@ -270,7 +270,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                       onClick={() => handleVerificationAction(verification.id, 'reject')}
                       style={{
                         padding: '4px 8px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         border: '1px solid var(--border)',
                         background: 'var(--surface)',
                         cursor: 'pointer',
@@ -283,7 +283,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                       onClick={() => handleVerificationAction(verification.id, 'approve')}
                       style={{
                         padding: '4px 8px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         border: 'none',
                         background: 'var(--accent)',
                         color: 'white',

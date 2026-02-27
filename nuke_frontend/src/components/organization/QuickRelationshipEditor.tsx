@@ -168,7 +168,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-header" style={{ 
-          fontSize: '11pt', 
+          fontSize: '15px', 
           fontWeight: 700,
           borderBottom: '2px solid var(--border-medium)'
         }}>
@@ -190,10 +190,10 @@ const QuickRelationshipEditor: React.FC<Props> = ({
               }} />
             )}
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                 {vehicleName}
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Click to change relationship type and status
               </div>
             </div>
@@ -205,7 +205,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
               background: 'var(--error-dim)',
               border: '1px solid var(--error)',
               borderRadius: '4px',
-              fontSize: '9pt',
+              fontSize: '12px',
               color: 'var(--error)'
             }}>
               {error}
@@ -215,7 +215,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
           <div>
             <label style={{ 
               display: 'block', 
-              fontSize: '9pt', 
+              fontSize: '12px', 
               fontWeight: 600, 
               marginBottom: '8px',
               color: 'var(--text-primary)'
@@ -239,10 +239,10 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                     textAlign: 'left'
                   }}
                 >
-                  <div style={{ fontSize: '8pt', fontWeight: 700 }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700 }}>
                     {type.label}
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     {type.description}
                   </div>
                 </button>
@@ -258,15 +258,15 @@ const QuickRelationshipEditor: React.FC<Props> = ({
               border: '2px solid var(--blue-300)',
               borderRadius: '4px'
             }}>
-              <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>
                 Storage Relationship
               </div>
               {detectingOwner ? (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Detecting vehicle owner...
                 </div>
               ) : detectedOwner ? (
-                <div style={{ fontSize: '8pt' }}>
+                <div style={{ fontSize: '11px' }}>
                   <div style={{ marginBottom: '4px' }}>
                     <strong>Detected Owner:</strong> {detectedOwner.owner_name}
                   </div>
@@ -278,7 +278,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                       marginTop: '8px', 
                       paddingTop: '8px', 
                       borderTop: '1px solid var(--blue-200)',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       color: 'var(--orange-600)'
                     }}>
                       ⚠️ {profileMerges.length} incomplete profile{profileMerges.length > 1 ? 's' : ''} detected that may need merging
@@ -286,7 +286,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                   )}
                 </div>
               ) : (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Could not auto-detect owner. You may need to add ownership info manually.
                 </div>
               )}
@@ -296,7 +296,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
           <div>
             <label style={{ 
               display: 'block', 
-              fontSize: '9pt', 
+              fontSize: '12px', 
               fontWeight: 600, 
               marginBottom: '8px',
               color: 'var(--text-primary)'
@@ -317,7 +317,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                     background: status === opt.value ? 'var(--accent-dim)' : 'transparent',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 700,
                     transition: 'all 0.12s ease'
                   }}
@@ -331,7 +331,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
           <div>
             <label style={{ 
               display: 'block', 
-              fontSize: '9pt', 
+              fontSize: '12px', 
               fontWeight: 600, 
               marginBottom: '8px',
               color: 'var(--text-primary)'
@@ -346,14 +346,14 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                 width: '100%',
                 minHeight: '80px',
                 padding: '8px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
                 fontFamily: 'inherit',
                 resize: 'vertical'
               }}
             />
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               Add notes about partnerships, collaboration details, or custom labels
             </div>
           </div>
@@ -368,7 +368,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
             <button
               onClick={onClose}
               className="button button-secondary"
-              style={{ flex: 1, fontSize: '9pt' }}
+              style={{ flex: 1, fontSize: '12px' }}
               disabled={saving}
             >
               Cancel
@@ -376,7 +376,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
             <button
               onClick={handleSave}
               className="button button-primary"
-              style={{ flex: 1, fontSize: '9pt' }}
+              style={{ flex: 1, fontSize: '12px' }}
               disabled={saving}
             >
               {saving ? 'Saving...' : 'Save Changes'}

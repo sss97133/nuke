@@ -116,12 +116,12 @@ export default function AdminPendingVehicles() {
   return (
     <div style={{ padding: 'var(--space-5)', maxWidth: '1400px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
-        <h1 style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pending Vehicle Profiles - Admin View</h1>
+        <h1 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pending Vehicle Profiles - Admin View</h1>
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-          <button onClick={loadAnalysis} disabled={loading} style={{ fontSize: '8pt' }}>
+          <button onClick={loadAnalysis} disabled={loading} style={{ fontSize: '11px' }}>
             {loading ? 'Loading...' : 'Refresh Analysis'}
           </button>
-          <button onClick={sourceAllMissing} disabled={sourcing} style={{ fontSize: '8pt', background: 'var(--success)', color: 'var(--white)', border: '2px solid var(--success)' }}>
+          <button onClick={sourceAllMissing} disabled={sourcing} style={{ fontSize: '11px', background: 'var(--success)', color: 'var(--white)', border: '2px solid var(--success)' }}>
             {sourcing ? 'Sourcing...' : 'Source All Missing Data'}
           </button>
         </div>
@@ -135,32 +135,32 @@ export default function AdminPendingVehicles() {
         marginBottom: 'var(--space-6)'
       }}>
         <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{analysis.summary.total_pending}</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Total Pending</div>
+          <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.total_pending}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Pending</div>
         </div>
         <div style={{ padding: 'var(--space-4)', background: 'var(--warning-dim)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{analysis.summary.missing_vin}</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Missing VIN</div>
+          <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_vin}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing VIN</div>
         </div>
         <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{analysis.summary.missing_images}</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Missing Images</div>
+          <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_images}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Images</div>
         </div>
         <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{analysis.summary.missing_description}</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Missing Description</div>
+          <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_description}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Description</div>
         </div>
         <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{analysis.summary.missing_price}</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Missing Price</div>
+          <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_price}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Price</div>
         </div>
         <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{analysis.summary.missing_mileage}</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Missing Mileage</div>
+          <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_mileage}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Mileage</div>
         </div>
         <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700 }}>{analysis.summary.missing_color}</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Missing Color</div>
+          <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_color}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Color</div>
         </div>
       </div>
 
@@ -178,8 +178,8 @@ export default function AdminPendingVehicles() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-3)' }}>
               <div>
-                <h3 style={{ margin: 0, marginBottom: 'var(--space-1)', fontSize: '8pt', fontWeight: 700 }}>{vehicle.vehicle_name}</h3>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <h3 style={{ margin: 0, marginBottom: 'var(--space-1)', fontSize: '11px', fontWeight: 700 }}>{vehicle.vehicle_name}</h3>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   ID: {vehicle.vehicle_id.slice(0, 8)}...
                 </div>
                 {vehicle.discovery_url && (
@@ -187,7 +187,7 @@ export default function AdminPendingVehicles() {
                     href={vehicle.discovery_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontSize: '8pt', color: 'var(--accent)' }}
+                    style={{ fontSize: '11px', color: 'var(--accent)' }}
                   >
                     {vehicle.discovery_url}
                   </a>
@@ -196,7 +196,7 @@ export default function AdminPendingVehicles() {
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <button
                   onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
-                  style={{ padding: 'var(--space-2) var(--space-3)', fontSize: '8pt' }}
+                  style={{ padding: 'var(--space-2) var(--space-3)', fontSize: '11px' }}
                 >
                   View
                 </button>
@@ -206,7 +206,7 @@ export default function AdminPendingVehicles() {
                     disabled={sourcing}
                     style={{
                       padding: 'var(--space-2) var(--space-3)',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       background: 'var(--success)',
                       color: 'var(--white)',
                       border: '2px solid var(--success)',
@@ -229,7 +229,7 @@ export default function AdminPendingVehicles() {
                     padding: 'var(--space-1) var(--space-2)',
                     background: getNeedColor(need),
                     borderRadius: '0px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 500
                   }}
                 >

@@ -272,16 +272,16 @@ export function BidToast({ notification, onClose }: BidToastProps) {
         animation: 'slideIn 0.3s ease',
       }}
     >
-      <span style={{ fontSize: '20pt' }}>{styles.icon}</span>
+      <span style={{ fontSize: '27px' }}>{styles.icon}</span>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 700, fontSize: '10pt', color: styles.color }}>
+        <div style={{ fontWeight: 700, fontSize: '13px', color: styles.color }}>
           {notification.title}
         </div>
-        <div style={{ fontSize: '9pt', color: 'var(--text-secondary)', marginTop: '2px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
           {notification.message}
         </div>
         {notification.amount && (
-          <div style={{ fontSize: '9pt', fontWeight: 600, marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '4px' }}>
             ${(notification.amount / 100).toLocaleString()}
           </div>
         )}
@@ -291,7 +291,7 @@ export function BidToast({ notification, onClose }: BidToastProps) {
         style={{
           background: 'none',
           border: 'none',
-          fontSize: '14pt',
+          fontSize: '19px',
           cursor: 'pointer',
           color: 'var(--text-muted)',
           padding: 0,
@@ -366,7 +366,7 @@ export function ActiveBidsIndicator({ onClick }: ActiveBidsIndicatorProps) {
         border: '1px solid #3b82f6',
         borderRadius: '20px',
         cursor: 'pointer',
-        fontSize: '8pt',
+        fontSize: '11px',
         fontWeight: 600,
         color: '#1e40af',
       }}

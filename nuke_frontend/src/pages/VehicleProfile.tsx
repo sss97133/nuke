@@ -3805,16 +3805,16 @@ const VehicleProfile: React.FC = () => {
                     const eba = (vehicle as any).origin_metadata.engine_bay_analysis;
                     const confPct = eba.engine_family_confidence != null ? Math.round(eba.engine_family_confidence * 100) : null;
                     return (
-                      <div style={{ fontSize: '10pt', lineHeight: '1.8' }}>
+                      <div style={{ fontSize: '13px', lineHeight: '1.8' }}>
                         {/* Engine family header */}
-                        <div style={{ fontWeight: 600, fontSize: '11pt', marginBottom: '4px' }}>
+                        <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '4px' }}>
                           {eba.engine_family}
                           {eba.estimated_displacement ? ` ${eba.estimated_displacement}` : ''}
                           {confPct != null && (
                             <span style={{
                               marginLeft: '8px',
                               padding: '2px 6px',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               fontWeight: 400,
                               borderRadius: '2px',
                               backgroundColor: confPct >= 80 ? 'rgba(34,197,94,0.15)' : confPct >= 50 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
@@ -3861,15 +3861,15 @@ const VehicleProfile: React.FC = () => {
 
                         {/* Mods list */}
                         {eba.modifications?.length > 0 && (
-                          <div style={{ marginTop: '8px', fontSize: '9pt' }}>
-                            <div className="text-muted" style={{ fontSize: '8pt', marginBottom: '2px' }}>Visible Modifications</div>
+                          <div style={{ marginTop: '8px', fontSize: '12px' }}>
+                            <div className="text-muted" style={{ fontSize: '11px', marginBottom: '2px' }}>Visible Modifications</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                               {eba.modifications.map((mod: string, i: number) => (
                                 <span key={i} style={{
                                   padding: '2px 6px',
                                   backgroundColor: 'var(--bg-secondary, rgba(0,0,0,0.05))',
                                   border: '1px solid var(--border-color, rgba(0,0,0,0.1))',
-                                  fontSize: '8pt',
+                                  fontSize: '11px',
                                 }}>
                                   {mod}
                                 </span>
@@ -3879,7 +3879,7 @@ const VehicleProfile: React.FC = () => {
                         )}
 
                         {/* Footer: analysis version + link */}
-                        <div className="text-muted" style={{ marginTop: '8px', fontSize: '8pt' }}>
+                        <div className="text-muted" style={{ marginTop: '8px', fontSize: '11px' }}>
                           Analyzed {eba.analyzed_at ? new Date(eba.analyzed_at).toLocaleDateString() : ''}
                           {eba.analysis_version > 1 ? ` (v${eba.analysis_version})` : ''}
                         </div>
@@ -4144,11 +4144,11 @@ const VehicleProfile: React.FC = () => {
           return (
             <div style={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-3) auto 0' }}>
               <div className="card" style={{ border: '2px solid var(--warning)', background: 'var(--warning-dim)' }}>
-                <div className="card-body" style={{ fontSize: '9pt' }}>
+                <div className="card-body" style={{ fontSize: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                     <div style={{ fontWeight: 800 }}>Base data incomplete</div>
                     {checkedAtText && (
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Last check: {checkedAtText}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Last check: {checkedAtText}</div>
                     )}
                   </div>
                   {missing.length > 0 && (
@@ -4157,7 +4157,7 @@ const VehicleProfile: React.FC = () => {
                       <span style={{ fontFamily: 'monospace' }}>{missing.join(', ')}</span>
                     </div>
                   )}
-                  <div style={{ marginTop: 6, fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ marginTop: 6, fontSize: '11px', color: 'var(--text-muted)' }}>
                     This vehicle is flagged for data enrichment to fill missing base fields.
                   </div>
                 </div>

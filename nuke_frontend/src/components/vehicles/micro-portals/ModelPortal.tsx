@@ -31,12 +31,12 @@ export default function ModelPortal({ make, model, vehiclePrice, activePortal, o
         error={error}
         state={state}
         emptyContent={
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', padding: '8px 0' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '8px 0' }}>
             No market data for {make} {model}
           </div>
         }
         richContent={data && (
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             {/* Price band */}
             <PriceBand
               p25={data.p25_price}
@@ -66,13 +66,13 @@ export default function ModelPortal({ make, model, vehiclePrice, activePortal, o
                   background: data.rarity_level === 'rare' ? '#fbbf2420' : 'var(--bg-secondary)',
                   color: data.rarity_level === 'rare' ? '#d97706' : 'var(--text-muted)',
                   borderRadius: '3px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 600,
                 }}>
                   {data.rarity_level.toUpperCase()}
                 </span>
                 {data.total_produced != null && (
-                  <span style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>
                     {data.total_produced.toLocaleString()} produced
                   </span>
                 )}
@@ -96,7 +96,7 @@ function PriceBand({ p25, median, p75, vehiclePrice }: {
 
   return (
     <div style={{ marginBottom: '10px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' }}>
         <span>P25: {formatCurrencyAmount(p25)}</span>
         <span>P75: {formatCurrencyAmount(p75)}</span>
       </div>
@@ -150,7 +150,7 @@ function TrendBadge({ direction }: { direction: 'up' | 'down' | 'stable' }) {
       display: 'inline-flex', alignItems: 'center', gap: '3px',
       padding: '1px 5px', borderRadius: '3px',
       background: config.color + '15', color: config.color,
-      fontSize: '7pt', fontWeight: 600,
+      fontSize: '9px', fontWeight: 600,
     }}>
       {config.arrow} {config.label}
     </span>
@@ -169,7 +169,7 @@ function HeatGauge({ score }: { score: number }) {
           background: score > 70 ? '#ef4444' : score > 40 ? '#f59e0b' : '#6b7280',
         }} />
       </div>
-      <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+      <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
         {score > 70 ? 'Hot' : score > 40 ? 'Warm' : 'Cool'}
       </span>
     </div>
@@ -179,8 +179,8 @@ function HeatGauge({ score }: { score: number }) {
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{label}</div>
-      <div style={{ fontWeight: 600, fontSize: '8pt' }}>{value}</div>
+      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{label}</div>
+      <div style={{ fontWeight: 600, fontSize: '11px' }}>{value}</div>
     </div>
   );
 }

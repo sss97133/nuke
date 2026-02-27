@@ -346,8 +346,8 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
   return (
     <div className="card" style={{ maxWidth: '700px', margin: '0 auto' }}>
       <div className="card-header">
-        <h2 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>Buyer Agency Agreement</h2>
-        <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Buyer Agency Agreement</h2>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
           Authorize Nuke to bid on your behalf at external auctions
         </p>
       </div>
@@ -361,7 +361,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
             padding: '10px 12px',
             borderRadius: '4px',
             marginBottom: '16px',
-            fontSize: '9pt'
+            fontSize: '12px'
           }}>
             {error}
           </div>
@@ -372,7 +372,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
           display: 'flex',
           gap: '8px',
           marginBottom: '20px',
-          fontSize: '8pt'
+          fontSize: '11px'
         }}>
           {['terms', 'details', 'sign'].map((s, i) => (
             <div key={s} style={{
@@ -398,11 +398,11 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
               borderRadius: '4px',
               maxHeight: '400px',
               overflowY: 'auto',
-              fontSize: '9pt',
+              fontSize: '12px',
               lineHeight: '1.6',
               marginBottom: '16px'
             }}>
-              <h3 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px' }}>
                 MARQUE BUYER AGENCY AGREEMENT
               </h3>
 
@@ -491,7 +491,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 onChange={(e) => setTermsAccepted(e.target.checked)}
                 style={{ marginTop: '2px' }}
               />
-              <span style={{ fontSize: '9pt' }}>
+              <span style={{ fontSize: '12px' }}>
                 I have read and agree to the terms and conditions of this Buyer Agency Agreement.
                 I understand that Nuke will act as my agent for bidding on external auctions
                 and that I am responsible for a risk-adjusted commission based on the schedule above.
@@ -504,7 +504,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                   type="button"
                   className="button"
                   onClick={onCancel}
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                 >
                   Cancel
                 </button>
@@ -514,7 +514,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 className="button button-primary"
                 onClick={handleAcceptTerms}
                 disabled={!termsAccepted}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Accept & Continue
               </button>
@@ -525,12 +525,12 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
         {/* Step 2: Personal Details */}
         {step === 'details' && (
           <div>
-            <p style={{ fontSize: '9pt', marginBottom: '16px', color: 'var(--text-secondary)' }}>
+            <p style={{ fontSize: '12px', marginBottom: '16px', color: 'var(--text-secondary)' }}>
               Please provide your legal information for the agreement.
             </p>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                 Legal Full Name *
               </label>
               <input
@@ -542,13 +542,13 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                   width: '100%',
                   padding: '8px 10px',
                   border: '1px solid var(--border)',
-                  fontSize: '9pt'
+                  fontSize: '12px'
                 }}
               />
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                 Street Address
               </label>
               <input
@@ -560,14 +560,14 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                   width: '100%',
                   padding: '8px 10px',
                   border: '1px solid var(--border)',
-                  fontSize: '9pt'
+                  fontSize: '12px'
                 }}
               />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                   City
                 </label>
                 <input
@@ -578,12 +578,12 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                     width: '100%',
                     padding: '8px 10px',
                     border: '1px solid var(--border)',
-                    fontSize: '9pt'
+                    fontSize: '12px'
                   }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                   State
                 </label>
                 <input
@@ -594,12 +594,12 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                     width: '100%',
                     padding: '8px 10px',
                     border: '1px solid var(--border)',
-                    fontSize: '9pt'
+                    fontSize: '12px'
                   }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                   ZIP
                 </label>
                 <input
@@ -610,14 +610,14 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                     width: '100%',
                     padding: '8px 10px',
                     border: '1px solid var(--border)',
-                    fontSize: '9pt'
+                    fontSize: '12px'
                   }}
                 />
               </div>
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                 Maximum Authorized Bid (Optional)
               </label>
               <div style={{ position: 'relative' }}>
@@ -626,7 +626,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                   left: '10px',
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   color: 'var(--text-muted)'
                 }}>$</span>
                 <input
@@ -638,11 +638,11 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                     width: '100%',
                     padding: '8px 10px 8px 20px',
                     border: '1px solid var(--border)',
-                    fontSize: '9pt'
+                    fontSize: '12px'
                   }}
                 />
               </div>
-              <p style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Leave blank for no maximum limit. You can set limits per-bid later.
               </p>
             </div>
@@ -652,7 +652,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 type="button"
                 className="button"
                 onClick={() => setStep('terms')}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Back
               </button>
@@ -661,7 +661,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 className="button button-primary"
                 onClick={handleSaveDetails}
                 disabled={loading || !legalName.trim()}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 {loading ? 'Saving...' : 'Continue to Sign'}
               </button>
@@ -672,7 +672,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
         {/* Step 3: Signature */}
         {step === 'sign' && (
           <div>
-            <p style={{ fontSize: '9pt', marginBottom: '16px', color: 'var(--text-secondary)' }}>
+            <p style={{ fontSize: '12px', marginBottom: '16px', color: 'var(--text-secondary)' }}>
               Please sign below to complete the agreement.
             </p>
 
@@ -681,7 +681,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
               padding: '12px',
               borderRadius: '4px',
               marginBottom: '16px',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               <p><strong>Signer:</strong> {legalName}</p>
               <p><strong>Commission Schedule:</strong> Risk-adjusted by value tier</p>
@@ -698,7 +698,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '8px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>
                 Sign in the area below:
               </label>
               <div style={{
@@ -719,12 +719,12 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                   onTouchEnd={stopDrawing}
                 />
               </div>
-              <p style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Use your mouse or touch screen to sign above
               </p>
             </div>
 
-            <p style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '16px' }}>
               By signing above, I acknowledge that I have read and agree to all terms and conditions
               of this Buyer Agency Agreement. This electronic signature has the same legal effect
               as a handwritten signature.
@@ -735,7 +735,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 type="button"
                 className="button"
                 onClick={() => setStep('details')}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Back
               </button>
@@ -744,7 +744,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 className="button"
                 onClick={clearSignature}
                 disabled={!signatureExists}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Clear
               </button>
@@ -753,7 +753,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 className="button button-primary"
                 onClick={handleSign}
                 disabled={loading || !signatureExists}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 {loading ? 'Signing...' : 'Sign & Complete Agreement'}
               </button>

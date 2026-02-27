@@ -246,7 +246,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="button button-small"
-                style={{ fontSize: '8pt', width: 'fit-content' }}
+                style={{ fontSize: '11px', width: 'fit-content' }}
               >
                 Watch Stream
               </a>
@@ -261,7 +261,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <label style={{ fontSize: '10pt', fontWeight: 600 }}>Stream provider</label>
+            <label style={{ fontSize: '13px', fontWeight: 600 }}>Stream provider</label>
             <select
               value={provider}
               onChange={(e) => setProvider(e.target.value as StreamProvider)}
@@ -272,7 +272,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
             </select>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: '10pt', fontWeight: 600 }}>Live title (optional)</label>
+              <label style={{ fontSize: '13px', fontWeight: 600 }}>Live title (optional)</label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -284,7 +284,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
             {provider === 'twitch' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {twitchIdentity ? (
-                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     Connected Twitch: <strong>{twitchIdentity.display_name || twitchIdentity.handle}</strong>
                   </div>
                 ) : (
@@ -298,7 +298,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label style={{ fontSize: '10pt', fontWeight: 600 }}>Twitch channel URL</label>
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Twitch channel URL</label>
                   <input
                     value={twitchUrl}
                     onChange={(e) => setTwitchUrl(e.target.value)}
@@ -317,7 +317,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
                   {settingsLoading ? 'Loading Mux Settings…' : 'Show Mux Stream Settings'}
                 </button>
                 {muxSettings && (
-                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {muxSettings.error ? (
                       <div style={{ color: '#b91c1c' }}>{String(muxSettings.error)}</div>
                     ) : (

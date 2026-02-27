@@ -20,13 +20,13 @@ const PrivacyPolicy: React.FC = () => {
   }, []);
 
   if (loading) {
-    return <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: '8pt' }}>Loading privacy policy…</div>;
+    return <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: '11px' }}>Loading privacy policy…</div>;
   }
 
   return (
     <div style={{ padding: 'var(--space-4)', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ background: 'var(--white)', border: '2px solid var(--border-medium)', padding: 'var(--space-4)' }}>
-        <pre style={{ fontFamily: 'Arial, sans-serif', fontSize: '8pt', whiteSpace: 'pre-wrap', lineHeight: 1.4, margin: 0 }}>{content}</pre>
+        <pre style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px', whiteSpace: 'pre-wrap', lineHeight: 1.4, margin: 0 }}>{content}</pre>
       </div>
     </div>
   );

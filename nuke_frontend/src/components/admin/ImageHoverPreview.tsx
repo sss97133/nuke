@@ -241,7 +241,7 @@ export const ImageHoverPreview: React.FC<ImageHoverPreviewProps> = ({
           onMouseLeave={handleMouseLeave}
         >
           {loading ? (
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'center', padding: 'var(--space-4)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: 'var(--space-4)' }}>
               Loading...
             </div>
           ) : (
@@ -260,7 +260,7 @@ export const ImageHoverPreview: React.FC<ImageHoverPreviewProps> = ({
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
-              <div style={{ fontSize: '8pt', color: 'var(--text)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text)' }}>
                 <div style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>Image Preview</div>
                 {extractionDate && (
                   <div style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-1)' }}>
@@ -273,7 +273,7 @@ export const ImageHoverPreview: React.FC<ImageHoverPreviewProps> = ({
                   </div>
                 )}
                 {!extractionDate && (
-                  <div style={{ color: 'var(--warning)', fontSize: '8pt' }}>
+                  <div style={{ color: 'var(--warning)', fontSize: '11px' }}>
                     No extraction data
                   </div>
                 )}

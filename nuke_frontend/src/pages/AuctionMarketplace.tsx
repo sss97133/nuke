@@ -7,11 +7,15 @@ import { formatCurrencyFromCents, resolveCurrencyCode } from '../utils/currency'
 import ProxyBidModal from '../components/ProxyBidModal';
 import '../design-system.css';
 
-// Add pulse animation for LIVE badge
+// Add pulse animation for LIVE badge + skeleton loading
 const liveBadgeStyle = `
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
+  }
+  @keyframes auction-skeleton-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 0.3; }
   }
 `;
 if (typeof document !== 'undefined') {
@@ -790,12 +794,12 @@ export default function AuctionMarketplace() {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h1 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>Auction Marketplace</h1>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                <h1 style={{ margin: 0, fontSize: '19px', fontWeight: 700 }}>Auction Marketplace</h1>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Live auctions across the network.
                 </div>
                 {!loading && debugCounts && debugCounts.total > 0 && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                     {debugCounts.total} live auctions
                   </div>
                 )}
@@ -806,7 +810,7 @@ export default function AuctionMarketplace() {
                 <button
                   onClick={() => navigate('/auctions/create')}
                   className="button button-primary"
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                 >
                   List Your Vehicle
                 </button>
@@ -824,7 +828,7 @@ export default function AuctionMarketplace() {
                     width: '100%',
                     padding: '8px 10px',
                     border: '1px solid var(--border)',
-                    fontSize: '9pt'
+                    fontSize: '12px'
                   }}
                 />
               </div>
@@ -844,7 +848,7 @@ export default function AuctionMarketplace() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-secondary)',
                     userSelect: 'none',
                   }}
@@ -862,7 +866,7 @@ export default function AuctionMarketplace() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-secondary)',
                     userSelect: 'none',
                   }}
@@ -880,7 +884,7 @@ export default function AuctionMarketplace() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-secondary)',
                     userSelect: 'none',
                   }}
@@ -909,7 +913,7 @@ export default function AuctionMarketplace() {
                       onClick={() => setFilter(option.id as FilterType)}
                       style={{
                         padding: '4px 10px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         border: filter === option.id ? '2px solid var(--accent)' : '1px solid var(--border)',
                         background: filter === option.id ? 'var(--accent-dim)' : 'var(--white)',
                         color: filter === option.id ? 'var(--accent)' : 'var(--text)',
@@ -931,7 +935,7 @@ export default function AuctionMarketplace() {
                     style={{
                       width: '100%',
                       padding: '6px 10px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                   >
@@ -953,12 +957,12 @@ export default function AuctionMarketplace() {
             <div className="card">
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '9pt', fontWeight: 800, color: 'var(--text)' }}>LIVE NOW</span>
-                  <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text)' }}>LIVE NOW</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     Ending in the next 15 minutes ({liveNowListings.length})
                   </span>
                   {flashListings.length > 0 && (
-                    <span style={{ fontSize: '7pt', fontWeight: 800, color: '#dc2626' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#dc2626' }}>
                       FLASH {flashListings.length}
                     </span>
                   )}
@@ -966,7 +970,7 @@ export default function AuctionMarketplace() {
                 <button
                   type="button"
                   className="button button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                   onClick={() => {
                     setFilter('ending_now');
                     setSort('ending_soon');
@@ -1005,19 +1009,27 @@ export default function AuctionMarketplace() {
           <div className="card">
             <div className="card-body">
               {loading ? (
-                <div className="text-center" style={{ padding: 'var(--space-6) 0', fontSize: 'var(--fs-9)', color: 'var(--text-secondary)' }}>
-                  Loading auctions...
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', padding: '8px 0' }}>
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} style={{ border: '2px solid var(--border)', borderRadius: '4px', overflow: 'hidden', background: 'var(--surface)' }}>
+                      <div style={{ width: '100%', paddingBottom: '75%', background: 'var(--border)', animation: 'auction-skeleton-pulse 1.5s ease-in-out infinite', opacity: 0.6 }} />
+                      <div style={{ padding: '10px 12px' }}>
+                        <div style={{ height: 14, background: 'var(--border)', borderRadius: 2, marginBottom: 8, width: '70%', animation: 'auction-skeleton-pulse 1.5s ease-in-out infinite' }} />
+                        <div style={{ height: 10, background: 'var(--border)', borderRadius: 2, width: '45%', animation: 'auction-skeleton-pulse 1.5s ease-in-out infinite' }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : filteredListings.length === 0 ? (
                 <div className="text-center" style={{ padding: 'var(--space-6) 0' }}>
-                  <div style={{ fontSize: '10pt', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '13px', marginBottom: '8px' }}>
                     {includeNoBidAuctions ? 'No live auctions found' : 'No auctions with bids found'}
                   </div>
                   {user && (
                     <button
                       onClick={() => navigate('/auctions/create')}
                       className="button button-primary"
-                      style={{ fontSize: '9pt' }}
+                      style={{ fontSize: '12px' }}
                     >
                       List a Vehicle
                     </button>
@@ -1196,7 +1208,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '10pt',
+              fontSize: '13px',
               color: 'var(--text-secondary)',
             }}
           >
@@ -1214,7 +1226,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
                   color: '#fff',
                   padding: '3px 8px',
                   borderRadius: '3px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 700,
                 }}
               >
@@ -1228,7 +1240,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
                   color: '#fff',
                   padding: '3px 8px',
                   borderRadius: '3px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 800,
                   letterSpacing: '0.5px',
                 }}
@@ -1243,7 +1255,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
                   color: '#fff',
                   padding: '3px 8px',
                   borderRadius: '3px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 700,
                 }}
               >
@@ -1264,7 +1276,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               color: '#fff',
               padding: '3px 8px',
               borderRadius: '3px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 700,
               animation: 'pulse 2s infinite',
             }}
@@ -1284,7 +1296,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               color: '#fff',
               padding: isBat && batIconOk ? '2px 8px' : '3px 8px',
               borderRadius: '3px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 700,
               display: 'inline-flex',
               alignItems: 'center',
@@ -1302,7 +1314,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
       <div style={{ padding: '10px 12px' }}>
         <h3
           style={{
-            fontSize: '10pt',
+            fontSize: '13px',
             fontWeight: 700,
             margin: '0 0 4px 0',
           }}
@@ -1318,7 +1330,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
         {vehicle.mileage && (
           <div
             style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--text-secondary)',
               marginBottom: '6px',
             }}
@@ -1339,11 +1351,11 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           }}
         >
           <div>
-            <div style={{ fontSize: '10pt', fontWeight: 800, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
               {formatCurrency(listing.current_high_bid_cents, listing.currency_code)}
             </div>
             {isStale && (
-              <div style={{ fontSize: '7pt', color: '#b45309', fontWeight: 700, marginTop: '2px' }}>
+              <div style={{ fontSize: '9px', color: '#b45309', fontWeight: 700, marginTop: '2px' }}>
                 Telemetry stale
               </div>
             )}
@@ -1351,7 +1363,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           <div style={{ textAlign: 'right' }}>
             <div
               style={{
-                fontSize: '7pt',
+                fontSize: '9px',
                 color: 'var(--text-secondary)',
                 marginBottom: '2px',
               }}
@@ -1360,7 +1372,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             </div>
             <div
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
               }}
               className={isStale ? 'text-gray-600' : getTimeRemainingColor(listing.auction_end_time)}
@@ -1377,7 +1389,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             justifyContent: 'space-between',
             alignItems: 'center',
             marginTop: '6px',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-secondary)',
           }}
         >
@@ -1406,7 +1418,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             <button
               type="button"
               className="button button-primary button-small"
-              style={{ flex: 1, fontSize: '8pt' }}
+              style={{ flex: 1, fontSize: '11px' }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1418,7 +1430,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             <button
               type="button"
               className="button button-small"
-              style={{ fontSize: '8pt', padding: '4px 8px' }}
+              style={{ fontSize: '11px', padding: '4px 8px' }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1435,7 +1447,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           <button
             type="button"
             className="button button-small"
-            style={{ marginTop: '8px', width: '100%', fontSize: '8pt' }}
+            style={{ marginTop: '8px', width: '100%', fontSize: '11px' }}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

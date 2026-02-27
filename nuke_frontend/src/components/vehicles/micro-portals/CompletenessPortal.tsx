@@ -48,7 +48,7 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
           background: completeness.percent > 70 ? '#22c55e' : completeness.percent > 40 ? '#f59e0b' : '#ef4444',
         }} />
       </span>
-      <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{completeness.percent}%</span>
+      <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{completeness.percent}%</span>
     </span>
   );
 
@@ -62,7 +62,7 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
     >
       <div style={{ padding: '10px 12px' }}>
         <div style={{
-          fontSize: '7pt',
+          fontSize: '9px',
           fontWeight: 700,
           color: 'var(--text-muted)',
           textTransform: 'uppercase',
@@ -105,7 +105,7 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
           return (
             <div key={importance} style={{ marginBottom: '8px' }}>
               <div style={{
-                fontSize: '7pt',
+                fontSize: '9px',
                 fontWeight: 600,
                 color: IMPORTANCE_COLORS[importance],
                 marginBottom: '3px',
@@ -120,7 +120,7 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '2px 0',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                   }}
                 >
                   <span style={{
@@ -130,7 +130,7 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
                     color: f.filled ? 'var(--text)' : 'var(--text-muted)',
                   }}>
                     <span style={{
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       lineHeight: 1,
                       width: '14px',
                       textAlign: 'center',
@@ -142,7 +142,7 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
                   {!f.filled && f.action && (
                     <span
                       style={{
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         color: 'var(--primary, #3b82f6)',
                         cursor: 'pointer',
                         whiteSpace: 'nowrap',

@@ -184,12 +184,12 @@ export default function AdminHome() {
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
         <div>
-          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Admin</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Everything admin lives here.</div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Admin</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Everything admin lives here.</div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Pending</div>
-          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Pending</div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>
             {loading ? '…' : String(stats?.total_pending_notifications ?? 0)}
           </div>
         </div>
@@ -204,19 +204,19 @@ export default function AdminHome() {
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
           <div>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Ralph brief</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Ralph brief</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
               One page of “what’s happening + what to do next”.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
             {ralphLoading && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                 {ralphLoadMode === 'explain' ? 'asking LLM…' : 'loading…'}
               </div>
             )}
             {!ralphLoading && ralphUpdatedAt && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 {ralphUpdatedAt.toLocaleTimeString()}
               </div>
             )}
@@ -243,7 +243,7 @@ export default function AdminHome() {
         </div>
 
         {ralphError && (
-          <div style={{ marginTop: 'var(--space-3)', fontSize: '8pt', color: 'var(--error, #b91c1c)' }}>
+          <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: 'var(--error, #b91c1c)' }}>
             {ralphError}
           </div>
         )}
@@ -251,7 +251,7 @@ export default function AdminHome() {
         {ralphData?.snapshot && (
           <div style={{
             marginTop: 'var(--space-3)',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text)',
             display: 'flex',
             flexWrap: 'wrap',
@@ -278,8 +278,8 @@ export default function AdminHome() {
 
         {Array.isArray(ralphData?.output?.headlines) && ralphData.output.headlines.length > 0 && (
           <div style={{ marginTop: 'var(--space-3)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Headlines</div>
-            <ul style={{ marginTop: 'var(--space-2)', paddingLeft: '18px', fontSize: '8pt', color: 'var(--text)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Headlines</div>
+            <ul style={{ marginTop: 'var(--space-2)', paddingLeft: '18px', fontSize: '11px', color: 'var(--text)' }}>
               {ralphData.output.headlines.slice(0, 8).map((h: string, idx: number) => (
                 <li key={idx} style={{ marginBottom: '4px' }}>{h}</li>
               ))}
@@ -289,12 +289,12 @@ export default function AdminHome() {
 
         {Array.isArray(ralphData?.output?.priorities_now) && ralphData.output.priorities_now.length > 0 && (
           <div style={{ marginTop: 'var(--space-3)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Do now</div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Do now</div>
             <div style={{ marginTop: 'var(--space-2)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-3)' }}>
               {ralphData.output.priorities_now.slice(0, 4).map((p: any, idx: number) => (
                 <div key={idx} style={{ border: '1px solid var(--border-light)', background: 'var(--grey-50)', padding: 'var(--space-3)' }}>
-                  <div style={{ fontSize: '8pt', fontWeight: 600 }}>{String(p?.title || 'Untitled')}</div>
-                  {p?.why && <div style={{ marginTop: '6px', fontSize: '8pt', color: 'var(--text-muted)' }}>{String(p.why)}</div>}
+                  <div style={{ fontSize: '11px', fontWeight: 600 }}>{String(p?.title || 'Untitled')}</div>
+                  {p?.why && <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>{String(p.why)}</div>}
                 </div>
               ))}
             </div>
@@ -320,8 +320,8 @@ export default function AdminHome() {
         backgroundColor: 'var(--white)',
         padding: 'var(--space-4)'
       }}>
-        <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-3)' }}>Operational pulse</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', fontSize: '8pt' }}>
+        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-3)' }}>Operational pulse</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', fontSize: '11px' }}>
           <div>
             <span style={{ color: 'var(--text-muted)' }}>import_queue </span>
             {opData == null ? (
@@ -360,7 +360,7 @@ export default function AdminHome() {
           </div>
         </div>
         {opData != null && opData.agentTasksByType.length > 0 && (
-          <div style={{ marginTop: 'var(--space-3)', fontSize: '8pt', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+          <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
             {opData.agentTasksByType.map(({ agent_type, count }) => (
               <span key={agent_type} style={{ fontFamily: 'monospace' }}>
                 {agent_type}:{count}
@@ -399,10 +399,10 @@ export default function AdminHome() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>{c.title}</div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>{c.title}</div>
                 {count != null && (
                   <div style={{
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 600,
                     color: count > 0 ? '#b91c1c' : 'var(--text-muted)',
                     fontFamily: 'monospace',
@@ -412,7 +412,7 @@ export default function AdminHome() {
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>{c.description}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>{c.description}</div>
             </Link>
           );
         })}
@@ -425,8 +425,8 @@ export default function AdminHome() {
         backgroundColor: 'var(--white)',
         padding: 'var(--space-4)'
       }}>
-        <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Quick links</div>
-        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Quick links</div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
           <Link className="button button-secondary" to="/admin/legacy-dashboard">
             Legacy dashboard
           </Link>

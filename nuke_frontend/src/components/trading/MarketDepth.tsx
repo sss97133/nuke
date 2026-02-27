@@ -144,8 +144,8 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
           background: '#f9fafb',
         }}
       >
-        <h3 style={{ margin: 0, fontSize: '10pt', fontWeight: 'bold' }}>Market Depth</h3>
-        <div style={{ display: 'flex', gap: '12px', fontSize: '9pt' }}>
+        <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>Market Depth</h3>
+        <div style={{ display: 'flex', gap: '12px', fontSize: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <div style={{ width: 12, height: 12, background: 'rgba(16, 185, 129, 0.5)', borderRadius: 2 }} />
             <span style={{ color: '#10b981' }}>Bids</span>
@@ -232,7 +232,7 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            fontSize: '9pt',
+            fontSize: '12px',
             color: '#6b7280',
             marginTop: '4px',
             fontFamily: 'var(--font-mono, monospace)',
@@ -252,7 +252,7 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
           gap: '12px',
           padding: '8px 12px',
           borderTop: '1px solid #e5e7eb',
-          fontSize: '9pt',
+          fontSize: '12px',
         }}
       >
         <div>

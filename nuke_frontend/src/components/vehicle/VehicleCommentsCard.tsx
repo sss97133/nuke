@@ -627,11 +627,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         }}
       >
         {loading ? (
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
             Loading comments...
           </div>
         ) : comments.length === 0 ? (
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
             No comments yet. Be the first to comment!
           </div>
         ) : (
@@ -670,7 +670,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         <button
                           onClick={() => handleUsernameClick(comment)}
                           style={{
-                            fontSize: '8pt',
+                            fontSize: '11px',
                             fontWeight: 600,
                             background: 'none',
                             border: 'none',
@@ -684,12 +684,12 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         </button>
                         {/* Platform badges for all external sources */}
                         {comment.source === 'bat' && (
-                          <span style={{ fontSize: '7pt', color: '#2563eb', fontWeight: 600 }}>
+                          <span style={{ fontSize: '9px', color: '#2563eb', fontWeight: 600 }}>
                             BaT
                           </span>
                         )}
                         {comment.source === 'auction' && auctionPlatform && (
-                          <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                             {auctionPlatform === 'cars_and_bids' ? 'Cars & Bids' :
                              auctionPlatform === 'pcarmarket' ? 'PCar Market' :
                              auctionPlatform === 'sbx' ? 'SBX Cars' :
@@ -698,33 +698,33 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           </span>
                         )}
                         {comment.source === 'facebook' && (
-                          <span style={{ fontSize: '7pt', color: '#1877f2', fontWeight: 600 }}>
+                          <span style={{ fontSize: '9px', color: '#1877f2', fontWeight: 600 }}>
                             Facebook
                           </span>
                         )}
                         {comment.source === 'instagram' && (
-                          <span style={{ fontSize: '7pt', color: '#e4405f', fontWeight: 600 }}>
+                          <span style={{ fontSize: '9px', color: '#e4405f', fontWeight: 600 }}>
                             Instagram
                           </span>
                         )}
                         {comment.source === 'sbx' && (
-                          <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                             SBX Cars
                           </span>
                         )}
                         {comment.source === 'pcar' && (
-                          <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                             PCar Market
                           </span>
                         )}
                         {comment.source === 'cars_and_bids' && (
-                          <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                             Cars & Bids
                           </span>
                         )}
                         {isSoldComment && (
                           <span style={{
-                            fontSize: '8pt',
+                            fontSize: '11px',
                             fontWeight: 700,
                             color: '#22c55e',
                             backgroundColor: '#dcfce7',
@@ -737,7 +737,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         )}
                         {isBid && amount && amount > 0 && (
                           <span style={{ 
-                            fontSize: '8pt', 
+                            fontSize: '11px', 
                             fontWeight: 700, 
                             color: '#059669',
                             backgroundColor: '#d1fae5',
@@ -750,7 +750,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         )}
                         {comment.is_seller && (
                           <span style={{ 
-                            fontSize: '7pt', 
+                            fontSize: '9px', 
                             fontWeight: 600, 
                             color: '#dc2626',
                             backgroundColor: '#fee2e2',
@@ -760,7 +760,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             SELLER
                           </span>
                         )}
-                        <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                           {formatTimeAgo(displayDate)}
                           {comment.updated_at && comment.updated_at !== comment.created_at && (
                             <span style={{ marginLeft: '4px', fontStyle: 'italic' }}>(edited)</span>
@@ -771,7 +771,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           <button
                             onClick={() => handleStartEdit(comment)}
                             style={{
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               background: 'none',
                               border: 'none',
                               padding: '2px 6px',
@@ -786,7 +786,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           </button>
                         )}
                       </div>
-                      <div style={{ fontSize: '9pt', lineHeight: 1.4 }}>
+                      <div style={{ fontSize: '12px', lineHeight: 1.4 }}>
                         {editingCommentId === comment.id ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <textarea
@@ -796,7 +796,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                               disabled={updating}
                               style={{
                                 width: '100%',
-                                fontSize: '8pt',
+                                fontSize: '11px',
                                 padding: '6px',
                                 border: '1px solid var(--border)',
                                 resize: 'vertical',
@@ -808,7 +808,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                                 onClick={() => handleUpdateComment(comment.id)}
                                 disabled={updating || !editingText.trim()}
                                 className="button button-primary"
-                                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                                style={{ fontSize: '11px', padding: '4px 12px' }}
                               >
                                 {updating ? 'Saving...' : 'Save'}
                               </button>
@@ -816,7 +816,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                                 onClick={handleCancelEdit}
                                 disabled={updating}
                                 className="button button-secondary"
-                                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                                style={{ fontSize: '11px', padding: '4px 12px' }}
                               >
                                 Cancel
                               </button>
@@ -845,7 +845,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                                   />
                                 ))}
                                 {comment.media_urls.length > 3 && (
-                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', alignSelf: 'center' }}>
                                     +{comment.media_urls.length - 3} more
                                   </span>
                                 )}
@@ -859,7 +859,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   style={{
-                                    fontSize: '7pt',
+                                    fontSize: '9px',
                                     color: 'var(--text-muted)',
                                     textDecoration: 'underline'
                                   }}
@@ -897,7 +897,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             disabled={posting}
             style={{
               width: '100%',
-              fontSize: '8pt',
+              fontSize: '11px',
               padding: '6px',
               border: '1px solid var(--border)',
               resize: 'vertical',
@@ -909,7 +909,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
             <button
               className="button button-secondary"
-              style={{ fontSize: '8pt', padding: '4px 12px' }}
+              style={{ fontSize: '11px', padding: '4px 12px' }}
               onClick={() => setMemePickerOpen(!memePickerOpen)}
               title="Meme picker (Ctrl+M)"
             >
@@ -917,7 +917,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             </button>
             <button
               className="button button-primary"
-              style={{ fontSize: '8pt', padding: '4px 12px' }}
+              style={{ fontSize: '11px', padding: '4px 12px' }}
               onClick={handlePostComment}
               disabled={posting || !newComment.trim()}
             >
@@ -950,14 +950,14 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                 alignItems: 'center',
                 background: 'var(--grey-100)',
               }}>
-                <span style={{ fontSize: '8pt', fontWeight: 600 }}>Select Meme</span>
+                <span style={{ fontSize: '11px', fontWeight: 600 }}>Select Meme</span>
                 <button
                   onClick={() => setMemePickerOpen(false)}
                   style={{
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     padding: '2px 4px',
                   }}
                 >

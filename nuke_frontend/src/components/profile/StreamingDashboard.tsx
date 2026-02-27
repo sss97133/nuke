@@ -154,7 +154,7 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
                   setShowScheduleForm(true);
                 }}
                 className="button button-primary"
-                style={{ fontSize: '8pt', padding: '6px 12px' }}
+                style={{ fontSize: '11px', padding: '6px 12px' }}
               >
                 + Schedule Stream
               </button>
@@ -207,7 +207,7 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
                                 padding: '2px 6px',
                                 background: 'var(--error)',
                                 color: 'white',
-                                fontSize: '7pt',
+                                fontSize: '9px',
                                 borderRadius: '2px'
                               }}>
                                 LIVE
@@ -233,7 +233,7 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
                             <button
                               onClick={() => handleGoLive(stream.id)}
                               className="button button-primary"
-                              style={{ fontSize: '8pt', padding: '4px 8px' }}
+                              style={{ fontSize: '11px', padding: '4px 8px' }}
                             >
                               Go Live
                             </button>
@@ -244,14 +244,14 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
                               setShowScheduleForm(false);
                             }}
                             className="button button-secondary"
-                            style={{ fontSize: '8pt', padding: '4px 8px' }}
+                            style={{ fontSize: '11px', padding: '4px 8px' }}
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteStream(stream.id)}
                             className="button button-secondary"
-                            style={{ fontSize: '8pt', padding: '4px 8px' }}
+                            style={{ fontSize: '11px', padding: '4px 8px' }}
                           >
                             Delete
                           </button>
@@ -273,17 +273,17 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-3)' }}>
                 <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: '4px', textAlign: 'center' }}>
                   <div className="text text-small text-muted">Total Streams</div>
-                  <div className="text font-bold" style={{ fontSize: '16pt' }}>{streams.length}</div>
+                  <div className="text font-bold" style={{ fontSize: '21px' }}>{streams.length}</div>
                 </div>
                 <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: '4px', textAlign: 'center' }}>
                   <div className="text text-small text-muted">Total Viewers</div>
-                  <div className="text font-bold" style={{ fontSize: '16pt' }}>
+                  <div className="text font-bold" style={{ fontSize: '21px' }}>
                     {streams.reduce((sum, s) => sum + s.viewer_count, 0)}
                   </div>
                 </div>
                 <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: '4px', textAlign: 'center' }}>
                   <div className="text text-small text-muted">Live Now</div>
-                  <div className="text font-bold" style={{ fontSize: '16pt' }}>
+                  <div className="text font-bold" style={{ fontSize: '21px' }}>
                     {streams.filter(s => s.is_live).length}
                   </div>
                 </div>
@@ -336,14 +336,14 @@ const StreamForm: React.FC<StreamFormProps> = ({ stream, onSave, onCancel }) => 
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="form-input"
-        style={{ fontSize: '10pt', padding: '8px' }}
+        style={{ fontSize: '13px', padding: '8px' }}
       />
       <textarea
         placeholder="Stream description..."
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         className="form-input"
-        style={{ fontSize: '9pt', padding: '8px', minHeight: '80px', fontFamily: 'inherit' }}
+        style={{ fontSize: '12px', padding: '8px', minHeight: '80px', fontFamily: 'inherit' }}
       />
       <input
         type="text"
@@ -351,7 +351,7 @@ const StreamForm: React.FC<StreamFormProps> = ({ stream, onSave, onCancel }) => 
         value={streamUrl}
         onChange={(e) => setStreamUrl(e.target.value)}
         className="form-input"
-        style={{ fontSize: '9pt', padding: '6px 8px' }}
+        style={{ fontSize: '12px', padding: '6px 8px' }}
       />
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <div style={{ flex: 1 }}>
@@ -363,7 +363,7 @@ const StreamForm: React.FC<StreamFormProps> = ({ stream, onSave, onCancel }) => 
             value={scheduledStart}
             onChange={(e) => setScheduledStart(e.target.value)}
             className="form-input"
-            style={{ width: '100%', fontSize: '9pt', padding: '6px 8px' }}
+            style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
           />
         </div>
         <div style={{ flex: 1 }}>
@@ -375,7 +375,7 @@ const StreamForm: React.FC<StreamFormProps> = ({ stream, onSave, onCancel }) => 
             value={scheduledEnd}
             onChange={(e) => setScheduledEnd(e.target.value)}
             className="form-input"
-            style={{ width: '100%', fontSize: '9pt', padding: '6px 8px' }}
+            style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
           />
         </div>
       </div>
@@ -383,14 +383,14 @@ const StreamForm: React.FC<StreamFormProps> = ({ stream, onSave, onCancel }) => 
         <button
           onClick={handleSubmit}
           className="button button-primary"
-          style={{ fontSize: '9pt', padding: '6px 12px' }}
+          style={{ fontSize: '12px', padding: '6px 12px' }}
         >
           {stream ? 'Update' : 'Schedule'}
         </button>
         <button
           onClick={onCancel}
           className="button button-secondary"
-          style={{ fontSize: '9pt', padding: '6px 12px' }}
+          style={{ fontSize: '12px', padding: '6px 12px' }}
         >
           Cancel
         </button>

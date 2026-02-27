@@ -98,7 +98,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
               target="_blank"
               rel="noopener noreferrer"
               onClick={e => e.stopPropagation()}
-              style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400, fontSize: '9pt', textDecoration: 'none' }}
+              style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400, fontSize: '12px', textDecoration: 'none' }}
               title="View source listing"
             >↗</a>
           )}
@@ -108,7 +108,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
               target="_blank"
               rel="noopener noreferrer"
               onClick={e => e.stopPropagation()}
-              style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400, fontSize: '9pt', textDecoration: 'none' }}
+              style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400, fontSize: '12px', textDecoration: 'none' }}
               title="Search Craigslist"
             >↗</a>
           )}
@@ -117,7 +117,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
           {scoreTxt(entry.deal_score)}
           {entry.deal_score != null && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>{entry.deal_score}</span>}
           {stale && (
-            <span title={`Discovery is ${stale.label} old — comps may be stale`} style={{ marginLeft: 6, color: stale.color, fontWeight: 700, fontSize: '7pt' }}>
+            <span title={`Discovery is ${stale.label} old — comps may be stale`} style={{ marginLeft: 6, color: stale.color, fontWeight: 700, fontSize: '9px' }}>
               {stale.label}
             </span>
           )}
@@ -241,7 +241,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                 {act && !inlineInput && (
                   <button
                     className="button button-primary"
-                    style={{ marginTop: 'var(--space-3)', fontSize: '8pt' }}
+                    style={{ marginTop: 'var(--space-3)', fontSize: '11px' }}
                     onClick={e => {
                       e.stopPropagation();
                       const needsInput = ['schedule_inspection', 'make_offer', 'accept_deal'].includes(act.action);
@@ -258,7 +258,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                 )}
                 {inlineInput && (
                   <div style={{ marginTop: 'var(--space-3)' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ marginBottom: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3px', fontSize: '8pt' }}>
+                    <div style={{ marginBottom: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3px', fontSize: '11px' }}>
                       {inlineInput.action === 'schedule_inspection' ? 'Shop Name' : inlineInput.action === 'make_offer' ? 'Offer Amount ($)' : 'Purchase Price ($)'}
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
@@ -269,10 +269,10 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                         onChange={e => setInlineInput({ ...inlineInput, value: e.target.value })}
                         onKeyDown={e => { if (e.key === 'Enter') submitInlineInput(); if (e.key === 'Escape') setInlineInput(null); }}
                         autoFocus
-                        style={{ flex: 1, padding: '4px 8px', fontFamily: 'monospace', border: '1px solid var(--border-dark)', background: 'var(--surface)', color: 'var(--text)', fontSize: '8pt' }}
+                        style={{ flex: 1, padding: '4px 8px', fontFamily: 'monospace', border: '1px solid var(--border-dark)', background: 'var(--surface)', color: 'var(--text)', fontSize: '11px' }}
                       />
-                      <button className="button button-primary" style={{ fontSize: '8pt', padding: '2px 8px' }} onClick={submitInlineInput}>✓</button>
-                      <button className="button" style={{ fontSize: '8pt', padding: '2px 8px' }} onClick={() => setInlineInput(null)}>✕</button>
+                      <button className="button button-primary" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={submitInlineInput}>✓</button>
+                      <button className="button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={() => setInlineInput(null)}>✕</button>
                     </div>
                   </div>
                 )}
@@ -347,7 +347,7 @@ export default function AcquisitionPipeline() {
           ].map(s => (
             <div key={s.label} className="card" style={{ padding: 'var(--space-3)' }}>
               <div style={{ textTransform: 'uppercase', letterSpacing: '0.3px', color: 'var(--text-muted)', marginBottom: 2 }}>{s.label}</div>
-              <div style={{ fontWeight: 700, fontSize: '11pt' }}>{s.value}</div>
+              <div style={{ fontWeight: 700, fontSize: '15px' }}>{s.value}</div>
               {s.sub && <div style={{ color: 'var(--text-muted)', marginTop: 1 }}>{s.sub}</div>}
             </div>
           ))}

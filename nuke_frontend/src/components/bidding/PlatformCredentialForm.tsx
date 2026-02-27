@@ -88,7 +88,7 @@ function PlatformFavicon({
     >
       <span
         style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 700,
           color: platform.color,
           opacity: showImage && loaded ? 0 : 1,
@@ -269,7 +269,7 @@ export default function PlatformCredentialForm({
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <h2 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
             {existingCredential ? 'Update Platform Login' : 'Add Platform Login'}
           </h2>
           <button
@@ -277,7 +277,7 @@ export default function PlatformCredentialForm({
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '16pt',
+              fontSize: '21px',
               cursor: 'pointer',
               padding: '0 4px',
               color: 'var(--text-muted)'
@@ -297,7 +297,7 @@ export default function PlatformCredentialForm({
               padding: '10px 12px',
               borderRadius: '4px',
               marginBottom: '16px',
-              fontSize: '9pt'
+              fontSize: '12px'
             }}>
               {error}
             </div>
@@ -308,7 +308,7 @@ export default function PlatformCredentialForm({
               {/* Platform selector (only show when not editing and no platform preselected) */}
               {!existingCredential && !initialPlatform && (
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>
                     Platform *
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -334,7 +334,7 @@ export default function PlatformCredentialForm({
                             background="transparent"
                           />
                         </div>
-                        <div style={{ fontSize: '7pt', fontWeight: 600 }}>{p.name}</div>
+                        <div style={{ fontSize: '9px', fontWeight: 600 }}>{p.name}</div>
                       </button>
                     ))}
                   </div>
@@ -361,10 +361,10 @@ export default function PlatformCredentialForm({
                     />
                   )}
                   <div>
-                    <div style={{ fontSize: '10pt', fontWeight: 600 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>
                       Connect to {selectedPlatformInfo?.name}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       Enter your login credentials to enable automated bidding
                     </div>
                   </div>
@@ -389,11 +389,11 @@ export default function PlatformCredentialForm({
                       />
                     )}
                     <div>
-                      <div style={{ fontSize: '9pt', fontWeight: 600 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600 }}>
                         {existingPlatformInfo?.name}
                       </div>
                       <div style={{
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         color: getStatusColor(existingCredential.status)
                       }}>
                         Status: {existingCredential.status}
@@ -405,7 +405,7 @@ export default function PlatformCredentialForm({
 
               {/* Username */}
               <div style={{ marginBottom: '16px' }}>
-                <label htmlFor="platform-username" style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                <label htmlFor="platform-username" style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                   Username / Email *
                 </label>
                 <input
@@ -422,14 +422,14 @@ export default function PlatformCredentialForm({
                     padding: '10px 12px',
                     border: '1px solid var(--border)',
                     borderRadius: '4px',
-                    fontSize: '9pt'
+                    fontSize: '12px'
                   }}
                 />
               </div>
 
               {/* Password */}
               <div style={{ marginBottom: '16px' }}>
-                <label htmlFor="platform-password" style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                <label htmlFor="platform-password" style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                   Password *
                 </label>
                 <input
@@ -446,10 +446,10 @@ export default function PlatformCredentialForm({
                     padding: '10px 12px',
                     border: '1px solid var(--border)',
                     borderRadius: '4px',
-                    fontSize: '9pt'
+                    fontSize: '12px'
                   }}
                 />
-                <p style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Your credentials are encrypted with AES-256 and stored securely.
                 </p>
               </div>
@@ -463,7 +463,7 @@ export default function PlatformCredentialForm({
                     background: 'none',
                     border: 'none',
                     color: 'var(--accent)',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     cursor: 'pointer',
                     padding: 0
                   }}
@@ -473,7 +473,7 @@ export default function PlatformCredentialForm({
 
                 {showTotpInput && (
                   <div style={{ marginTop: '8px' }}>
-                    <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                       TOTP Secret Key
                     </label>
                     <input
@@ -486,11 +486,11 @@ export default function PlatformCredentialForm({
                         padding: '10px 12px',
                         border: '1px solid var(--border)',
                         borderRadius: '4px',
-                        fontSize: '9pt',
+                        fontSize: '12px',
                         fontFamily: 'monospace'
                       }}
                     />
-                    <p style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       If provided, we can generate 2FA codes automatically.
                       Find this in your authenticator app's setup or account settings.
                     </p>
@@ -511,7 +511,7 @@ export default function PlatformCredentialForm({
                       background: 'transparent',
                       color: '#ef4444',
                       borderRadius: '4px',
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       cursor: 'pointer'
                     }}
                   >
@@ -524,7 +524,7 @@ export default function PlatformCredentialForm({
                     onClick={onClose}
                     disabled={loading}
                     className="button"
-                    style={{ fontSize: '9pt' }}
+                    style={{ fontSize: '12px' }}
                   >
                     Cancel
                   </button>
@@ -532,7 +532,7 @@ export default function PlatformCredentialForm({
                     type="submit"
                     disabled={loading || !platform || !username || !password}
                     className="button button-primary"
-                    style={{ fontSize: '9pt' }}
+                    style={{ fontSize: '12px' }}
                   >
                     {loading ? 'Saving...' : 'Save & Validate'}
                   </button>
@@ -552,10 +552,10 @@ export default function PlatformCredentialForm({
                 margin: '0 auto 16px',
                 animation: 'spin 1s linear infinite'
               }} />
-              <div style={{ fontSize: '10pt', fontWeight: 600, marginBottom: '8px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
                 Validating Credentials
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Attempting to log in to {activePlatformInfo?.name}...
               </div>
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -573,17 +573,17 @@ export default function PlatformCredentialForm({
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                fontSize: '11pt',
+                fontSize: '15px',
                 fontWeight: 700,
                 color: '#92400e',
                 letterSpacing: '0.5px'
               }}>
                 2FA
               </div>
-              <h3 style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '8px' }}>
                 2FA Required
               </h3>
-              <p style={{ fontSize: '9pt', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
                 Your account requires two-factor authentication.
                 We'll prompt you for the code when needed.
               </p>
@@ -594,7 +594,7 @@ export default function PlatformCredentialForm({
                   onSaved?.();
                   onClose();
                 }}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Got it
               </button>
@@ -612,21 +612,21 @@ export default function PlatformCredentialForm({
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                fontSize: '24pt'
+                fontSize: '32px'
               }}>
                 ✓
               </div>
-              <h3 style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '8px' }}>
                 Credentials Saved
               </h3>
-              <p style={{ fontSize: '9pt', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
                 Your {activePlatformInfo?.name} login is ready for automated bidding.
               </p>
               <button
                 type="button"
                 className="button button-primary"
                 onClick={onClose}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Done
               </button>

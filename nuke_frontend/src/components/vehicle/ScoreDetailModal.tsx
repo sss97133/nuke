@@ -92,7 +92,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
     return (
       <div style={overlayStyle} onClick={onClose}>
         <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-          <div style={{ padding: '40px', textAlign: 'center', fontSize: '9pt', color: '#666' }}>
+          <div style={{ padding: '40px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
             Analyzing score breakdown...
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
     return (
       <div style={overlayStyle} onClick={onClose}>
         <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-          <div style={{ padding: '40px', textAlign: 'center', fontSize: '9pt', color: '#666' }}>
+          <div style={{ padding: '40px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
             Score data unavailable
           </div>
         </div>
@@ -131,14 +131,14 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
           alignItems: 'center',
         }}>
           <div>
-            <div style={{ fontSize: '7pt', color: '#999', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            <div style={{ fontSize: '9px', color: '#999', textTransform: 'uppercase', letterSpacing: '1px' }}>
               Score Breakdown
             </div>
-            <div style={{ fontSize: '14pt', fontWeight: 800, marginTop: '2px' }}>
+            <div style={{ fontSize: '19px', fontWeight: 800, marginTop: '2px' }}>
               {explanation.label}
             </div>
             {vehicleTitle && (
-              <div style={{ fontSize: '8pt', color: '#666', marginTop: '2px' }}>{vehicleTitle}</div>
+              <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>{vehicleTitle}</div>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -152,13 +152,13 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '20pt',
+                fontSize: '27px',
                 fontWeight: 800,
                 border: '2px solid #000',
               }}>
                 {score ?? '--'}
               </div>
-              <div style={{ fontSize: '6pt', fontWeight: 700, color: scoreBg, marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div style={{ fontSize: '8px', fontWeight: 700, color: scoreBg, marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 {scoreLabel}
               </div>
             </div>
@@ -170,7 +170,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                 border: '1px solid #ddd',
                 background: '#fff',
                 cursor: 'pointer',
-                fontSize: '14pt',
+                fontSize: '19px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -183,7 +183,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
         </div>
 
         {/* Description */}
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', fontSize: '8pt', color: '#555', lineHeight: '1.5' }}>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', fontSize: '11px', color: '#555', lineHeight: '1.5' }}>
           {explanation.description}
         </div>
 
@@ -201,7 +201,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                 padding: '6px 10px',
                 background: '#f8f8f8',
                 borderBottom: '1px solid #e5e5e5',
-                fontSize: '6pt',
+                fontSize: '8px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
@@ -225,10 +225,10 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: '8pt', fontWeight: 600 }}>{f.name}</div>
-                    <div style={{ fontSize: '6pt', color: '#999', marginTop: '1px' }}>{f.scale}</div>
+                    <div style={{ fontSize: '11px', fontWeight: 600 }}>{f.name}</div>
+                    <div style={{ fontSize: '8px', color: '#999', marginTop: '1px' }}>{f.scale}</div>
                   </div>
-                  <div style={{ textAlign: 'right', fontSize: '9pt', fontWeight: 700 }}>
+                  <div style={{ textAlign: 'right', fontSize: '12px', fontWeight: 700 }}>
                     {f.raw != null ? (typeof f.raw === 'number' ? f.raw.toLocaleString() : f.raw) : <span style={{ color: '#ccc' }}>--</span>}
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -246,13 +246,13 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                             background: f.normalized >= 70 ? '#000' : f.normalized >= 40 ? '#666' : '#999',
                           }} />
                         </div>
-                        <span style={{ fontSize: '9pt', fontWeight: 700, minWidth: '20px' }}>{f.normalized}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, minWidth: '20px' }}>{f.normalized}</span>
                       </div>
                     ) : (
-                      <span style={{ fontSize: '8pt', color: '#ccc' }}>--</span>
+                      <span style={{ fontSize: '11px', color: '#ccc' }}>--</span>
                     )}
                   </div>
-                  <div style={{ textAlign: 'right', fontSize: '8pt', color: '#666' }}>
+                  <div style={{ textAlign: 'right', fontSize: '11px', color: '#666' }}>
                     {totalWeight > 0 ? `${Math.round((f.weight / totalWeight) * 100)}%` : `w${f.weight}`}
                   </div>
                 </div>
@@ -284,14 +284,14 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                           borderRadius: '50%',
                           background: b.present ? (b.value >= 0 ? '#2a9d2a' : '#cc3333') : '#ddd',
                         }} />
-                        <span style={{ fontSize: '8pt', fontWeight: 600 }}>{b.name}</span>
+                        <span style={{ fontSize: '11px', fontWeight: 600 }}>{b.name}</span>
                       </div>
-                      <div style={{ fontSize: '7pt', color: '#888', marginTop: '2px', marginLeft: '14px' }}>
+                      <div style={{ fontSize: '9px', color: '#888', marginTop: '2px', marginLeft: '14px' }}>
                         {b.reason}
                       </div>
                     </div>
                     <div style={{
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       fontWeight: 800,
                       color: !b.present ? '#ccc' : b.value > 0 ? '#2a9d2a' : b.value < 0 ? '#cc3333' : '#666',
                       minWidth: '40px',
@@ -312,7 +312,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
               <button
                 onClick={() => setShowFormula(!showFormula)}
                 style={{
-                  fontSize: '6pt',
+                  fontSize: '8px',
                   padding: '2px 8px',
                   border: '1px solid #ddd',
                   background: showFormula ? '#000' : '#fff',
@@ -331,7 +331,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
               background: '#f8f8f8',
               border: '1px solid #e5e5e5',
               fontFamily: 'monospace',
-              fontSize: '9pt',
+              fontSize: '12px',
               color: '#333',
               position: 'relative',
               overflow: 'hidden',
@@ -356,7 +356,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                     padding: '4px 12px',
                     background: '#000',
                     color: '#fff',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '1px',
@@ -373,7 +373,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
             <div style={{ marginTop: '16px' }}>
               <div style={sectionHeaderStyle}>
                 Source Data
-                <span style={{ fontWeight: 400, color: '#999', fontSize: '7pt' }}>
+                <span style={{ fontWeight: 400, color: '#999', fontSize: '9px' }}>
                   {commentCount} comment{commentCount !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -387,11 +387,11 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                      <span style={{ fontSize: '7pt', fontWeight: 700 }}>{c.user || 'Anonymous'}</span>
+                      <span style={{ fontSize: '9px', fontWeight: 700 }}>{c.user || 'Anonymous'}</span>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         {c.sentiment && (
                           <span style={{
-                            fontSize: '6pt',
+                            fontSize: '8px',
                             padding: '1px 4px',
                             background: c.sentiment === 'positive' ? '#e8f5e9' : c.sentiment === 'negative' ? '#ffebee' : '#f5f5f5',
                             color: c.sentiment === 'positive' ? '#2e7d32' : c.sentiment === 'negative' ? '#c62828' : '#666',
@@ -401,12 +401,12 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                             {c.sentiment}
                           </span>
                         )}
-                        <span style={{ fontSize: '6pt', color: '#bbb' }}>
+                        <span style={{ fontSize: '8px', color: '#bbb' }}>
                           {c.date ? new Date(c.date).toLocaleDateString() : ''}
                         </span>
                       </div>
                     </div>
-                    <div style={{ fontSize: '7pt', color: '#555', lineHeight: '1.4' }}>
+                    <div style={{ fontSize: '9px', color: '#555', lineHeight: '1.4' }}>
                       {c.text}
                     </div>
                   </div>
@@ -426,18 +426,18 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
               }}>
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
                   <div>
-                    <div style={{ fontSize: '6pt', color: '#999', textTransform: 'uppercase' }}>Sentiment</div>
-                    <div style={{ fontSize: '10pt', fontWeight: 800 }}>{aiAnalysis.overall_sentiment || '--'}</div>
+                    <div style={{ fontSize: '8px', color: '#999', textTransform: 'uppercase' }}>Sentiment</div>
+                    <div style={{ fontSize: '13px', fontWeight: 800 }}>{aiAnalysis.overall_sentiment || '--'}</div>
                   </div>
                   {aiAnalysis.sentiment_score != null && (
                     <div>
-                      <div style={{ fontSize: '6pt', color: '#999', textTransform: 'uppercase' }}>Score</div>
-                      <div style={{ fontSize: '10pt', fontWeight: 800 }}>{aiAnalysis.sentiment_score}/100</div>
+                      <div style={{ fontSize: '8px', color: '#999', textTransform: 'uppercase' }}>Score</div>
+                      <div style={{ fontSize: '13px', fontWeight: 800 }}>{aiAnalysis.sentiment_score}/100</div>
                     </div>
                   )}
                 </div>
                 {aiAnalysis.key_themes && (
-                  <div style={{ fontSize: '7pt', color: '#666' }}>
+                  <div style={{ fontSize: '9px', color: '#666' }}>
                     <strong>Key themes:</strong> {Array.isArray(aiAnalysis.key_themes) ? aiAnalysis.key_themes.join(', ') : aiAnalysis.key_themes}
                   </div>
                 )}
@@ -450,7 +450,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
             <div style={sectionHeaderStyle}>
               Personalized Insights
               <span style={{
-                fontSize: '6pt',
+                fontSize: '8px',
                 padding: '1px 6px',
                 background: '#000',
                 color: '#fff',
@@ -467,10 +467,10 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
               background: '#fafafa',
               textAlign: 'center',
             }}>
-              <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
                 "Users Like You" Score Adjustments
               </div>
-              <div style={{ fontSize: '7pt', color: '#888', lineHeight: '1.5', maxWidth: '300px', margin: '0 auto' }}>
+              <div style={{ fontSize: '9px', color: '#888', lineHeight: '1.5', maxWidth: '300px', margin: '0 auto' }}>
                 Personalized score adjustments based on your profile, preferences, and what buyers with similar tastes rated highest.
                 Your demographics, driving style, and collection goals will fine-tune every score.
               </div>
@@ -509,7 +509,7 @@ const modalStyle: React.CSSProperties = {
 };
 
 const sectionHeaderStyle: React.CSSProperties = {
-  fontSize: '7pt',
+  fontSize: '9px',
   fontWeight: 800,
   textTransform: 'uppercase',
   letterSpacing: '1px',

@@ -410,7 +410,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                 <button
                   className="button button-small button-tertiary"
                   onClick={() => setShowModeratorWizard(true)}
-                  style={{ fontSize: '7pt', padding: '2px 6px' }}
+                  style={{ fontSize: '9px', padding: '2px 6px' }}
                 >
                   Assign
                 </button>
@@ -658,7 +658,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                   backgroundColor: 'var(--grey-100)',
                   border: '2px solid var(--accent)',
                   borderRadius: '4px',
-                  fontSize: '9pt'
+                  fontSize: '12px'
                 }}>
                   <div style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>
                     Also claim your Bring a Trailer profile?
@@ -678,7 +678,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                         color: 'white',
                         textDecoration: 'none',
                         borderRadius: '3px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         fontWeight: 700,
                         border: 'none',
                         cursor: 'pointer',
@@ -699,7 +699,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                         backgroundColor: 'transparent',
                         color: 'var(--text-secondary)',
                         textDecoration: 'underline',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         border: '1px solid var(--border)',
                         borderRadius: '3px',
                         cursor: 'pointer',
@@ -977,10 +977,10 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
 
                 {(claimUploading || claimSuccessMessage) && (
                   <div style={{ marginBottom: '12px', padding: '10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg-secondary)' }}>
-                    <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '6px' }}>
                       {claimSuccessMessage ? 'Submitted' : 'Uploading'}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                       {claimSuccessMessage || claimStep || 'Working…'}
                     </div>
                     {!claimSuccessMessage && (
@@ -1032,7 +1032,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                         e.stopPropagation();
                         fileInputRef.current?.click();
                       }}
-                      style={{ fontSize: '8pt' }}
+                      style={{ fontSize: '11px' }}
                     >
                       Choose File
                     </button>

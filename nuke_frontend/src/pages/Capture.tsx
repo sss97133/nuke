@@ -119,12 +119,12 @@ const Capture: React.FC = () => {
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Add</span>
-          <button className="button button-secondary" style={{ fontSize: '9pt' }} onClick={() => navigate('/')}
+          <button className="button button-secondary" style={{ fontSize: '12px' }} onClick={() => navigate('/')}
           >
             Done
           </button>
         </div>
-        <div className="card-body" style={{ fontSize: '9pt', color: 'var(--text-secondary)' }}>
+        <div className="card-body" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
           Drop photos here. If the system can’t place them confidently, they’ll stay in your inbox/album until you decide.
         </div>
       </div>
@@ -135,7 +135,7 @@ const Capture: React.FC = () => {
             <button
               type="button"
               className="button button-primary"
-              style={{ fontSize: '9pt' }}
+              style={{ fontSize: '12px' }}
               onClick={() => {
                 void openCamera();
               }}
@@ -146,7 +146,7 @@ const Capture: React.FC = () => {
               <button
                 type="button"
                 className="button button-secondary"
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
                 onClick={() => {
                   closeCamera();
                   setUseCaptured(true);
@@ -159,7 +159,7 @@ const Capture: React.FC = () => {
               <button
                 type="button"
                 className="button button-secondary"
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
                 onClick={() => {
                   captured.forEach((c) => {
                     try {
@@ -178,7 +178,7 @@ const Capture: React.FC = () => {
           </div>
 
           {cameraError ? (
-            <div className="text text-muted" style={{ fontSize: '9pt' }}>
+            <div className="text text-muted" style={{ fontSize: '12px' }}>
               {cameraError}
             </div>
           ) : null}
@@ -189,13 +189,13 @@ const Capture: React.FC = () => {
                 <video ref={videoRef} playsInline muted style={{ width: '100%', height: 'auto', display: 'block' }} />
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button type="button" className="button button-primary" style={{ fontSize: '9pt' }} onClick={() => void takePhoto()}>
+                <button type="button" className="button button-primary" style={{ fontSize: '12px' }} onClick={() => void takePhoto()}>
                   Shoot
                 </button>
-                <button type="button" className="button button-secondary" style={{ fontSize: '9pt' }} onClick={() => closeCamera()}>
+                <button type="button" className="button button-secondary" style={{ fontSize: '12px' }} onClick={() => closeCamera()}>
                   Close
                 </button>
-                <div className="text text-muted" style={{ fontSize: '9pt' }}>
+                <div className="text text-muted" style={{ fontSize: '12px' }}>
                   {captured.length} captured
                 </div>
               </div>
@@ -218,7 +218,7 @@ const Capture: React.FC = () => {
                       position: 'absolute',
                       top: 4,
                       right: 4,
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       padding: '2px 6px',
                       borderRadius: 999,
                     }}

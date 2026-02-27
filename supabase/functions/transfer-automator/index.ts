@@ -85,12 +85,20 @@ serve(async (req) => {
 // seed_from_auction
 // Creates an ownership_transfer from a sold auction_events row.
 // Idempotent — if transfer already exists for this trigger_id, returns it.
+//
+// suppress_notifications:
+//   When true, skips the fire-and-forget notify-transfer-parties call.
+//   Required when running historical backfill (crons 223-227) to avoid
+//   sending 150K+ emails/SMSes to buyers and sellers of old auction records.
+//   Set to true for any batch seeding. Only set false (default) for new,
+//   live auction closes where parties actually need to be notified.
 // ---------------------------------------------------------------------------
 async function seedFromAuction(supabase: ReturnType<typeof createClient>, body: {
   auction_event_id: string;
   include_shipping?: boolean;
+  suppress_notifications?: boolean;
 }) {
-  const { auction_event_id, include_shipping = false } = body;
+  const { auction_event_id, include_shipping = false, suppress_notifications = false } = body;
 
   if (!auction_event_id) return json({ error: 'auction_event_id required' }, 400);
 
@@ -176,9 +184,12 @@ async function seedFromAuction(supabase: ReturnType<typeof createClient>, body: 
     .eq('id', vehicle_id);
 
   // Notify parties — fire-and-forget, never blocks the seed response
-  fireAndForgetNotify(transfer.id, 'seeded');
+  // Skip when suppress_notifications=true (e.g. historical backfill runs)
+  if (!suppress_notifications) {
+    fireAndForgetNotify(transfer.id, 'seeded');
+  }
 
-  console.log(`[transfer-automator] seeded transfer ${transfer.id} for vehicle ${vehicle_id}`);
+  console.log(`[transfer-automator] seeded transfer ${transfer.id} for vehicle ${vehicle_id} (notifications ${suppress_notifications ? 'suppressed' : 'sent'})`);
 
   return json({
     transfer_id: transfer.id,
@@ -207,6 +218,7 @@ async function seedFromListing(supabase: ReturnType<typeof createClient>, body: 
   trigger_type?: 'listing' | 'private_sale' | 'gift' | 'inheritance';
   include_shipping?: boolean;
   notes?: string;
+  suppress_notifications?: boolean;
 }) {
   const {
     vehicle_id,
@@ -218,6 +230,7 @@ async function seedFromListing(supabase: ReturnType<typeof createClient>, body: 
     buyer_user_id,
     trigger_type = 'private_sale',
     include_shipping = false,
+    suppress_notifications = false,
   } = body;
 
   if (!vehicle_id) return json({ error: 'vehicle_id required' }, 400);
@@ -262,9 +275,12 @@ async function seedFromListing(supabase: ReturnType<typeof createClient>, body: 
     .eq('id', vehicle_id);
 
   // Notify parties — fire-and-forget, never blocks the seed response
-  fireAndForgetNotify(transfer.id, 'seeded');
+  // suppress_notifications=true silences these for private_sale/listing backfill runs
+  if (!suppress_notifications) {
+    fireAndForgetNotify(transfer.id, 'seeded');
+  }
 
-  return json({ transfer_id: transfer.id, vehicle_id, milestones_seeded: milestones.length, created: true });
+  return json({ transfer_id: transfer.id, vehicle_id, milestones_seeded: milestones.length, created: true, notifications_sent: !suppress_notifications });
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +342,7 @@ async function getTransfer(supabase: ReturnType<typeof createClient>, body: {
   else return json({ error: 'transfer_id or vehicle_id required' }, 400);
 
   const { data, error } = transfer_id ? await query.single() : await query.maybeSingle();
-  if (error) return json({ error: String(error) }, 500);
+  if (error) return json({ error: error?.message ?? JSON.stringify(error) }, 500);
   if (!data) return json({ error: 'Transfer not found' }, 404);
 
   return json({ transfer: data });

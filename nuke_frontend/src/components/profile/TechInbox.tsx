@@ -434,7 +434,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
           flexWrap: 'wrap',
           gap: 'var(--space-2)'
         }}>
-          <h3 className="text font-bold" style={{ fontSize: '8pt', margin: 0 }}>
+          <h3 className="text font-bold" style={{ fontSize: '11px', margin: 0 }}>
             Tech Inbox ({filteredImages.length} photos, {filteredNotes.length} notes)
           </h3>
 
@@ -583,7 +583,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
             alignItems: 'center'
           }}>
             <div>
-              <span className="text font-bold" style={{ fontSize: '8pt' }}>
+              <span className="text font-bold" style={{ fontSize: '11px' }}>
                 {group.vehicle.year} {group.vehicle.make} {group.vehicle.model}
               </span>
               {group.vehicle.vin && (
@@ -653,7 +653,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                             color: 'var(--white)',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            fontSize: '6pt'
+                            fontSize: '8px'
                           }}>
                             {img.category}
                           </div>
@@ -669,7 +669,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                             color: 'var(--white)',
                             padding: '4px',
                             borderRadius: '4px',
-                            fontSize: '6pt'
+                            fontSize: '8px'
                           }}>
                             🤖 AI: {Math.round(img.ai_confidence * 100)}%
                           </div>

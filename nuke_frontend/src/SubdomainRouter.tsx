@@ -105,7 +105,7 @@ export default function SubdomainRouter() {
         justifyContent: 'center',
         height: '100vh',
         fontFamily: 'Arial, sans-serif',
-        fontSize: '9pt',
+        fontSize: '12px',
         color: '#888',
       }}>
         loading...
@@ -123,7 +123,7 @@ export default function SubdomainRouter() {
             justifyContent: 'center',
             height: '100vh',
             fontFamily: 'Arial, sans-serif',
-            fontSize: '9pt',
+            fontSize: '12px',
             color: '#888',
           }}>
             loading storefront...

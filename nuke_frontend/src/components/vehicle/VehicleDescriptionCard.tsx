@@ -310,7 +310,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               placeholder="Describe the vehicle, modifications, history..."
               style={{
                 width: '100%',
-                fontSize: '9pt',
+                fontSize: '12px',
                 padding: '8px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
@@ -318,13 +318,13 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 fontFamily: 'inherit'
               }}
             />
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textAlign: 'right' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', textAlign: 'right' }}>
               {editValue.length}/500
             </div>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button
                 className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                style={{ fontSize: '11px', padding: '4px 12px' }}
                 onClick={handleCancel}
                 disabled={saving}
               >
@@ -332,7 +332,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               </button>
               <button
                 className="button button-primary"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                style={{ fontSize: '11px', padding: '4px 12px' }}
                 onClick={handleSave}
                 disabled={saving}
               >
@@ -359,15 +359,15 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               
               return (
                 <div>
-                  <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
                     CURATED SUMMARY
                   </div>
                   {isEmpty ? (
-                    <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                       No curated summary yet. Use Generate or Edit to create one.
                     </div>
                   ) : (
-                    <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                    <div style={{ fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                       {cleaned || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No summary available</span>}
                     </div>
                   )}
@@ -377,11 +377,11 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
 
             {/* Source description entries (provenance-backed) */}
             <div>
-              <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
                 DESCRIPTION ENTRIES
               </div>
               {rawListingDescriptions.length === 0 ? (
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                   No source descriptions yet.
                 </div>
               ) : (
@@ -408,7 +408,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '8px',
-                            fontSize: '8pt',
+                            fontSize: '11px',
                             fontWeight: 700,
                           }}
                         >
@@ -419,12 +419,12 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                               {domain ? ` • ${domain}` : ''}
                             </span>
                           </span>
-                          <span style={{ fontSize: '7pt', fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                             {dateLabel}
                           </span>
                         </summary>
                         <div style={{ marginTop: '8px' }}>
-                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                             {row.source_url ? (
                               <a
                                 href={row.source_url}
@@ -436,7 +436,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                               </a>
                             ) : null}
                           </div>
-                          <div style={{ fontSize: '8.5pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                          <div style={{ fontSize: '11px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                             {row.text}
                           </div>
                         </div>
@@ -454,7 +454,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 padding: '8px',
                 background: 'var(--bg-secondary)',
                 borderRadius: '4px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 color: 'var(--text-muted)',
               }}>
                 <span>AI-generated from vehicle images</span>

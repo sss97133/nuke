@@ -850,7 +850,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
         title={collapsed ? 'Expand' : 'Collapse'}
       >
         <span>Valuation Breakdown{collapsed ? ` — ${formatCurrency(valuation.estimatedValue)}` : ''}</span>
-        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           {valuation.overallConfidence}% confidence
         </div>
       </div>
@@ -864,7 +864,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
           border: '2px solid var(--border)',
           marginBottom: '16px'
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', fontSize: '9pt' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', fontSize: '12px' }}>
             <div style={{ fontWeight: 'bold' }}>Purchase Price:</div>
             <div style={{ textAlign: 'right', fontWeight: 'bold' }}>
               {formatCurrency(valuation.purchasePrice)}
@@ -883,7 +883,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
               borderTop: '2px solid var(--border)', 
               paddingTop: '8px', 
               fontWeight: 'bold',
-              fontSize: '11pt'
+              fontSize: '15px'
             }}>
               Estimated Value:
             </div>
@@ -892,7 +892,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
               paddingTop: '8px',
               textAlign: 'right',
               fontWeight: 'bold',
-              fontSize: '11pt',
+              fontSize: '15px',
               color: 'var(--accent)'
             }}>
               {formatCurrency(valuation.estimatedValue)}
@@ -905,7 +905,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
               marginTop: '12px', 
               paddingTop: '12px', 
               borderTop: '1px solid var(--border)',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--text-muted)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -936,7 +936,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
             background: '#fef3c7', 
             border: '1px solid #fbbf24',
             marginBottom: '16px',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}>
             {valuation.warnings.map((warning, idx) => (
               <div key={idx} style={{ marginBottom: idx < valuation.warnings.length - 1 ? '6px' : '0' }}>
@@ -947,8 +947,8 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
         )}
 
         {/* Line Items with Visual Evidence */}
-        <div style={{ fontSize: '8pt' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '9pt' }}>
+        <div style={{ fontSize: '11px' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '12px' }}>
             Investment Timeline ({valuation.lineItems.length} items)
           </div>
           
@@ -986,17 +986,17 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
               >
                 <div>
                   <div style={{ fontWeight: 'bold' }}>{item.category}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '9px' }}>
                     {item.description}
                   </div>
                 </div>
 
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                   {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
 
                 <div style={{ 
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   padding: '2px 6px',
                   background: item.evidence.photoCount > 3 ? '#dcfce7' : 
                               item.evidence.photoCount > 0 ? '#fef3c7' : 
@@ -1044,7 +1044,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                   </div>
                   <div style={{ 
                     marginTop: '6px', 
-                    fontSize: '7pt', 
+                    fontSize: '9px', 
                     color: 'var(--text-muted)',
                     textAlign: 'center'
                   }}>
@@ -1062,7 +1062,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
           padding: '12px',
           background: 'var(--grey-50)',
           border: '1px solid var(--border)',
-          fontSize: '8pt'
+          fontSize: '11px'
         }}>
           <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Documentation Quality</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1087,7 +1087,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                 className="button button-primary button-small"
                 onClick={() => setShowUploader(true)}
                 style={{ 
-                  fontSize: '7pt', 
+                  fontSize: '9px', 
                   padding: '3px 8px',
                   marginLeft: '8px'
                 }}

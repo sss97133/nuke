@@ -73,13 +73,13 @@ export const AnalysisConfigSelector: React.FC<AnalysisConfigSelectorProps> = ({
       backgroundColor: 'var(--bg-secondary)'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <div style={{ fontSize: '8pt', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
           ANALYSIS CONFIGURATION
         </div>
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             padding: '2px 6px',
             border: '1px solid var(--border-medium)',
             background: 'transparent',
@@ -92,7 +92,7 @@ export const AnalysisConfigSelector: React.FC<AnalysisConfigSelectorProps> = ({
 
       {/* Tier Selection */}
       <div style={{ marginBottom: '8px' }}>
-        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px' }}>
           ANALYSIS TIER
         </div>
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -104,7 +104,7 @@ export const AnalysisConfigSelector: React.FC<AnalysisConfigSelectorProps> = ({
                 key={tier}
                 onClick={() => handleTierChange(tier)}
                 style={{
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   padding: '4px 8px',
                   border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border-medium)'}`,
                   background: isSelected ? 'var(--accent-light)' : 'transparent',
@@ -119,7 +119,7 @@ export const AnalysisConfigSelector: React.FC<AnalysisConfigSelectorProps> = ({
             );
           })}
         </div>
-        <div style={{ fontSize: '6pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+        <div style={{ fontSize: '8px', color: 'var(--text-muted)', marginTop: '2px' }}>
           {TIER_CONFIGS[selectedTier].description}
         </div>
       </div>
@@ -127,14 +127,14 @@ export const AnalysisConfigSelector: React.FC<AnalysisConfigSelectorProps> = ({
       {/* Advanced Options */}
       {showAdvanced && (
         <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '8px', marginTop: '8px' }}>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px' }}>
             LLM PROVIDER
           </div>
           <select
             value={selectedProvider || ''}
             onChange={(e) => handleProviderChange(e.target.value as LLMProvider)}
             style={{
-              fontSize: '7pt',
+              fontSize: '9px',
               padding: '4px',
               width: '100%',
               border: '1px solid var(--border-medium)',
@@ -149,14 +149,14 @@ export const AnalysisConfigSelector: React.FC<AnalysisConfigSelectorProps> = ({
 
           {selectedProvider && (
             <>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '8px', marginBottom: '4px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: '4px' }}>
                 MODEL
               </div>
               <select
                 value={selectedModel || ''}
                 onChange={(e) => handleModelChange(e.target.value)}
                 style={{
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   padding: '4px',
                   width: '100%',
                   border: '1px solid var(--border-medium)',
@@ -176,7 +176,7 @@ export const AnalysisConfigSelector: React.FC<AnalysisConfigSelectorProps> = ({
 
       {/* Current Selection Summary */}
       <div style={{ 
-        fontSize: '6pt', 
+        fontSize: '8px', 
         color: 'var(--text-muted)', 
         marginTop: '8px',
         padding: '4px',

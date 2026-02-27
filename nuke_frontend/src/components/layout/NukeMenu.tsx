@@ -71,7 +71,7 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
         }}
       >
         <span>Nuke</span>
-        <span style={{ fontSize: '7pt' }}>{menuOpen ? '▼' : '▶'}</span>
+        <span style={{ fontSize: '9px' }}>{menuOpen ? '▼' : '▶'}</span>
       </button>
 
       {menuOpen && (
@@ -119,7 +119,7 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
                 }}
               >
                 <span>Vehicles</span>
-                <span style={{ fontSize: '7pt', marginLeft: '8px' }}>{vehiclesSubMenuOpen ? '▾' : '▸'}</span>
+                <span style={{ fontSize: '9px', marginLeft: '8px' }}>{vehiclesSubMenuOpen ? '▾' : '▸'}</span>
               </button>
             )}
             <Link to="/search" className={`nav-link ${isActivePage('/search') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>Search</Link>
@@ -127,6 +127,7 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
             <Link to="/org" className={`nav-link ${isActivePage('/org') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>Organizations</Link>
             {session && (
               <>
+                <Link to="/inbox" className={`nav-link ${isActivePage('/inbox') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>Inbox</Link>
                 <Link to="/pipeline" className={`nav-link ${isActivePage('/pipeline') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>Acquisitions</Link>
                 <Link to="/invoices" className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>Invoices</Link>
                 <Link to="/restoration" className={`nav-link ${isActivePage('/restoration') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>Restoration Intake</Link>
@@ -165,7 +166,7 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
                   style={{
                     width: '100%',
                     padding: '4px 8px',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     border: '1px solid var(--border)',
                     background: 'var(--white)',
                     outline: 'none'
@@ -176,9 +177,9 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
 
               <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}>
                 {quickVehiclesLoading ? (
-                  <div style={{ padding: '12px', textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)' }}>Loading...</div>
+                  <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>Loading...</div>
                 ) : quickVehicles.length === 0 ? (
-                  <div style={{ padding: '12px', textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)' }}>No vehicles yet</div>
+                  <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>No vehicles yet</div>
                 ) : (
                   quickVehicles
                     .filter((v) => {
@@ -208,7 +209,7 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
                           background: 'transparent',
                           cursor: 'pointer',
                           textAlign: 'left',
-                          fontSize: '9pt'
+                          fontSize: '12px'
                         }}
                         className="nav-link"
                         title={v.title}
@@ -235,7 +236,7 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
                   display: 'block',
                   padding: '8px 12px',
                   textDecoration: 'none',
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 600,
                   borderTop: '1px solid var(--border)',
                   background: 'var(--surface)'

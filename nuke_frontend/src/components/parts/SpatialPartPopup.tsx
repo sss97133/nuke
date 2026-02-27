@@ -48,34 +48,34 @@ const SpatialPartPopup: React.FC<SpatialPartPopupProps> = ({ part, onClose, onOr
 					maxWidth: 520
 				}}
 			>
-				<div style={{ fontWeight: 700, marginBottom: 8, fontSize: '10pt' }}>
+				<div style={{ fontWeight: 700, marginBottom: 8, fontSize: '13px' }}>
 					{part.name || 'Part'}
 				</div>
 				{part.oem_part_number && (
-					<div style={{ fontSize: '9pt', color: '#374151', marginBottom: 8 }}>
+					<div style={{ fontSize: '12px', color: '#374151', marginBottom: 8 }}>
 						Part #: {part.oem_part_number}
 					</div>
 				)}
 				<div style={{ marginBottom: 12 }}>
-					<div style={{ fontSize: '9pt', marginBottom: 6 }}>Suppliers</div>
+					<div style={{ fontSize: '12px', marginBottom: 6 }}>Suppliers</div>
 					<div style={{ display: 'grid', gap: 6 }}>
 						{(part.suppliers || []).map((s, idx) => (
 							<button
 								key={idx}
 								onClick={() => onOrder(s)}
 								className="button"
-								style={{ fontSize: '8pt', textAlign: 'left' }}
+								style={{ fontSize: '11px', textAlign: 'left' }}
 							>
 								{(s.supplier_name || 'Supplier')} {typeof s.price_cents === 'number' ? `- $${(s.price_cents / 100).toFixed(2)}` : ''}
 							</button>
 						))}
 						{(part.suppliers || []).length === 0 && (
-							<div style={{ fontSize: '8pt', color: '#6b7280' }}>No suppliers available</div>
+							<div style={{ fontSize: '11px', color: '#6b7280' }}>No suppliers available</div>
 						)}
 					</div>
 				</div>
 				<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-					<button className="button" style={{ fontSize: '8pt' }} onClick={onClose}>
+					<button className="button" style={{ fontSize: '11px' }} onClick={onClose}>
 						Close
 					</button>
 				</div>

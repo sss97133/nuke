@@ -147,8 +147,20 @@ export default function MarketSegments() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
-        Loading market segments...
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
+        <style>{`@keyframes seg-pulse { 0%,100%{opacity:.6} 50%{opacity:.3} }`}</style>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ height: 28, background: 'var(--surface)', borderRadius: 3, marginBottom: 24, width: 220, animation: 'seg-pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} style={{ border: '2px solid var(--border)', borderRadius: 4, padding: 16, background: 'var(--surface)' }}>
+                <div style={{ height: 14, background: 'var(--border)', borderRadius: 2, marginBottom: 10, width: '60%', animation: 'seg-pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ height: 24, background: 'var(--border)', borderRadius: 2, marginBottom: 8, width: '40%', animation: 'seg-pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ height: 10, background: 'var(--border)', borderRadius: 2, width: '75%', animation: 'seg-pulse 1.5s ease-in-out infinite' }} />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -167,8 +179,8 @@ export default function MarketSegments() {
           }}
         >
           <div>
-            <h1 style={{ margin: 0, fontSize: '14pt' }}>Market Segments</h1>
-            <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 200 }}>
+            <h1 style={{ margin: 0, fontSize: '19px' }}>Market Segments</h1>
+            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 200 }}>
               Browse segments and index stats. Trading is intentionally not enabled here yet.
             </div>
           </div>
@@ -185,7 +197,7 @@ export default function MarketSegments() {
         {error && (
           <div style={{ marginTop: '16px', padding: '12px', border: '2px solid var(--border)', background: 'var(--surface)' }}>
             <div style={{ fontWeight: 800, marginBottom: '6px' }}>Error</div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{error}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{error}</div>
           </div>
         )}
 
@@ -203,7 +215,7 @@ export default function MarketSegments() {
               color: 'var(--text)'
             }}
           />
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '9pt', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
             Manager
             <select
               value={managerFilter}
@@ -226,7 +238,7 @@ export default function MarketSegments() {
         {!error && rows.length === 0 && (
           <div style={{ marginTop: '18px', padding: '14px', border: '2px solid var(--border)', background: 'var(--surface)' }}>
             <div style={{ fontWeight: 900, marginBottom: '6px' }}>No segments returned</div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
               This usually means there are no segments with status = active, or your database permissions/policies are preventing reads of the
               market segments index view.
             </div>
@@ -246,7 +258,7 @@ export default function MarketSegments() {
         <div style={{ marginTop: '18px', display: 'grid', gap: '18px' }}>
           {Object.entries(grouped).map(([groupName, items]) => (
             <div key={groupName}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 900, marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 900, marginBottom: '10px' }}>
                 {groupName} <span style={{ fontWeight: 400 }}>({items.length})</span>
               </div>
 
@@ -270,23 +282,23 @@ export default function MarketSegments() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
                       <div style={{ fontWeight: 900 }}>{r.name}</div>
-                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{r.manager_type.toUpperCase()}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{r.manager_type.toUpperCase()}</div>
                     </div>
 
-                    <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
                       {r.vehicle_count.toLocaleString()} vehicles • {formatUSD0(r.market_cap_usd)} in play
                     </div>
 
                     <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>7d</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>7d</div>
                       <div style={{ fontWeight: 900 }}>{formatPct(r.change_7d_pct)}</div>
                     </div>
                     <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>30d</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>30d</div>
                       <div style={{ fontWeight: 900 }}>{formatPct(r.change_30d_pct)}</div>
                     </div>
 
-                    <div style={{ marginTop: '10px', fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                    <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
                       <div>
                         <strong>Year</strong>: {r.year_min ?? '—'} to {r.year_max ?? '—'}
                       </div>
@@ -310,10 +322,10 @@ export default function MarketSegments() {
                     </div>
 
                     {r.description && (
-                      <div style={{ marginTop: '10px', fontSize: '9pt', color: 'var(--text-muted)' }}>{r.description}</div>
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>{r.description}</div>
                     )}
 
-                    <div style={{ marginTop: '10px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                    <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>
                       Slug: <strong style={{ color: 'var(--text)' }}>{r.slug}</strong>
                     </div>
                   </button>

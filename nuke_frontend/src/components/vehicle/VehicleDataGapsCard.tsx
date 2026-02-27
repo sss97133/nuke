@@ -340,7 +340,7 @@ export function VehicleDataGapsCard({
         <div>
         {showWhy && (
           <div style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 10, background: 'var(--grey-50)', marginBottom: 12 }}>
-            <div style={{ fontWeight: 800, fontSize: '9pt', marginBottom: 4 }}>
+            <div style={{ fontWeight: 800, fontSize: '12px', marginBottom: 4 }}>
               Why does this panel show up sometimes?
             </div>
             <div className="text-small text-muted" style={{ lineHeight: 1.4 }}>
@@ -476,7 +476,7 @@ export function VehicleDataGapsCard({
                                 style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                               />
                             </div>
-                            <div style={{ fontSize: '7pt', padding: '4px 6px', textAlign: 'left' }}>
+                            <div style={{ fontSize: '9px', padding: '4px 6px', textAlign: 'left' }}>
                               <div style={{ fontWeight: 700 }}>
                                 {img.sensitive_type ? img.sensitive_type.replace(/_/g, ' ') : 'photo'}
                               </div>

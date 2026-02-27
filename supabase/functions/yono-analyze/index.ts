@@ -52,6 +52,15 @@ const corsHeaders = {
 const SIDECAR_URL =
   Deno.env.get("YONO_SIDECAR_URL") || "http://127.0.0.1:8472";
 const SIDECAR_TIMEOUT_MS = 30_000; // Vision is slower than classify (Florence-2 inference)
+const SIDECAR_TOKEN = Deno.env.get("MODAL_SIDECAR_TOKEN") || "";
+
+function sidecarHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    ...(SIDECAR_TOKEN ? { "Authorization": `Bearer ${SIDECAR_TOKEN}` } : {}),
+    ...extra,
+  };
+}
 
 interface AnalysisResult {
   vehicle_zone: string;
@@ -85,7 +94,7 @@ async function checkSidecarHealth(): Promise<boolean> {
 async function analyzeImage(imageUrl: string): Promise<AnalysisResult | null> {
   const resp = await fetch(`${SIDECAR_URL}/analyze`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: sidecarHeaders(),
     body: JSON.stringify({ image_url: imageUrl }),
     signal: AbortSignal.timeout(SIDECAR_TIMEOUT_MS),
   });

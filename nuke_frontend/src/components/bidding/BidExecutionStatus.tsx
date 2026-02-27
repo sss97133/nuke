@@ -152,7 +152,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
         padding: '12px',
         background: 'var(--surface-hover)',
         borderRadius: '4px',
-        fontSize: '8pt',
+        fontSize: '11px',
         color: 'var(--text-muted)'
       }}>
         Loading execution status...
@@ -180,23 +180,23 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
         alignItems: 'center',
         gap: '10px'
       }}>
-        <span style={{ fontSize: '14pt' }}>{statusInfo.icon}</span>
+        <span style={{ fontSize: '19px' }}>{statusInfo.icon}</span>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 700,
             color: statusInfo.color
           }}>
             {statusInfo.label}
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
             {statusInfo.description}
           </div>
         </div>
 
         {execution.status === 'queued' && (
           <div style={{
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 600,
             color: statusInfo.color
           }}>
@@ -228,7 +228,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
 
         {/* Result for completed */}
         {execution.status === 'completed' && execution.result_data && (
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             {execution.result_data.bid_amount_cents && (
               <div style={{ marginBottom: '4px' }}>
                 Bid placed: <strong>${(execution.result_data.bid_amount_cents / 100).toLocaleString()}</strong>
@@ -247,7 +247,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
         {/* Error for failed */}
         {execution.status === 'failed' && execution.error_message && (
           <div style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#ef4444'
           }}>
             {execution.error_message}
@@ -257,7 +257,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
         {/* Retry info */}
         {execution.attempts > 0 && execution.status !== 'completed' && (
           <div style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-muted)',
             marginTop: '6px'
           }}>

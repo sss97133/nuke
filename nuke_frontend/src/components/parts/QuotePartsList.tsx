@@ -94,7 +94,7 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
   }, {} as Record<string, number>);
 
   if (loading) {
-    return <div style={{ padding: '20px', fontSize: '9pt', color: '#666' }}>Loading parts...</div>;
+    return <div style={{ padding: '20px', fontSize: '12px', color: '#666' }}>Loading parts...</div>;
   }
 
   return (
@@ -110,19 +110,19 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
         marginBottom: '12px'
       }}>
         <div>
-          <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+          <div style={{ fontSize: '13px', fontWeight: 700 }}>
             PARTS QUOTE
           </div>
-          <div style={{ fontSize: '7pt', color: '#666', marginTop: '2px' }}>
+          <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
             {parts.length} items • Click to see alternatives
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '12pt', fontWeight: 700 }}>
+          <div style={{ fontSize: '16px', fontWeight: 700 }}>
             ${activeTotal.toFixed(2)}
           </div>
           {laterTotal > 0 && (
-            <div style={{ fontSize: '7pt', color: '#666' }}>
+            <div style={{ fontSize: '9px', color: '#666' }}>
               +${laterTotal.toFixed(2)} later
             </div>
           )}
@@ -133,7 +133,7 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
       {criticalParts.length > 0 && (
         <div style={{ marginBottom: '16px' }}>
           <div style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 700,
             color: '#991b1b',
             padding: '4px 12px',
@@ -171,7 +171,7 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
       {normalParts.length > 0 && (
         <div style={{ marginBottom: '16px' }}>
           <div style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 700,
             color: '#374151',
             padding: '4px 12px',
@@ -211,7 +211,7 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
           <div
             onClick={() => setShowLater(!showLater)}
             style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               color: '#1e40af',
               padding: '4px 12px',
@@ -256,7 +256,7 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
         borderTop: '2px solid #000'
       }}>
         <div style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 700,
           marginBottom: '8px',
           textTransform: 'uppercase'
@@ -270,7 +270,7 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
               <div
                 key={retailer}
                 style={{
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   padding: '4px 8px',
                   background: '#fff',
                   border: '1px solid #e5e7eb'
@@ -293,12 +293,12 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
         alignItems: 'center'
       }}>
         <div>
-          <div style={{ fontSize: '8pt', textTransform: 'uppercase' }}>Active Total</div>
-          <div style={{ fontSize: '7pt', opacity: 0.7 }}>
+          <div style={{ fontSize: '11px', textTransform: 'uppercase' }}>Active Total</div>
+          <div style={{ fontSize: '9px', opacity: 0.7 }}>
             {criticalParts.length + normalParts.length} items ready to order
           </div>
         </div>
-        <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+        <div style={{ fontSize: '19px', fontWeight: 700 }}>
           ${activeTotal.toFixed(2)}
         </div>
       </div>

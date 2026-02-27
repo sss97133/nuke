@@ -241,7 +241,7 @@ const Login = () => {
                   flex: 1,
                   padding: '8px 12px',
                   border: 'none',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: mode === 'signin' ? 700 : 400,
                   backgroundColor: mode === 'signin' ? 'var(--text)' : 'transparent',
                   color: mode === 'signin' ? 'var(--white)' : 'var(--text-muted)',
@@ -258,7 +258,7 @@ const Login = () => {
                   flex: 1,
                   padding: '8px 12px',
                   border: 'none',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: mode === 'signup' ? 700 : 400,
                   backgroundColor: mode === 'signup' ? 'var(--text)' : 'transparent',
                   color: mode === 'signup' ? 'var(--white)' : 'var(--text-muted)',
@@ -301,7 +301,7 @@ const Login = () => {
               {loading ? 'Connecting...' : 'Continue with GitHub'}
             </button>
 
-            <div style={{ textAlign: 'center', margin: '16px 0', fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ textAlign: 'center', margin: '16px 0', fontSize: '11px', color: 'var(--text-muted)' }}>
               or
             </div>
 
@@ -324,7 +324,7 @@ const Login = () => {
                   flex: 1,
                   padding: '6px 12px',
                   border: 'none',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: authMethod === 'email' ? 600 : 400,
                   backgroundColor: authMethod === 'email' ? 'var(--grey-100)' : 'transparent',
                   color: authMethod === 'email' ? 'var(--text)' : 'var(--text-muted)',
@@ -346,7 +346,7 @@ const Login = () => {
                   flex: 1,
                   padding: '6px 12px',
                   border: 'none',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: authMethod === 'phone' ? 600 : 400,
                   backgroundColor: authMethod === 'phone' ? 'var(--grey-100)' : 'transparent',
                   color: authMethod === 'phone' ? 'var(--text)' : 'var(--text-muted)',
@@ -456,7 +456,7 @@ const Login = () => {
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-muted)',
                     textDecoration: 'underline',
                   }}
@@ -475,7 +475,7 @@ const Login = () => {
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-muted)',
                     textDecoration: 'underline',
                   }}
@@ -486,7 +486,7 @@ const Login = () => {
             )}
 
             {authMethod === 'phone' && (
-              <p style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
                 Phone sign-in creates an account if you don't have one.
               </p>
             )}

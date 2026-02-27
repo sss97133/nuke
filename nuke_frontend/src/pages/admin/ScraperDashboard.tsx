@@ -369,7 +369,7 @@ export default function ScraperDashboard() {
   if (loading && scrapers[0].status === 'unknown') {
     return (
       <div style={{ padding: '48px', textAlign: 'center' }}>
-        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Loading scraper status...</div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading scraper status...</div>
       </div>
     );
   }
@@ -382,7 +382,7 @@ export default function ScraperDashboard() {
           <button
             onClick={() => navigate('/admin/mission-control')}
             style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               padding: '4px 8px',
               marginBottom: '8px',
               background: 'transparent',
@@ -392,15 +392,15 @@ export default function ScraperDashboard() {
           >
             ← Back to Mission Control
           </button>
-          <h1 style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '4px' }}>
+          <h1 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
             SCRAPER DASHBOARD
           </h1>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Monitor and trigger all scrapers • Real-time diagnostics
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <label style={{ fontSize: '8pt', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="checkbox"
               checked={autoRefresh}
@@ -412,7 +412,7 @@ export default function ScraperDashboard() {
           <button
             onClick={loadStatus}
             className="button button-secondary cursor-button"
-            style={{ fontSize: '8pt', padding: '8px 16px' }}
+            style={{ fontSize: '11px', padding: '8px 16px' }}
           >
             REFRESH NOW
           </button>
@@ -432,9 +432,9 @@ export default function ScraperDashboard() {
             padding: '16px',
             background: 'var(--surface)'
           }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>VEHICLES (24H)</div>
-            <div style={{ fontSize: '16pt', fontWeight: 700 }}>{systemStats.recentVehicles}</div>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>VEHICLES (24H)</div>
+            <div style={{ fontSize: '21px', fontWeight: 700 }}>{systemStats.recentVehicles}</div>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
               {systemStats.vehiclesLastHour} in last hour
             </div>
           </div>
@@ -444,8 +444,8 @@ export default function ScraperDashboard() {
             padding: '16px',
             background: 'var(--surface)'
           }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>TOTAL VEHICLES</div>
-            <div style={{ fontSize: '16pt', fontWeight: 700 }}>{systemStats.totalVehicles.toLocaleString()}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>TOTAL VEHICLES</div>
+            <div style={{ fontSize: '21px', fontWeight: 700 }}>{systemStats.totalVehicles.toLocaleString()}</div>
           </div>
           
           <div style={{
@@ -453,12 +453,12 @@ export default function ScraperDashboard() {
             padding: '16px',
             background: 'var(--surface)'
           }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>IMPORT QUEUE</div>
-            <div style={{ fontSize: '16pt', fontWeight: 700, color: systemStats.queueHealth.import.pending > 0 ? '#f59e0b' : '#10b981' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>IMPORT QUEUE</div>
+            <div style={{ fontSize: '21px', fontWeight: 700, color: systemStats.queueHealth.import.pending > 0 ? '#f59e0b' : '#10b981' }}>
               {systemStats.queueHealth.import.pending}
             </div>
             {systemStats.queueHealth.import.failed > 0 && (
-              <div style={{ fontSize: '7pt', color: '#ef4444', marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: '#ef4444', marginTop: '4px' }}>
                 {systemStats.queueHealth.import.failed} failed
               </div>
             )}
@@ -469,12 +469,12 @@ export default function ScraperDashboard() {
             padding: '16px',
             background: 'var(--surface)'
           }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>CL QUEUE</div>
-            <div style={{ fontSize: '16pt', fontWeight: 700, color: systemStats.queueHealth.cl.pending > 0 ? '#f59e0b' : '#10b981' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>CL QUEUE</div>
+            <div style={{ fontSize: '21px', fontWeight: 700, color: systemStats.queueHealth.cl.pending > 0 ? '#f59e0b' : '#10b981' }}>
               {systemStats.queueHealth.cl.pending}
             </div>
             {systemStats.queueHealth.cl.failed > 0 && (
-              <div style={{ fontSize: '7pt', color: '#ef4444', marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: '#ef4444', marginTop: '4px' }}>
                 {systemStats.queueHealth.cl.failed} failed
               </div>
             )}
@@ -485,12 +485,12 @@ export default function ScraperDashboard() {
             padding: '16px',
             background: 'var(--surface)'
           }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>BAT QUEUE</div>
-            <div style={{ fontSize: '16pt', fontWeight: 700, color: systemStats.queueHealth.bat.pending > 0 ? '#f59e0b' : '#10b981' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>BAT QUEUE</div>
+            <div style={{ fontSize: '21px', fontWeight: 700, color: systemStats.queueHealth.bat.pending > 0 ? '#f59e0b' : '#10b981' }}>
               {systemStats.queueHealth.bat.pending}
             </div>
             {systemStats.queueHealth.bat.failed > 0 && (
-              <div style={{ fontSize: '7pt', color: '#ef4444', marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: '#ef4444', marginTop: '4px' }}>
                 {systemStats.queueHealth.bat.failed} failed
               </div>
             )}
@@ -506,17 +506,17 @@ export default function ScraperDashboard() {
           marginBottom: '24px',
           background: 'var(--surface)'
         }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px' }}>RECENT VEHICLES</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px' }}>RECENT VEHICLES</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
             {recentVehicles.slice(0, 6).map((v: any) => (
-              <div key={v.id} style={{ fontSize: '7pt', padding: '8px', background: '#f5f5f5' }}>
+              <div key={v.id} style={{ fontSize: '9px', padding: '8px', background: '#f5f5f5' }}>
                 <div style={{ fontWeight: 600 }}>
                   {v.year} {v.make} {v.model}
                 </div>
                 <div style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
                   {new Date(v.created_at).toLocaleString()}
                 </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '6pt', marginTop: '2px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '8px', marginTop: '2px' }}>
                   {v.origin_metadata?.source || 'unknown'}
                 </div>
               </div>
@@ -533,7 +533,7 @@ export default function ScraperDashboard() {
         return (
           <div key={category} style={{ marginBottom: '32px' }}>
             <h2 style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               marginBottom: '12px',
               textTransform: 'uppercase',
@@ -569,7 +569,7 @@ export default function ScraperDashboard() {
                   {/* Header */}
                   <div style={{ marginBottom: '12px' }}>
                     <div style={{
-                      fontSize: '10pt',
+                      fontSize: '13px',
                       fontWeight: 700,
                       marginBottom: '4px',
                       display: 'flex',
@@ -578,14 +578,14 @@ export default function ScraperDashboard() {
                     }}>
                       <span>{scraper.name}</span>
                       {scraper.status === 'running' && (
-                        <span style={{ fontSize: '7pt', color: '#3b82f6' }}>RUNNING...</span>
+                        <span style={{ fontSize: '9px', color: '#3b82f6' }}>RUNNING...</span>
                       )}
                       {scraper.status === 'error' && (
-                        <span style={{ fontSize: '7pt', color: '#ef4444' }}>ERROR</span>
+                        <span style={{ fontSize: '9px', color: '#ef4444' }}>ERROR</span>
                       )}
                     </div>
                     <div style={{
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       color: 'var(--text-muted)',
                       lineHeight: '1.4'
                     }}>
@@ -600,7 +600,7 @@ export default function ScraperDashboard() {
                       padding: '8px',
                       background: scraper.lastResult.success ? '#f0fdf4' : '#fef2f2',
                       border: `1px solid ${scraper.lastResult.success ? '#10b981' : '#ef4444'}`,
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       lineHeight: '1.4'
                     }}>
                       {scraper.lastResult.success ? (
@@ -633,7 +633,7 @@ export default function ScraperDashboard() {
                       marginBottom: '12px',
                       padding: '8px',
                       background: '#f5f5f5',
-                      fontSize: '8pt'
+                      fontSize: '11px'
                     }}>
                       <div>
                         <div style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PENDING</div>
@@ -670,7 +670,7 @@ export default function ScraperDashboard() {
                       className="button button-primary cursor-button"
                       style={{
                         flex: 1,
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         padding: '8px',
                         opacity: (!scraper.canTrigger || triggering === scraper.functionName) ? 0.5 : 1,
                         cursor: (!scraper.canTrigger || triggering === scraper.functionName) ? 'not-allowed' : 'pointer'
@@ -683,7 +683,7 @@ export default function ScraperDashboard() {
                   {/* Function Name & Last Run */}
                   <div style={{
                     marginTop: '8px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     color: 'var(--text-muted)',
                     display: 'flex',
                     justifyContent: 'space-between'
@@ -706,7 +706,7 @@ export default function ScraperDashboard() {
         padding: '16px',
         border: '2px solid #e5e5e5',
         background: '#f9f9f9',
-        fontSize: '8pt',
+        fontSize: '11px',
         lineHeight: '1.6'
       }}>
         <div style={{ fontWeight: 700, marginBottom: '8px' }}>DIAGNOSTICS</div>

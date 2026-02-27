@@ -114,7 +114,7 @@ const s = {
     maxWidth: '960px',
     margin: '0 auto',
     padding: 'var(--space-4)',
-    fontSize: '8pt',
+    fontSize: '11px',
     fontFamily: 'Arial, sans-serif',
     color: 'var(--text)',
   },
@@ -154,7 +154,7 @@ const s = {
     fontFamily: 'monospace',
   },
   statLabel: {
-    fontSize: '8pt',
+    fontSize: '11px',
     color: 'var(--text-muted)',
     marginTop: '2px',
   },
@@ -170,7 +170,7 @@ const s = {
     borderBottom: '1px solid var(--border-light)',
   },
   sectionSubtitle: {
-    fontSize: '8pt',
+    fontSize: '11px',
     color: 'var(--text-muted)',
     marginBottom: 'var(--space-4)',
     lineHeight: '1.4',
@@ -198,7 +198,7 @@ const s = {
     border: '1px solid var(--border-light)',
     padding: 'var(--space-3)',
     fontFamily: 'monospace',
-    fontSize: '8pt',
+    fontSize: '11px',
     overflow: 'auto' as const,
     whiteSpace: 'pre' as const,
     lineHeight: '1.5',
@@ -207,7 +207,7 @@ const s = {
     background: 'var(--grey-200)',
     padding: '1px 4px',
     fontFamily: 'monospace',
-    fontSize: '8pt',
+    fontSize: '11px',
     border: '1px solid var(--border-light)',
   },
   /* Search demo */
@@ -250,12 +250,12 @@ const s = {
   },
   searchSubtitle: {
     color: 'var(--text-muted)',
-    fontSize: '8pt',
+    fontSize: '11px',
   },
   typeBadge: {
     display: 'inline-block',
     padding: '1px 6px',
-    fontSize: '8pt',
+    fontSize: '11px',
     fontFamily: 'monospace',
     background: 'var(--grey-200)',
     border: '1px solid var(--border-light)',
@@ -263,7 +263,7 @@ const s = {
   },
   /* Buttons */
   buttonPrimary: {
-    fontSize: '8pt',
+    fontSize: '11px',
     padding: 'var(--space-2) var(--space-4)',
     background: 'var(--text)',
     color: 'var(--white)',
@@ -274,7 +274,7 @@ const s = {
     transition: 'all 0.12s ease',
   },
   buttonSecondary: {
-    fontSize: '8pt',
+    fontSize: '11px',
     padding: 'var(--space-2) var(--space-4)',
     background: 'var(--grey-200)',
     border: '2px outset var(--border-light)',
@@ -300,7 +300,7 @@ const s = {
     color: 'var(--text)',
     fontWeight: 'bold' as const,
     textDecoration: 'underline',
-    fontSize: '8pt',
+    fontSize: '11px',
   },
   /* Footer */
   footer: {

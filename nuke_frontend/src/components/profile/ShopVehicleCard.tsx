@@ -52,7 +52,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
     border: '1px solid #c0c0c0',
     padding: '1px 4px',
     borderRadius: '2px',
-    fontSize: '8pt',
+    fontSize: '11px',
     color: '#374151'
   };
 
@@ -79,20 +79,20 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         
         {/* Content */}
         <div style={{ padding: '8px' }}>
-          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
+          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>
             {title}
           </h3>
           {/* Price and Status */}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
             {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
-              <div className="text" style={{ fontSize: '8pt', color: '#3b82f6', fontWeight: 'bold' }}>
+              <div className="text" style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 'bold' }}>
                 {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
               </div>
             )}
             {vehicle.listing_status && (
               <span
                 style={{
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   padding: '2px 6px',
                   borderRadius: '2px',
                   fontWeight: 600,
@@ -147,12 +147,12 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         {/* Content */}
         <div style={{ padding: '8px' }}>
           {/* Title */}
-          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
+          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>
             {title}
           </h3>
           
           {/* Owner */}
-          <div className="text text-muted" style={{ fontSize: '8pt', marginBottom: '4px' }}>
+          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>
             {getUserDisplay()}
           </div>
           
@@ -224,22 +224,22 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         {/* Details */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Title */}
-          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
+          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>
             {title}
           </h3>
           
           {/* VIN */}
-          <div className="text text-muted" style={{ fontSize: '8pt', marginBottom: '2px' }}>
+          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '2px' }}>
             VIN: {vehicle.vin || 'Not provided'}
           </div>
           
           {/* Owner */}
-          <div className="text text-muted" style={{ fontSize: '8pt', marginBottom: '2px' }}>
+          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '2px' }}>
             Owner: {getUserDisplay()}
           </div>
           
           {/* Date */}
-          <div className="text text-muted" style={{ fontSize: '8pt', marginBottom: '4px' }}>
+          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>
             Added: {vehicle.created_at ? new Date(vehicle.created_at).toLocaleDateString() : 'Unknown'}
           </div>
           

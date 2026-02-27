@@ -158,7 +158,7 @@ const CraigslistQueueDashboard: React.FC = () => {
   if (loading && !stats) {
     return (
       <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <div style={{ fontSize: '8pt' }}>Loading queue data...</div>
+        <div style={{ fontSize: '11px' }}>Loading queue data...</div>
       </div>
     );
   }
@@ -172,10 +172,10 @@ const CraigslistQueueDashboard: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ fontSize: '8pt', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+          <h2 style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             Craigslist Squarebody Scraping Queue
           </h2>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Last updated: {lastUpdate.toLocaleTimeString()}
           </div>
         </div>
@@ -183,14 +183,14 @@ const CraigslistQueueDashboard: React.FC = () => {
           <button
             onClick={triggerDiscovery}
             className="button button-primary cursor-button"
-            style={{ padding: '8px 16px', fontSize: '8pt' }}
+            style={{ padding: '8px 16px', fontSize: '11px' }}
           >
             TRIGGER DISCOVERY
           </button>
           <button
             onClick={triggerProcessing}
             className="button button-primary cursor-button"
-            style={{ padding: '8px 16px', fontSize: '8pt' }}
+            style={{ padding: '8px 16px', fontSize: '11px' }}
           >
             PROCESS QUEUE
           </button>
@@ -198,7 +198,7 @@ const CraigslistQueueDashboard: React.FC = () => {
             <button
               onClick={retryFailed}
               className="button button-secondary cursor-button"
-              style={{ padding: '8px 16px', fontSize: '8pt', color: 'var(--warning)' }}
+              style={{ padding: '8px 16px', fontSize: '11px', color: 'var(--warning)' }}
             >
               RETRY FAILED ({stats.failed})
             </button>
@@ -210,55 +210,55 @@ const CraigslistQueueDashboard: React.FC = () => {
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '24px' }}>
           <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
               Pending
             </div>
-            <div style={{ fontSize: '16pt', fontWeight: '700', color: 'var(--warning)' }}>
+            <div style={{ fontSize: '21px', fontWeight: '700', color: 'var(--warning)' }}>
               {stats.pending.toLocaleString()}
             </div>
           </div>
 
           <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
               Processing
             </div>
-            <div style={{ fontSize: '16pt', fontWeight: '700', color: 'var(--accent)' }}>
+            <div style={{ fontSize: '21px', fontWeight: '700', color: 'var(--accent)' }}>
               {stats.processing.toLocaleString()}
             </div>
           </div>
 
           <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
               Complete
             </div>
-            <div style={{ fontSize: '16pt', fontWeight: '700', color: 'var(--success)' }}>
+            <div style={{ fontSize: '21px', fontWeight: '700', color: 'var(--success)' }}>
               {stats.complete.toLocaleString()}
             </div>
           </div>
 
           <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
               Failed
             </div>
-            <div style={{ fontSize: '16pt', fontWeight: '700', color: 'var(--error)' }}>
+            <div style={{ fontSize: '21px', fontWeight: '700', color: 'var(--error)' }}>
               {stats.failed.toLocaleString()}
             </div>
           </div>
 
           <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
               Skipped
             </div>
-            <div style={{ fontSize: '16pt', fontWeight: '700', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '21px', fontWeight: '700', color: 'var(--text-muted)' }}>
               {stats.skipped.toLocaleString()}
             </div>
           </div>
 
           <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
               Total
             </div>
-            <div style={{ fontSize: '16pt', fontWeight: '700', color: 'var(--text)' }}>
+            <div style={{ fontSize: '21px', fontWeight: '700', color: 'var(--text)' }}>
               {stats.total.toLocaleString()}
             </div>
           </div>
@@ -269,10 +269,10 @@ const CraigslistQueueDashboard: React.FC = () => {
       {stats && stats.total > 0 && (
         <div className="card" style={{ padding: '16px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <div style={{ fontSize: '8pt', fontWeight: '700', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase' }}>
               Processing Progress
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               {stats.complete} / {stats.total} ({percentComplete}%)
             </div>
           </div>
@@ -296,11 +296,11 @@ const CraigslistQueueDashboard: React.FC = () => {
 
       {/* Recent Activity */}
       <div className="card" style={{ padding: '16px' }}>
-        <div style={{ fontSize: '8pt', fontWeight: '700', textTransform: 'uppercase', marginBottom: '16px' }}>
+        <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', marginBottom: '16px' }}>
           Recent Activity
         </div>
         {recentActivity.length === 0 ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
             No activity yet
           </div>
         ) : (
@@ -313,7 +313,7 @@ const CraigslistQueueDashboard: React.FC = () => {
                   backgroundColor: 'var(--bg-secondary)',
                   borderRadius: '4px',
                   border: '1px solid var(--border-light)',
-                  fontSize: '8pt'
+                  fontSize: '11px'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
@@ -322,7 +322,7 @@ const CraigslistQueueDashboard: React.FC = () => {
                       {item.listing_url}
                     </div>
                     {item.error_message && (
-                      <div style={{ color: 'var(--error)', fontSize: '7pt', marginTop: '4px' }}>
+                      <div style={{ color: 'var(--error)', fontSize: '9px', marginTop: '4px' }}>
                         Error: {item.error_message}
                       </div>
                     )}
@@ -331,7 +331,7 @@ const CraigslistQueueDashboard: React.FC = () => {
                     <div style={{
                       padding: '2px 6px',
                       borderRadius: '2px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: '700',
                       backgroundColor:
                         item.status === 'complete' ? 'var(--success)' :
@@ -343,7 +343,7 @@ const CraigslistQueueDashboard: React.FC = () => {
                     }}>
                       {item.status.toUpperCase()}
                     </div>
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       {item.processed_at
                         ? new Date(item.processed_at).toLocaleString()
                         : new Date(item.created_at).toLocaleString()}

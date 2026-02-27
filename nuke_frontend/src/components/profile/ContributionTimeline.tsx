@@ -314,7 +314,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                           alignItems: 'center',
                           justifyContent: 'center',
                           flex: '0 0 auto',
-                          fontSize: '9pt',
+                          fontSize: '12px',
                           fontWeight: 800,
                         }}
                       >
@@ -346,7 +346,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                             aria-pressed={targetYear === y}
                             style={{
                               padding: '2px 6px',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               lineHeight: '16px',
                               height: 20,
                               whiteSpace: 'nowrap',
@@ -373,7 +373,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                           alignItems: 'center',
                           justifyContent: 'center',
                           flex: '0 0 auto',
-                          fontSize: '9pt',
+                          fontSize: '12px',
                           fontWeight: 800,
                         }}
                       >
@@ -404,7 +404,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                             style={{
                               gridColumn: `${startWeek + 1} / span ${monthWidth}`,
                               textAlign: 'center',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               color: '#888888',
                               lineHeight: '8px'
                             }}
@@ -574,11 +574,11 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                       currentDate.setDate(currentDate.getDate() - 1);
                       handleDayClick(currentDate);
                     }}
-                    style={{ fontSize: '8pt', fontWeight: 700 }}
+                    style={{ fontSize: '11px', fontWeight: 700 }}
                   >
                     PREV DAY
                   </button>
-                  <h4 style={{ fontSize: '8pt', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+                  <h4 style={{ fontSize: '11px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
                     {new Date(selectedDayContributions[0].contribution_date).toLocaleDateString('en-US', {
                       month: 'numeric',
                       day: 'numeric',
@@ -593,7 +593,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                       currentDate.setDate(currentDate.getDate() + 1);
                       handleDayClick(currentDate);
                     }}
-                    style={{ fontSize: '8pt', fontWeight: 700 }}
+                    style={{ fontSize: '11px', fontWeight: 700 }}
                   >
                     NEXT DAY
                   </button>
@@ -604,7 +604,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                     e.stopPropagation();
                     setShowDayPopup(false);
                   }}
-                  style={{ fontSize: '8pt', fontWeight: 700 }}
+                  style={{ fontSize: '11px', fontWeight: 700 }}
                 >
                   CLOSE
                 </button>
@@ -672,24 +672,24 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                               {metadata.title || metadata.event_type?.replace('_', ' ') || contribution.contribution_type.replace('_', ' ')}
                             </div>
                             {metadata.description && (
-                              <div className="text text-muted" style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                              <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>
                                 {metadata.description}
                               </div>
                             )}
                             {/* Show intelligent analysis if available */}
                             {metadata.ai_analysis && (
                               <div style={{
-                                fontSize: '8pt',
+                                fontSize: '11px',
                                 padding: '6px',
                                 backgroundColor: '#e8f4f8',
                                 border: '1px solid #4a90e2',
                                 borderRadius: '3px',
                                 marginTop: '4px'
                               }}>
-                                <div style={{ fontWeight: 'bold', color: '#1a5490', marginBottom: '2px', fontSize: '8pt' }}>
+                                <div style={{ fontWeight: 'bold', color: '#1a5490', marginBottom: '2px', fontSize: '11px' }}>
                                   AI Analysis
                                 </div>
-                                <div style={{ color: '#475569', fontSize: '8pt' }}>
+                                <div style={{ color: '#475569', fontSize: '11px' }}>
                                   {metadata.ai_analysis.summary}
                                 </div>
                               </div>

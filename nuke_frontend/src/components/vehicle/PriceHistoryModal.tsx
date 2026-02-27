@@ -19,7 +19,7 @@ interface HistoryRow {
   outlier_reason?: string | null;
 }
 
-const to8 = { fontSize: '8pt' } as const;
+const to8 = { fontSize: '11px' } as const;
 const modalStyle: React.CSSProperties = {
   position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
   background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
@@ -146,7 +146,7 @@ const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({ vehicleId, isOpen
                         ) : (
                           <button
                             className="button button-small"
-                            style={{ fontSize: '7pt', padding: '2px 6px' }}
+                            style={{ fontSize: '9px', padding: '2px 6px' }}
                             disabled={Boolean(r.is_outlier) || pinningId === r.id}
                             onClick={() => handlePinBaseline(r)}
                             title={r.is_outlier ? 'Cannot pin an outlier' : 'Pin as 30D baseline'}

@@ -137,7 +137,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
             alignItems: 'center'
           }}
         >
-          <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+          <div style={{ fontSize: '13px', fontWeight: 700 }}>
             NUKE PLATFORM - FEATURE SHOWCASE
           </div>
           <button
@@ -146,7 +146,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
               background: 'none',
               border: 'none',
               color: 'var(--white)',
-              fontSize: '16pt',
+              fontSize: '21px',
               cursor: 'pointer',
               padding: '0 var(--space-2)',
               lineHeight: 1
@@ -193,7 +193,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 'var(--space-4)',
-              fontSize: '64pt'
+              fontSize: '85px'
             }}
           >
             {slide.visual}
@@ -202,7 +202,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
           {/* Title */}
           <h2
             style={{
-              fontSize: '16pt',
+              fontSize: '21px',
               fontWeight: 700,
               marginBottom: 'var(--space-2)',
               color: 'var(--grey-900)'
@@ -214,7 +214,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
           {/* Description */}
           <p
             style={{
-              fontSize: '10pt',
+              fontSize: '13px',
               marginBottom: 'var(--space-4)',
               color: 'var(--text)',
               lineHeight: 1.6
@@ -233,7 +233,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
                   alignItems: 'start',
                   gap: 'var(--space-2)',
                   marginBottom: 'var(--space-2)',
-                  fontSize: '9pt'
+                  fontSize: '12px'
                 }}
               >
                 <div
@@ -253,7 +253,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
           {/* Slide Counter */}
           <div
             style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--text-muted)',
               textAlign: 'center',
               marginBottom: 'var(--space-4)'
@@ -281,7 +281,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
             disabled={currentSlide === 0}
             className="button"
             style={{
-              fontSize: '9pt',
+              fontSize: '12px',
               padding: 'var(--space-2) var(--space-3)',
               opacity: currentSlide === 0 ? 0.3 : 1,
               cursor: currentSlide === 0 ? 'not-allowed' : 'pointer'
@@ -297,7 +297,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
                 onClick={handleSignUp}
                 className="button button-primary"
                 style={{
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   padding: 'var(--space-2) var(--space-4)',
                   fontWeight: 700
                 }}
@@ -308,7 +308,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
                 onClick={handleSignIn}
                 className="button"
                 style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   padding: 'var(--space-2) var(--space-3)'
                 }}
               >
@@ -321,7 +321,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
                 onClick={handleSignUp}
                 className="button button-primary"
                 style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   padding: 'var(--space-2) var(--space-3)'
                 }}
               >
@@ -336,7 +336,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
             disabled={currentSlide === slides.length - 1}
             className="button"
             style={{
-              fontSize: '9pt',
+              fontSize: '12px',
               padding: 'var(--space-2) var(--space-3)',
               opacity: currentSlide === slides.length - 1 ? 0.3 : 1,
               cursor: currentSlide === slides.length - 1 ? 'not-allowed' : 'pointer'

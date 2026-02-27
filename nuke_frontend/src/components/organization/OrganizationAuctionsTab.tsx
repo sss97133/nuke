@@ -308,7 +308,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '40px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
         Loading auctions...
       </div>
     );
@@ -319,20 +319,20 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
       <div className="card" style={{ marginBottom: '12px' }}>
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontWeight: 700 }}>Auctions</span>
-          <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Live {liveCount} · Sold {soldCount} · Unsold {unsoldCount} · Total {rows.length}
           </span>
         </div>
         <div className="card-body" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Results</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Results</span>
             {(['all', 'sold', 'unsold'] as const).map((k) => (
               <button
                 key={k}
                 className="button button-secondary button-small"
                 onClick={() => setSoldFilter(k)}
                 style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   borderRadius: 0,
                   border: soldFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
                   color: soldFilter === k ? 'var(--accent)' : 'var(--text)',
@@ -344,14 +344,14 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
           </div>
 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Status</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Status</span>
             {(['live', 'ended', 'all'] as const).map((k) => (
               <button
                 key={k}
                 className="button button-secondary button-small"
                 onClick={() => setStatusFilter(k)}
                 style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   borderRadius: 0,
                   border: statusFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
                   color: statusFilter === k ? 'var(--accent)' : 'var(--text)',
@@ -363,14 +363,14 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
           </div>
 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Reserve</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Reserve</span>
             {(['all', 'reserve', 'no_reserve'] as const).map((k) => (
               <button
                 key={k}
                 className="button button-secondary button-small"
                 onClick={() => setReserveFilter(k)}
                 style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   borderRadius: 0,
                   border: reserveFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
                   color: reserveFilter === k ? 'var(--accent)' : 'var(--text)',
@@ -391,7 +391,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
             style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
             title={`${cardsPerRow} per row`}
           >
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: '"MS Sans Serif", sans-serif' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: '"MS Sans Serif", sans-serif' }}>
               {cardsPerRow}/row
             </div>
             <input
@@ -413,7 +413,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
                 }}
                 style={{
                   padding: '1px 6px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   border: '1px solid var(--border)',
                   background: thumbFitMode === 'square' ? 'var(--grey-600)' : 'var(--grey-200)',
                   color: thumbFitMode === 'square' ? 'var(--white)' : 'var(--text)',
@@ -433,7 +433,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
                 }}
                 style={{
                   padding: '1px 6px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   border: '1px solid var(--border)',
                   background: thumbFitMode === 'original' ? 'var(--grey-600)' : 'var(--grey-200)',
                   color: thumbFitMode === 'original' ? 'var(--white)' : 'var(--text)',
@@ -452,7 +452,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
 
       {filtered.length === 0 ? (
         <div className="card">
-          <div className="card-body" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+          <div className="card-body" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
             No auctions match these filters.
           </div>
         </div>

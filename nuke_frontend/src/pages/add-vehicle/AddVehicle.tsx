@@ -1550,7 +1550,7 @@ Redirecting to vehicle profile...`);
                         value={detailLevel}
                         onChange={(e) => setDetailLevel(e.target.value as DetailLevel)}
                         style={{ 
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           padding: '2px 4px',
                           border: '1px solid var(--border-medium)',
                           backgroundColor: 'var(--grey-100)'
@@ -1566,7 +1566,7 @@ Redirecting to vehicle profile...`);
                         type="button"
                         onClick={() => setShowTitleScan(true)}
                         className="button button-secondary"
-                        style={{ fontSize: '8pt', padding: '2px 6px' }}
+                        style={{ fontSize: '11px', padding: '2px 6px' }}
                       >
                         Scan Title
                       </button>
@@ -1626,14 +1626,14 @@ Redirecting to vehicle profile...`);
                       }}>
                         <div>
                           <div style={{ fontWeight: 700 }}>Already in the database</div>
-                          <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                             {vinMatchedVehicle.year} {vinMatchedVehicle.make} {vinMatchedVehicle.model} — VIN matched
                           </div>
                         </div>
                         <button
                           type="button"
                           className="button button-primary"
-                          style={{ fontSize: '8pt', whiteSpace: 'nowrap' }}
+                          style={{ fontSize: '11px', whiteSpace: 'nowrap' }}
                           onClick={() => navigate(`/vehicle/${vinMatchedVehicle.id}`)}
                         >
                           View Vehicle →
@@ -1812,7 +1812,7 @@ Redirecting to vehicle profile...`);
                     onClick={() => fileInputRef.current?.click()}
                     className="button button-primary w-full mb-3"
                     style={{ 
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       minHeight: '44px',
                       fontWeight: 'bold'
                     }}
@@ -1826,7 +1826,7 @@ Redirecting to vehicle profile...`);
                   </button>
                   
                   <div style={{
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     textAlign: 'center',
                     color: 'var(--text-muted)',
                     marginBottom: 'var(--space-2)'
@@ -1838,7 +1838,7 @@ Redirecting to vehicle profile...`);
                   {extractedImages.length > 0 && (
                     <>
                       <div style={{
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         textAlign: 'center',
                         color: 'var(--text-success)',
                         marginBottom: 'var(--space-2)',
@@ -1883,7 +1883,7 @@ Redirecting to vehicle profile...`);
                               />
                               {dateTaken && (
                                 <div style={{ 
-                                  fontSize: '7pt', 
+                                  fontSize: '9px', 
                                   textAlign: 'center', 
                                   marginTop: '2px',
                                   color: 'var(--text-muted)'
@@ -1901,7 +1901,7 @@ Redirecting to vehicle profile...`);
                       
                       {extractedImages.length > 20 && (
                         <div style={{
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           textAlign: 'center',
                           color: 'var(--text-muted)',
                           fontStyle: 'italic'
@@ -1947,19 +1947,19 @@ Redirecting to vehicle profile...`);
                       </div>
                     ) : isDragging ? (
                       <div>
-                        <div className="text font-medium text-blue-600 mb-1" style={{ fontSize: '9pt' }}>
+                        <div className="text font-medium text-blue-600 mb-1" style={{ fontSize: '12px' }}>
                           Drop images now
                         </div>
-                        <p className="text-small text-muted" style={{ fontSize: '8pt' }}>
+                        <p className="text-small text-muted" style={{ fontSize: '11px' }}>
                           Release to upload
                         </p>
                       </div>
                     ) : (
                       <div>
-                        <div className="text font-medium text-grey-900 mb-1" style={{ fontSize: '8pt' }}>
+                        <div className="text font-medium text-grey-900 mb-1" style={{ fontSize: '11px' }}>
                           Drag &amp; Drop Images Here
                         </div>
-                        <p className="text-small text-muted" style={{ fontSize: '8pt' }}>
+                        <p className="text-small text-muted" style={{ fontSize: '11px' }}>
                           Accepts: JPG, PNG, HEIC, WebP • Max 300 images
                         </p>
                       </div>
@@ -2007,7 +2007,7 @@ Redirecting to vehicle profile...`);
                   display: 'grid', 
                   gridTemplateColumns: 'repeat(2, 1fr)', 
                   gap: 'var(--space-3)',
-                  fontSize: '8pt'
+                  fontSize: '11px'
                 }}>
                   <div>
                     <div className="text-small text-muted font-bold">Basic Information</div>
@@ -2034,7 +2034,7 @@ Redirecting to vehicle profile...`);
                 {extractedImages.length > 0 && (
                   <div style={{ marginTop: 'var(--space-3)' }}>
                     <div className="text-small text-muted font-bold">Vehicle Images ({extractedImages.length})</div>
-                    <div className="text-small text-muted" style={{ fontSize: '8pt', marginTop: 'var(--space-1)' }}>
+                    <div className="text-small text-muted" style={{ fontSize: '11px', marginTop: 'var(--space-1)' }}>
                       Images will upload in the background after vehicle creation. You can navigate the site while uploads continue.
                       {extractedImages.length > 12 && ' (Showing first 12 preview thumbnails)'}
                     </div>
@@ -2068,7 +2068,7 @@ Redirecting to vehicle profile...`);
                               loading="lazy"
                             />
                             {dateTaken && (
-                              <div className="text-muted" style={{ fontSize: '7pt', textAlign: 'center' }}>
+                              <div className="text-muted" style={{ fontSize: '9px', textAlign: 'center' }}>
                                 {dateTaken.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
                               </div>
                             )}
@@ -2078,7 +2078,7 @@ Redirecting to vehicle profile...`);
                     </div>
                     {extractedImages.length > 12 && (
                       <div style={{
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         textAlign: 'center',
                         color: 'var(--text-muted)',
                         marginTop: 'var(--space-2)',
@@ -2097,7 +2097,7 @@ Redirecting to vehicle profile...`);
                       marginTop: 'var(--space-1)',
                       padding: 'var(--space-2)',
                       backgroundColor: 'var(--grey-100)',
-                      fontSize: '8pt'
+                      fontSize: '11px'
                     }}>
                       {formData.notes}
                     </div>

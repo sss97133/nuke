@@ -133,7 +133,7 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
       padding: '8px', 
       backgroundColor: 'var(--surface)', 
       border: '1px solid #bdbdbd',
-      fontSize: '8pt'
+      fontSize: '11px'
     }}>
       <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
         My Relationship to This Vehicle:
@@ -172,14 +172,14 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
             />
             <div>
               <div style={{ fontWeight: 'bold' }}>{option.label}</div>
-              <div style={{ fontSize: '7pt', color: '#757575' }}>{option.description}</div>
+              <div style={{ fontSize: '9px', color: '#757575' }}>{option.description}</div>
             </div>
           </label>
         ))}
       </div>
       
       {updating && (
-        <div style={{ marginTop: '6px', fontSize: '7pt', color: '#757575' }}>
+        <div style={{ marginTop: '6px', fontSize: '9px', color: '#757575' }}>
           Updating...
         </div>
       )}
@@ -188,7 +188,7 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
         <div style={{ 
           marginTop: '6px', 
           padding: '6px',
-          fontSize: '7pt', 
+          fontSize: '9px', 
           color: '#dc2626',
           background: '#fee2e2',
           border: '1px solid #dc2626',
@@ -202,7 +202,7 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
         <div style={{ 
           marginTop: '6px', 
           padding: '6px',
-          fontSize: '7pt', 
+          fontSize: '9px', 
           color: '#15803d',
           background: '#dcfce7',
           border: '1px solid #15803d',

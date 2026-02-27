@@ -193,7 +193,7 @@ export default function AuctionTrendsDashboard() {
           color: sentimentConfig.text,
           borderRadius: '4px',
           display: 'inline-block',
-          fontSize: '10pt',
+          fontSize: '13px',
           fontWeight: 700,
         }}>
           {sentimentConfig.label} ({score})
@@ -283,7 +283,7 @@ export default function AuctionTrendsDashboard() {
               onMouseLeave={() => setSelectedPlatform(null)}
             >
               <div style={{ width: '12px', height: '3px', background: color }} />
-              <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                 {(PLATFORM_DISPLAY[platform]?.name || platform).split(' ')[0]}
               </span>
             </div>
@@ -321,13 +321,13 @@ export default function AuctionTrendsDashboard() {
           })}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-          <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>12AM</span>
-          <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>6AM</span>
-          <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>12PM</span>
-          <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>6PM</span>
-          <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>12AM</span>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>12AM</span>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>6AM</span>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>12PM</span>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>6PM</span>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>12AM</span>
         </div>
-        <div style={{ marginTop: 'var(--space-2)', fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <div style={{ marginTop: 'var(--space-2)', fontSize: '11px', color: 'var(--text-muted)' }}>
           Peak hours: {peak_hours.map(h => formatHour(h)).join(', ')} (UTC)
         </div>
       </div>
@@ -375,7 +375,7 @@ export default function AuctionTrendsDashboard() {
             strokeWidth="1.5"
           />
         </svg>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
           <span>{prices[prices.length - 1]?.week?.slice(5) || ''}</span>
           <span style={{ color, fontWeight: 600 }}>
             {priceDirection >= 0 ? '+' : ''}{priceDirection.toFixed(1)}%
@@ -395,8 +395,8 @@ export default function AuctionTrendsDashboard() {
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Auction Trends</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Auction Trends</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
             Market sentiment & platform activity
           </div>
         </div>
@@ -404,14 +404,14 @@ export default function AuctionTrendsDashboard() {
           className="button button-secondary"
           onClick={() => void loadData()}
           disabled={loading}
-          style={{ fontSize: '8pt' }}
+          style={{ fontSize: '11px' }}
         >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
 
       {error && (
-        <div style={{ marginTop: 'var(--space-3)', fontSize: '8pt', color: '#b91c1c' }}>
+        <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: '#b91c1c' }}>
           {error}
         </div>
       )}
@@ -429,11 +429,11 @@ export default function AuctionTrendsDashboard() {
           }}>
             {/* Sentiment Gauge */}
             <div>
-              <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
                 Market Sentiment
               </div>
               <SentimentGauge score={data.market_sentiment.score} label={data.market_sentiment.label} />
-              <div style={{ marginTop: 'var(--space-3)', fontSize: '7pt', color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: 'var(--space-3)', fontSize: '9px', color: 'var(--text-muted)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                   <span>Bid Activity:</span>
                   <span style={{ fontWeight: 600 }}>{data.market_sentiment.components.bid_ratio}x baseline</span>
@@ -450,11 +450,11 @@ export default function AuctionTrendsDashboard() {
 
             {/* Price Trend */}
             <div>
-              <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
                 Weekly Average Sale Price
               </div>
               <PriceTrendChart />
-              <div style={{ marginTop: 'var(--space-2)', fontSize: '7pt', color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: 'var(--space-2)', fontSize: '9px', color: 'var(--text-muted)' }}>
                 Current avg: {formatPrice(data.market_sentiment.weekly_price_trend[0]?.avg_price || 0)}
                 <span style={{ marginLeft: '8px' }}>
                   ({data.market_sentiment.weekly_price_trend[0]?.sales_count || 0} sales)
@@ -465,7 +465,7 @@ export default function AuctionTrendsDashboard() {
 
           {/* Source Leaderboard */}
           <div style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
               Source Leaderboard - Live Auctions
             </div>
             {data.source_leaderboard.slice(0, 6).map((platform) => {
@@ -475,7 +475,7 @@ export default function AuctionTrendsDashboard() {
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     marginBottom: '2px',
                   }}>
                     <span style={{ color: 'var(--text-muted)' }}>{config.name}</span>
@@ -507,7 +507,7 @@ export default function AuctionTrendsDashboard() {
 
           {/* Platform Activity Over Time */}
           <div style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
               New Listings by Platform (14 days)
             </div>
             <PlatformActivityChart />
@@ -515,7 +515,7 @@ export default function AuctionTrendsDashboard() {
 
           {/* Hourly Activity */}
           <div style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
               Daily Activity - Auction Endings by Hour
             </div>
             <HourlyActivityChart />
@@ -527,7 +527,7 @@ export default function AuctionTrendsDashboard() {
               paddingTop: 'var(--space-3)',
               borderTop: '1px solid var(--border-light)',
             }}>
-              <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
                 S-Tier Quality Weighting
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
@@ -538,7 +538,7 @@ export default function AuctionTrendsDashboard() {
                       padding: 'var(--space-2)',
                       background: 'var(--grey-50)',
                       border: '1px solid var(--border-light)',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                     }}
                   >
                     <div style={{ fontWeight: 600, color: 'var(--text)' }}>
@@ -567,7 +567,7 @@ export default function AuctionTrendsDashboard() {
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
             gap: 'var(--space-2)',
-            fontSize: '7pt',
+            fontSize: '9px',
           }}>
             <div>
               <div style={{ color: 'var(--text-muted)' }}>Recent Avg Bids</div>
@@ -590,7 +590,7 @@ export default function AuctionTrendsDashboard() {
           {data.generated_at && (
             <div style={{
               marginTop: 'var(--space-3)',
-              fontSize: '7pt',
+              fontSize: '9px',
               color: 'var(--text-muted)',
               textAlign: 'right',
             }}>

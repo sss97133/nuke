@@ -87,7 +87,7 @@ export default function PortfolioWithdraw() {
               <span>Withdraw Cash</span>
               <button
                 className="button button-secondary"
-                style={{ fontSize: '8pt' }}
+                style={{ fontSize: '11px' }}
                 onClick={() => navigate('/portfolio')}
               >
                 Back to Portfolio
@@ -98,7 +98,7 @@ export default function PortfolioWithdraw() {
               {!loading && balance && (
                 <div style={{ marginBottom: '16px' }}>
                   <div className="text-small text-muted">Available balance</div>
-                  <div style={{ fontSize: '16pt', fontWeight: 700, color: 'var(--accent)' }}>
+                  <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--accent)' }}>
                     {CashBalanceService.formatCurrency(balance.available_cents)}
                   </div>
                 </div>

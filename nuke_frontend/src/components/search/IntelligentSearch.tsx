@@ -1880,7 +1880,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             onFocus={(e) => { setShowSuggestions(true); e.currentTarget.style.borderColor = '#3b82f6'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = '#000'; setTimeout(() => setShowSuggestions(false), 200); }}
             style={{
-              fontSize: '10pt',
+              fontSize: '13px',
               padding: queryIsUrl ? '10px 68px 10px 28px' : '10px 68px 10px 14px',
               background: '#fff',
               border: '2px solid #000',
@@ -1904,7 +1904,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                 top: '50%',
                 transform: 'translateY(-50%)',
                 padding: '2px 6px',
-                fontSize: '10pt',
+                fontSize: '13px',
                 lineHeight: 1,
                 border: 'none',
                 background: 'transparent',
@@ -1932,7 +1932,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
               top: '0',
               bottom: '0',
               padding: '0 16px',
-              fontSize: '8.5pt',
+              fontSize: '11px',
               fontWeight: 700,
               border: 'none',
               borderLeft: '2px solid #000',
@@ -1969,7 +1969,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           {/* Autocomplete Results */}
           {autocompleteResults.length > 0 && (
             <div style={{ padding: '8px 0' }}>
-              <div style={{ padding: '4px 16px', fontSize: '8pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
+              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
                 Quick Results
               </div>
               {autocompleteResults.map((result, index) => (
@@ -1991,7 +1991,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   style={{
                     padding: '8px 16px',
                     cursor: 'pointer',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     borderBottom: '1px solid #e5e7eb',
                     background: selectedSuggestionIndex === index ? '#f0f0f0' : 'white',
                     display: 'flex',
@@ -2002,7 +2002,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   onMouseLeave={() => setSelectedSuggestionIndex(-1)}
                 >
                   <span style={{
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 700,
                     color: '#000',
                     minWidth: '20px'
@@ -2012,7 +2012,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <span>{result.title}</span>
                     {result.type === 'user' && result.metadata?.subtitle && (
-                      <span style={{ fontSize: '7pt', color: '#666', marginTop: '2px' }}>
+                      <span style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
                         {result.metadata.subtitle}
                       </span>
                     )}
@@ -2025,7 +2025,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           {/* Suggestions */}
           {suggestions.length > 0 && (
             <div style={{ padding: '8px 0', borderTop: autocompleteResults.length > 0 ? '1px solid #e5e7eb' : 'none' }}>
-              <div style={{ padding: '4px 16px', fontSize: '8pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
+              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
                 Suggestions
               </div>
               {suggestions.map((suggestion, index) => (
@@ -2035,7 +2035,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   style={{
                     padding: '8px 16px',
                     cursor: 'pointer',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     borderBottom: '1px solid #e5e7eb'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
@@ -2050,7 +2050,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           {/* Recent Searches */}
           {searchHistory.length > 0 && (
             <div style={{ padding: '8px 0', borderTop: (autocompleteResults.length > 0 || suggestions.length > 0) ? '1px solid #e5e7eb' : 'none' }}>
-              <div style={{ padding: '4px 16px', fontSize: '8pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
+              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
                 Recent Searches
               </div>
               {searchHistory.slice(0, 5).map((historyQuery, index) => (
@@ -2060,7 +2060,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   style={{
                     padding: '8px 16px',
                     cursor: 'pointer',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     color: '#666'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}

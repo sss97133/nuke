@@ -403,7 +403,7 @@ export function ModelHarnessAnnotator({
   return (
     <div className="card" style={{ padding: '12px' }}>
       <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>3D harness drafting (MVP)</div>
-      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', lineHeight: 1.35, marginBottom: '10px' }}>
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.35, marginBottom: '10px' }}>
         Upload a GLB (or FBX, which we auto-convert), click the model to place named points (grommets/clamps/connectors), then export an annotation JSON (with slack) for a cut list workflow.
       </div>
 
@@ -413,12 +413,12 @@ export function ModelHarnessAnnotator({
         </button>
         <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileChange} />
 
-        <label style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '8pt' }}>
+        <label style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '11px' }}>
           Units
           <select
             value={unitHint}
             onChange={(e) => setUnitHint(e.target.value as any)}
-            style={{ fontSize: '8pt', padding: '2px 6px', border: '2px solid var(--border)', borderRadius: '2px' }}
+            style={{ fontSize: '11px', padding: '2px 6px', border: '2px solid var(--border)', borderRadius: '2px' }}
           >
             <option value="unknown">unknown</option>
             <option value="inches">inches</option>
@@ -427,13 +427,13 @@ export function ModelHarnessAnnotator({
           </select>
         </label>
 
-        <label style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '8pt' }}>
+        <label style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '11px' }}>
           Slack
           <input
             type="number"
             value={slackInches}
             onChange={(e) => setSlackInches(Number(e.target.value || 0))}
-            style={{ width: '80px', fontSize: '8pt', padding: '2px 6px', border: '2px solid var(--border)', borderRadius: '2px' }}
+            style={{ width: '80px', fontSize: '11px', padding: '2px 6px', border: '2px solid var(--border)', borderRadius: '2px' }}
           />
           in
         </label>
@@ -448,17 +448,17 @@ export function ModelHarnessAnnotator({
           value={importUrl}
           onChange={(e) => setImportUrl(e.target.value)}
           placeholder="Paste signed URL (.fbx or .glb) to import"
-          style={{ flex: 1, minWidth: '240px', fontSize: '8pt', padding: '6px', border: '2px solid var(--border)', borderRadius: '2px' }}
+          style={{ flex: 1, minWidth: '240px', fontSize: '11px', padding: '6px', border: '2px solid var(--border)', borderRadius: '2px' }}
           disabled={!userId || isBusy}
         />
         <button type="button" className="button-win95" onClick={importFromSignedUrl} disabled={!userId || isBusy || !importUrl.trim()}>
           Import URL
         </button>
-        {isBusy ? <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Working…</span> : null}
+        {isBusy ? <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Working…</span> : null}
       </div>
 
       {modelError && (
-        <div style={{ marginBottom: '10px', padding: '8px', background: '#ffebee', border: '1px solid #f44336', borderRadius: '2px', fontSize: '8pt', color: '#c62828' }}>
+        <div style={{ marginBottom: '10px', padding: '8px', background: '#ffebee', border: '1px solid #f44336', borderRadius: '2px', fontSize: '11px', color: '#c62828' }}>
           {modelError}
         </div>
       )}
@@ -478,28 +478,28 @@ export function ModelHarnessAnnotator({
               <OrbitControls makeDefault />
             </Canvas>
           </div>
-          <div style={{ padding: '6px 8px', fontSize: '7pt', color: '#cbd5e1', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ padding: '6px 8px', fontSize: '9px', color: '#cbd5e1', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
             {modelPath ? `Model: ${modelPath}` : 'No model loaded. Upload a GLB to start.'}
           </div>
         </div>
 
         <div>
-          <div style={{ fontWeight: 'bold', fontSize: '8pt', marginBottom: '6px' }}>Points</div>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.35 }}>
+          <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '6px' }}>Points</div>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.35 }}>
             Click the model to stage a point, name it, then add it to the list. Use names like <span style={{ fontWeight: 600 }}>HP_FIREWALL_GROMMET_MAIN</span>.
           </div>
 
           {pendingPoint && (
             <div className="card" style={{ padding: '8px', marginBottom: '10px' }}>
-              <div style={{ fontSize: '8pt', fontWeight: 600, marginBottom: '6px' }}>Staged point</div>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '6px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>Staged point</div>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 [{pendingPoint.map((n) => n.toFixed(4)).join(', ')}]
               </div>
               <input
                 value={pendingName}
                 onChange={(e) => setPendingName(e.target.value)}
                 placeholder="HP_..."
-                style={{ width: '100%', fontSize: '8pt', padding: '6px', border: '2px solid var(--border)', borderRadius: '2px', marginBottom: '8px' }}
+                style={{ width: '100%', fontSize: '11px', padding: '6px', border: '2px solid var(--border)', borderRadius: '2px', marginBottom: '8px' }}
               />
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="button" className="button-win95" onClick={addPendingPoint}>
@@ -513,18 +513,18 @@ export function ModelHarnessAnnotator({
           )}
 
           {points.length === 0 ? (
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>No points yet.</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No points yet.</div>
           ) : (
             <div style={{ display: 'grid', gap: '6px' }}>
               {points.slice().reverse().map((p) => (
                 <div key={p.id} className="card" style={{ padding: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'baseline' }}>
-                    <div style={{ fontSize: '8pt', fontWeight: 600 }}>{p.name}</div>
+                    <div style={{ fontSize: '11px', fontWeight: 600 }}>{p.name}</div>
                     <button type="button" className="button-win95" onClick={() => removePoint(p.id)} style={{ padding: '2px 6px' }}>
                       Delete
                     </button>
                   </div>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                     [{p.position.map((n) => n.toFixed(4)).join(', ')}]
                   </div>
                 </div>

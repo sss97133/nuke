@@ -281,7 +281,7 @@ const APIAccessSubscription: React.FC = () => {
                         padding: '6px 8px',
                         border: '1px solid var(--border)',
                         borderRadius: '2px',
-                        fontSize: '9pt'
+                        fontSize: '12px'
                       }}
                     />
                   </div>
@@ -290,7 +290,7 @@ const APIAccessSubscription: React.FC = () => {
                     disabled={!customAmount || parseFloat(customAmount) <= 0 || purchasingCredits === 'custom' || (parseFloat(customAmount) * 100) > cashBalance}
                     className="button button-primary"
                     style={{ 
-                      fontSize: '8pt', 
+                      fontSize: '11px', 
                       padding: '6px 12px',
                       whiteSpace: 'nowrap',
                       opacity: (!customAmount || parseFloat(customAmount) <= 0 || (parseFloat(customAmount) * 100) > cashBalance) ? 0.5 : 1
@@ -325,7 +325,7 @@ const APIAccessSubscription: React.FC = () => {
                 <h4 className="text font-bold">
                   {isMonthly ? 'Monthly Subscription' : 'Prepaid Credits'}
                 </h4>
-                <span className={`badge ${isActive ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '7pt' }}>
+                <span className={`badge ${isActive ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '9px' }}>
                   {subscription.status.toUpperCase()}
                 </span>
               </div>

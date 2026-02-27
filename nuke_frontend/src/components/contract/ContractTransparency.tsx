@@ -304,7 +304,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)', fontSize: '12px' }}>
         Loading contract details...
       </div>
     );
@@ -313,7 +313,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
   if (error || !contract) {
     return (
       <div className="card">
-        <div className="card-body" style={{ color: 'var(--danger, #ef4444)', fontSize: '9pt' }}>
+        <div className="card-body" style={{ color: 'var(--danger, #ef4444)', fontSize: '12px' }}>
           {error || 'Contract not found'}
           <div style={{ marginTop: '12px' }}>
             <button className="button button-secondary" onClick={onBack}>
@@ -354,7 +354,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <h1 style={{ margin: 0, fontSize: '16pt', fontWeight: 900 }}>
+                <h1 style={{ margin: 0, fontSize: '21px', fontWeight: 900 }}>
                   {contract.contract_name}
                 </h1>
                 <span style={{
@@ -362,14 +362,14 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                   background: contract.status === 'active' ? 'var(--success, #10b981)' : 'var(--text-muted)',
                   color: 'var(--white)',
                   borderRadius: '4px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 700,
                   textTransform: 'uppercase'
                 }}>
                   {contract.status}
                 </span>
               </div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 700 }}>{contract.contract_symbol}</span>
                 <span>•</span>
                 <DrillDown concept={contract.contract_type} value={contract.contract_type}>
@@ -387,7 +387,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 <span>Curated by {contract.curator_name || 'Unknown'}</span>
               </div>
               {contract.contract_description && (
-                <div style={{ fontSize: '9pt', color: 'var(--text)', lineHeight: '16px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text)', lineHeight: '16px' }}>
                   {contract.contract_description}
                 </div>
               )}
@@ -396,7 +396,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
               <button className="button button-primary" onClick={() => navigate(`/market/exchange/${contract.contract_symbol}`)}>
                 INVEST NOW
               </button>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textAlign: 'right' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', textAlign: 'right' }}>
                 Min: {formatCurrencyFromCents(contract.minimum_investment_cents)}
               </div>
             </div>
@@ -419,38 +419,38 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
         <div className="card">
           <div className="card-header"><h3 className="heading-3">Total Assets</h3></div>
           <div className="card-body">
-            <div style={{ fontSize: '18pt', fontWeight: 900 }}>{assets.length}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>Underlying assets</div>
+            <div style={{ fontSize: '24px', fontWeight: 900 }}>{assets.length}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Underlying assets</div>
           </div>
         </div>
         <div className="card">
           <div className="card-header"><h3 className="heading-3">Total Value</h3></div>
           <div className="card-body">
-            <div style={{ fontSize: '18pt', fontWeight: 900 }}>{formatCurrencyFromCents(totalValue)}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>Portfolio value</div>
+            <div style={{ fontSize: '24px', fontWeight: 900 }}>{formatCurrencyFromCents(totalValue)}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Portfolio value</div>
           </div>
         </div>
         <div className="card">
           <div className="card-header"><h3 className="heading-3">AUM</h3></div>
           <div className="card-body">
-            <div style={{ fontSize: '18pt', fontWeight: 900 }}>{formatCurrencyFromCents(contract.total_assets_under_management_cents)}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>Assets under management</div>
+            <div style={{ fontSize: '24px', fontWeight: 900 }}>{formatCurrencyFromCents(contract.total_assets_under_management_cents)}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Assets under management</div>
           </div>
         </div>
         <div className="card">
           <div className="card-header"><h3 className="heading-3">Investors</h3></div>
           <div className="card-body">
-            <div style={{ fontSize: '18pt', fontWeight: 900 }}>{contract.total_investors || 0}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>Active investors</div>
+            <div style={{ fontSize: '24px', fontWeight: 900 }}>{contract.total_investors || 0}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Active investors</div>
           </div>
         </div>
         <div className="card">
           <div className="card-header"><h3 className="heading-3">Performance</h3></div>
           <div className="card-body">
-            <div style={{ fontSize: '18pt', fontWeight: 900, color: contract.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: contract.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
               {formatPct(contract.total_return_pct)}
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>Total return</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Total return</div>
           </div>
         </div>
       </div>
@@ -501,7 +501,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                     tickFormatter={(v: number) => formatCurrencyFromCents(v, { maximumFractionDigits: 0 })}
                   />
                   <Tooltip
-                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '9pt' }}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px' }}
                     formatter={(value: number) => [formatCurrencyFromCents(value), 'NAV']}
                     labelFormatter={(label: string) => label ? new Date(label).toLocaleDateString() : ''}
                   />
@@ -510,7 +510,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
               </ResponsiveContainer>
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '12px' }}>
               Performance tracking begins when contract goes active.
             </div>
           )}
@@ -525,8 +525,8 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Investment Terms</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '16px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Investment Terms</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '16px' }}>
                 <strong>Minimum:</strong> {formatCurrencyFromCents(contract.minimum_investment_cents)}<br />
                 {contract.maximum_investment_cents && <><strong>Maximum:</strong> {formatCurrencyFromCents(contract.maximum_investment_cents)}<br /></>}
                 <strong>Liquidity:</strong> {contract.liquidity_type}<br />
@@ -534,8 +534,8 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Fee Structure</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '16px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Fee Structure</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '16px' }}>
                 <strong>Management:</strong> {contract.management_fee_pct}% annually<br />
                 {contract.performance_fee_pct > 0 && <><strong>Performance:</strong> {contract.performance_fee_pct}%<br /></>}
                 <strong>Transaction:</strong> {contract.transaction_fee_pct}%<br />
@@ -543,8 +543,8 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Legal Structure</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Legal Structure</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '20px' }}>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
                   <strong>Entity:</strong>
                   <DrillDown concept={contract.legal_entity_type} value={contract.legal_entity_type}>
@@ -595,7 +595,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                       alignItems: 'center',
                       justifyContent: 'center',
                       color: '#fff',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       fontWeight: 700,
                       minWidth: pct > 8 ? undefined : '0',
                     }}
@@ -611,7 +611,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
               {Object.entries(allocationByType).map(([type, valueCents]) => {
                 const pct = (valueCents / totalValue) * 100;
                 return (
-                  <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '8pt' }}>
+                  <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: ASSET_TYPE_COLORS[type] || '#6b7280' }} />
                     <span style={{ color: 'var(--text-muted)' }}>
                       {ASSET_TYPE_LABELS[type] || type} — {pct.toFixed(1)}% ({formatCurrencyFromCents(valueCents)})
@@ -641,7 +641,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 display: 'grid',
                 gridTemplateColumns: '24px 2fr 1fr 1fr 1fr 80px',
                 gap: '12px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 700,
                 padding: '12px 8px',
                 borderBottom: '2px solid var(--border)',
@@ -669,7 +669,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                         display: 'grid',
                         gridTemplateColumns: '24px 2fr 1fr 1fr 1fr 80px',
                         gap: '12px',
-                        fontSize: '9pt',
+                        fontSize: '12px',
                         padding: '12px 8px',
                         borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
                         cursor: 'pointer',
@@ -705,7 +705,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                               width: '27px', height: '27px', borderRadius: '3px', flexShrink: 0,
                               background: ASSET_TYPE_COLORS[asset.asset_type] || '#6b7280',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: '#fff', fontSize: '9pt', fontWeight: 900,
+                              color: '#fff', fontSize: '12px', fontWeight: 900,
                             }}>
                               {asset.asset_type === 'bond' ? 'B' : asset.asset_type === 'stake' ? 'S' :
                                asset.asset_type === 'organization' ? (asset.details?.business_name || 'O').charAt(0).toUpperCase() :
@@ -713,8 +713,8 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                             </div>
                           )}
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: '10pt' }}>{assetName}</div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '8pt', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '13px' }}>{assetName}</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{
                                 display: 'inline-block',
                                 width: '8px',
@@ -750,7 +750,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                               borderRadius: '2px',
                               background: 'var(--primary)',
                               color: 'var(--white)',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               fontWeight: 700,
                               cursor: 'pointer',
                               display: 'flex',
@@ -770,7 +770,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                         padding: '16px 16px 16px 44px',
                         background: 'var(--surface)',
                         borderBottom: '1px solid var(--border)',
-                        fontSize: '9pt',
+                        fontSize: '12px',
                       }}>
                         <AssetDetailPanel asset={asset} navigate={navigate} />
                       </div>
@@ -795,7 +795,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 background: 'var(--primary)',
                 color: 'var(--white)',
                 borderRadius: '4px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 fontWeight: 700,
               }}>CURATOR VIEW</span>
             </div>
@@ -803,22 +803,22 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
           <div className="card-body">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '16px' }}>
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Investors</div>
-                <div style={{ fontSize: '16pt', fontWeight: 900 }}>{investorData.count}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Investors</div>
+                <div style={{ fontSize: '21px', fontWeight: 900 }}>{investorData.count}</div>
               </div>
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Shares Outstanding</div>
-                <div style={{ fontSize: '16pt', fontWeight: 900 }}>{investorData.totalShares.toLocaleString()}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Shares Outstanding</div>
+                <div style={{ fontSize: '21px', fontWeight: 900 }}>{investorData.totalShares.toLocaleString()}</div>
               </div>
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>New (30d)</div>
-                <div style={{ fontSize: '16pt', fontWeight: 900 }}>{investorData.recentSubscriptions}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>New (30d)</div>
+                <div style={{ fontSize: '21px', fontWeight: 900 }}>{investorData.recentSubscriptions}</div>
               </div>
             </div>
 
             {recentTransactions.length > 0 && (
               <>
-                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                   Recent Transactions
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
@@ -828,7 +828,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                       justifyContent: 'space-between',
                       padding: '6px 0',
                       borderBottom: '1px solid var(--border)',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       color: 'var(--text-muted)',
                     }}>
                       <span style={{
@@ -863,9 +863,9 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
 function MetricPill({ label, value, positive }: { label: string; value: string; positive?: boolean }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>{label}</div>
       <div style={{
-        fontSize: '11pt',
+        fontSize: '15px',
         fontWeight: 900,
         color: positive === undefined ? 'var(--text)' : positive ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)',
       }}>
@@ -962,7 +962,7 @@ function VehicleDetail({ asset, d, navigate }: { asset: any; d: any; navigate: a
             borderRadius: '4px',
             background: 'var(--primary)',
             color: 'var(--white)',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 700,
             cursor: 'pointer',
             display: 'inline-flex',
@@ -999,7 +999,7 @@ function BondDetail({ asset, d }: { asset: any; d: any }) {
         {d.payments_on_time != null && <DetailRow label="On-Time Payments" value={d.payments_on_time} />}
         {d.collateral_description && <DetailRow label="Collateral" value={d.collateral_description} />}
         {!isHealthy && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: 'var(--danger, #ef4444)', fontSize: '8pt', fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: 'var(--danger, #ef4444)', fontSize: '11px', fontWeight: 700 }}>
             <AlertTriangle size={12} /> Risk indicator: bond not in active status
           </div>
         )}
@@ -1041,7 +1041,7 @@ function StakeDetail({ asset, d }: { asset: any; d: any }) {
           <DetailRow label="Investor's Share" value={formatCurrencyFromCents(Math.round(d.expected_profit_cents * d.profit_share_pct / 100))} />
         )}
         {isFundraising && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: '#f59e0b', fontSize: '8pt', fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: '#f59e0b', fontSize: '11px', fontWeight: 700 }}>
             <AlertTriangle size={12} /> Still fundraising — not yet active
           </div>
         )}
@@ -1076,7 +1076,7 @@ function OrgDetail({ asset, d }: { asset: any; d: any }) {
           </>
         )}
         {d.reputation_score == null && (
-          <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>No reputation data available</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>No reputation data available</div>
         )}
       </div>
     </div>
@@ -1109,7 +1109,7 @@ function RealEstateDetail({ asset, d }: { asset: any; d: any }) {
         {specs.amenities && (
           <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {specs.amenities.map((a: string, i: number) => (
-              <span key={i} style={{ padding: '1px 6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '3px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+              <span key={i} style={{ padding: '1px 6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '3px', fontSize: '9px', color: 'var(--text-muted)' }}>
                 {a.replace('_', ' ')}
               </span>
             ))}
@@ -1163,7 +1163,7 @@ function EventDetail({ asset, d }: { asset: any; d: any }) {
             <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
               <div style={{ width: `${Math.min(fillPct, 100)}%`, height: '100%', background: fillPct >= 90 ? 'var(--danger, #ef4444)' : fillPct >= 60 ? '#f59e0b' : 'var(--success, #10b981)', borderRadius: '2px' }} />
             </div>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{fillPct}% filled</div>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{fillPct}% filled</div>
           </>
         )}
       </div>
@@ -1203,7 +1203,7 @@ function CuratorPanel({
             background: isAgent ? '#8b5cf6' : '#3b82f6',
             color: '#fff',
             borderRadius: '4px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 700,
           }}>
             {isAgent ? 'AGENT' : 'HUMAN'}
@@ -1227,17 +1227,17 @@ function CuratorPanel({
                   width: '48px', height: '48px', borderRadius: '50%',
                   background: isAgent ? '#8b5cf6' : 'var(--primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', fontSize: '16pt', fontWeight: 900,
+                  color: '#fff', fontSize: '21px', fontWeight: 900,
                   border: '2px solid var(--border)',
                 }}>
                   {isAgent ? <Bot size={20} /> : (contract.curator_name || '?').charAt(0).toUpperCase()}
                 </div>
               )}
               <div>
-                <div style={{ fontWeight: 900, fontSize: '12pt' }}>
+                <div style={{ fontWeight: 900, fontSize: '16px' }}>
                   {curatorProfile?.full_name || contract.curator_name || 'Unknown'}
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   {curatorProfile?.username && <span>@{curatorProfile.username}</span>}
                   {curatorProfile?.is_verified && (
                     <span style={{ color: 'var(--success, #10b981)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
@@ -1248,7 +1248,7 @@ function CuratorPanel({
                     <HoverCard content={
                       <div style={{ padding: '8px' }}>
                         <div style={{ fontWeight: 700, marginBottom: '4px' }}>{curatorProfile.user_type.toUpperCase()}</div>
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           {curatorProfile.user_type === 'professional' ? 'Verified automotive professional with industry credentials.' :
                            curatorProfile.user_type === 'dealer' ? 'Licensed dealer with transactional history on the platform.' :
                            curatorProfile.user_type === 'admin' ? 'Platform administrator with elevated access.' : ''}
@@ -1257,7 +1257,7 @@ function CuratorPanel({
                     } width={220}>
                       <span style={{
                         padding: '1px 6px', background: 'var(--surface)', border: '1px solid var(--border)',
-                        borderRadius: '3px', fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', cursor: 'default',
+                        borderRadius: '3px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', cursor: 'default',
                       }}>
                         {curatorProfile.user_type}
                       </span>
@@ -1269,7 +1269,7 @@ function CuratorPanel({
 
             {/* Bio */}
             {(curatorProfile?.bio || contract.curator_bio) && (
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '15px', marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '15px', marginBottom: '10px' }}>
                 {curatorProfile?.bio || contract.curator_bio}
               </div>
             )}
@@ -1281,14 +1281,14 @@ function CuratorPanel({
                   <HoverCard key={i} content={
                     <div style={{ padding: '8px' }}>
                       <div style={{ fontWeight: 700, marginBottom: '4px' }}>{cred}</div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         Professional credential held by this curator. Credentials are self-reported — verify independently.
                       </div>
                     </div>
                   } width={200}>
                     <span style={{
                       padding: '2px 8px', background: 'var(--primary)', color: '#fff',
-                      borderRadius: '3px', fontSize: '7pt', fontWeight: 700, cursor: 'default',
+                      borderRadius: '3px', fontSize: '9px', fontWeight: 700, cursor: 'default',
                     }}>
                       {cred}
                     </span>
@@ -1314,14 +1314,14 @@ function CuratorPanel({
                       <div style={{ fontWeight: 700, marginBottom: '4px' }}>Total AUM</div>
                       <HoverStat label="All contracts" value={formatCurrencyFromCents(totalAum)} />
                       <HoverStat label="This contract" value={formatCurrencyFromCents(contract.total_assets_under_management_cents)} />
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                         Total assets under management across all contracts curated by this manager.
                       </div>
                     </div>
                   } width={240}>
                     <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
-                      <div style={{ fontSize: '12pt', fontWeight: 900 }}>{formatCurrencyFromCents(totalAum)}</div>
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Total AUM</div>
+                      <div style={{ fontSize: '16px', fontWeight: 900 }}>{formatCurrencyFromCents(totalAum)}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Total AUM</div>
                     </div>
                   </HoverCard>
                   {avgReturn != null && (
@@ -1332,16 +1332,16 @@ function CuratorPanel({
                           <HoverStat key={i} label={c.contract_symbol || c.contract_name} value={`${c.total_return_pct >= 0 ? '+' : ''}${c.total_return_pct.toFixed(2)}%`}
                             color={c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
                         ))}
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                           Unweighted average across {withReturns.length} contract{withReturns.length !== 1 ? 's' : ''}.
                         </div>
                       </div>
                     } width={240}>
                       <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
-                        <div style={{ fontSize: '12pt', fontWeight: 900, color: avgReturn >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 900, color: avgReturn >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
                           {avgReturn >= 0 ? '+' : ''}{avgReturn.toFixed(2)}%
                         </div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Avg Return</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Avg Return</div>
                       </div>
                     </HoverCard>
                   )}
@@ -1350,28 +1350,28 @@ function CuratorPanel({
                       <div style={{ fontWeight: 700, marginBottom: '4px' }}>Contracts</div>
                       <HoverStat label="Total" value={allContracts.length} />
                       <HoverStat label="Active" value={activeCount} />
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                         Investment contracts managed by this curator.
                       </div>
                     </div>
                   } width={200}>
                     <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
-                      <div style={{ fontSize: '12pt', fontWeight: 900 }}>{allContracts.length}</div>
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{activeCount} Active</div>
+                      <div style={{ fontSize: '16px', fontWeight: 900 }}>{allContracts.length}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{activeCount} Active</div>
                     </div>
                   </HoverCard>
                   {curatorStats?.total_vehicles != null && (
                     <HoverCard content={
                       <div style={{ padding: '8px' }}>
                         <div style={{ fontWeight: 700, marginBottom: '4px' }}>Personal Vehicles</div>
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           Vehicles this curator owns on the platform. Skin in the game — direct ownership experience informs curation.
                         </div>
                       </div>
                     } width={220}>
                       <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
-                        <div style={{ fontSize: '12pt', fontWeight: 900 }}>{curatorStats.total_vehicles}</div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Vehicles</div>
+                        <div style={{ fontSize: '16px', fontWeight: 900 }}>{curatorStats.total_vehicles}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Vehicles</div>
                       </div>
                     </HoverCard>
                   )}
@@ -1380,16 +1380,16 @@ function CuratorPanel({
                       <div style={{ padding: '8px' }}>
                         <div style={{ fontWeight: 700, marginBottom: '4px' }}>Reputation</div>
                         <HoverStat label="Score" value={`${curatorStats.reputation_score}/100`} />
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                           Computed from contributions, verifications, community activity, and transaction history.
                         </div>
                       </div>
                     } width={220}>
                       <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
-                        <div style={{ fontSize: '12pt', fontWeight: 900, color: curatorStats.reputation_score >= 70 ? 'var(--success, #10b981)' : curatorStats.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 900, color: curatorStats.reputation_score >= 70 ? 'var(--success, #10b981)' : curatorStats.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)' }}>
                           {curatorStats.reputation_score}
                         </div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Reputation</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Reputation</div>
                       </div>
                     </HoverCard>
                   )}
@@ -1399,7 +1399,7 @@ function CuratorPanel({
 
             {/* Member since */}
             {curatorProfile?.created_at && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '8px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
                 Member since {new Date(curatorProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 {curatorProfile.location && ` • ${curatorProfile.location}`}
               </div>
@@ -1411,20 +1411,20 @@ function CuratorPanel({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Bot size={14} color="#8b5cf6" />
-                    <span style={{ fontWeight: 900, fontSize: '9pt', color: '#8b5cf6' }}>AGENT: {agentInfo.name}</span>
+                    <span style={{ fontWeight: 900, fontSize: '12px', color: '#8b5cf6' }}>AGENT: {agentInfo.name}</span>
                   </div>
                   <button
                     onClick={() => setShowCode(!showCode)}
                     style={{
                       padding: '2px 8px', border: '1px solid #8b5cf6', borderRadius: '3px',
                       background: showCode ? '#8b5cf6' : 'transparent', color: showCode ? '#fff' : '#8b5cf6',
-                      fontSize: '7pt', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                      fontSize: '9px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
                     }}
                   >
                     <Code size={10} /> {showCode ? 'HIDE CODE' : 'READ CODE'}
                   </button>
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   <strong>Focus:</strong> {agentInfo.focus}
                 </div>
                 {agentInfo.capabilities?.length > 0 && (
@@ -1433,14 +1433,14 @@ function CuratorPanel({
                       <HoverCard key={i} content={
                         <div style={{ padding: '8px' }}>
                           <div style={{ fontWeight: 700, marginBottom: '4px' }}>{cap}</div>
-                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                             This agent is capable of performing {cap.toLowerCase()} operations autonomously.
                           </div>
                         </div>
                       } width={200}>
                         <span style={{
                           padding: '1px 6px', background: '#8b5cf620', border: '1px solid #8b5cf640',
-                          borderRadius: '3px', fontSize: '7pt', color: '#8b5cf6', fontWeight: 600, cursor: 'default',
+                          borderRadius: '3px', fontSize: '9px', color: '#8b5cf6', fontWeight: 600, cursor: 'default',
                         }}>
                           {cap}
                         </span>
@@ -1451,14 +1451,14 @@ function CuratorPanel({
                 {showCode && agentInfo.prompt_template && (
                   <div style={{
                     marginTop: '8px', padding: '10px', background: '#0d1117', color: '#c9d1d9',
-                    borderRadius: '4px', fontSize: '8pt', fontFamily: 'monospace', lineHeight: '14px',
+                    borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace', lineHeight: '14px',
                     maxHeight: '300px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
                     {agentInfo.prompt_template}
                   </div>
                 )}
                 {showCode && !agentInfo.prompt_template && (
-                  <div style={{ marginTop: '8px', padding: '10px', background: '#0d1117', color: '#8b949e', borderRadius: '4px', fontSize: '8pt', fontFamily: 'monospace' }}>
+                  <div style={{ marginTop: '8px', padding: '10px', background: '#0d1117', color: '#8b949e', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace' }}>
                     // Agent prompt template not published.{'\n'}
                     // Agent ID: {agentInfo.id}{'\n'}
                     // Capabilities: [{agentInfo.capabilities?.join(', ')}]{'\n'}
@@ -1474,7 +1474,7 @@ function CuratorPanel({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
                 <Briefcase size={12} />
-                <span style={{ fontWeight: 700, fontSize: '9pt' }}>Other Contracts by This Curator</span>
+                <span style={{ fontWeight: 700, fontSize: '12px' }}>Other Contracts by This Curator</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {curatorContracts.map((c: any) => (
@@ -1489,7 +1489,7 @@ function CuratorPanel({
                         <HoverStat label="Return" value={`${c.total_return_pct >= 0 ? '+' : ''}${c.total_return_pct.toFixed(2)}%`}
                           color={c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
                       )}
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
                         Click to view this contract
                       </div>
                     </div>
@@ -1505,8 +1505,8 @@ function CuratorPanel({
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: '9pt' }}>{c.contract_name}</div>
-                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', display: 'flex', gap: '4px', marginTop: '2px' }}>
+                          <div style={{ fontWeight: 700, fontSize: '12px' }}>{c.contract_name}</div>
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)', display: 'flex', gap: '4px', marginTop: '2px' }}>
                             <span>{c.contract_symbol}</span>
                             <span>•</span>
                             <span>{c.contract_type?.replace('_', ' ')}</span>
@@ -1521,13 +1521,13 @@ function CuratorPanel({
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           {c.total_assets_under_management_cents ? (
-                            <div style={{ fontWeight: 700, fontSize: '9pt' }}>
+                            <div style={{ fontWeight: 700, fontSize: '12px' }}>
                               {formatCurrencyFromCents(c.total_assets_under_management_cents)}
                             </div>
                           ) : null}
                           {c.total_return_pct != null && (
                             <div style={{
-                              fontSize: '8pt', fontWeight: 700,
+                              fontSize: '11px', fontWeight: 700,
                               color: c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)',
                             }}>
                               {c.total_return_pct >= 0 ? '+' : ''}{c.total_return_pct.toFixed(2)}%
@@ -1618,7 +1618,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
                 </div>
               )}
               <div style={{ padding: '12px' }}>
-                <div style={{ fontWeight: 900, fontSize: '11pt', marginBottom: '6px' }}>
+                <div style={{ fontWeight: 900, fontSize: '15px', marginBottom: '6px' }}>
                   {d.year} {d.make} {d.model}
                 </div>
                 <HoverRow label="Location" value={[d.city, d.state].filter(Boolean).join(', ') || d.location || '—'} />
@@ -1636,10 +1636,10 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'bond' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.bond, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12pt', fontWeight: 900 }}>B</div>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.bond, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px', fontWeight: 900 }}>B</div>
                 <div>
-                  <div style={{ fontWeight: 900, fontSize: '11pt' }}>{d.issuer_name || 'Bond'}</div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{d.issuer_type || 'Fixed Income'}</div>
+                  <div style={{ fontWeight: 900, fontSize: '15px' }}>{d.issuer_name || 'Bond'}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.issuer_type || 'Fixed Income'}</div>
                 </div>
               </div>
               <HoverRow label="Principal" value={formatCurrencyFromCents(d.principal_amount_cents)} />
@@ -1658,10 +1658,10 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
             return (
               <div style={{ padding: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.stake, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12pt', fontWeight: 900 }}>S</div>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.stake, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px', fontWeight: 900 }}>S</div>
                   <div>
-                    <div style={{ fontWeight: 900, fontSize: '11pt' }}>Equity Stake</div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{d.status?.toUpperCase() || 'ACTIVE'}</div>
+                    <div style={{ fontWeight: 900, fontSize: '15px' }}>Equity Stake</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.status?.toUpperCase() || 'ACTIVE'}</div>
                   </div>
                 </div>
                 {d.equity_pct != null && <HoverRow label="Equity" value={`${d.equity_pct}%`} />}
@@ -1671,7 +1671,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
                 <div style={{ marginTop: '6px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: ASSET_TYPE_COLORS.stake, borderRadius: '2px' }} />
                 </div>
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{pct.toFixed(0)}% funded</div>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{pct.toFixed(0)}% funded</div>
               </div>
             );
           })()}
@@ -1680,12 +1680,12 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'organization' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.organization, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12pt', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.organization, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px', fontWeight: 900 }}>
                   {(d.business_name || 'O').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 900, fontSize: '11pt' }}>{d.business_name || 'Organization'}</div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{d.business_type || 'Business'}</div>
+                  <div style={{ fontWeight: 900, fontSize: '15px' }}>{d.business_name || 'Organization'}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.business_type || 'Business'}</div>
                 </div>
               </div>
               <HoverRow label="Location" value={[d.city, d.state, d.country].filter(Boolean).join(', ') || '—'} />
@@ -1705,12 +1705,12 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'real_estate' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.real_estate, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14pt', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.real_estate, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '19px', fontWeight: 900 }}>
                   {'\u2302'}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 900, fontSize: '11pt' }}>{d.name || 'Property'}</div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{(d.property_type || '').replace('_', ' ')}</div>
+                  <div style={{ fontWeight: 900, fontSize: '15px' }}>{d.name || 'Property'}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{(d.property_type || '').replace('_', ' ')}</div>
                 </div>
               </div>
               <HoverRow label="Location" value={[d.city, d.region].filter(Boolean).join(', ') || '—'} />
@@ -1726,12 +1726,12 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'event' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.event, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12pt', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.event, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px', fontWeight: 900 }}>
                   {'\u2605'}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 900, fontSize: '11pt' }}>{d.event_name || 'Event'}</div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{(d.event_type || '').replace('_', ' ')} {d.recurring && d.recurring !== 'once' ? `• ${d.recurring}` : ''}</div>
+                  <div style={{ fontWeight: 900, fontSize: '15px' }}>{d.event_name || 'Event'}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{(d.event_type || '').replace('_', ' ')} {d.recurring && d.recurring !== 'once' ? `• ${d.recurring}` : ''}</div>
                 </div>
               </div>
               <HoverRow label="Venue" value={d.venue_name || [d.city, d.state].filter(Boolean).join(', ') || '—'} />
@@ -1751,7 +1751,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
 /** Compact row for hover preview cards */
 function HoverRow({ label, value, valueColor }: { label: string; value: any; valueColor?: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0', fontSize: '8pt' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0', fontSize: '11px' }}>
       <span style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span style={{ fontWeight: 700, color: valueColor || 'var(--text)' }}>{value}</span>
     </div>
@@ -1761,7 +1761,7 @@ function HoverRow({ label, value, valueColor }: { label: string; value: any; val
 /** Reusable detail row */
 function DetailRow({ label, value, valueColor }: { label: string; value: any; valueColor?: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '9pt' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '12px' }}>
       <span style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span style={{ fontWeight: 600, color: valueColor || 'var(--text)' }}>{value}</span>
     </div>

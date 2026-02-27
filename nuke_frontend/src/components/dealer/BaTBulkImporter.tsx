@@ -160,7 +160,7 @@ const BaTBulkImporter: React.FC<Props> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: '11pt', fontWeight: 700 }}>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>
             Import BaT Sales for {organizationName}
           </h3>
           {onClose && (
@@ -181,7 +181,7 @@ const BaTBulkImporter: React.FC<Props> = ({
 
         <div className="card-body">
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '9pt', fontWeight: 600 }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 600 }}>
               BaT Member URL or Listing URLs (one per line)
             </label>
             <textarea
@@ -192,14 +192,14 @@ const BaTBulkImporter: React.FC<Props> = ({
               style={{
                 width: '100%',
                 padding: '8px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
                 fontFamily: 'monospace'
               }}
               disabled={importing}
             />
-            <div style={{ marginTop: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
               Tip: Visit your BaT member page (e.g., bringatrailer.com/member/vivalasvegasautos), 
               copy the URL, and paste it here. We'll automatically extract all your sold listings.
             </div>
@@ -210,7 +210,7 @@ const BaTBulkImporter: React.FC<Props> = ({
               onClick={handleBulkImport}
               disabled={importing || !batMemberUrl.trim()}
               className="button button-primary"
-              style={{ fontSize: '9pt' }}
+              style={{ fontSize: '12px' }}
             >
               {importing ? 'Importing...' : 'Start Import'}
             </button>
@@ -219,7 +219,7 @@ const BaTBulkImporter: React.FC<Props> = ({
                 onClick={onClose}
                 disabled={importing}
                 className="button button-secondary"
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Cancel
               </button>
@@ -228,7 +228,7 @@ const BaTBulkImporter: React.FC<Props> = ({
 
           {importing && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '9pt', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', marginBottom: '8px' }}>
                 Progress: {progress.current} / {progress.total} listings
               </div>
               <div style={{ 
@@ -259,19 +259,19 @@ const BaTBulkImporter: React.FC<Props> = ({
                 borderRadius: '4px'
               }}>
                 <div>
-                  <span style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--color-success)' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-success)' }}>
                     ✓ {successCount}
                   </span>
-                  <span style={{ fontSize: '8pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '4px' }}>
                     imported
                   </span>
                 </div>
                 {errorCount > 0 && (
                   <div>
-                    <span style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--color-danger)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-danger)' }}>
                       ✗ {errorCount}
                     </span>
-                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '4px' }}>
                       failed
                     </span>
                   </div>
@@ -287,7 +287,7 @@ const BaTBulkImporter: React.FC<Props> = ({
                       marginBottom: '4px',
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       background: result.success ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)'
                     }}
                   >
@@ -319,7 +319,7 @@ const BaTBulkImporter: React.FC<Props> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
-                            fontSize: '8pt',
+                            fontSize: '11px',
                             color: 'var(--accent)',
                             textDecoration: 'none',
                             marginLeft: '8px'
@@ -340,7 +340,7 @@ const BaTBulkImporter: React.FC<Props> = ({
             padding: '12px', 
             background: 'var(--background-secondary)', 
             borderRadius: '4px',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)'
           }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>What this does:</div>
@@ -356,7 +356,7 @@ const BaTBulkImporter: React.FC<Props> = ({
             padding: '12px', 
             background: 'rgba(59, 130, 246, 0.1)', 
             borderRadius: '4px',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)',
             border: '1px solid rgba(59, 130, 246, 0.3)'
           }}>

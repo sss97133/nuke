@@ -163,13 +163,13 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <h3 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>Inquire About {vehicleName}</h3>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Inquire About {vehicleName}</h3>
           <button
             onClick={onClose}
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '20pt',
+              fontSize: '27px',
               cursor: 'pointer',
               color: 'var(--text)',
               padding: 0,
@@ -186,7 +186,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
 
         <form onSubmit={handleSubmit} style={{ padding: '16px' }}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '9pt', fontWeight: 600 }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}>
               Inquiry Type
             </label>
             <select
@@ -195,7 +195,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
               style={{
                 width: '100%',
                 padding: '6px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '2px'
               }}
@@ -208,7 +208,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '9pt', fontWeight: 600 }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}>
               Your Name *
             </label>
             <input
@@ -219,7 +219,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
               style={{
                 width: '100%',
                 padding: '6px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '2px'
               }}
@@ -227,7 +227,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '9pt', fontWeight: 600 }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}>
               Email *
             </label>
             <input
@@ -238,7 +238,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
               style={{
                 width: '100%',
                 padding: '6px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '2px'
               }}
@@ -246,7 +246,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '9pt', fontWeight: 600 }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}>
               Phone
             </label>
             <input
@@ -256,7 +256,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
               style={{
                 width: '100%',
                 padding: '6px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '2px'
               }}
@@ -264,7 +264,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '9pt', fontWeight: 600 }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}>
               Message *
             </label>
             <textarea
@@ -276,7 +276,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
               style={{
                 width: '100%',
                 padding: '6px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '2px',
                 fontFamily: 'inherit',
@@ -290,7 +290,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
               type="button"
               onClick={onClose}
               className="button button-secondary"
-              style={{ fontSize: '9pt' }}
+              style={{ fontSize: '12px' }}
               disabled={submitting}
             >
               Cancel
@@ -298,7 +298,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
             <button
               type="submit"
               className="button button-primary"
-              style={{ fontSize: '9pt' }}
+              style={{ fontSize: '12px' }}
               disabled={submitting}
             >
               {submitting ? 'Sending...' : 'Send Inquiry'}

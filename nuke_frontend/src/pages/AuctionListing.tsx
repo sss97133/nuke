@@ -199,8 +199,8 @@ export default function AuctionListing() {
         <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: '12pt', fontWeight: 800 }}>{vehicleTitle}</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: '16px', fontWeight: 800 }}>{vehicleTitle}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>
                 Listing: <span style={{ fontFamily: 'monospace' }}>{listing.id}</span>
               </div>
             </div>
@@ -210,7 +210,7 @@ export default function AuctionListing() {
                   padding: '4px 8px',
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 700,
                   borderRadius: 4,
                 }}
@@ -222,7 +222,7 @@ export default function AuctionListing() {
               </Link>
             </div>
           </div>
-          <div className="card-body" style={{ fontSize: '9pt' }}>
+          <div className="card-body" style={{ fontSize: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               <div>
                 <div style={{ color: 'var(--text-muted)' }}>Current</div>
@@ -252,7 +252,7 @@ export default function AuctionListing() {
               <div className="card-header" style={{ fontWeight: 800 }}>
                 Premium Timing
               </div>
-              <div className="card-body" style={{ fontSize: '9pt' }}>
+              <div className="card-body" style={{ fontSize: '12px' }}>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                   <div style={{ minWidth: 220 }}>
                     <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>Status</div>
@@ -275,7 +275,7 @@ export default function AuctionListing() {
                       style={{
                         padding: '6px 10px',
                         border: '1px solid var(--border)',
-                        fontSize: '9pt',
+                        fontSize: '12px',
                         width: 140,
                       }}
                       disabled={premiumLoading}
@@ -291,12 +291,12 @@ export default function AuctionListing() {
                 </div>
 
                 {premiumError && (
-                  <div style={{ marginTop: 10, color: 'var(--error)', fontSize: '9pt' }}>{premiumError}</div>
+                  <div style={{ marginTop: 10, color: 'var(--error)', fontSize: '12px' }}>{premiumError}</div>
                 )}
                 {premiumSuccess && (
-                  <div style={{ marginTop: 10, color: 'var(--success)', fontSize: '9pt' }}>{premiumSuccess}</div>
+                  <div style={{ marginTop: 10, color: 'var(--success)', fontSize: '12px' }}>{premiumSuccess}</div>
                 )}
-                <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: '8pt' }}>
+                <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: '11px' }}>
                   Premium timing is a scheduling priority rail. As we learn market patterns from ingested auction data, this budget will translate into better placement and targeted buyer outreach.
                 </div>
               </div>

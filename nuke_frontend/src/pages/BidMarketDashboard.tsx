@@ -595,7 +595,7 @@ export default function BidMarketDashboard() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
-        <span style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Loading bid analytics...</span>
+        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Loading bid analytics...</span>
       </div>
     );
   }
@@ -603,7 +603,7 @@ export default function BidMarketDashboard() {
   if (error) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
-        <span style={{ fontSize: '9pt', color: 'var(--error)' }}>Error: {error}</span>
+        <span style={{ fontSize: '12px', color: 'var(--error)' }}>Error: {error}</span>
       </div>
     );
   }
@@ -618,11 +618,11 @@ export default function BidMarketDashboard() {
       <div style={{ marginBottom: 'var(--space-4)' }}>
         {/* Title + range stats */}
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Bid Market
           </span>
           {rangeStats && (
-            <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               {fmt(rangeStats.totalBids)} bids &middot; {fmt(rangeStats.totalAuctions)} auctions &middot; {rangeStats.weeks} weeks
             </span>
           )}
@@ -634,7 +634,7 @@ export default function BidMarketDashboard() {
             <span
               title={isHovering ? `${metricConfig.label} for this week` : `${metricConfig.aggregate === 'sum' ? 'Total' : metricConfig.aggregate === 'max' ? 'Peak' : 'Average'} ${metricConfig.label.toLowerCase()} across ${timeRange === 'ALL' ? 'all time' : `last ${TIME_RANGES.find(r => r.key === timeRange)?.weeks} weeks`}`}
               style={{
-                fontSize: '28pt', fontWeight: 800, color: 'var(--text)',
+                fontSize: '37px', fontWeight: 800, color: 'var(--text)',
                 fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-1px',
                 transition: 'opacity 0.15s',
                 opacity: isHovering ? 0.9 : 1,
@@ -646,7 +646,7 @@ export default function BidMarketDashboard() {
             {heroValue.secondary && secondaryConfig && (
               <span
                 title={`${secondaryConfig.aggregate === 'sum' ? 'Total' : secondaryConfig.aggregate === 'max' ? 'Peak' : 'Average'} ${secondaryConfig.label.toLowerCase()}`}
-                style={{ fontSize: '14pt', fontWeight: 600, color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)', cursor: 'help' }}
+                style={{ fontSize: '19px', fontWeight: 600, color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)', cursor: 'help' }}
               >
                 {heroValue.secondary}
               </span>
@@ -657,14 +657,14 @@ export default function BidMarketDashboard() {
               <span
                 title={`${metricConfig.label} averaged ${trendDelta.positive ? 'higher' : 'lower'} in the second half of this range vs the first half`}
                 style={{
-                  fontSize: '9pt', fontWeight: 700, cursor: 'help',
+                  fontSize: '12px', fontWeight: 700, cursor: 'help',
                   color: trendDelta.positive ? '#008000' : '#d13438',
                 }}
               >
                 {trendDelta.positive ? '+' : ''}{trendDelta.pct.toFixed(1)}%
               </span>
             )}
-            <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               {heroValue.isWeek ? heroValue.label : (
                 <>
                   {metricConfig.aggregate === 'sum' ? 'Total' : metricConfig.aggregate === 'max' ? 'Peak weekly' : 'Avg weekly'}{' '}
@@ -706,7 +706,7 @@ export default function BidMarketDashboard() {
                 setSecondaryMetric(prev => prev === m.key ? null : m.key);
               }}
               style={{
-                padding: '3px 10px', fontSize: '8pt', cursor: 'pointer',
+                padding: '3px 10px', fontSize: '11px', cursor: 'pointer',
                 border: '1px solid',
                 borderColor: primaryMetric === m.key ? METRIC_COLORS[m.key] : secondaryMetric === m.key ? `${METRIC_COLORS[m.key]}60` : 'var(--border-light)',
                 background: primaryMetric === m.key ? `${METRIC_COLORS[m.key]}15` : 'var(--white)',
@@ -715,7 +715,7 @@ export default function BidMarketDashboard() {
               }}
             >
               {m.label}
-              {secondaryMetric === m.key && <span style={{ fontSize: '6pt', marginLeft: 3, opacity: 0.6 }}>2nd</span>}
+              {secondaryMetric === m.key && <span style={{ fontSize: '8px', marginLeft: 3, opacity: 0.6 }}>2nd</span>}
             </button>
           ))}
         </div>
@@ -728,7 +728,7 @@ export default function BidMarketDashboard() {
               title={r.tip}
               onClick={() => setTimeRange(r.key)}
               style={{
-                padding: '4px 14px', fontSize: '9pt', fontWeight: 700, cursor: 'pointer',
+                padding: '4px 14px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
                 border: '1px solid var(--border-light)',
                 borderRight: 'none',
                 background: timeRange === r.key ? 'var(--text)' : 'var(--white)',
@@ -797,7 +797,7 @@ export default function BidMarketDashboard() {
                 )}
                 <Tooltip
                   cursor={<ChartCrosshair />}
-                  contentStyle={{ background: 'var(--white)', border: '1px solid var(--border-medium)', fontSize: '8pt', padding: '6px 8px' }}
+                  contentStyle={{ background: 'var(--white)', border: '1px solid var(--border-medium)', fontSize: '11px', padding: '6px 8px' }}
                   labelFormatter={(v: string) => ''}
                   formatter={(value: number, name: string) => {
                     const m = METRICS.find(mt => mt.key === name);
@@ -837,16 +837,16 @@ export default function BidMarketDashboard() {
         {isHovering && hoverData && (
           <div style={{
             borderTop: '1px solid var(--border-light)', padding: '8px 12px',
-            background: 'var(--grey-50)', transition: 'opacity 0.15s', fontSize: '8pt',
+            background: 'var(--grey-50)', transition: 'opacity 0.15s', fontSize: '11px',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <div>
-                <span style={{ fontWeight: 700, fontSize: '9pt' }}>{hoverData.weekFull}</span>
+                <span style={{ fontWeight: 700, fontSize: '12px' }}>{hoverData.weekFull}</span>
                 <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
                   {fmt(hoverData.total_bids)} bids &middot; {fmt(hoverData.auctions)} auctions &middot; {fmt(hoverData.active_bidders)} bidders &middot; avg {fmtPrice(hoverData.avg_bid)}
                 </span>
               </div>
-              {weekVehiclesLoading && <span style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>loading...</span>}
+              {weekVehiclesLoading && <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>loading...</span>}
             </div>
             {weekVehicles.length > 0 && (
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
@@ -860,7 +860,7 @@ export default function BidMarketDashboard() {
                       textDecoration: 'none', color: 'inherit', display: 'block',
                     }}
                   >
-                    <div style={{ fontWeight: 700, fontSize: '8pt', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0066cc' }}>
+                    <div style={{ fontWeight: 700, fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0066cc' }}>
                       {v.name}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
@@ -872,7 +872,7 @@ export default function BidMarketDashboard() {
               </div>
             )}
             {!weekVehiclesLoading && weekVehicles.length === 0 && (
-              <div style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>Hover to see which vehicles drove this week's activity</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '9px' }}>Hover to see which vehicles drove this week's activity</div>
             )}
           </div>
         )}
@@ -881,7 +881,7 @@ export default function BidMarketDashboard() {
         {!isHovering && rangeStats && (
           <div style={{
             display: 'flex', gap: 0, borderTop: '1px solid var(--border-light)',
-            fontSize: '8pt', color: 'var(--text-muted)',
+            fontSize: '11px', color: 'var(--text-muted)',
           }}>
             {[
               { label: 'Total Bids', value: fmt(rangeStats.totalBids) },
@@ -893,8 +893,8 @@ export default function BidMarketDashboard() {
                 flex: 1, padding: '6px 10px',
                 borderRight: i < 3 ? '1px solid var(--border-light)' : 'none',
               }}>
-                <div style={{ textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '7pt' }}>{s.label}</div>
-                <div style={{ fontWeight: 700, fontSize: '9pt', color: 'var(--text)', fontFamily: 'var(--font-mono, monospace)' }}>{s.value}</div>
+                <div style={{ textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '9px' }}>{s.label}</div>
+                <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--text)', fontFamily: 'var(--font-mono, monospace)' }}>{s.value}</div>
               </div>
             ))}
           </div>
@@ -904,11 +904,11 @@ export default function BidMarketDashboard() {
         {platformStats?.cars_and_bids && platformStats.cars_and_bids.bids > 0 && (
           <div style={{
             display: 'flex', gap: 0, borderTop: '1px solid var(--border-light)',
-            fontSize: '7pt', color: 'var(--text-muted)', background: 'var(--grey-50)',
+            fontSize: '9px', color: 'var(--text-muted)', background: 'var(--grey-50)',
           }}>
             <div style={{ padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6, borderRight: '1px solid var(--border-light)' }}>
               <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#e8590c' }}>C&B</span>
-              <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, color: 'var(--text)', fontSize: '8pt' }}>
+              <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, color: 'var(--text)', fontSize: '11px' }}>
                 {fmt(platformStats.cars_and_bids.bids)}
               </span>
               <span>bids</span>
@@ -947,7 +947,7 @@ export default function BidMarketDashboard() {
       }}>
         {/* Filter header with active count + clear */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>
             Filters
             {hasFilters && (
               <span style={{ fontWeight: 400, marginLeft: 6 }}>
@@ -958,7 +958,7 @@ export default function BidMarketDashboard() {
           {hasFilters && (
             <button
               onClick={clearAllFilters}
-              style={{ fontSize: '8pt', color: '#d13438', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+              style={{ fontSize: '11px', color: '#d13438', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
             >
               Clear all
             </button>
@@ -967,7 +967,7 @@ export default function BidMarketDashboard() {
 
         {/* ─── Decade pills ──────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 6, flexWrap: 'wrap' }}>
-          <span title="Filter by vehicle decade. Multiple decades can be selected. This filters the chart, treemap, and all data." style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 600, width: 42, flexShrink: 0, cursor: 'help' }}>ERA</span>
+          <span title="Filter by vehicle decade. Multiple decades can be selected. This filters the chart, treemap, and all data." style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, width: 42, flexShrink: 0, cursor: 'help' }}>ERA</span>
           {decadeChips.map(d => {
             const label = `${d.decade}s`;
             const selected = selectedDecades.has(d.decade);
@@ -977,7 +977,7 @@ export default function BidMarketDashboard() {
                 title={`${label}: ${fmt(d.total_bids)} bids across ${fmt(d.vehicles)} vehicles. Click to filter all data to this era.`}
                 onClick={() => toggleDecade(d.decade)}
                 style={{
-                  padding: '2px 7px', fontSize: '7pt', cursor: 'pointer',
+                  padding: '2px 7px', fontSize: '9px', cursor: 'pointer',
                   border: '1px solid',
                   borderColor: selected ? '#7d6b91' : 'var(--border-light)',
                   background: selected ? '#7d6b9118' : 'var(--white)',
@@ -993,7 +993,7 @@ export default function BidMarketDashboard() {
 
         {/* ─── Body style pills ──────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 6, flexWrap: 'wrap' }}>
-          <span title="Filter by body style. Based on actual bid data — styles with more bids appear first." style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 600, width: 42, flexShrink: 0, cursor: 'help' }}>TYPE</span>
+          <span title="Filter by body style. Based on actual bid data — styles with more bids appear first." style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, width: 42, flexShrink: 0, cursor: 'help' }}>TYPE</span>
           {bodyStyleChips.map(b => {
             const selected = selectedBodyStyles.has(b.name);
             return (
@@ -1002,7 +1002,7 @@ export default function BidMarketDashboard() {
                 title={`${b.name}: ${fmt(b.total_bids)} bids across ${fmt(b.vehicles)} vehicles`}
                 onClick={() => toggleBodyStyle(b.name)}
                 style={{
-                  padding: '2px 7px', fontSize: '7pt', cursor: 'pointer',
+                  padding: '2px 7px', fontSize: '9px', cursor: 'pointer',
                   border: '1px solid',
                   borderColor: selected ? '#6b9d7d' : 'var(--border-light)',
                   background: selected ? '#6b9d7d18' : 'var(--white)',
@@ -1018,7 +1018,7 @@ export default function BidMarketDashboard() {
 
         {/* ─── Make chips ────────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-          <span title="Filter by make. Top 15 makes by bid volume. Click to filter chart and treemap." style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 600, width: 42, flexShrink: 0, cursor: 'help' }}>MAKE</span>
+          <span title="Filter by make. Top 15 makes by bid volume. Click to filter chart and treemap." style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, width: 42, flexShrink: 0, cursor: 'help' }}>MAKE</span>
           {makeChips.map(m => {
             const selected = selectedMakes.has(m.name);
             return (
@@ -1027,7 +1027,7 @@ export default function BidMarketDashboard() {
                 title={`${m.name}: ${fmt(m.total_bids)} bids · ${fmt(m.vehicles)} vehicles · avg ${fmtPrice(m.avg_bid)}`}
                 onClick={() => toggleMake(m.name)}
                 style={{
-                  padding: '2px 7px', fontSize: '7pt', cursor: 'pointer',
+                  padding: '2px 7px', fontSize: '9px', cursor: 'pointer',
                   border: '1px solid',
                   borderColor: selected ? '#5b7a9d' : 'var(--border-light)',
                   background: selected ? '#5b7a9d18' : 'var(--white)',
@@ -1049,14 +1049,14 @@ export default function BidMarketDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
         {/* Treemap — click to drill into models */}
         <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-          <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-light)', background: 'var(--grey-50)', fontSize: '9pt', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-light)', background: 'var(--grey-50)', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               {drillMake ? (
                 <>
                   <button
                     onClick={() => setDrillMake(null)}
                     title="Back to all makes"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '9pt', color: '#0066cc', padding: 0, marginRight: 4 }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#0066cc', padding: 0, marginRight: 4 }}
                   >
                     Makes
                   </button>
@@ -1074,7 +1074,7 @@ export default function BidMarketDashboard() {
               <button
                 onClick={() => setDrillMake(null)}
                 title="Back to all makes view"
-                style={{ background: 'none', border: '1px solid var(--border-light)', cursor: 'pointer', fontSize: '8pt', color: 'var(--text-muted)', padding: '1px 8px' }}
+                style={{ background: 'none', border: '1px solid var(--border-light)', cursor: 'pointer', fontSize: '11px', color: 'var(--text-muted)', padding: '1px 8px' }}
               >
                 Back
               </button>
@@ -1083,7 +1083,7 @@ export default function BidMarketDashboard() {
           <div style={{ padding: 4, position: 'relative' }}>
             {drillLoading && (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.8)', zIndex: 2 }}>
-                <span style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Loading {drillMake} models...</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Loading {drillMake} models...</span>
               </div>
             )}
             <div style={{ width: '100%', height: 258 }}>
@@ -1104,8 +1104,8 @@ export default function BidMarketDashboard() {
                       const d = payload?.[0]?.payload;
                       if (!d) return null;
                       return (
-                        <div style={{ background: 'var(--white)', border: '2px solid var(--border-medium)', padding: 10, fontSize: '8pt', maxWidth: 260 }}>
-                          <div style={{ fontWeight: 700, fontSize: '10pt', marginBottom: 4 }}>
+                        <div style={{ background: 'var(--white)', border: '2px solid var(--border-medium)', padding: 10, fontSize: '11px', maxWidth: 260 }}>
+                          <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: 4 }}>
                             {drillMake ? `${drillMake} ${d.name}` : d.name}
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
@@ -1134,7 +1134,7 @@ export default function BidMarketDashboard() {
                                  d.avg_bid > 50000 ? 'Lower volume but higher average bids — a premium/niche segment.' :
                                  'Moderate activity. Bids tend to cluster around enthusiast price points.')}
                           </div>
-                          {!drillMake && <div style={{ marginTop: 4, fontSize: '7pt', color: '#0066cc' }}>Click to see model breakdown</div>}
+                          {!drillMake && <div style={{ marginTop: 4, fontSize: '9px', color: '#0066cc' }}>Click to see model breakdown</div>}
                         </div>
                       );
                     }}
@@ -1147,17 +1147,17 @@ export default function BidMarketDashboard() {
 
         {/* Most Competitive Auctions */}
         <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-          <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-light)', background: 'var(--grey-50)', fontSize: '9pt', fontWeight: 700 }}>
+          <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-light)', background: 'var(--grey-50)', fontSize: '12px', fontWeight: 700 }}>
             Most Competitive Auctions
           </div>
           <div style={{ padding: 'var(--space-4)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Vehicle</th>
-                  <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Bids</th>
-                  <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Final</th>
-                  <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Appr.</th>
+                  <th style={{ textAlign: 'left', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Vehicle</th>
+                  <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Bids</th>
+                  <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Final</th>
+                  <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Appr.</th>
                 </tr>
               </thead>
               <tbody>
@@ -1165,11 +1165,11 @@ export default function BidMarketDashboard() {
                   const insight = describeAuction(h, avgBidCount);
                   return (
                     <HoverCard key={h.vehicle_id} content={
-                      <div style={{ fontSize: '8pt' }}>
-                        <div style={{ fontWeight: 700, fontSize: '10pt', marginBottom: 2 }}>
+                      <div style={{ fontSize: '11px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: 2 }}>
                           {h.year ? `${h.year} ${h.make || ''} ${h.model || ''}`.trim() : 'Unknown Vehicle'}
                         </div>
-                        <div style={{ display: 'inline-block', padding: '1px 6px', background: 'var(--grey-100)', fontWeight: 700, fontSize: '8pt', marginBottom: 6 }}>
+                        <div style={{ display: 'inline-block', padding: '1px 6px', background: 'var(--grey-100)', fontWeight: 700, fontSize: '11px', marginBottom: 6 }}>
                           {insight.headline}
                         </div>
                         <div style={{ color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 8 }}>{insight.detail}</div>
@@ -1193,14 +1193,14 @@ export default function BidMarketDashboard() {
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--grey-100)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <td style={{ textAlign: 'left', padding: '3px 6px', fontSize: '8pt', borderBottom: '1px solid var(--border-light)' }}>
-                          <a href={`/vehicle/${h.vehicle_id}`} style={{ color: '#0066cc', textDecoration: 'none', fontSize: '8pt' }}>
+                        <td style={{ textAlign: 'left', padding: '3px 6px', fontSize: '11px', borderBottom: '1px solid var(--border-light)' }}>
+                          <a href={`/vehicle/${h.vehicle_id}`} style={{ color: '#0066cc', textDecoration: 'none', fontSize: '11px' }}>
                             {h.year ? `${h.year} ${h.make || ''} ${h.model || ''}`.trim() : h.vehicle_id.slice(0, 8)}
                           </a>
                         </td>
-                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', fontFamily: 'var(--font-mono)', fontWeight: 700, borderBottom: '1px solid var(--border-light)' }}>{fmt(h.bid_count)}</td>
-                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{fmtPrice(h.final_bid)}</td>
-                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 700, borderBottom: '1px solid var(--border-light)' }}>{fmt(h.bid_count)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{fmtPrice(h.final_bid)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>
                           <span style={{ color: Number(h.appreciation_pct) > 100 ? '#008000' : 'inherit' }}>
                             {h.appreciation_pct ? `+${Number(h.appreciation_pct).toFixed(0)}%` : '—'}
                           </span>
@@ -1217,7 +1217,7 @@ export default function BidMarketDashboard() {
 
       {/* ─── Top Bidders ──────────────────────────────────────── */}
       <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', overflow: 'hidden', marginBottom: 'var(--space-4)' }}>
-        <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-light)', background: 'var(--grey-50)', fontSize: '9pt', fontWeight: 700 }}>
+        <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-light)', background: 'var(--grey-50)', fontSize: '12px', fontWeight: 700 }}>
           Top Bidders
           <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>hover for profile, click for detail</span>
         </div>
@@ -1225,12 +1225,12 @@ export default function BidMarketDashboard() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Username</th>
-                <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Bids</th>
-                <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Wins</th>
-                <th style={{ textAlign: 'left', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Type</th>
-                <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Avg Bid</th>
-                <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Max Bid</th>
+                <th style={{ textAlign: 'left', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Username</th>
+                <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Bids</th>
+                <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Wins</th>
+                <th style={{ textAlign: 'left', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Type</th>
+                <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Avg Bid</th>
+                <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Max Bid</th>
               </tr>
             </thead>
             <tbody>
@@ -1238,9 +1238,9 @@ export default function BidMarketDashboard() {
                 const cls = classifyBidder(b, avgBidsAll, avgWinRateAll);
                 return (
                   <HoverCard key={b.bat_username} content={
-                    <div style={{ fontSize: '8pt' }}>
-                      <div style={{ fontWeight: 700, fontSize: '10pt', marginBottom: 2 }}>{b.bat_username}</div>
-                      <div style={{ display: 'inline-block', padding: '1px 6px', background: `${cls.color}18`, border: `1px solid ${cls.color}40`, color: cls.color, fontWeight: 700, fontSize: '8pt', marginBottom: 6 }}>
+                    <div style={{ fontSize: '11px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: 2 }}>{b.bat_username}</div>
+                      <div style={{ display: 'inline-block', padding: '1px 6px', background: `${cls.color}18`, border: `1px solid ${cls.color}40`, color: cls.color, fontWeight: 700, fontSize: '11px', marginBottom: 6 }}>
                         {cls.label}
                       </div>
                       <div style={{ color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 8 }}>{cls.detail}</div>
@@ -1270,19 +1270,19 @@ export default function BidMarketDashboard() {
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--grey-100)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ textAlign: 'left', padding: '3px 6px', fontSize: '8pt', borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ textAlign: 'left', padding: '3px 6px', fontSize: '11px', borderBottom: '1px solid var(--border-light)' }}>
                         <button onClick={() => setSelectedBidder(b.bat_username)}
-                          style={{ color: '#0066cc', cursor: 'pointer', background: 'none', border: 'none', padding: 0, fontSize: '8pt', fontFamily: 'var(--font-family)', textAlign: 'left' }}>
+                          style={{ color: '#0066cc', cursor: 'pointer', background: 'none', border: 'none', padding: 0, fontSize: '11px', fontFamily: 'var(--font-family)', textAlign: 'left' }}>
                           {b.bat_username}
                         </button>
                       </td>
-                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{fmt(b.total_bids)}</td>
-                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{b.wins}</td>
-                      <td style={{ textAlign: 'left', padding: '3px 6px', fontSize: '7pt', borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{fmt(b.total_bids)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{b.wins}</td>
+                      <td style={{ textAlign: 'left', padding: '3px 6px', fontSize: '9px', borderBottom: '1px solid var(--border-light)' }}>
                         <span style={{ color: cls.color, fontWeight: 600 }}>{cls.label}</span>
                       </td>
-                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{fmtPrice(b.avg_bid)}</td>
-                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '8pt', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{fmtPrice(b.max_bid)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{fmtPrice(b.avg_bid)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: '11px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-light)' }}>{fmtPrice(b.max_bid)}</td>
                     </tr>
                   </HoverCard>
                 );

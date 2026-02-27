@@ -112,12 +112,12 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
             marginBottom: '8px', 
             border: '1px solid #bdbdbd', 
             backgroundColor: (!notification.read && !notification.is_read) ? '#f5f5f5' : 'white',
-            fontSize: '9pt'
+            fontSize: '12px'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
             <span style={{ 
-              fontSize: '8pt', 
+              fontSize: '11px', 
               marginRight: '6px', 
               padding: '1px 4px',
               backgroundColor: '#e0e0e0',
@@ -126,14 +126,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
               {getNotificationIcon(notification.type)}
             </span>
             <div style={{ flex: 1 }}>
-              <strong style={{ fontSize: '9pt' }}>{notification.title}</strong>
-              <span style={{ fontSize: '8pt', color: '#757575', marginLeft: '8px' }}>
+              <strong style={{ fontSize: '12px' }}>{notification.title}</strong>
+              <span style={{ fontSize: '11px', color: '#757575', marginLeft: '8px' }}>
                 {formatDate(notification.created_at)}
               </span>
             </div>
             {(!notification.read && !notification.is_read) && (
               <span style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 'bold',
                 padding: '1px 4px',
                 backgroundColor: '#757575',
@@ -147,7 +147,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
           <div style={{ 
             marginBottom: '8px', 
             lineHeight: '1.3',
-            fontSize: '9pt',
+            fontSize: '12px',
             color: '#000000'
           }}>
             {notification.message}
@@ -167,7 +167,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
                 </div>
                 <div style={{ 
                   marginTop: '2px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   color: '#757575'
                 }}>
                   {notification.metadata.completion_percentage}% Complete
@@ -187,7 +187,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
               padding: '4px',
               backgroundColor: 'var(--bg)',
               border: '1px solid #e0e0e0',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               {notification.metadata.image_count} {notification.metadata.image_count === 1 ? 'image needs' : 'images need'} date information
             </div>
@@ -205,7 +205,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
                   padding: '2px 8px',
                   backgroundColor: '#757575',
                   color: 'white',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   border: 'none',
                   cursor: 'pointer'
                 }}
@@ -236,7 +236,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
                   backgroundColor: 'var(--surface)',
                   color: '#000000',
                   border: '1px solid #bdbdbd',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   cursor: 'pointer'
                 }}
               >

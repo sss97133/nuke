@@ -100,7 +100,7 @@ export default function BatchImageAnalysis() {
             borderRadius: '2px',
             background: 'var(--surface)',
             cursor: 'pointer',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 600,
             transition: 'all 0.12s ease'
           }}
@@ -109,16 +109,16 @@ export default function BatchImageAnalysis() {
         </button>
       </div>
 
-      <h1 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+      <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         Batch Image Analysis
       </h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '8pt' }}>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '11px' }}>
         Analyze all images for a vehicle using AI (Rekognition + OpenAI Vision)
       </p>
 
       {/* Quick Presets */}
       <div className="card" style={{ marginBottom: '24px' }}>
-        <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.5px' }}>
+        <div className="card-header" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px' }}>
           QUICK PRESETS
         </div>
         <div className="card-body">
@@ -135,7 +135,7 @@ export default function BatchImageAnalysis() {
                 color: 'var(--text)',
                 cursor: analyzing ? 'not-allowed' : 'pointer',
                 opacity: analyzing ? 0.5 : 1,
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 transition: 'all 0.12s ease'
               }}
@@ -154,7 +154,7 @@ export default function BatchImageAnalysis() {
                 color: 'white',
                 cursor: analyzing ? 'not-allowed' : 'pointer',
                 opacity: analyzing ? 0.5 : 1,
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 transition: 'all 0.12s ease'
               }}
@@ -167,12 +167,12 @@ export default function BatchImageAnalysis() {
 
       {/* Configuration Form */}
       <div className="card" style={{ marginBottom: '24px' }}>
-        <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.5px' }}>
+        <div className="card-header" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px' }}>
           CONFIGURATION
         </div>
         <div className="card-body">
           <div style={{ marginBottom: '16px' }}>
-            <label className="form-label" style={{ fontSize: '8pt', fontWeight: 600 }}>
+            <label className="form-label" style={{ fontSize: '11px', fontWeight: 600 }}>
               VEHICLE ID *
             </label>
             <input
@@ -184,14 +184,14 @@ export default function BatchImageAnalysis() {
               className="form-input"
               style={{
                 width: '100%',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontFamily: 'monospace'
               }}
             />
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label className="form-label" style={{ fontSize: '8pt', fontWeight: 600 }}>
+            <label className="form-label" style={{ fontSize: '11px', fontWeight: 600 }}>
               MAX IMAGES (OPTIONAL)
             </label>
             <input
@@ -203,10 +203,10 @@ export default function BatchImageAnalysis() {
               className="form-input"
               style={{
                 width: '200px',
-                fontSize: '8pt'
+                fontSize: '11px'
               }}
             />
-            <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               Limit number of images to analyze (useful for testing)
             </p>
           </div>
@@ -217,7 +217,7 @@ export default function BatchImageAnalysis() {
               alignItems: 'center',
               gap: '8px',
               cursor: analyzing ? 'not-allowed' : 'pointer',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               <input
                 type="checkbox"
@@ -243,7 +243,7 @@ export default function BatchImageAnalysis() {
               color: 'white',
               fontWeight: 600,
               cursor: analyzing || !vehicleId.trim() ? 'not-allowed' : 'pointer',
-              fontSize: '8pt',
+              fontSize: '11px',
               transition: 'all 0.12s ease'
             }}
           >
@@ -254,7 +254,7 @@ export default function BatchImageAnalysis() {
             <div className="card" style={{
               marginTop: '16px',
               background: 'var(--bg)',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600
             }}>
               <div className="card-body">
@@ -272,7 +272,7 @@ export default function BatchImageAnalysis() {
           border: `2px solid ${result.success ? 'var(--success)' : 'var(--error)'}`,
         }}>
           <div className="card-header" style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 700,
             letterSpacing: '0.5px',
             color: result.success ? 'var(--success)' : 'var(--error)'
@@ -282,7 +282,7 @@ export default function BatchImageAnalysis() {
           <div className="card-body">
 
           {result.message && (
-            <p style={{ marginBottom: '16px', fontSize: '8pt' }}>
+            <p style={{ marginBottom: '16px', fontSize: '11px' }}>
               {result.message}
             </p>
           )}
@@ -291,10 +291,10 @@ export default function BatchImageAnalysis() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
               <div className="card" style={{ border: '2px solid var(--border)' }}>
                 <div className="card-body">
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, letterSpacing: '0.5px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, letterSpacing: '0.5px' }}>
                     TOTAL IMAGES
                   </div>
-                  <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+                  <div style={{ fontSize: '19px', fontWeight: 700 }}>
                     {result.total_images || 0}
                   </div>
                 </div>
@@ -302,10 +302,10 @@ export default function BatchImageAnalysis() {
 
               <div className="card" style={{ border: '2px solid var(--success)' }}>
                 <div className="card-body">
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, letterSpacing: '0.5px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, letterSpacing: '0.5px' }}>
                     ANALYZED
                   </div>
-                  <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--success)' }}>
+                  <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--success)' }}>
                     {result.analyzed || 0}
                   </div>
                 </div>
@@ -313,10 +313,10 @@ export default function BatchImageAnalysis() {
 
               <div className="card" style={{ border: '2px solid var(--border)' }}>
                 <div className="card-body">
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, letterSpacing: '0.5px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, letterSpacing: '0.5px' }}>
                     SKIPPED
                   </div>
-                  <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text-muted)' }}>
                     {result.skipped || 0}
                   </div>
                 </div>
@@ -324,10 +324,10 @@ export default function BatchImageAnalysis() {
 
               <div className="card" style={{ border: '2px solid var(--error)' }}>
                 <div className="card-body">
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, letterSpacing: '0.5px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, letterSpacing: '0.5px' }}>
                     FAILED
                   </div>
-                  <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--error)' }}>
+                  <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--error)' }}>
                     {result.failed || 0}
                   </div>
                 </div>
@@ -339,7 +339,7 @@ export default function BatchImageAnalysis() {
             <div className="card" style={{
               border: '2px solid var(--error)',
               background: 'var(--bg)',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontFamily: 'monospace'
             }}>
               <div className="card-body">
@@ -350,7 +350,7 @@ export default function BatchImageAnalysis() {
 
           {result.failures && result.failures.length > 0 && (
             <div style={{ marginTop: '16px' }}>
-              <h3 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', letterSpacing: '0.5px' }}>
+              <h3 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', letterSpacing: '0.5px' }}>
                 FAILURES
               </h3>
               <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
@@ -359,7 +359,7 @@ export default function BatchImageAnalysis() {
                     border: '2px solid var(--error)',
                     background: 'var(--bg)',
                     marginBottom: '8px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontFamily: 'monospace'
                   }}>
                     <div className="card-body">
@@ -374,10 +374,10 @@ export default function BatchImageAnalysis() {
 
           {result.success && result.analyzed && result.analyzed > 0 && (
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '2px solid var(--success)' }}>
-              <h3 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', letterSpacing: '0.5px' }}>
+              <h3 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', letterSpacing: '0.5px' }}>
                 NEXT STEPS
               </h3>
-              <ol style={{ marginLeft: '20px', fontSize: '8pt', lineHeight: '1.6' }}>
+              <ol style={{ marginLeft: '20px', fontSize: '11px', lineHeight: '1.6' }}>
                 <li>Refresh the vehicle profile page to see updated valuation</li>
                 <li>Check image tags: Look for AI-detected parts and systems</li>
                 <li>Review profile insights: AI summary of build quality</li>
@@ -391,11 +391,11 @@ export default function BatchImageAnalysis() {
 
       {/* Documentation */}
       <div className="card" style={{ marginTop: '32px' }}>
-        <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.5px' }}>
+        <div className="card-header" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px' }}>
           DOCUMENTATION
         </div>
-        <div className="card-body" style={{ fontSize: '8pt', lineHeight: '1.6' }}>
-          <h3 style={{ fontWeight: 700, marginBottom: '8px', fontSize: '8pt', letterSpacing: '0.5px' }}>WHAT THIS DOES</h3>
+        <div className="card-body" style={{ fontSize: '11px', lineHeight: '1.6' }}>
+          <h3 style={{ fontWeight: 700, marginBottom: '8px', fontSize: '11px', letterSpacing: '0.5px' }}>WHAT THIS DOES</h3>
           <ul style={{ marginLeft: '20px', marginBottom: '12px' }}>
             <li>Analyzes all vehicle images using AI (AWS Rekognition + OpenAI Vision)</li>
             <li>Detects parts, systems, build quality, paint condition, modifications</li>
@@ -404,7 +404,7 @@ export default function BatchImageAnalysis() {
             <li>Valuation service automatically uses results to adjust estimates</li>
           </ul>
 
-          <h3 style={{ fontWeight: 700, marginBottom: '8px', fontSize: '8pt', letterSpacing: '0.5px' }}>TIME AND COST</h3>
+          <h3 style={{ fontWeight: 700, marginBottom: '8px', fontSize: '11px', letterSpacing: '0.5px' }}>TIME AND COST</h3>
           <ul style={{ marginLeft: '20px' }}>
             <li><strong>Time:</strong> 2-5 seconds per image (239 images = 5-8 minutes)</li>
             <li><strong>Cost:</strong> $0.02 per image via OpenAI GPT-4o (239 images = $5)</li>

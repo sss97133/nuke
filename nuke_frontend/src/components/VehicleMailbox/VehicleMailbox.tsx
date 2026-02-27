@@ -827,7 +827,7 @@ const VehicleMailbox: React.FC = () => {
           <button
             onClick={() => setShowCompose(true)}
             className="m-3 px-3 py-2 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 font-semibold"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
           >
             <Plus className="w-3 h-3" />
             Compose
@@ -842,12 +842,12 @@ const VehicleMailbox: React.FC = () => {
                   ? 'bg-gray-900 text-white border-gray-900'
                   : 'text-gray-900 border-gray-300 hover:bg-gray-100'
               }`}
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               <Inbox className="w-3 h-3" />
               <span>Inbox</span>
               {unreadCount > 0 && (
-                <span className="ml-auto bg-red-600 text-white px-1.5 py-0.5 rounded-full" style={{ fontSize: '7pt' }}>
+                <span className="ml-auto bg-red-600 text-white px-1.5 py-0.5 rounded-full" style={{ fontSize: '9px' }}>
                   {unreadCount}
                 </span>
               )}
@@ -860,7 +860,7 @@ const VehicleMailbox: React.FC = () => {
                   ? 'bg-gray-900 text-white border-gray-900'
                   : 'text-gray-900 border-gray-300 hover:bg-gray-100'
               }`}
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               <Settings className="w-3 h-3" />
               <span>Mailbox Settings</span>
@@ -873,7 +873,7 @@ const VehicleMailbox: React.FC = () => {
           {/* Header */}
           <div className="bg-white border-b-2 border-gray-300 px-4 py-2">
             <div className="flex items-center justify-between">
-              <div style={{ fontSize: '8pt' }} className="text-gray-900 font-semibold">
+              <div style={{ fontSize: '11px' }} className="text-gray-900 font-semibold">
                 Vehicle Mailbox VIN: {mailbox.vin}
               </div>
               {activeTab === 'messages' && (
@@ -886,7 +886,7 @@ const VehicleMailbox: React.FC = () => {
                         ? 'bg-gray-900 text-white border-gray-900'
                         : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-100'
                     }`}
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   >
                     Inbox
                   </button>
@@ -898,14 +898,14 @@ const VehicleMailbox: React.FC = () => {
                         ? 'bg-gray-900 text-white border-gray-900'
                         : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-100'
                     }`}
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   >
                     Expert
                   </button>
                 </div>
               )}
               {unreadCount > 0 && (
-                <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-semibold" style={{ fontSize: '8pt' }}>
+                <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-semibold" style={{ fontSize: '11px' }}>
                   {unreadCount} unread
                 </span>
               )}
@@ -951,36 +951,36 @@ const VehicleMailbox: React.FC = () => {
                   {/* Access Management */}
                   {mailbox.user_access_level === 'read_write' && (
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: '8pt' }}>Access Management</h3>
+                      <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: '11px' }}>Access Management</h3>
                       <AccessKeyManager vehicleId={vehicleId!} />
                     </div>
                   )}
 
                   {/* Stamps */}
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: '8pt' }}>Stamps</h3>
+                    <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: '11px' }}>Stamps</h3>
                     <div className="space-y-2">
-                      <div className="text-gray-600" style={{ fontSize: '8pt' }}>
+                      <div className="text-gray-600" style={{ fontSize: '11px' }}>
                         Owned: {stamps.filter(s => !s.is_burned).length}
                       </div>
                       <button
                         onClick={purchaseStamp}
                         disabled={sending}
                         className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 text-gray-900 font-semibold transition-colors"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                       >
                         Buy Stamp ($0.01)
                       </button>
                       {purchaseError && (
-                        <div className="text-red-600" style={{ fontSize: '8pt' }}>{purchaseError}</div>
+                        <div className="text-red-600" style={{ fontSize: '11px' }}>{purchaseError}</div>
                       )}
                     </div>
                   </div>
 
                   {/* Notification Settings */}
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-2" style={{ fontSize: '8pt' }}>Notification Settings</h3>
-                    <p className="text-gray-600" style={{ fontSize: '8pt' }}>Notification preferences coming soon.</p>
+                    <h3 className="font-semibold text-gray-900 mb-2" style={{ fontSize: '11px' }}>Notification Settings</h3>
+                    <p className="text-gray-600" style={{ fontSize: '11px' }}>Notification preferences coming soon.</p>
                   </div>
                 </div>
               )}
@@ -992,25 +992,25 @@ const VehicleMailbox: React.FC = () => {
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>{selectedMessage.title}</h2>
-                      <p className="text-gray-500" style={{ fontSize: '8pt' }}>
+                      <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: '11px' }}>{selectedMessage.title}</h2>
+                      <p className="text-gray-500" style={{ fontSize: '11px' }}>
                         {new Date(selectedMessage.created_at).toLocaleString()}
                       </p>
                     </div>
                     {getMessageIcon(selectedMessage.message_type, selectedMessage.priority)}
                   </div>
 
-                  <div className="text-gray-700 leading-relaxed whitespace-pre-wrap" style={{ fontSize: '8pt' }}>
+                  <div className="text-gray-700 leading-relaxed whitespace-pre-wrap" style={{ fontSize: '11px' }}>
                     {selectedMessage.content}
                   </div>
 
                   {selectedMessage.metadata && (
-                    <div className="text-gray-500 bg-gray-50 p-2 border-2 border-gray-300" style={{ fontSize: '8pt' }}>
+                    <div className="text-gray-500 bg-gray-50 p-2 border-2 border-gray-300" style={{ fontSize: '11px' }}>
                       <pre className="whitespace-pre-wrap">{JSON.stringify(selectedMessage.metadata, null, 2)}</pre>
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 text-gray-600" style={{ fontSize: '8pt' }}>
+                  <div className="flex items-center gap-2 text-gray-600" style={{ fontSize: '11px' }}>
                     <span>Type: {selectedMessage.message_type}</span>
                     <span>•</span>
                     <span>Priority: {selectedMessage.priority}</span>
@@ -1019,16 +1019,16 @@ const VehicleMailbox: React.FC = () => {
                   {/* Work order actions */}
                   {selectedWorkOrderId && (
                     <div className="border-2 border-gray-300 bg-gray-50 p-3 space-y-2">
-                      <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Work Order</div>
-                      <div className="text-gray-600" style={{ fontSize: '8pt' }}>
+                      <div className="font-semibold text-gray-900" style={{ fontSize: '11px' }}>Work Order</div>
+                      <div className="text-gray-600" style={{ fontSize: '11px' }}>
                         ID: <span className="font-mono">{String(selectedWorkOrderId)}</span>
                       </div>
 
                       {/* Progress (visual cue) */}
                       <div className="border border-gray-300 bg-white p-2">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-gray-900 font-semibold" style={{ fontSize: '8pt' }}>Progress</div>
-                          <div className="text-gray-600" style={{ fontSize: '8pt' }}>
+                          <div className="text-gray-900 font-semibold" style={{ fontSize: '11px' }}>Progress</div>
+                          <div className="text-gray-600" style={{ fontSize: '11px' }}>
                             {workOrderLoading ? 'Loading…' : (selectedWorkOrder?.status || (selectedWorkOrderIsDraft ? 'draft' : '—'))}
                             {selectedWorkOrder?.is_published ? ' • published' : ''}
                           </div>
@@ -1056,7 +1056,7 @@ const VehicleMailbox: React.FC = () => {
                           return (
                             <div className="mt-2 space-y-1">
                               {steps.map((s) => (
-                                <div key={s.label} className="flex items-center gap-2" style={{ fontSize: '8pt' }}>
+                                <div key={s.label} className="flex items-center gap-2" style={{ fontSize: '11px' }}>
                                   {s.done ? (
                                     <CheckCircle className="w-3 h-3 text-green-700" />
                                   ) : (
@@ -1072,10 +1072,10 @@ const VehicleMailbox: React.FC = () => {
 
                       {selectedWorkOrderIsDraft && (
                         <div className="space-y-2">
-                          <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Availability</div>
+                          <div className="font-semibold text-gray-900" style={{ fontSize: '11px' }}>Availability</div>
                           <select
                             className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                            style={{ fontSize: '8pt' }}
+                            style={{ fontSize: '11px' }}
                             value={publishVisibility}
                             onChange={(e) => setPublishVisibility(e.target.value as any)}
                           >
@@ -1085,7 +1085,7 @@ const VehicleMailbox: React.FC = () => {
                           </select>
                           <button
                             className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
-                            style={{ fontSize: '8pt' }}
+                            style={{ fontSize: '11px' }}
                             disabled={sending}
                             onClick={publishSelectedWorkOrder}
                           >
@@ -1096,7 +1096,7 @@ const VehicleMailbox: React.FC = () => {
 
                       <button
                         className="px-3 py-1.5 border-2 border-gray-300 text-gray-900 hover:bg-gray-100 transition-colors font-semibold"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                         disabled={quotesLoading}
                         onClick={loadQuotesForSelectedWorkOrder}
                       >
@@ -1104,10 +1104,10 @@ const VehicleMailbox: React.FC = () => {
                       </button>
 
                       <div className="space-y-2">
-                        <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Post a Quote (USD)</div>
+                        <div className="font-semibold text-gray-900" style={{ fontSize: '11px' }}>Post a Quote (USD)</div>
                         <input
                           className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           placeholder="1500"
                           inputMode="numeric"
                           value={quoteAmountUsd}
@@ -1115,18 +1115,18 @@ const VehicleMailbox: React.FC = () => {
                         />
                         <textarea
                           className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           rows={3}
                           placeholder="Notes (optional)"
                           value={quoteNotes}
                           onChange={(e) => setQuoteNotes(e.target.value)}
                         />
                         {sendError && (
-                          <div className="text-red-600" style={{ fontSize: '8pt' }}>{sendError}</div>
+                          <div className="text-red-600" style={{ fontSize: '11px' }}>{sendError}</div>
                         )}
                         <button
                           className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           disabled={sending || !quoteAmountUsd.trim()}
                           onClick={createQuoteForSelectedWorkOrder}
                         >
@@ -1136,22 +1136,22 @@ const VehicleMailbox: React.FC = () => {
 
                       {workOrderQuotes.length > 0 && (
                         <div className="space-y-2 pt-2 border-t border-gray-300">
-                          <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Quotes</div>
+                          <div className="font-semibold text-gray-900" style={{ fontSize: '11px' }}>Quotes</div>
                           {workOrderQuotes.map((q: any) => (
                             <div key={q.id} className="bg-white border border-gray-300 p-2">
                               <div className="flex items-center justify-between gap-2">
-                                <div className="text-gray-900 font-semibold" style={{ fontSize: '8pt' }}>
+                                <div className="text-gray-900 font-semibold" style={{ fontSize: '11px' }}>
                                   ${(Number(q.amount_cents || 0) / 100).toFixed(0)} {q.currency || 'USD'}
                                 </div>
-                                <div className="text-gray-500" style={{ fontSize: '8pt' }}>{String(q.status || '')}</div>
+                                <div className="text-gray-500" style={{ fontSize: '11px' }}>{String(q.status || '')}</div>
                               </div>
                               {q.notes && (
-                                <div className="text-gray-600 whitespace-pre-wrap" style={{ fontSize: '8pt' }}>{q.notes}</div>
+                                <div className="text-gray-600 whitespace-pre-wrap" style={{ fontSize: '11px' }}>{q.notes}</div>
                               )}
                               {q.status !== 'accepted' && (
                                 <button
                                   className="mt-2 px-2 py-1 border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-colors font-semibold"
-                                  style={{ fontSize: '8pt' }}
+                                  style={{ fontSize: '11px' }}
                                   disabled={sending}
                                   onClick={() => acceptQuote(q.id)}
                                 >
@@ -1164,10 +1164,10 @@ const VehicleMailbox: React.FC = () => {
                       )}
 
                       <div className="space-y-2 pt-2 border-t border-gray-300">
-                        <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Proof</div>
+                        <div className="font-semibold text-gray-900" style={{ fontSize: '11px' }}>Proof</div>
                         <select
                           className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           value={proofType}
                           onChange={(e) => setProofType(e.target.value as any)}
                         >
@@ -1180,7 +1180,7 @@ const VehicleMailbox: React.FC = () => {
                         </select>
                         <textarea
                           className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           rows={3}
                           placeholder="Paste URLs (one per line)"
                           value={proofUrlsText}
@@ -1188,7 +1188,7 @@ const VehicleMailbox: React.FC = () => {
                         />
                         <textarea
                           className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           rows={2}
                           placeholder="Notes (optional)"
                           value={proofNotes}
@@ -1196,7 +1196,7 @@ const VehicleMailbox: React.FC = () => {
                         />
                         <button
                           className="px-3 py-1.5 border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           disabled={sending}
                           onClick={submitProofForSelectedWorkOrder}
                         >
@@ -1204,7 +1204,7 @@ const VehicleMailbox: React.FC = () => {
                         </button>
                         <button
                           className="px-3 py-1.5 border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           disabled={sending}
                           onClick={requestCompletionForSelectedWorkOrder}
                         >
@@ -1212,7 +1212,7 @@ const VehicleMailbox: React.FC = () => {
                         </button>
                         <button
                           className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           disabled={sending}
                           onClick={completeSelectedWorkOrder}
                         >
@@ -1225,16 +1225,16 @@ const VehicleMailbox: React.FC = () => {
                   {/* Agent-style suggestion: draft a work order from a selected work request message */}
                   {!selectedWorkOrderId && (selectedMessage.message_type === 'work_request' || selectedMessage.message_type === 'user_message') && (
                     <div className="border-2 border-gray-300 bg-gray-50 p-3 space-y-2">
-                      <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Suggestion</div>
-                      <div className="text-gray-600" style={{ fontSize: '8pt' }}>
+                      <div className="font-semibold text-gray-900" style={{ fontSize: '11px' }}>Suggestion</div>
+                      <div className="text-gray-600" style={{ fontSize: '11px' }}>
                         Draft a work order from this message.
                       </div>
                       {sendError && (
-                        <div className="text-red-600" style={{ fontSize: '8pt' }}>{sendError}</div>
+                        <div className="text-red-600" style={{ fontSize: '11px' }}>{sendError}</div>
                       )}
                       <button
                         className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                         disabled={sending || !selectedMessage.content}
                         onClick={draftWorkOrderFromSelectedMessage}
                       >
@@ -1247,7 +1247,7 @@ const VehicleMailbox: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors font-semibold"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                         onClick={() => resolveMessage(selectedMessage.id)}
                       >
                         Mark as Resolved
@@ -1255,7 +1255,7 @@ const VehicleMailbox: React.FC = () => {
                       {selectedMessage.message_type === 'duplicate_detected' && (
                         <button
                           className="px-3 py-1.5 border-2 border-gray-300 text-gray-900 hover:bg-gray-100 transition-colors font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           onClick={() => handleDuplicateMessage(selectedMessage)}
                         >
                           Review Duplicate
@@ -1263,7 +1263,7 @@ const VehicleMailbox: React.FC = () => {
                       )}
                     </div>
                   ) : (
-                    <div className="text-green-700 font-semibold" style={{ fontSize: '8pt' }}>Resolved</div>
+                    <div className="text-green-700 font-semibold" style={{ fontSize: '11px' }}>Resolved</div>
                   )}
                 </div>
               </div>
@@ -1277,7 +1277,7 @@ const VehicleMailbox: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white border-2 border-gray-300 w-full max-w-2xl mx-4">
             <div className="p-3 border-b-2 border-gray-300 flex items-center justify-between bg-gray-100">
-              <h3 className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>New Message</h3>
+              <h3 className="font-semibold text-gray-900" style={{ fontSize: '11px' }}>New Message</h3>
               <button
                 onClick={() => {
                   setShowCompose(false)
@@ -1286,7 +1286,7 @@ const VehicleMailbox: React.FC = () => {
                   setSendError(null)
                 }}
                 className="text-gray-600 hover:text-gray-900"
-                style={{ fontSize: '8pt' }}
+                style={{ fontSize: '11px' }}
               >
                 <XCircle className="w-3 h-3" />
               </button>
@@ -1294,10 +1294,10 @@ const VehicleMailbox: React.FC = () => {
 
             <div className="p-4 space-y-3">
               <div>
-                <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>Title</label>
+                <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '11px' }}>Title</label>
                 <input
                   className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                   placeholder="Message title"
                   value={draftTitle}
                   onChange={(e) => setDraftTitle(e.target.value)}
@@ -1305,10 +1305,10 @@ const VehicleMailbox: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>Message</label>
+                <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '11px' }}>Message</label>
                 <textarea
                   className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                   rows={6}
                   placeholder="Your message..."
                   value={draftBody}
@@ -1318,10 +1318,10 @@ const VehicleMailbox: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>Urgency</label>
+                  <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '11px' }}>Urgency</label>
                   <select
                     className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                     value={draftUrgency}
                     onChange={(e) => setDraftUrgency(e.target.value as any)}
                   >
@@ -1332,10 +1332,10 @@ const VehicleMailbox: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>Funds committed (USD, optional)</label>
+                  <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '11px' }}>Funds committed (USD, optional)</label>
                   <input
                     className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                     placeholder="1500"
                     inputMode="numeric"
                     value={draftFundsUsd}
@@ -1347,7 +1347,7 @@ const VehicleMailbox: React.FC = () => {
               {/* Stamp selection */}
               {stamps.length > 0 && (
                 <div>
-                  <label className="block font-semibold text-gray-900 mb-2" style={{ fontSize: '8pt' }}>Select Stamp</label>
+                  <label className="block font-semibold text-gray-900 mb-2" style={{ fontSize: '11px' }}>Select Stamp</label>
                   <div className="flex flex-wrap gap-2">
                     {stamps.map((s) => (
                       <button
@@ -1358,7 +1358,7 @@ const VehicleMailbox: React.FC = () => {
                             ? 'border-gray-900 bg-gray-900 text-white'
                             : 'border-gray-300 text-gray-900 hover:border-gray-600'
                         }`}
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                       >
                         {s.name || s.sku || 'Stamp'} ({s.remaining_uses ?? 1} uses)
                       </button>
@@ -1368,14 +1368,14 @@ const VehicleMailbox: React.FC = () => {
               )}
 
               {sendError && (
-                <div className="text-red-600 bg-red-50 p-2 border-2 border-red-300" style={{ fontSize: '8pt' }}>{sendError}</div>
+                <div className="text-red-600 bg-red-50 p-2 border-2 border-red-300" style={{ fontSize: '11px' }}>{sendError}</div>
               )}
 
               <div className="flex items-center justify-between pt-3 border-t-2 border-gray-300">
                 <div className="flex gap-2">
                   <button
                     className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                     disabled={sending || !selectedStampId}
                     onClick={() => sendMessage('paid')}
                   >
@@ -1383,7 +1383,7 @@ const VehicleMailbox: React.FC = () => {
                   </button>
                   <button
                     className="px-3 py-1.5 border-2 border-gray-300 text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 font-semibold"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                     disabled={sending}
                     onClick={() => sendMessage('comment')}
                   >
@@ -1391,7 +1391,7 @@ const VehicleMailbox: React.FC = () => {
                   </button>
                   <button
                     className="px-3 py-1.5 border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 font-semibold"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                     disabled={sending || !draftTitle.trim() || !draftBody.trim()}
                     onClick={draftWorkOrder}
                   >
@@ -1402,7 +1402,7 @@ const VehicleMailbox: React.FC = () => {
                   <button
                     onClick={purchaseStamp}
                     className="px-3 py-1.5 bg-gray-100 text-gray-900 border-2 border-gray-300 hover:bg-gray-200 transition-colors font-semibold"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   >
                     Buy Stamp ($0.01)
                   </button>

@@ -33,22 +33,22 @@ export default function TransmissionPortal({ transmission, activePortal, onOpen 
     >
       <div style={{ padding: '10px 12px' }}>
         <div style={{
-          fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)',
+          fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)',
           textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
         }}>
           Transmission
         </div>
 
         {definition && definition.known ? (
-          <div style={{ fontSize: '8pt' }}>
-            <div style={{ fontWeight: 600, fontSize: '10pt', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px' }}>
+            <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}>
               {definition.title}
             </div>
             <div style={{ marginBottom: '4px' }}>
               <span style={{
                 padding: '1px 5px', borderRadius: '3px',
                 background: 'var(--bg-secondary, #f3f4f6)',
-                fontSize: '7pt', fontWeight: 500,
+                fontSize: '9px', fontWeight: 500,
                 textTransform: 'uppercase',
               }}>
                 {definition.label}
@@ -68,9 +68,9 @@ export default function TransmissionPortal({ transmission, activePortal, onOpen 
             )}
           </div>
         ) : (
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>{transmission}</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '9px' }}>
               No detailed spec information available
             </div>
           </div>
@@ -82,7 +82,7 @@ export default function TransmissionPortal({ transmission, activePortal, onOpen 
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '8pt' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '11px' }}>
       <span style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span style={{ fontWeight: 600 }}>{value}</span>
     </div>

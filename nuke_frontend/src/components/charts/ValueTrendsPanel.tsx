@@ -301,7 +301,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
 
   if (loading) {
     return (
-      <div style={{ padding: '10px', color: 'var(--text-muted)', fontSize: '8pt', ...style }}>
+      <div style={{ padding: '10px', color: 'var(--text-muted)', fontSize: '11px', ...style }}>
         Loading value trends...
       </div>
     );
@@ -309,7 +309,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
 
   if (error) {
     return (
-      <div style={{ padding: '10px', color: '#b91c1c', fontSize: '8pt', ...style }}>
+      <div style={{ padding: '10px', color: '#b91c1c', fontSize: '11px', ...style }}>
         {error}
       </div>
     );
@@ -319,7 +319,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
     <div style={{ ...style }}>
       {/* Period selector */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', alignItems: 'center' }}>
-        <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>PERIOD:</span>
+        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>PERIOD:</span>
         {(['30d', '90d', '1y'] as TrendPeriod[]).map(p => (
           <button
             key={p}
@@ -327,7 +327,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
             onClick={() => setPeriod(p)}
             style={{
               padding: '2px 8px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontFamily: 'monospace',
               fontWeight: 700,
               border: '1px solid var(--border)',
@@ -346,7 +346,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
         {/* Value Breakdown */}
         <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px', borderRadius: 6 }}>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '6px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '6px' }}>
             VALUE BREAKDOWN (cumulative)
           </div>
           <MiniLineChart
@@ -361,12 +361,12 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         {/* Total Market Value */}
         <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px', borderRadius: 6 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
               TOTAL MARKET VALUE
             </div>
             {trends && (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 color: trends.totalTrend > 0 ? '#22c55e' : trends.totalTrend < 0 ? '#ef4444' : 'var(--text-muted)',
               }}>
@@ -381,7 +381,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
             showLegend={false}
             showTrendArrow={false}
           />
-          <div style={{ fontSize: '8pt', color: 'var(--text)', marginTop: '4px', fontWeight: 700 }}>
+          <div style={{ fontSize: '11px', color: 'var(--text)', marginTop: '4px', fontWeight: 700 }}>
             {data?.current_totals?.total_value ? formatCurrency(data.current_totals.total_value) : '--'}
           </div>
         </div>
@@ -389,12 +389,12 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         {/* Sold vs Unsold Ratio */}
         <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px', borderRadius: 6 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
               AUCTION SOLD RATE (7d rolling)
             </div>
             {trends && (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 color: trends.avgSoldRatio >= 0.7 ? '#22c55e' : trends.avgSoldRatio >= 0.5 ? '#f59e0b' : '#ef4444',
               }}>
@@ -415,12 +415,12 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         {/* Import Velocity */}
         <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px', borderRadius: 6 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
               IMPORT VELOCITY (daily)
             </div>
             {trends && (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 color: trends.velocityTrend > 10 ? '#22c55e' : trends.velocityTrend < -10 ? '#ef4444' : 'var(--text-muted)',
               }}>
@@ -435,14 +435,14 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
             showLegend={false}
             showTrendArrow={false}
           />
-          <div style={{ fontSize: '8pt', color: 'var(--text)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text)', marginTop: '4px' }}>
             7d avg: {trends?.recentAvgImport ? formatCurrency(trends.recentAvgImport) : '--'}/day
           </div>
         </div>
       </div>
 
       {/* Summary stats */}
-      <div style={{ marginTop: '12px', fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+      <div style={{ marginTop: '12px', fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
         Data as of {data?.generated_at ? new Date(data.generated_at).toLocaleString() : '--'} ({period} window)
       </div>
     </div>

@@ -105,7 +105,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
         onClick={() => setShowForm(true)}
         style={{
           padding: '4px 8px',
-          fontSize: '8pt',
+          fontSize: '11px',
           border: '1px solid var(--border)',
           background: 'var(--bg)',
           cursor: 'pointer',
@@ -125,7 +125,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
       background: 'var(--surface)',
       marginTop: '8px'
     }}>
-      <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '12px' }}>
+      <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '12px' }}>
         Request Verification
       </div>
 
@@ -135,7 +135,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
           background: '#fee',
           border: '1px solid #fcc',
           borderRadius: '3px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: '#c00',
           marginBottom: '12px'
         }}>
@@ -146,7 +146,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
       <form onSubmit={handleSubmit}>
         {/* Verification Type */}
         <div style={{ marginBottom: '12px' }}>
-          <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+          <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
             Verification Type
           </label>
           <select
@@ -155,7 +155,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
             style={{
               width: '100%',
               padding: '6px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--border)',
               borderRadius: '3px'
             }}
@@ -169,7 +169,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
         {/* Relationship Type Change */}
         {verificationType === 'relationship' && (
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               New Relationship Type
             </label>
             <select
@@ -178,7 +178,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
               style={{
                 width: '100%',
                 padding: '6px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid var(--border)',
                 borderRadius: '3px'
               }}
@@ -197,7 +197,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
         {verificationType === 'sale' && (
           <>
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 Proof Type *
               </label>
               <select
@@ -206,7 +206,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
                 style={{
                   width: '100%',
                   padding: '6px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   border: '1px solid var(--border)',
                   borderRadius: '3px'
                 }}
@@ -220,7 +220,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 Proof URL *
               </label>
               <input
@@ -232,7 +232,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
                 style={{
                   width: '100%',
                   padding: '6px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   border: '1px solid var(--border)',
                   borderRadius: '3px'
                 }}
@@ -244,7 +244,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
         {/* Status Change */}
         {verificationType === 'status_change' && (
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               New Status
             </label>
             <select
@@ -253,7 +253,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
               style={{
                 width: '100%',
                 padding: '6px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid var(--border)',
                 borderRadius: '3px'
               }}
@@ -267,7 +267,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
 
         {/* Notes */}
         <div style={{ marginBottom: '12px' }}>
-          <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+          <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
             Notes (Optional)
           </label>
           <textarea
@@ -278,7 +278,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
             style={{
               width: '100%',
               padding: '6px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--border)',
               borderRadius: '3px',
               resize: 'vertical'
@@ -296,7 +296,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
             }}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--border)',
               background: 'var(--bg)',
               cursor: 'pointer',
@@ -310,7 +310,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
             disabled={submitting || (verificationType === 'sale' && !proofUrl)}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: 'none',
               background: submitting ? 'var(--text-muted)' : 'var(--accent)',
               color: 'white',

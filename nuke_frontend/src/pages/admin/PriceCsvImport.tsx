@@ -16,7 +16,7 @@ interface CsvRow {
 
 const NUMERIC_KEYS: (keyof CsvRow)[] = ['msrp','current_value','purchase_price','asking_price','sale_price'];
 
-const to8 = { fontSize: '8pt' } as const;
+const to8 = { fontSize: '11px' } as const;
 const inputStyle: React.CSSProperties = { ...to8, padding: '2px 4px', border: '1px solid #c0c0c0', borderRadius: 0 };
 const chip: React.CSSProperties = { ...to8, background: 'var(--bg)', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: 2 };
 

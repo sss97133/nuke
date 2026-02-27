@@ -381,10 +381,10 @@ export default function VehicleJobs() {
               <div className="text" style={{ fontWeight: 700 }}>{vehicleLabel}</div>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <Link to={`/vehicle/${vehicleId}`} className="button button-secondary" style={{ fontSize: '10pt' }}>
+              <Link to={`/vehicle/${vehicleId}`} className="button button-secondary" style={{ fontSize: '13px' }}>
                 Back to Vehicle
               </Link>
-              <Link to={`/vehicle/${vehicleId}/mailbox`} className="button button-secondary" style={{ fontSize: '10pt' }}>
+              <Link to={`/vehicle/${vehicleId}/mailbox`} className="button button-secondary" style={{ fontSize: '13px' }}>
                 Open Mailbox
               </Link>
             </div>
@@ -451,7 +451,7 @@ export default function VehicleJobs() {
                   <button
                     className="button button-secondary"
                     onClick={() => setShowFullForm(v => !v)}
-                    style={{ fontSize: '10pt' }}
+                    style={{ fontSize: '13px' }}
                   >
                     {showFullForm ? 'Hide' : 'Show'}
                   </button>
@@ -576,7 +576,7 @@ export default function VehicleJobs() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
                             <button
                               className="button button-secondary"
-                              style={{ fontSize: '10pt' }}
+                              style={{ fontSize: '13px' }}
                               onClick={() => navigate(`/vehicle/${vehicleId}/mailbox`)}
                             >
                               Discuss in Mailbox

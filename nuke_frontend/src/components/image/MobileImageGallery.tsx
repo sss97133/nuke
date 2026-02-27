@@ -134,7 +134,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
           alignItems: 'center'
         }}
       >
-        <div style={{ color: '#fff', fontSize: '10pt' }}>
+        <div style={{ color: '#fff', fontSize: '13px' }}>
           {currentIndex + 1} / {images.length}
         </div>
         <button
@@ -240,23 +240,23 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
           }}
         >
           {currentImage.angle_tag && (
-            <div style={{ fontSize: '8pt', color: '#aaa', marginBottom: 'var(--space-1)' }}>
+            <div style={{ fontSize: '11px', color: '#aaa', marginBottom: 'var(--space-1)' }}>
               {currentImage.angle_tag}
             </div>
           )}
           {currentImage.caption && (
-            <div style={{ fontSize: '9pt' }}>
+            <div style={{ fontSize: '12px' }}>
               {currentImage.caption}
             </div>
           )}
-          <div style={{ fontSize: '7pt', color: '#888', marginTop: 'var(--space-2)' }}>
+          <div style={{ fontSize: '9px', color: '#888', marginTop: 'var(--space-2)' }}>
             {new Date(currentImage.created_at).toLocaleDateString()}
           </div>
           <div
             style={{
               marginTop: 'var(--space-3)',
               textAlign: 'center',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: '#aaa'
             }}
           >

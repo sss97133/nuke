@@ -986,7 +986,7 @@ const VehicleTimeline: React.FC<{
                               alignItems: 'center',
                               justifyContent: 'center',
                               flex: '0 0 auto',
-                              fontSize: '9pt',
+                              fontSize: '12px',
                               fontWeight: 800,
                             }}
                           >
@@ -1018,7 +1018,7 @@ const VehicleTimeline: React.FC<{
                                 aria-pressed={targetYear === y}
                                 style={{
                                   padding: '2px 6px',
-                                  fontSize: '8pt',
+                                  fontSize: '11px',
                                   lineHeight: '16px',
                                   height: 20,
                                   whiteSpace: 'nowrap',
@@ -1045,7 +1045,7 @@ const VehicleTimeline: React.FC<{
                               alignItems: 'center',
                               justifyContent: 'center',
                               flex: '0 0 auto',
-                              fontSize: '9pt',
+                              fontSize: '12px',
                               fontWeight: 800,
                             }}
                           >
@@ -1078,7 +1078,7 @@ const VehicleTimeline: React.FC<{
                                 style={{
                                   gridColumn: `${startWeek + 2} / span ${monthWidth}`,
                                   textAlign: 'center',
-                                  fontSize: '8pt',
+                                  fontSize: '11px',
                                   color: 'var(--text-muted)',
                                   lineHeight: '8px',
                                   fontWeight: 500
@@ -1134,7 +1134,7 @@ const VehicleTimeline: React.FC<{
                             {/* Weekday labels (Mon-Sun) */}
                             <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, 12px)', gap: '2px' }}>
                               {['M','T','W','T','F','S','S'].map((d, i) => (
-                                <div key={i} style={{ textAlign: 'center', fontSize: '8pt', color: 'var(--text-muted)', lineHeight: '12px', fontWeight: 500 }}>{d}</div>
+                                <div key={i} style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', lineHeight: '12px', fontWeight: 500 }}>{d}</div>
                               ))}
                             </div>
                             {/* Timeline grid */}
@@ -1629,23 +1629,23 @@ const VehicleTimeline: React.FC<{
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                         {totalCost > 0 && (
                           <div>
-                            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COST</div>
-                            <div style={{ fontSize: '16pt', fontWeight: 700 }}>${Math.round(totalCost).toLocaleString()}</div>
-                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 2 }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COST</div>
+                            <div style={{ fontSize: '21px', fontWeight: 700 }}>${Math.round(totalCost).toLocaleString()}</div>
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 2 }}>
                               {dayInvoicesLoading ? 'Loading invoices…' : invoiceCount > 0 ? `From ${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} (fallback: estimate)` : 'Estimated (no invoices yet)'}
                             </div>
                           </div>
                         )}
                         {totalHours > 0 && (
                           <div>
-                            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>LABOR</div>
-                            <div style={{ fontSize: '14pt', fontWeight: 700 }}>{totalHours.toFixed(1)}h</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>LABOR</div>
+                            <div style={{ fontSize: '19px', fontWeight: 700 }}>{totalHours.toFixed(1)}h</div>
                           </div>
                         )}
                         {photoCount > 0 && (
                           <div>
-                            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>DOCUMENTATION</div>
-                            <div style={{ fontSize: '14pt', fontWeight: 700 }}>{photoCount} photos</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>DOCUMENTATION</div>
+                            <div style={{ fontSize: '19px', fontWeight: 700 }}>{photoCount} photos</div>
                           </div>
                         )}
                       </div>
@@ -1682,13 +1682,13 @@ const VehicleTimeline: React.FC<{
                         marginBottom: 12,
                       }}
                     >
-                      <div style={{ fontSize: '9pt', fontWeight: 800, letterSpacing: '0.5px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.5px' }}>
                         Daily Auction Receipt
                       </div>
-                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.35 }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.35 }}>
                         {summaryParts.join(' • ')}
                       </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 6 }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 6 }}>
                         Vehicle-first note: we log auction activity as evidence about the vehicle and the market, not as an endorsement of the auction platform.
                       </div>
                     </div>
@@ -1806,7 +1806,7 @@ const VehicleTimeline: React.FC<{
                                   <h4 className="text" style={{ marginBottom: 'var(--space-1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     {isFuture && (
                                       <span style={{
-                                        fontSize: '7pt',
+                                        fontSize: '9px',
                                         fontWeight: 700,
                                         color: '#1d4ed8',
                                         background: '#dbeafe',

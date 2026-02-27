@@ -153,10 +153,10 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
     return (
       <div className="card">
         <div className="card-body" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '11pt', fontWeight: 600, marginBottom: '8px' }}>
+          <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>
             No duplicate vehicles detected
           </div>
-          <div style={{ fontSize: '9pt' }}>
+          <div style={{ fontSize: '12px' }}>
             When potential duplicates are found, they'll appear here for review and merging.
           </div>
         </div>
@@ -169,7 +169,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
       {proposals.map((proposal) => (
         <div key={proposal.id} className="card">
           <div className="card-header" style={{
-            fontSize: '10pt',
+            fontSize: '13px',
             fontWeight: 700,
             background: 'var(--warning-dim)',
             borderBottom: '2px solid var(--warning)',
@@ -183,7 +183,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
               background: 'var(--warning)',
               color: 'white',
               borderRadius: '4px',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               {proposal.confidence_score}% Match
             </span>
@@ -202,18 +202,18 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                 }}
                 onClick={() => navigate(`/vehicle/${proposal.primary_vehicle_id}`)}
               >
-                <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--success)', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success)', marginBottom: '8px' }}>
                   PRIMARY (KEEP)
                 </div>
-                <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                   {proposal.primary_vehicle?.year} {proposal.primary_vehicle?.make} {proposal.primary_vehicle?.model}
                 </div>
                 {proposal.primary_vehicle?.trim && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                     {proposal.primary_vehicle.trim}
                   </div>
                 )}
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {proposal.primary_vehicle?.vin ? (
                     <div style={{ fontFamily: 'monospace', marginBottom: '4px' }}>
                       VIN: {proposal.primary_vehicle.vin}
@@ -230,7 +230,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '24pt',
+                fontSize: '32px',
                 color: 'var(--text-muted)'
               }}>
                 ←
@@ -247,18 +247,18 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                 }}
                 onClick={() => navigate(`/vehicle/${proposal.duplicate_vehicle_id}`)}
               >
-                <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--error)', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--error)', marginBottom: '8px' }}>
                   DUPLICATE (MERGE INTO PRIMARY)
                 </div>
-                <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                   {proposal.duplicate_vehicle?.year} {proposal.duplicate_vehicle?.make} {proposal.duplicate_vehicle?.model}
                 </div>
                 {proposal.duplicate_vehicle?.trim && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                     {proposal.duplicate_vehicle.trim}
                   </div>
                 )}
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {proposal.duplicate_vehicle?.vin ? (
                     <div style={{ fontFamily: 'monospace', marginBottom: '4px' }}>
                       VIN: {proposal.duplicate_vehicle.vin}
@@ -279,10 +279,10 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                 background: 'var(--bg-secondary)',
                 borderRadius: '4px'
               }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>
                   Match Reasons:
                 </div>
-                <ul style={{ fontSize: '8pt', margin: 0, paddingLeft: '20px' }}>
+                <ul style={{ fontSize: '11px', margin: 0, paddingLeft: '20px' }}>
                   {proposal.reasons.filter(Boolean).map((reason, idx) => (
                     <li key={idx}>{reason}</li>
                   ))}
@@ -301,7 +301,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
               <button
                 onClick={() => handleReject(proposal.id)}
                 className="button button-secondary"
-                style={{ flex: 1, fontSize: '9pt' }}
+                style={{ flex: 1, fontSize: '12px' }}
                 disabled={merging === proposal.id}
               >
                 Not a Duplicate
@@ -313,7 +313,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                   proposal.duplicate_vehicle_id
                 )}
                 className="button button-primary"
-                style={{ flex: 1, fontSize: '9pt' }}
+                style={{ flex: 1, fontSize: '12px' }}
                 disabled={merging === proposal.id}
               >
                 {merging === proposal.id ? 'Merging...' : 'Merge Vehicles'}

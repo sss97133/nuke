@@ -290,8 +290,8 @@ export default function ProxyBidOperations() {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h1 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>Proxy Bid Operations</h1>
-                <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                <h1 style={{ margin: 0, fontSize: '19px', fontWeight: 700 }}>Proxy Bid Operations</h1>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Manage and execute proxy bids for users
                 </p>
               </div>
@@ -299,7 +299,7 @@ export default function ProxyBidOperations() {
                 className="button button-small"
                 onClick={loadBids}
                 disabled={loading}
-                style={{ fontSize: '8pt' }}
+                style={{ fontSize: '11px' }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </button>
@@ -311,7 +311,7 @@ export default function ProxyBidOperations() {
                     key={f}
                     className={`button button-small ${filter === f ? 'button-primary' : ''}`}
                     onClick={() => setFilter(f)}
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   >
                     {f.charAt(0).toUpperCase() + f.slice(1)}
                   </button>
@@ -326,11 +326,11 @@ export default function ProxyBidOperations() {
           <div className="card">
             <div className="card-body">
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
                   Loading bids...
                 </div>
               ) : bids.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
                   No proxy bids found
                 </div>
               ) : (
@@ -361,12 +361,12 @@ export default function ProxyBidOperations() {
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div>
-                              <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700 }}>
                                 {bid.vehicle
                                   ? `${bid.vehicle.year} ${bid.vehicle.make} ${bid.vehicle.model}`
                                   : 'Unknown Vehicle'}
                               </div>
-                              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                 {PLATFORM_NAMES[bid.platform] || bid.platform} • {bid.user_profile?.username || 'Unknown User'}
                               </div>
                             </div>
@@ -377,7 +377,7 @@ export default function ProxyBidOperations() {
                                   color: '#fff',
                                   padding: '2px 8px',
                                   borderRadius: '3px',
-                                  fontSize: '7pt',
+                                  fontSize: '9px',
                                   fontWeight: 700,
                                   textTransform: 'uppercase',
                                 }}
@@ -387,7 +387,7 @@ export default function ProxyBidOperations() {
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', gap: '20px', marginTop: '8px', fontSize: '8pt' }}>
+                          <div style={{ display: 'flex', gap: '20px', marginTop: '8px', fontSize: '11px' }}>
                             <div>
                               <span style={{ color: 'var(--text-muted)' }}>Max Bid:</span>{' '}
                               <strong>{formatCurrency(bid.max_bid_cents)}</strong>
@@ -416,7 +416,7 @@ export default function ProxyBidOperations() {
                               className="button button-small button-primary"
                               onClick={(e) => { e.stopPropagation(); handleAssignToSelf(bid); }}
                               disabled={actionLoading}
-                              style={{ fontSize: '7pt' }}
+                              style={{ fontSize: '9px' }}
                             >
                               Claim
                             </button>
@@ -427,7 +427,7 @@ export default function ProxyBidOperations() {
                             rel="noopener noreferrer"
                             className="button button-small"
                             onClick={(e) => e.stopPropagation()}
-                            style={{ fontSize: '7pt', textAlign: 'center' }}
+                            style={{ fontSize: '9px', textAlign: 'center' }}
                           >
                             Open Auction
                           </a>
@@ -440,21 +440,21 @@ export default function ProxyBidOperations() {
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                             {/* Actions */}
                             <div>
-                              <h4 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Actions</h4>
+                              <h4 style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Actions</h4>
 
                               {bid.assignment?.assigned_operator_id === user?.id && bid.assignment?.status === 'assigned' && (
                                 <button
                                   className="button button-small"
                                   onClick={() => handleStartWorking(bid)}
                                   disabled={actionLoading}
-                                  style={{ fontSize: '8pt', marginBottom: '8px' }}
+                                  style={{ fontSize: '11px', marginBottom: '8px' }}
                                 >
                                   Start Working
                                 </button>
                               )}
 
                               <div style={{ marginBottom: '8px' }}>
-                                <label style={{ display: 'block', fontSize: '7pt', marginBottom: '4px' }}>
+                                <label style={{ display: 'block', fontSize: '9px', marginBottom: '4px' }}>
                                   Current Bid (our bid amount)
                                 </label>
                                 <input
@@ -462,12 +462,12 @@ export default function ProxyBidOperations() {
                                   value={currentBidInput}
                                   onChange={(e) => setCurrentBidInput(e.target.value)}
                                   placeholder="Enter amount"
-                                  style={{ width: '100%', padding: '6px', fontSize: '8pt', border: '1px solid var(--border)' }}
+                                  style={{ width: '100%', padding: '6px', fontSize: '11px', border: '1px solid var(--border)' }}
                                 />
                               </div>
 
                               <div style={{ marginBottom: '8px' }}>
-                                <label style={{ display: 'block', fontSize: '7pt', marginBottom: '4px' }}>
+                                <label style={{ display: 'block', fontSize: '9px', marginBottom: '4px' }}>
                                   Note
                                 </label>
                                 <textarea
@@ -475,7 +475,7 @@ export default function ProxyBidOperations() {
                                   onChange={(e) => setActionNote(e.target.value)}
                                   placeholder="Add a note..."
                                   rows={2}
-                                  style={{ width: '100%', padding: '6px', fontSize: '8pt', border: '1px solid var(--border)', resize: 'none' }}
+                                  style={{ width: '100%', padding: '6px', fontSize: '11px', border: '1px solid var(--border)', resize: 'none' }}
                                 />
                               </div>
 
@@ -484,7 +484,7 @@ export default function ProxyBidOperations() {
                                   className="button button-small"
                                   onClick={() => handleLogAction(bid, 'bid_placed')}
                                   disabled={actionLoading}
-                                  style={{ fontSize: '7pt' }}
+                                  style={{ fontSize: '9px' }}
                                 >
                                   Log Bid
                                 </button>
@@ -492,7 +492,7 @@ export default function ProxyBidOperations() {
                                   className="button button-small"
                                   onClick={() => handleLogAction(bid, 'bid_increased')}
                                   disabled={actionLoading}
-                                  style={{ fontSize: '7pt' }}
+                                  style={{ fontSize: '9px' }}
                                 >
                                   Bid Increased
                                 </button>
@@ -500,7 +500,7 @@ export default function ProxyBidOperations() {
                                   className="button button-small"
                                   onClick={() => handleLogAction(bid, 'outbid')}
                                   disabled={actionLoading}
-                                  style={{ fontSize: '7pt' }}
+                                  style={{ fontSize: '9px' }}
                                 >
                                   Outbid
                                 </button>
@@ -512,7 +512,7 @@ export default function ProxyBidOperations() {
                                     className="button button-small"
                                     onClick={() => handleMarkStatus(bid, 'won')}
                                     disabled={actionLoading}
-                                    style={{ fontSize: '7pt', background: '#059669', color: '#fff' }}
+                                    style={{ fontSize: '9px', background: '#059669', color: '#fff' }}
                                   >
                                     Mark Won
                                   </button>
@@ -520,7 +520,7 @@ export default function ProxyBidOperations() {
                                     className="button button-small"
                                     onClick={() => handleMarkStatus(bid, 'lost')}
                                     disabled={actionLoading}
-                                    style={{ fontSize: '7pt', background: '#6b7280', color: '#fff' }}
+                                    style={{ fontSize: '9px', background: '#6b7280', color: '#fff' }}
                                   >
                                     Mark Lost
                                   </button>
@@ -530,14 +530,14 @@ export default function ProxyBidOperations() {
 
                             {/* Execution Log */}
                             <div>
-                              <h4 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>Execution Log</h4>
+                              <h4 style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Execution Log</h4>
                               <div style={{
                                 background: 'var(--surface-hover)',
                                 padding: '8px',
                                 borderRadius: '4px',
                                 maxHeight: '200px',
                                 overflowY: 'auto',
-                                fontSize: '7pt'
+                                fontSize: '9px'
                               }}>
                                 {(bid.execution_log as any[] || []).length === 0 ? (
                                   <div style={{ color: 'var(--text-muted)' }}>No actions yet</div>

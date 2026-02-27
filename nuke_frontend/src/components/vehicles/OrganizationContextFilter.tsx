@@ -66,7 +66,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
 
   if (loading) {
     return (
-      <div style={{ padding: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
         Loading organizations...
       </div>
     );
@@ -74,7 +74,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
 
   return (
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-      <label style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text-muted)' }}>
+      <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
         View:
       </label>
       
@@ -83,7 +83,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
           onClick={() => onOrganizationChange(null)}
           style={{
             padding: '6px 12px',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 600,
             border: selectedOrganizationId === null ? '2px solid var(--accent)' : '1px solid var(--border)',
             background: selectedOrganizationId === null ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
@@ -103,7 +103,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
           onClick={() => onOrganizationChange(org.organization_id)}
           style={{
             padding: '6px 12px',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 600,
             border: selectedOrganizationId === org.organization_id ? '2px solid var(--accent)' : '1px solid var(--border)',
             background: selectedOrganizationId === org.organization_id ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
@@ -136,7 +136,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
               }
             }}
             style={{
-              fontSize: '9pt',
+              fontSize: '12px',
               lineHeight: 1,
               opacity: org.preferences?.is_pinned ? 1 : 0.4,
               color: org.preferences?.is_pinned ? 'var(--accent)' : 'var(--text-muted)',
@@ -160,7 +160,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
           )}
           <span>{org.organization.business_name}</span>
           {org.stats && (
-            <span style={{ fontSize: '7pt', opacity: 0.7 }}>
+            <span style={{ fontSize: '9px', opacity: 0.7 }}>
               ({org.stats.vehicle_count})
             </span>
           )}
@@ -168,7 +168,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
       ))}
 
       {organizations.length === 0 && (
-        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
           No organizations found
         </div>
       )}

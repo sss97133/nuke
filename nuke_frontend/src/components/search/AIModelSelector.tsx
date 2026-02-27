@@ -167,7 +167,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 cursor: 'pointer',
-                fontSize: '8pt',
+                fontSize: '11px',
                 borderBottom: '1px solid var(--border-light)'
               }}
               onClick={() => handleToggle(model.provider, model.modelName, model.enabled)}
@@ -186,7 +186,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '10pt'
+                fontSize: '13px'
               }}>
                 {model.enabled && '✓'}
               </div>

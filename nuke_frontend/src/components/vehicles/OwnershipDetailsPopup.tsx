@@ -203,7 +203,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
       >
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '12pt', fontWeight: 700, margin: 0 }}>Ownership History</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Ownership History</h3>
           <button
             onClick={onClose}
             style={{
@@ -211,7 +211,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--white)',
               cursor: 'pointer',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}
           >
             CLOSE
@@ -221,14 +221,14 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
         {/* Sale Info */}
         {salePrice && (
           <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--grey-100)', borderRadius: '4px' }}>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
               Sale Price
             </div>
-            <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+            <div style={{ fontSize: '19px', fontWeight: 700 }}>
               {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(salePrice)}
             </div>
             {saleDate && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {new Date(saleDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
               </div>
             )}
@@ -247,14 +247,14 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                 {(() => {
                   if (recentTransfers.length > 0) {
                     return (
-                      <div style={{ padding: '8px', background: '#fef3c7', borderRadius: '4px', fontSize: '8pt' }}>
+                      <div style={{ padding: '8px', background: '#fef3c7', borderRadius: '4px', fontSize: '11px' }}>
                         <strong>Recent Ownership Change:</strong> {recentTransfers.length} transfer{recentTransfers.length > 1 ? 's' : ''} in last 90 days
                       </div>
                     );
                   }
                   if (ownerships.length >= 3) {
                     return (
-                      <div style={{ padding: '8px', background: '#e0e7ff', borderRadius: '4px', fontSize: '8pt' }}>
+                      <div style={{ padding: '8px', background: '#e0e7ff', borderRadius: '4px', fontSize: '11px' }}>
                         <strong>Multiple Owners:</strong> {ownerships.length} total owners
                       </div>
                     );
@@ -263,7 +263,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                     const daysOwned = (Date.now() - new Date(currentOwners[0].start_date).getTime()) / (1000 * 60 * 60 * 24);
                     if (daysOwned > 365) {
                       return (
-                        <div style={{ padding: '8px', background: '#dcfce7', borderRadius: '4px', fontSize: '8pt' }}>
+                        <div style={{ padding: '8px', background: '#dcfce7', borderRadius: '4px', fontSize: '11px' }}>
                           <strong>Stable Ownership:</strong> {Math.floor(daysOwned / 365)} year{Math.floor(daysOwned / 365) > 1 ? 's' : ''} owned
                         </div>
                       );
@@ -277,7 +277,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
             {/* Current Owners */}
             {currentOwners.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--text-muted)' }}>
                   Current Owner{currentOwners.length > 1 ? 's' : ''}
                 </div>
                 {currentOwners.map((owner, idx) => (
@@ -286,12 +286,12 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                       {getOwnerName(owner)}
                     </div>
                     {owner.start_date && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                         Since {new Date(owner.start_date).toLocaleDateString()}
                       </div>
                     )}
                     {owner.role && owner.role !== 'owner' && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                         Role: {owner.role}
                       </div>
                     )}
@@ -303,11 +303,11 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
             {/* Ownership Transfers */}
             {transfers.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--text-muted)' }}>
                   Ownership Transfers ({transfers.length})
                 </div>
                 {transfers.slice(0, 5).map((transfer, idx) => (
-                  <div key={idx} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', marginBottom: '4px', fontSize: '8pt' }}>
+                  <div key={idx} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', marginBottom: '4px', fontSize: '11px' }}>
                     <div style={{ fontWeight: 600, marginBottom: '4px' }}>
                       {new Date(transfer.transfer_date).toLocaleDateString()}
                     </div>
@@ -315,19 +315,19 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                       {getTransferFromName(transfer)} → {getTransferToName(transfer)}
                     </div>
                     {transfer.source && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
                         Source: {transfer.source}
                       </div>
                     )}
                     {transfer.price && (
-                      <div style={{ fontSize: '7pt', fontWeight: 600, marginTop: '2px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 600, marginTop: '2px' }}>
                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(transfer.price)}
                       </div>
                     )}
                   </div>
                 ))}
                 {transfers.length > 5 && (
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                     +{transfers.length - 5} more transfers
                   </div>
                 )}
@@ -337,11 +337,11 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
             {/* Historical Owners */}
             {historicalOwners.length > 0 && (
               <div>
-                <div style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--text-muted)' }}>
                   Previous Owner{historicalOwners.length > 1 ? 's' : ''} ({historicalOwners.length})
                 </div>
                 {historicalOwners.slice(0, 3).map((owner, idx) => (
-                  <div key={idx} style={{ padding: '6px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+                  <div key={idx} style={{ padding: '6px', fontSize: '9px', color: 'var(--text-muted)' }}>
                     {getOwnerName(owner)}
                     {owner.start_date && owner.end_date && (
                       <span> ({new Date(owner.start_date).getFullYear()}-{new Date(owner.end_date).getFullYear()})</span>
@@ -353,9 +353,9 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
 
             {/* Empty State */}
             {ownerships.length === 0 && transfers.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '8pt' }}>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '11px' }}>
                 <div style={{ marginBottom: '8px' }}>No ownership history available</div>
-                <div style={{ fontSize: '7pt', opacity: 0.7 }}>
+                <div style={{ fontSize: '9px', opacity: 0.7 }}>
                   Ownership data will appear here as transfers are recorded from sales and title verifications.
                 </div>
               </div>

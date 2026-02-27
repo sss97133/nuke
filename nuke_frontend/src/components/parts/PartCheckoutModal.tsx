@@ -34,17 +34,17 @@ const PartCheckoutModal: React.FC<PartCheckoutModalProps> = ({ isOpen, part, onC
 					maxWidth: 520
 				}}
 			>
-				<div style={{ fontWeight: 700, marginBottom: 8, fontSize: '10pt' }}>Checkout</div>
-				<div style={{ fontSize: '9pt', marginBottom: 12 }}>
+				<div style={{ fontWeight: 700, marginBottom: 8, fontSize: '13px' }}>Checkout</div>
+				<div style={{ fontSize: '12px', marginBottom: 12 }}>
 					{part?.name || 'Selected Part'}
 				</div>
 				<div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-					<button className="button" style={{ fontSize: '8pt' }} onClick={onClose}>
+					<button className="button" style={{ fontSize: '11px' }} onClick={onClose}>
 						Cancel
 					</button>
 					<button
 						className="button button-primary"
-						style={{ fontSize: '8pt' }}
+						style={{ fontSize: '11px' }}
 						onClick={() => {
 							onSuccess(`purchase_${Date.now()}`);
 							onClose();

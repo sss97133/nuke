@@ -103,7 +103,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
         Loading inventory...
       </div>
     );
@@ -117,7 +117,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
           <button
             onClick={() => setShowAddModal(true)}
             className="button button-primary button-small"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
           >
             Add Item
           </button>
@@ -133,7 +133,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
             style={{
               flex: 1,
               padding: '8px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: 'none',
               background: filter === type ? 'var(--white)' : 'transparent',
               borderBottom: filter === type ? '2px solid var(--accent)' : 'none',
@@ -149,7 +149,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
 
       <div className="card-body">
         {filteredItems.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
             {filter === 'all' ? 'No inventory items yet' : `No ${filter} items yet`}
           </div>
         ) : (
@@ -186,7 +186,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
                       color: '#fff',
                       padding: '4px 8px',
                       borderRadius: '2px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 700
                     }}>
                       {itemTypeLabels[item.item_type].toUpperCase()}
@@ -196,18 +196,18 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
 
                 {/* Details */}
                 <div style={{ padding: '12px' }}>
-                  <div style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '4px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>
                     {item.name}
                   </div>
 
                   {(item.brand || item.model) && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                       {item.brand} {item.model}
                     </div>
                   )}
 
                   {item.description && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.4 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.4 }}>
                       {item.description}
                     </div>
                   )}
@@ -224,26 +224,26 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
                   }}>
                     {item.quantity && item.quantity > 1 && (
                       <div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Quantity</div>
-                        <div style={{ fontSize: '9pt', fontWeight: 700 }}>{item.quantity}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Quantity</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700 }}>{item.quantity}</div>
                       </div>
                     )}
                     {item.value_usd && (
                       <div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Value</div>
-                        <div style={{ fontSize: '9pt', fontWeight: 700 }}>${item.value_usd.toLocaleString()}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Value</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700 }}>${item.value_usd.toLocaleString()}</div>
                       </div>
                     )}
                     {item.condition && (
                       <div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Condition</div>
-                        <div style={{ fontSize: '9pt', fontWeight: 700, textTransform: 'capitalize' }}>{item.condition}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Condition</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'capitalize' }}>{item.condition}</div>
                       </div>
                     )}
                     {item.acquisition_date && (
                       <div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Acquired</div>
-                        <div style={{ fontSize: '9pt', fontWeight: 700 }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Acquired</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700 }}>
                           {new Date(item.acquisition_date).getFullYear()}
                         </div>
                       </div>
@@ -266,7 +266,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
                         alt={item.profiles?.full_name}
                         style={{ width: '20px', height: '20px', borderRadius: '50%' }}
                       />
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                         Added by {item.profiles?.full_name || item.profiles?.username}
                       </div>
                     </div>
@@ -277,7 +277,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
                           setEditingItem(item);
                         }}
                         className="button button-secondary button-small"
-                        style={{ fontSize: '7pt', padding: '2px 6px' }}
+                        style={{ fontSize: '9px', padding: '2px 6px' }}
                       >
                         Edit
                       </button>
@@ -448,22 +448,22 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
         }}
       >
         <div style={{ padding: '12px', borderBottom: '2px solid var(--border)', background: 'var(--surface)' }}>
-          <h2 style={{ margin: 0, fontSize: '11pt', fontWeight: 700 }}>Add Inventory Item</h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Add Inventory Item</h2>
+          <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
             Showcase your tools, equipment, and capabilities
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: '16px' }}>
           <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '2px' }}>
               Item Type *
             </label>
             <select
               value={itemType}
               onChange={(e) => setItemType(e.target.value as any)}
               className="form-select"
-              style={{ width: '100%', fontSize: '9pt' }}
+              style={{ width: '100%', fontSize: '12px' }}
               required
             >
               <option value="tool">Tool</option>
@@ -475,7 +475,7 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
           </div>
 
           <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '2px' }}>
               Name/Description *
             </label>
             <input
@@ -484,14 +484,14 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
               onChange={(e) => setName(e.target.value)}
               required
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt' }}
+              style={{ width: '100%', fontSize: '12px' }}
               placeholder="e.g., 4-Post Lift, Snap-On Diagnostic Scanner"
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Brand
               </label>
               <input
@@ -499,12 +499,12 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
                 placeholder="Snap-On, Rotary, etc."
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Model
               </label>
               <input
@@ -512,28 +512,28 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
                 placeholder="SPX-40, etc."
               />
             </div>
           </div>
 
           <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '2px' }}>
               Details
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt', minHeight: '60px' }}
+              style={{ width: '100%', fontSize: '12px', minHeight: '60px' }}
               placeholder="What makes this special? Capabilities, specs, history..."
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Quantity
               </label>
               <input
@@ -541,12 +541,12 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
                 min="1"
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Value (USD)
               </label>
               <input
@@ -554,20 +554,20 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
                 value={valueUsd}
                 onChange={(e) => setValueUsd(e.target.value ? parseFloat(e.target.value) : '')}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
                 placeholder="0"
                 step="0.01"
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Condition
               </label>
               <select
                 value={condition}
                 onChange={(e) => setCondition(e.target.value)}
                 className="form-select"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
               >
                 <option value="excellent">Excellent</option>
                 <option value="good">Good</option>
@@ -578,7 +578,7 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
           </div>
 
           <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '2px' }}>
               Acquisition Date
             </label>
             <input
@@ -586,12 +586,12 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
               value={acquisitionDate}
               onChange={(e) => setAcquisitionDate(e.target.value)}
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt' }}
+              style={{ width: '100%', fontSize: '12px' }}
             />
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
               Photo
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
@@ -625,11 +625,11 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
                   fileInputRef.current?.click();
                 }}
                 className="button button-secondary button-small"
-                style={{ fontSize: '8pt', cursor: 'pointer', position: 'relative', zIndex: 1 }}
+                style={{ fontSize: '11px', cursor: 'pointer', position: 'relative', zIndex: 1 }}
               >
                 Choose File
               </button>
-              <span style={{ fontSize: '8pt', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {selectedFileName || 'No file selected'}
               </span>
             </div>
@@ -640,7 +640,7 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
               type="button"
               onClick={onClose}
               className="button button-secondary button-small"
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               Cancel
             </button>
@@ -648,14 +648,14 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
               type="submit"
               disabled={submitting || !name}
               className="button button-primary button-small"
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               {submitting ? 'Adding...' : 'Add to Inventory'}
             </button>
           </div>
         </form>
 
-        <div style={{ padding: '12px', background: 'var(--surface)', borderTop: '1px solid var(--border)', fontSize: '7pt', color: 'var(--text-muted)' }}>
+        <div style={{ padding: '12px', background: 'var(--surface)', borderTop: '1px solid var(--border)', fontSize: '9px', color: 'var(--text-muted)' }}>
           Your submission will be attributed to you and appear in the org timeline
         </div>
       </div>
@@ -785,19 +785,19 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
         }}
       >
         <div style={{ padding: '16px', borderBottom: '2px solid var(--border)', background: 'var(--surface)' }}>
-          <h2 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>Edit Inventory Item</h2>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Edit Inventory Item</h2>
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: '16px' }}>
           <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '2px' }}>
               Item Type *
             </label>
             <select
               value={itemType}
               onChange={(e) => setItemType(e.target.value as any)}
               className="form-select"
-              style={{ width: '100%', fontSize: '9pt' }}
+              style={{ width: '100%', fontSize: '12px' }}
               required
             >
               <option value="tool">Tool</option>
@@ -809,7 +809,7 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
           </div>
 
           <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '2px' }}>
               Name/Description *
             </label>
             <input
@@ -818,13 +818,13 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
               onChange={(e) => setName(e.target.value)}
               required
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt' }}
+              style={{ width: '100%', fontSize: '12px' }}
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Brand
               </label>
               <input
@@ -832,11 +832,11 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Model
               </label>
               <input
@@ -844,26 +844,26 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
               />
             </div>
           </div>
 
           <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '2px' }}>
               Details
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt', minHeight: '60px' }}
+              style={{ width: '100%', fontSize: '12px', minHeight: '60px' }}
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Quantity
               </label>
               <input
@@ -871,12 +871,12 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
                 min="1"
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Value (USD)
               </label>
               <input
@@ -884,19 +884,19 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
                 value={valueUsd}
                 onChange={(e) => setValueUsd(e.target.value ? parseFloat(e.target.value) : '')}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
                 step="0.01"
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Condition
               </label>
               <select
                 value={condition}
                 onChange={(e) => setCondition(e.target.value)}
                 className="form-select"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
               >
                 <option value="excellent">Excellent</option>
                 <option value="good">Good</option>
@@ -907,7 +907,7 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
           </div>
 
           <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '2px' }}>
               Acquisition Date
             </label>
             <input
@@ -915,12 +915,12 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
               value={acquisitionDate}
               onChange={(e) => setAcquisitionDate(e.target.value)}
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt' }}
+              style={{ width: '100%', fontSize: '12px' }}
             />
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
               Photo {item.image_url && '(upload new to replace)'}
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
@@ -954,11 +954,11 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
                   fileInputRef.current?.click();
                 }}
                 className="button button-secondary button-small"
-                style={{ fontSize: '8pt', cursor: 'pointer', position: 'relative', zIndex: 1 }}
+                style={{ fontSize: '11px', cursor: 'pointer', position: 'relative', zIndex: 1 }}
               >
                 Choose File
               </button>
-              <span style={{ fontSize: '8pt', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {selectedFileName || (item.image_url ? 'Current image' : 'No file selected')}
               </span>
             </div>
@@ -970,7 +970,7 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
               onClick={handleDelete}
               disabled={deleting}
               className="button button-small"
-              style={{ fontSize: '8pt', background: 'var(--danger)', color: 'white', border: 'none' }}
+              style={{ fontSize: '11px', background: 'var(--danger)', color: 'white', border: 'none' }}
             >
               {deleting ? 'Deleting...' : 'Delete'}
             </button>
@@ -979,7 +979,7 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
                 type="button"
                 onClick={onClose}
                 className="button button-secondary button-small"
-                style={{ fontSize: '8pt' }}
+                style={{ fontSize: '11px' }}
               >
                 Cancel
               </button>
@@ -987,7 +987,7 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
                 type="submit"
                 disabled={submitting || !name}
                 className="button button-primary button-small"
-                style={{ fontSize: '8pt' }}
+                style={{ fontSize: '11px' }}
               >
                 {submitting ? 'Saving...' : 'Save Changes'}
               </button>

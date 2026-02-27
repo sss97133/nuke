@@ -588,25 +588,25 @@ const DealerDropboxImport: React.FC = () => {
         <button
           onClick={() => navigate(`/org/${orgId}`)}
           className="button button-secondary"
-          style={{ fontSize: '9pt', marginBottom: '12px' }}
+          style={{ fontSize: '12px', marginBottom: '12px' }}
         >
           ← Back to Organization
         </button>
-        <h1 style={{ fontSize: '14pt', fontWeight: 700, margin: 0 }}>
+        <h1 style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>
           Dealer Inventory Import
         </h1>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <h2 style={{ fontSize: '14pt', fontWeight: 700, margin: 0 }}>
+          <h2 style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>
             Dropbox Bulk Import - Yucca Car Inventory
           </h2>
         </div>
         <div className="card-body">
           {!isConnected ? (
               <div style={{ textAlign: 'center', padding: '40px' }}>
-                <div style={{ fontSize: '10pt', marginBottom: '20px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '13px', marginBottom: '20px', color: 'var(--text-secondary)' }}>
                   Connect Dropbox to import vehicles from "Yucca Car Inventory"
                 </div>
                 <button onClick={connectDropbox} className="button button-primary">
@@ -618,33 +618,33 @@ const DealerDropboxImport: React.FC = () => {
                 <div style={{ marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   {needsReconnect ? (
                     <>
-                      <div style={{ fontSize: '9pt', color: 'var(--error)', fontWeight: 700 }}>
+                      <div style={{ fontSize: '12px', color: 'var(--error)', fontWeight: 700 }}>
                         Missing Permissions - Reconnect Required
                       </div>
                       <button
                         onClick={disconnectDropbox}
                         className="button button-secondary button-small"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                       >
                         Disconnect
                       </button>
                       <button
                         onClick={connectDropbox}
                         className="button button-primary button-small"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                       >
                         Reconnect Dropbox
                       </button>
                     </>
                   ) : (
                     <>
-                      <div style={{ fontSize: '9pt', color: 'var(--success)' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--success)' }}>
                         Dropbox connected
                       </div>
                       <button
                         onClick={disconnectDropbox}
                         className="button button-secondary button-small"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                       >
                         Disconnect
                       </button>
@@ -652,7 +652,7 @@ const DealerDropboxImport: React.FC = () => {
                         onClick={scanInventory}
                         disabled={scanning}
                         className="button button-secondary button-small"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                       >
                         {scanning ? 'Scanning...' : 'Rescan Inventory'}
                       </button>
@@ -666,7 +666,7 @@ const DealerDropboxImport: React.FC = () => {
                         }}
                         disabled={autoSyncInProgress || importing}
                         className="button button-primary button-small"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                       >
                         {autoSyncInProgress ? 'Syncing...' : 'Sync Images'}
                       </button>
@@ -681,7 +681,7 @@ const DealerDropboxImport: React.FC = () => {
                     border: '1px solid #ffc107',
                     borderRadius: '4px',
                     marginBottom: '12px',
-                    fontSize: '9pt'
+                    fontSize: '12px'
                   }}>
                     Auto-syncing missing images for existing vehicles...
                   </div>
@@ -695,13 +695,13 @@ const DealerDropboxImport: React.FC = () => {
                     borderRadius: '4px',
                     marginBottom: '20px'
                   }}>
-                    <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '8px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
                       Importing...
                     </div>
-                    <div style={{ fontSize: '9pt' }}>
+                    <div style={{ fontSize: '12px' }}>
                       {importProgress.completed} / {importProgress.total} folders processed
                     </div>
-                    <div style={{ fontSize: '9pt' }}>
+                    <div style={{ fontSize: '12px' }}>
                       {importProgress.created} new vehicles created
                     </div>
                   </div>
@@ -710,21 +710,21 @@ const DealerDropboxImport: React.FC = () => {
                 {vehicleFolders.length > 0 && (
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700 }}>
                         Found {vehicleFolders.length} vehicles
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={selectAll} className="button button-small" style={{ fontSize: '8pt' }}>
+                        <button onClick={selectAll} className="button button-small" style={{ fontSize: '11px' }}>
                           Select All
                         </button>
-                        <button onClick={deselectAll} className="button button-small" style={{ fontSize: '8pt' }}>
+                        <button onClick={deselectAll} className="button button-small" style={{ fontSize: '11px' }}>
                           Deselect All
                         </button>
                         <button
                           onClick={() => startImport()}
                           disabled={importing || selectedFolders.size === 0}
                           className="button button-primary button-small"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                         >
                           Import {selectedFolders.size} Selected
                         </button>
@@ -745,10 +745,10 @@ const DealerDropboxImport: React.FC = () => {
                             transition: 'all 0.12s ease'
                           }}
                         >
-                          <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                             {folder.name}
                           </div>
-                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                             {folder.images.length} images
                           </div>
                         </div>
@@ -758,7 +758,7 @@ const DealerDropboxImport: React.FC = () => {
                 )}
 
                 {vehicleFolders.length === 0 && !scanning && (
-                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
                     No vehicle folders found. Click "Rescan Inventory" to check Dropbox.
                   </div>
                 )}

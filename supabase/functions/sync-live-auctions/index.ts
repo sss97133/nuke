@@ -21,6 +21,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
+import { archiveFetch } from "../_shared/archiveFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -88,19 +89,22 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
   try {
     console.log("[sync-live-auctions] Fetching BaT live auctions page...");
 
-    const response = await fetch("https://bringatrailer.com/auctions/", {
-      headers: {
-        "User-Agent": USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
+    // Use archiveFetch so the page is stored in listing_page_snapshots for replay.
+    // skipCache: true because live auction data changes every ~15 min (this cron runs every 15 min).
+    const { html: batHtml, error: fetchError } = await archiveFetch(
+      "https://bringatrailer.com/auctions/",
+      {
+        platform: "bat",
+        skipCache: true,
+        callerName: "sync-live-auctions",
+      }
+    );
 
-    if (!response.ok) {
-      return { auctions: [], error: `BaT returned HTTP ${response.status}` };
+    if (fetchError || !batHtml) {
+      return { auctions: [], error: `BaT fetch failed: ${fetchError ?? "no HTML returned"}` };
     }
 
-    const html = await response.text();
+    const html = batHtml;
 
     // Extract the JSON data from the page
     const match = html.match(/var\s+auctionsCurrentInitialData\s*=\s*(\{[\s\S]*?\});/);

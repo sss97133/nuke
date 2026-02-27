@@ -163,10 +163,10 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
               <FaviconIcon url={orgData.website_url} size={24} />
             ) : null}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11pt', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: '15px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {organizationName}
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 {formatRelationship(relationshipType)}
               </div>
             </div>
@@ -181,7 +181,7 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
                   border: 'none',
                   borderRadius: '3px',
                   padding: '4px 8px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   textDecoration: 'none',
                   whiteSpace: 'nowrap',
@@ -227,7 +227,7 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
               <a
                 href={`tel:${orgData.phone.replace(/\D/g, '')}`}
                 style={{
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   fontWeight: 600,
                   color: 'var(--accent)',
                   textDecoration: 'none'
@@ -241,7 +241,7 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
                   <a
                     href={`mailto:${orgData.email}`}
                     style={{
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       color: 'var(--text-muted)',
                       textDecoration: 'none',
                       overflow: 'hidden',
@@ -261,15 +261,15 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
               Loading investment snapshot...
             </div>
           ) : metrics.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '12px' }}>
               <div style={{ marginBottom: '8px' }}>No investment metrics available</div>
-              <div style={{ fontSize: '8pt' }}>
+              <div style={{ fontSize: '11px' }}>
                 This organization needs more data to generate investment insights.
               </div>
             </div>
           ) : (
             <>
-              <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
                 INVESTMENT SNAPSHOT
               </div>
               
@@ -284,14 +284,14 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
                       border: '1px solid var(--border)'
                     }}
                   >
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       {metric.label}
                     </div>
-                    <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--text)' }}>
+                    <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text)' }}>
                       {metric.value}
                     </div>
                     {metric.description && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                         {metric.description}
                       </div>
                     )}

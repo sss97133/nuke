@@ -57,10 +57,10 @@ export const OrganizationServiceTab: React.FC<OrganizationServiceTabProps> = ({
   if (serviceVehicles.length === 0) {
     return (
       <div style={{ padding: '32px', textAlign: 'center' }}>
-        <div style={{ fontSize: '12pt', color: 'var(--grey-600)', marginBottom: '8px' }}>
+        <div style={{ fontSize: '16px', color: 'var(--grey-600)', marginBottom: '8px' }}>
           No service vehicles found
         </div>
-        <div style={{ fontSize: '9pt', color: 'var(--grey-500)' }}>
+        <div style={{ fontSize: '12px', color: 'var(--grey-500)' }}>
           Vehicles with service relationship will appear here
         </div>
       </div>
@@ -70,10 +70,10 @@ export const OrganizationServiceTab: React.FC<OrganizationServiceTabProps> = ({
   return (
     <div style={{ padding: '16px' }}>
       <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '11pt', fontWeight: 600, color: 'var(--grey-700)' }}>
+        <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--grey-700)' }}>
           Vehicles in Service ({serviceVehicles.length})
         </div>
-        <div style={{ fontSize: '9pt', color: 'var(--grey-600)', marginTop: '4px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--grey-600)', marginTop: '4px' }}>
           Showing vehicles with active service work
         </div>
       </div>

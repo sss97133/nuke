@@ -132,10 +132,10 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
       
       {/* Header */}
       <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '12px' }}>
-        <h2 style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '4px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
           AI PARTS QUOTE GENERATOR
         </h2>
-        <div style={{ fontSize: '8pt', color: '#666' }}>
+        <div style={{ fontSize: '11px', color: '#666' }}>
           {vehicleInfo.year} {vehicleInfo.make} {vehicleInfo.model}
         </div>
       </div>
@@ -148,7 +148,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
           style={{
             width: '100%',
             padding: '16px',
-            fontSize: '10pt',
+            fontSize: '13px',
             fontWeight: 700,
             border: '2px solid #000',
             background: loading ? '#ccc' : '#000',
@@ -165,7 +165,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
       {recommendations.length > 0 && (
         <>
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
               RECOMMENDED PARTS ({recommendations.length} found)
             </div>
             
@@ -191,7 +191,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                       <input
                         type="checkbox"
                         checked={selectedParts.has(idx)}
@@ -200,10 +200,10 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                       />
                       {rec.part_name}
                     </div>
-                    <div style={{ fontSize: '8pt', color: '#666', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
                       {rec.issue}
                     </div>
-                    <div style={{ fontSize: '7pt' }}>
+                    <div style={{ fontSize: '9px' }}>
                       <span style={{ 
                         padding: '2px 6px', 
                         background: getPriorityColor(rec.priority),
@@ -219,11 +219,11 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '12pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700 }}>
                       ${rec.estimated_cost?.toFixed(2) || 'N/A'}
                     </div>
                     {rec.catalog_matches.length > 0 && (
-                      <div style={{ fontSize: '7pt', color: '#666' }}>
+                      <div style={{ fontSize: '9px', color: '#666' }}>
                         {rec.catalog_matches[0].part_number}
                       </div>
                     )}
@@ -235,12 +235,12 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
 
           {/* Labor */}
           <div style={{ marginBottom: '16px', padding: '12px', background: '#f8f8f8', border: '2px solid #000' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
               LABOR ESTIMATE
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ fontSize: '8pt', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>
                   Hours
                 </label>
                 <input
@@ -251,13 +251,13 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                   style={{
                     width: '100%',
                     padding: '6px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     border: '2px solid #000'
                   }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: '8pt', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>
                   Rate ($/hr)
                 </label>
                 <input
@@ -267,7 +267,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                   style={{
                     width: '100%',
                     padding: '6px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     border: '2px solid #000'
                   }}
                 />
@@ -277,26 +277,26 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
 
           {/* Quote Summary */}
           <div style={{ padding: '12px', background: '#000', color: '#fff', border: '2px solid #000', marginBottom: '16px' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
               QUOTE SUMMARY
             </div>
-            <div style={{ fontSize: '8pt', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span>Parts ({Array.from(selectedParts).length} items):</span>
               <span>${total.parts.toFixed(2)}</span>
             </div>
-            <div style={{ fontSize: '8pt', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span>Labor ({laborHours}hrs @ ${laborRate}/hr):</span>
               <span>${total.labor.toFixed(2)}</span>
             </div>
-            <div style={{ fontSize: '8pt', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span>Subtotal:</span>
               <span>${total.subtotal.toFixed(2)}</span>
             </div>
-            <div style={{ fontSize: '8pt', display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #666' }}>
+            <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #666' }}>
               <span>Tax (est.):</span>
               <span>${total.tax.toFixed(2)}</span>
             </div>
-            <div style={{ fontSize: '14pt', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '19px', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
               <span>TOTAL:</span>
               <span>${total.total.toFixed(2)}</span>
             </div>
@@ -309,7 +309,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
               style={{
                 flex: 1,
                 padding: '12px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
                 background: '#000',
@@ -323,7 +323,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
               onClick={generateQuote}
               style={{
                 padding: '12px 16px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
                 background: 'var(--surface)',

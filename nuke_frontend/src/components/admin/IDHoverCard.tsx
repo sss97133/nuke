@@ -315,7 +315,7 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
           onMouseLeave={handleMouseLeave}
         >
           {loading ? (
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'center', padding: 'var(--space-4)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: 'var(--space-4)' }}>
               Loading...
             </div>
           ) : data ? (
@@ -323,24 +323,24 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
               {/* Vehicle Card */}
               {detectedType === 'vehicle' && 'year' in data && (
                 <>
-                  <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                     Vehicle
                   </div>
-                  <div style={{ fontSize: '8pt', marginBottom: 'var(--space-1)' }}>
+                  <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
                     <strong>ID:</strong> {data.id.substring(0, 8)}...
                   </div>
                   {(data.year || data.make || data.model) && (
-                    <div style={{ fontSize: '8pt', marginBottom: 'var(--space-1)' }}>
+                    <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
                       <strong>Vehicle:</strong> {data.year} {data.make} {data.model}
                     </div>
                   )}
                   {data.vin && (
-                    <div style={{ fontSize: '8pt', marginBottom: 'var(--space-1)', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)', fontFamily: 'monospace' }}>
                       <strong>VIN:</strong> {data.vin}
                     </div>
                   )}
                   {data.created_at && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       <strong>Created:</strong> {formatDate(data.created_at)}
                     </div>
                   )}
@@ -350,24 +350,24 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
               {/* User Card */}
               {detectedType === 'user' && 'email' in data && (
                 <>
-                  <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                     User
                   </div>
-                  <div style={{ fontSize: '8pt', marginBottom: 'var(--space-1)' }}>
+                  <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
                     <strong>ID:</strong> {data.id.substring(0, 8)}...
                   </div>
                   {data.email && (
-                    <div style={{ fontSize: '8pt', marginBottom: 'var(--space-1)' }}>
+                    <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
                       <strong>Email:</strong> {data.email}
                     </div>
                   )}
                   {data.full_name && (
-                    <div style={{ fontSize: '8pt', marginBottom: 'var(--space-1)' }}>
+                    <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
                       <strong>Name:</strong> {data.full_name}
                     </div>
                   )}
                   {data.created_at && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       <strong>Created:</strong> {formatDate(data.created_at)}
                     </div>
                   )}
@@ -377,14 +377,14 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
               {/* Document Card */}
               {detectedType === 'document' && (
                 <>
-                  <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                     Document
                   </div>
-                  <div style={{ fontSize: '8pt', marginBottom: 'var(--space-1)' }}>
+                  <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
                     <strong>ID:</strong> {data.id.substring(0, 8)}...
                   </div>
                   {data.created_at && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       <strong>Created:</strong> {formatDate(data.created_at)}
                     </div>
                   )}
@@ -394,20 +394,20 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
               {/* Generic ID Card (fallback) */}
               {!detectedType && (
                 <>
-                  <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                     ID Reference
                   </div>
-                  <div style={{ fontSize: '8pt', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                  <div style={{ fontSize: '11px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
                     {id}
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
                     No data found for this ID
                   </div>
                 </>
               )}
             </>
           ) : (
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               No data found
             </div>
           )}

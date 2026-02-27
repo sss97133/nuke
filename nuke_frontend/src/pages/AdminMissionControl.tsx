@@ -722,7 +722,7 @@ const AdminMissionControl: React.FC = () => {
   // Admin access check
   if (adminLoading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
         Checking admin access...
       </div>
     );
@@ -730,13 +730,13 @@ const AdminMissionControl: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
         <div style={{ marginBottom: '16px', fontWeight: 700 }}>Access Denied</div>
         <div style={{ marginBottom: '16px' }}>Admin privileges are required to access this page.</div>
         <button
           className="button button-secondary"
           onClick={() => navigate('/org/dashboard')}
-          style={{ fontSize: '8pt', padding: '8px 16px' }}
+          style={{ fontSize: '11px', padding: '8px 16px' }}
         >
           Return to Dashboard
         </button>
@@ -746,7 +746,7 @@ const AdminMissionControl: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
         Loading...
       </div>
     );
@@ -756,10 +756,10 @@ const AdminMissionControl: React.FC = () => {
     <div style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '32px', borderBottom: '2px solid var(--border)', paddingBottom: '16px' }}>
-        <h1 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           ADMIN MISSION CONTROL
         </h1>
-        <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           Real-time system monitoring and control
         </p>
       </div>
@@ -770,7 +770,7 @@ const AdminMissionControl: React.FC = () => {
           <span>Image Backfill: origin_metadata → vehicle_images</span>
           <button
             className="button button-primary"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
             disabled={originBackfillRunning}
             onClick={runOriginImageBackfill}
           >
@@ -778,11 +778,11 @@ const AdminMissionControl: React.FC = () => {
           </button>
         </div>
         <div className="card-body">
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Fixes profiles that have `origin_metadata.image_urls` but no rows in `vehicle_images`. Runs in small batches to avoid load spikes.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Batch size
               <input
                 type="number"
@@ -790,10 +790,10 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={200}
                 onChange={(e) => setOriginBackfillBatchSize(Number(e.target.value || 50))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Max images/vehicle (0 = no cap)
               <input
                 type="number"
@@ -801,10 +801,10 @@ const AdminMissionControl: React.FC = () => {
                 min={0}
                 max={5000}
                 onChange={(e) => setOriginBackfillMaxImages(Number(e.target.value || 0))}
-                style={{ marginLeft: 8, width: 110, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 110, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="checkbox"
                 checked={originBackfillIncludePartials}
@@ -827,7 +827,7 @@ const AdminMissionControl: React.FC = () => {
           <span>Backfill: BaT vehicles with 0 images</span>
           <button
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
             disabled={batBackfillRunning}
             onClick={runBatMissingImagesBackfill}
           >
@@ -835,11 +835,11 @@ const AdminMissionControl: React.FC = () => {
           </button>
         </div>
         <div className="card-body">
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Fixes BaT profiles where the UI can show a gallery but `vehicle_images` has 0 rows by re-extracting the canonical BaT gallery and writing image rows into `vehicle_images`.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Batch size
               <input
                 type="number"
@@ -847,7 +847,7 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={25}
                 onChange={(e) => setBatBackfillBatchSize(Number(e.target.value || 10))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
           </div>
@@ -865,7 +865,7 @@ const AdminMissionControl: React.FC = () => {
           <span>BaT DOM Health: template pass-rate (images/location/description/comments/bids)</span>
           <button
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
             disabled={batDomHealthRunning}
             onClick={runBatDomHealthBatch}
           >
@@ -873,11 +873,11 @@ const AdminMissionControl: React.FC = () => {
           </button>
         </div>
         <div className="card-body">
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Computes a deterministic BaT DOM-map over listings, persists HTML snapshots + per-field health, and shows coverage gaps so we can target backfills (especially images, location, comments, bids).
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Batch size
               <input
                 type="number"
@@ -885,7 +885,7 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={500}
                 onChange={(e) => setBatDomHealthBatchSize(Number(e.target.value || 50))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
           </div>
@@ -893,51 +893,51 @@ const AdminMissionControl: React.FC = () => {
           {batDomHealthSummary && (
             <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.listings ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>LISTINGS (LAST 14 DAYS)</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.listings ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>LISTINGS (LAST 14 DAYS)</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.ok_listings ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>OK LISTINGS</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.ok_listings ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>OK LISTINGS</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.fail_listings ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>FAILED LISTINGS</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.fail_listings ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>FAILED LISTINGS</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.avg_score ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>AVG SCORE</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.avg_score ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>AVG SCORE</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.p50_score ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>P50 SCORE</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.p50_score ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>P50 SCORE</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.images_missing ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>IMAGES MISSING</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.images_missing ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>IMAGES MISSING</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.location_missing ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>LOCATION MISSING</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.location_missing ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>LOCATION MISSING</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.description_missing ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>DESCRIPTION MISSING</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.description_missing ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>DESCRIPTION MISSING</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.comments_missing ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>COMMENTS MISSING</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.comments_missing ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>COMMENTS MISSING</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.bids_missing ?? '—'}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>BIDS MISSING</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.bids_missing ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>BIDS MISSING</div>
               </div>
             </div>
           )}
 
           {Array.isArray(batDomFieldBreakdown) && batDomFieldBreakdown.length > 0 && (
             <div style={{ marginTop: 12, border: '1px solid var(--border)', overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                 <thead>
                   <tr style={{ background: 'var(--grey-100)' }}>
                     <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>FIELD</th>
@@ -974,7 +974,7 @@ const AdminMissionControl: React.FC = () => {
           <span>BaT Base Data Check: flag missing base fields + requeue extraction (uses stored HTML snapshots when available)</span>
           <button
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
             disabled={batBaseCheckRunning}
             onClick={runBatBaseDataCheckBatch}
           >
@@ -982,13 +982,13 @@ const AdminMissionControl: React.FC = () => {
           </button>
         </div>
         <div className="card-body">
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Computes a strict BaT “base data” checklist (VIN/specs/location/colors/body_style/sale outcome), writes missing-field reasons into
             <span style={{ fontFamily: 'monospace' }}> vehicles.origin_metadata.bat_base_check</span>, and re-queues
             <span style={{ fontFamily: 'monospace' }}> bat_extraction_queue</span> even when status is “complete”.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Batch size
               <input
                 type="number"
@@ -996,20 +996,20 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={200}
                 onChange={(e) => setBatBaseCheckBatchSize(Number(e.target.value || 50))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Vehicle ID (optional)
               <input
                 type="text"
                 value={batBaseCheckVehicleId}
                 placeholder="uuid"
                 onChange={(e) => setBatBaseCheckVehicleId(e.target.value)}
-                style={{ marginLeft: 8, width: 320, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 320, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="checkbox"
                 checked={batBaseCheckDryRun}
@@ -1033,7 +1033,7 @@ const AdminMissionControl: React.FC = () => {
           <span>BaT Repair Loop: make profiles correct (images + description + location + comments)</span>
           <button
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
             disabled={batRepairRunning}
             onClick={runBatMakeProfilesCorrectBatch}
           >
@@ -1041,11 +1041,11 @@ const AdminMissionControl: React.FC = () => {
           </button>
         </div>
         <div className="card-body">
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Selects incomplete BaT vehicles and runs the approved workflow (core extraction + best-effort comments) to top off images, description, location, and auction metadata.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Batch size
               <input
                 type="number"
@@ -1053,7 +1053,7 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={50}
                 onChange={(e) => setBatRepairBatchSize(Number(e.target.value || 10))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
           </div>
@@ -1071,7 +1071,7 @@ const AdminMissionControl: React.FC = () => {
           <span>BaT Image Hygiene (canonical gallery + remove contamination)</span>
           <button
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
             disabled={batCleanupRunning}
             onClick={runBatImageCleanup}
           >
@@ -1079,21 +1079,21 @@ const AdminMissionControl: React.FC = () => {
           </button>
         </div>
         <div className="card-body">
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Repairs BaT galleries using the ONLY canonical source: `vehicles.origin_metadata.image_urls` (BaT `data-gallery-items`).\n            Sets `vehicle_images.position` to match BaT order, marks non-canonical BaT-domain images as `is_duplicate`, and resets the primary image to the first canonical photo.\n            Run repeatedly until the BaT feed no longer shows BaT UI assets as primary images.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Vehicle ID (optional)
               <input
                 type="text"
                 value={batCleanupVehicleId}
                 placeholder="uuid"
                 onChange={(e) => setBatCleanupVehicleId(e.target.value)}
-                style={{ marginLeft: 8, width: 320, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 320, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Batch size
               <input
                 type="number"
@@ -1101,7 +1101,7 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={100}
                 onChange={(e) => setBatCleanupBatchSize(Number(e.target.value || 25))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
           </div>
@@ -1119,7 +1119,7 @@ const AdminMissionControl: React.FC = () => {
           <span>Backfill: image angles + yaw (contextual, cheap)</span>
           <button
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
             disabled={angleBackfillRunning}
             onClick={runAnglePoseBackfill}
           >
@@ -1127,12 +1127,12 @@ const AdminMissionControl: React.FC = () => {
           </button>
         </div>
         <div className="card-body">
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Tags images with a precise angle taxonomy and writes pose signals directly onto `vehicle_images` (`ai_detected_angle`, confidence, and `yaw_deg` when applicable).
             Uses a <AnalysisModelPopup modelName="gemini-1.5-flash">cheaper model</AnalysisModelPopup> and processes only images missing `ai_detected_angle`.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Batch size
               <input
                 type="number"
@@ -1140,10 +1140,10 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={200}
                 onChange={(e) => setAngleBackfillBatchSize(Number(e.target.value || 25))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Min confidence
               <input
                 type="number"
@@ -1151,7 +1151,7 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={100}
                 onChange={(e) => setAngleBackfillMinConfidence(Number(e.target.value || 80))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
           </div>
@@ -1170,7 +1170,7 @@ const AdminMissionControl: React.FC = () => {
             backgroundColor: 'var(--grey-100)',
             color: 'var(--text)',
             padding: 'var(--space-3) var(--space-4)',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 600,
             letterSpacing: '0.5px',
             display: 'flex',
@@ -1180,7 +1180,7 @@ const AdminMissionControl: React.FC = () => {
           }}>
             <span>AI IMAGE SCANNING</span>
             {scanProgress?.status === 'running' && (
-              <span style={{ backgroundColor: 'var(--success)', color: 'var(--white)', padding: '2px var(--space-2)', fontSize: '8pt', fontWeight: 600 }}>
+              <span style={{ backgroundColor: 'var(--success)', color: 'var(--white)', padding: '2px var(--space-2)', fontSize: '11px', fontWeight: 600 }}>
                 ACTIVE
               </span>
             )}
@@ -1190,8 +1190,8 @@ const AdminMissionControl: React.FC = () => {
             {imageScanStats && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-                  <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>OVERALL PROGRESS</span>
-                  <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>OVERALL PROGRESS</span>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>
                     {imageScanStats.scan_percentage || 0}%
                   </span>
                 </div>
@@ -1212,7 +1212,7 @@ const AdminMissionControl: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <span style={{ color: 'var(--white)', fontSize: '8pt', fontWeight: 600 }}>
+                    <span style={{ color: 'var(--white)', fontSize: '11px', fontWeight: 600 }}>
                       {imageScanStats.scan_percentage > 10 && `${imageScanStats.scan_percentage}%`}
                     </span>
                   </div>
@@ -1221,24 +1221,24 @@ const AdminMissionControl: React.FC = () => {
                 {/* Stats Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
                   <div style={{ border: '2px solid var(--border)', padding: 'var(--space-3)', backgroundColor: 'var(--white)' }}>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', fontWeight: 600 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', fontWeight: 600 }}>
                       VEHICLE IMAGES
                     </div>
-                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>
                       {imageScanStats.scanned_vehicle_images?.toLocaleString()} / {imageScanStats.total_vehicle_images?.toLocaleString()}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       {imageScanStats.unscanned_vehicle_images?.toLocaleString()} REMAINING
                     </div>
                   </div>
                   <div style={{ border: '2px solid var(--border)', padding: 'var(--space-3)', backgroundColor: 'var(--white)' }}>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', fontWeight: 600 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', fontWeight: 600 }}>
                       ORGANIZATION IMAGES
                     </div>
-                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>
                       {imageScanStats.scanned_org_images?.toLocaleString()} / {imageScanStats.total_org_images?.toLocaleString()}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       {imageScanStats.unscanned_org_images?.toLocaleString()} REMAINING
                     </div>
                   </div>
@@ -1256,18 +1256,18 @@ const AdminMissionControl: React.FC = () => {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <div>
-                    <div style={{ fontSize: '8pt', fontWeight: 600, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
                       CURRENT SCAN: {scanProgress.scan_type?.toUpperCase().replace(/_/g, ' ')}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       Started: {new Date(scanProgress.started_at).toLocaleString()}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>
                       {scanProgress.processed_images}/{scanProgress.total_images}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--error)', fontWeight: 600 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--error)', fontWeight: 600 }}>
                       {scanProgress.failed_images} FAILED
                     </div>
                   </div>
@@ -1295,7 +1295,7 @@ const AdminMissionControl: React.FC = () => {
 
       {/* System Stats */}
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           SYSTEM STATISTICS
         </h2>
       <div style={{
@@ -1322,10 +1322,10 @@ const AdminMissionControl: React.FC = () => {
                 textAlign: 'center'
               }}
             >
-              <div style={{ fontSize: '16pt', fontWeight: 700, marginBottom: '4px', color: stat.alert ? '#ef4444' : '#000' }}>
+              <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', color: stat.alert ? '#ef4444' : '#000' }}>
                 {stat.value}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
                 {stat.label}
               </div>
             </div>
@@ -1335,21 +1335,21 @@ const AdminMissionControl: React.FC = () => {
 
       {/* Image Fingerprint Radar */}
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           IMAGE FINGERPRINT RADAR (DUPES + CONTAMINATION)
         </h2>
         <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
-          <div style={{ fontSize: '8pt', color: '#666', marginBottom: 10 }}>
+          <div style={{ fontSize: '11px', color: '#666', marginBottom: 10 }}>
             Finds image keys that appear many times across vehicles. This is the fastest way to detect BaT "chrome" images and cross-post reuse.
           </div>
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Kind
               <select
                 value={imageRadarKind}
                 onChange={(e) => setImageRadarKind(e.target.value as any)}
-                style={{ marginLeft: 8, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               >
                 <option value="normalized_url">normalized_url</option>
                 <option value="file_hash">file_hash</option>
@@ -1358,18 +1358,18 @@ const AdminMissionControl: React.FC = () => {
               </select>
             </label>
 
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Source (optional)
               <input
                 type="text"
                 value={imageRadarSource}
                 onChange={(e) => setImageRadarSource(e.target.value)}
                 placeholder="bat_import / organization_import / ..."
-                style={{ marginLeft: 8, width: 220, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 220, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
 
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Min count
               <input
                 type="number"
@@ -1377,11 +1377,11 @@ const AdminMissionControl: React.FC = () => {
                 min={2}
                 max={1000000}
                 onChange={(e) => setImageRadarMinCount(Number(e.target.value || 25))}
-                style={{ marginLeft: 8, width: 110, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 110, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
 
-            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Limit
               <input
                 type="number"
@@ -1389,7 +1389,7 @@ const AdminMissionControl: React.FC = () => {
                 min={1}
                 max={500}
                 onChange={(e) => setImageRadarLimit(Number(e.target.value || 50))}
-                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '12px' }}
               />
             </label>
 
@@ -1397,24 +1397,24 @@ const AdminMissionControl: React.FC = () => {
               className="button button-secondary"
               onClick={loadImageRadar}
               disabled={imageRadarLoading}
-              style={{ fontSize: '9pt' }}
+              style={{ fontSize: '12px' }}
             >
               {imageRadarLoading ? 'Loading…' : 'Refresh'}
             </button>
 
-            <div style={{ fontSize: '8pt', color: '#666' }}>
+            <div style={{ fontSize: '11px', color: '#666' }}>
               {imageRadarLastUpdatedAt ? `Updated: ${imageRadarLastUpdatedAt.toLocaleString()}` : ''}
             </div>
           </div>
 
           {imageRadarError && (
-            <div style={{ marginTop: 10, padding: 10, border: '2px solid #ef4444', background: '#fef2f2', fontSize: '8pt' }}>
+            <div style={{ marginTop: 10, padding: 10, border: '2px solid #ef4444', background: '#fef2f2', fontSize: '11px' }}>
               {imageRadarError}
             </div>
           )}
 
           <div style={{ marginTop: 12, border: '1px solid var(--border)', overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
               <thead>
                 <tr style={{ background: 'var(--grey-100)' }}>
                   <th style={{ textAlign: 'right', padding: 8, borderBottom: '1px solid var(--border)' }}>COUNT</th>
@@ -1445,7 +1445,7 @@ const AdminMissionControl: React.FC = () => {
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {r.sample_url ? (
                           <ImageHoverPreview imageUrl={r.sample_url} vehicleId={r.sample_vehicle_id || undefined}>
-                            <a className="button button-secondary" style={{ fontSize: '8pt' }} href={r.sample_url} target="_blank" rel="noreferrer">
+                            <a className="button button-secondary" style={{ fontSize: '11px' }} href={r.sample_url} target="_blank" rel="noreferrer">
                               Open image
                             </a>
                           </ImageHoverPreview>
@@ -1453,7 +1453,7 @@ const AdminMissionControl: React.FC = () => {
                         {r.sample_vehicle_id ? (
                           <button
                             className="button button-secondary"
-                            style={{ fontSize: '8pt' }}
+                            style={{ fontSize: '11px' }}
                             onClick={() => navigate(`/vehicle/${r.sample_vehicle_id}`)}
                           >
                             Open vehicle
@@ -1478,35 +1478,35 @@ const AdminMissionControl: React.FC = () => {
 
       {/* Inventory Data Completeness */}
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           INVENTORY DATA COMPLETENESS (TRUTH-GATED)
         </h2>
         <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
-          <div style={{ fontSize: '8pt', color: '#666', marginBottom: 10 }}>
+          <div style={{ fontSize: '11px', color: '#666', marginBottom: 10 }}>
             Counts only fields with confidence at or above threshold. Default: 70.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
-              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {inventoryCompleteness?.counts?.at_or_above_min ?? '—'} / {inventoryCompleteness?.counts?.total ?? '—'}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
                 VEHICLES AT OR ABOVE 90% FIELDS
               </div>
             </div>
             <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
-              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {inventoryCompleteness?.counts?.avg_fill_pct ?? '—'}%
               </div>
-              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
                 AVERAGE FIELD COMPLETENESS
               </div>
             </div>
             <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
-              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {inventoryCompleteness?.counts?.p50_fill_pct ?? '—'}%
               </div>
-              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
                 MEDIAN FIELD COMPLETENESS
               </div>
             </div>
@@ -1516,35 +1516,35 @@ const AdminMissionControl: React.FC = () => {
 
       {/* Angle Coverage */}
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           IMAGE ANGLE COVERAGE
         </h2>
         <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
-          <div style={{ fontSize: '8pt', color: '#666', marginBottom: 10 }}>
+          <div style={{ fontSize: '11px', color: '#666', marginBottom: 10 }}>
             Coverage is computed from image angle tags (AI-detected) with confidence at or above 0.60.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
-              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {angleCoverage?.counts?.full_coverage ?? '—'} / {angleCoverage?.counts?.vehicles ?? '—'}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
                 FULL COVERAGE (ALL REQUIRED ANGLES)
               </div>
             </div>
             <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
-              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {angleCoverage?.counts?.at_or_above_90 ?? '—'} / {angleCoverage?.counts?.vehicles ?? '—'}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
                 AT OR ABOVE 90% ANGLES
               </div>
             </div>
             <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
-              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {angleCoverage?.counts?.avg_angle_coverage_pct ?? '—'}%
               </div>
-              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
                 AVERAGE ANGLE COVERAGE
               </div>
             </div>
@@ -1554,7 +1554,7 @@ const AdminMissionControl: React.FC = () => {
 
       {/* Quick Actions */}
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           QUICK ACTIONS
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
@@ -1578,7 +1578,7 @@ const AdminMissionControl: React.FC = () => {
               onClick={() => navigate(action.path)}
               style={{
                 padding: '16px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 textAlign: 'left',
                 border: action.primary ? '2px solid #000' : '2px solid #ccc',
                 background: action.primary ? '#000' : '#fff',
@@ -1601,7 +1601,7 @@ const AdminMissionControl: React.FC = () => {
               }}
             >
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>{action.label}</div>
-              <div style={{ fontSize: '8pt', opacity: 0.7 }}>{action.sublabel}</div>
+              <div style={{ fontSize: '11px', opacity: 0.7 }}>{action.sublabel}</div>
             </button>
           ))}
         </div>
@@ -1614,7 +1614,7 @@ const AdminMissionControl: React.FC = () => {
             background: '#f59e0b',
             color: '#000',
             padding: '12px 16px',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 700,
             letterSpacing: '0.5px'
           }}>
@@ -1635,10 +1635,10 @@ const AdminMissionControl: React.FC = () => {
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
                       ORG: {queue.organization_id.slice(0, 8)}
                     </div>
-                    <div style={{ fontSize: '8pt', color: '#666' }}>
+                    <div style={{ fontSize: '11px', color: '#666' }}>
                       {queue.pending_count} images | Oldest: {new Date(queue.oldest_image).toLocaleDateString()}
                     </div>
                   </div>
@@ -1646,7 +1646,7 @@ const AdminMissionControl: React.FC = () => {
                     <button
                       onClick={() => navigate(`/org/${queue.organization_id}`)}
                       style={{ 
-                        fontSize: '8pt', 
+                        fontSize: '11px', 
                         padding: '8px 12px',
                         border: '2px solid #000',
                         background: 'var(--surface)',
@@ -1659,7 +1659,7 @@ const AdminMissionControl: React.FC = () => {
                     <button
                       onClick={() => runAnalysis(queue.organization_id)}
                       style={{ 
-                        fontSize: '8pt', 
+                        fontSize: '11px', 
                         padding: '8px 12px',
                         border: '2px solid #000',
                         background: '#000',
@@ -1685,7 +1685,7 @@ const AdminMissionControl: React.FC = () => {
           background: '#000',
           color: '#fff',
           padding: '12px 16px',
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 700,
           letterSpacing: '0.5px'
         }}>
@@ -1693,7 +1693,7 @@ const AdminMissionControl: React.FC = () => {
         </div>
         <div style={{ padding: '16px', background: 'var(--surface)' }}>
           {recentActivity.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#999', fontSize: '8pt' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#999', fontSize: '11px' }}>
               NO RECENT ACTIVITY
             </div>
           ) : (
@@ -1708,18 +1708,18 @@ const AdminMissionControl: React.FC = () => {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    fontSize: '8pt'
+                    fontSize: '11px'
                   }}
                 >
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase' }}>
                       {event.event_type?.replace(/_/g, ' ')}
                     </div>
-                    <div style={{ fontSize: '8pt', color: '#666' }}>
+                    <div style={{ fontSize: '11px', color: '#666' }}>
                       {event.description || 'No description'}
                     </div>
                   </div>
-                  <div style={{ fontSize: '8pt', color: '#999', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '11px', color: '#999', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
                     {new Date(event.created_at).toLocaleString()}
                   </div>
                 </div>

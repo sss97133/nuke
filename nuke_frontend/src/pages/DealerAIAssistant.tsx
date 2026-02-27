@@ -203,10 +203,10 @@ What do you want to do first?`,
         alignItems: 'center'
       }}>
         <div>
-          <h1 style={{ fontSize: '14pt', fontWeight: 700, margin: 0 }}>
+          <h1 style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>
             AI Assistant
           </h1>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
             {organization?.business_name || 'Loading...'}
           </p>
         </div>
@@ -215,7 +215,7 @@ What do you want to do first?`,
             onClick={() => navigate(`/dealer/${orgId}/bulk-editor`)}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               cursor: 'pointer'
@@ -227,7 +227,7 @@ What do you want to do first?`,
             onClick={clearConversation}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               cursor: 'pointer'
@@ -239,7 +239,7 @@ What do you want to do first?`,
             onClick={() => navigate(`/org/${orgId}`)}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               cursor: 'pointer'
@@ -278,7 +278,7 @@ What do you want to do first?`,
                   : 'white',
                 color: message.role === 'user' ? 'white' : 'black',
                 border: message.role === 'assistant' ? '1px solid var(--border)' : 'none',
-                fontSize: '9pt',
+                fontSize: '12px',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}
@@ -295,7 +295,7 @@ What do you want to do first?`,
                         padding: '4px 8px',
                         background: message.role === 'user' ? 'rgba(255,255,255,0.2)' : 'var(--grey-50)',
                         borderRadius: '4px',
-                        fontSize: '7pt'
+                        fontSize: '9px'
                       }}
                     >
                       {att.name}
@@ -307,7 +307,7 @@ What do you want to do first?`,
               {/* Actions */}
               {message.actions && message.actions.length > 0 && (
                 <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', opacity: 0.7 }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', opacity: 0.7 }}>
                     Actions Taken:
                   </div>
                   {message.actions.map((action, idx) => (
@@ -317,7 +317,7 @@ What do you want to do first?`,
                         padding: '6px 8px',
                         background: 'var(--grey-50)',
                         borderRadius: '4px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         marginBottom: '4px',
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -331,7 +331,7 @@ What do you want to do first?`,
                         {action.type === 'parse_receipt' && '🧾 Parsed receipt'}
                       </span>
                       <span style={{
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         padding: '2px 6px',
                         borderRadius: '3px',
                         background: action.status === 'completed' ? 'var(--success)' : 
@@ -346,7 +346,7 @@ What do you want to do first?`,
               )}
             </div>
             <div style={{
-              fontSize: '7pt',
+              fontSize: '9px',
               color: 'var(--text-muted)',
               marginTop: '4px',
               alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start'
@@ -363,7 +363,7 @@ What do you want to do first?`,
             borderRadius: '8px',
             background: 'var(--surface)',
             border: '1px solid var(--border)',
-            fontSize: '9pt',
+            fontSize: '12px',
             color: 'var(--text-muted)'
           }}>
             <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
@@ -396,7 +396,7 @@ What do you want to do first?`,
                   background: 'var(--grey-50)',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   display: 'flex',
                   gap: '8px',
                   alignItems: 'center'
@@ -413,7 +413,7 @@ What do you want to do first?`,
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    fontSize: '10pt',
+                    fontSize: '13px',
                     color: 'var(--danger)',
                     padding: 0
                   }}
@@ -444,7 +444,7 @@ What do you want to do first?`,
               background: 'var(--surface)',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '14pt'
+              fontSize: '19px'
             }}
             title="Attach files"
           >
@@ -467,7 +467,7 @@ What do you want to do first?`,
               padding: '10px',
               border: '1px solid var(--border)',
               borderRadius: '4px',
-              fontSize: '9pt',
+              fontSize: '12px',
               resize: 'none',
               minHeight: '60px',
               fontFamily: 'inherit'
@@ -485,7 +485,7 @@ What do you want to do first?`,
               border: 'none',
               borderRadius: '4px',
               cursor: processing ? 'wait' : 'pointer',
-              fontSize: '9pt',
+              fontSize: '12px',
               fontWeight: 600,
               opacity: processing || (!input.trim() && selectedFiles.length === 0) ? 0.5 : 1
             }}
@@ -496,7 +496,7 @@ What do you want to do first?`,
         
         <div style={{
           marginTop: '8px',
-          fontSize: '7pt',
+          fontSize: '9px',
           color: 'var(--text-muted)',
           display: 'flex',
           gap: '16px'

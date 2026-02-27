@@ -132,7 +132,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
       >
         <div>
           <div style={{
-            fontSize: '10pt',
+            fontSize: '13px',
             fontWeight: 'bold',
             marginBottom: '8px',
             display: '-webkit-box',
@@ -145,7 +145,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
           </div>
 
           <div style={{
-            fontSize: '11pt',
+            fontSize: '15px',
             fontWeight: 'bold',
             color: getStateColor(),
             marginBottom: '6px'
@@ -154,7 +154,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
           </div>
 
           {auction.bid_count > 0 && (
-            <div style={{ fontSize: '8pt', color: '#6b7280', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
               🔨 {auction.bid_count} {auction.bid_count === 1 ? 'bid' : 'bids'}
             </div>
           )}
@@ -184,7 +184,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}>
             <span style={{
               color: urgencyTimerColors[urgencyLevel],
@@ -250,7 +250,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
             background: getStateColor(),
             color: 'white',
             padding: '4px 8px',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 'bold',
             borderRadius: '2px'
           }}
@@ -267,7 +267,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
             background: 'rgba(0, 0, 0, 0.7)',
             color: urgencyTimerColors[urgencyLevel],
             padding: '4px 8px',
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 'bold',
             borderRadius: '2px',
             opacity: ['lastMinute', 'critical'].includes(urgencyLevel) ? (pulsePhase === 0 ? 1 : 0.7) : 1,
@@ -288,7 +288,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
               background: 'rgba(0, 0, 0, 0.7)',
               color: '#fbbf24',
               padding: '2px 6px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 'bold',
               borderRadius: '2px'
             }}
@@ -301,7 +301,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
       {/* Details Section */}
       <div style={{ padding: '12px' }}>
         <div style={{
-          fontSize: '10pt',
+          fontSize: '13px',
           fontWeight: 'bold',
           marginBottom: '8px',
           display: '-webkit-box',
@@ -315,7 +315,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
 
         {auction.description && (
           <div style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#6b7280',
             marginBottom: '6px',
             display: '-webkit-box',
@@ -336,11 +336,11 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
           border: '1px solid rgba(16, 185, 129, 0.2)',
           boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5)',
         }}>
-          <div style={{ fontSize: '8pt', color: '#6b7280', marginBottom: '2px' }}>
+          <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>
             Current Bid:
           </div>
           <div style={{
-            fontSize: '14pt',
+            fontSize: '19px',
             fontWeight: 'bold',
             color: getStateColor()
           }}>
@@ -354,7 +354,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
           gridTemplateColumns: '1fr 1fr',
           gap: '8px',
           marginBottom: '8px',
-          fontSize: '8pt'
+          fontSize: '11px'
         }}>
           <div style={{ color: '#6b7280' }}>
             🔨 <strong>{auction.bid_count}</strong> bids
@@ -386,7 +386,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
         {/* Category and reserve */}
         {auction.category && (
           <div style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#6b7280',
             marginBottom: '4px'
           }}>
@@ -396,7 +396,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
 
         {auction.config.reserve_price && auction.current_bid < auction.config.reserve_price && (
           <div style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#dc2626',
             marginBottom: '4px'
           }}>
@@ -413,7 +413,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
             color: 'white',
             border: 'none',
             borderRadius: '2px',
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 'bold',
             cursor: ['active', 'ending_soon'].includes(auction.state) ? 'pointer' : 'not-allowed',
             opacity: ['active', 'ending_soon'].includes(auction.state) ? 1 : 0.5,

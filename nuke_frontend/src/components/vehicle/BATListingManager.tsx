@@ -158,10 +158,10 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
       borderRadius: '4px',
       marginBottom: '16px'
     }}>
-      <h4 style={{ fontSize: '10pt', fontWeight: 600, marginBottom: '12px' }}>
+      <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>
         Bring a Trailer Listing Manager
       </h4>
-      <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
         Import vehicle data or extract parts/brands from Bring a Trailer listings.
         This provides provenance and legitimizes vehicle modifications.
       </p>
@@ -172,7 +172,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           onClick={() => setMode('import')}
           style={{
             padding: '6px 12px',
-            fontSize: '9pt',
+            fontSize: '12px',
             background: mode === 'import' ? 'var(--color-primary)' : 'var(--background-secondary)',
             color: mode === 'import' ? '#fff' : 'var(--text)',
             border: '1px solid var(--border)',
@@ -186,7 +186,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           onClick={() => setMode('extract')}
           style={{
             padding: '6px 12px',
-            fontSize: '9pt',
+            fontSize: '12px',
             background: mode === 'extract' ? 'var(--color-primary)' : 'var(--background-secondary)',
             color: mode === 'extract' ? '#fff' : 'var(--text)',
             border: '1px solid var(--border)',
@@ -206,10 +206,10 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           background: 'rgba(16, 185, 129, 0.1)',
           border: '1px solid rgba(16, 185, 129, 0.3)',
           borderRadius: '4px',
-          fontSize: '8pt'
+          fontSize: '11px'
         }}>
           <strong>Already extracted:</strong> {existingParts.length} parts/brands from this listing
-          <div style={{ marginTop: '4px', fontSize: '7pt', opacity: 0.8 }}>
+          <div style={{ marginTop: '4px', fontSize: '9px', opacity: 0.8 }}>
             {existingParts.slice(0, 3).map((p, i) => (
               <span key={i}>
                 {p.part_name}{p.brand_name ? ` (${p.brand_name})` : ''}
@@ -231,7 +231,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           style={{
             flex: 1,
             padding: '6px 12px',
-            fontSize: '9pt',
+            fontSize: '12px',
             border: '1px solid var(--border)',
             borderRadius: '4px',
             fontFamily: 'inherit'
@@ -242,7 +242,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           disabled={(mode === 'import' ? importing : extracting) || !batUrl}
           style={{
             padding: '6px 16px',
-            fontSize: '9pt',
+            fontSize: '12px',
             background: (mode === 'import' ? importing : extracting) ? 'var(--background-secondary)' : 'var(--color-primary)',
             color: '#fff',
             border: 'none',
@@ -265,7 +265,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           background: 'rgba(16, 185, 129, 0.1)',
           border: '1px solid rgba(16, 185, 129, 0.3)',
           borderRadius: '4px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: '#10b981',
           marginTop: '8px'
         }}>
@@ -279,7 +279,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           background: 'rgba(239, 68, 68, 0.1)',
           border: '1px solid rgba(239, 68, 68, 0.3)',
           borderRadius: '4px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: '#ef4444',
           marginTop: '8px'
         }}>
@@ -295,10 +295,10 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           background: 'rgba(59, 130, 246, 0.1)',
           border: '1px solid rgba(59, 130, 246, 0.3)',
           borderRadius: '4px',
-          fontSize: '8pt'
+          fontSize: '11px'
         }}>
           <strong>Import Summary:</strong>
-          <div style={{ marginTop: '6px', fontSize: '7pt', opacity: 0.9 }}>
+          <div style={{ marginTop: '6px', fontSize: '9px', opacity: 0.9 }}>
             {importResult.imported?.timeline_events > 0 && (
               <div>• {importResult.imported.timeline_events} timeline events</div>
             )}

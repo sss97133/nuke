@@ -41,7 +41,7 @@ const headerStyle: React.CSSProperties = {
   borderBottom: '1px solid #c0c0c0',
   background: 'var(--bg)',
   fontWeight: 700,
-  fontSize: '9pt'
+  fontSize: '12px'
 };
 
 const bodyStyle: React.CSSProperties = {
@@ -97,7 +97,7 @@ export const InputDialog: React.FC<InputDialogProps> = ({
         <div style={headerStyle}>{title}</div>
         <div style={bodyStyle}>
           {message && (
-            <div style={{ marginBottom: '8px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            <div style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
               {message}
             </div>
           )}
@@ -111,7 +111,7 @@ export const InputDialog: React.FC<InputDialogProps> = ({
             placeholder={placeholder}
             style={{
               width: '100%',
-              fontSize: '9pt',
+              fontSize: '12px',
               padding: '6px',
               marginBottom: '12px'
             }}

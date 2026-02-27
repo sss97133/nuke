@@ -179,7 +179,7 @@ function StatBar({ label, value, max, unit, precision, invert }: {
   if (value == null) {
     return (
       <div style={{ marginBottom: '6px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', fontWeight: 600 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: 600 }}>
           <span>{label}</span>
           <span style={{ color: '#999' }}>--</span>
         </div>
@@ -196,7 +196,7 @@ function StatBar({ label, value, max, unit, precision, invert }: {
 
   return (
     <div style={{ marginBottom: '6px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', fontWeight: 600 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: 600 }}>
         <span>{label}</span>
         <span>{displayVal}{unit || ''}</span>
       </div>
@@ -266,7 +266,7 @@ function ScoreBadge({ score, label, size = 'md', onClick }: { score: number | nu
 function SocialBar({ label, value }: { label: string; value: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-      <span style={{ fontSize: '7pt', fontWeight: 600, width: '90px', textAlign: 'right' }}>{label}</span>
+      <span style={{ fontSize: '9px', fontWeight: 600, width: '90px', textAlign: 'right' }}>{label}</span>
       <div style={{ flex: 1, height: '6px', background: '#f0f0f0', position: 'relative' }}>
         <div
           style={{
@@ -277,7 +277,7 @@ function SocialBar({ label, value }: { label: string; value: number }) {
           }}
         />
       </div>
-      <span style={{ fontSize: '7pt', fontWeight: 700, width: '24px' }}>{value}</span>
+      <span style={{ fontSize: '9px', fontWeight: 700, width: '24px' }}>{value}</span>
     </div>
   );
 }
@@ -351,7 +351,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
   if (loading) {
     return (
       <div style={{ padding: '16px', border: '2px solid #000', background: '#fff' }}>
-        <div style={{ fontSize: '8pt', color: '#999' }}>Loading performance data...</div>
+        <div style={{ fontSize: '11px', color: '#999' }}>Loading performance data...</div>
       </div>
     );
   }
@@ -378,10 +378,10 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
         alignItems: 'center',
       }}>
         <div>
-          <div style={{ fontSize: '9pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
             Performance Profile
           </div>
-          <div style={{ fontSize: '7pt', color: '#666', marginTop: '2px' }}>
+          <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
             {data.engine_liters ? `${data.engine_liters}L` : ''}{' '}
             {data.engine_type || ''}{' '}
             {data.drivetrain ? `· ${data.drivetrain}` : ''}{' '}
@@ -423,7 +423,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
           border: '1px solid #e5e5e5',
           marginBottom: '12px',
         }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
             Raw Specs
           </div>
           <StatBar label="Horsepower" value={data.horsepower} max={800} unit=" hp" />
@@ -448,7 +448,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
             border: '1px solid #e5e5e5',
             marginBottom: '12px',
           }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
               Component Condition
             </div>
             <StatBar label="Tires" value={data.tire_condition_score} max={100} unit="/100" />
@@ -474,7 +474,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
@@ -483,12 +483,12 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
               <span>Social Positioning</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span
-                  style={{ fontWeight: 800, fontSize: '9pt', cursor: 'pointer', textDecoration: 'underline' }}
+                  style={{ fontWeight: 800, fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
                   onClick={(e) => { e.stopPropagation(); setDetailScoreKey('social'); }}
                 >
                   {social.overall}
                 </span>
-                <span style={{ fontSize: '10pt' }}>{showSocial ? '\u25B2' : '\u25BC'}</span>
+                <span style={{ fontSize: '13px' }}>{showSocial ? '\u25B2' : '\u25BC'}</span>
               </span>
             </button>
             {showSocial && (
@@ -519,17 +519,17 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
               }}
             >
               <span>Running Gear</span>
-              <span style={{ fontSize: '10pt' }}>{showRunningGear ? '\u25B2' : '\u25BC'}</span>
+              <span style={{ fontSize: '13px' }}>{showRunningGear ? '\u25B2' : '\u25BC'}</span>
             </button>
             {showRunningGear && (
-              <div style={{ padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '7pt' }}>
+              <div style={{ padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '9px' }}>
                 {data.suspension_front && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Suspension (F)</div>
@@ -592,10 +592,10 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
             textAlign: 'center',
             marginTop: '12px',
           }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
               Performance data needed
             </div>
-            <div style={{ fontSize: '7pt', color: '#666' }}>
+            <div style={{ fontSize: '9px', color: '#666' }}>
               Add horsepower, torque, weight, and 0-60 time to unlock full performance scoring.
             </div>
           </div>

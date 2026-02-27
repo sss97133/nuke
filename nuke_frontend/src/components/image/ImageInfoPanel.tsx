@@ -181,12 +181,12 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
     }
 
     return (
-      <div style={{ color: 'white', fontSize: '10pt', lineHeight: '1.5' }}>
+      <div style={{ color: 'white', fontSize: '13px', lineHeight: '1.5' }}>
         {/* Date/Time */}
         {(imageMetadata?.created_at || imageMetadata?.taken_at) && (
           <>
             <div>{formatDate(imageMetadata.taken_at || imageMetadata.created_at)}</div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt' }}>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>
               {(() => {
                 const now = new Date();
                 const then = new Date(imageMetadata.taken_at || imageMetadata.created_at);
@@ -215,7 +215,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
             {location && typeof location === 'object' && location.city ? (
               <>
                 <div>{location.city}{location.state ? `, ${location.state}` : ''}</div>
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>
                   {lat.toFixed(4)}, {lng.toFixed(4)}
                 </div>
               </>
@@ -239,17 +239,17 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
             }
           </div>
           {getExifText() && (
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9pt' }}>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
               {getExifText()}
             </div>
           )}
           {imageMetadata?.exif_data?.dimensions && (
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt' }}>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>
               {imageMetadata.exif_data.dimensions.width} × {imageMetadata.exif_data.dimensions.height}
             </div>
           )}
           {!getExifText() && !imageMetadata?.exif_data?.dimensions && (
-            <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '8pt', fontStyle: 'italic' }}>
+            <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', fontStyle: 'italic' }}>
               No EXIF details available
             </div>
           )}
@@ -267,19 +267,19 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
             <>
               <div style={{ fontWeight: 600 }}>{attribution.organization.name}</div>
               {attribution.organization.relationshipLabel && (
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9pt' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
                   {attribution.organization.relationshipLabel}
                 </div>
               )}
             </>
           ) : attribution.uploader ? (
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9pt' }}>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
               {attribution.uploader.full_name || attribution.uploader.username || 'User'}
             </div>
           ) : null}
           {/* Only show source if it's not bat_listing (already shown via organization) */}
           {attribution.source && attribution.source !== 'bat_listing' && (
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt' }}>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>
               Source: {attribution.source}
             </div>
           )}
@@ -290,7 +290,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
       {(imageMetadata?.view_count || imageMetadata?.comment_count || comments.length > 0) && (
         <>
           <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9pt' }}>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
             {[
               imageMetadata?.view_count ? `${imageMetadata.view_count} ${imageMetadata.view_count === 1 ? 'view' : 'views'}` : null,
               comments.length > 0 ? `${comments.length} ${comments.length === 1 ? 'comment' : 'comments'}` : null
@@ -302,11 +302,11 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
       {/* Tags preview - Show even if empty to indicate section exists */}
       <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
       {tags.length > 0 ? (
-        <div style={{ fontSize: '9pt', color: 'var(--surface-glass)' }}>
+        <div style={{ fontSize: '12px', color: 'var(--surface-glass)' }}>
           {tags.slice(0, 5).map(tag => tag.tag_text || tag.tag_name || tag.text || 'tag').filter(Boolean).join(' • ')}
         </div>
       ) : (
-        <div style={{ fontSize: '8pt', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
+        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
           No tags
         </div>
       )}
@@ -315,7 +315,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
       {(imageMetadata?.ai_scan_metadata?.appraiser || imageMetadata?.ai_scan_metadata?.tier_1_analysis) && (
         <>
           <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt', marginBottom: '4px' }}>AI ANALYSIS</div>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '4px' }}>AI ANALYSIS</div>
 
           {/* Tier 1 Analysis (new format) */}
           {imageMetadata?.ai_scan_metadata?.tier_1_analysis && (
@@ -327,7 +327,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                     padding: '2px 6px',
                     backgroundColor: 'rgba(255,255,255,0.1)',
                     border: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '8pt'
+                    fontSize: '11px'
                   }}>
                     {imageMetadata.ai_scan_metadata.tier_1_analysis.angle.replace(/_/g, ' ')}
                   </span>
@@ -337,7 +337,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                     padding: '2px 6px',
                     backgroundColor: 'rgba(255,255,255,0.1)',
                     border: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '8pt'
+                    fontSize: '11px'
                   }}>
                     {imageMetadata.ai_scan_metadata.tier_1_analysis.category.replace(/_/g, ' ')}
                   </span>
@@ -349,7 +349,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                                      imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('good') ? 'rgba(59,130,246,0.2)' :
                                      imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('poor') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)',
                     border: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '8pt'
+                    fontSize: '11px'
                   }}>
                     {imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.replace(/_/g, ' ')}
                   </span>
@@ -359,8 +359,8 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               {/* Components visible */}
               {imageMetadata.ai_scan_metadata.tier_1_analysis.components_visible?.length > 0 && (
                 <div style={{ marginBottom: '8px' }}>
-                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '7pt', marginBottom: '2px' }}>COMPONENTS</div>
-                  <div style={{ fontSize: '8pt', color: 'var(--surface-glass)' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', marginBottom: '2px' }}>COMPONENTS</div>
+                  <div style={{ fontSize: '11px', color: 'var(--surface-glass)' }}>
                     {imageMetadata.ai_scan_metadata.tier_1_analysis.components_visible.map((c: string) => c.replace(/_/g, ' ')).join(' • ')}
                   </div>
                 </div>
@@ -368,14 +368,14 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
 
               {/* Basic observations - the key insight */}
               {imageMetadata.ai_scan_metadata.tier_1_analysis.basic_observations && (
-                <div style={{ color: 'var(--surface-glass)', fontSize: '9pt', lineHeight: '1.4' }}>
+                <div style={{ color: 'var(--surface-glass)', fontSize: '12px', lineHeight: '1.4' }}>
                   {imageMetadata.ai_scan_metadata.tier_1_analysis.basic_observations}
                 </div>
               )}
 
               {/* Image quality score */}
               {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality && (
-                <div style={{ marginTop: '8px', display: 'flex', gap: '8px', fontSize: '7pt', color: 'rgba(255,255,255,0.5)' }}>
+                <div style={{ marginTop: '8px', display: 'flex', gap: '8px', fontSize: '9px', color: 'rgba(255,255,255,0.5)' }}>
                   <span>Quality: {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality.overall_score}/10</span>
                   <span>Focus: {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality.focus}</span>
                   <span>Lighting: {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality.lighting}</span>
@@ -391,7 +391,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                 <div>{imageMetadata.ai_scan_metadata.appraiser.angle}</div>
               )}
               {imageMetadata.ai_scan_metadata.appraiser.description && (
-                <div style={{ color: 'var(--surface-glass)', fontSize: '9pt', marginTop: '4px' }}>
+                <div style={{ color: 'var(--surface-glass)', fontSize: '12px', marginTop: '4px' }}>
                   {imageMetadata.ai_scan_metadata.appraiser.description}
                 </div>
               )}
@@ -404,11 +404,11 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
       {imageMetadata?.components?.engine_family && (
         <>
           <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt', marginBottom: '6px' }}>ENGINE BAY ANALYSIS</div>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '6px' }}>ENGINE BAY ANALYSIS</div>
 
           {/* Engine family + displacement */}
           <div style={{ marginBottom: '6px' }}>
-            <span style={{ fontSize: '10pt', fontWeight: 600 }}>
+            <span style={{ fontSize: '13px', fontWeight: 600 }}>
               {imageMetadata.components.engine_family}
               {imageMetadata.components.estimated_displacement ? ` ${imageMetadata.components.estimated_displacement}` : ''}
             </span>
@@ -416,7 +416,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               <span style={{
                 marginLeft: '6px',
                 padding: '1px 5px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 backgroundColor: imageMetadata.components.engine_family_confidence >= 0.8 ? 'rgba(34,197,94,0.25)' :
                                  imageMetadata.components.engine_family_confidence >= 0.5 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.25)',
                 border: `1px solid ${imageMetadata.components.engine_family_confidence >= 0.8 ? 'rgba(34,197,94,0.5)' :
@@ -428,7 +428,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           </div>
 
           {/* Component rows */}
-          <div style={{ fontSize: '8pt', lineHeight: '1.8', color: 'rgba(255,255,255,0.8)' }}>
+          <div style={{ fontSize: '11px', lineHeight: '1.8', color: 'rgba(255,255,255,0.8)' }}>
             {imageMetadata.components.fuel_system?.type && (
               <div>
                 <span style={{ color: 'rgba(255,255,255,0.4)' }}>Fuel: </span>
@@ -495,10 +495,10 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           {/* Visible modifications */}
           {imageMetadata.components.visible_modifications?.length > 0 && (
             <div style={{ marginTop: '6px' }}>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '7pt', marginBottom: '2px' }}>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '9px', marginBottom: '2px' }}>
                 MODS ({imageMetadata.components.visible_modifications.length})
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--surface-glass)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--surface-glass)' }}>
                 {imageMetadata.components.visible_modifications.join(' / ')}
               </div>
             </div>
@@ -506,13 +506,13 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
 
           {/* Notes */}
           {imageMetadata.components.notes && (
-            <div style={{ marginTop: '4px', fontSize: '8pt', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
+            <div style={{ marginTop: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
               {imageMetadata.components.notes}
             </div>
           )}
 
           {/* Analysis metadata */}
-          <div style={{ marginTop: '6px', fontSize: '7pt', color: 'rgba(255,255,255,0.25)' }}>
+          <div style={{ marginTop: '6px', fontSize: '9px', color: 'rgba(255,255,255,0.25)' }}>
             {imageMetadata.components.analyzed_by}
             {imageMetadata.components.analysis_version > 1 ? ` v${imageMetadata.components.analysis_version}` : ''}
             {imageMetadata.components.vehicle_context_used ? ' +context' : ''}
@@ -534,7 +534,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                 padding: '4px 8px',
                 backgroundColor: 'rgba(255,255,255,0.1)',
                 border: '1px solid rgba(255,255,255,0.2)',
-                fontSize: '8pt'
+                fontSize: '11px'
               }}
             >
               {tag.tag_text || tag.tag_name}
@@ -542,7 +542,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           ))}
         </div>
       ) : (
-        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9pt' }}>
+        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
           No tags yet
         </div>
       )}
@@ -556,7 +556,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
             backgroundColor: 'rgba(255,255,255,0.1)',
             border: '2px solid rgba(255,255,255,0.3)',
             color: 'white',
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 'bold',
             marginTop: '12px'
           }}
@@ -597,14 +597,14 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                 marginBottom: '8px'
               }}
             >
-              <div style={{ fontSize: '8pt', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>
                 {comment.username} • {comment.created_at}
               </div>
-              <div style={{ fontSize: '9pt' }}>{comment.comment_text}</div>
+              <div style={{ fontSize: '12px' }}>{comment.comment_text}</div>
             </div>
           ))
         ) : (
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9pt' }}>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
             No comments yet
           </div>
         )}
@@ -623,7 +623,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           backgroundColor: 'var(--surface)',
           color: 'black',
           border: '2px solid white',
-          fontSize: '9pt',
+          fontSize: '12px',
           fontWeight: 'bold'
         }}
       >
@@ -640,7 +640,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           backgroundColor: imageMetadata?.is_primary ? '#16a34a' : 'rgba(255,255,255,0.1)',
           border: '2px solid rgba(255,255,255,0.3)',
           color: 'white',
-          fontSize: '9pt',
+          fontSize: '12px',
           fontWeight: 'bold'
         }}
       >
@@ -656,7 +656,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           backgroundColor: 'rgba(255,255,255,0.1)',
           border: '2px solid rgba(255,255,255,0.3)',
           color: 'white',
-          fontSize: '9pt',
+          fontSize: '12px',
           fontWeight: 'bold'
         }}
       >
@@ -672,7 +672,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           backgroundColor: imageMetadata?.is_sensitive ? '#eab308' : 'rgba(255,255,255,0.1)',
           border: '2px solid rgba(255,255,255,0.3)',
           color: imageMetadata?.is_sensitive ? 'black' : 'white',
-          fontSize: '9pt',
+          fontSize: '12px',
           fontWeight: 'bold'
         }}
       >
@@ -694,7 +694,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           backgroundColor: '#dc2626',
           border: '2px solid #ef4444',
           color: 'white',
-          fontSize: '9pt',
+          fontSize: '12px',
           fontWeight: 'bold'
         }}
       >
@@ -758,7 +758,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                 border: 'none',
                 borderBottom: activeTab === 'actions' ? '2px solid white' : 'none',
                 color: activeTab === 'actions' ? 'white' : 'rgba(255,255,255,0.5)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 textTransform: 'uppercase'
@@ -776,7 +776,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               border: 'none',
               borderBottom: activeTab === 'info' ? '2px solid white' : 'none',
               color: activeTab === 'info' ? 'white' : 'rgba(255,255,255,0.5)',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               textTransform: 'uppercase'
@@ -793,7 +793,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               border: 'none',
               borderBottom: activeTab === 'tags' ? '2px solid white' : 'none',
               color: activeTab === 'tags' ? 'white' : 'rgba(255,255,255,0.5)',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               textTransform: 'uppercase'
@@ -810,7 +810,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               border: 'none',
               borderBottom: activeTab === 'comments' ? '2px solid white' : 'none',
               color: activeTab === 'comments' ? 'white' : 'rgba(255,255,255,0.5)',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               textTransform: 'uppercase'

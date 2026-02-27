@@ -221,7 +221,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
         flexWrap: 'wrap',
         gap: '12px'
       }}>
-        <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--accent)' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>
           {selectedVehicleIds.length} vehicle{selectedVehicleIds.length !== 1 ? 's' : ''} selected
         </div>
 
@@ -232,7 +232,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
             disabled={action === 'favorite'}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               border: '1px solid var(--border)',
               background: 'var(--surface)',
@@ -250,7 +250,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
             disabled={action === 'unfavorite'}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               border: '1px solid var(--border)',
               background: 'var(--surface)',
@@ -269,7 +269,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
             disabled={action === 'hide'}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               border: '1px solid var(--border)',
               background: 'var(--surface)',
@@ -287,7 +287,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
             disabled={action === 'unhide'}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               border: '1px solid var(--border)',
               background: 'var(--surface)',
@@ -318,7 +318,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 placeholder="Collection name"
                 style={{
                   padding: '6px 12px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
                   width: '150px'
@@ -334,7 +334,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 disabled={action === 'collection'}
                 style={{
                   padding: '6px 12px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   border: '1px solid var(--accent)',
                   background: 'var(--accent)',
                   color: 'white',
@@ -352,7 +352,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 }}
                 style={{
                   padding: '6px 12px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-muted)',
@@ -369,7 +369,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 onClick={() => setShowCollectionInput(true)}
                 style={{
                   padding: '6px 12px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
@@ -385,7 +385,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 disabled={action === 'remove_collection'}
                 style={{
                   padding: '6px 12px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
@@ -404,7 +404,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
           {onQuickFix && (
             showDataActions ? (
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 600 }}>FIX:</span>
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600 }}>FIX:</span>
                 <button
                   onClick={() => {
                     onQuickFix('price', selectedVehicleIds);
@@ -412,7 +412,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   }}
                   style={{
                     padding: '6px 10px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 600,
                     border: '1px solid #15803d',
                     background: '#dcfce7',
@@ -430,7 +430,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   }}
                   style={{
                     padding: '6px 10px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 600,
                     border: '1px solid #15803d',
                     background: '#dcfce7',
@@ -448,7 +448,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   }}
                   style={{
                     padding: '6px 10px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 600,
                     border: '1px solid #15803d',
                     background: '#dcfce7',
@@ -466,7 +466,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   }}
                   style={{
                     padding: '6px 10px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 600,
                     border: '1px solid #15803d',
                     background: '#dcfce7',
@@ -481,7 +481,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   onClick={() => setShowDataActions(false)}
                   style={{
                     padding: '6px 10px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     border: '1px solid var(--border)',
                     background: 'var(--surface)',
                     color: 'var(--text-muted)',
@@ -497,7 +497,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 onClick={() => setShowDataActions(true)}
                 style={{
                   padding: '6px 12px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   border: '1px solid #15803d',
                   background: '#15803d',
@@ -515,7 +515,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
           {showOrgAssignment ? (
             <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
               {loadingOrgs ? (
-                <div style={{ padding: '6px 12px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ padding: '6px 12px', fontSize: '11px', color: 'var(--text-muted)' }}>
                   Loading organizations...
                 </div>
               ) : (
@@ -525,7 +525,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     onChange={(e) => setSelectedOrgId(e.target.value || null)}
                     style={{
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
                       minWidth: '200px'
@@ -543,7 +543,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     onChange={(e) => setRelationshipType(e.target.value)}
                     style={{
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)',
                       borderRadius: '4px'
                     }}
@@ -564,7 +564,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     disabled={action === 'assign_org' || !selectedOrgId}
                     style={{
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--accent)',
                       background: 'var(--accent)',
                       color: 'white',
@@ -582,7 +582,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     }}
                     style={{
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)',
                       background: 'var(--surface)',
                       color: 'var(--text-muted)',
@@ -600,7 +600,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
               onClick={() => setShowOrgAssignment(true)}
               style={{
                 padding: '6px 12px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 border: '1px solid #1e40af',
                 background: '#1e40af',
@@ -618,7 +618,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
             onClick={onDeselectAll}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               border: '1px solid var(--border)',
               background: 'var(--surface)',

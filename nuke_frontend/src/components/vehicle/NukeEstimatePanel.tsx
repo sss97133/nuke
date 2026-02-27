@@ -140,8 +140,9 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
     return (
       <div className="card">
         <div className="card-header">NUKE ESTIMATE</div>
-        <div className="card-body" style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '8pt' }}>
-          Loading...
+        <div className="card-body" style={{ padding: '12px' }}>
+          <div style={{ height: 28, background: 'var(--border)', borderRadius: 2, marginBottom: 8, width: '50%', opacity: 0.5 }} />
+          <div style={{ height: 14, background: 'var(--border)', borderRadius: 2, width: '70%', opacity: 0.4 }} />
         </div>
       </div>
     );
@@ -160,7 +161,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
             border: '1px solid var(--border)',
             padding: '2px 8px',
             borderRadius: '3px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 600,
             cursor: computing ? 'wait' : 'pointer',
             color: 'var(--text)',
@@ -171,21 +172,21 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
       </div>
       <div className="card-body" style={{ padding: '12px' }}>
         {!estimate ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
             No estimate computed yet. Click "Compute" to generate.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {/* Main estimate */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span style={{ fontSize: '16pt', fontWeight: 800, color: 'var(--text)' }}>
+              <span style={{ fontSize: '21px', fontWeight: 800, color: 'var(--text)' }}>
                 ${estimate.estimated_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </span>
-              <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 {estimate.confidence_score}% confidence
               </span>
               <span style={{
-                fontSize: '7pt',
+                fontSize: '9px',
                 padding: '1px 5px',
                 borderRadius: '3px',
                 background: 'var(--grey-100)',
@@ -198,7 +199,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
             </div>
 
             {/* Range */}
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               Range: ${estimate.value_low.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               {' - '}
               ${estimate.value_high.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -214,7 +215,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                   borderRadius: '4px',
                   background: DEAL_COLORS[estimate.deal_score_label] || '#6b7280',
                   color: 'white',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 700,
                 }}>
                   {DEAL_SCORE_CONFIG[estimate.deal_score_label as DealScoreLabel]?.display || estimate.deal_score_label}
@@ -228,7 +229,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                   borderRadius: '4px',
                   background: HEAT_COLORS[estimate.heat_score_label] || '#6b7280',
                   color: 'white',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 700,
                 }}>
                   {estimate.heat_score_label === 'volcanic' ? '\u{1F30B} VOLCANIC' :
@@ -242,7 +243,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
 
             {/* Signal weight breakdown */}
             <div>
-              <div style={{ fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
                 Signal Breakdown
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -281,17 +282,17 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
             {/* Record tracker */}
             {record && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
-                <div style={{ fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
                   Record Price
                 </div>
-                <div style={{ fontSize: '9pt', fontWeight: 700 }}>
+                <div style={{ fontSize: '12px', fontWeight: 700 }}>
                   ${record.record_price.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginLeft: '6px' }}>
                     for {vehicle.make} {vehicle.model} ({vehicle.year && `${Math.floor(vehicle.year / 5) * 5}-${Math.floor(vehicle.year / 5) * 5 + 4}`})
                   </span>
                 </div>
                 {record.previous_record_price && (
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                     Previous record: ${record.previous_record_price.toLocaleString()} (beaten {record.times_record_broken}x)
                   </div>
                 )}
@@ -301,10 +302,10 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
             {/* Survival data */}
             {survival && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
-                <div style={{ fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
                   Survival Estimate
                 </div>
-                <div style={{ fontSize: '9pt' }}>
+                <div style={{ fontSize: '12px' }}>
                   {survival.estimated_surviving != null && (
                     <span style={{ fontWeight: 700 }}>
                       ~{survival.estimated_surviving.toLocaleString()} surviving

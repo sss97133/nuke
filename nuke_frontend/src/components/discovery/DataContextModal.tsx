@@ -201,10 +201,10 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
           justifyContent: 'space-between'
         }}>
           <div>
-            <h2 className="heading-2" style={{ margin: 0, fontSize: '11pt' }}>
+            <h2 className="heading-2" style={{ margin: 0, fontSize: '15px' }}>
               {getTitle()}
             </h2>
-            <div className="text-muted" style={{ fontSize: '8pt', marginTop: '2px' }}>
+            <div className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
               {contextType && contextType !== 'estimate' && contextType !== 'band' && contextType !== 'confidence' && (
                 `Comparable vehicles based on ${contextType}`
               )}
@@ -213,7 +213,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
           <button
             onClick={onClose}
             className="button button-small"
-            style={{ padding: '4px 8px', fontSize: '8pt' }}
+            style={{ padding: '4px 8px', fontSize: '11px' }}
           >
             Close
           </button>
@@ -228,7 +228,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
             gap: '4px',
             flexWrap: 'wrap'
           }}>
-            <span className="text" style={{ fontSize: '8pt', marginRight: '4px' }}>Sort by:</span>
+            <span className="text" style={{ fontSize: '11px', marginRight: '4px' }}>Sort by:</span>
             {['coolest', 'nearest', 'best_opportunity', 'highest_value', 'most_documented'].map(sort => (
               <button
                 key={sort}
@@ -240,7 +240,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                   border: '1px solid #c0c0c0',
                   padding: '2px 6px',
                   borderRadius: '2px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   cursor: 'pointer'
                 }}
               >
@@ -259,13 +259,13 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
           {loading ? (
             <div style={{ textAlign: 'center', padding: '32px' }}>
               <div className="loading-spinner" style={{ margin: '0 auto' }}></div>
-              <div className="text-muted" style={{ marginTop: '8px', fontSize: '8pt' }}>
+              <div className="text-muted" style={{ marginTop: '8px', fontSize: '11px' }}>
                 Loading comparable vehicles...
               </div>
             </div>
           ) : vehicles.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px' }}>
-              <div className="text-muted" style={{ fontSize: '8pt' }}>
+              <div className="text-muted" style={{ fontSize: '11px' }}>
                 No comparable vehicles found
               </div>
             </div>
@@ -298,7 +298,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                       <VehicleThumbnail vehicleId={vehicle.id} />
                     </div>
                     <div style={{ padding: '6px' }}>
-                      <div className="text text-bold" style={{ fontSize: '8pt', marginBottom: '2px' }}>
+                      <div className="text text-bold" style={{ fontSize: '11px', marginBottom: '2px' }}>
                         {vehicle.year} {vehicle.make} {vehicle.model}
                       </div>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
@@ -308,7 +308,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                             border: '1px solid #c0c0c0',
                             padding: '1px 4px',
                             borderRadius: '2px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             color: '#374151'
                           }}>
                             ${estimate.toLocaleString()}
@@ -320,7 +320,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                             border: '1px solid #c0c0c0',
                             padding: '1px 4px',
                             borderRadius: '2px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             color: change >= 0 ? '#166534' : '#991b1b'
                           }}>
                             {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%

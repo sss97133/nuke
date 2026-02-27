@@ -8,7 +8,7 @@ const CreateOrganization = React.lazy(() => import('../../../pages/CreateOrganiz
 const Dashboard = React.lazy(() => import('../../../pages/Dashboard'));
 
 const LazyFallback = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '9pt' }}>
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '12px' }}>
     loading...
   </div>
 );

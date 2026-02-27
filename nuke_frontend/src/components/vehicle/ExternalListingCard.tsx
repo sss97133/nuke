@@ -155,7 +155,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
   if (loading) {
     return (
-      <div style={{ padding: '12px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
         Loading external listings...
       </div>
     );
@@ -207,7 +207,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                     background: platformColor,
                     color: '#fff',
                     borderRadius: '2px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 700
                   }}>
                     {platformName.toUpperCase()}
@@ -217,7 +217,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                     background: isActive ? 'var(--accent)' : isSold ? 'var(--success)' : 'var(--text-secondary)',
                     color: '#fff',
                     borderRadius: '2px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 700
                   }}>
                     {listing.listing_status.toUpperCase().replace('_', ' ')}
@@ -228,7 +228,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                       background: 'var(--warning)',
                       color: '#fff',
                       borderRadius: '2px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       fontWeight: 700
                     }}>
                       RESERVE NOT MET
@@ -240,7 +240,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="button button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   View on {platformName} →
                 </a>
@@ -248,7 +248,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
               {/* Seller / Buyer */}
               {(seller || buyer) && (
-                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   {seller && (
                     <div>
                       <span style={{ fontWeight: 700 }}>Seller:</span> {seller}
@@ -266,60 +266,60 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '8px' }}>
                 {listing.current_bid !== null && listing.current_bid !== undefined && (
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                       {reserveNotMet ? 'High Bid' : 'Current Bid'}
                     </div>
-                    <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>
                       ${listing.current_bid.toLocaleString()}
                     </div>
                   </div>
                 )}
                 {listing.final_price && (
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                       Sold For
                     </div>
-                    <div style={{ fontSize: '11pt', fontWeight: 700, color: 'var(--success)' }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--success)' }}>
                       ${listing.final_price.toLocaleString()}
                     </div>
                   </div>
                 )}
                 {listing.bid_count !== null && listing.bid_count !== undefined && (
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                       Bids
                     </div>
-                    <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>
                       {listing.bid_count}
                     </div>
                   </div>
                 )}
                 {listing.watcher_count !== null && listing.watcher_count !== undefined && (
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                       Watchers
                     </div>
-                    <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>
                       {listing.watcher_count.toLocaleString()}
                     </div>
                   </div>
                 )}
                 {listing.view_count !== null && listing.view_count !== undefined && (
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                       Views
                     </div>
-                    <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>
                       {listing.view_count.toLocaleString()}
                     </div>
                   </div>
                 )}
                 {listing.metadata?.comment_count && (
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                       Comments
                     </div>
-                    <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>
                       {listing.metadata.comment_count}
                     </div>
                   </div>
@@ -328,7 +328,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
               {/* End Date */}
               {endIso && (
-                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
                   {endLabel}: {new Date(endIso).toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric', 
@@ -347,7 +347,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                   background: 'var(--warning-dim)',
                   border: '1px solid var(--warning)',
                   borderRadius: '4px',
-                  fontSize: '8pt'
+                  fontSize: '11px'
                 }}>
                   This vehicle did not meet its reserve price on {platformName}. It may be available for direct purchase.
                 </div>
@@ -356,7 +356,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
               {/* Features */}
               {listing.metadata?.features && listing.metadata.features.length > 0 && (
                 <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                     Highlighted Features:
                   </div>
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -368,7 +368,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                           background: 'var(--surface-hover)',
                           border: '1px solid var(--border)',
                           borderRadius: '2px',
-                          fontSize: '7pt'
+                          fontSize: '9px'
                         }}
                       >
                         {feature}
@@ -388,7 +388,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
           background: 'var(--accent-dim)',
           border: '1px solid var(--border)',
           borderRadius: '4px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-secondary)'
         }}>
           <div style={{ fontWeight: 600, marginBottom: '4px' }}>Fair Play Policy:</div>

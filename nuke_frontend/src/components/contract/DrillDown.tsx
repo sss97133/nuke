@@ -310,7 +310,7 @@ export default function DrillDown({ concept, value, children, inline = true }: D
             borderRadius: '6px',
             boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
             overflow: 'hidden',
-            fontSize: '9pt',
+            fontSize: '12px',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -324,8 +324,8 @@ export default function DrillDown({ concept, value, children, inline = true }: D
             alignItems: 'center',
           }}>
             <div>
-              <div style={{ fontWeight: 900, fontSize: '10pt' }}>{def.title}</div>
-              <div style={{ fontSize: '7pt', opacity: 0.9, textTransform: 'uppercase', fontWeight: 700, marginTop: '2px' }}>
+              <div style={{ fontWeight: 900, fontSize: '13px' }}>{def.title}</div>
+              <div style={{ fontSize: '9px', opacity: 0.9, textTransform: 'uppercase', fontWeight: 700, marginTop: '2px' }}>
                 {def.category.replace('_', ' ')}
               </div>
             </div>
@@ -340,7 +340,7 @@ export default function DrillDown({ concept, value, children, inline = true }: D
             )}
             {def.requirements && (
               <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontWeight: 700, fontSize: '8pt', textTransform: 'uppercase', marginBottom: '4px', color }}>Requirements</div>
+                <div style={{ fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px', color }}>Requirements</div>
                 <ul style={{ margin: 0, paddingLeft: '16px' }}>
                   {def.requirements.map((r, i) => <li key={i} style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>{r}</li>)}
                 </ul>
@@ -348,7 +348,7 @@ export default function DrillDown({ concept, value, children, inline = true }: D
             )}
             {def.restrictions && (
               <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontWeight: 700, fontSize: '8pt', textTransform: 'uppercase', marginBottom: '4px', color }}>Restrictions</div>
+                <div style={{ fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px', color }}>Restrictions</div>
                 <ul style={{ margin: 0, paddingLeft: '16px' }}>
                   {def.restrictions.map((r, i) => <li key={i} style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>{r}</li>)}
                 </ul>
@@ -356,7 +356,7 @@ export default function DrillDown({ concept, value, children, inline = true }: D
             )}
             {def.rules && (
               <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontWeight: 700, fontSize: '8pt', textTransform: 'uppercase', marginBottom: '4px', color }}>Rules</div>
+                <div style={{ fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px', color }}>Rules</div>
                 <ul style={{ margin: 0, paddingLeft: '16px' }}>
                   {def.rules.map((r, i) => <li key={i} style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>{r}</li>)}
                 </ul>
@@ -364,12 +364,12 @@ export default function DrillDown({ concept, value, children, inline = true }: D
             )}
             {def.tax && (
               <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontWeight: 700, fontSize: '8pt', textTransform: 'uppercase', marginBottom: '4px', color }}>Tax Treatment</div>
+                <div style={{ fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px', color }}>Tax Treatment</div>
                 <div style={{ color: 'var(--text-muted)' }}>{def.tax}</div>
               </div>
             )}
             {def.context && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: '6px', marginTop: '6px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: '6px', marginTop: '6px' }}>
                 {def.context}
               </div>
             )}

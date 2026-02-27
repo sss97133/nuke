@@ -43,14 +43,14 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
         state={!mileage && state === 'empty' ? 'empty' : state}
         emptyContent={
           <div style={{ padding: '8px 0' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
               No mileage history. Snap your odometer to start tracking.
             </div>
             <div style={{
               padding: '6px 8px',
               border: '1px dashed var(--border)',
               borderRadius: '4px',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--primary, #3b82f6)',
               cursor: 'pointer',
               textAlign: 'center',
@@ -59,7 +59,7 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
               justifyContent: 'center',
               gap: '4px',
             }}>
-              <span style={{ fontSize: '12pt' }}>&#128247;</span> Add odometer reading
+              <span style={{ fontSize: '16px' }}>&#128247;</span> Add odometer reading
             </div>
           </div>
         }
@@ -67,25 +67,25 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
           <div>
             {mileage && (
               <div style={{
-                fontSize: '16pt',
+                fontSize: '21px',
                 fontWeight: 700,
                 fontFamily: 'ui-monospace, "SF Mono", monospace',
                 letterSpacing: '1px',
                 marginBottom: '6px',
               }}>
                 {mileage.toLocaleString()}
-                <span style={{ fontSize: '8pt', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '4px' }}>mi</span>
+                <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '4px' }}>mi</span>
               </div>
             )}
             {milesPerYear != null && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                 ~{milesPerYear.toLocaleString()} mi/year
                 {mileageLevel && (
                   <span style={{
                     marginLeft: '6px',
                     padding: '1px 5px',
                     borderRadius: '3px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 600,
                     background: mileageLevel === 'Low' ? '#22c55e20' : mileageLevel === 'Average' ? '#f59e0b20' : '#ef444420',
                     color: mileageLevel === 'Low' ? '#22c55e' : mileageLevel === 'Average' ? '#f59e0b' : '#ef4444',
@@ -96,7 +96,7 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
               </div>
             )}
             {data && data.length > 0 && (
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                 {data.length} reading{data.length !== 1 ? 's' : ''} tracked
               </div>
             )}
@@ -110,7 +110,7 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
                 <div key={i} style={{
                   display: 'flex', justifyContent: 'space-between',
                   padding: '2px 0', borderBottom: '1px solid var(--border)',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                 }}>
                   <span style={{ color: 'var(--text-muted)' }}>
                     {new Date(pt.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
@@ -122,14 +122,14 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
               ))}
             </div>
             {milesPerYear != null && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Accumulation rate: ~{milesPerYear.toLocaleString()} mi/year
                 {mileageLevel && (
                   <span style={{
                     marginLeft: '6px',
                     padding: '1px 5px',
                     borderRadius: '3px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 600,
                     background: mileageLevel === 'Low' ? '#22c55e20' : mileageLevel === 'Average' ? '#f59e0b20' : '#ef444420',
                     color: mileageLevel === 'Low' ? '#22c55e' : mileageLevel === 'Average' ? '#f59e0b' : '#ef4444',

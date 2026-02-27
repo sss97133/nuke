@@ -228,19 +228,19 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
         }}
       >
         <div className="card-header">
-          <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
             Set GPS Location for {organizationName}
           </h3>
         </div>
         <div className="card-body">
-          <div style={{ marginBottom: '16px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <div style={{ marginBottom: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>
             Set the GPS coordinates for this location to enable automatic work order linking.
             When vehicle images are taken at this location, timeline events will automatically link to this organization.
           </div>
 
           {/* Address Search */}
           <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--grey-100)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
               Search by Address
             </div>
             <div style={{ display: 'grid', gap: '8px' }}>
@@ -250,7 +250,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
                 className="form-input"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               />
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '8px' }}>
                 <input
@@ -259,7 +259,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
                   className="form-input"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                 />
                 <input
                   type="text"
@@ -267,7 +267,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
                   className="form-input"
                   value={state}
                   onChange={(e) => setState(e.target.value)}
-                  style={{ fontSize: '9pt', textTransform: 'uppercase' }}
+                  style={{ fontSize: '12px', textTransform: 'uppercase' }}
                   maxLength={2}
                 />
                 <input
@@ -276,7 +276,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
                   className="form-input"
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                   maxLength={10}
                 />
               </div>
@@ -284,7 +284,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
                 className="button button-primary"
                 onClick={geocodeAddress}
                 disabled={geocoding || (!address && !city)}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 {geocoding ? 'Searching...' : 'Find Coordinates'}
               </button>
@@ -293,12 +293,12 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
 
           {/* Manual Coordinates */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
               GPS Coordinates (Decimal Degrees)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div>
-                <label style={{ fontSize: '8pt', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                   Latitude (-90 to 90)
                 </label>
                 <input
@@ -308,11 +308,11 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
                   className="form-input"
                   value={latitude}
                   onChange={(e) => setLatitude(e.target.value)}
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: '8pt', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                   Longitude (-180 to 180)
                 </label>
                 <input
@@ -322,7 +322,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
                   className="form-input"
                   value={longitude}
                   onChange={(e) => setLongitude(e.target.value)}
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                 />
               </div>
             </div>
@@ -330,7 +330,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
 
           {/* Interactive Map */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
               Interactive Map - Click or drag marker to set location
             </div>
             <div 
@@ -344,7 +344,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
                 zIndex: 1
               }}
             />
-            <div style={{ marginTop: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
               Drag the marker or click anywhere on the map to set precise GPS coordinates.
               {latitude && longitude && (
                 <>
@@ -364,10 +364,10 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
 
           {/* Help Text */}
           <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--info-dim)', border: '1px solid var(--info)', borderRadius: '4px' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 600, marginBottom: '4px', color: 'var(--info)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px', color: 'var(--info)' }}>
               How to get coordinates:
             </div>
-            <ul style={{ fontSize: '8pt', margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)' }}>
+            <ul style={{ fontSize: '11px', margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)' }}>
               <li>Use the address search above (easiest)</li>
               <li>Right-click on Google Maps → "What's here?" → Copy coordinates</li>
               <li>On mobile: Long-press location → Dropped pin shows coordinates</li>
@@ -380,7 +380,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
           <button
             className="button button-secondary"
             onClick={onClose}
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
           >
             Cancel
           </button>
@@ -388,7 +388,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
             className="button button-primary"
             onClick={handleSave}
             disabled={saving || !latitude || !longitude}
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
           >
             {saving ? 'Saving...' : 'Save Location'}
           </button>

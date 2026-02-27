@@ -17,8 +17,8 @@ export default function TradingPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto', paddingTop: '100px' }}>
-          <h1 style={{ fontSize: '14pt', marginBottom: '12px' }}>Trading Terminal</h1>
-          <p style={{ fontSize: '10pt', color: 'var(--text-muted)', marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '19px', marginBottom: '12px' }}>Trading Terminal</h1>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
             Select an offering from the market to start trading.
           </p>
           <button

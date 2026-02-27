@@ -76,7 +76,7 @@ export default function LiveImageAnalysisMonitor() {
 
   if (loading || !stats) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
         Loading analysis progress...
       </div>
     );
@@ -93,10 +93,10 @@ export default function LiveImageAnalysisMonitor() {
       {/* Header */}
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '4px' }}>
+          <h1 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
             LIVE IMAGE ANALYSIS PROGRESS
           </h1>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Real-time monitoring of AI image analysis pipeline
           </p>
         </div>
@@ -104,7 +104,7 @@ export default function LiveImageAnalysisMonitor() {
           onClick={() => setAutoRefresh(!autoRefresh)}
           style={{
             padding: '8px 16px',
-            fontSize: '8pt',
+            fontSize: '11px',
             border: `2px solid ${autoRefresh ? 'var(--success)' : 'var(--border-light)'}`,
             background: autoRefresh ? 'var(--success-light)' : 'var(--surface)',
             color: autoRefresh ? 'var(--success)' : 'var(--text-muted)',
@@ -127,7 +127,7 @@ export default function LiveImageAnalysisMonitor() {
           background: '#000',
           color: '#fff',
           padding: '12px 16px',
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 700,
           letterSpacing: '0.5px'
         }}>
@@ -138,7 +138,7 @@ export default function LiveImageAnalysisMonitor() {
           <div style={{ marginBottom: '24px' }}>
             <div style={{ 
               fontFamily: 'monospace', 
-              fontSize: '10pt', 
+              fontSize: '13px', 
               marginBottom: '8px',
               letterSpacing: '1px'
             }}>
@@ -154,25 +154,25 @@ export default function LiveImageAnalysisMonitor() {
             marginBottom: '20px'
           }}>
             <div style={{ border: '2px solid #000', padding: '16px', background: '#f8f8f8' }}>
-              <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
                 ANALYZED
               </div>
-              <div style={{ fontSize: '20pt', fontWeight: 700, marginBottom: '4px' }}>
+              <div style={{ fontSize: '27px', fontWeight: 700, marginBottom: '4px' }}>
                 {stats.analyzed.toLocaleString()}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: '#666' }}>
                 of {stats.total.toLocaleString()} total
               </div>
             </div>
 
             <div style={{ border: '2px solid #000', padding: '16px', background: '#fff3cd' }}>
-              <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
                 REMAINING
               </div>
-              <div style={{ fontSize: '20pt', fontWeight: 700, marginBottom: '4px', color: '#856404' }}>
+              <div style={{ fontSize: '27px', fontWeight: 700, marginBottom: '4px', color: '#856404' }}>
                 {stats.pending.toLocaleString()}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: '#666' }}>
                 images pending analysis
               </div>
             </div>
@@ -186,37 +186,37 @@ export default function LiveImageAnalysisMonitor() {
             marginTop: '20px'
           }}>
             <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
-              <div style={{ fontSize: '8pt', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
                 PROCESSING RATE
               </div>
-              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {stats.rate.toFixed(1)}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: '#666' }}>
                 images/minute
               </div>
             </div>
 
             <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
-              <div style={{ fontSize: '8pt', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
                 ELAPSED TIME
               </div>
-              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {stats.elapsed.toFixed(1)}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: '#666' }}>
                 minutes
               </div>
             </div>
 
             <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
-              <div style={{ fontSize: '8pt', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
                 ESTIMATED TIME REMAINING
               </div>
-              <div style={{ fontSize: '14pt', fontWeight: 700, color: stats.eta < 60 ? '#10b981' : '#f59e0b' }}>
+              <div style={{ fontSize: '19px', fontWeight: 700, color: stats.eta < 60 ? '#10b981' : '#f59e0b' }}>
                 {stats.eta < 60 ? `${stats.eta.toFixed(1)}m` : `${(stats.eta / 60).toFixed(1)}h`}
               </div>
-              <div style={{ fontSize: '8pt', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: '#666' }}>
                 {stats.eta > 0 ? 'at current rate' : 'calculating...'}
               </div>
             </div>
@@ -229,7 +229,7 @@ export default function LiveImageAnalysisMonitor() {
               padding: '12px',
               background: '#10b98110',
               border: '2px solid #10b981',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               color: '#10b981'
             }}>
@@ -244,7 +244,7 @@ export default function LiveImageAnalysisMonitor() {
               padding: '16px',
               background: '#10b981',
               color: '#fff',
-              fontSize: '10pt',
+              fontSize: '13px',
               fontWeight: 700,
               textAlign: 'center',
               border: '2px solid #000'
@@ -260,7 +260,7 @@ export default function LiveImageAnalysisMonitor() {
         padding: '12px', 
         background: '#f8f8f8', 
         border: '2px solid #e5e5e5',
-        fontSize: '8pt',
+        fontSize: '11px',
         color: '#666',
         textAlign: 'center'
       }}>

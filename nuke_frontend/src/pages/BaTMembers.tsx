@@ -126,7 +126,7 @@ export default function BaTMembers() {
   if (loading) {
     return (
       <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', padding: '40px', fontSize: '9pt' }}>
+        <div style={{ textAlign: 'center', padding: '40px', fontSize: '12px' }}>
           Loading BaT members...
         </div>
       </div>
@@ -137,10 +137,10 @@ export default function BaTMembers() {
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '20px' }}>
-        <h1 style={{ fontSize: '16pt', fontWeight: 700, marginBottom: '6px' }}>
+        <h1 style={{ fontSize: '21px', fontWeight: 700, marginBottom: '6px' }}>
           BaT Members
         </h1>
-        <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           Browse Bring a Trailer members and their activity
         </p>
       </div>
@@ -161,7 +161,7 @@ export default function BaTMembers() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by username..."
             className="form-input"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
           />
 
           {/* Platform filter */}
@@ -169,7 +169,7 @@ export default function BaTMembers() {
             value={platformFilter}
             onChange={(e) => setPlatformFilter(e.target.value)}
             className="form-select"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
           >
             <option value="bat">BaT</option>
             <option value="cars_and_bids">Cars & Bids</option>
@@ -180,7 +180,7 @@ export default function BaTMembers() {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
             className="form-select"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '12px' }}
           >
             <option value="comments">Most Comments</option>
             <option value="listings">Most Listings</option>
@@ -191,7 +191,7 @@ export default function BaTMembers() {
       </div>
 
       {/* Stats */}
-      <div style={{ marginBottom: '20px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+      <div style={{ marginBottom: '20px', fontSize: '11px', color: 'var(--text-muted)' }}>
         Showing {members.length} {platformFilter === 'bat' ? 'BaT' : 'Cars & Bids'} members
         {searchQuery && ` matching "${searchQuery}"`}
       </div>
@@ -205,8 +205,8 @@ export default function BaTMembers() {
           border: '1px solid var(--border)',
           borderRadius: '4px'
         }}>
-          <div style={{ fontSize: '9pt', marginBottom: '8px' }}>No members found</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '12px', marginBottom: '8px' }}>No members found</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             {searchQuery ? 'Try a different search term' : 'No members with activity yet'}
           </div>
         </div>
@@ -248,7 +248,7 @@ export default function BaTMembers() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '16pt',
+                fontSize: '21px',
                 fontWeight: 700,
                 color: 'var(--text-muted)'
               }}>
@@ -257,7 +257,7 @@ export default function BaTMembers() {
 
               {/* Name */}
               <div style={{
-                fontSize: '11pt',
+                fontSize: '15px',
                 fontWeight: 700,
                 marginBottom: '4px',
                 color: 'var(--text)'
@@ -267,7 +267,7 @@ export default function BaTMembers() {
 
               {/* Handle */}
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 color: 'var(--text-muted)',
                 marginBottom: '12px'
               }}>
@@ -281,7 +281,7 @@ export default function BaTMembers() {
               <div style={{
                 display: 'flex',
                 gap: '16px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 color: 'var(--text-muted)'
               }}>
                 <div>
@@ -295,7 +295,7 @@ export default function BaTMembers() {
               {/* Member since */}
               {member.member_since && (
                 <div style={{
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text-muted)',
                   marginTop: '8px',
                   paddingTop: '8px',

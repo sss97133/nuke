@@ -36,17 +36,17 @@ const PartEnrichmentModal: React.FC<PartEnrichmentModalProps> = ({ isOpen, tag, 
 					maxWidth: 520
 				}}
 			>
-				<div style={{ marginBottom: 8, fontWeight: 700, fontSize: '10pt' }}>Enrich Part</div>
-				<div style={{ fontSize: '9pt', marginBottom: 12 }}>
+				<div style={{ marginBottom: 8, fontWeight: 700, fontSize: '13px' }}>Enrich Part</div>
+				<div style={{ fontSize: '12px', marginBottom: 12 }}>
 					{tag?.tag_name ? `Tag: ${tag.tag_name}` : 'No tag selected'}
 				</div>
 				<div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-					<button className="button" style={{ fontSize: '8pt' }} onClick={onClose}>
+					<button className="button" style={{ fontSize: '11px' }} onClick={onClose}>
 						Close
 					</button>
 					<button
 						className="button button-primary"
-						style={{ fontSize: '8pt' }}
+						style={{ fontSize: '11px' }}
 						onClick={() => {
 							onSave();
 							onClose();

@@ -69,7 +69,7 @@ function NavBadge({ count }: { count: number }) {
       display: 'inline-block',
       marginLeft: '6px',
       padding: '0 5px',
-      fontSize: '7pt',
+      fontSize: '9px',
       fontWeight: 700,
       fontFamily: 'monospace',
       color: '#fff',
@@ -95,7 +95,7 @@ function NavList({ items, counts }: { items: AdminNavItem[]; counts: NavCounts }
             style={({ isActive }) => ({
               display: 'block',
               padding: 'var(--space-2) var(--space-3)',
-              fontSize: '8pt',
+              fontSize: '11px',
               borderRadius: '0px',
               backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
               color: isActive ? 'var(--text)' : 'var(--text-muted)',
@@ -112,7 +112,7 @@ function NavList({ items, counts }: { items: AdminNavItem[]; counts: NavCounts }
             </div>
             {item.description ? (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 color: 'var(--text-muted)',
                 marginTop: '2px'
               }}>{item.description}</div>
@@ -147,7 +147,7 @@ function Section({
   return (
     <div style={{ marginBottom: 'var(--space-6)' }}>
       <div style={{
-        fontSize: '8pt',
+        fontSize: '11px',
         fontWeight: 600,
         color: 'var(--text-muted)',
         textTransform: 'uppercase',
@@ -306,7 +306,7 @@ export default function AdminShell() {
     : [];
 
   if (loading) {
-    return <div style={{ padding: 'var(--space-6)', fontSize: '8pt', color: 'var(--text-muted)' }}>Loading admin…</div>;
+    return <div style={{ padding: 'var(--space-6)', fontSize: '11px', color: 'var(--text-muted)' }}>Loading admin…</div>;
   }
 
   if (!isAdmin) {
@@ -319,8 +319,8 @@ export default function AdminShell() {
           padding: 'var(--space-4)',
           backgroundColor: 'var(--white)'
         }}>
-          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>Access denied</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Admin privileges are required to view this area.</div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>Access denied</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Admin privileges are required to view this area.</div>
           <div style={{ marginTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
             <button className="button button-secondary" onClick={() => navigate('/org/dashboard')}>
               Return to dashboard
@@ -343,8 +343,8 @@ export default function AdminShell() {
         padding: 'var(--space-4)'
       }}>
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Admin</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Central admin hub</div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Admin</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Central admin hub</div>
         </div>
 
         <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -356,7 +356,7 @@ export default function AdminShell() {
               placeholder="Search admin…"
               style={{
                 width: '100%',
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: '8px 10px',
                 borderRadius: '0px',
                 border: '2px solid var(--border-light)',
@@ -364,7 +364,7 @@ export default function AdminShell() {
               }}
             />
           </div>
-          <div style={{ marginTop: '6px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
             Tip: press <span style={{ fontFamily: 'monospace' }}>⌘K</span> to focus.
           </div>
         </div>
@@ -372,7 +372,7 @@ export default function AdminShell() {
         {q ? (
           <div style={{ marginBottom: 'var(--space-6)' }}>
             <div style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               color: 'var(--text-muted)',
               textTransform: 'uppercase',
@@ -400,7 +400,7 @@ export default function AdminShell() {
                   style={({ isActive }) => ({
                     display: 'block',
                     padding: 'var(--space-2) var(--space-3)',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     borderRadius: '0px',
                     backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
                     color: isActive ? 'var(--text)' : 'var(--text-muted)',
@@ -415,15 +415,15 @@ export default function AdminShell() {
                       {item.label}
                       {item.countKey && navCounts[item.countKey] > 0 && <NavBadge count={navCounts[item.countKey]} />}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item._section}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item._section}</div>
                   </div>
                   {item.description ? (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>{item.description}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.description}</div>
                   ) : null}
                 </NavLink>
               ))}
               {searchResults.length === 0 ? (
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', padding: 'var(--space-2) var(--space-1)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: 'var(--space-2) var(--space-1)' }}>
                   No matches.
                 </div>
               ) : null}

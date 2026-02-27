@@ -146,13 +146,13 @@ export function ServiceReportModal({
           alignItems: 'flex-start'
         }}>
           <div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
               Service Report
             </div>
-            <div style={{ fontSize: '8pt', fontWeight: 700 }}>
+            <div style={{ fontSize: '11px', fontWeight: 700 }}>
               {vehicleYear} {vehicleMake} {vehicleModel}
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {organizationName}
             </div>
           </div>
@@ -161,7 +161,7 @@ export function ServiceReportModal({
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '8pt',
+              fontSize: '11px',
               cursor: 'pointer',
               padding: '4px 8px',
               color: 'var(--text-muted)'
@@ -172,7 +172,7 @@ export function ServiceReportModal({
         </div>
 
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <div style={{ padding: '40px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
             Loading report...
           </div>
         ) : (
@@ -186,27 +186,27 @@ export function ServiceReportModal({
               borderBottom: '1px solid var(--border-light)'
             }}>
               <div style={{ background: 'var(--card-bg)', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--accent)' }}>{sessions.length}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>SESSIONS</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)' }}>{sessions.length}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>SESSIONS</div>
               </div>
               <div style={{ background: 'var(--card-bg)', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700 }}>{Math.round(totalHours * 10) / 10}h</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>HOURS</div>
+                <div style={{ fontSize: '11px', fontWeight: 700 }}>{Math.round(totalHours * 10) / 10}h</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>HOURS</div>
               </div>
               <div style={{ background: 'var(--card-bg)', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--success, #22c55e)' }}>{formatCurrency(estimatedCost)}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>EST. VALUE</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success, #22c55e)' }}>{formatCurrency(estimatedCost)}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>EST. VALUE</div>
               </div>
               <div style={{ background: 'var(--card-bg)', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700 }}>{totalImages}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>PHOTOS</div>
+                <div style={{ fontSize: '11px', fontWeight: 700 }}>{totalImages}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>PHOTOS</div>
               </div>
             </div>
 
             {/* Photo Gallery */}
             {images.length > 0 && (
               <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                   WORK DOCUMENTATION
                 </div>
                 <div style={{
@@ -229,7 +229,7 @@ export function ServiceReportModal({
                   ))}
                 </div>
                 {images.length > 10 && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
                     +{images.length - 10} more photos
                   </div>
                 )}
@@ -238,7 +238,7 @@ export function ServiceReportModal({
 
             {/* Work Sessions Timeline */}
             <div style={{ padding: '12px' }}>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 WORK SESSIONS ({formatDate(firstDate)} - {formatDate(lastDate)})
               </div>
               <div style={{ maxHeight: '300px', overflow: 'auto' }}>
@@ -255,17 +255,17 @@ export function ServiceReportModal({
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <div style={{ fontSize: '8pt', fontWeight: 600 }}>{session.title}</div>
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600 }}>{session.title}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           {formatDate(session.date)}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         {session.duration_hours > 0 && (
-                          <div style={{ fontSize: '8pt', fontWeight: 600 }}>{session.duration_hours}h</div>
+                          <div style={{ fontSize: '11px', fontWeight: 600 }}>{session.duration_hours}h</div>
                         )}
                         {session.image_count > 0 && (
-                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{session.image_count} photos</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{session.image_count} photos</div>
                         )}
                       </div>
                     </div>
@@ -282,7 +282,7 @@ export function ServiceReportModal({
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Labor rate: {formatCurrency(laborRate)}/hr
               </div>
               <button
@@ -292,7 +292,7 @@ export function ServiceReportModal({
                   color: 'white',
                   border: 'none',
                   padding: '8px 16px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   borderRadius: '2px'

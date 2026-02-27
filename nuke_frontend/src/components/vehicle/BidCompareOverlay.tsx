@@ -80,7 +80,7 @@ function CompareTooltip({ active, payload }: any) {
   return (
     <div style={{
       background: 'var(--grey-800, #1f2937)', color: '#fff', padding: '6px 10px',
-      borderRadius: 6, fontSize: '8pt', fontFamily: 'monospace', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+      borderRadius: 6, fontSize: '11px', fontFamily: 'monospace', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
     }}>
       <div>Time: {d.pctTime}%</div>
       <div style={{ color: '#3b82f6' }}>Vehicle: {d.vehicle}%</div>
@@ -140,7 +140,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
 
   if (isLoading) {
     return (
-      <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
         Loading market comparison...
       </div>
     );
@@ -154,11 +154,11 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        fontSize: '8pt', color: 'var(--text-muted)',
+        fontSize: '11px', color: 'var(--text-muted)',
       }}>
         <span>Normalized bid curve: this vehicle vs {make} {model || ''} market avg</span>
         <span style={{
-          color: outperformed ? '#22c55e' : '#ef4444', fontWeight: 700, fontSize: '9pt',
+          color: outperformed ? '#22c55e' : '#ef4444', fontWeight: 700, fontSize: '12px',
         }}>
           {outperformed ? 'Outperformed' : 'Underperformed'} market
         </span>
@@ -183,7 +183,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
             <Tooltip content={<CompareTooltip />} />
             <Legend
               iconType="line"
-              wrapperStyle={{ fontSize: '8pt' }}
+              wrapperStyle={{ fontSize: '11px' }}
             />
             {/* Delta shading */}
             <Area
@@ -218,7 +218,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
       </div>
 
       {aggregateData?.aggregate && (
-        <div style={{ display: 'flex', gap: 16, fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', gap: 16, fontSize: '11px', color: 'var(--text-muted)' }}>
           <span>Market avg bids: {aggregateData.aggregate.avg_bids ?? '—'}</span>
           <span>Market avg bidders: {aggregateData.aggregate.avg_unique_bidders ?? '—'}</span>
           <span>Avg appreciation: {aggregateData.aggregate.avg_appreciation_pct ?? '—'}%</span>

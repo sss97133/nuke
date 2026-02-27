@@ -89,19 +89,19 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
 
   // Determine the trigger display
   const triggerContent = anyPrice ? (
-    <span style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--text)' }}>
+    <span style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text)' }}>
       {formatCurrencyAmount(anyPrice)}
     </span>
   ) : estimate ? (
-    <span style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--text-muted)' }}>
+    <span style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text-muted)' }}>
       ~{formatCurrencyAmount(estimate)}
     </span>
   ) : displayMsrp ? (
-    <span style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--text-muted)' }}>
+    <span style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text-muted)' }}>
       MSRP {formatCurrencyAmount(displayMsrp)}
     </span>
   ) : (
-    <span style={{ color: 'var(--primary, #3b82f6)', fontSize: '10pt', fontWeight: 500 }}>
+    <span style={{ color: 'var(--primary, #3b82f6)', fontSize: '13px', fontWeight: 500 }}>
       + Add price
     </span>
   );
@@ -116,7 +116,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
     >
       <div style={{ padding: '10px 12px' }}>
         <div style={{
-          fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)',
+          fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)',
           textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
         }}>
           Price Intelligence
@@ -125,14 +125,14 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
         {!hasData && !savedMsrp ? (
           /* Empty state — MSRP input form */
           <div style={{ padding: '8px 0' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
               No price data yet. Add MSRP to unlock deal scoring and market comparison.
             </div>
 
             {showMsrpForm ? (
               <div>
                 <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '10pt', color: 'var(--text-muted)', lineHeight: '28px' }}>$</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '28px' }}>$</span>
                   <input
                     type="text"
                     value={msrpInput}
@@ -146,7 +146,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                     style={{
                       flex: 1,
                       padding: '4px 6px',
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
                       background: 'var(--bg, #fff)',
@@ -160,7 +160,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                     disabled={saving || !msrpInput.trim()}
                     style={{
                       padding: '4px 8px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       fontWeight: 600,
                       background: saving ? 'var(--border)' : 'var(--primary, #3b82f6)',
                       color: '#fff',
@@ -174,12 +174,12 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                   </button>
                 </div>
                 {saveError && (
-                  <div style={{ fontSize: '7pt', color: '#ef4444', marginTop: '2px' }}>{saveError}</div>
+                  <div style={{ fontSize: '9px', color: '#ef4444', marginTop: '2px' }}>{saveError}</div>
                 )}
                 <button
                   onClick={() => { setShowMsrpForm(false); setMsrpInput(''); setSaveError(null); }}
                   style={{
-                    background: 'none', border: 'none', fontSize: '7pt',
+                    background: 'none', border: 'none', fontSize: '9px',
                     color: 'var(--text-muted)', cursor: 'pointer', padding: '2px 0',
                   }}
                 >
@@ -193,7 +193,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                   padding: '6px 8px',
                   border: '1px dashed var(--border)',
                   borderRadius: '4px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   color: 'var(--primary, #3b82f6)',
                   cursor: 'pointer',
                   textAlign: 'center',
@@ -235,7 +235,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
 
             {/* Depreciation from MSRP */}
             {displayMsrp && displayMsrp > 0 && anyPrice && anyPrice > 0 && (
-              <div style={{ marginTop: '6px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: '6px', fontSize: '9px', color: 'var(--text-muted)' }}>
                 {anyPrice < displayMsrp
                   ? `${Math.round(((displayMsrp - anyPrice) / displayMsrp) * 100)}% below MSRP`
                   : anyPrice > displayMsrp
@@ -251,7 +251,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                 {showMsrpForm ? (
                   <div>
                     <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '10pt', color: 'var(--text-muted)', lineHeight: '28px' }}>$</span>
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '28px' }}>$</span>
                       <input
                         type="text"
                         value={msrpInput}
@@ -260,7 +260,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                         placeholder="MSRP"
                         autoFocus
                         style={{
-                          flex: 1, padding: '4px 6px', fontSize: '9pt',
+                          flex: 1, padding: '4px 6px', fontSize: '12px',
                           border: '1px solid var(--border)', borderRadius: '4px',
                           background: 'var(--bg, #fff)', color: 'var(--text)',
                           outline: 'none', minWidth: 0,
@@ -270,7 +270,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                         onClick={handleSaveMsrp}
                         disabled={saving || !msrpInput.trim()}
                         style={{
-                          padding: '4px 8px', fontSize: '8pt', fontWeight: 600,
+                          padding: '4px 8px', fontSize: '11px', fontWeight: 600,
                           background: saving ? 'var(--border)' : 'var(--primary, #3b82f6)',
                           color: '#fff', border: 'none', borderRadius: '4px',
                           cursor: saving ? 'wait' : 'pointer',
@@ -281,14 +281,14 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                       </button>
                     </div>
                     {saveError && (
-                      <div style={{ fontSize: '7pt', color: '#ef4444', marginTop: '2px' }}>{saveError}</div>
+                      <div style={{ fontSize: '9px', color: '#ef4444', marginTop: '2px' }}>{saveError}</div>
                     )}
                   </div>
                 ) : (
                   <div
                     onClick={() => setShowMsrpForm(true)}
                     style={{
-                      padding: '4px 6px', fontSize: '7pt',
+                      padding: '4px 6px', fontSize: '9px',
                       color: 'var(--primary, #3b82f6)', cursor: 'pointer',
                       borderTop: '1px solid var(--border)', paddingTop: '6px',
                     }}
@@ -314,13 +314,13 @@ function WaterfallRow({ label, value, bold, muted, suffix }: {
       padding: '3px 0',
       borderBottom: '1px solid var(--border)',
     }}>
-      <span style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>{label}</span>
+      <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>{label}</span>
       <span style={{
         fontWeight: bold ? 700 : 500,
         color: muted ? 'var(--text-muted)' : 'var(--text)',
       }}>
         {value}
-        {suffix && <span style={{ fontSize: '7pt', color: 'var(--text-muted)', marginLeft: '4px' }}>{suffix}</span>}
+        {suffix && <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginLeft: '4px' }}>{suffix}</span>}
       </span>
     </div>
   );
@@ -332,7 +332,7 @@ function DealScore({ score, price, estimate }: { score: number; price: number; e
   const isFair = score > 0;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '8pt' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
       <span style={{
         width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
         background: isGoodDeal ? '#22c55e' : isFair ? '#84cc16' : score > -20 ? '#f59e0b' : '#ef4444',

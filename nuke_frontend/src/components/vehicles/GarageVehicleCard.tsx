@@ -212,7 +212,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
     return (
       <span
         style={{
-          fontSize: '7pt',
+          fontSize: '9px',
           fontWeight: 700,
           padding: '4px 8px',
           borderRadius: '3px',
@@ -450,7 +450,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
             color: healthScore >= 75 ? '#15803d' : healthScore >= 50 ? '#b45309' : '#991b1b',
             padding: '4px 8px',
             borderRadius: '3px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 700,
             backdropFilter: 'blur(4px)',
             cursor: 'help'
@@ -471,7 +471,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
               color: '#fff',
               padding: '4px 8px',
               borderRadius: '3px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 600,
               backdropFilter: 'blur(4px)'
             }}
@@ -486,7 +486,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
         {/* Vehicle name */}
         <h3
           style={{
-            fontSize: '11pt',
+            fontSize: '15px',
             fontWeight: 700,
             margin: '0 0 8px 0',
             lineHeight: 1.3,
@@ -517,7 +517,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
                   }
                 }}
                 style={{
-                  fontSize: '6pt',
+                  fontSize: '8px',
                   fontWeight: 600,
                   padding: '3px 6px',
                   borderRadius: '2px',
@@ -541,7 +541,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
           <div style={{ marginBottom: '8px' }}>
             {/* Value/ROI */}
             {vehicle.current_value && vehicle.purchase_price ? (
-              <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                 <span style={{ color: '#4b5563', fontWeight: 500 }}>Value: </span>
                 <span style={{ fontWeight: 700, color: '#111827' }}>
                   {formatCurrency(vehicle.current_value)}
@@ -558,7 +558,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
                 </span>
               </div>
             ) : vehicle.current_value ? (
-              <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                 <span style={{ color: '#4b5563', fontWeight: 500 }}>Value: </span>
                 <span style={{ fontWeight: 700, color: '#111827' }}>{formatCurrency(vehicle.current_value)}</span>
               </div>
@@ -566,7 +566,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
 
             {/* Latest activity */}
             {liveData.latestEvent ? (
-              <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                 <span style={{ color: '#4b5563', fontWeight: 500 }}>Last: </span>
                 <span style={{ color: '#111827', fontWeight: 500 }}>
                   {liveData.latestEvent.title || liveData.latestEvent.event_type}
@@ -576,7 +576,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
                 </span>
               </div>
             ) : (
-              <div style={{ fontSize: '8pt', marginBottom: '4px', color: '#6b7280' }}>
+              <div style={{ fontSize: '11px', marginBottom: '4px', color: '#6b7280' }}>
                 No activity yet
               </div>
             )}
@@ -586,7 +586,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
               style={{
                 display: 'flex',
                 gap: '8px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 color: '#4b5563',
                 borderTop: '1px solid #e5e7eb',
                 paddingTop: '8px',
@@ -636,7 +636,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
           >
             <div
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 color: primaryAction.type === 'critical' ? '#991b1b' : primaryAction.type === 'high' ? '#92400e' : '#1f2937',
                 marginBottom: '4px',
@@ -647,7 +647,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
               {primaryAction.icon} {primaryAction.text}
             </div>
             <div style={{ 
-              fontSize: '7pt', 
+              fontSize: '9px', 
               color: primaryAction.type === 'critical' ? '#7f1d1d' : primaryAction.type === 'high' ? '#78350f' : '#374151',
               lineHeight: 1.4
             }}>
@@ -667,7 +667,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
                   background: '#1f2937',
                   color: '#fff',
                   borderRadius: '4px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   lineHeight: 1.5,
                   whiteSpace: 'nowrap',
                   zIndex: 1000,
@@ -702,7 +702,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
           <div
             style={{
               marginTop: '6px',
-              fontSize: '7pt',
+              fontSize: '9px',
               color: '#2563eb',
               textDecoration: 'underline',
               cursor: 'pointer'
@@ -750,7 +750,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
               background: '#f9fafb',
               border: '1px solid #e5e7eb',
               borderRadius: '2px',
-              fontSize: '7pt',
+              fontSize: '9px',
               color: '#6b7280',
               textAlign: 'center'
             }}

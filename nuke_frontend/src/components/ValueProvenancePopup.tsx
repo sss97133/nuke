@@ -743,16 +743,16 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           background: 'var(--bg)'
         }}>
           <div>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
               {isAuctionResultMode ? 'Auction result' : 'Value provenance'}
             </div>
-            <div style={{ fontSize: '14pt', fontWeight: 'bold' }}>
+            <div style={{ fontSize: '19px', fontWeight: 'bold' }}>
               {isAuctionResultMode
                 ? `${headerPrefix || ''} ${Number(auctionPrice ?? headerValue).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}`.trim()
                 : headerValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
             </div>
             {isAuctionResultMode && (context?.winner_name || '').trim() ? (
-              <div style={{ marginTop: 4, fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>
+              <div style={{ marginTop: 4, fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
                 Winner: {String(context?.winner_name).trim()}
               </div>
             ) : null}
@@ -763,7 +763,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               padding: '4px 12px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 'bold',
               cursor: 'pointer',
               textTransform: 'uppercase'
@@ -780,13 +780,13 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           {/* Trend (what we think it’s worth based on price signal) */}
           {typeof context?.trend_pct === 'number' && Number.isFinite(context.trend_pct) ? (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
                 Trend
               </div>
-              <div style={{ fontSize: '9pt', fontWeight: 800, color: context.trend_pct >= 0 ? '#16a34a' : '#dc2626' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: context.trend_pct >= 0 ? '#16a34a' : '#dc2626' }}>
                 {context.trend_pct >= 0 ? 'UP' : 'DOWN'} {Math.abs(context.trend_pct).toFixed(1)}% {context.trend_period ? String(context.trend_period).toUpperCase() : ''}
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 4 }}>
                 {(() => {
                   const t = String(context?.trend_price_type || '').toLowerCase();
                   if (t === 'sale') return 'Based on sale price history (filtered for outliers).';
@@ -796,7 +796,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 })()}
               </div>
               {(typeof context?.trend_baseline_value === 'number' && Number.isFinite(context.trend_baseline_value) && context?.trend_baseline_as_of) ? (
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 6 }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 6 }}>
                   Baseline: {context.trend_baseline_value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}{' '}
                   on {new Date(String(context.trend_baseline_as_of)).toLocaleDateString()}{' '}
                   ({String(context.trend_baseline_source || 'auto').toUpperCase()})
@@ -810,10 +810,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
 
           {/* Source */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
               Source
             </div>
-            <div style={{ fontSize: '9pt', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
               {(context?.evidence_url || provenance?.bat_url) ? (
                 <FaviconIcon url={String(context?.evidence_url || provenance?.bat_url)} size={14} preserveAspectRatio={true} />
               ) : null}
@@ -838,7 +838,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             </div>
             {/* Seller Username with Profile Link */}
             {provenance?.seller_username && (
-              <div style={{ marginTop: '8px', fontSize: '8pt', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ marginTop: '8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Seller:</span>
                 {sellerProfileLink ? (
                   <a
@@ -890,7 +890,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           {/* Auction history (multi-auction provenance) */}
           {(field === 'sale_price' || field === 'high_bid') && auctionSources.length > 1 && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
                 Auction history
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
@@ -925,12 +925,12 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-                        <div style={{ fontSize: '8pt', fontWeight: 800, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 800, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {a.platform_name}{a.lot_number ? ` (Lot #${a.lot_number})` : ''}
                         </div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{dLabel}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{dLabel}</div>
                       </div>
-                      <div style={{ marginTop: 4, fontSize: '8pt', display: 'flex', gap: 10, flexWrap: 'wrap', color: 'var(--text-muted)' }}>
+                      <div style={{ marginTop: 4, fontSize: '11px', display: 'flex', gap: 10, flexWrap: 'wrap', color: 'var(--text-muted)' }}>
                         <span style={{ color: 'var(--text)', fontWeight: 700 }}>{amountLabel}</span>
                         <span>{outcome}</span>
                         {a.seller_name ? <span>Seller: {a.seller_name}</span> : null}
@@ -946,11 +946,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
 
           {/* Confidence */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
               Confidence
             </div>
             <div style={{ 
-              fontSize: '9pt', 
+              fontSize: '12px', 
               fontWeight: 'bold',
               color: getConfidenceColor(effectiveConfidence)
             }}>
@@ -960,11 +960,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
 
           {/* Record Origin - provenance with timestamp and source */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
               Record Origin
             </div>
             <div
-              style={{ fontSize: '9pt', display: 'flex', flexDirection: 'column', gap: 2 }}
+              style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: 2 }}
               title={(() => {
                 const parts: string[] = [];
                 const inserterName = context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown';
@@ -977,14 +977,14 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             >
               <span>{context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown'}</span>
               {provenance?.inserted_at && (
-                <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                   {new Date(provenance.inserted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   {' '}
                   {new Date(provenance.inserted_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
               {provenance?.evidence_count != null && (
-                <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                   {provenance.evidence_count} evidence point{provenance.evidence_count !== 1 ? 's' : ''}
                 </span>
               )}
@@ -994,10 +994,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           {/* Sale Date / Auction End */}
           {(field === 'sale_price' || field === 'high_bid') && provenance?.sale_date && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
                 {field === 'sale_price' ? 'Date Sold' : 'Auction Ended'}
               </div>
-              <div style={{ fontSize: '9pt', fontWeight: 600 }}>
+              <div style={{ fontSize: '12px', fontWeight: 600 }}>
                 {new Date(provenance.sale_date).toLocaleDateString('en-US', { 
                   month: 'short', 
                   day: 'numeric', 
@@ -1009,7 +1009,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 })()}
               </div>
               {field === 'sale_price' && provenance.buyer_name && (
-                <div style={{ fontSize: '9pt', marginTop: '4px', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--text-muted)' }}>
                   To: {buyerProfileLink ? (
                     <a
                       href={buyerProfileLink.url}
@@ -1043,10 +1043,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           {/* Auction Metrics (bids, views, watchers) */}
           {field === 'sale_price' && (provenance?.bid_count !== undefined || provenance?.view_count !== undefined || provenance?.watcher_count !== undefined || context?.bid_count !== undefined || context?.view_count !== undefined || context?.watcher_count !== undefined) && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
                 Auction Metrics
               </div>
-              <div style={{ fontSize: '9pt', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 {(() => {
                   // Prefer context (live data) over provenance (database), but show provenance if context is missing
                   const bidCount = (typeof context?.bid_count === 'number' && context.bid_count > 0) ? context.bid_count : (provenance?.bid_count ?? null);
@@ -1151,7 +1151,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           {isLiveAuction && (recentBids.length > 0 || sellerUsername) && (
             <div style={{ marginBottom: '16px' }}>
               <div style={{
-                fontSize: '7pt',
+                fontSize: '9px',
                 color: 'var(--text-muted)',
                 textTransform: 'uppercase',
                 marginBottom: '8px',
@@ -1177,7 +1177,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               {/* Seller info */}
               {sellerUsername && (
                 <div style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   marginBottom: '8px',
                   padding: '6px 10px',
                   background: 'var(--surface)',
@@ -1187,7 +1187,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                   alignItems: 'center',
                   gap: '8px'
                 }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Seller:</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Seller:</span>
                   <span style={{ fontWeight: 600 }}>{sellerUsername}</span>
                 </div>
               )}
@@ -1201,7 +1201,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                   maxHeight: '180px',
                   overflowY: 'auto'
                 }}>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
                     Recent Bids ({recentBids.length})
                   </div>
                   {recentBids.slice(0, 8).map((bid, idx) => (
@@ -1213,7 +1213,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         alignItems: 'center',
                         padding: '4px 0',
                         borderBottom: idx < Math.min(recentBids.length - 1, 7) ? '1px solid var(--border)' : 'none',
-                        fontSize: '9pt'
+                        fontSize: '12px'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1244,7 +1244,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         }}>
                           ${bid.amount.toLocaleString()}
                         </span>
-                        <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                           {(() => {
                             if (!bid.posted_at) return '';
                             const d = new Date(bid.posted_at);
@@ -1267,10 +1267,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           {/* Evidence Count */}
           {evidence.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
+              <div style={{ fontSize: '9px', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
                 Supporting Evidence
               </div>
-              <div style={{ fontSize: '9pt' }}>
+              <div style={{ fontSize: '12px' }}>
                 {evidence.length} source{evidence.length > 1 ? 's' : ''}
               </div>
               {evidence.length > 1 && (
@@ -1281,7 +1281,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                       marginBottom: '4px',
                       background: '#f9f9f9',
                       border: '1px solid #e0e0e0',
-                      fontSize: '7pt'
+                      fontSize: '9px'
                     }}>
                       <div style={{ fontWeight: 'bold' }}>{getSourceLabel(e.source_type)}</div>
                       <div style={{ color: '#666' }}>
@@ -1309,10 +1309,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               borderRadius: '4px',
               marginBottom: '16px'
             }}>
-              <div style={{ fontSize: '7pt', fontWeight: 'bold', color: '#856404', marginBottom: '4px' }}>
+              <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#856404', marginBottom: '4px' }}>
                 NO EVIDENCE FOUND
               </div>
-              <div style={{ fontSize: '7pt', color: '#856404' }}>
+              <div style={{ fontSize: '9px', color: '#856404' }}>
                 This value has no supporting evidence. Upload receipts or build estimates to verify.
               </div>
             </div>
@@ -1333,7 +1333,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                     padding: '8px',
                     border: '2px solid #000',
                     background: 'var(--surface)',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 'bold',
                     cursor: 'pointer',
                     textTransform: 'uppercase'
@@ -1343,7 +1343,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 </button>
               ) : (
                 <div>
-                  <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '9px', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
                     New Value
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -1355,7 +1355,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         flex: 1,
                         padding: '8px',
                         border: '2px solid #000',
-                        fontSize: '9pt'
+                        fontSize: '12px'
                       }}
                     />
                     <button
@@ -1365,7 +1365,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         border: '2px solid #000',
                         background: '#000',
                         color: '#fff',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
                         textTransform: 'uppercase'
@@ -1382,7 +1382,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         padding: '8px 16px',
                         border: '2px solid #000',
                         background: 'var(--surface)',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
                         textTransform: 'uppercase'
@@ -1400,7 +1400,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
 
           {/* Bell Curve Chart - Right Column */}
           <div style={{ padding: '16px', background: 'var(--bg)' }}>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.6px', fontWeight: 700 }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.6px', fontWeight: 700 }}>
               Market Distribution
             </div>
             {marketData && marketData.prices.length >= 3 ? (
@@ -1415,7 +1415,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 padding: '20px', 
                 textAlign: 'center', 
                 color: 'var(--text-muted)', 
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontStyle: 'italic'
               }}>
                 Insufficient market data<br/>for comparable vehicles

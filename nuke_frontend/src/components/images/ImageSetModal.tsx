@@ -166,7 +166,7 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-header" style={{ borderBottom: '2px solid var(--border)' }}>
-          <h3 className="text" style={{ fontWeight: 700, fontSize: '11pt', margin: 0 }}>
+          <h3 className="text" style={{ fontWeight: 700, fontSize: '15px', margin: 0 }}>
             {editingSet ? 'Edit Image Set' : 'Create Image Set'}
           </h3>
         </div>
@@ -180,13 +180,13 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
               marginBottom: 'var(--space-3)',
               color: 'var(--error-dark)'
             }}>
-              <p className="text" style={{ fontSize: '8pt', margin: 0 }}>{error}</p>
+              <p className="text" style={{ fontSize: '11px', margin: 0 }}>{error}</p>
             </div>
           )}
 
           {/* Name */}
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '8pt' }}>
+            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '11px' }}>
               Set Name *
             </label>
             <input
@@ -195,14 +195,14 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Restoration Progress, Engine Bay, Before & After"
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt', padding: 'var(--space-2)' }}
+              style={{ width: '100%', fontSize: '12px', padding: 'var(--space-2)' }}
               maxLength={100}
             />
           </div>
 
           {/* Description */}
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '8pt' }}>
+            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '11px' }}>
               Description
             </label>
             <textarea
@@ -210,14 +210,14 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description of this image set"
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt', padding: 'var(--space-2)', minHeight: '80px', resize: 'vertical' }}
+              style={{ width: '100%', fontSize: '12px', padding: 'var(--space-2)', minHeight: '80px', resize: 'vertical' }}
               maxLength={500}
             />
           </div>
 
           {/* Color */}
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '8pt' }}>
+            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '11px' }}>
               Color Tag
             </label>
             <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
@@ -242,7 +242,7 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
 
           {/* Icon (optional) */}
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '8pt' }}>
+            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '11px' }}>
               Icon (optional)
             </label>
             <input
@@ -251,10 +251,10 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
               onChange={(e) => setIcon(e.target.value)}
               placeholder="e.g., wrench, camera, star"
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt', padding: 'var(--space-2)' }}
+              style={{ width: '100%', fontSize: '12px', padding: 'var(--space-2)' }}
               maxLength={20}
             />
-            <p className="text text-muted" style={{ fontSize: '7pt', marginTop: 'var(--space-1)' }}>
+            <p className="text text-muted" style={{ fontSize: '9px', marginTop: 'var(--space-1)' }}>
               Used for quick visual identification
             </p>
           </div>
@@ -262,14 +262,14 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
           {/* Link to Timeline Event */}
           {timelineEvents.length > 0 && (
             <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '8pt' }}>
+              <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '11px' }}>
                 Link to Timeline Event
               </label>
               <select
                 value={timelineEventId}
                 onChange={(e) => setTimelineEventId(e.target.value)}
                 className="form-select"
-                style={{ width: '100%', fontSize: '9pt', padding: 'var(--space-2)' }}
+                style={{ width: '100%', fontSize: '12px', padding: 'var(--space-2)' }}
               >
                 <option value="">No timeline link</option>
                 {timelineEvents.map((event) => (
@@ -283,7 +283,7 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
 
           {/* Event Date */}
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '8pt' }}>
+            <label className="text" style={{ display: 'block', marginBottom: 'var(--space-1)', fontWeight: 700, fontSize: '11px' }}>
               Event Date (optional)
             </label>
             <input
@@ -291,9 +291,9 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt', padding: 'var(--space-2)' }}
+              style={{ width: '100%', fontSize: '12px', padding: 'var(--space-2)' }}
             />
-            <p className="text text-muted" style={{ fontSize: '7pt', marginTop: 'var(--space-1)' }}>
+            <p className="text text-muted" style={{ fontSize: '9px', marginTop: 'var(--space-1)' }}>
               When this set represents a specific date/event
             </p>
           </div>
@@ -304,7 +304,7 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
           <button
             onClick={onClose}
             className="button"
-            style={{ fontSize: '8pt', padding: 'var(--space-2) var(--space-3)' }}
+            style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-3)' }}
             disabled={saving}
           >
             Cancel
@@ -312,7 +312,7 @@ export const ImageSetModal: React.FC<ImageSetModalProps> = ({
           <button
             onClick={handleSave}
             className="button button-primary"
-            style={{ fontSize: '8pt', padding: 'var(--space-2) var(--space-3)' }}
+            style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-3)' }}
             disabled={saving || !name.trim()}
           >
             {saving ? 'Saving...' : editingSet ? 'Update Set' : 'Create Set'}

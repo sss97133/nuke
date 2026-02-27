@@ -212,7 +212,7 @@ export default function ImageProcessingDashboard() {
             className="button button-secondary cursor-button"
             style={{ 
               marginBottom: '16px',
-              fontSize: '8pt', 
+              fontSize: '11px', 
               padding: '6px 12px',
               border: '2px solid var(--border-light)',
               transition: 'all 0.12s ease'
@@ -220,10 +220,10 @@ export default function ImageProcessingDashboard() {
           >
             ← Back to Mission Control
           </button>
-          <h1 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Image Processing Dashboard
           </h1>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Real-time AI analysis monitoring
           </p>
         </div>
@@ -232,7 +232,7 @@ export default function ImageProcessingDashboard() {
           className="button cursor-button"
           style={{
             padding: '8px 16px',
-            fontSize: '8pt',
+            fontSize: '11px',
             border: `2px solid ${autoRefresh ? 'var(--success)' : 'var(--border-light)'}`,
             background: autoRefresh ? 'var(--success-light)' : 'var(--surface)',
             color: autoRefresh ? 'var(--success)' : 'var(--text-muted)',
@@ -248,58 +248,58 @@ export default function ImageProcessingDashboard() {
         
         {/* Total Images */}
         <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             TOTAL IMAGES
           </div>
-          <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+          <div style={{ fontSize: '19px', fontWeight: 700 }}>
             {stats.total.toLocaleString()}
           </div>
         </div>
 
         {/* Tier 1 Progress */}
         <div className="card" style={{ padding: '16px', border: '2px solid var(--accent)' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             ORGANIZATION (TIER 1)
           </div>
-          <div style={{ fontSize: '14pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
             {stats.tier1Complete.toLocaleString()}
           </div>
           <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
             <div style={{ width: `${tier1Percent}%`, height: '100%', background: 'var(--accent)' }} />
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             {tier1Percent.toFixed(1)}% complete
           </div>
         </div>
 
         {/* Tier 2 Progress */}
         <div className="card" style={{ padding: '16px', border: '2px solid var(--success)' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             PARTS ID (TIER 2)
           </div>
-          <div style={{ fontSize: '14pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
             {stats.tier2Complete.toLocaleString()}
           </div>
           <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
             <div style={{ width: `${tier2Percent}%`, height: '100%', background: 'var(--success)' }} />
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             {tier2Percent.toFixed(1)}% complete
           </div>
         </div>
 
         {/* Tier 3 Progress */}
         <div className="card" style={{ padding: '16px', border: '2px solid #8b5cf6' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             EXPERT ANALYSIS (TIER 3)
           </div>
-          <div style={{ fontSize: '14pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
             {stats.tier3Complete.toLocaleString()}
           </div>
           <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
             <div style={{ width: `${tier3Percent}%`, height: '100%', background: '#8b5cf6' }} />
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             {tier3Percent.toFixed(1)}% complete
           </div>
         </div>
@@ -308,37 +308,37 @@ export default function ImageProcessingDashboard() {
       {/* Cost & Savings */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             TOTAL COST
           </div>
-          <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--warning)' }}>
+          <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--warning)' }}>
             ${stats.totalCost.toFixed(4)}
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             ${(stats.totalCost / (stats.tier1Complete || 1)).toFixed(6)} per image
           </div>
         </div>
 
         <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             FULL PRICE (BASELINE)
           </div>
-          <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+          <div style={{ fontSize: '19px', fontWeight: 700 }}>
             ${estimatedTotal.toFixed(2)}
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             If using GPT-4o for all
           </div>
         </div>
 
         <div className="card" style={{ padding: '16px', border: '2px solid var(--success)' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             SAVINGS
           </div>
-          <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--success)' }}>
+          <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--success)' }}>
             ${savings.toFixed(2)}
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--success)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '4px' }}>
             {savingsPercent.toFixed(1)}% cheaper
           </div>
         </div>
@@ -347,7 +347,7 @@ export default function ImageProcessingDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
         {/* Recent Activity Feed */}
         <div className="card">
-          <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700 }}>
+          <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
             RECENT ACTIVITY
           </div>
           <div className="card-body" style={{ padding: 0 }}>
@@ -364,17 +364,17 @@ export default function ImageProcessingDashboard() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontSize: '8pt', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
                       {activity.imageId.substring(0, 8)}
                     </div>
-                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase' }}>
                       {activity.model}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       {activity.confidence}% confidence
                     </div>
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     {timeAgo < 60 ? `${timeAgo}s ago` : `${Math.floor(timeAgo / 60)}m ago`}
                   </div>
                 </div>
@@ -385,11 +385,11 @@ export default function ImageProcessingDashboard() {
 
         {/* Context Quality */}
         <div className="card">
-          <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700 }}>
+          <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
             CONTEXT QUALITY
           </div>
           <div className="card-body">
-            <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Higher context = cheaper processing
             </p>
             
@@ -401,14 +401,14 @@ export default function ImageProcessingDashboard() {
                 { label: 'Poor (<10)', count: stats.contextScores.poor, color: 'var(--error)', cost: '$0.015' }
               ].map(score => (
                 <div key={score.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8pt', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
                     <span style={{ color: score.color, fontWeight: 600 }}>{score.label}</span>
                     <span>{score.count}</span>
                   </div>
                   <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
                     <div style={{ width: `${(score.count / stats.total) * 100}%`, height: '100%', background: score.color }} />
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>
                     {score.cost}/img
                   </div>
                 </div>
@@ -423,7 +423,7 @@ export default function ImageProcessingDashboard() {
         <button
           onClick={loadStats}
           className="button button-primary cursor-button"
-          style={{ padding: '10px 20px', fontSize: '8pt' }}
+          style={{ padding: '10px 20px', fontSize: '11px' }}
         >
           REFRESH DATA
         </button>
@@ -431,7 +431,7 @@ export default function ImageProcessingDashboard() {
         <button
           onClick={() => navigate('/admin/scripts')}
           className="button button-secondary cursor-button"
-          style={{ padding: '10px 20px', fontSize: '8pt' }}
+          style={{ padding: '10px 20px', fontSize: '11px' }}
         >
           SCRIPT CONTROL
         </button>

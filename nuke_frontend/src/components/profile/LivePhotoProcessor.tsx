@@ -197,7 +197,7 @@ export default function LivePhotoProcessor() {
       {/* Header */}
       <div className="card" style={{ marginBottom: 'var(--space-3)' }}>
         <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
-          <h2 style={{ fontSize: '12pt', marginBottom: 'var(--space-2)' }}>
+          <h2 style={{ fontSize: '16px', marginBottom: 'var(--space-2)' }}>
             {greeting}, Skylar
           </h2>
           <p className="text-muted" style={{ marginBottom: 'var(--space-3)' }}>
@@ -211,7 +211,7 @@ export default function LivePhotoProcessor() {
             <button
               className="button button-primary"
               onClick={startProcessing}
-              style={{ fontSize: '10pt', padding: 'var(--space-2) var(--space-4)' }}
+              style={{ fontSize: '13px', padding: 'var(--space-2) var(--space-4)' }}
             >
               Start Processing
             </button>

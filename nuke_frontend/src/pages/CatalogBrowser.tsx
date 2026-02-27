@@ -136,15 +136,15 @@ export default function CatalogBrowser() {
       
       {/* Header */}
       <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '12px' }}>
-        <h1 style={{ fontSize: '14pt', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>
+        <h1 style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>
           LMC PARTS CATALOG
         </h1>
-        <div style={{ display: 'flex', gap: '16px', fontSize: '8pt', color: '#666' }}>
+        <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: '#666' }}>
           <span>Total Parts: {stats.total.toLocaleString()}</span>
           <span>With Images: {stats.with_images.toLocaleString()}</span>
           <span>In Stock: {stats.in_stock.toLocaleString()}</span>
         </div>
-        <div style={{ marginTop: '6px', fontSize: '8pt', color: '#666' }}>
+        <div style={{ marginTop: '6px', fontSize: '11px', color: '#666' }}>
           Provider:{' '}
           <span style={{ fontWeight: 700, color: '#111' }}>
             {providerName}
@@ -172,7 +172,7 @@ export default function CatalogBrowser() {
         
         {/* Search */}
         <div>
-          <label style={{ fontSize: '8pt', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+          <label style={{ fontSize: '11px', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
             SEARCH
           </label>
           <input
@@ -183,7 +183,7 @@ export default function CatalogBrowser() {
             style={{
               width: '100%',
               padding: '6px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid #000',
               fontFamily: 'inherit'
             }}
@@ -192,7 +192,7 @@ export default function CatalogBrowser() {
 
         {/* Category */}
         <div>
-          <label style={{ fontSize: '8pt', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+          <label style={{ fontSize: '11px', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
             CATEGORY
           </label>
           <select
@@ -201,7 +201,7 @@ export default function CatalogBrowser() {
             style={{
               width: '100%',
               padding: '6px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid #000',
               fontFamily: 'inherit'
             }}
@@ -215,10 +215,10 @@ export default function CatalogBrowser() {
 
         {/* Stock Filter */}
         <div>
-          <label style={{ fontSize: '8pt', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+          <label style={{ fontSize: '11px', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
             AVAILABILITY
           </label>
-          <label style={{ fontSize: '8pt', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+          <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={filters.inStock}
@@ -234,7 +234,7 @@ export default function CatalogBrowser() {
             onClick={() => setFilters({ category: '', search: '', inStock: true, minYear: 1973, maxYear: 1987 })}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               border: '2px solid #000',
               background: 'var(--surface)',
@@ -248,11 +248,11 @@ export default function CatalogBrowser() {
 
       {/* Parts Grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', fontSize: '8pt', color: '#999' }}>
+        <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: '#999' }}>
           Loading catalog...
         </div>
       ) : parts.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', fontSize: '8pt', color: '#999' }}>
+        <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: '#999' }}>
           No parts found matching filters
         </div>
       ) : (
@@ -292,7 +292,7 @@ export default function CatalogBrowser() {
                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   />
                 ) : (
-                  <div style={{ fontSize: '8pt', color: '#999' }}>No image</div>
+                  <div style={{ fontSize: '11px', color: '#999' }}>No image</div>
                 )}
               </div>
 
@@ -301,7 +301,7 @@ export default function CatalogBrowser() {
                 
                 {/* Part Number */}
                 <div style={{ 
-                  fontSize: '10pt', 
+                  fontSize: '13px', 
                   fontWeight: 700, 
                   fontFamily: 'monospace',
                   marginBottom: '4px'
@@ -311,7 +311,7 @@ export default function CatalogBrowser() {
 
                 {/* Name */}
                 <div style={{ 
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   marginBottom: '8px',
                   minHeight: '32px'
                 }}>
@@ -321,7 +321,7 @@ export default function CatalogBrowser() {
                 {/* Category */}
                 {part.category && (
                   <div style={{ 
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     color: '#666',
                     marginBottom: '4px'
                   }}>
@@ -333,7 +333,7 @@ export default function CatalogBrowser() {
                 {/* Fits */}
                 {(part.year_start || part.fits_models?.length > 0) && (
                   <div style={{ 
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     color: '#666',
                     marginBottom: '8px'
                   }}>
@@ -345,7 +345,7 @@ export default function CatalogBrowser() {
 
                 {/* Price */}
                 <div style={{ 
-                  fontSize: '12pt',
+                  fontSize: '16px',
                   fontWeight: 700,
                   marginBottom: '8px'
                 }}>
@@ -354,7 +354,7 @@ export default function CatalogBrowser() {
 
                 {/* Stock Status */}
                 <div style={{ 
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 700,
                   color: part.in_stock ? '#16a34a' : '#dc2626',
                   marginBottom: '8px'
@@ -370,7 +370,7 @@ export default function CatalogBrowser() {
                       style={{
                         flex: 1,
                         padding: '6px 8px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 700,
                         border: '2px solid #000',
                         background: '#000',
@@ -385,7 +385,7 @@ export default function CatalogBrowser() {
                     <button
                       style={{
                         padding: '6px 8px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 700,
                         border: '2px solid #000',
                         background: 'var(--surface)',
@@ -407,7 +407,7 @@ export default function CatalogBrowser() {
         marginTop: '24px',
         padding: '12px',
         borderTop: '2px solid #000',
-        fontSize: '8pt',
+        fontSize: '11px',
         color: '#666',
         textAlign: 'center'
       }}>

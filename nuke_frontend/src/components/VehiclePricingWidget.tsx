@@ -655,24 +655,24 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         <div className="card-body" style={{ padding: 'var(--space-2)', borderBottom: '1px solid var(--border-medium)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <div>
-              <div className="text" style={{ fontSize: '18pt', fontWeight: 'bold', lineHeight: '1.2' }}>
+              <div className="text" style={{ fontSize: '24px', fontWeight: 'bold', lineHeight: '1.2' }}>
                 {hasEstimate ? formatCurrency(estimatedValue) : '—'}
               </div>
-              <div className="text text-muted" style={{ fontSize: '8pt', marginTop: '2px', letterSpacing: '0.5px' }}>
+              <div className="text text-muted" style={{ fontSize: '11px', marginTop: '2px', letterSpacing: '0.5px' }}>
                 {hasEstimate ? 'ESTIMATED VALUE' : 'ESTIMATE PENDING'}
               </div>
             </div>
             {hasEstimate && hasConfidence && (
               <div style={{ textAlign: 'right' }}>
                 <div className="text" style={{
-                  fontSize: '12pt',
+                  fontSize: '16px',
                   fontWeight: 'bold',
                   color: confidenceScore >= 80 ? '#008000' :
                          confidenceScore >= 60 ? '#808000' : '#800000'
                 }}>
                   {confidenceScore}%
                 </div>
-                <div className="text text-muted" style={{ fontSize: '7pt', marginTop: '2px' }}>CONFIDENCE</div>
+                <div className="text text-muted" style={{ fontSize: '9px', marginTop: '2px' }}>CONFIDENCE</div>
               </div>
             )}
           </div>
@@ -680,26 +680,26 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
           {/* Decision instrument: connect live auction telemetry to the valuation */}
           {auctionPulse?.listing_url && hasEstimate ? (
             <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-              <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }}>
+              <span className="badge badge-secondary" style={{ fontSize: '11px', fontWeight: 800 }}>
                 {auctionPulse.platform === 'bat' ? 'BAT' : String(auctionPulse.platform).toUpperCase()}
               </span>
               {String(auctionPulse.listing_status || '').toLowerCase() === 'active' ? (
-                <span className="badge" style={{ fontSize: '8pt', fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', border: '1px solid #60a5fa' }}>
+                <span className="badge" style={{ fontSize: '11px', fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', border: '1px solid #60a5fa' }}>
                   LIVE
                 </span>
               ) : (
-                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }}>
+                <span className="badge badge-secondary" style={{ fontSize: '11px', fontWeight: 800 }}>
                   {String(auctionPulse.listing_status || 'status').toUpperCase()}
                 </span>
               )}
               {auctionPulse.end_date ? (
-                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Time remaining">
+                <span className="badge badge-secondary" style={{ fontSize: '11px', fontWeight: 800 }} title="Time remaining">
                   ENDS {formatRemaining(auctionPulse.end_date) || '—'}
                 </span>
               ) : null}
 
               {typeof auctionPulse.current_bid === 'number' ? (
-                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Current bid">
+                <span className="badge badge-secondary" style={{ fontSize: '11px', fontWeight: 800 }} title="Current bid">
                   BID {formatCurrency(auctionPulse.current_bid)}
                 </span>
               ) : null}
@@ -715,36 +715,36 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                 const color = under ? '#15803d' : '#b91c1c';
                 const bg = under ? '#dcfce7' : '#fee2e2';
                 return (
-                  <span className="badge" style={{ fontSize: '8pt', fontWeight: 900, background: bg, color, border: `1px solid ${color}` }} title="Bid vs estimate">
+                  <span className="badge" style={{ fontSize: '11px', fontWeight: 900, background: bg, color, border: `1px solid ${color}` }} title="Bid vs estimate">
                     {label} {formatCurrency(Math.abs(delta))} ({pct.toFixed(1)}%)
                   </span>
                 );
               })()}
 
               {typeof auctionPulse.bid_count === 'number' ? (
-                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Bids">
+                <span className="badge badge-secondary" style={{ fontSize: '11px', fontWeight: 800 }} title="Bids">
                   {auctionPulse.bid_count} BIDS
                 </span>
               ) : null}
               {typeof auctionPulse.watcher_count === 'number' && auctionPulse.watcher_count > 0 ? (
-                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Watchers">
+                <span className="badge badge-secondary" style={{ fontSize: '11px', fontWeight: 800 }} title="Watchers">
                   {auctionPulse.watcher_count.toLocaleString()} WATCHING
                 </span>
               ) : null}
               {typeof auctionPulse.comment_count === 'number' ? (
-                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Comments">
+                <span className="badge badge-secondary" style={{ fontSize: '11px', fontWeight: 800 }} title="Comments">
                   {auctionPulse.comment_count.toLocaleString()} COMMENTS
                 </span>
               ) : null}
               {auctionPulse.last_bid_at ? (
-                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Time since last bid">
+                <span className="badge badge-secondary" style={{ fontSize: '11px', fontWeight: 800 }} title="Time since last bid">
                   LAST BID {formatAge(auctionPulse.last_bid_at) || '—'} AGO
                 </span>
               ) : null}
 
               <button
                 className="button button-small"
-                style={{ fontSize: '8pt', fontWeight: 800, marginLeft: 'auto' }}
+                style={{ fontSize: '11px', fontWeight: 800, marginLeft: 'auto' }}
                 onClick={() => window.open(auctionPulse.listing_url, '_blank')}
                 title="Open the auction listing in a new tab"
               >
@@ -757,17 +757,17 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         {/* Value Breakdown - ONLY REAL DATA */}
         {breakdown?.hasRealData && (
           <div className="card-body" style={{ padding: 'var(--space-2)', borderBottom: '1px solid var(--border-medium)' }}>
-            <div className="text text-muted" style={{ fontSize: '7pt', fontWeight: 'bold', marginBottom: 'var(--space-1)', letterSpacing: '0.5px' }}>
+            <div className="text text-muted" style={{ fontSize: '9px', fontWeight: 'bold', marginBottom: 'var(--space-1)', letterSpacing: '0.5px' }}>
               BUILD INVESTMENT {breakdown.topParts?.some((p: any) => p.images?.length > 0) && (
-                <span style={{ fontSize: '6pt', fontWeight: '400', marginLeft: '4px', color: '#008000' }}>
+                <span style={{ fontSize: '8px', fontWeight: '400', marginLeft: '4px', color: '#008000' }}>
                   ✓ AI-verified parts
                 </span>
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span className="text" style={{ fontSize: '8pt' }}>Total Build Cost</span>
-                <span className="text" style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+                <span className="text" style={{ fontSize: '11px' }}>Total Build Cost</span>
+                <span className="text" style={{ fontSize: '11px', fontWeight: 'bold' }}>
                   {formatCurrency(breakdown.buildInvestment)}
                 </span>
               </div>
@@ -786,8 +786,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                     onClick={() => openPartViewer(part)}
                     title="Click to view validation images"
                   >
-                    <span className="text" style={{ fontSize: '7pt' }}>• {part.name}</span>
-                    <span className="text" style={{ fontSize: '7pt', fontWeight: part.price > 0 ? 'bold' : '400' }}>
+                    <span className="text" style={{ fontSize: '9px' }}>• {part.name}</span>
+                    <span className="text" style={{ fontSize: '9px', fontWeight: part.price > 0 ? 'bold' : '400' }}>
                       {part.price > 0 ? formatCurrency(part.price) : 'AI analyzing...'}
                     </span>
                   </div>
@@ -947,7 +947,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             <div className="card" style={{
               marginTop: 'var(--space-2)',
               padding: 'var(--space-2)',
-              fontSize: '7pt'
+              fontSize: '9px'
             }}>
               <div className="text" style={{ marginBottom: 'var(--space-1)', fontWeight: 'bold' }}>
                 Data Sources:
@@ -963,7 +963,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                         alignItems: 'center',
                         gap: 'var(--space-1)',
                         padding: '2px var(--space-1)',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         cursor: 'pointer',
                         justifyContent: 'flex-start'
                       }}
@@ -1088,10 +1088,10 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                 )}
               </div>
               <div style={{ marginTop: 'var(--space-1)', paddingTop: 'var(--space-1)', borderTop: '1px solid var(--border-light)' }}>
-                <div className="text" style={{ fontSize: '6pt', fontWeight: 'bold' }}>
+                <div className="text" style={{ fontSize: '8px', fontWeight: 'bold' }}>
                   Evidence
                 </div>
-                <div className="text text-muted" style={{ fontSize: '7pt', marginTop: '4px' }}>
+                <div className="text text-muted" style={{ fontSize: '9px', marginTop: '4px' }}>
                   Click value to see sources
                 </div>
               </div>
@@ -1119,7 +1119,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             <div className="p-4 max-h-[calc(90vh-120px)] overflow-y-auto">
               {/* This would be the full PricingIntelligence component */}
               <div className="text-center py-8">
-                <div className="text" style={{ fontSize: '10pt', fontWeight: 800, marginBottom: 8 }}>LOADING</div>
+                <div className="text" style={{ fontSize: '13px', fontWeight: 800, marginBottom: 8 }}>LOADING</div>
                 <p className="text-gray-600">Loading comprehensive analysis...</p>
                 <p className="text-sm text-gray-500 mt-2">
                   AI is analyzing market data, modifications, and generating detailed report
@@ -1140,7 +1140,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             right: '20px',
             zIndex: 1000,
             padding: 'var(--space-2)',
-            fontSize: '8pt',
+            fontSize: '11px',
             backgroundColor: 'var(--grey-100)',
             border: '2px outset var(--grey-300)',
             minWidth: '200px'
@@ -1189,7 +1189,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-              <h3 className="text" style={{ fontSize: '10pt', fontWeight: 'bold' }}>
+              <h3 className="text" style={{ fontSize: '13px', fontWeight: 'bold' }}>
                 {selectedPart.name} - Validation Data
               </h3>
               <button
@@ -1201,14 +1201,14 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             </div>
 
             <div style={{ marginBottom: 'var(--space-2)' }}>
-              <div className="text" style={{ fontSize: '8pt', marginBottom: 'var(--space-1)' }}>
+              <div className="text" style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
                 <strong>Cost:</strong> {selectedPart.price > 0 ? formatCurrency(selectedPart.price) : 'Analyzing...'}
               </div>
             </div>
 
             {selectedPart.images && selectedPart.images.length > 0 ? (
               <>
-                <div className="text" style={{ fontSize: '8pt', marginBottom: 'var(--space-2)', fontWeight: 'bold' }}>
+                <div className="text" style={{ fontSize: '11px', marginBottom: 'var(--space-2)', fontWeight: 'bold' }}>
                   Validation Images ({selectedPart.images.length}):
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 'var(--space-2)' }}>
@@ -1229,7 +1229,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                           marginBottom: 'var(--space-1)'
                         }}
                       />
-                      <div className="text text-muted" style={{ fontSize: '6pt' }}>
+                      <div className="text text-muted" style={{ fontSize: '8px' }}>
                         Tags: {img.tags?.join(', ') || 'Receipt, Installation'}
                       </div>
                     </div>
@@ -1237,7 +1237,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                 </div>
               </>
             ) : (
-              <div className="text text-muted" style={{ fontSize: '8pt', textAlign: 'center', padding: 'var(--space-4)' }}>
+              <div className="text text-muted" style={{ fontSize: '11px', textAlign: 'center', padding: 'var(--space-4)' }}>
                 No validation images available for this part.
                 <br />
                 This would show receipts, installation photos, or part identification images.

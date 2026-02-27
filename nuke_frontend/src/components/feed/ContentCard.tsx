@@ -38,7 +38,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
     border: '1px solid #c0c0c0',
     padding: '1px 4px',
     borderRadius: '2px',
-    fontSize: '8pt',
+    fontSize: '11px',
     color: '#374151'
   };
 
@@ -244,7 +244,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             }}
           />
           {images.length > 1 && (
-            <div style={{ position: 'absolute', top: '6px', right: '6px', fontSize: '7pt', color: 'var(--surface-glass)' }}>
+            <div style={{ position: 'absolute', top: '6px', right: '6px', fontSize: '9px', color: 'var(--surface-glass)' }}>
               {currentImageIdx + 1}/{images.length}
             </div>
           )}
@@ -261,14 +261,14 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
         {/* User Info */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
           <div style={{ flex: 1 }}>
-            <div className="text" style={{ fontSize: '6pt', fontWeight: 600, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowUserPopover((s) => !s); }}>
+            <div className="text" style={{ fontSize: '8px', fontWeight: 600, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowUserPopover((s) => !s); }}>
               {item.user_name || 'User'}
             </div>
           </div>
           {showUserPopover && (
             <div style={{ position: 'absolute', top: '18px', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid #c0c0c0', padding: '6px', width: '220px' }} onClick={(e) => e.stopPropagation()}>
-              <div className="text text-bold" style={{ fontSize: '8pt', marginBottom: '4px' }}>{item.user_name || 'User'}</div>
-              <div className="text text-muted" style={{ fontSize: '7pt' }}>User profile</div>
+              <div className="text text-bold" style={{ fontSize: '11px', marginBottom: '4px' }}>{item.user_name || 'User'}</div>
+              <div className="text text-muted" style={{ fontSize: '9px' }}>User profile</div>
             </div>
           )}
         </div>
@@ -276,12 +276,12 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
         {/* Title */}
         {item.type === 'vehicle' ? (
           <a href={`/vehicle/${item.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'inherit', textDecoration: 'none' }}>
-            <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
+            <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>
               {item.title}
             </h3>
           </a>
         ) : (
-          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
+          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>
             {item.title}
           </h3>
         )}
@@ -290,7 +290,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
         {item.type !== 'vehicle' && item.description && (
           <p className="text" style={{
             margin: '0 0 8px 0',
-            fontSize: '8pt',
+            fontSize: '11px',
             lineHeight: 1.3,
             color: '#555',
             overflow: 'hidden',
@@ -335,31 +335,31 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
                         {pi.label && typeof pi.amount === 'number' && (
                           <>
-                            <span style={{ fontSize: '8pt', color: '#6b7280', fontWeight: 600 }}>{pi.label}</span>
-                            <span style={{ fontSize: '12pt', fontWeight: 700, color: '#111827' }}>{formatCurrency(pi.amount)}</span>
+                            <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600 }}>{pi.label}</span>
+                            <span style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>{formatCurrency(pi.amount)}</span>
                           </>
                         )}
                         {delta && (
-                          <span style={{ fontSize: '8pt', fontWeight: 600, color: delta.isPositive ? '#065f46' : '#7f1d1d' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: delta.isPositive ? '#065f46' : '#7f1d1d' }}>
                             {delta.isPositive ? '↑' : '↓'} {Math.abs(delta.percent).toFixed(1)}%
                           </span>
                         )}
                         {typeof sig?.confidence === 'number' && sig.confidence > 0 && (
-                          <span style={{ fontSize: '8pt', color: '#6b7280' }}>conf {sig.confidence}</span>
+                          <span style={{ fontSize: '11px', color: '#6b7280' }}>conf {sig.confidence}</span>
                         )}
                         {(item as any).type === 'auction' || (item.metadata?.auction_status === 'active') ? (
-                          <a href={`/vehicle/${item.id}?action=bid`} onClick={(e) => e.stopPropagation()} style={{ marginLeft: 'auto', background: '#fee2e2', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '8pt', color: '#991b1b', textDecoration: 'none' }}>
+                          <a href={`/vehicle/${item.id}?action=bid`} onClick={(e) => e.stopPropagation()} style={{ marginLeft: 'auto', background: '#fee2e2', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: '#991b1b', textDecoration: 'none' }}>
                             Bid
                           </a>
                         ) : null}
                         {item.metadata?.is_for_sale ? (
-                          <a href={`/vehicle/${item.id}?action=buy`} onClick={(e) => e.stopPropagation()} style={{ background: '#dcfce7', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '8pt', color: '#166534', textDecoration: 'none' }}>
+                          <a href={`/vehicle/${item.id}?action=buy`} onClick={(e) => e.stopPropagation()} style={{ background: '#dcfce7', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: '#166534', textDecoration: 'none' }}>
                             Buy
                           </a>
                         ) : null}
                       </div>
                       {marketBand && (
-                        <div style={{ fontSize: '7pt', color: '#6b7280' }}>
+                        <div style={{ fontSize: '9px', color: '#6b7280' }}>
                           Band: {formatCurrency(marketBand.low)}–{formatCurrency(marketBand.mid)}–{formatCurrency(marketBand.high)}
                         </div>
                       )}
@@ -390,12 +390,12 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
                       {pc != null && (<span className="badge" style={smallChipStyle}>Parts: {formatCurrency(pc)}</span>)}
                       {partsCount != null && (<span className="badge" style={smallChipStyle}>Parts: {partsCount}</span>)}
                       {(m.book_url || m.shop_id) && (
-                        <a href={m.book_url || `/book?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: '#e0f2fe', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '8pt', color: '#075985', textDecoration: 'none' }}>
+                        <a href={m.book_url || `/book?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: '#e0f2fe', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: '#075985', textDecoration: 'none' }}>
                           Book
                         </a>
                       )}
                       {(m.order_url || m.parts_list) && (
-                        <a href={m.order_url || `/order-parts?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: '#fef3c7', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '8pt', color: '#92400e', textDecoration: 'none' }}>
+                        <a href={m.order_url || `/order-parts?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: '#fef3c7', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: '#92400e', textDecoration: 'none' }}>
                           Order
                         </a>
                       )}

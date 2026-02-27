@@ -91,7 +91,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
 
   if (loading) {
     return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
         Loading ETF contract details...
       </div>
     );
@@ -99,7 +99,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
 
   if (error) {
     return (
-      <div style={{ padding: '24px', color: 'var(--danger, #ef4444)', fontSize: '9pt' }}>
+      <div style={{ padding: '24px', color: 'var(--danger, #ef4444)', fontSize: '12px' }}>
         Error loading segment: {error}
         <div style={{ marginTop: '10px' }}>
           <button className="button button-secondary" onClick={() => navigate('/market')}>
@@ -112,7 +112,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
 
   if (!segment) {
     return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
         Segment not found: {segmentSlug}
         <div style={{ marginTop: '10px' }}>
           <button className="button button-secondary" onClick={() => navigate('/market')}>
@@ -131,12 +131,12 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '16pt', fontWeight: 900 }}>{segment.name}</h1>
-            <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            <h1 style={{ margin: 0, fontSize: '21px', fontWeight: 900 }}>{segment.name}</h1>
+            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
               ETF Contract Details - {vehicles.length} underlying vehicles
             </div>
             {segment.description && (
-              <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
                 {segment.description}
               </div>
             )}
@@ -156,29 +156,29 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
           <div className="card">
             <div className="card-header"><h3 className="heading-3">Total Vehicles</h3></div>
             <div className="card-body">
-              <div style={{ fontSize: '18pt', fontWeight: 900 }}>{vehicles.length}</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>Real vehicles in contract</div>
+              <div style={{ fontSize: '24px', fontWeight: 900 }}>{vehicles.length}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Real vehicles in contract</div>
             </div>
           </div>
           <div className="card">
             <div className="card-header"><h3 className="heading-3">Market Cap</h3></div>
             <div className="card-body">
-              <div style={{ fontSize: '18pt', fontWeight: 900 }}>{formatUSD(totalValue)}</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>Total vehicle value</div>
+              <div style={{ fontSize: '24px', fontWeight: 900 }}>{formatUSD(totalValue)}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Total vehicle value</div>
             </div>
           </div>
           <div className="card">
             <div className="card-header"><h3 className="heading-3">Year Focus</h3></div>
             <div className="card-body">
-              <div style={{ fontSize: '18pt', fontWeight: 900 }}>1979</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>Collector vintage year</div>
+              <div style={{ fontSize: '24px', fontWeight: 900 }}>1979</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Collector vintage year</div>
             </div>
           </div>
           <div className="card">
             <div className="card-header"><h3 className="heading-3">ETF Symbol</h3></div>
             <div className="card-body">
-              <div style={{ fontSize: '18pt', fontWeight: 900 }}>Y79</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>Trading symbol</div>
+              <div style={{ fontSize: '24px', fontWeight: 900 }}>Y79</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Trading symbol</div>
             </div>
           </div>
         </div>
@@ -192,7 +192,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div>
                 <div style={{ fontWeight: 700, marginBottom: '8px' }}>Legal Structure</div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px', marginBottom: '12px' }}>
                   • <strong>Entity Type:</strong> Market Segment Fund (Limited Partnership)<br/>
                   • <strong>Securities Class:</strong> Investment Fund Shares<br/>
                   • <strong>Management:</strong> AI-managed portfolio optimization<br/>
@@ -201,7 +201,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
                 </div>
 
                 <div style={{ fontWeight: 700, marginBottom: '8px' }}>Investment Criteria</div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
                   <strong>Year Range:</strong> {segment.year_min || 'Any'} - {segment.year_max || 'Any'}<br/>
                   <strong>Makes:</strong> {segment.makes?.join(', ') || 'All manufacturers'}<br/>
                   <strong>Keywords:</strong> {segment.model_keywords?.join(', ') || 'No restrictions'}<br/>
@@ -211,7 +211,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
 
               <div>
                 <div style={{ fontWeight: 700, marginBottom: '8px' }}>Fee Structure</div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px', marginBottom: '12px' }}>
                   • <strong>Management Fee:</strong> 0.10% annually<br/>
                   • <strong>Performance Fee:</strong> 10% above 8% annual return<br/>
                   • <strong>Transaction Fee:</strong> 0.05% per trade<br/>
@@ -220,7 +220,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
                 </div>
 
                 <div style={{ fontWeight: 700, marginBottom: '8px' }}>Risk Factors</div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
                   • <strong>Market Risk:</strong> Vehicle values may decline<br/>
                   • <strong>Concentration Risk:</strong> Single model year exposure<br/>
                   • <strong>Liquidity Risk:</strong> Small underlying market<br/>
@@ -247,7 +247,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
                   display: 'grid', 
                   gridTemplateColumns: '2fr 1fr 2fr 1fr 100px',
                   gap: '12px',
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 700,
                   padding: '12px 8px',
                   borderBottom: '2px solid var(--border)',
@@ -272,7 +272,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
                         display: 'grid',
                         gridTemplateColumns: '2fr 1fr 2fr 1fr 100px',
                         gap: '12px',
-                        fontSize: '9pt',
+                        fontSize: '12px',
                         padding: '12px 8px',
                         borderBottom: '1px solid var(--border)',
                         transition: 'background 0.12s ease'
@@ -281,10 +281,10 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '10pt' }}>
+                        <div style={{ fontWeight: 700, fontSize: '13px' }}>
                           {vehicle.year} {vehicle.make} {vehicle.model}
                         </div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '8pt', marginTop: '2px' }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>
                           Vehicle ID: {vehicle.id.slice(-8)}
                         </div>
                       </div>
@@ -293,7 +293,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
                         {formatUSD(Number(vehicle.current_value))}
                       </div>
                       
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         {location}
                       </div>
                       
@@ -310,7 +310,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
                             borderRadius: '2px',
                             background: 'var(--primary)',
                             color: 'var(--white)',
-                            fontSize: '8pt',
+                            fontSize: '11px',
                             fontWeight: 700,
                             cursor: 'pointer'
                           }}
@@ -332,7 +332,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
             <h3 className="heading-3">Investment Summary</h3>
           </div>
           <div className="card-body">
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px', marginBottom: '16px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px', marginBottom: '16px' }}>
               This ETF provides diversified exposure to {vehicles.length} vehicles from {segment.year_min || 'various'} 
               {segment.year_min !== segment.year_max ? `-${segment.year_max}` : ''} with a total market capitalization 
               of {formatUSD(totalValue)}. The fund is managed automatically and provides daily liquidity.

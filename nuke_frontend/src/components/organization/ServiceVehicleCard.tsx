@@ -90,7 +90,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
       }}
       onClick={() => navigate(`/vehicle/${vehicleId}`)}
     >
-      <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
+      <div className="card-header" style={{ fontSize: '15px', fontWeight: 700 }}>
         SERVICE
       </div>
 
@@ -131,7 +131,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 'bold',
                   color: 'var(--accent)',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
@@ -152,7 +152,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   color: 'var(--grey-600)',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
@@ -168,10 +168,10 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
 
       {/* Vehicle Info */}
       <div className="card-body">
-        <div style={{ fontSize: '12pt', fontWeight: 600, marginBottom: '12px' }}>
+        <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>
           {vehicleInfo.year} {vehicleInfo.make} {vehicleInfo.model}
           {vehicleInfo.vin && (
-            <span style={{ fontSize: '9pt', color: 'var(--grey-600)', marginLeft: '8px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--grey-600)', marginLeft: '8px' }}>
               {vehicleInfo.vin}
             </span>
           )}
@@ -190,26 +190,26 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
           }}
         >
           <div>
-            <div style={{ fontSize: '8pt', color: 'var(--grey-600)', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--grey-600)', marginBottom: '4px' }}>
               Investment
             </div>
-            <div style={{ fontSize: '11pt', fontWeight: 600 }}>
+            <div style={{ fontSize: '15px', fontWeight: 600 }}>
               {formatCurrency(totalInvestment)}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '8pt', color: 'var(--grey-600)', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--grey-600)', marginBottom: '4px' }}>
               Time
             </div>
-            <div style={{ fontSize: '11pt', fontWeight: 600 }}>
+            <div style={{ fontSize: '15px', fontWeight: 600 }}>
               {totalDays} {totalDays === 1 ? 'day' : 'days'}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '8pt', color: 'var(--grey-600)', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--grey-600)', marginBottom: '4px' }}>
               Jobs
             </div>
-            <div style={{ fontSize: '11pt', fontWeight: 600 }}>
+            <div style={{ fontSize: '15px', fontWeight: 600 }}>
               {jobCount} {jobCount === 1 ? 'receipt' : 'receipts'}
             </div>
           </div>
@@ -221,7 +221,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
             display: 'inline-block',
             padding: '4px 8px',
             borderRadius: '4px',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 600,
             background: statusColors[currentStatus] + '20',
             color: statusColors[currentStatus],
@@ -236,7 +236,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
           <div style={{ marginTop: '12px' }}>
             <div
               style={{
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 600,
                 color: 'var(--grey-700)',
                 marginBottom: '8px'
@@ -249,7 +249,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
                 <div
                   key={receipt.id}
                   style={{
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     padding: '6px',
                     background: 'var(--grey-50)',
                     borderRadius: '4px',
@@ -276,7 +276,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
               {receipts.length > 3 && (
                 <div
                   style={{
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--grey-600)',
                     textAlign: 'center',
                     padding: '4px'

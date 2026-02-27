@@ -23,7 +23,7 @@ export const ScoreBadge: React.FC<ScoreBadgeProps> = ({
   if (compact) {
     return (
       <span style={{
-        fontSize: '8pt',
+        fontSize: '11px',
         fontFamily: 'monospace',
         whiteSpace: 'nowrap'
       }}>
@@ -38,7 +38,7 @@ export const ScoreBadge: React.FC<ScoreBadgeProps> = ({
     <div style={{
       display: 'flex',
       gap: '8px',
-      fontSize: '8pt'
+      fontSize: '11px'
     }}>
       <div style={{
         display: 'flex',
@@ -48,9 +48,9 @@ export const ScoreBadge: React.FC<ScoreBadgeProps> = ({
         background: `${confColor}15`,
         borderRadius: '2px'
       }}>
-        <span style={{ color: confColor, fontSize: '10pt' }}>●</span>
+        <span style={{ color: confColor, fontSize: '13px' }}>●</span>
         <span style={{ color: confColor, fontWeight: 600 }}>{confidence}%</span>
-        <span style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>CONF</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>CONF</span>
       </div>
       <div style={{
         display: 'flex',
@@ -60,9 +60,9 @@ export const ScoreBadge: React.FC<ScoreBadgeProps> = ({
         background: `${intColor}15`,
         borderRadius: '2px'
       }}>
-        <span style={{ color: intColor, fontSize: '10pt' }}>●</span>
+        <span style={{ color: intColor, fontSize: '13px' }}>●</span>
         <span style={{ color: intColor, fontWeight: 600 }}>{interaction}%</span>
-        <span style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>INT</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>INT</span>
       </div>
     </div>
   );

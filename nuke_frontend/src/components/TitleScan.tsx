@@ -266,10 +266,10 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
               title="Click to enlarge"
             />
             <div style={{ flex: 1 }}>
-              <div className="text" style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+              <div className="text" style={{ fontSize: '11px', fontWeight: 'bold' }}>
                 {file.name}
               </div>
-              <div className="text-small text-muted" style={{ fontSize: '8pt' }}>
+              <div className="text-small text-muted" style={{ fontSize: '11px' }}>
                 {(file.size / 1024).toFixed(1)} KB
               </div>
             </div>
@@ -282,7 +282,7 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
                 setShowOldImageWarning(false);
               }}
               className="button button-small"
-              style={{ fontSize: '8pt', padding: '2px 6px' }}
+              style={{ fontSize: '11px', padding: '2px 6px' }}
               title="Remove"
             >
               ✕
@@ -294,7 +294,7 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
             padding: 'var(--space-2)',
             backgroundColor: 'var(--grey-200)',
             border: '1px solid var(--border-medium)',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}>
             {imageMetadata.dateTime && (
               <div className="text">
@@ -313,7 +313,7 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
             padding: 'var(--space-2)',
             backgroundColor: 'var(--grey-200)',
             border: '2px solid var(--grey-800)',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}>
             <div className="text font-bold">Old Image Detected</div>
             <div className="text text-muted" style={{ marginTop: 'var(--space-1)' }}>
@@ -322,14 +322,14 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
             <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 'var(--space-1)' }}>
               <button 
                 className="button button-primary"
-                style={{ fontSize: '8pt', padding: '3px 6px' }}
+                style={{ fontSize: '11px', padding: '3px 6px' }}
                 onClick={() => setShowLiveCapture(true)}
               >
                 Take Fresh Photo
               </button>
               <button 
                 className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '3px 6px' }}
+                style={{ fontSize: '11px', padding: '3px 6px' }}
                 onClick={() => setShowOldImageWarning(false)}
               >
                 Dismiss
@@ -342,7 +342,7 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
             padding: 'var(--space-2)',
             backgroundColor: 'var(--grey-200)',
             border: '2px solid var(--grey-800)',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}>
             {error}
           </div>

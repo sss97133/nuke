@@ -93,7 +93,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
               borderBottom: '1px solid var(--border)',
             }}
           >
-            <span style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</span>
+            <span style={{ fontWeight: 700, fontSize: '13px' }}>{title}</span>
             <button
               type="button"
               onClick={onClose}
@@ -101,7 +101,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: '14pt',
+                fontSize: '19px',
                 color: 'var(--text-muted)',
                 lineHeight: 1,
                 padding: '0 4px',
@@ -110,7 +110,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
               ×
             </button>
           </div>
-          <div style={{ padding: '12px 16px', fontSize: '8pt' }}>{children}</div>
+          <div style={{ padding: '12px 16px', fontSize: '11px' }}>{children}</div>
         </div>
       </>
     );
@@ -149,7 +149,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <span style={{ fontWeight: 700, fontSize: '9pt' }}>{title}</span>
+        <span style={{ fontWeight: 700, fontSize: '12px' }}>{title}</span>
         <button
           type="button"
           onClick={onClose}
@@ -157,7 +157,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '12pt',
+            fontSize: '16px',
             color: 'var(--text-muted)',
             lineHeight: 1,
             padding: '0 4px',
@@ -166,7 +166,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
           ×
         </button>
       </div>
-      <div style={{ padding: '12px', fontSize: '8pt' }}>{children}</div>
+      <div style={{ padding: '12px', fontSize: '11px' }}>{children}</div>
     </div>
   );
 };

@@ -167,7 +167,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
               onClick={onAddRelationship}
               style={{
                 padding: '6px 12px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 border: '1px solid var(--accent)',
                 background: 'var(--accent)',

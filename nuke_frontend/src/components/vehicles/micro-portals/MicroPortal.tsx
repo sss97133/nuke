@@ -143,7 +143,7 @@ export default function MicroPortal({
             border: '1px solid var(--border, #e5e7eb)',
             borderRadius: '6px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-            fontSize: '9pt',
+            fontSize: '12px',
             animation: 'microPortalAppear 0.12s ease',
           }}
           onClick={(e) => e.stopPropagation()}

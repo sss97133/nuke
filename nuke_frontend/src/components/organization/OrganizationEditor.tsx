@@ -174,13 +174,13 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
             Edit Organization Details
           </h3>
           <button
             onClick={onClose}
             className="button button-small"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
           >
             × Close
           </button>
@@ -195,7 +195,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                 padding: '8px 12px',
                 borderRadius: '2px',
                 marginBottom: '16px',
-                fontSize: '9pt'
+                fontSize: '12px'
               }}>
                 {error}
               </div>
@@ -203,12 +203,12 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
 
             {/* Basic Information */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
                 Basic Information
               </h4>
               
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Business Name *
                 </label>
                 <input
@@ -217,12 +217,12 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                   value={formData.business_name}
                   onChange={(e) => handleChange('business_name', e.target.value)}
                   required
-                  style={{ fontSize: '9pt', width: '100%' }}
+                  style={{ fontSize: '12px', width: '100%' }}
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Legal Name
                 </label>
                 <input
@@ -230,19 +230,19 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                   className="form-input"
                   value={formData.legal_name || ''}
                   onChange={(e) => handleChange('legal_name', e.target.value)}
-                  style={{ fontSize: '9pt', width: '100%' }}
+                  style={{ fontSize: '12px', width: '100%' }}
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Business Type
                 </label>
                 <select
                   className="form-input"
                   value={formData.entity_type || ''}
                   onChange={(e) => handleChange('entity_type', e.target.value)}
-                  style={{ fontSize: '9pt', width: '100%' }}
+                  style={{ fontSize: '12px', width: '100%' }}
                 >
                   <option value="">Select type...</option>
                   <option value="garage">Garage</option>
@@ -262,7 +262,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Description
                 </label>
                 <textarea
@@ -270,19 +270,19 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                   value={formData.description || ''}
                   onChange={(e) => handleChange('description', e.target.value)}
                   rows={3}
-                  style={{ fontSize: '9pt', width: '100%' }}
+                  style={{ fontSize: '12px', width: '100%' }}
                 />
               </div>
             </div>
 
             {/* Contact Information */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
                 Contact Information
               </h4>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Website
                 </label>
                 <input
@@ -291,13 +291,13 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                   value={formData.website || ''}
                   onChange={(e) => handleChange('website', e.target.value)}
                   placeholder="https://example.com"
-                  style={{ fontSize: '9pt', width: '100%' }}
+                  style={{ fontSize: '12px', width: '100%' }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Email
                   </label>
                   <input
@@ -305,12 +305,12 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     className="form-input"
                     value={formData.email || ''}
                     onChange={(e) => handleChange('email', e.target.value)}
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Phone
                   </label>
                   <input
@@ -318,7 +318,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     className="form-input"
                     value={formData.phone || ''}
                     onChange={(e) => handleChange('phone', e.target.value)}
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
               </div>
@@ -326,12 +326,12 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
 
             {/* Location */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
                 Location
               </h4>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Address
                 </label>
                 <input
@@ -339,13 +339,13 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                   className="form-input"
                   value={formData.address || ''}
                   onChange={(e) => handleChange('address', e.target.value)}
-                  style={{ fontSize: '9pt', width: '100%' }}
+                  style={{ fontSize: '12px', width: '100%' }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     City
                   </label>
                   <input
@@ -353,12 +353,12 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     className="form-input"
                     value={formData.city || ''}
                     onChange={(e) => handleChange('city', e.target.value)}
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     State
                   </label>
                   <input
@@ -368,12 +368,12 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     onChange={(e) => handleChange('state', e.target.value)}
                     maxLength={2}
                     placeholder="NV"
-                    style={{ fontSize: '9pt', width: '100%', textTransform: 'uppercase' }}
+                    style={{ fontSize: '12px', width: '100%', textTransform: 'uppercase' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     ZIP Code
                   </label>
                   <input
@@ -382,14 +382,14 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     value={formData.zip_code || ''}
                     onChange={(e) => handleChange('zip_code', e.target.value)}
                     maxLength={10}
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Latitude
                   </label>
                   <input
@@ -398,12 +398,12 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     className="form-input"
                     value={formData.latitude || ''}
                     onChange={(e) => handleChange('latitude', e.target.value ? parseFloat(e.target.value) : null)}
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Longitude
                   </label>
                   <input
@@ -412,7 +412,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     className="form-input"
                     value={formData.longitude || ''}
                     onChange={(e) => handleChange('longitude', e.target.value ? parseFloat(e.target.value) : null)}
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
               </div>
@@ -420,20 +420,20 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
 
             {/* Financial Settings */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
                 Financial Settings
               </h4>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Currency
                   </label>
                   <select
                     className="form-input"
                     value={formData.currency || 'USD'}
                     onChange={(e) => handleChange('currency', e.target.value)}
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   >
                     <option value="USD">USD ($)</option>
                     <option value="EUR">EUR (€)</option>
@@ -446,7 +446,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Labor Rate (per hour)
                   </label>
                   <input
@@ -456,12 +456,12 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     value={formData.labor_rate || ''}
                     onChange={(e) => handleChange('labor_rate', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="150.00"
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Tax Rate (%)
                   </label>
                   <input
@@ -471,7 +471,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     value={formData.tax_rate || ''}
                     onChange={(e) => handleChange('tax_rate', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="8.25"
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
               </div>
@@ -479,13 +479,13 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
 
             {/* Valuation */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
                 Valuation
               </h4>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Estimated Value (USD)
                   </label>
                   <input
@@ -495,7 +495,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     value={formData.estimated_value ?? ''}
                     onChange={(e) => handleChange('estimated_value', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="2500000"
-                    style={{ fontSize: '9pt', width: '100%' }}
+                    style={{ fontSize: '12px', width: '100%' }}
                   />
                 </div>
 
@@ -515,7 +515,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                 onClick={onClose}
                 className="button button-secondary"
                 disabled={saving}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Cancel
               </button>
@@ -523,7 +523,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                 type="submit"
                 className="button button-primary"
                 disabled={saving}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>

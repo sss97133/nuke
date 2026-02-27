@@ -72,7 +72,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
 
     return (
       <span style={{
-        fontSize: '7pt',
+        fontSize: '9px',
         padding: '2px 6px',
         background: platformColors[p] || 'var(--text-muted)',
         color: 'var(--white)',
@@ -91,7 +91,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
         padding: 'var(--space-6)',
         textAlign: 'center',
         color: 'var(--text-muted)',
-        fontSize: '8pt',
+        fontSize: '11px',
       }}>
         No comments yet
       </div>
@@ -190,7 +190,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text-muted)',
                 }}>
                   No Image
@@ -204,7 +204,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
               <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                 <div>
                   <h3 style={{
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     fontWeight: 'bold',
                     margin: 0,
                     marginBottom: '4px',
@@ -239,7 +239,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
 
               {/* Metadata: Date, likes, bid amount */}
               <div style={{ 
-                fontSize: '7pt', 
+                fontSize: '9px', 
                 color: 'var(--text-muted)',
                 display: 'flex',
                 gap: 'var(--space-2)',
@@ -260,7 +260,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
               {/* Comment text */}
               {commentText && (
                 <div style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   color: 'var(--text)',
                   lineHeight: '1.5',
                   whiteSpace: 'pre-wrap',
@@ -272,7 +272,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
                       onClick={() => toggleExpanded(comment.id)}
                       style={{
                         marginLeft: 'var(--space-1)',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         color: 'var(--accent)',
                         background: 'none',
                         border: 'none',
@@ -295,7 +295,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       color: 'var(--accent)',
                       textDecoration: 'none',
                     }}

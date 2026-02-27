@@ -32,7 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div
           style={{
             fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-            fontSize: '8pt',
+            fontSize: '11px',
             padding: '4px 8px',
             cursor: 'pointer',
             userSelect: 'none',
@@ -70,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {category.label}
           </span>
           {category.count > 0 && (
-            <span style={{ color: '#9e9e9e', fontSize: '7pt' }}>
+            <span style={{ color: '#9e9e9e', fontSize: '9px' }}>
               ({category.count})
             </span>
           )}
@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         height: '100%',
         overflowY: 'auto',
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-        fontSize: '8pt'
+        fontSize: '11px'
       }}
     >
       {categories.map((category) => renderCategory(category))}
