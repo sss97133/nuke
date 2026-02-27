@@ -33,7 +33,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('q') || '';
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'map'>('cards');
-  const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location'>('relevance');
+  const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location' | 'price_asc' | 'price_desc' | 'year_desc' | 'year_asc'>('relevance');
   const [internalFilter, setInternalFilter] = useState<SearchFilter>('all');
   const [showBazaar, setShowBazaar] = useState(false);
   const filterBy = activeFilter ?? internalFilter;
@@ -167,6 +167,26 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           if (a.location && !b.location) return -1;
           if (!a.location && b.location) return 1;
           return 0;
+        case 'price_asc': {
+          const pa = (a.metadata as any)?.sale_price ?? Infinity;
+          const pb = (b.metadata as any)?.sale_price ?? Infinity;
+          return pa - pb;
+        }
+        case 'price_desc': {
+          const pa = (a.metadata as any)?.sale_price ?? -1;
+          const pb = (b.metadata as any)?.sale_price ?? -1;
+          return pb - pa;
+        }
+        case 'year_desc': {
+          const ya = (a.metadata as any)?.year ?? 0;
+          const yb = (b.metadata as any)?.year ?? 0;
+          return yb - ya;
+        }
+        case 'year_asc': {
+          const ya = (a.metadata as any)?.year ?? Infinity;
+          const yb = (b.metadata as any)?.year ?? Infinity;
+          return ya - yb;
+        }
         default:
           return 0;
       }
@@ -546,7 +566,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
               onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
             >
               <option value="relevance">Relevance</option>
-              <option value="date">Date</option>
+              <option value="date">Date (newest)</option>
+              <option value="price_asc">Price (low → high)</option>
+              <option value="price_desc">Price (high → low)</option>
+              <option value="year_desc">Year (newest first)</option>
+              <option value="year_asc">Year (oldest first)</option>
               <option value="location">Location</option>
             </select>
           </div>
@@ -657,7 +681,18 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         year: result.metadata?.year,
                         make: result.metadata?.make,
                         model: result.metadata?.model,
+                        vin: result.metadata?.vin,
+                        sale_price: result.metadata?.sale_price,
+                        current_value: result.metadata?.current_value,
+                        asking_price: result.metadata?.asking_price,
+                        mileage: result.metadata?.mileage,
+                        transmission: result.metadata?.transmission,
                         is_for_sale: result.metadata?.for_sale ?? result.metadata?.is_for_sale,
+                        profile_origin: result.metadata?.profile_origin,
+                        ownership_verified: result.metadata?.ownership_verified,
+                        view_count: result.metadata?.view_count,
+                        image_count: result.metadata?.image_count,
+                        event_count: result.metadata?.event_count,
                         location:
                           (result.metadata?.city || result.metadata?.state)
                             ? `${result.metadata?.city || ''}${result.metadata?.city && result.metadata?.state ? ', ' : ''}${result.metadata?.state || ''}`.trim()
@@ -787,7 +822,31 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       </div>
                     </div>
 
-                    <p 
+                    {/* Key specs row for vehicles */}
+                    {result.type === 'vehicle' && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                        {(result.metadata?.sale_price || result.metadata?.current_value || result.metadata?.asking_price) && (
+                          <span style={{ fontSize: '8pt', fontWeight: 700, color: '#000' }}>
+                            ${((result.metadata?.sale_price || result.metadata?.current_value || result.metadata?.asking_price) || 0).toLocaleString()}
+                          </span>
+                        )}
+                        {result.metadata?.vin && (
+                          <span style={{ fontSize: '7pt', color: '#666', fontFamily: 'monospace' }}>
+                            {result.metadata.vin}
+                          </span>
+                        )}
+                        {result.metadata?.mileage && (
+                          <span style={{ fontSize: '7pt', color: '#666' }}>
+                            {result.metadata.mileage.toLocaleString()} mi
+                          </span>
+                        )}
+                        {result.metadata?.transmission && (
+                          <span style={{ fontSize: '7pt', color: '#666' }}>{result.metadata.transmission}</span>
+                        )}
+                      </div>
+                    )}
+
+                    <p
                       style={{
                         margin: '0 0 8px 0',
                         fontSize: '8pt',
