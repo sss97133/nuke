@@ -502,7 +502,7 @@ export default function MarketCompetitors() {
             verdict="Claims FCA. Own site says otherwise."
             color="rgba(16,185,129,0.12)"
             accentColor="#059669"
-            body='Their FAQ: "not regulated by the UK Financial Conduct Authority. Your capital is at risk and not protected by FSCS." 12.5% upfront fee + 3.91%/year + 10% of gains means ~30% appreciation needed to break even. Returns (12.6%) are directors\' paper estimates — 2 confirmed exits in 4 years. £2,000 minimum. UK-only.'
+            body={'Their FAQ: "not regulated by the UK Financial Conduct Authority. Your capital is at risk and not protected by FSCS." 12.5% upfront fee + 3.91%/year + 10% of gains means ~30% appreciation needed to break even. Returns (12.6%) are directors\' paper estimates \u2014 2 confirmed exits in 4 years. \u00a32,000 minimum. UK-only.'}
           />
           <SummaryCard
             title="vs. MCQ Markets"
