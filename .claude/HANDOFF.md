@@ -1,7 +1,11 @@
-# Auto-Checkpoint — 2026-02-27 07:46:43
+# Auto-Checkpoint — 2026-02-27 07:48:47
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
+015843569 chore: update ACTIVE_AGENTS + DONE for global UX pass 2 session
+74bc77d1c chore: update coordination files + admin-apply-crons function
+6fca908fb chore: document search UX overhaul session in DONE.md
+10c63847c fix(ux): convert remaining pt font units to px in TeamInbox
 973eee1d1 chore: update ACTIVE_AGENTS + DONE for VP Orgs session
 a044ec665 feat: CPO audit filed, archiveFetch fixes, deal-flow wiring, Resend inbound check
 22bc26633 chore: redact OAuth credentials from gmail migration comments
@@ -20,8 +24,8 @@ d24aa0ad0 fix(pages): org profile + offering page UX improvements
 a5ebb07b8 fix(ux): global navigation, homepage, mobile, loading states polish
 
 ## Uncommitted Changes
+DONE.md
 mcp-server
-nuke_frontend/src/pages/TeamInbox.tsx
 
 ## Staged
 none

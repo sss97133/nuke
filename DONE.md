@@ -5,6 +5,20 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [platform] Resend Inbound Email — Audit, Fix, alerts@nuke.ag wiring
+- **Status**: Pipeline was already working. 5 real emails in contact_inbox including shkylar@gmail.com → info@nuke.ag and Amazon SES DMARC reports → privacy@nuke.ag
+- **Root finding**: RESEND_API_KEY in Supabase is send-only scope (restricted_api_key) — cannot read domains/webhooks via API. Inbound routing IS configured in Resend dashboard (confirmed by working emails)
+- **Bug fixed**: inbound-email was silently losing email body when Resend API content fetch failed. Now uses webhook payload `data.text`/`data.html` as immediate fallback before attempting API enrichment
+- **New feature**: Added `alerts@nuke.ag` to VALID_ADDRESSES + routing to process-alert-email → import_queue
+  - Email arrives at alerts@nuke.ag → stored in contact_inbox AND forwarded to process-alert-email
+  - process-alert-email extracts listing URLs, queues to import_queue with alert_source + ingested_via metadata
+  - Supports: BaT, Craigslist, KSL, Hemmings, eBay, Cars.com, AutoTrader, Hagerty, CarGurus, ClassicCars, FB, PCarMarket, C&B
+- **Test result verified**: BMW M3 test → alert_email_log: urls_found=1, urls_queued=1, status=processed → import_queue: status=pending, source=bat, ingested_via=email_alert
+- **Inserted test record**: contact_inbox email_id=test-001 (from someone@example.com to info@nuke.ag)
+- **Deployed**: inbound-email v17 (two fixes: body fallback + alerts routing)
+- **DNS/MX**: Already configured — emails ARE flowing. No action needed.
+- **What's needed for Gmail→alerts@nuke.ag flow**: Set up Gmail forwarding in toymachine91@gmail.com settings to forward to alerts@nuke.ag
+
 ### [frontend] Search + Discovery + Vehicle Cards UX overhaul — committed in 05000c396
 - **Loading state**: `loading` initializes `true` when URL has `?q=` param → skeleton shows immediately on page load (not blank)
 - **Search summary**: Default changed from stale "Enter a search query..." to empty string → no ghost text after results load
