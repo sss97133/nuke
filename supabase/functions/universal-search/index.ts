@@ -291,8 +291,9 @@ serve(async (req) => {
           if (!ftsError && ftsResults?.length) {
             // Filter to high-confidence results only (relevance >= 0.85 = strategies 1a/1b).
             // Strategy 2 (raw FTS, relevance = 0.8) produces too many false positives.
+            // FIX: Only use high-confidence results. Discard low-relevance garbage completely.
             const highConfidence = ftsResults.filter((r: any) => (r.relevance || 0) >= 0.85);
-            const useFts = highConfidence.length > 0 ? highConfidence : ftsResults;
+            const useFts = highConfidence; // Changed: don't fall back to low-quality results
 
             // FTS RPC returns limited columns — enrich with full vehicle data in one query
             const ftsIds = useFts.map((r: any) => r.id);
@@ -326,6 +327,7 @@ serve(async (req) => {
 
         // ILIKE fallback — always try this and merge; structured field matching is more reliable
         // than FTS for make/model queries like "Porsche 997 GT3"
+        // FIX: For multi-token queries, prefer ILIKE over FTS (more precise for "porsche 911")
         {
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
           let ilikeQuery = supabase
@@ -374,10 +376,17 @@ serve(async (req) => {
               // No FTS results — use ILIKE exclusively
               vehicles = ilikeResults;
             } else {
-              // Merge: ILIKE results get higher relevance than low-confidence FTS
-              const ftsIds = new Set(vehicles.map((v: any) => v.id));
-              for (const r of ilikeResults) {
-                if (!ftsIds.has(r.id)) vehicles.push({ ...r, _from_ilike: true });
+              // FIX: For specific queries (2+ tokens), prioritize ILIKE over FTS
+              // ILIKE is more precise for "porsche 997 gt3" than full-text search
+              if (tokens.length >= 2) {
+                // Replace FTS results with ILIKE (more accurate for make/model searches)
+                vehicles = ilikeResults;
+              } else {
+                // Merge: ILIKE results get higher relevance than low-confidence FTS
+                const ftsIds = new Set(vehicles.map((v: any) => v.id));
+                for (const r of ilikeResults) {
+                  if (!ftsIds.has(r.id)) vehicles.push({ ...r, _from_ilike: true });
+                }
               }
             }
           }
