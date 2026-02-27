@@ -15,9 +15,7 @@
  * 4. Add pg_cron job (see migration):
  *    supabase db push (or apply migration manually)
  *
- * The pg_cron job calls this function every 5 minutes:
- *   SELECT cron.schedule('gmail-alert-poller', '*/5 * * * *',
- *     $$SELECT net.http_post(url:=..., body:=...) AS request_id$$);
+ * The pg_cron job calls this function every 5 minutes (see migration file).
  *
  * ENVIRONMENT VARIABLES (set via `supabase secrets set`):
  *   GOOGLE_CLIENT_ID       — OAuth2 client ID

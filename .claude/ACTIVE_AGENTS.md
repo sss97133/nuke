@@ -19,6 +19,13 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
+### CDO — Data Quality Audit — 2026-02-27 (this session)
+- Full data quality audit: source coverage, VIN/desc gaps, BAT stall, YONO training balance
+- Filed 7 agent_tasks to vp-extraction, vp-vehicle-intel, vp-ai
+- Read-only (no code changes, DB inserts to agent_tasks only)
+- COMPLETE — removing on session end
+
+
 ### VP AI — Zone Classifier + Bearer Auth + interior_quality — 2026-02-27 11:20 UTC — COMPLETE
 - Zone classifier: uploaded safetensors to Modal, redeployed, live (72.8% val_acc, 41 classes)
 - Bearer token auth: added to modal_serve.py, yono-classify, yono-analyze, yono-vision-worker
@@ -40,11 +47,6 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Also creating: DB migration for `alert_email_log` table (if needed)
 - Touching: scripts/gmail-poller.mjs, supabase/functions/gmail-alert-poller/, supabase/migrations/
 - DO NOT: modify process-alert-email/index.ts
-
-### Frontend Worker — TeamInbox Page — 2026-02-27
-- Building: /nuke_frontend/src/pages/TeamInbox.tsx (unified team email/message communication hub)
-- Touching: nuke_frontend/src/pages/TeamInbox.tsx, nuke_frontend/src/routes/DomainRoutes.tsx, nuke_frontend/src/components/layout/NukeMenu.tsx
-- DO NOT: modify AdminInbox.tsx or AdminAgentInbox.tsx
 
 ### VP Photos — Health Check + K10 Vision Audit — 2026-02-27 07:30 UTC
 - Checking: YONO vision worker (jobs 247+248), organization status, K10 photos, agent_tasks
@@ -74,12 +76,15 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Processed CFO recommendation task bcf6d537
 - REMOVED: session complete
 
-### Worker Agent — Multi-task sprint — 2026-02-27 07:35 UTC
-- Task 1: 1977ede1 (P90) — YONO ACTIVE_AGENTS update — DONE
-- Task 2: 363eca02 (P85) — YONO sidecar unreachable — IN PROGRESS
-- Task 3: 78505a8b (P80) — Import queue backlog — NEXT
-- Touching: ACTIVE_AGENTS.md, YONO sidecar health check, import queue investigation
-- DO NOT: kill training PIDs 7390/28401/23678
+### Worker Agent — Multi-task sprint — COMPLETED 2026-02-27 08:10 UTC
+- P90 YONO ACTIVE_AGENTS update (1977ede1): zone classifier finished epoch 15/15 (72.8%), tier-2 training active
+- P85 YONO sidecar (363eca02): already working, typo in task URL; verified auth=401 without token
+- P80 Import queue backlog (78505a8b): not stalled, 84K pending/353 active workers draining
+- P75 YONO Bearer auth (b6b693ab): already deployed by VP AI; verified working
+- P70 crawl-bat-active (db1d1a69): documented RSS exception, deployed
+- P70 sync-live-auctions (7ad92537): FIXED — archiveFetch() for BaT /auctions/ page, deployed
+- P60 extract-gooding (c8afcd1e): documented sitemap exception, deployed
+- REMOVED: session complete
 
 ### Worker — BaT Queue Unblock + PCarMarket Fix — COMPLETED 2026-02-27
 - P0: Deployed process-bat-extraction-queue (was missing, caused 2-month stall). Added cron job 260 (bat-extraction-queue-worker, */2 * * * *). 119,300 pending items now draining.
@@ -109,11 +114,8 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Approach: Firecrawl to fetch individual lot pages, parse description + highlights + chassis info
 - DO NOT: touch extract-rmsothebys (enhancement goes in new backfill function)
 
-### VP Orgs — Cron Gap Fix — 2026-02-27
-- Fixing 3 missing cron jobs: classic_seller_queue worker, ECR refresh, compute-org-seller-stats
-- Deploying process-classic-seller-queue (restore from archive)
-- Touching: supabase/functions/process-classic-seller-queue/, supabase/migrations/
-- Areas: organizations, classic_seller_queue, organization_seller_stats, ECR collections
+### VP Orgs — Cron Gap Fix — COMPLETED 2026-02-27
+- 3 cron jobs added (jobs 262, 263, 264), 2 functions deployed, 109 queue items reset and draining
 
 ### VP Extraction — FB GraphQL Probe — 2026-02-27 07:20 UTC — COMPLETED
 - Key finding: GraphQL works from residential IPs (doc_id 33269364996041474), blocked from Supabase datacenter (1675004)

@@ -5,6 +5,67 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [vp-orgs] Org cron gap fix — 3 missing crons added, 2 functions deployed
+- **classic-seller-queue-worker** (job 264, `*/5 * * * *`): drains `classic_seller_queue`; 109 items were stuck with 5 failed attempts since Dec 2025. Root cause: `index-classic-com-dealer` was not deployed. Fixed: redeployed both functions, reset 109 items to pending, cron draining now (8 completed in first batch).
+- **ecr-collection-inventory-refresh** (job 262, `0 3 * * *`): refreshes ECR collection inventory; was 45 days stale. 1,831 collections, 142 never synced.
+- **compute-org-seller-stats-daily** (job 263, `0 4 * * *`): rebuilds `organization_seller_stats` for all orgs with external listings. Was 1 entry, stale Feb 14.
+- Deployed: `process-classic-seller-queue`, `index-classic-com-dealer`
+- Filed agent task for org-to-seller bridge (P70, build when queues populate more data)
+- Migration file: `supabase/migrations/20260227100000_vp_orgs_cron_fixes.sql`
+
+### [cdo] Data Quality Audit — 7 work orders filed
+- Audited 1.255M vehicles across all sources using pg_stats (fast, no sequential scans)
+- **Key findings**: VIN coverage 17% overall, description coverage 25%, signal_score near-zero (0.22%), valuation 41%
+- **Source breakdown** (10% sample): User Submission dominates (96% of corpus), Mecum 8% desc coverage, B-J 41% VIN coverage, Craigslist 4% desc coverage
+- **BAT extraction stall confirmed**: 119,299 pending items since Dec 2025, stopped processing Feb 5. 142K BaT vehicles effectively have no signal_score as a result.
+- **YONO training imbalance confirmed**: 17 of 38 zones have <50 examples. panel_fender_rr/rr=1 example each.
+- Filed 7 agent_tasks: vp-extraction (4: VIN backfill P82, Description backfill P80, B-J VIN gap P78, BAT stall P85x2), vp-vehicle-intel (valuation coverage P75), vp-ai (YONO zone balance P72)
+
+## 2026-02-27
+
+### [frontend] TeamInbox — unified team communication hub at /inbox
+- Built `/nuke_frontend/src/pages/TeamInbox.tsx` (1294 lines) — full-featured three-tab inbox page
+- **Emails tab**: contact_inbox reader, mailbox filters (support/info/privacy/legal/investors/hello), status filters (unread/read/replied/archived), full email detail pane, reply via `reply-email` edge function, archive/spam actions, real-time subscription via Supabase realtime
+- **Messages tab**: agent_messages reader, to/from role filters, unread-only toggle, thread view, compose modal (founder→any agent role via `agent-email` edge function), marks as read on open
+- **Alerts tab**: filtered view of alert emails (alerts@nuke.ag or subject contains "vehicle alert"), auto-extracts vehicle listing URLs (BaT, C&B, PCarMarket, Mecum, etc.), links for direct access
+- Left sidebar: tab nav with live unread count badges, auto-refreshes every 30s
+- Auth-gated: redirects to /login?returnUrl=%2Finbox for unauthenticated users
+- Uses Nuke design tokens only (var(--bg), var(--text), var(--primary), etc.)
+- Route: `/inbox` added to DomainRoutes.tsx
+- Nav: "Inbox" link added to NukeMenu (authenticated users) and ProfileBalancePill dropdown
+- Committed in 944ba7704, pushed to main (Vercel deploying)
+
+### [worker] Multi-task sprint — 6 tasks completed
+- **P90 YONO ACTIVE_AGENTS update (1977ede1)**: Updated ACTIVE_AGENTS.md: zone classifier PID 7241 COMPLETE (epoch 15/15, val_acc=72.8%), tier-2 PID 28401 active training german family, watcher PID 7390 active
+- **P85 YONO sidecar unreachable (363eca02)**: Sidecar IS reachable. Task had typo (sss83133 vs sss97133). Verified: health=200, classify_no_token=401, classify_with_token=200. Auth middleware working
+- **P80 Import queue backlog (78505a8b)**: Not stalled. 84,847 pending, 353 active, 277K completed. Demand spike from Extraction Quality Sprint draining at ~50/min
+- **P75 YONO sidecar Bearer token auth (b6b693ab)**: Already implemented by VP AI. auth_middleware in modal_serve.py lines 374-389, Modal secret nuke-sidecar-secrets and Supabase secret MODAL_SIDECAR_TOKEN both set, yono-classify + yono-analyze both send Bearer token
+- **P70 archiveFetch violation: crawl-bat-active (db1d1a69)**: Documented exception — RSS/XML feeds are URL-discovery-only (parse URLs from XML, content not stored). Added comments. Deployed crawl-bat-active
+- **P70 archiveFetch violation: sync-live-auctions (7ad92537)**: FIXED — replaced raw fetch("https://bringatrailer.com/auctions/") with archiveFetch() (skipCache: true, platform: bat). Page now archived to listing_page_snapshots. Deployed sync-live-auctions
+- **P60 archiveFetch violation: extract-gooding (c8afcd1e)**: Documented exception — sitemap.xml is URL-discovery-only. Added comments. Deployed extract-gooding
+
+### [ux-audit] CPO full site audit — 13 tasks filed in agent_tasks
+- Conducted Playwright-based audit of all major pages: /, /search, /vehicle/[id], /market, /portfolio, /offering, /organizations, /profile
+- Confirmed via direct API testing (not just screenshots) — identified root causes not just symptoms
+- 3 confirmed P0 broken experiences:
+  1. Vehicle profile stuck loading: get_vehicle_profile_data RPC times out (3s) for anon users (task bda3c25b, P97)
+  2. /market is a "Coming Soon" hardcoded stub — real data at /market/exchange not linked (task 8aaed8ad, P95)
+  3. Homepage Feed tab: "Unable to load vehicles" error — listing_kind column issue in CursorHomepage.tsx (task 0139bb65, P93)
+- 10 additional UX issues filed (P68-P90):
+  - Search takes 11+ seconds, shows "0 results" while loading (task 6db748af, P90)
+  - Nav has no Search or Market links (task 99850151, P88)
+  - Search empty state blank (task a2e04f6a, P85)
+  - Search filters (Year/Price/Make) not rendering (task c774b1cd, P85)
+  - Investor offering gate shows no traction stats (task ac67d3b6, P82)
+  - No loading skeleton during search (task b9e49520, P78)
+  - No logo/wordmark in header (task 723ab790, P75)
+  - Mobile bottom nav missing Search/Market (task 96434c40, P72)
+  - Vehicle profile tab labels confusing Evidence/Facts/Commerce/Financials (task da638271, P70)
+  - Similar Sales section not wired/visible (task e0433594, P68)
+- All 13 tasks filed to agent_tasks as vp-platform, status=pending
+
+## 2026-02-27
+
 ### [market] Market Exchange, Fund Detail, Portfolio — comprehensive UX overhaul
 - **MarketDashboard** (/market): replaced "Coming Soon" placeholder with live data dashboard — real fund cards from api-v1-exchange, animated skeleton loading, platform AUM stats strip, CTAs
 - **MarketExchange** (/market/exchange): skeleton loading (4 animated cards), user-friendly error state with Refresh button (no raw error string), BETA badge properly styled, market cap formatted as $X.XXB/M/K, font sizes → CSS vars

@@ -78,7 +78,7 @@
 
 import { createServer } from 'http';
 import { readFileSync, writeFileSync } from 'fs';
-import { open } from 'child_process';
+import { exec } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -415,7 +415,6 @@ async function runSetup() {
 
   // Try to open browser
   try {
-    const { exec } = await import('child_process');
     exec(`open "${authUrl.toString()}"`);
     console.log('(Browser opened automatically)');
   } catch {
