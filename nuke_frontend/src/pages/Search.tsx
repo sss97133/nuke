@@ -1,23 +1,62 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import IntelligentSearch from '../components/search/IntelligentSearch';
 import SearchResults from '../components/search/SearchResults';
 import { aiGateway } from '../lib/aiGateway';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 import type { SearchResult } from '../types/search';
 import '../design-system.css';
 
+interface VehicleEnrichment {
+  sale_price: number | null;
+  mileage: number | null;
+  transmission: string | null;
+  is_for_sale: boolean | null;
+  city: string | null;
+  state: string | null;
+}
+
+interface VehicleFilters {
+  priceMin: string;
+  priceMax: string;
+  yearMin: string;
+  yearMax: string;
+  mileageMax: string;
+  transmission: string;
+  listingStatus: string;
+  showFilters: boolean;
+}
+
+const DEFAULT_FILTERS: VehicleFilters = {
+  priceMin: '',
+  priceMax: '',
+  yearMin: '',
+  yearMax: '',
+  mileageMax: '',
+  transmission: '',
+  listingStatus: '',
+  showFilters: false,
+};
+
 export default function Search() {
+  const navigate = useNavigate();
+  // useAuth reads from global AuthContext — synchronous for returning users
+  const { user: authUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [searchSummary, setSearchSummary] = useState('Enter a search query to find vehicles, organizations, parts, and more');
-  const [loading, setLoading] = useState(false);
+  const [searchSummary, setSearchSummary] = useState('');
+  const [loading, setLoading] = useState(() => Boolean(searchParams.get('q')));
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | undefined>(undefined);
   const [resultFilter, setResultFilter] = useState<
     'all' | 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'source'
   >('all');
   const resultsRef = useRef<HTMLDivElement | null>(null);
+
+  // Vehicle enrichment: price, mileage, transmission, for-sale status, location
+  const [vehicleEnrichment, setVehicleEnrichment] = useState<Map<string, VehicleEnrichment>>(new Map());
+  const [vFilters, setVFilters] = useState<VehicleFilters>(DEFAULT_FILTERS);
 
   const [answer, setAnswer] = useState<string>('');
   const [answerLoading, setAnswerLoading] = useState(false);
@@ -25,6 +64,57 @@ export default function Search() {
   const [answerSources, setAnswerSources] = useState<Array<{ title: string; href?: string }>>([]);
   const [answerRequestId, setAnswerRequestId] = useState(0);
   const [showWorkstation, setShowWorkstation] = useState(false);
+
+  // VIN search state
+  const [vinInput, setVinInput] = useState('');
+  const [vinSearching, setVinSearching] = useState(false);
+  const [vinResults, setVinResults] = useState<any[]>([]);
+  const [vinError, setVinError] = useState<string | null>(null);
+  const [showVinSearch, setShowVinSearch] = useState(false);
+
+  const handleVinSearch = useCallback(async (vin: string) => {
+    const v = vin.trim().toUpperCase();
+    if (!v || v.length < 5) {
+      setVinError('Enter at least 5 characters of the VIN');
+      return;
+    }
+    setVinSearching(true);
+    setVinError(null);
+    setVinResults([]);
+
+    try {
+      // Try exact/partial match in vehicles table directly
+      const isExact = v.length === 17;
+      let query = supabase
+        .from('vehicles')
+        .select('id, year, make, model, vin, color, mileage, primary_image_url, sale_price, discovery_url')
+        .eq('is_public', true);
+
+      if (isExact) {
+        query = query.ilike('vin', v);
+      } else {
+        query = query.ilike('vin', `%${v}%`);
+      }
+
+      const { data, error } = await query.limit(10);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        setVinError(`No vehicles found for VIN "${v}" in the Nuke database.`);
+      } else if (data.length === 1) {
+        // Direct navigation for exact single hit
+        navigate(`/vehicle/${data[0].id}`);
+        return;
+      } else {
+        setVinResults(data);
+      }
+    } catch (e: any) {
+      setVinError(e?.message || 'VIN lookup failed');
+    } finally {
+      setVinSearching(false);
+    }
+  }, [navigate]);
 
   const haversineMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371000;
@@ -100,13 +190,8 @@ export default function Search() {
     const wantsNearby = looksLikeNearbyCurationQuestion(trimmed) || looksLikeVibeQuestion(trimmed);
     const wantsVibe = looksLikeVibeQuestion(trimmed);
 
-    let currentUserId: string | null = null;
-    try {
-      const { data } = await supabase.auth.getUser();
-      currentUserId = data?.user?.id ?? null;
-    } catch {
-      currentUserId = null;
-    }
+    // Use user from global AuthContext — no extra getUser() call
+    const currentUserId: string | null = authUser?.id ?? null;
 
     if (wantsCount && currentUserId) {
       try {
@@ -157,6 +242,9 @@ export default function Search() {
           vq = vq
             .not('latitude', 'is', null)
             .not('longitude', 'is', null)
+            .not('year', 'is', null)
+            .not('make', 'is', null)
+            .not('model', 'is', null)
             .gte('latitude', lat - approxLatDelta)
             .lte('latitude', lat + approxLatDelta)
             .gte('longitude', lng - approxLngDelta)
@@ -385,6 +473,12 @@ export default function Search() {
     setSearchSummary(summary);
     setLoading(false);
     setResultFilter('all');
+    // Reset vehicle-specific filters when new search runs (keep showFilters state)
+    setVFilters(prev => ({ ...DEFAULT_FILTERS, showFilters: prev.showFilters }));
+    // Scroll to results
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
 
     const q = (searchParams.get('q') || searchQuery || '').trim();
     if (looksLikeQuestion(q)) {
@@ -396,6 +490,117 @@ export default function Search() {
       setAnswerSources([]);
     }
   };
+
+  // Fetch enrichment data (price, mileage, transmission, for-sale, location) for vehicle results
+  useEffect(() => {
+    const vehicleIds = results
+      .filter(r => r.type === 'vehicle')
+      .map(r => r.id);
+    if (vehicleIds.length === 0) {
+      setVehicleEnrichment(new Map());
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from('vehicles')
+      .select('id, sale_price, mileage, transmission, is_for_sale, city, state')
+      .in('id', vehicleIds)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const map = new Map<string, VehicleEnrichment>();
+        for (const row of data) {
+          map.set(row.id, {
+            sale_price: row.sale_price ?? null,
+            mileage: row.mileage ?? null,
+            transmission: row.transmission ?? null,
+            is_for_sale: row.is_for_sale ?? null,
+            city: row.city ?? null,
+            state: row.state ?? null,
+          });
+        }
+        setVehicleEnrichment(map);
+      });
+    return () => { cancelled = true; };
+  }, [results]);
+
+  // Merge enrichment into results and apply vehicle filters
+  const displayResults = useMemo(() => {
+    // Merge enrichment into vehicle result metadata — enrichment fills gaps, doesn't overwrite
+    const enriched = results.map(r => {
+      if (r.type !== 'vehicle') return r;
+      const e = vehicleEnrichment.get(r.id);
+      if (!e) return r;
+      const meta = (r.metadata || {}) as any;
+      return {
+        ...r,
+        metadata: {
+          ...meta,
+          // Only use enrichment values if the search result didn't already have them
+          sale_price: meta.sale_price ?? e.sale_price,
+          mileage: meta.mileage ?? e.mileage,
+          transmission: meta.transmission ?? e.transmission,
+          is_for_sale: meta.is_for_sale ?? e.is_for_sale,
+          city: meta.city ?? e.city,
+          state: meta.state ?? e.state,
+        }
+      } as SearchResult;
+    });
+
+    // Apply vehicle filters
+    const anyFilterActive =
+      vFilters.priceMin || vFilters.priceMax ||
+      vFilters.yearMin || vFilters.yearMax ||
+      vFilters.mileageMax || vFilters.transmission ||
+      vFilters.listingStatus;
+
+    if (!anyFilterActive) return enriched;
+
+    return enriched.filter(r => {
+      if (r.type !== 'vehicle') return true; // non-vehicle results pass through unfiltered
+      const e = r.metadata as any;
+
+      if (vFilters.priceMin) {
+        const min = parseInt(vFilters.priceMin, 10);
+        if (!isNaN(min) && (e.sale_price === null || e.sale_price === undefined || e.sale_price < min)) return false;
+      }
+      if (vFilters.priceMax) {
+        const max = parseInt(vFilters.priceMax, 10);
+        if (!isNaN(max) && e.sale_price !== null && e.sale_price !== undefined && e.sale_price > max) return false;
+      }
+      if (vFilters.yearMin) {
+        const min = parseInt(vFilters.yearMin, 10);
+        if (!isNaN(min) && (e.year === null || e.year === undefined || e.year < min)) return false;
+      }
+      if (vFilters.yearMax) {
+        const max = parseInt(vFilters.yearMax, 10);
+        if (!isNaN(max) && e.year !== null && e.year !== undefined && e.year > max) return false;
+      }
+      if (vFilters.mileageMax) {
+        const max = parseInt(vFilters.mileageMax, 10);
+        if (!isNaN(max) && e.mileage !== null && e.mileage !== undefined && e.mileage > max) return false;
+      }
+      if (vFilters.transmission) {
+        if (e.transmission === null || e.transmission === undefined) return false;
+        const t = String(e.transmission).toLowerCase();
+        if (vFilters.transmission === 'automatic' && !t.includes('auto')) return false;
+        if (vFilters.transmission === 'manual' && !(t.includes('manual') || t.includes('stick') || t.includes('6-speed') || t.includes('5-speed') || t.includes('4-speed') || t.includes('3-speed'))) return false;
+      }
+      if (vFilters.listingStatus) {
+        if (vFilters.listingStatus === 'for_sale' && !e.is_for_sale) return false;
+        if (vFilters.listingStatus === 'sold' && e.is_for_sale !== false) return false;
+      }
+      return true;
+    });
+  }, [results, vehicleEnrichment, vFilters]);
+
+  const activeFilterCount = [
+    vFilters.priceMin, vFilters.priceMax,
+    vFilters.yearMin, vFilters.yearMax,
+    vFilters.mileageMax, vFilters.transmission, vFilters.listingStatus
+  ].filter(Boolean).length;
+
+  const vehicleCount = results.filter(r => r.type === 'vehicle').length;
+  const displayVehicleCount = displayResults.filter(r => r.type === 'vehicle').length;
 
   const resultCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -469,13 +674,18 @@ export default function Search() {
     resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Sync searchQuery with URL parameter
+  // Sync searchQuery with URL parameter — set loading immediately when URL changes
   useEffect(() => {
     const urlQuery = searchParams.get('q') || '';
     if (urlQuery !== searchQuery) {
       setSearchQuery(urlQuery);
       if (urlQuery) {
         setLoading(true);
+        setSearchSummary('');
+      } else {
+        setLoading(false);
+        setResults([]);
+        setSearchSummary('');
       }
     }
   }, [searchParams]);
@@ -483,7 +693,7 @@ export default function Search() {
   return (
     <div style={{ padding: '12px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Search Input */}
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '16px' }}>
         <IntelligentSearch
           initialQuery={searchQuery}
           userLocation={userLocation}
@@ -491,111 +701,292 @@ export default function Search() {
         />
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{
-          padding: '12px 16px',
-          background: 'var(--surface)',
-          border: '2px solid #000',
-          borderRadius: '0px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-            <button
-              type="button"
-              onClick={() => setShowWorkstation((v) => !v)}
-              style={{
-                padding: '6px 10px',
-                fontSize: '8pt',
-                fontWeight: 700,
-                border: '2px solid #000',
-                background: '#fff',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
+      {/* VIN Search — only shown when explicitly toggled */}
+      <div style={{ marginBottom: showVinSearch ? '16px' : '8px' }}>
+        <button
+          type="button"
+          onClick={() => { setShowVinSearch(v => !v); setVinError(null); setVinResults([]); }}
+          style={{
+            padding: '3px 8px',
+            fontSize: '7.5pt',
+            fontWeight: 600,
+            border: '1px solid #ccc',
+            background: showVinSearch ? '#111' : 'transparent',
+            color: showVinSearch ? '#fff' : '#666',
+            cursor: 'pointer',
+            borderRadius: '2px',
+          }}
+        >
+          {showVinSearch ? 'Close VIN Lookup' : 'VIN Lookup'}
+        </button>
+
+        {showVinSearch && (
+          <div style={{
+            marginTop: '8px',
+            padding: '12px 16px',
+            background: 'var(--surface)',
+            border: '2px solid #000',
+          }}>
+            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px' }}>
+              Look up a vehicle by VIN (full 17-char or partial)
+            </div>
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleVinSearch(vinInput); }}
+              style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
             >
-              {showWorkstation ? 'Hide workstation' : 'Search workstation & quick links'}
-            </button>
-            {focusQuery && (
-              <button
-                type="button"
-                onClick={() => jumpToFilter('all')}
+              <input
+                type="text"
+                value={vinInput}
+                onChange={(e) => setVinInput(e.target.value.toUpperCase())}
+                placeholder="e.g. WP0AA2A95ES123456"
+                maxLength={17}
                 style={{
-                  padding: '4px 8px',
+                  flex: 1,
+                  padding: '8px 10px',
+                  fontSize: '10pt',
+                  fontFamily: 'monospace',
+                  border: '2px solid #000',
+                  background: '#fff',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase'
+                }}
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={vinSearching}
+                style={{
+                  padding: '8px 16px',
                   fontSize: '8pt',
                   fontWeight: 700,
                   border: '2px solid #000',
-                  background: '#fff',
-                  cursor: 'pointer'
+                  background: '#000',
+                  color: '#fff',
+                  cursor: vinSearching ? 'wait' : 'pointer'
                 }}
               >
-                View all results
+                {vinSearching ? 'Searching...' : 'Look up'}
               </button>
+            </form>
+            <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px' }}>
+              VIN characters: A–H, J–N, P, R–Z, 0–9 (no I, O, Q)
+            </div>
+
+            {vinError && (
+              <div style={{ marginTop: '10px', padding: '8px 12px', background: '#fff3f3', border: '1px solid #f00', fontSize: '8pt' }}>
+                {vinError}
+              </div>
+            )}
+
+            {vinResults.length > 1 && (
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px' }}>
+                  {vinResults.length} vehicles matched — click to view
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {vinResults.map((v) => (
+                    <a
+                      key={v.id}
+                      href={`/vehicle/${v.id}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '8px 10px',
+                        border: '1px solid var(--border)',
+                        background: '#fff',
+                        textDecoration: 'none',
+                        color: '#000'
+                      }}
+                    >
+                      {v.primary_image_url && (
+                        <img
+                          src={v.primary_image_url}
+                          alt=""
+                          style={{ width: 56, height: 42, objectFit: 'cover', border: '1px solid var(--border)', flexShrink: 0 }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontSize: '9pt', fontWeight: 700 }}>
+                          {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown vehicle'}
+                        </div>
+                        <div style={{ fontSize: '8pt', fontFamily: 'monospace', color: '#666' }}>{v.vin || '—'}</div>
+                        {v.color && <div style={{ fontSize: '7pt', color: '#999' }}>{v.color}{v.mileage ? ` · ${v.mileage.toLocaleString()} mi` : ''}</div>}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-          {showWorkstation && (
-            <>
-              <div style={{ fontSize: '8pt', color: '#666', marginTop: '8px', marginBottom: '12px' }}>
-                {focusQuery ? `Focus: ${focusQuery}` : 'Start with a brand, model, or intent'}
+        )}
+      </div>
+
+      {/* Vehicle Filters Panel */}
+      {vehicleCount > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{
+            padding: '10px 14px',
+            background: 'var(--surface)',
+            border: '2px solid #000',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setVFilters(prev => ({ ...prev, showFilters: !prev.showFilters }))}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '8pt',
+                    fontWeight: 700,
+                    border: '2px solid #000',
+                    background: vFilters.showFilters ? '#000' : '#fff',
+                    color: vFilters.showFilters ? '#fff' : '#000',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </button>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setVFilters(prev => ({ ...DEFAULT_FILTERS, showFilters: prev.showFilters }))}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '7pt',
+                      fontWeight: 700,
+                      border: '1px solid #999',
+                      background: '#fff',
+                      color: '#666',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Clear all
+                  </button>
+                )}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-                {workspaceSections.map((section) => (
-                  <div key={section.title} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
-                    <div style={{ fontSize: '9pt', fontWeight: 700 }}>{section.title}</div>
-                    <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px' }}>{section.helper}</div>
-                    <div style={{ display: 'grid', gap: '6px' }}>
-                      {section.actions.map((action) => (
-                        <a
-                          key={action.label}
-                          href={action.href}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: '8px',
-                            textDecoration: 'none',
-                            color: '#000',
-                            border: '1px solid var(--border)',
-                            padding: '6px 8px',
-                            background: 'var(--surface)'
-                          }}
-                        >
-                          <span style={{ fontSize: '8pt', fontWeight: 600 }}>{action.label}</span>
-                          {typeof action.badge === 'number' && action.badge > 0 && (
-                            <span style={{ fontSize: '7pt', color: '#666' }}>{action.badge}</span>
-                          )}
-                        </a>
-                      ))}
-                    </div>
+              <div style={{ fontSize: '8pt', color: '#666' }}>
+                {activeFilterCount > 0
+                  ? `${displayVehicleCount} of ${vehicleCount} vehicles match filters`
+                  : `${vehicleCount} vehicle${vehicleCount === 1 ? '' : 's'}`
+                }
+              </div>
+            </div>
+
+            {vFilters.showFilters && (
+              <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }}>
+
+                {/* Price range */}
+                <div>
+                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price ($)</div>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={vFilters.priceMin}
+                      onChange={e => setVFilters(prev => ({ ...prev, priceMin: e.target.value }))}
+                      style={{ width: '80px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                      min={0}
+                    />
+                    <span style={{ fontSize: '8pt', color: '#999' }}>–</span>
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={vFilters.priceMax}
+                      onChange={e => setVFilters(prev => ({ ...prev, priceMax: e.target.value }))}
+                      style={{ width: '80px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                      min={0}
+                    />
                   </div>
-                ))}
-              </div>
-              {focusQuery && (
-                <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '6px' }}>Jump to a lane</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {laneFilters.filter((lane) => lane.count > 0).map((lane) => (
+                </div>
+
+                {/* Year range */}
+                <div>
+                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Year</div>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      placeholder="From"
+                      value={vFilters.yearMin}
+                      onChange={e => setVFilters(prev => ({ ...prev, yearMin: e.target.value }))}
+                      style={{ width: '68px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                      min={1886}
+                      max={new Date().getFullYear() + 2}
+                    />
+                    <span style={{ fontSize: '8pt', color: '#999' }}>–</span>
+                    <input
+                      type="number"
+                      placeholder="To"
+                      value={vFilters.yearMax}
+                      onChange={e => setVFilters(prev => ({ ...prev, yearMax: e.target.value }))}
+                      style={{ width: '68px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                      min={1886}
+                      max={new Date().getFullYear() + 2}
+                    />
+                  </div>
+                </div>
+
+                {/* Mileage max */}
+                <div>
+                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Max Mileage</div>
+                  <input
+                    type="number"
+                    placeholder="e.g. 50000"
+                    value={vFilters.mileageMax}
+                    onChange={e => setVFilters(prev => ({ ...prev, mileageMax: e.target.value }))}
+                    style={{ width: '100px', padding: '4px 6px', fontSize: '8pt', border: '2px solid #000', background: '#fff' }}
+                    min={0}
+                  />
+                </div>
+
+                {/* Transmission */}
+                <div>
+                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Transmission</div>
+                  <select
+                    value={vFilters.transmission}
+                    onChange={e => setVFilters(prev => ({ ...prev, transmission: e.target.value }))}
+                    style={{ padding: '4px 8px', fontSize: '8pt', border: '2px solid #000', background: '#fff', cursor: 'pointer' }}
+                  >
+                    <option value="">Any</option>
+                    <option value="automatic">Automatic</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </div>
+
+                {/* For sale / sold */}
+                <div>
+                  <div style={{ fontSize: '7pt', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {[
+                      { val: '', label: 'All' },
+                      { val: 'for_sale', label: 'For Sale' },
+                      { val: 'sold', label: 'Sold' },
+                    ].map(opt => (
                       <button
-                        key={lane.key}
+                        key={opt.val}
                         type="button"
-                        onClick={() => jumpToFilter(lane.key as typeof resultFilter)}
+                        onClick={() => setVFilters(prev => ({ ...prev, listingStatus: opt.val }))}
                         style={{
                           padding: '4px 8px',
                           fontSize: '8pt',
                           fontWeight: 700,
                           border: '2px solid #000',
-                          background: '#fff',
-                          cursor: 'pointer'
+                          background: vFilters.listingStatus === opt.val ? '#000' : '#fff',
+                          color: vFilters.listingStatus === opt.val ? '#fff' : '#000',
+                          cursor: 'pointer',
                         }}
                       >
-                        {lane.label} · {lane.count}
+                        {opt.label}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
-            </>
-          )}
+
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {searchQuery && looksLikeQuestion(searchQuery) && (answerLoading || answer || answerError) && (
         <div style={{ marginBottom: '24px' }}>
@@ -636,31 +1027,138 @@ export default function Search() {
         </div>
       )}
 
-        {/* Loading State */}
-        {loading && (
-          <div style={{
-            textAlign: 'center',
-            padding: '24px',
-            background: 'var(--grey-50)',
-            border: '1px solid var(--border)',
-            borderRadius: '0px',
-            fontSize: '8pt'
-          }}>
-            <h3 className="heading-3" style={{ fontSize: '9pt', marginBottom: '8px' }}>Searching...</h3>
-            <p className="text text-muted" style={{ fontSize: '8pt' }}>Finding results for "{searchQuery}"</p>
-          </div>
-        )}
-
-      {/* Results - Always show if there's a query or results */}
+      {/* Results - shown when there's a query */}
       {searchQuery && (
         <div ref={resultsRef}>
           <SearchResults
-            results={results}
+            results={displayResults}
             searchSummary={searchSummary}
             loading={loading}
             activeFilter={resultFilter}
             onFilterChange={setResultFilter}
           />
+        </div>
+      )}
+
+      {/* No-query empty state */}
+      {!searchQuery && !loading && (
+        <div style={{
+          textAlign: 'center',
+          padding: '64px 24px',
+          color: '#999',
+        }}>
+          <div style={{ fontSize: '32pt', marginBottom: '12px', opacity: 0.3 }}>N</div>
+          <div style={{ fontSize: '10pt', fontWeight: 700, color: '#555', marginBottom: '8px' }}>
+            Search Nuke
+          </div>
+          <div style={{ fontSize: '9pt', color: '#888', marginBottom: '24px' }}>
+            Find vehicles, organizations, people, and more
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '480px', margin: '0 auto' }}>
+            {['Porsche 911', '1967 Mustang', 'LS swap', 'Barn find', 'Ferrari'].map(term => (
+              <a
+                key={term}
+                href={`/search?q=${encodeURIComponent(term)}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '8pt',
+                  fontWeight: 600,
+                  border: '2px solid #e5e7eb',
+                  background: '#fff',
+                  color: '#444',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#000'; e.currentTarget.style.color = '#000'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = '#444'; }}
+              >
+                {term}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Workstation / quick links — only shown on demand, at bottom */}
+      {(results.length > 0 || searchQuery) && (
+        <div style={{ marginTop: '32px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+          <button
+            type="button"
+            onClick={() => setShowWorkstation((v) => !v)}
+            style={{
+              padding: '4px 8px',
+              fontSize: '7.5pt',
+              fontWeight: 600,
+              border: '1px solid #ccc',
+              background: 'transparent',
+              color: '#666',
+              cursor: 'pointer',
+              borderRadius: '2px',
+            }}
+          >
+            {showWorkstation ? 'Hide quick links' : 'Quick links & workspace'}
+          </button>
+
+          {showWorkstation && (
+            <div style={{ marginTop: '12px' }}>
+              {focusQuery && laneFilters.filter(l => l.count > 0).length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '7.5pt', fontWeight: 700, color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Jump to lane</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {laneFilters.filter((lane) => lane.count > 0).map((lane) => (
+                      <button
+                        key={lane.key}
+                        type="button"
+                        onClick={() => jumpToFilter(lane.key as typeof resultFilter)}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '8pt',
+                          fontWeight: 700,
+                          border: '2px solid #000',
+                          background: '#fff',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {lane.label} · {lane.count}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                {workspaceSections.map((section) => (
+                  <div key={section.title} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
+                    <div style={{ fontSize: '9pt', fontWeight: 700 }}>{section.title}</div>
+                    <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px' }}>{section.helper}</div>
+                    <div style={{ display: 'grid', gap: '6px' }}>
+                      {section.actions.map((action) => (
+                        <a
+                          key={action.label}
+                          href={action.href}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                            textDecoration: 'none',
+                            color: '#000',
+                            border: '1px solid var(--border)',
+                            padding: '6px 8px',
+                            background: 'var(--surface)'
+                          }}
+                        >
+                          <span style={{ fontSize: '8pt', fontWeight: 600 }}>{action.label}</span>
+                          {typeof action.badge === 'number' && action.badge > 0 && (
+                            <span style={{ fontSize: '7pt', color: '#666' }}>{action.badge}</span>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

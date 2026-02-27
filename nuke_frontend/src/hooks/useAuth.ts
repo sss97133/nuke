@@ -1,33 +1,37 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+/**
+ * useAuth — Auth hook backed by the global AuthContext.
+ *
+ * Reads from the single cached auth state initialised at app boot.
+ * Zero additional network calls. Components that previously called
+ * `supabase.auth.getSession()` directly on mount should use this instead.
+ *
+ * If this hook is used outside an <AuthProvider> it falls back gracefully
+ * to the legacy behaviour (reads localStorage + async getSession).
+ */
+
+import { useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext';
 
 export interface AuthUser {
   id: string;
   email?: string;
-  user_metadata?: any;
+  user_metadata?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export const useAuth = () => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const ctx = useContext(AuthContext);
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user || null);
-        setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  return { user, loading };
+  return {
+    /** The authenticated user, or null when logged out / not yet resolved. */
+    user: ctx.user as AuthUser | null,
+    /** The full Supabase session object. */
+    session: ctx.session,
+    /**
+     * True only while the first auth check is in-flight for a visitor with
+     * no cached session (new user / incognito). For returning users this is
+     * false on the very first render.
+     */
+    loading: ctx.loading,
+  };
 };

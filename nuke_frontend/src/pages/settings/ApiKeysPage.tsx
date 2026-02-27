@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getSupabaseFunctionsUrl } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ApiKey {
   id: string;
@@ -37,7 +38,9 @@ interface NewKey {
 
 export default function ApiKeysPage() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  // useAuth reads from global AuthContext — synchronous for returning users
+  const { session, loading: authLoading } = useAuth();
+  const [loading, setLoading] = useState(!session);
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
@@ -48,21 +51,26 @@ export default function ApiKeysPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!session) {
+      navigate('/login');
+      return;
+    }
     loadKeys();
-  }, []);
+  }, [session, authLoading]);
 
   const loadKeys = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const token = session?.access_token;
+      if (!token) {
         navigate('/login');
         return;
       }
 
       const response = await fetch(`${getSupabaseFunctionsUrl()}/api-keys-manage`, {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -81,13 +89,13 @@ export default function ApiKeysPage() {
     setCreating(true);
     setError('');
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const token = session?.access_token;
+      if (!token) return;
 
       const response = await fetch(`${getSupabaseFunctionsUrl()}/api-keys-manage`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -119,13 +127,13 @@ export default function ApiKeysPage() {
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const token = session?.access_token;
+      if (!token) return;
 
       await fetch(`${getSupabaseFunctionsUrl()}/api-keys-manage/${keyId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 

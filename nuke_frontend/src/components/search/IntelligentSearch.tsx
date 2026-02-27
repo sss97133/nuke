@@ -1877,18 +1877,46 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
               setSelectedSuggestionIndex(-1);
             }}
             onKeyDown={handleKeyDown}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            onFocus={(e) => { setShowSuggestions(true); e.currentTarget.style.borderColor = '#3b82f6'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#000'; setTimeout(() => setShowSuggestions(false), 200); }}
             style={{
-              fontSize: '9pt',
-              padding: queryIsUrl ? '4px 50px 4px 24px' : '4px 50px 4px 8px', // Extra left padding when URL detected
-              background: 'var(--white)',
-              border: '2px solid var(--border)',
+              fontSize: '10pt',
+              padding: queryIsUrl ? '10px 68px 10px 28px' : '10px 68px 10px 14px',
+              background: '#fff',
+              border: '2px solid #000',
               borderRadius: '0px',
-              fontFamily: '"MS Sans Serif", sans-serif',
-              transition: 'all 0.12s ease'
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              transition: 'border-color 0.1s ease',
+              width: '100%',
+              boxSizing: 'border-box',
+              outline: 'none',
             }}
           />
+
+          {/* Clear button — show when there's input */}
+          {query && !isSearching && (
+            <button
+              type="button"
+              onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}
+              style={{
+                position: 'absolute',
+                right: '52px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                padding: '2px 6px',
+                fontSize: '10pt',
+                lineHeight: 1,
+                border: 'none',
+                background: 'transparent',
+                color: '#9ca3af',
+                cursor: 'pointer',
+              }}
+              tabIndex={-1}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
 
           <button
             type="submit"
@@ -1898,20 +1926,26 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
               handleSubmit(e);
             }}
             disabled={isSearching}
-            className="button-win95"
             style={{
               position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              padding: '2px 8px',
-              fontSize: '8pt',
-              height: '20px',
-              minWidth: '40px',
-              cursor: isSearching ? 'not-allowed' : 'pointer'
+              right: '0',
+              top: '0',
+              bottom: '0',
+              padding: '0 16px',
+              fontSize: '8.5pt',
+              fontWeight: 700,
+              border: 'none',
+              borderLeft: '2px solid #000',
+              background: isSearching ? '#333' : '#000',
+              color: '#fff',
+              cursor: isSearching ? 'not-allowed' : 'pointer',
+              letterSpacing: '0.5px',
+              transition: 'background 0.1s ease',
             }}
+            onMouseEnter={(e) => { if (!isSearching) e.currentTarget.style.background = '#222'; }}
+            onMouseLeave={(e) => { if (!isSearching) e.currentTarget.style.background = '#000'; }}
           >
-            {isSearching ? '...' : 'GO'}
+            {isSearching ? '...' : 'Search'}
           </button>
         </div>
       </form>

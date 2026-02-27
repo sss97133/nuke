@@ -1574,16 +1574,25 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           overflow: 'hidden',
           textDecoration: 'none',
           color: 'inherit',
-          transition: 'all 0.12s ease',
-          marginBottom: '8px',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          marginBottom: '0px',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-3px)';
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.18)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
         }}
       >
         {/* Image preview with overlays */}
         <div
           style={{
             width: '100%',
-            height: '220px',
-            backgroundColor: '#000',
+            height: '200px',
+            backgroundColor: '#1a1a1a',
             position: 'relative',
           }}
         >

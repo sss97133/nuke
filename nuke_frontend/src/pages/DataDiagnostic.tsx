@@ -1,36 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 import ImageTrackingBackfill from '../components/ImageTrackingBackfill';
 
 const DataDiagnostic: React.FC = () => {
-  const [session, setSession] = useState<any>(null);
+  // useAuth reads from global AuthContext — no getSession() call
+  const { session } = useAuth();
   const [localVehicles, setLocalVehicles] = useState<any[]>([]);
   const [supabaseVehicles, setSupabaseVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkEverything();
-  }, []);
+  }, [session]);
 
   const checkEverything = async () => {
     setLoading(true);
-    
-    // Check authentication
-    const { data: { session } } = await supabase.auth.getSession();
-    setSession(session);
-    
+
     // Check localStorage
     const localData = JSON.parse(localStorage.getItem('anonymousVehicles') || '[]');
     setLocalVehicles(localData);
-    
+
     // Check Supabase (if authenticated)
-    if (session) {
+    if (session?.user?.id) {
       try {
         const { data, error } = await supabase
           .from('vehicles')
           .select('*')
           .eq('user_id', session.user.id);
-        
+
         if (!error) {
           setSupabaseVehicles(data || []);
         }
@@ -38,7 +36,7 @@ const DataDiagnostic: React.FC = () => {
         console.error('Error loading Supabase vehicles:', error);
       }
     }
-    
+
     setLoading(false);
   };
 
