@@ -19,6 +19,23 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
+### Key Guardian Setup — COMPLETED 2026-02-27
+- gitleaks installed (v8.30.0), .gitleaks.toml config created
+- .claude/agents/key-guardian/CLAUDE.md persona created
+- scripts/key-audit.sh daily audit script built and tested
+- Pre-commit hook updated to run gitleaks protect --staged first
+- key-guardian registered in agent_registry + agent_tasks (daily audit task 0e8b5ca1, P95)
+- FOUNDER_EMAIL set in Supabase secrets for real email delivery
+- First audit ran: ACTION REQUIRED (2 unrotated keys in .env)
+- Confirmation email sent (Resend ID: 130dbf6b)
+- Committed cf0b94722, pushed to main
+- REMOVED: session complete
+
+### Frontend Worker — TeamInbox Gmail-style 3-pane Redesign — 2026-02-27
+- Task: Full visual redesign of TeamInbox.tsx (3-pane layout, design system tokens)
+- Files: nuke_frontend/src/pages/TeamInbox.tsx ONLY
+- Preserving all logic, replacing JSX/styles only
+
 ### Stripe Connect Agent — COMPLETED 2026-02-27
 - All done. See DONE.md for details. Commit 5528063ab, pushed to main.
 - REMOVED: session complete
@@ -306,3 +323,8 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 ### Frontend Worker — Org Profile + Offering Page UX — COMPLETED 2026-02-27
 - Commit d24aa0ad0 pushed to main, Vercel deploying
 - Fixed: offering gate landing page, org profile alerts→toasts, loading skeleton, business-docs visibility, verification badge, competitors CTA
+
+### CFO/Security Officer — Stripe Connect Security Audit — COMPLETED 2026-02-27
+- 4 Critical + 4 High issues found and fixed. Commit 8ec743ad9 deployed.
+- Email report sent to founder via agent-email. See DONE.md for full details.
+- REMOVED: session complete

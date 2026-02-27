@@ -5,6 +5,34 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [security] Key Guardian — automated secret scanning + daily audits — commit cf0b94722
+- gitleaks v8.30.0 installed locally (brew)
+- .gitleaks.toml: catches Stripe (sk_/rk_/whsec_), Google/Gemini (AIza*), Resend (re_*), Supabase JWT, Twilio (32-char hex, entropy 3.5), Modal (ak-*); allowlists .env.vault, node_modules, placeholders
+- .claude/agents/key-guardian/CLAUDE.md: full agent persona — startup ritual, rotation workflow, tool inventory, known-compromised key table
+- scripts/key-audit.sh: daily bash audit — gitleaks detect on last 50 commits + working tree, checks .env for known-bad keys, emails founder via agent-email → Resend
+- .git/hooks/pre-commit: prepended gitleaks protect --staged before existing TypeScript check — blocks commit with actionable message if secrets found
+- DB: key-guardian registered in agent_registry; daily audit task inserted in agent_tasks (id=0e8b5ca1, P95)
+- FOUNDER_EMAIL=toymachine91@gmail.com set in Supabase secrets (required for agent-email → real email delivery)
+- First audit ran: ACTION REQUIRED — 2 unrotated known-bad keys in .env (Gemini + Stripe webhook)
+- Activation email sent to founder (Resend ID: 130dbf6b)
+- Pre-commit hook verified working: ran gitleaks on setup commit, passed clean
+
+### [security] Stripe Connect Security Audit + Hardening — commit 8ec743ad9
+- Audited all 7 Stripe Connect surfaces: 4 edge functions + 2 frontend pages + 1 migration
+- Found and fixed 4 CRITICAL issues:
+  - stripe-connect-account: Added JWT auth guard on all actions (was fully unauthenticated)
+  - stripe-connect-products: Added JWT auth + ownership check on POST/create
+  - stripe-connect-checkout: Fixed application fee bypass — fee now computed from Stripe-authoritative price (not client-supplied priceInCents)
+  - stripe-connect-checkout: Added JWT auth guard on subscription + billing_portal actions
+- Found and fixed 4 HIGH issues:
+  - CORS: All 4 functions restricted from Access-Control-Allow-Origin: * to https://nuke.ag
+  - IDOR: Added ownership checks on get_link + status actions in stripe-connect-account
+  - Data minimization: stripe-connect-account status no longer returns full Stripe account object
+  - RLS: stripe_subscriptions had RLS enabled but zero policies — added SELECT policy via stripe_connect_accounts FK join
+- 4 MEDIUM issues documented, pending founder action (STRIPE_WEBHOOK_SECRET verification, slug URLs, API version pin, rate limiting)
+- Sent audit report to founder via agent-email (Resend message_id: b1486a50-534d-40ea-baf0-9cd137f942a1)
+- All 4 functions deployed to Supabase, committed + pushed to main
+
 ### [stripe] Full Stripe Connect Integration — commit 5528063ab
 - stripe-connect-account edge function: create V2 connected accounts, onboarding links, live status check
 - stripe-connect-products edge function: create products on connected accounts, list with expanded prices
