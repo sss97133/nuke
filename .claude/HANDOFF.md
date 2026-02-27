@@ -1,7 +1,8 @@
-# Auto-Checkpoint — 2026-02-27 07:49:23
+# Auto-Checkpoint — 2026-02-27 07:49:51
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
+94d663e42 chore: Resend inbound audit complete — email body fix + alerts routing
 90082cb51 chore: update DONE.md for global UX polish + typography pass
 015843569 chore: update ACTIVE_AGENTS + DONE for global UX pass 2 session
 74bc77d1c chore: update coordination files + admin-apply-crons function
@@ -25,8 +26,8 @@ d24aa0ad0 fix(pages): org profile + offering page UX improvements
 a5ebb07b8 fix(ux): global navigation, homepage, mobile, loading states polish
 
 ## Uncommitted Changes
-DONE.md
 mcp-server
+supabase/functions/admin-apply-crons/index.ts
 
 ## Staged
 none
