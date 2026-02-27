@@ -74,6 +74,9 @@ const ApiLanding = React.lazy(() => import('../pages/ApiLanding'));
 const DeveloperSignup = React.lazy(() => import('../pages/DeveloperSignup'));
 const DeveloperDashboard = React.lazy(() => import('../pages/DeveloperDashboard'));
 
+// Transfer party page (buyer/seller, no auth required)
+const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'));
+
 // Stripe Connect
 const StripeConnect = React.lazy(() => import('../pages/StripeConnect'));
 const StripeConnectStore = React.lazy(() => import('../pages/StripeConnectStore'));
@@ -195,6 +198,9 @@ export const DomainRoutes = () => {
         <Route path="/map" element={<Navigate to="/?tab=map" replace />} />
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
+
+        {/* Transfer party page — public, token-accessible */}
+        <Route path="/t/:transferId" element={<TransferPartyPage />} />
 
         {/* Stripe Connect */}
         <Route path="/stripe-connect" element={<StripeConnect />} />
