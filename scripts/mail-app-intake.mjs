@@ -87,16 +87,35 @@ function getAlertEmails() {
 
 // ─── Find .emlx file on disk ────────────────────────────────────────────────
 
-function findEmlxFile(rowid) {
+// Build a lookup index once instead of running `find` per email
+let emlxIndex = null;
+
+function buildEmlxIndex() {
+  if (emlxIndex) return emlxIndex;
+  console.log('Building .emlx file index (one-time)...');
   try {
     const result = execSync(
-      `find "${MAIL_BASE}" -name "${rowid}.emlx" 2>/dev/null | head -1`,
-      { encoding: 'utf-8', timeout: 5000 }
-    ).trim();
-    return result || null;
-  } catch {
-    return null;
+      `find "${MAIL_BASE}" -name "*.emlx" 2>/dev/null`,
+      { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024, timeout: 60000 }
+    );
+    emlxIndex = new Map();
+    for (const line of result.trim().split('\n')) {
+      if (!line) continue;
+      const basename = line.split('/').pop().replace('.emlx', '');
+      emlxIndex.set(basename, line);
+    }
+    console.log(`Indexed ${emlxIndex.size} .emlx files`);
+    return emlxIndex;
+  } catch (err) {
+    console.error('Failed to build emlx index:', err.message);
+    emlxIndex = new Map();
+    return emlxIndex;
   }
+}
+
+function findEmlxFile(rowid) {
+  const index = buildEmlxIndex();
+  return index.get(rowid) || null;
 }
 
 // ─── Extract URLs from .emlx file content ───────────────────────────────────
