@@ -5,6 +5,26 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [frontend] Search + Discovery + Vehicle Cards UX overhaul — committed in 05000c396
+- **Loading state**: `loading` initializes `true` when URL has `?q=` param → skeleton shows immediately on page load (not blank)
+- **Search summary**: Default changed from stale "Enter a search query..." to empty string → no ghost text after results load
+- **Skeleton shimmer**: SearchResults loading state replaced spinner-in-box with animated shimmer card grid (6 cards, `skeleton-shimmer` keyframe)
+- **Empty state** (no query): Replaced blank page with popular search suggestion links grid
+- **Empty state** (no results): Removed emoji, clean "No results for X" + popular search links
+- **VIN Lookup**: Demoted from prominent button to small 7.5pt secondary link, collapsed by default
+- **Workstation panel**: Removed from between search/results (was blocking flow), moved to collapsible section at page bottom
+- **Search input**: Larger padding (10px), blue focus ring, "Search" button (was "GO") full-height black fill flush right
+- **Clear button** (×): Added to search input between text and Search button
+- **Type filter pills**: Compact black/white toggle style replaces verbose icon+count+label buttons
+- **Controls bar**: Removed redundant Filter type dropdown, simplified to Grid/List + Sort
+- **Card hover**: Gallery mode cards get `translateY(-3px)` lift + `box-shadow` on hover
+- **Enrichment merge fix**: Used nullish coalescing (`??`) instead of spread (was overwriting valid data with nulls)
+- **Edge function** (`supabase/functions/search/index.ts`): `vehicleMetaById` select expanded to include `sale_price, asking_price, mileage, transmission, vin` — metadata now flows through to tier calculation
+- **Edge function fix**: Removed non-existent `image_count, event_count` columns from select (were causing silent query failure → no metadata); replaced with `vehicleImageById` presence check
+- Deployed: `supabase functions deploy search --no-verify-jwt` ✓
+- TypeScript: clean (`npx tsc --noEmit`)
+- Search verified: 10 results for "porsche" with sale_price + mileage in metadata
+
 ### [vp-orgs] Org cron gap fix — 3 missing crons added, 2 functions deployed
 - **classic-seller-queue-worker** (job 264, `*/5 * * * *`): drains `classic_seller_queue`; 109 items were stuck with 5 failed attempts since Dec 2025. Root cause: `index-classic-com-dealer` was not deployed. Fixed: redeployed both functions, reset 109 items to pending, cron draining now (8 completed in first batch).
 - **ecr-collection-inventory-refresh** (job 262, `0 3 * * *`): refreshes ECR collection inventory; was 45 days stale. 1,831 collections, 142 never synced.
