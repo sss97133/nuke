@@ -6,17 +6,35 @@
  *   POST { action: "subscription", accountId, priceId }
  *     — subscription checkout on connected account
  *   POST { action: "billing_portal", accountId }
- *     — billing portal session for connected account
+ *     — billing portal session for connected account (auth required)
+ *
+ * SECURITY:
+ *   - "direct_charge" is intentionally available without auth (public storefront checkout).
+ *     application_fee_amount is computed server-side from the STRIPE PRICE (not client-supplied amount).
+ *   - "subscription" and "billing_portal" require authentication.
+ *   - All actions: priceInCents from the client is ONLY used for the fee calculation as a
+ *     HINT — we re-fetch the price from Stripe to get the authoritative amount.
  */
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import Stripe from 'https://esm.sh/stripe@17?target=deno'
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-// TODO: set STRIPE_WEBHOOK_SECRET in Supabase secrets
-
+// CORS: restrict to nuke.ag origin only
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://nuke.ag',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Validate that a success/cancel URL is within our own domain to prevent open redirect
+function validateReturnUrl(url: string, baseUrl: string): boolean {
+  try {
+    const parsed = new URL(url)
+    const base = new URL(baseUrl)
+    return parsed.hostname === base.hostname || parsed.hostname === 'nuke.ag'
+  } catch {
+    return false
+  }
 }
 
 Deno.serve(async (req) => {
@@ -32,15 +50,54 @@ Deno.serve(async (req) => {
     const stripeClient = new Stripe(stripeSecretKey)
 
     const body = await req.json()
-    const { action, accountId, priceId, priceInCents } = body
+    const { action, accountId, priceId } = body
 
     const baseUrl = Deno.env.get('FRONTEND_URL') || 'https://nuke.ag'
 
     if (action === 'direct_charge') {
-      // Direct charge with 5% platform application fee
-      if (!accountId || !priceId || priceInCents == null) {
+      // Public storefront checkout — no auth required.
+      // application_fee_amount is computed from the AUTHORITATIVE Stripe price,
+      // never from the client-supplied priceInCents.
+      if (!accountId || !priceId) {
         return new Response(
-          JSON.stringify({ error: 'accountId, priceId, and priceInCents are required' }),
+          JSON.stringify({ error: 'accountId and priceId are required' }),
+          { status: 400, headers: { 'content-type': 'application/json', ...corsHeaders } }
+        )
+      }
+
+      // Validate accountId format
+      if (!/^acct_[a-zA-Z0-9]+$/.test(accountId)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid accountId format' }),
+          { status: 400, headers: { 'content-type': 'application/json', ...corsHeaders } }
+        )
+      }
+
+      // Validate priceId format
+      if (!/^price_[a-zA-Z0-9]+$/.test(priceId)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid priceId format' }),
+          { status: 400, headers: { 'content-type': 'application/json', ...corsHeaders } }
+        )
+      }
+
+      // Fetch authoritative price from Stripe — never trust client-supplied amounts for fee calculation
+      const stripePrice = await stripeClient.prices.retrieve(priceId, {}, { stripeAccount: accountId })
+      const authoritativeAmount = stripePrice.unit_amount
+      if (!authoritativeAmount || authoritativeAmount <= 0) {
+        return new Response(
+          JSON.stringify({ error: 'Could not determine price amount from Stripe' }),
+          { status: 400, headers: { 'content-type': 'application/json', ...corsHeaders } }
+        )
+      }
+
+      // Build safe redirect URLs — both go to nuke.ag, accountId embedded for session context
+      const successUrl = `${baseUrl}/stripe-connect/store/${encodeURIComponent(accountId)}?success=true&session_id={CHECKOUT_SESSION_ID}`
+      const cancelUrl = `${baseUrl}/stripe-connect/store/${encodeURIComponent(accountId)}`
+
+      if (!validateReturnUrl(successUrl, baseUrl) || !validateReturnUrl(cancelUrl, baseUrl)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid redirect URL' }),
           { status: 400, headers: { 'content-type': 'application/json', ...corsHeaders } }
         )
       }
@@ -49,11 +106,11 @@ Deno.serve(async (req) => {
         {
           line_items: [{ price: priceId, quantity: 1 }],
           payment_intent_data: {
-            application_fee_amount: Math.round(priceInCents * 0.05), // 5% platform fee
+            application_fee_amount: Math.round(authoritativeAmount * 0.05), // 5% platform fee — computed from Stripe's authoritative price
           },
           mode: 'payment',
-          success_url: `${baseUrl}/stripe-connect/store/${accountId}?success=true&session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${baseUrl}/stripe-connect/store/${accountId}`,
+          success_url: successUrl,
+          cancel_url: cancelUrl,
         },
         { stripeAccount: accountId }
       )
@@ -61,6 +118,30 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ url: session.url, session_id: session.id }),
         { headers: { 'content-type': 'application/json', ...corsHeaders } }
+      )
+    }
+
+    // "subscription" and "billing_portal" require authentication
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')!
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')!
+
+    const authHeader = req.headers.get('Authorization') || ''
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { 'content-type': 'application/json', ...corsHeaders } }
+      )
+    }
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
+    const { data: { user }, error: authError } = await userClient.auth.getUser()
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required — invalid or expired token' }),
+        { status: 401, headers: { 'content-type': 'application/json', ...corsHeaders } }
       )
     }
 
@@ -114,9 +195,9 @@ Deno.serve(async (req) => {
       { status: 400, headers: { 'content-type': 'application/json', ...corsHeaders } }
     )
   } catch (error: any) {
-    console.error('[stripe-connect-checkout] error:', error)
+    console.error('[stripe-connect-checkout] error:', error?.message || String(error))
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'content-type': 'application/json', ...corsHeaders } }
     )
   }

@@ -11,8 +11,9 @@ import Stripe from 'https://esm.sh/stripe@17?target=deno'
 
 // TODO: set STRIPE_WEBHOOK_SECRET in Supabase secrets
 
+// Webhooks come from Stripe servers, not browsers. We restrict CORS anyway.
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://nuke.ag',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
 }
 
@@ -476,9 +477,10 @@ Deno.serve(async (req) => {
       { headers: { 'content-type': 'application/json', ...corsHeaders } }
     )
   } catch (error: any) {
-    console.error('Webhook error:', error)
+    console.error('Webhook error:', error?.message || String(error))
+    // Do not leak internal error details to callers
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'content-type': 'application/json', ...corsHeaders } }
     )
   }
