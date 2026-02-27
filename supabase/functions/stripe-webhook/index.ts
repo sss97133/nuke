@@ -1,10 +1,15 @@
 /**
  * Stripe Webhook Handler
- * Processes successful payments and adds credits to user accounts
+ * Processes:
+ * - Standard checkout/subscription events (existing functionality)
+ * - Thin V2 events for connected account requirements/capabilities
+ * - Standard subscription events for V2 connected accounts
  */
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import Stripe from 'npm:stripe@14.11.0'
+import Stripe from 'https://esm.sh/stripe@17?target=deno'
+
+// TODO: set STRIPE_WEBHOOK_SECRET in Supabase secrets
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,14 +24,12 @@ Deno.serve(async (req) => {
   try {
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
     const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
-    
+
     if (!stripeKey || !webhookSecret) {
       throw new Error('Stripe keys not configured')
     }
 
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: '2023-10-16',
-    })
+    const stripe = new Stripe(stripeKey) as any
 
     // Get request body and signature
     const signature = req.headers.get('stripe-signature')
@@ -36,8 +39,66 @@ Deno.serve(async (req) => {
 
     const body = await req.text()
 
-    // Verify webhook signature
-    let event
+    // Initialize Supabase with service role
+    const { createClient } = await import('jsr:@supabase/supabase-js@2')
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')!
+    )
+
+    // -------------------------------------------------------------------------
+    // Attempt V2 thin event parsing first (for Connect account events)
+    // V2 thin events have an 'id' but the full event must be fetched separately
+    // -------------------------------------------------------------------------
+    let handledAsThinEvent = false
+    try {
+      const thinEvent = stripe.parseThinEvent(body, signature, webhookSecret)
+
+      if (thinEvent && thinEvent.id && thinEvent.type?.startsWith('v2.')) {
+        handledAsThinEvent = true
+        const event = await stripe.v2.core.events.retrieve(thinEvent.id)
+
+        console.log(`[stripe-webhook] V2 thin event: ${event.type}`)
+
+        switch (event.type) {
+          case 'v2.core.account[requirements].updated': {
+            const accountId = event.related_object?.id
+            console.log(`[stripe-webhook] Account requirements updated for ${accountId}`)
+            // Could update stripe_connect_accounts with requirements status if needed
+            break
+          }
+
+          case 'v2.core.account[configuration.merchant].capability_status_updated': {
+            const accountId = event.related_object?.id
+            const data = (event as any).data
+            console.log(`[stripe-webhook] Merchant capability updated for ${accountId}:`, data)
+            break
+          }
+
+          case 'v2.core.account[configuration.customer].capability_status_updated': {
+            const accountId = event.related_object?.id
+            const data = (event as any).data
+            console.log(`[stripe-webhook] Customer capability updated for ${accountId}:`, data)
+            break
+          }
+
+          default:
+            console.log(`[stripe-webhook] Unhandled V2 event type: ${event.type}`)
+        }
+
+        return new Response(
+          JSON.stringify({ received: true }),
+          { headers: { 'content-type': 'application/json', ...corsHeaders } }
+        )
+      }
+    } catch (_thinErr) {
+      // Not a V2 thin event — fall through to standard webhook handling
+    }
+
+    // -------------------------------------------------------------------------
+    // Standard webhook verification (V1 events)
+    // -------------------------------------------------------------------------
+    let event: Stripe.Event
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
     } catch (err) {
@@ -45,36 +106,78 @@ Deno.serve(async (req) => {
       return new Response('Invalid signature', { status: 400 })
     }
 
-    // Handle the event
+    console.log(`[stripe-webhook] Standard event: ${event.type}`)
+
+    // -------------------------------------------------------------------------
+    // Standard subscription events (including V2 connected accounts)
+    // For V2 accounts, use subscription.customer_account instead of .customer
+    // -------------------------------------------------------------------------
+    if (event.type === 'customer.subscription.updated') {
+      const subscription = event.data.object as any
+      // V2 accounts use customer_account; V1 use customer
+      const stripeAccountId = subscription.customer_account || subscription.customer
+
+      if (stripeAccountId) {
+        await supabase.from('stripe_subscriptions').upsert(
+          {
+            stripe_account_id: stripeAccountId,
+            subscription_id: subscription.id,
+            status: subscription.status,
+            price_id: subscription.items?.data?.[0]?.price?.id || null,
+            quantity: subscription.items?.data?.[0]?.quantity || 1,
+            cancel_at_period_end: subscription.cancel_at_period_end || false,
+            current_period_end: subscription.current_period_end
+              ? new Date(subscription.current_period_end * 1000).toISOString()
+              : null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'subscription_id' }
+        )
+        console.log(`[stripe-webhook] Upserted subscription ${subscription.id} for account ${stripeAccountId}`)
+      }
+    }
+
     if (event.type === 'customer.subscription.deleted') {
-      // Downgrade to free when subscription is canceled
-      const subscription = event.data.object
+      const subscription = event.data.object as any
+      // V2 accounts use customer_account; V1 use customer
+      const stripeAccountId = subscription.customer_account || null
       const customerId = subscription.customer
 
-      const { createClient: createSB } = await import('jsr:@supabase/supabase-js@2')
-      const sb = createSB(
-        Deno.env.get('PROJECT_URL') || Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      )
+      // Update stripe_subscriptions table
+      if (stripeAccountId) {
+        await supabase.from('stripe_subscriptions').upsert(
+          {
+            stripe_account_id: stripeAccountId,
+            subscription_id: subscription.id,
+            status: 'canceled',
+            cancel_at_period_end: false,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'subscription_id' }
+        )
+      }
 
-      const { data: sub2 } = await sb
-        .from('api_access_subscriptions')
-        .select('user_id')
-        .eq('stripe_customer_id', customerId)
-        .maybeSingle()
+      // Downgrade to free when subscription is canceled (existing V1 logic)
+      if (customerId && !stripeAccountId) {
+        const { data: sub2 } = await supabase
+          .from('api_access_subscriptions')
+          .select('user_id')
+          .eq('stripe_customer_id', customerId)
+          .maybeSingle()
 
-      if (sub2) {
-        await sb.from('api_access_subscriptions')
-          .update({ subscription_type: 'free', status: 'canceled', stripe_subscription_id: null })
-          .eq('user_id', sub2.user_id)
+        if (sub2) {
+          await supabase.from('api_access_subscriptions')
+            .update({ subscription_type: 'free', status: 'canceled', stripe_subscription_id: null })
+            .eq('user_id', sub2.user_id)
 
-        // Reset rate limits to free tier (100/day = ~5/hour)
-        await sb.from('api_keys')
-          .update({ rate_limit_per_hour: 5 })
-          .eq('user_id', sub2.user_id)
-          .eq('is_active', true)
+          // Reset rate limits to free tier (100/day = ~5/hour)
+          await supabase.from('api_keys')
+            .update({ rate_limit_per_hour: 5 })
+            .eq('user_id', sub2.user_id)
+            .eq('is_active', true)
 
-        console.log(`Subscription canceled for user ${sub2.user_id}, downgraded to free`)
+          console.log(`Subscription canceled for user ${sub2.user_id}, downgraded to free`)
+        }
       }
 
       return new Response(
@@ -83,11 +186,49 @@ Deno.serve(async (req) => {
       )
     }
 
+    if (event.type === 'payment_method.attached') {
+      const paymentMethod = event.data.object as any
+      console.log(`[stripe-webhook] Payment method attached: ${paymentMethod.id} to customer ${paymentMethod.customer}`)
+    }
+
+    if (event.type === 'payment_method.detached') {
+      const paymentMethod = event.data.object as any
+      console.log(`[stripe-webhook] Payment method detached: ${paymentMethod.id}`)
+    }
+
+    if (event.type === 'customer.updated') {
+      const customer = event.data.object as any
+      console.log(`[stripe-webhook] Customer updated: ${customer.id}`)
+    }
+
+    if (event.type === 'customer.tax_id.created') {
+      const taxId = event.data.object as any
+      console.log(`[stripe-webhook] Tax ID created: ${taxId.id} for customer ${taxId.customer}`)
+    }
+
+    if (event.type === 'customer.tax_id.deleted') {
+      const taxId = event.data.object as any
+      console.log(`[stripe-webhook] Tax ID deleted: ${taxId.id}`)
+    }
+
+    if (event.type === 'customer.tax_id.updated') {
+      const taxId = event.data.object as any
+      console.log(`[stripe-webhook] Tax ID updated: ${taxId.id} — verification: ${taxId.verification?.status}`)
+    }
+
+    if (event.type === 'billing_portal.session.created') {
+      const session = event.data.object as any
+      console.log(`[stripe-webhook] Billing portal session created: ${session.id} for customer ${session.customer}`)
+    }
+
+    // -------------------------------------------------------------------------
+    // checkout.session.completed — existing logic preserved exactly
+    // -------------------------------------------------------------------------
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object
+      const session = event.data.object as any
 
       const userId = session.client_reference_id || session.metadata?.user_id
-      const amountCents = session.amount_total // Stripe provides this directly
+      const amountCents = session.amount_total
       const purchaseType = session.metadata?.purchase_type || 'credits'
 
       if (!userId || !amountCents) {
@@ -95,41 +236,30 @@ Deno.serve(async (req) => {
         return new Response('Invalid metadata', { status: 400 })
       }
 
-      // Initialize Supabase with service role
-      const { createClient } = await import('jsr:@supabase/supabase-js@2')
-      const supabase = createClient(
-        Deno.env.get('PROJECT_URL') || Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      )
-
-      // Route based on purchase type
       if (purchaseType === 'invoice_payment') {
-        // Handle invoice payment
         const invoiceId = session.metadata?.invoice_id
         const paymentToken = session.metadata?.payment_token
         const customerEmail = session.customer_email || session.customer_details?.email
-        
+
         if (!invoiceId || !paymentToken) {
           console.error('Missing invoice_id or payment_token for invoice payment')
           return new Response('Invalid metadata', { status: 400 })
         }
 
-        // Mark invoice as paid via the public function
-        const { data: paymentResult, error: paymentError } = await supabase
-          .rpc('mark_invoice_paid', {
-            p_payment_token: paymentToken,
-            p_payment_method: 'stripe',
-            p_payment_method_details: {
-              stripe_session_id: session.id,
-              stripe_payment_intent: session.payment_intent,
-              stripe_customer_id: session.customer,
-              amount_paid_cents: amountCents,
-              amount_paid_usd: amountCents / 100,
-              payment_method_type: session.payment_method_types?.[0] || 'card'
-            },
-            p_confirmed_by: customerEmail || session.customer_details?.name || 'Card Payment',
-            p_notes: `Paid via Stripe - Session ${session.id}`
-          })
+        const { error: paymentError } = await supabase.rpc('mark_invoice_paid', {
+          p_payment_token: paymentToken,
+          p_payment_method: 'stripe',
+          p_payment_method_details: {
+            stripe_session_id: session.id,
+            stripe_payment_intent: session.payment_intent,
+            stripe_customer_id: session.customer,
+            amount_paid_cents: amountCents,
+            amount_paid_usd: amountCents / 100,
+            payment_method_type: session.payment_method_types?.[0] || 'card',
+          },
+          p_confirmed_by: customerEmail || session.customer_details?.name || 'Card Payment',
+          p_notes: `Paid via Stripe - Session ${session.id}`,
+        })
 
         if (paymentError) {
           console.error('Failed to mark invoice as paid:', paymentError)
@@ -143,20 +273,17 @@ Deno.serve(async (req) => {
         // TODO: Update journal entries for accounting
 
       } else if (purchaseType === 'api_access_subscription') {
-        // Handle API access subscription
         const subscriptionType = session.metadata?.subscription_type
         const credits = session.metadata?.credits ? parseInt(session.metadata.credits, 10) || null : null
-        
+
         if (!subscriptionType) {
           console.error('Missing subscription_type for API access subscription')
           return new Response('Invalid metadata', { status: 400 })
         }
 
-        // Create or update subscription
         if (subscriptionType === 'monthly') {
-          // Monthly subscription
-          const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-          
+          const subscription = await (stripe as Stripe).subscriptions.retrieve(session.subscription as string)
+
           const { error: subError } = await supabase
             .from('api_access_subscriptions')
             .upsert({
@@ -165,13 +292,11 @@ Deno.serve(async (req) => {
               status: 'active',
               stripe_subscription_id: subscription.id,
               stripe_customer_id: subscription.customer as string,
-              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-              monthly_limit: 1000, // 1000 images per month
-              updated_at: new Date().toISOString()
-            }, {
-              onConflict: 'user_id'
-            })
+              current_period_start: new Date((subscription as any).current_period_start * 1000).toISOString(),
+              current_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
+              monthly_limit: 1000,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' })
 
           if (subError) {
             console.error('Failed to create subscription:', subError)
@@ -180,7 +305,6 @@ Deno.serve(async (req) => {
 
           console.log(`Monthly API access subscription created for user ${userId}`)
         } else if (subscriptionType.startsWith('prepaid_')) {
-          // Prepaid credits
           const { error: subError } = await supabase
             .from('api_access_subscriptions')
             .upsert({
@@ -188,10 +312,8 @@ Deno.serve(async (req) => {
               subscription_type: 'prepaid_credits',
               status: 'active',
               credits_remaining: credits || 0,
-              updated_at: new Date().toISOString()
-            }, {
-              onConflict: 'user_id'
-            })
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' })
 
           if (subError) {
             console.error('Failed to create prepaid subscription:', subError)
@@ -202,7 +324,6 @@ Deno.serve(async (req) => {
         }
 
       } else if (purchaseType === 'dealerscan_credits') {
-        // Handle DealerScan credit purchases
         const credits = session.metadata?.credits ? (parseInt(session.metadata.credits, 10) || 0) : 0
 
         if (credits > 0) {
@@ -222,21 +343,19 @@ Deno.serve(async (req) => {
         }
 
       } else if (purchaseType === 'vehicle_transaction') {
-        // Handle vehicle transaction facilitation fee
         const transactionId = session.metadata?.transaction_id
-        
+
         if (!transactionId) {
           console.error('Missing transaction_id for vehicle transaction')
           return new Response('Invalid metadata', { status: 400 })
         }
 
-        // Update transaction with payment confirmation
         const { error: updateError } = await supabase
           .from('vehicle_transactions')
           .update({
             stripe_payment_id: session.payment_intent,
             fee_paid_at: new Date().toISOString(),
-            status: 'pending_documents'
+            status: 'pending_documents',
           })
           .eq('id', transactionId)
 
@@ -246,9 +365,7 @@ Deno.serve(async (req) => {
 
         console.log(`Vehicle transaction ${transactionId} fee paid: $${amountCents / 100}`)
 
-        // Advance ownership_transfer payment_confirmed milestone (fire-and-forget)
-        // This connects System B (vehicle_transactions / Stripe) to System A (ownership_transfers)
-        // per the CTO architectural decision: vehicle_transactions is a fee record within the transfer
+        // Advance ownership_transfer payment_confirmed milestone
         const transferId = session.metadata?.transfer_id || null
         if (transferId) {
           try {
@@ -256,7 +373,7 @@ Deno.serve(async (req) => {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')}`
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')}`,
               },
               body: JSON.stringify({
                 action: 'advance_manual',
@@ -271,7 +388,6 @@ Deno.serve(async (req) => {
             console.error('[stripe-webhook] Failed to advance transfer milestone (non-fatal):', err)
           }
         } else {
-          // Try to look up transfer_id from vehicle_transactions if not in metadata
           try {
             const { data: txRecord } = await supabase
               .from('vehicle_transactions')
@@ -285,7 +401,7 @@ Deno.serve(async (req) => {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')}`
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')}`,
                 },
                 body: JSON.stringify({
                   action: 'advance_manual',
@@ -308,7 +424,7 @@ Deno.serve(async (req) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')}`
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')}`,
             },
             body: JSON.stringify({ transaction_id: transactionId }),
             signal: AbortSignal.timeout(30000),
@@ -323,11 +439,11 @@ Deno.serve(async (req) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')}`
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')}`,
             },
             body: JSON.stringify({
               transaction_id: transactionId,
-              notification_type: 'sign_request'
+              notification_type: 'sign_request',
             }),
             signal: AbortSignal.timeout(30000),
           })
@@ -336,7 +452,6 @@ Deno.serve(async (req) => {
         }
 
         // Note: Shipping listing will be created after BOTH parties sign
-        // This is handled by the transaction service when checking signature status
       } else {
         // Default: Add cash to user account (existing functionality)
         const { error: rpcError } = await supabase.rpc('add_cash_to_user', {
@@ -346,8 +461,8 @@ Deno.serve(async (req) => {
           p_metadata: {
             stripe_session_id: session.id,
             amount_paid_usd: amountCents / 100,
-            payment_method: session.payment_method_types?.[0] || 'card'
-          }
+            payment_method: session.payment_method_types?.[0] || 'card',
+          },
         })
 
         if (rpcError) console.error('CRITICAL: Failed to add cash to user:', rpcError.message)

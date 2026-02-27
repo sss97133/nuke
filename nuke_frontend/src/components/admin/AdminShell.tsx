@@ -37,6 +37,7 @@ const operations: AdminNavItem[] = [
 ];
 
 const tools: AdminNavItem[] = [
+  { label: 'Stripe Connect', to: '/stripe-connect', description: 'V2 connected accounts, onboarding, products, storefront' },
   { label: 'Business Intelligence', to: '/admin/business-intelligence' },
   { label: 'Price Editor', to: '/admin/price-editor' },
   { label: 'Price Import', to: '/admin/price-import' },
