@@ -91,7 +91,8 @@
   "overrides": {
     "minimatch": "^10.2.1",
     "axios": "^1.13.5",
-    "qs": "^6.14.2"
+    "qs": "^6.14.2",
+    "tar": "^7.5.8"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
