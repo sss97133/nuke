@@ -1203,6 +1203,10 @@ body {
   padding: 120px 0 var(--space-4) 0; /* Height of upload status + header + buffer */
 }
 
+.has-upload-status .main-content.content-container {
+  padding: 120px 5px var(--space-4) 5px; /* Upload status + merged side padding */
+}
+
 /* Also ensure content container has proper spacing */
 .content-container {
   padding-top: 0;
@@ -1431,6 +1435,14 @@ body {
   padding: 0 0 var(--space-4) 0; /* Flush with header on top */
 }
 
+/* When main-content IS the content-container (merged layout), combine both roles:
+   flex child + centered max-width container with correct merged padding */
+.main-content.content-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 5px var(--space-4) 5px;
+}
+
 .mobile-bottom-nav {
   display: none;
 }
@@ -1472,6 +1484,10 @@ body {
   }
 
   .main-content {
+    padding-bottom: calc(var(--space-4) + 56px);
+  }
+
+  .main-content.content-container {
     padding-bottom: calc(var(--space-4) + 56px);
   }
 

@@ -2,177 +2,65 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
-import { formatCurrency as formatUsdCurrency } from '../../services/priceSignalService';
-import { formatCurrencyAmount, resolveCurrencyCode } from '../../utils/currency';
 import { supabase } from '../../lib/supabase';
-// Deprecated modals (history/analysis/tag review) intentionally removed from UI
-import { VehicleValuationService } from '../../services/vehicleValuationService';
-const TradePanel = React.lazy(() => import('../../components/trading/TradePanel'));
 import { VehicleDeduplicationService } from '../../services/vehicleDeduplicationService';
+// Deprecated modals (history/analysis/tag review) intentionally removed from UI
+const TradePanel = React.lazy(() => import('../../components/trading/TradePanel'));
 const ValueProvenancePopup = React.lazy(() => import('../../components/ValueProvenancePopup').then(m => ({ default: m.ValueProvenancePopup })));
 const DataValidationPopup = React.lazy(() => import('../../components/vehicle/DataValidationPopup'));
-import { useVINProofs } from '../../hooks/useVINProofs';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 import MemeDropBadge from '../../components/vehicle/MemeDropBadge';
-import vinDecoderService from '../../services/vinDecoder';
 const UpdateSalePriceModal = React.lazy(() => import('../../components/vehicle/UpdateSalePriceModal'));
 const FollowAuctionCard = React.lazy(() => import('../../components/auction/FollowAuctionCard').then(m => ({ default: m.FollowAuctionCard })));
 const OrganizationInvestmentCard = React.lazy(() => import('../../components/organization/OrganizationInvestmentCard'));
 import { CircularAvatar } from '../../components/common/CircularAvatar';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
-import { useIsMobile } from '../../hooks/useIsMobile';
-const RELATIONSHIP_LABELS: Record<string, string> = {
-  owner: 'Owner',
-  consigner: 'Consignment',
-  collaborator: 'Collaborator',
-  service_provider: 'Service',
-  work_location: 'Work site',
-  seller: 'Seller',
-  buyer: 'Buyer',
-  parts_supplier: 'Parts',
-  fabricator: 'Fabricator',
-  painter: 'Paint',
-  upholstery: 'Upholstery',
-  transport: 'Transport',
-  storage: 'Storage',
-  inspector: 'Inspector'
-};
 
-const parseMoneyNumber = (val: any): number | null => {
-  if (val === null || val === undefined) return null;
-  if (typeof val === 'number') return Number.isFinite(val) && val > 0 ? val : null;
-  if (typeof val === 'string') {
-    const cleaned = val.replace(/[^0-9.]/g, '');
-    if (!cleaned) return null;
-    const n = Number(cleaned);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  }
-  return null;
-};
+// Extracted pure utilities (no React dependencies)
+import {
+  RELATIONSHIP_LABELS,
+  parseMoneyNumber,
+  formatLivePlatformLabel,
+  normalizePartyHandle,
+  toTitleCase,
+  formatAuctionHouseLabel,
+  isClassifiedPlatform,
+  normalizeBusinessType,
+  isIntermediaryBusinessType,
+  roleLabelFromBusinessType,
+  formatSellerRoleLabel,
+  formatRelationship,
+  escapeRegExp,
+  extractMileageFromText,
+  cleanListingishTitle,
+  appendUnique,
+  normalizeListingLocation,
+  formatShortDate,
+  formatAge,
+  formatRemaining,
+  isValidUsername,
+} from './vehicleHeaderUtils';
 
-const formatLivePlatformLabel = (provider?: string | null, platform?: string | null) => {
-  if (provider === 'mux') return 'Nuke Live';
-  if (!platform) return 'Live';
-  if (platform === 'twitch') return 'Twitch';
-  if (platform === 'youtube') return 'YouTube';
-  if (platform === 'custom') return 'Live';
-  return platform;
-};
-
-const normalizePartyHandle = (raw?: string | null): string | null => {
-  const h = String(raw || '').trim();
-  if (!h) return null;
-  const normalized = h
-    .replace(/^@/, '')
-    .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
-    .replace(/^https?:\/\/carsandbids\.com\/u\//i, '')
-    .replace(/^https?:\/\/www\.hagerty\.com\/marketplace\/profile\//i, '')
-    .replace(/^https?:\/\/pcarmarket\.com\/member\//i, '')
-    .replace(/\/+$/, '')
-    .trim();
-  return normalized || null;
-};
-
-const toTitleCase = (input: string) =>
-  input
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-
-const formatAuctionHouseLabel = (platform?: string | null, host?: string | null, source?: string | null) => {
-  const raw = String(platform || source || host || '').trim();
-  if (!raw) return null;
-  const normalized = raw
-    .toLowerCase()
-    .replace(/^www\./, '')
-    .replace(/\.com$/, '')
-    .replace(/\s+/g, '_');
-  const map: Record<string, string> = {
-    bat: 'Bring a Trailer',
-    bringatrailer: 'Bring a Trailer',
-    bring_a_trailer: 'Bring a Trailer',
-    carsandbids: 'Cars & Bids',
-    cars_and_bids: 'Cars & Bids',
-    hagerty: 'Hagerty Marketplace',
-    hagerty_marketplace: 'Hagerty Marketplace',
-    pcarmarket: 'PCarMarket',
-    mecum: 'Mecum',
-    barrett_jackson: 'Barrett-Jackson',
-    barrettjackson: 'Barrett-Jackson',
-    rm_sothebys: "RM Sotheby's",
-    rmsothebys: "RM Sotheby's",
-    collecting_cars: 'Collecting Cars',
-    collectingcars: 'Collecting Cars',
-    sbxcars: 'SBX Cars',
-    broadarrow: 'Broad Arrow',
-    broad_arrow: 'Broad Arrow',
-    ebay_motors: 'eBay Motors',
-    ebay: 'eBay Motors',
-    facebook_marketplace: 'Facebook Marketplace',
-    facebook: 'Facebook Marketplace',
-    hemmings: 'Hemmings',
-    autotrader: 'AutoTrader',
-    classic: 'Classic.com',
-    classic_com: 'Classic.com',
-  };
-  if (map[normalized]) return map[normalized];
-  return toTitleCase(normalized.replace(/[_-]+/g, ' '));
-};
-
-// Classified platforms are not auctions - they have sellers, not consigners
-const isClassifiedPlatform = (platform?: string | null) => {
-  const normalized = String(platform || '').trim().toLowerCase().replace(/[_\s-]+/g, '');
-  const classifiedPlatforms = [
-    'facebookmarketplace', 'facebook',
-    'craigslist',
-    'autotrader',
-    'carscom', 'cars',
-    'carfax',
-    'carsdirect',
-    'truecar',
-    'ksl',
-    'offerup',
-  ];
-  return classifiedPlatforms.some(p => normalized.includes(p));
-};
-
-const normalizeBusinessType = (value?: string | null) => {
-  const normalized = String(value || '').trim().toLowerCase();
-  return normalized || null;
-};
-
-const isIntermediaryBusinessType = (value?: string | null) => {
-  const normalized = normalizeBusinessType(value);
-  if (!normalized) return false;
-  return (
-    normalized.includes('auction') ||
-    normalized.includes('platform') ||
-    normalized.includes('marketplace') ||
-    normalized.includes('broker') ||
-    normalized.includes('aggregator')
-  );
-};
-
-const roleLabelFromBusinessType = (value?: string | null) => {
-  const normalized = normalizeBusinessType(value);
-  if (!normalized) return null;
-  if (normalized === 'auction_house' || normalized.includes('auction')) return 'Auction platform';
-  if (normalized === 'dealer' || normalized === 'dealership' || normalized === 'classic_car_dealer' || normalized === 'dealer_group') return 'Dealer';
-  if (normalized.includes('broker')) return 'Broker';
-  if (normalized.includes('marketplace') || normalized.includes('platform') || normalized.includes('aggregator')) return 'Marketplace';
-  return null;
-};
-
-const formatSellerRoleLabel = (relationship?: string | null, businessType?: string | null) => {
-  const fromBusiness = roleLabelFromBusinessType(businessType);
-  if (fromBusiness) return fromBusiness;
-  const rel = String(relationship || '').toLowerCase();
-  if (rel === 'consigner') return 'Consigner';
-  if (rel === 'sold_by' || rel === 'seller') return 'Seller';
-  return rel ? toTitleCase(rel.replace(/[_-]+/g, ' ')) : 'Seller';
-};
+// Extracted data-fetching hooks
+import {
+  usePopoverData,
+  useOwnerPopoverData,
+  useOwnerGuess,
+  usePriceData,
+  usePriceSources,
+  useFutureAuctionListing,
+  usePendingDetails,
+  useSaleSettings,
+  useTrendData,
+  useOwnerProfile,
+  useTransferStatus,
+  useAuctionTimer,
+  useLocationDisplay,
+  useAuctionCurrency,
+  useVinValidation,
+  useIsMobile,
+} from './hooks/useVehicleHeaderData';
 
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
@@ -199,82 +87,32 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const claimHasTitle = !!userOwnershipClaim?.title_document_url && userOwnershipClaim?.title_document_url !== 'pending';
   const claimHasId = !!userOwnershipClaim?.drivers_license_url && userOwnershipClaim?.drivers_license_url !== 'pending';
   const claimNeedsId = hasClaim && !claimHasId;
-  const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
-  const [trendPct, setTrendPct] = useState<number | null>(null);
-  const [trendPriceType, setTrendPriceType] = useState<string | null>(null);
-  const [trendBaselineValue, setTrendBaselineValue] = useState<number | null>(null);
-  const [trendBaselineAsOf, setTrendBaselineAsOf] = useState<string | null>(null);
-  const [trendBaselineSource, setTrendBaselineSource] = useState<string | null>(null);
-  const [trendOutlierCount, setTrendOutlierCount] = useState<number | null>(null);
-  const [trendPeriod, setTrendPeriod] = useState<'live' | '1w' | '30d' | '6m' | '1y' | '5y'>('30d');
+  // --- Extracted data-fetching hooks ---
+  const { rpcSignal, valuation } = usePriceData(vehicle?.id, initialPriceSignal, initialValuation);
+  const { trendPct, trendPriceType, trendBaselineValue, trendBaselineAsOf, trendBaselineSource, trendOutlierCount, trendPeriod, toggleTrendPeriod } = useTrendData(vehicle);
+  const ownerGuess = useOwnerGuess(vehicle, auctionPulse);
+  const locationDisplay = useLocationDisplay(vehicle);
+  const { auctionCurrency, formatCurrency } = useAuctionCurrency(vehicle, auctionPulse);
+  const { displayMode, setDisplayMode, responsibleMode, setResponsibleMode, responsibleCustom, setResponsibleCustom } = useSaleSettings(vehicle?.id);
+  const { similarVehicles, loadingSimilar, imageCount } = usePendingDetails(vehicle);
+  const priceSources = usePriceSources(vehicle?.id);
+  const futureAuctionListing = useFutureAuctionListing(vehicle?.id);
+  const { vinProofSummary, vinIsEvidenceBacked, vinLooksValid } = useVinValidation(vehicle);
+  const transferStatus = useTransferStatus(vehicle?.id);
+  const isMobile = useIsMobile();
+
+  // --- UI toggle state (stays inline, tightly coupled to JSX) ---
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showOwnerClaimDropdown, setShowOwnerClaimDropdown] = useState(false);
   const [showOwnerPopover, setShowOwnerPopover] = useState(false);
-  const [ownerPopoverLoading, setOwnerPopoverLoading] = useState(false);
-  const [ownerPopoverError, setOwnerPopoverError] = useState<string | null>(null);
-  const [ownerPopoverData, setOwnerPopoverData] = useState<{
-    identityId: string | null;
-    claimedByUserId: string | null;
-    profileUrl: string | null;
-    auctionsWon: number;
-    auctionsSold: number;
-    commentCount: number;
-    lastCommentAt: string | null;
-    firstSeenAt: string | null;
-    lastSeenAt: string | null;
-  } | null>(null);
   const [showAccessInfo, setShowAccessInfo] = useState(false);
-  const [transferStatus, setTransferStatus] = useState<{
-    transfer_id: string;
-    status: string;
-    progress: { completed: number; total: number; pct: number };
-    current_milestone: { type: string; label: string; status: string; deadline_at: string | null } | null;
-    days_since_activity: number | null;
-    buyer: { handle: string; platform: string; claimed: boolean } | null;
-  } | null>(null);
   const locationRef = useRef<HTMLDivElement>(null);
   const ownerClaimRef = useRef<HTMLDivElement>(null);
   const accessRef = useRef<HTMLDivElement>(null);
-  // Popover state for Year/Make/Model/Seller/Auction badges — declare before useEffect that uses them (avoid TDZ when minified).
+  // Popover state for Year/Make/Model/Seller/Auction badges
   const [activePopover, setActivePopover] = useState<'year' | 'make' | 'model' | 'seller' | 'auction' | null>(null);
-  const [popoverData, setPopoverData] = useState<any>(null);
-  const [popoverLoading, setPopoverLoading] = useState(false);
-  const auctionCurrency = useMemo(() => {
-    const v: any = vehicle as any;
-    const externalListing = v?.external_listings?.[0];
-    const pulseMeta = (auctionPulse as any)?.metadata;
-    return resolveCurrencyCode(
-      pulseMeta?.currency,
-      pulseMeta?.currency_code,
-      pulseMeta?.currencyCode,
-      pulseMeta?.price_currency,
-      pulseMeta?.priceCurrency,
-      externalListing?.currency,
-      externalListing?.currency_code,
-      externalListing?.price_currency,
-      externalListing?.metadata?.currency,
-      externalListing?.metadata?.currency_code,
-      externalListing?.metadata?.currencyCode,
-      externalListing?.metadata?.price_currency,
-      externalListing?.metadata?.priceCurrency,
-      v?.origin_metadata?.currency,
-      v?.origin_metadata?.currency_code,
-      v?.origin_metadata?.price_currency,
-      v?.origin_metadata?.priceCurrency,
-      v?.origin_metadata?.priceCurrencyCode,
-    );
-  }, [vehicle, auctionPulse]);
-  const formatCurrency = (value?: number | null) => {
-    if (auctionCurrency) {
-      return formatCurrencyAmount(value, {
-        currency: auctionCurrency,
-        maximumFractionDigits: 0,
-        minimumFractionDigits: 0,
-        fallback: '—',
-      });
-    }
-    return formatUsdCurrency(value);
-  };
+  const { popoverData, popoverLoading } = usePopoverData(activePopover, vehicle, auctionPulse);
+  const { ownerPopoverData, ownerPopoverLoading, ownerPopoverError } = useOwnerPopoverData(showOwnerPopover, ownerGuess?.username);
 
   // Theme tokens used in many useMemos and JSX; declare early to avoid TDZ when minified.
   const baseTextColor = 'var(--text)';
@@ -300,754 +138,30 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLocationDropdown, showOwnerClaimDropdown, showOwnerPopover, showAccessInfo]);
 
-  // Fetch data for Year/Make/Model/Seller/Auction popovers
-  useEffect(() => {
-    if (!activePopover || !vehicle) return;
-    let cancelled = false;
-    setPopoverLoading(true);
-    setPopoverData(null);
+  // ownerGuess, locationDisplay, auctionCurrency, formatCurrency, trendData, etc.
+  // are now provided by extracted hooks at the top of this component.
 
-    const fetchPopoverData = async () => {
-      try {
-        if (activePopover === 'year' && vehicle.year) {
-          const { data } = await supabase.rpc('get_year_market_stats', { p_year: vehicle.year }).maybeSingle();
-          if (!cancelled) setPopoverData(data || { year: vehicle.year });
-        } else if (activePopover === 'make' && vehicle.make) {
-          const { data } = await supabase.rpc('get_make_market_stats', { p_make: vehicle.make }).maybeSingle();
-          if (!cancelled) setPopoverData(data || { make: vehicle.make });
-        } else if (activePopover === 'model' && vehicle.make) {
-          const model = (vehicle as any)?.normalized_model || vehicle?.model;
-          const { data } = await supabase.rpc('get_model_market_stats', { p_make: vehicle.make, p_model: model || '' }).maybeSingle();
-          if (!cancelled) setPopoverData(data || { make: vehicle.make, model });
-        } else if (activePopover === 'seller') {
-          const sellerHandle = normalizePartyHandle(
-            (auctionPulse as any)?.seller_username ||
-            (auctionPulse as any)?.metadata?.seller_username ||
-            (auctionPulse as any)?.metadata?.seller ||
-            (vehicle as any)?.bat_seller ||
-            (vehicle as any)?.origin_metadata?.bat_seller ||
-            (vehicle as any)?.origin_metadata?.seller ||
-            null
-          );
-          if (sellerHandle) {
-            const { data: identity } = await supabase
-              .from('external_identities')
-              .select('id, platform, handle, proof_url, claimed_by, first_seen_at, last_seen_at')
-              .ilike('handle', sellerHandle)
-              .limit(1)
-              .maybeSingle();
-            const { count: auctionCount } = await supabase
-              .from('auction_events')
-              .select('id', { count: 'exact', head: true })
-              .or(`seller_username.ilike.%${sellerHandle}%`);
-            if (!cancelled) setPopoverData({
-              handle: sellerHandle,
-              identity,
-              auctionCount: auctionCount || 0,
-            });
-          } else {
-            if (!cancelled) setPopoverData({ handle: null });
-          }
-        } else if (activePopover === 'auction') {
-          const v = vehicle as any;
-          if (!cancelled) setPopoverData({
-            platform: v?.profile_origin || v?.discovery_source || (auctionPulse as any)?.platform,
-            listingUrl: (auctionPulse as any)?.listing_url || v?.bat_auction_url || v?.discovery_url || v?.listing_url,
-            bidCount: (auctionPulse as any)?.bid_count || v?.bid_count,
-            viewCount: (auctionPulse as any)?.view_count,
-            watcherCount: (auctionPulse as any)?.watcher_count,
-            commentCount: (auctionPulse as any)?.comment_count,
-            listingStatus: (auctionPulse as any)?.listing_status || v?.auction_outcome,
-            currentBid: (auctionPulse as any)?.current_bid,
-            finalPrice: (auctionPulse as any)?.final_price,
-          });
-        }
-      } catch (err) {
-        console.warn('Popover data fetch failed:', err);
-        if (!cancelled) setPopoverData({});
-      } finally {
-        if (!cancelled) setPopoverLoading(false);
-      }
-    };
-
-    fetchPopoverData();
-    return () => { cancelled = true; };
-  }, [activePopover, vehicle, auctionPulse]);
-
-  // Derive current owner (best guess) from BaT data
-  const ownerGuess = useMemo(() => {
-    const v = vehicle as any;
-
-    const rawOutcome = String(v?.auction_outcome || '').toLowerCase();
-    const saleStatus = String(v?.sale_status || '').toLowerCase();
-    const pulseStatus = auctionPulse?.listing_url ? String((auctionPulse as any)?.listing_status || '').toLowerCase() : '';
-
-    const pulseFinal = parseMoneyNumber((auctionPulse as any)?.final_price);
-    const pulseSoldAt = (auctionPulse as any)?.sold_at ?? null;
-    const telemetryUnsold = pulseStatus === 'reserve_not_met' || pulseStatus === 'no_sale';
-    const telemetrySold = pulseStatus === 'sold' && (pulseFinal !== null || !!pulseSoldAt);
-    const vehicleUnsold = rawOutcome === 'reserve_not_met' || rawOutcome === 'no_sale';
-    const vehicleSold = saleStatus === 'sold' || rawOutcome === 'sold';
-
-    // Precedence: telemetry overrides stale vehicle fields (fixes cases where vehicles.auction_outcome is wrong).
-    // - If telemetry says SOLD, trust it even if vehicle says RNM.
-    // - If telemetry says RNM/NO SALE, trust it even if vehicle says SOLD.
-    const hasSoldSignal = telemetrySold || (!telemetryUnsold && vehicleSold);
-
-    // Filter out obviously invalid/useless usernames
-    const isValidUsername = (username: string | null | undefined): boolean => {
-      if (!username || typeof username !== 'string') return false;
-      const u = username.trim().toLowerCase();
-      // Reject generic/placeholder usernames
-      const invalid = ['everyone', 'unknown', 'n/a', 'none', 'null', 'undefined', 'seller', 'buyer', 'owner', 'user', 'admin'];
-      return u.length > 0 && !invalid.includes(u) && u.length >= 2;
-    };
-
-    const normalizeHandle = (raw: string | null | undefined): string | null => {
-      const h = String(raw || '').trim();
-      if (!h) return null;
-      const handle = h
-        .replace(/^@/, '')
-        .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
-        .replace(/\/+$/, '')
-        .trim();
-      return handle || null;
-    };
-
-    const seller =
-      normalizeHandle(
-        (auctionPulse as any)?.seller_username ||
-          (auctionPulse as any)?.metadata?.seller_username ||
-          (auctionPulse as any)?.metadata?.seller ||
-          v?.bat_seller ||
-          v?.origin_metadata?.bat_seller ||
-          v?.origin_metadata?.seller ||
-          null
-      ) || null;
-
-    const buyer =
-      normalizeHandle(
-        (auctionPulse as any)?.winner_name ||
-          (auctionPulse as any)?.metadata?.buyer_username ||
-          (auctionPulse as any)?.metadata?.buyer ||
-          (auctionPulse as any)?.winning_bidder_name ||
-          (auctionPulse as any)?.winner_display_name ||
-          v?.bat_buyer ||
-          v?.origin_metadata?.bat_buyer ||
-          v?.origin_metadata?.buyer ||
-          null
-      ) || null;
-
-    // If sold, buyer is current owner; otherwise seller owns it
-    if (hasSoldSignal) {
-      if (buyer && isValidUsername(buyer)) {
-        const fromSeller = seller && isValidUsername(seller) ? seller : null;
-        return { username: buyer, from: fromSeller, role: 'buyer' };
-      }
-      return null;
-    }
-    
-    // Not sold - seller is current owner (consigning)
-    if (seller && isValidUsername(seller)) {
-      return { username: seller, from: null, role: 'seller' };
-    }
-    return null;
-  }, [vehicle, auctionPulse]);
-
-  // Load partner signals for the @handle popover (unverified owner guess)
-  useEffect(() => {
-    if (!showOwnerPopover) return;
-    const raw = String(ownerGuess?.username || '').trim();
-    const handle = raw.replace(/^@/, '').trim();
-    if (!handle) return;
-
-    let cancelled = false;
-    setOwnerPopoverLoading(true);
-    setOwnerPopoverError(null);
-
-    (async () => {
-      try {
-        const proofUrl = `https://bringatrailer.com/member/${handle}/`;
-        const { data: identity, error: idErr } = await supabase
-          .from('external_identities')
-          .select('id, claimed_by_user_id, profile_url, first_seen_at, last_seen_at')
-          .eq('platform', 'bat')
-          .eq('handle', handle)
-          .maybeSingle();
-
-        if (idErr) {
-          // Non-fatal: we can still show partial signals using handle matching.
-          console.warn('Owner popover identity lookup failed:', idErr);
-        }
-
-        const identityId = identity?.id ? String(identity.id) : null;
-        const claimedByUserId = identity?.claimed_by_user_id ? String(identity.claimed_by_user_id) : null;
-        const profileUrl = String((identity as any)?.profile_url || proofUrl).trim() || proofUrl;
-        const firstSeenAt = (identity as any)?.first_seen_at ? String((identity as any).first_seen_at) : null;
-        const lastSeenAt = (identity as any)?.last_seen_at ? String((identity as any).last_seen_at) : null;
-
-        const winsQ = supabase
-          .from('auction_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('source', 'bat')
-          .ilike('winning_bidder', handle);
-
-        const soldQ = supabase
-          .from('auction_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('source', 'bat')
-          .ilike('seller_name', handle);
-
-        const commentsBase = supabase
-          .from('auction_comments')
-          .select('id', { count: 'exact', head: true })
-          .eq('platform', 'bat')
-          .is('bid_amount', null);
-
-        const lastCommentBase = supabase
-          .from('auction_comments')
-          .select('posted_at')
-          .eq('platform', 'bat')
-          .is('bid_amount', null)
-          .order('posted_at', { ascending: false })
-          .limit(1);
-
-        const commentsQ = identityId
-          ? commentsBase.eq('external_identity_id', identityId)
-          : commentsBase.ilike('author_username', handle);
-
-        const lastCommentQ = identityId
-          ? lastCommentBase.eq('external_identity_id', identityId)
-          : lastCommentBase.ilike('author_username', handle);
-
-        const [winsRes, soldRes, commentsRes, lastCommentRes] = await Promise.all([
-          winsQ,
-          soldQ,
-          commentsQ,
-          lastCommentQ,
-        ]);
-
-        const lastCommentRow = Array.isArray((lastCommentRes as any)?.data) ? (lastCommentRes as any).data[0] : null;
-        const lastCommentAt = lastCommentRow?.posted_at ? String(lastCommentRow.posted_at) : null;
-
-        if (cancelled) return;
-        setOwnerPopoverData({
-          identityId,
-          claimedByUserId,
-          profileUrl,
-          auctionsWon: (winsRes as any)?.count || 0,
-          auctionsSold: (soldRes as any)?.count || 0,
-          commentCount: (commentsRes as any)?.count || 0,
-          lastCommentAt,
-          firstSeenAt,
-          lastSeenAt,
-        });
-      } catch (e: any) {
-        if (cancelled) return;
-        setOwnerPopoverData(null);
-        setOwnerPopoverError(e?.message || 'Failed to load partner signals');
-      } finally {
-        if (!cancelled) setOwnerPopoverLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [showOwnerPopover, ownerGuess?.username]);
-
-  // Derive location display - prefer city codes (ATL, LAX, NYC) or state abbrev
-  const locationDisplay = useMemo(() => {
-    const v = vehicle as any;
-    const city = v?.city;
-    const state = v?.state;
-    const zip = v?.zip_code;
-    const country = v?.country;
-    const batLoc = v?.bat_location;
-    const listingLoc = v?.listing_location || v?.listing_location_raw;
-
-    // Extract state from bat_location if needed
-    const extractState = (loc: string) => {
-      const m = loc.match(/,\s*([A-Z]{2})\b/);
-      return m ? m[1] : null;
-    };
-
-    const resolvedState = state && state !== ':' && state.length <= 3 ? state : (
-      batLoc ? extractState(batLoc) : listingLoc ? extractState(listingLoc) : null
-    );
-
-    // Build responsive levels: full → medium → compact → minimal
-    if (zip && city && resolvedState) {
-      return {
-        short: `${zip} ${resolvedState}`,
-        full: `${zip} ${city}, ${resolvedState}`,
-        compact: zip,
-        minimal: resolvedState,
-      };
-    }
-    if (zip && resolvedState) {
-      return { short: `${zip} ${resolvedState}`, full: `${zip} ${resolvedState}`, compact: zip, minimal: resolvedState };
-    }
-    if (zip) {
-      return { short: zip, full: zip, compact: zip, minimal: zip };
-    }
-    if (city && resolvedState) {
-      return { short: `${city}, ${resolvedState}`, full: `${city}, ${resolvedState}`, compact: resolvedState, minimal: resolvedState };
-    }
-    if (resolvedState) {
-      return { short: resolvedState, full: resolvedState, compact: resolvedState, minimal: resolvedState };
-    }
-    if (batLoc && batLoc !== 'United States') {
-      return { short: batLoc, full: batLoc, compact: batLoc.slice(0, 5), minimal: batLoc.slice(0, 2).toUpperCase() };
-    }
-    if (listingLoc) {
-      return { short: listingLoc, full: listingLoc, compact: listingLoc.slice(0, 5), minimal: listingLoc.slice(0, 2).toUpperCase() };
-    }
-    if (country && country !== 'USA' && country !== 'US') {
-      return { short: country.slice(0, 3).toUpperCase(), full: country, compact: country.slice(0, 3).toUpperCase(), minimal: country.slice(0, 2).toUpperCase() };
-    }
-    return null;
-  }, [(vehicle as any)?.city, (vehicle as any)?.state, (vehicle as any)?.country, (vehicle as any)?.bat_location, (vehicle as any)?.listing_location, (vehicle as any)?.zip_code]);
-  
-  // Cycle through trend periods
-  const toggleTrendPeriod = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const periods: ('live' | '1w' | '30d' | '6m' | '1y' | '5y')[] = ['live', '1w', '30d', '6m', '1y', '5y'];
-    const currentIndex = periods.indexOf(trendPeriod);
-    const nextIndex = (currentIndex + 1) % periods.length;
-    setTrendPeriod(periods[nextIndex]);
-  };
-  const [displayMode, setDisplayMode] = useState<'auto'|'estimate'|'auction'|'asking'|'sale'|'purchase'|'msrp'>('auto');
-  const [responsibleMode, setResponsibleMode] = useState<'auto'|'owner'|'consigner'|'uploader'|'listed_by'|'custom'>('auto');
-  const [responsibleCustom, setResponsibleCustom] = useState<string>('');
-  const [valuation, setValuation] = useState<any | null>(initialValuation || null);
+  // --- Remaining UI toggle state ---
   const [showTrade, setShowTrade] = useState(false);
   const [showOwnerCard, setShowOwnerCard] = useState(false);
-  const [ownerProfile, setOwnerProfile] = useState<any | null>(null);
-  const [ownerStats, setOwnerStats] = useState<{ contributions: number; vehicles: number } | null>(null);
-  const [isFollowing, setIsFollowing] = useState(false);
   const [priceMenuOpen, setPriceMenuOpen] = useState(false);
   const priceMenuRef = useRef<HTMLDivElement | null>(null);
   const [showPendingDetails, setShowPendingDetails] = useState(false);
-  const [similarVehicles, setSimilarVehicles] = useState<any[]>([]);
-  const [loadingSimilar, setLoadingSimilar] = useState(false);
-  const [imageCount, setImageCount] = useState(0);
   const pendingDetailsRef = useRef<HTMLDivElement | null>(null);
   const [showOriginDetails, setShowOriginDetails] = useState(false);
   const originDetailsRef = useRef<HTMLDivElement | null>(null);
   const [showProvenancePopup, setShowProvenancePopup] = useState(false);
-  const [priceSources, setPriceSources] = useState<Record<string, boolean>>({});
   const [showVinValidation, setShowVinValidation] = useState(false);
   const [showUpdateSalePriceModal, setShowUpdateSalePriceModal] = useState(false);
   const [showFollowAuctionCard, setShowFollowAuctionCard] = useState(false);
-  const [futureAuctionListing, setFutureAuctionListing] = useState<any | null>(null);
   const [showOrgInvestmentCard, setShowOrgInvestmentCard] = useState<string | null>(null);
   const [orgCardAnchor, setOrgCardAnchor] = useState<HTMLElement | null>(null);
-  const isMobile = useIsMobile();
   const titleRef = useRef<HTMLDivElement>(null);
   const sellerPopoverRef = useRef<HTMLDivElement>(null);
   const auctionPopoverRef = useRef<HTMLDivElement>(null);
 
-  const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
-  // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
-  // (VIN plate/stamping photo OCR, title OCR, etc). Manual entry alone is not enough.
-  const vinIsEvidenceBacked = !!vinProofSummary?.hasConclusiveProof;
-  const vinLooksValid = useMemo(() => {
-    const raw = (vehicle as any)?.vin;
-    if (!raw || typeof raw !== 'string') return false;
-    const v = raw.trim();
-    if (!v) return false;
-    const validation = vinDecoderService.validateVIN(v);
-    // Guard against garbage strings that happen to be 17 letters (e.g. "DUALEXHASUTSTACKS").
-    if (!validation.valid) return false;
-    if (!/\d/.test(validation.normalized)) return false;
-    return true;
-  }, [(vehicle as any)?.vin]);
-
-  // Check if price fields have verified sources (FACT-BASED requirement)
-  useEffect(() => {
-    const checkPriceSources = async () => {
-      if (!vehicle?.id) return;
-      
-      const sources: Record<string, boolean> = {};
-      
-      // Check each price field for verified sources
-      const priceFields = ['sale_price', 'asking_price', 'current_value', 'purchase_price', 'msrp'];
-      
-      for (const field of priceFields) {
-        const { data } = await supabase
-          .from('vehicle_field_sources')
-          .select('id, is_verified')
-          .eq('vehicle_id', vehicle.id)
-          .eq('field_name', field)
-          .eq('is_verified', true)
-          .limit(1);
-        
-        sources[field] = (data && data.length > 0) || false;
-      }
-      
-      setPriceSources(sources);
-    };
-    
-    checkPriceSources();
-  }, [vehicle?.id]);
-
-  // Check for future auction dates (for Mecum or other future auctions)
-  useEffect(() => {
-    const checkFutureAuction = async () => {
-      if (!vehicle?.id) {
-        setFutureAuctionListing(null);
-        return;
-      }
-
-      try {
-        const now = new Date().toISOString();
-        const { data, error } = await supabase
-          .from('external_listings')
-          .select('id, platform, listing_url, listing_status, start_date, end_date, metadata')
-          .eq('vehicle_id', vehicle.id)
-          .order('start_date', { ascending: true, nullsFirst: false })
-          .limit(10);
-
-        if (error) {
-          console.error('Error checking future auctions:', error);
-          setFutureAuctionListing(null);
-          return;
-        }
-
-        // Find the first listing with a future date (start_date, end_date, or metadata.sale_date)
-        const futureListing = (data || []).find((listing: any) => {
-          const nowMs = Date.now();
-          
-          // Check start_date first (auction start)
-          if (listing.start_date) {
-            const startDate = new Date(listing.start_date).getTime();
-            if (Number.isFinite(startDate) && startDate > nowMs) {
-              return true;
-            }
-          }
-          // Check end_date (auction end)
-          if (listing.end_date) {
-            const endDate = new Date(listing.end_date).getTime();
-            if (Number.isFinite(endDate) && endDate > nowMs) {
-              return true;
-            }
-          }
-          // Check metadata.sale_date (Mecum and other auction houses store dates here)
-          if (listing.metadata?.sale_date) {
-            const saleDate = new Date(listing.metadata.sale_date).getTime();
-            if (Number.isFinite(saleDate) && saleDate > nowMs) {
-              return true;
-            }
-          }
-          return false;
-        });
-
-        setFutureAuctionListing(futureListing || null);
-      } catch (error) {
-        console.error('Error checking future auctions:', error);
-        setFutureAuctionListing(null);
-      }
-    };
-
-    checkFutureAuction();
-  }, [vehicle?.id]);
-
-  // Only fetch if not provided via props (eliminates duplicate query)
-  useEffect(() => {
-    if (initialPriceSignal) {
-      setRpcSignal(initialPriceSignal);
-      return; // Skip fetch if provided
-    }
-    (async () => {
-      try {
-        if (!vehicle?.id) { setRpcSignal(null); return; }
-        const { data, error } = await supabase.rpc('vehicle_price_signal', { vehicle_ids: [vehicle.id] });
-        if (!error && Array.isArray(data) && data.length > 0) {
-          setRpcSignal(data[0]);
-        } else {
-          setRpcSignal(null);
-        }
-      } catch {
-        setRpcSignal(null);
-      }
-    })();
-  }, [vehicle?.id, initialPriceSignal]);
-
-  // Only fetch if not provided via props (eliminates duplicate query)
-  useEffect(() => {
-    if (initialValuation) {
-      setValuation(initialValuation);
-      return; // Skip fetch if provided
-    }
-    (async () => {
-      try {
-        if (!vehicle?.id) { setValuation(null); return; }
-        const v = await VehicleValuationService.getValuation(vehicle.id);
-        setValuation(v);
-      } catch {
-        setValuation(null);
-      }
-    })();
-  }, [vehicle?.id, initialValuation]);
-
-  // Load pending details if vehicle is pending
-  useEffect(() => {
-    if (!vehicle || (vehicle as any).status !== 'pending') {
-      setSimilarVehicles([]);
-      setImageCount(0);
-      return;
-    }
-
-    (async () => {
-      // Count images
-      const { count } = await supabase
-        .from('vehicle_images')
-        .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicle.id);
-      setImageCount(count || 0);
-
-      // Find similar vehicles if we have basic info
-      if (vehicle.year && vehicle.make && vehicle.model) {
-        setLoadingSimilar(true);
-        try {
-          const matches = await VehicleDeduplicationService.findDuplicates({
-            vin: vehicle.vin || undefined,
-            year: vehicle.year,
-            make: vehicle.make,
-            model: vehicle.model,
-          });
-
-          // Filter out this vehicle and enrich with image counts
-          const enriched = await Promise.all(
-            matches
-              .filter(m => m.existingVehicle.id !== vehicle.id)
-              .map(async (match) => {
-                const { count } = await supabase
-                  .from('vehicle_images')
-                  .select('id', { count: 'exact', head: true })
-                  .eq('vehicle_id', match.existingVehicle.id);
-
-                return {
-                  id: match.existingVehicle.id,
-                  year: match.existingVehicle.year,
-                  make: match.existingVehicle.make,
-                  model: match.existingVehicle.model,
-                  vin: match.existingVehicle.vin,
-                  image_count: count || 0,
-                  confidence: match.confidence,
-                  matchType: match.matchType,
-                };
-              })
-          );
-
-          setSimilarVehicles(enriched);
-        } catch (error) {
-          console.error('Error loading similar vehicles:', error);
-        } finally {
-          setLoadingSimilar(false);
-        }
-      }
-    })();
-  }, [vehicle?.id, (vehicle as any)?.status, vehicle?.year, vehicle?.make, vehicle?.model, vehicle?.vin]);
-
-  // Load owner's preferred display settings (if the table/columns exist)
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!vehicle?.id) return;
-        const { data, error } = await supabase
-          .from('vehicle_sale_settings')
-          .select('display_price_mode, display_responsible_mode, display_responsible_custom')
-          .eq('vehicle_id', vehicle.id)
-          .maybeSingle();
-        if (!error && data) {
-          if (typeof (data as any).display_price_mode === 'string') {
-            setDisplayMode(((data as any).display_price_mode as any) || 'auto');
-          }
-          if (typeof (data as any).display_responsible_mode === 'string') {
-            setResponsibleMode(((data as any).display_responsible_mode as any) || 'auto');
-          }
-          if (typeof (data as any).display_responsible_custom === 'string') {
-            setResponsibleCustom((data as any).display_responsible_custom || '');
-          }
-        }
-      } catch {
-        // ignore if table/column missing
-      }
-    })();
-  }, [vehicle?.id]);
-
-  // Load trend based on selected period (baseline + outlier filtering from DB)
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!vehicle?.id) {
-          setTrendPct(null);
-          setTrendPriceType(null);
-          setTrendBaselineValue(null);
-          setTrendBaselineAsOf(null);
-          setTrendBaselineSource(null);
-          setTrendOutlierCount(null);
-          return;
-        }
-
-        // Don't show trend if price was auto-corrected (e.g., $15 -> $15,000)
-        // The "trend" would be the correction, not real market movement
-        if ((vehicle as any)?.origin_metadata?.price_corrected === true ||
-            (vehicle as any)?.origin_metadata?.price_was_corrected === true) {
-          setTrendPct(null);
-          setTrendPriceType(null);
-          setTrendBaselineValue(null);
-          setTrendBaselineAsOf(null);
-          setTrendBaselineSource(null);
-          setTrendOutlierCount(null);
-          return;
-        }
-
-        // For 'live', we also check builds/receipts for active investment
-        if (trendPeriod === 'live') {
-          try {
-            const since = Date.now() - 24 * 60 * 60 * 1000;
-            const { data: builds } = await supabase
-              .from('vehicle_builds')
-              .select('id')
-              .eq('vehicle_id', vehicle.id);
-
-            let recentInvestment = 0;
-            if (builds && builds.length > 0) {
-              const buildIds = builds.map(b => b.id);
-              const { data: recentItems } = await supabase
-                .from('build_line_items')
-                .select('total_price')
-                .in('build_id', buildIds)
-                .gte('created_at', new Date(since).toISOString());
-
-              recentInvestment = recentItems?.reduce((sum, item) => sum + (item.total_price || 0), 0) || 0;
-            }
-
-            if (recentInvestment > 0) {
-              const currentValue = (vehicle as any).current_value || (vehicle as any).purchase_price || 10000;
-              const pct = (recentInvestment / currentValue) * 100;
-              setTrendPct(pct);
-              setTrendPriceType('current');
-              setTrendBaselineValue(null);
-              setTrendBaselineAsOf(null);
-              setTrendBaselineSource('auto');
-              setTrendOutlierCount(null);
-              return;
-            }
-          } catch {
-            // fall through to baseline trend
-          }
-        }
-
-        const v: any = vehicle as any;
-        const rawOutcome = String(v?.auction_outcome || '').toLowerCase();
-        const saleStatus = String(v?.sale_status || '').toLowerCase();
-        const isSold = saleStatus === 'sold' || rawOutcome === 'sold';
-
-        let priceType: 'sale' | 'asking' | 'current' | 'purchase' | 'msrp' = 'current';
-        if (isSold && typeof v?.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0) {
-          priceType = 'sale';
-        } else if (!isSold && typeof v?.asking_price === 'number' && Number.isFinite(v.asking_price) && v.asking_price > 0) {
-          priceType = 'asking';
-        } else if (typeof v?.current_value === 'number' && Number.isFinite(v.current_value) && v.current_value > 0) {
-          priceType = 'current';
-        } else if (typeof v?.purchase_price === 'number' && Number.isFinite(v.purchase_price) && v.purchase_price > 0) {
-          priceType = 'purchase';
-        } else if (typeof v?.msrp === 'number' && Number.isFinite(v.msrp) && v.msrp > 0) {
-          priceType = 'msrp';
-        }
-
-        setTrendPriceType(priceType);
-
-        const periodForRpc = trendPeriod === 'live' ? '1w' : trendPeriod;
-        const { data, error } = await supabase.rpc('get_vehicle_price_trend', {
-          p_vehicle_id: vehicle.id,
-          p_price_type: priceType,
-          p_period: periodForRpc,
-        });
-
-        if (error) {
-          setTrendPct(null);
-          setTrendBaselineValue(null);
-          setTrendBaselineAsOf(null);
-          setTrendBaselineSource(null);
-          setTrendOutlierCount(null);
-          return;
-        }
-
-        const row: any = Array.isArray(data) ? data[0] : data;
-        if (!row) {
-          setTrendPct(null);
-          setTrendBaselineValue(null);
-          setTrendBaselineAsOf(null);
-          setTrendBaselineSource(null);
-          setTrendOutlierCount(null);
-          return;
-        }
-
-        const pctRaw = row?.delta_pct;
-        const pct = typeof pctRaw === 'number' ? pctRaw : (pctRaw != null ? parseFloat(String(pctRaw)) : null);
-        setTrendPct(Number.isFinite(pct as any) ? (pct as number) : null);
-
-        const baseRaw = row?.baseline_value;
-        const base = typeof baseRaw === 'number' ? baseRaw : (baseRaw != null ? parseFloat(String(baseRaw)) : null);
-        setTrendBaselineValue(Number.isFinite(base as any) ? (base as number) : null);
-        setTrendBaselineAsOf(row?.baseline_as_of ? String(row.baseline_as_of) : null);
-        setTrendBaselineSource(row?.baseline_source ? String(row.baseline_source) : null);
-
-        const outRaw = row?.outlier_count;
-        const out = typeof outRaw === 'number' ? outRaw : (outRaw != null ? parseInt(String(outRaw), 10) : null);
-        setTrendOutlierCount(Number.isFinite(out as any) ? (out as number) : null);
-      } catch {
-        setTrendPct(null);
-        setTrendPriceType(null);
-        setTrendBaselineValue(null);
-        setTrendBaselineAsOf(null);
-        setTrendBaselineSource(null);
-        setTrendOutlierCount(null);
-      }
-    })();
-  }, [vehicle?.id, trendPeriod]);
-
-  // Load owner profile and stats when owner card opens
-  useEffect(() => {
-    if (!showOwnerCard) return;
-    (async () => {
-      try {
-        const ownerId = (vehicle as any)?.uploaded_by || (vehicle as any)?.user_id;
-        if (!ownerId) return;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id, username, full_name, avatar_url')
-          .eq('id', ownerId)
-          .maybeSingle();
-        setOwnerProfile(profile || null);
-        const { count: contribCount } = await supabase
-          .from('user_contributions')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', ownerId);
-        const { count: vehicleCount } = await supabase
-          .from('vehicles')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', ownerId);
-        setOwnerStats({ contributions: contribCount || 0, vehicles: vehicleCount || 0 });
-        if (session?.user?.id) {
-          const { data: follow } = await supabase
-            .from('user_follows')
-            .select('id')
-            .eq('follower_id', session.user.id)
-            .eq('following_id', ownerId)
-            .maybeSingle();
-          setIsFollowing(!!follow);
-        }
-      } catch (err) {
-        console.warn('Owner card load failed:', err);
-      }
-    })();
-  }, [showOwnerCard, vehicle, session?.user?.id]);
+  // Owner profile data (depends on showOwnerCard toggle)
+  const { ownerProfile, ownerStats, isFollowing, setIsFollowing } = useOwnerProfile(showOwnerCard, vehicle, session?.user?.id);
 
   // Close price popover when clicking outside or pressing Escape
   useEffect(() => {
@@ -1379,44 +493,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date || null;
   }, [auctionPulse?.end_date, vehicle]);
 
-  const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
-  const lastUpdateRef = useRef<number>(Date.now());
-  useEffect(() => {
-    if (!auctionEndDateForTimer) return;
-    const tick = () => {
-      const now = Date.now();
-      setAuctionNow(now);
-      lastUpdateRef.current = now;
-    };
-    // Update immediately
-    tick();
-    // Update every second when visible, every 10 seconds when hidden (to keep it accurate)
-    const id = window.setInterval(() => {
-      const isVisible = document.visibilityState === 'visible';
-      const now = Date.now();
-      if (isVisible) {
-        tick();
-      } else {
-        // Update less frequently when hidden, but still update to keep it accurate
-        if (now - lastUpdateRef.current >= 10000) { // Update every 10 seconds when hidden
-          tick();
-        }
-      }
-    }, 1000);
-    
-    // Also update when page becomes visible again (to catch up after tab switch)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        tick();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [auctionEndDateForTimer]);
+  const auctionNow = useAuctionTimer(auctionEndDateForTimer);
 
   const formatCountdownClock = (iso?: string | null, skipEndedText?: boolean) => {
     if (!iso) return null;
@@ -2560,18 +1637,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showPendingDetails]);
-
-  // Fetch transfer status for this vehicle (shows active transfer milestone in badge row)
-  useEffect(() => {
-    if (!vehicle?.id) return;
-    let cancelled = false;
-    supabase.functions.invoke('transfer-status-api', { body: { vehicle_id: vehicle.id } })
-      .then(({ data }) => {
-        if (!cancelled && data?.transfer_id) setTransferStatus(data);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [vehicle?.id]);
 
   return (
     <div

@@ -40,7 +40,9 @@ type EventType =
   | 'auction_ending_soon'
   | 'auction_ended'
   | 'auction_sold'
-  | 'auction_reserve_not_met';
+  | 'auction_reserve_not_met'
+  | 'service'
+  | 'work_completed';
 
 interface TimelineEvent {
   id: string;
@@ -845,6 +847,8 @@ const VehicleTimeline: React.FC<{
       auction_ended: 'badge-secondary',
       auction_reserve_not_met: 'badge-secondary',
       ownership_transfer: 'badge-warning',
+      service: 'badge-primary',
+      work_completed: 'badge-success',
     };
     return eventTypeColors[eventType] || 'badge-secondary';
   };

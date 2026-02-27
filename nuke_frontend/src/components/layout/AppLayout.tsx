@@ -194,10 +194,8 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         breadcrumbs={breadcrumbs}
       />
 
-      <main id="main-content" className="main-content">
-        <div className="content-container">
-          {children}
-        </div>
+      <main id="main-content" className="main-content content-container">
+        {children}
       </main>
 
       <MobileBottomNav />
