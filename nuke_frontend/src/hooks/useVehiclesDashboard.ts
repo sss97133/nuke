@@ -79,20 +79,123 @@ export function useVehiclesDashboard(userId: string | undefined) {
       setLoading(true);
       setError(null);
 
-      const { data: result, error: rpcError } = await supabase
-        .rpc('get_user_vehicles_dashboard', { p_user_id: userId });
+      // Run all queries in parallel — no monolithic RPC
+      const [ownedRes, permRes, publicRes] = await Promise.all([
+        // 1. Vehicles via ownership_verifications
+        supabase
+          .from('ownership_verifications')
+          .select('vehicle_id, created_at, status')
+          .eq('user_id', userId)
+          .eq('status', 'approved'),
 
-      if (rpcError) {
-        throw new Error(rpcError.message);
+        // 2. Vehicles via vehicle_user_permissions
+        supabase
+          .from('vehicle_user_permissions')
+          .select('vehicle_id, created_at, role, is_active')
+          .eq('user_id', userId)
+          .in('role', ['owner', 'co_owner']),
+
+        // 3. Public vehicles (uploaded_by — always indexed)
+        supabase
+          .from('vehicles')
+          .select('id, year, make, model, vin, current_value, purchase_price, primary_image_url, confidence_score, heat_score, created_at, status')
+          .eq('uploaded_by', userId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ]);
+
+      // Collect owned vehicle IDs
+      const ownedIds = new Map<string, { acquired_at: string; role: string }>();
+
+      if (ownedRes.data) {
+        for (const row of ownedRes.data) {
+          ownedIds.set(row.vehicle_id, {
+            acquired_at: row.created_at,
+            role: 'verified_owner',
+          });
+        }
       }
 
-      const raw = result as DashboardData;
-      // Merge public_vehicles into my_vehicles if user has no owned vehicles
-      if (raw.public_vehicles?.length && raw.my_vehicles.length === 0) {
-        raw.my_vehicles = raw.public_vehicles;
-        raw.summary.total_my_vehicles = raw.public_vehicles.length;
+      if (permRes.data) {
+        for (const row of permRes.data) {
+          if (row.is_active !== false && !ownedIds.has(row.vehicle_id)) {
+            ownedIds.set(row.vehicle_id, {
+              acquired_at: row.created_at,
+              role: row.role,
+            });
+          }
+        }
       }
-      setData(raw);
+
+      // Fetch owned vehicle details if any
+      let myVehicles: MyVehicle[] = [];
+      if (ownedIds.size > 0) {
+        const { data: vehicleRows } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, vin, current_value, purchase_price, primary_image_url, confidence_score, heat_score, created_at')
+          .in('id', Array.from(ownedIds.keys()));
+
+        if (vehicleRows) {
+          myVehicles = vehicleRows.map((v) => {
+            const ownership = ownedIds.get(v.id)!;
+            return {
+              vehicle_id: v.id,
+              year: v.year,
+              make: v.make,
+              model: v.model,
+              vin: v.vin,
+              acquisition_date: ownership.acquired_at,
+              ownership_role: ownership.role,
+              confidence_score: v.confidence_score ?? 0,
+              interaction_score: v.heat_score ?? 0,
+              last_activity_date: null,
+              event_count: 0,
+              image_count: 0,
+              current_value: v.current_value,
+              purchase_price: v.purchase_price,
+              primary_image_url: v.primary_image_url,
+            };
+          });
+        }
+      }
+
+      // Build public vehicles list from uploaded_by query
+      const publicVehicles: MyVehicle[] = (publicRes.data || []).map((v) => ({
+        vehicle_id: v.id,
+        year: v.year,
+        make: v.make,
+        model: v.model,
+        vin: null,
+        acquisition_date: v.created_at,
+        ownership_role: 'uploaded_by',
+        confidence_score: v.confidence_score ?? 0,
+        interaction_score: v.heat_score ?? 0,
+        last_activity_date: null,
+        event_count: 0,
+        image_count: 0,
+        current_value: v.current_value,
+        purchase_price: v.purchase_price,
+        primary_image_url: v.primary_image_url,
+      }));
+
+      // Merge: if user has owned vehicles, show those; otherwise fall back to public
+      const displayVehicles = myVehicles.length > 0 ? myVehicles : publicVehicles;
+
+      const result: DashboardData = {
+        my_vehicles: displayVehicles,
+        public_vehicles: publicVehicles,
+        client_vehicles: [],
+        business_fleets: [],
+        summary: {
+          total_my_vehicles: displayVehicles.length,
+          total_client_vehicles: 0,
+          total_business_vehicles: 0,
+          recent_activity_30d: 0,
+        },
+      };
+
+      setData(result);
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       setError(err instanceof Error ? err : new Error('Failed to load dashboard'));
