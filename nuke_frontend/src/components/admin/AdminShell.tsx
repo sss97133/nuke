@@ -1,18 +1,24 @@
 import React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
+import { supabase } from '../../lib/supabase';
 
 type AdminNavItem = {
   label: string;
   to: string;
   description?: string;
+  countKey?: string;
 };
+
+type NavCounts = Record<string, number>;
 
 const primary: AdminNavItem[] = [
   { label: 'Home', to: '/admin' },
-  { label: 'Reviews', to: '/admin/reviews', description: 'Contributor onboarding, ownership review, queues' },
-  { label: 'Verifications', to: '/admin/verifications' },
-  { label: 'Ownership Verifications', to: '/admin/ownership-verifications' },
+  { label: 'Inbox', to: '/admin/inbox', countKey: 'inbox' },
+  { label: 'Agent Inbox', to: '/admin/agent-inbox', countKey: 'agentInbox' },
+  { label: 'Reviews', to: '/admin/reviews', description: 'Contributor onboarding, ownership review, queues', countKey: 'reviews' },
+  { label: 'Verifications', to: '/admin/verifications', countKey: 'verifications' },
+  { label: 'Ownership Verifications', to: '/admin/ownership-verifications', countKey: 'ownership' },
   { label: 'Merge Proposals', to: '/admin/merge-proposals' },
   { label: 'Pending Vehicles', to: '/admin/pending-vehicles' },
 ];
@@ -37,7 +43,9 @@ const tools: AdminNavItem[] = [
   { label: 'Shipping Settings', to: '/admin/shipping-settings' },
   { label: 'x402 Settings', to: '/admin/x402-settings' },
   { label: 'Scraper Dashboard', to: '/admin/scrapers', description: 'Monitor and trigger all scrapers' },
+  { label: 'Unified Scrapers', to: '/admin/unified-scrapers', description: 'Unified scraper orchestrator dashboard' },
   { label: 'KSL Scraper', to: '/admin/ksl-scraper' },
+  { label: 'Proxy Bids', to: '/admin/proxy-bids', description: 'Proxy bid operations and assignment' },
   { label: 'Meme Library', to: '/admin/meme-library' },
   { label: 'Catalog Browser', to: '/admin/catalog' },
   { label: 'Make Logos Catalog', to: '/admin/make-logos-catalog', description: 'Vehicle makes + logo links (Wikidata/Commons)' },
@@ -54,37 +62,64 @@ const experimental: AdminNavItem[] = [
   { label: 'Legacy dashboard', to: '/admin/legacy-dashboard' },
 ];
 
-function NavList({ items }: { items: AdminNavItem[] }) {
+function NavBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span style={{
+      display: 'inline-block',
+      marginLeft: '6px',
+      padding: '0 5px',
+      fontSize: '7pt',
+      fontWeight: 700,
+      fontFamily: 'monospace',
+      color: '#fff',
+      backgroundColor: '#b91c1c',
+      borderRadius: '3px',
+      lineHeight: '14px',
+      verticalAlign: 'middle',
+    }}>
+      {count > 999 ? '999+' : count}
+    </span>
+  );
+}
+
+function NavList({ items, counts }: { items: AdminNavItem[]; counts: NavCounts }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-      {items.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          style={({ isActive }) => ({
-            display: 'block',
-            padding: 'var(--space-2) var(--space-3)',
-            fontSize: '8pt',
-            borderRadius: '0px',
-            backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
-            color: isActive ? 'var(--text)' : 'var(--text-muted)',
-            transition: 'all 0.12s ease',
-            textDecoration: 'none'
-          })}
-          className={({ isActive }) => isActive ? 'admin-nav-active' : 'admin-nav-inactive'}
-          title={item.description}
-          end={item.to === '/admin'}
-        >
-          <div style={{ fontWeight: 500 }}>{item.label}</div>
-          {item.description ? (
-            <div style={{
+      {items.map((item) => {
+        const count = item.countKey != null ? (counts[item.countKey] ?? 0) : 0;
+        return (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            style={({ isActive }) => ({
+              display: 'block',
+              padding: 'var(--space-2) var(--space-3)',
               fontSize: '8pt',
-              color: 'var(--text-muted)',
-              marginTop: '2px'
-            }}>{item.description}</div>
-          ) : null}
-        </NavLink>
-      ))}
+              borderRadius: '0px',
+              backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
+              color: isActive ? 'var(--text)' : 'var(--text-muted)',
+              transition: 'all 0.12s ease',
+              textDecoration: 'none'
+            })}
+            className={({ isActive }) => isActive ? 'admin-nav-active' : 'admin-nav-inactive'}
+            title={item.description}
+            end={item.to === '/admin'}
+          >
+            <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center' }}>
+              {item.label}
+              <NavBadge count={count} />
+            </div>
+            {item.description ? (
+              <div style={{
+                fontSize: '8pt',
+                color: 'var(--text-muted)',
+                marginTop: '2px'
+              }}>{item.description}</div>
+            ) : null}
+          </NavLink>
+        );
+      })}
     </div>
   );
 }
@@ -92,23 +127,30 @@ function NavList({ items }: { items: AdminNavItem[] }) {
 function Section({
   title,
   items,
+  counts,
   collapsed,
   onToggle,
   right,
 }: {
   title: string;
   items: AdminNavItem[];
+  counts: NavCounts;
   collapsed?: boolean;
   onToggle?: () => void;
   right?: React.ReactNode;
 }) {
+  const sectionTotal = items.reduce((sum, item) => {
+    if (!item.countKey) return sum;
+    return sum + (counts[item.countKey] ?? 0);
+  }, 0);
+
   return (
     <div style={{ marginBottom: 'var(--space-6)' }}>
       <div style={{
-        fontSize: '8pt', 
-        fontWeight: 600, 
-        color: 'var(--text-muted)', 
-        textTransform: 'uppercase', 
+        fontSize: '8pt',
+        fontWeight: 600,
+        color: 'var(--text-muted)',
+        textTransform: 'uppercase',
         letterSpacing: '0.5px',
         marginBottom: 'var(--space-2)',
         display: 'flex',
@@ -132,15 +174,17 @@ function Section({
             <span style={{ fontFamily: 'monospace' }}>{collapsed ? '+' : '-'}</span>
             <span>{title}</span>
             <span style={{ fontFamily: 'monospace', opacity: 0.7 }}>({items.length})</span>
+            {sectionTotal > 0 && <NavBadge count={sectionTotal} />}
           </button>
         ) : (
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             {title} <span style={{ fontFamily: 'monospace', opacity: 0.7 }}>({items.length})</span>
+            {sectionTotal > 0 && <NavBadge count={sectionTotal} />}
           </div>
         )}
         {right ? <div style={{ textTransform: 'none' }}>{right}</div> : null}
       </div>
-      {collapsed ? null : <NavList items={items} />}
+      {collapsed ? null : <NavList items={items} counts={counts} />}
     </div>
   );
 }
@@ -151,6 +195,41 @@ export default function AdminShell() {
   const { loading, isAdmin } = useAdminAccess();
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = React.useState('');
+  const [navCounts, setNavCounts] = React.useState<NavCounts>({});
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function fetchNavCounts() {
+      try {
+        const [
+          { count: inbox },
+          { count: agentInbox },
+          { count: reviews },
+          { count: verifications },
+          { count: ownership },
+        ] = await Promise.all([
+          supabase.from('contact_inbox').select('*', { count: 'exact', head: true }).eq('status', 'unread'),
+          supabase.from('agent_messages').select('*', { count: 'exact', head: true }).eq('to_role', 'founder').is('read_at', null),
+          supabase.from('admin_notifications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('secure_documents').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
+          supabase.from('ownership_verifications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        ]);
+        if (cancelled) return;
+        setNavCounts({
+          inbox: inbox ?? 0,
+          agentInbox: agentInbox ?? 0,
+          reviews: reviews ?? 0,
+          verifications: verifications ?? 0,
+          ownership: ownership ?? 0,
+        });
+      } catch {
+        // counts are decorative — ignore errors
+      }
+    }
+    fetchNavCounts();
+    const interval = setInterval(fetchNavCounts, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
   const [showTools, setShowTools] = React.useState<boolean>(() => {
     try {
       return localStorage.getItem('nuke_admin_nav_showTools') === '1';
@@ -332,7 +411,10 @@ export default function AdminShell() {
                   end={item.to === '/admin'}
                 >
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
-                    <div style={{ fontWeight: 500 }}>{item.label}</div>
+                    <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center' }}>
+                      {item.label}
+                      {item.countKey && navCounts[item.countKey] > 0 && <NavBadge count={navCounts[item.countKey]} />}
+                    </div>
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item._section}</div>
                   </div>
                   {item.description ? (
@@ -349,11 +431,12 @@ export default function AdminShell() {
           </div>
         ) : (
           <>
-            <Section title="Primary" items={primary} />
-            <Section title="Operations" items={operations} />
+            <Section title="Primary" items={primary} counts={navCounts} />
+            <Section title="Operations" items={operations} counts={navCounts} />
             <Section
               title="Tools"
               items={tools}
+              counts={navCounts}
               collapsed={!showTools}
               onToggle={() => setShowTools((v) => !v)}
               right={<span style={{ fontFamily: 'monospace' }}>{showTools ? 'shown' : 'hidden'}</span>}
@@ -361,6 +444,7 @@ export default function AdminShell() {
             <Section
               title="Experimental"
               items={experimental}
+              counts={navCounts}
               collapsed={!showExperimental}
               onToggle={() => setShowExperimental((v) => !v)}
               right={<span style={{ fontFamily: 'monospace' }}>{showExperimental ? 'shown' : 'hidden'}</span>}

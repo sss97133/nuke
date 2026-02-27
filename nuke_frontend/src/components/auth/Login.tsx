@@ -25,7 +25,8 @@ const Login = () => {
   const navigate = useNavigate();
 
   // Support both returnUrl and redirect (used across the app)
-  const getReturnUrl = () => searchParams.get('returnUrl') || searchParams.get('redirect') || '/vehicles';
+  // Default: new users land on homepage (Garage tab), not /vehicles which is an extra redirect
+  const getReturnUrl = () => searchParams.get('returnUrl') || searchParams.get('redirect') || '/';
 
   useEffect(() => {
     const modeParam = searchParams.get('mode');
@@ -220,29 +221,73 @@ const Login = () => {
       <div className="container">
         <div className="main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           <div style={{ width: '320px' }}>
+            {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <h1 className="heading-1" style={{ marginBottom: '8px' }}>Nuke</h1>
               <p className="text text-muted">Vehicle Provenance Engine</p>
             </div>
-            
-            
+
+            {/* Sign in / Sign up toggle */}
+            <div style={{
+              display: 'flex',
+              marginBottom: '24px',
+              border: '2px solid var(--border-light)',
+              borderRadius: '0px',
+            }}>
+              <button
+                type="button"
+                onClick={() => { setMode('signin'); setError(null); setMessage(null); }}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: 'none',
+                  fontSize: '8pt',
+                  fontWeight: mode === 'signin' ? 700 : 400,
+                  backgroundColor: mode === 'signin' ? 'var(--text)' : 'transparent',
+                  color: mode === 'signin' ? 'var(--white)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
+                }}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('signup'); setError(null); setMessage(null); }}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: 'none',
+                  fontSize: '8pt',
+                  fontWeight: mode === 'signup' ? 700 : 400,
+                  backgroundColor: mode === 'signup' ? 'var(--text)' : 'transparent',
+                  color: mode === 'signup' ? 'var(--white)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
+                }}
+              >
+                Create account
+              </button>
+            </div>
+
             {error && (
-              <div className="alert alert-error" role="alert" style={{ marginBottom: '24px' }}>
+              <div className="alert alert-error" role="alert" style={{ marginBottom: '16px' }}>
                 {error}
               </div>
             )}
-            
+
             {message && (
-              <div className="alert alert-success" role="status" style={{ marginBottom: '24px' }}>
+              <div className="alert alert-success" role="status" style={{ marginBottom: '16px' }}>
                 {message}
               </div>
             )}
-            
+
+            {/* OAuth buttons */}
             <button
               onClick={handleGoogleLogin}
               className="button button-secondary w-full"
               disabled={loading}
-              style={{ marginBottom: '12px' }}
+              style={{ marginBottom: '8px' }}
             >
               {loading ? 'Connecting...' : 'Continue with Google'}
             </button>
@@ -255,13 +300,18 @@ const Login = () => {
             >
               {loading ? 'Connecting...' : 'Continue with GitHub'}
             </button>
-            
-            <div style={{ textAlign: 'center', margin: '16px 0', color: '#666' }}>
+
+            <div style={{ textAlign: 'center', margin: '16px 0', fontSize: '8pt', color: 'var(--text-muted)' }}>
               or
             </div>
 
-            {/* Auth method selector */}
-            <div style={{ display: 'flex', marginBottom: '16px', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+            {/* Auth method selector (email / phone) */}
+            <div style={{
+              display: 'flex',
+              marginBottom: '16px',
+              border: '2px solid var(--border-light)',
+              borderRadius: '0px',
+            }}>
               <button
                 type="button"
                 onClick={() => {
@@ -272,12 +322,14 @@ const Login = () => {
                 }}
                 style={{
                   flex: 1,
-                  padding: '8px 12px',
+                  padding: '6px 12px',
                   border: 'none',
-                  borderRadius: '6px 0 0 6px',
-                  backgroundColor: authMethod === 'email' ? '#3b82f6' : 'transparent',
-                  color: authMethod === 'email' ? 'white' : '#6b7280',
-                  cursor: 'pointer'
+                  fontSize: '8pt',
+                  fontWeight: authMethod === 'email' ? 600 : 400,
+                  backgroundColor: authMethod === 'email' ? 'var(--grey-100)' : 'transparent',
+                  color: authMethod === 'email' ? 'var(--text)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
                 }}
               >
                 Email
@@ -292,22 +344,24 @@ const Login = () => {
                 }}
                 style={{
                   flex: 1,
-                  padding: '8px 12px',
+                  padding: '6px 12px',
                   border: 'none',
-                  borderRadius: '0 6px 6px 0',
-                  backgroundColor: authMethod === 'phone' ? '#3b82f6' : 'transparent',
-                  color: authMethod === 'phone' ? 'white' : '#6b7280',
-                  cursor: 'pointer'
+                  fontSize: '8pt',
+                  fontWeight: authMethod === 'phone' ? 600 : 400,
+                  backgroundColor: authMethod === 'phone' ? 'var(--grey-100)' : 'transparent',
+                  color: authMethod === 'phone' ? 'var(--text)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
                 }}
               >
                 Phone
               </button>
             </div>
 
-            <form onSubmit={handleAuth} style={{ marginBottom: '24px' }}>
+            <form onSubmit={handleAuth} style={{ marginBottom: '16px' }}>
               {authMethod === 'email' ? (
                 <>
-                  <div style={{ marginBottom: '16px' }}>
+                  <div style={{ marginBottom: '12px' }}>
                     <label htmlFor="login-email" className="sr-only">Email</label>
                     <input
                       id="login-email"
@@ -321,23 +375,23 @@ const Login = () => {
                     />
                   </div>
 
-                  <div style={{ marginBottom: '24px' }}>
+                  <div style={{ marginBottom: '16px' }}>
                     <label htmlFor="login-password" className="sr-only">Password</label>
                     <input
                       id="login-password"
                       type="password"
                       className="input"
-                      placeholder="Password"
+                      placeholder={mode === 'signup' ? 'Choose a password' : 'Password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      autoComplete="current-password"
+                      autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     />
                   </div>
                 </>
               ) : (
                 <>
-                  <div style={{ marginBottom: '16px' }}>
+                  <div style={{ marginBottom: '12px' }}>
                     <label htmlFor="login-phone" className="sr-only">Phone number</label>
                     <input
                       id="login-phone"
@@ -352,13 +406,13 @@ const Login = () => {
                   </div>
 
                   {showOtpInput && (
-                    <div style={{ marginBottom: '16px' }}>
+                    <div style={{ marginBottom: '12px' }}>
                       <label htmlFor="login-otp" className="sr-only">OTP code</label>
                       <input
                         id="login-otp"
                         type="text"
                         className="input"
-                        placeholder="Enter OTP code"
+                        placeholder="6-digit code"
                         value={otpCode}
                         onChange={(e) => setOtpCode(e.target.value)}
                         maxLength={6}
@@ -378,16 +432,18 @@ const Login = () => {
                 {loading
                   ? 'Loading...'
                   : authMethod === 'phone' && !showOtpInput
-                    ? 'Send OTP'
+                    ? 'Send code'
                     : authMethod === 'phone' && showOtpInput
-                    ? 'Verify OTP'
-                    : 'Continue'
+                    ? 'Verify code'
+                    : mode === 'signup'
+                    ? 'Create account'
+                    : 'Sign in'
                 }
               </button>
             </form>
 
             {authMethod === 'phone' && showOtpInput && (
-              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '12px' }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -396,41 +452,44 @@ const Login = () => {
                     setMessage(null);
                     setError(null);
                   }}
-                  className="text text-muted"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '8pt',
+                    color: 'var(--text-muted)',
+                    textDecoration: 'underline',
+                  }}
                 >
-                  ← Back to phone number
+                  Back to phone number
                 </button>
               </div>
             )}
-            
-            <div style={{ textAlign: 'center' }}>
-              {authMethod === 'email' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotPassword(true)}
-                    className="text text-muted"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginRight: '16px' }}
-                  >
-                    Forgot password?
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-                    className="text text-muted"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-                  >
-                    {mode === 'signin' ? 'Create account' : 'Sign in instead'}
-                  </button>
-                </>
-              )}
-              {authMethod === 'phone' && (
-                <p className="text text-muted" style={{ fontSize: '14px', margin: 0 }}>
-                  Phone authentication will create an account if one doesn't exist
-                </p>
-              )}
-            </div>
+
+            {authMethod === 'email' && (
+              <div style={{ textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '8pt',
+                    color: 'var(--text-muted)',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            {authMethod === 'phone' && (
+              <p style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
+                Phone sign-in creates an account if you don't have one.
+              </p>
+            )}
           </div>
         </div>
       </div>

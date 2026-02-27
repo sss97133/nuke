@@ -39,6 +39,9 @@ const NLQueryConsole = React.lazy(() => import('../../../pages/admin/NLQueryCons
 const AdminIdentityClaims = React.lazy(() => import('../../../pages/admin/AdminIdentityClaims'));
 const InventoryAnalytics = React.lazy(() => import('../../../pages/admin/InventoryAnalytics'));
 const AdminInbox = React.lazy(() => import('../../../pages/admin/AdminInbox'));
+const AdminAgentInbox = React.lazy(() => import('../../../pages/admin/AdminAgentInbox'));
+const ProxyBidOperations = React.lazy(() => import('../../../pages/admin/ProxyBidOperations'));
+const UnifiedScraperDashboard = React.lazy(() => import('../../../pages/admin/UnifiedScraperDashboard'));
 
 const LazyFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '9pt' }}>
@@ -64,6 +67,7 @@ const AdminModuleRoutes = () => {
 
           {/* Inbox */}
           <Route path="inbox" element={<AdminInbox />} />
+          <Route path="agent-inbox" element={<AdminAgentInbox />} />
 
           {/* Ops */}
           <Route path="ralph" element={<AdminRalphBrief />} />
@@ -97,6 +101,8 @@ const AdminModuleRoutes = () => {
           <Route path="query-console" element={<NLQueryConsole />} />
           <Route path="hover-demo" element={<HoverCardDemo />} />
           <Route path="bot-testing" element={<BotTestDashboard />} />
+          <Route path="proxy-bids" element={<ProxyBidOperations />} />
+          <Route path="unified-scrapers" element={<UnifiedScraperDashboard />} />
         </Route>
       </Routes>
     </Suspense>
