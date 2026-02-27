@@ -492,15 +492,16 @@ export default function Portfolio() {
         }}>
           <div>
             <h1 style={{
-              fontSize: '11px',
-              fontWeight: 700,
+              fontSize: 'var(--fs-12)',
+              fontWeight: 900,
               marginBottom: '2px'
             }}>
               Portfolio
             </h1>
             <p style={{
-              fontSize: '9px',
-              color: 'var(--text-secondary)'
+              fontSize: 'var(--fs-9)',
+              color: 'var(--text-secondary)',
+              margin: 0,
             }}>
               Trading account · Cash balance · Share holdings
             </p>
@@ -540,19 +541,19 @@ export default function Portfolio() {
             padding: '20px'
           }}>
             <div style={{
-              fontSize: '8px',
+              fontSize: 'var(--fs-8)',
               color: 'var(--text-secondary)',
               marginBottom: '4px',
               fontWeight: 600,
-              textTransform: 'uppercase'
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
             }}>
               Total Portfolio Value
             </div>
             <div style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              color: 'var(--accent)',
-              fontFamily: 'var(--font-mono, monospace)'
+              fontSize: 'var(--fs-12)',
+              fontWeight: 900,
+              fontFamily: 'var(--font-mono, monospace)',
             }}>
               {CashBalanceService.formatCurrency(totalPortfolioValue)}
             </div>
@@ -569,19 +570,20 @@ export default function Portfolio() {
             padding: '20px'
           }}>
             <div style={{
-              fontSize: '8px',
+              fontSize: 'var(--fs-8)',
               color: 'var(--text-secondary)',
               marginBottom: '4px',
               fontWeight: 600,
-              textTransform: 'uppercase'
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
             }}>
               Unrealized P&L
             </div>
             <div style={{
-              fontSize: '12px',
-              fontWeight: 700,
+              fontSize: 'var(--fs-12)',
+              fontWeight: 900,
               color: totalUnrealizedPL >= 0 ? 'var(--success)' : 'var(--error)',
-              fontFamily: 'var(--font-mono, monospace)'
+              fontFamily: 'var(--font-mono, monospace)',
             }}>
               {totalUnrealizedPL >= 0 ? '+' : ''}
               {CashBalanceService.formatCurrency(totalUnrealizedPL)}
@@ -590,165 +592,43 @@ export default function Portfolio() {
         </div>
 
         {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '16px',
-          overflowX: 'auto',
-          scrollbarWidth: 'none'
-        }}>
-          <button
-            onClick={() => setActiveTab('overview')}
-            style={{
-              border: '2px solid var(--border)',
-              background: activeTab === 'overview' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'overview' ? 'var(--accent)' : 'var(--text)',
-              padding: '6px 12px',
-              fontSize: '9px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Overview
-          </button>
-
-          <button
-            onClick={() => setActiveTab('cash')}
-            style={{
-              border: '2px solid var(--border)',
-              background: activeTab === 'cash' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'cash' ? 'var(--accent)' : 'var(--text)',
-              padding: '6px 12px',
-              fontSize: '9px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Cash
-          </button>
-
-          <button
-            onClick={() => setActiveTab('shares')}
-            style={{
-              border: '2px solid var(--border)',
-              background: activeTab === 'shares' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'shares' ? 'var(--accent)' : 'var(--text)',
-              padding: '6px 12px',
-              fontSize: '9px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Shares ({holdings.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('orders')}
-            style={{
-              border: '2px solid var(--border)',
-              background: activeTab === 'orders' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'orders' ? 'var(--accent)' : 'var(--text)',
-              padding: '6px 12px',
-              fontSize: '9px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Orders{openOrders.length > 0 ? ` (${openOrders.length})` : ''}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('stakes')}
-            style={{
-              border: '2px solid var(--border)',
-              background: activeTab === 'stakes' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'stakes' ? 'var(--accent)' : 'var(--text)',
-              padding: '6px 12px',
-              fontSize: '9px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Stakes ({stakes.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('bonds')}
-            style={{
-              border: '2px solid var(--border)',
-              background: activeTab === 'bonds' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'bonds' ? 'var(--accent)' : 'var(--text)',
-              padding: '6px 12px',
-              fontSize: '9px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Bonds ({bonds.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('orgs')}
-            style={{
-              border: '2px solid var(--border)',
-              background: activeTab === 'orgs' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'orgs' ? 'var(--accent)' : 'var(--text)',
-              padding: '6px 12px',
-              fontSize: '9px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Org Stocks ({orgHoldings.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('vehicles')}
-            style={{
-              border: '2px solid var(--border)',
-              background: activeTab === 'vehicles' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'vehicles' ? 'var(--accent)' : 'var(--text)',
-              padding: '6px 12px',
-              fontSize: '9px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            My Vehicles ({ownedVehicles.length})
-          </button>
-        </div>
+        {(() => {
+          const tabs: Array<{ id: typeof activeTab; label: string }> = [
+            { id: 'overview', label: 'Overview' },
+            { id: 'cash', label: 'Cash' },
+            { id: 'shares', label: `Shares${holdings.length > 0 ? ` (${holdings.length})` : ''}` },
+            { id: 'orders', label: `Orders${openOrders.length > 0 ? ` (${openOrders.length})` : ''}` },
+            { id: 'stakes', label: `Stakes${stakes.length > 0 ? ` (${stakes.length})` : ''}` },
+            { id: 'bonds', label: `Bonds${bonds.length > 0 ? ` (${bonds.length})` : ''}` },
+            { id: 'orgs', label: `Org Stocks${orgHoldings.length > 0 ? ` (${orgHoldings.length})` : ''}` },
+            { id: 'vehicles', label: `My Vehicles${ownedVehicles.length > 0 ? ` (${ownedVehicles.length})` : ''}` },
+          ];
+          return (
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '2px' }}>
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    border: '2px solid var(--border)',
+                    background: activeTab === tab.id ? 'var(--accent)' : 'var(--surface)',
+                    color: activeTab === tab.id ? 'var(--white, #fff)' : 'var(--text)',
+                    padding: '6px 12px',
+                    fontSize: 'var(--fs-9)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: '0.12s',
+                    borderRadius: '4px',
+                    whiteSpace: 'nowrap',
+                    borderColor: activeTab === tab.id ? 'var(--accent)' : 'var(--border)',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Content */}
         <div style={{
@@ -767,34 +647,34 @@ export default function Portfolio() {
                 marginBottom: '24px'
               }}>
                 <div>
-                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
                     Cash
                   </div>
-                  <div style={{ fontSize: '11px', fontWeight: 600 }}>
+                  <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>
                     {CashBalanceService.formatCurrency(cashBalance?.balance_cents || 0)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
                     Shares
                   </div>
-                  <div style={{ fontSize: '11px', fontWeight: 600 }}>
+                  <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>
                     {CashBalanceService.formatCurrency(sharesValue)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
                     Stakes
                   </div>
-                  <div style={{ fontSize: '11px', fontWeight: 600 }}>
+                  <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>
                     {CashBalanceService.formatCurrency(stakesValue)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
                     Bonds
                   </div>
-                  <div style={{ fontSize: '11px', fontWeight: 600 }}>
+                  <div style={{ fontSize: 'var(--fs-11)', fontWeight: 700 }}>
                     {CashBalanceService.formatCurrency(bondsValue)}
                   </div>
                 </div>
@@ -806,23 +686,31 @@ export default function Portfolio() {
                 padding: '16px',
                 background: 'var(--bg)'
               }}>
-                <div style={{ fontSize: '9px', fontWeight: 600, marginBottom: '12px' }}>
+                <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, marginBottom: '12px' }}>
                   Portfolio Breakdown
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
-                    <span>Total Assets</span>
-                    <span style={{ fontWeight: 600 }}>{CashBalanceService.formatCurrency(totalPortfolioValue)}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-9)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total Assets</span>
+                    <span style={{ fontWeight: 700 }}>{CashBalanceService.formatCurrency(totalPortfolioValue)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
-                    <span>Unrealized P&L</span>
-                    <span style={{ 
-                      fontWeight: 600, 
-                      color: totalUnrealizedPL >= 0 ? 'var(--success)' : 'var(--error)' 
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-9)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Unrealized P&L</span>
+                    <span style={{
+                      fontWeight: 700,
+                      color: totalUnrealizedPL >= 0 ? 'var(--success)' : 'var(--error)'
                     }}>
                       {totalUnrealizedPL >= 0 ? '+' : ''}
                       {CashBalanceService.formatCurrency(totalUnrealizedPL)}
                     </span>
+                  </div>
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button className="button button-primary" style={{ fontSize: 'var(--fs-9)' }} onClick={() => navigate('/market/exchange')}>
+                      Browse Funds
+                    </button>
+                    <button className="button button-secondary" style={{ fontSize: 'var(--fs-9)' }} onClick={() => navigate('/vehicles')}>
+                      Browse Vehicles
+                    </button>
                   </div>
                 </div>
               </div>
@@ -976,10 +864,16 @@ export default function Portfolio() {
                 <div style={{
                   padding: '48px 20px',
                   textAlign: 'center',
-                  color: 'var(--text-secondary)',
-                  fontSize: '9px'
                 }}>
-                  No holdings yet. Invest in vehicles or ETF funds to build your portfolio.
+                  <div style={{ fontSize: 'var(--fs-10)', fontWeight: 700, marginBottom: '8px' }}>
+                    No holdings yet
+                  </div>
+                  <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                    Invest in collector vehicle ETF funds to start building your portfolio.
+                  </div>
+                  <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
+                    Browse Funds
+                  </button>
                 </div>
               ) : (
                 <div>
@@ -1272,10 +1166,6 @@ export default function Portfolio() {
                   {orgHoldings.map((holding, index) => (
                     <div
                       key={holding.offering_id}
-                      onClick={() => {
-                        // TODO: navigate to org profile once we have org_id
-                        alert(`View ${holding.stock_symbol} - org profile integration pending`);
-                      }}
                       style={{
                         padding: '16px 20px',
                         borderBottom: index < orgHoldings.length - 1 ? '1px solid var(--border)' : 'none',
@@ -1283,7 +1173,6 @@ export default function Portfolio() {
                         gridTemplateColumns: '2fr 1fr 1fr 1fr',
                         gap: '16px',
                         alignItems: 'center',
-                        cursor: 'pointer',
                         transition: '0.12s',
                         fontSize: '9px'
                       }}
@@ -1383,7 +1272,7 @@ export default function Portfolio() {
                           </div>
                         )}
                         {v.vin && (
-                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)' }}>
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)' }}>
                             VIN: {v.vin.slice(0, 8)}...
                           </div>
                         )}

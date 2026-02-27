@@ -46,19 +46,39 @@ const formatUSD2 = (value: number) =>
     maximumFractionDigits: 2
   }).format(value);
 
+const formatLargeUSD = (value: number) => {
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+};
+
 const formatPct = (value: number | null) => {
   if (value === null || Number.isNaN(value)) return '—';
   const sign = value >= 0 ? '+' : '';
   return `${sign}${value.toFixed(2)}%`;
 };
 
+function SkeletonBlock({ width = '100%', height = '16px' }: { width?: string; height?: string }) {
+  return (
+    <div style={{
+      width,
+      height,
+      background: 'var(--border)',
+      borderRadius: '3px',
+      animation: 'pulse 1.5s ease-in-out infinite',
+    }} />
+  );
+}
+
 export default function MarketFundDetail() {
   const { symbol } = useParams();
   const navigate = useNavigate();
-  // useAuth reads from global AuthContext — synchronous, no getSession() call needed
   const { session, user } = useAuth();
 
   const [fund, setFund] = useState<FundRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [cashCents, setCashCents] = useState<number>(0);
   const [amount, setAmount] = useState<string>('100');
   const [buying, setBuying] = useState(false);
@@ -74,15 +94,19 @@ export default function MarketFundDetail() {
   useEffect(() => {
     (async () => {
       try {
+        setLoading(true);
+        setNotFound(false);
         setError(null);
         setSuccess(null);
 
-        if (!symbol) return;
+        if (!symbol) {
+          setNotFound(true);
+          return;
+        }
 
-        // Use api-v1-exchange for fund data + cached stats (avoids slow market_segment_stats RPC)
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         };
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
@@ -93,7 +117,7 @@ export default function MarketFundDetail() {
         const json = await res.json();
         if (json.error) throw new Error(json.error);
         if (!json.fund) {
-          setFund(null);
+          setNotFound(true);
           return;
         }
 
@@ -104,7 +128,9 @@ export default function MarketFundDetail() {
         }
       } catch (e: any) {
         console.error('Failed to load market fund:', e);
-        setError(e?.message || 'Failed to load market fund');
+        setError('Unable to load fund data. Please try again.');
+      } finally {
+        setLoading(false);
       }
     })();
   }, [symbol, session]);
@@ -112,7 +138,7 @@ export default function MarketFundDetail() {
   const handleBuy = async () => {
     if (!fund) return;
     if (!parsedAmountUSD) {
-      setError('Enter a valid amount');
+      setError('Enter a valid dollar amount');
       return;
     }
 
@@ -127,36 +153,78 @@ export default function MarketFundDetail() {
       setError(null);
       setSuccess(null);
 
-      const { data, error } = await supabase.rpc('market_fund_buy', {
+      const { data, error: rpcError } = await supabase.rpc('market_fund_buy', {
         p_fund_id: fund.id,
-        p_amount_cents: amountCents
+        p_amount_cents: amountCents,
       });
-      if (error) throw error;
+      if (rpcError) throw rpcError;
 
       const first = Array.isArray(data) ? data[0] : data;
+      const sharesIssued = Number(first?.shares_issued || 0).toFixed(6);
       setSuccess(
-        `Invested ${formatUSD2(amountCents / 100)} into ${fund.symbol}. Shares issued: ${Number(first?.shares_issued || 0).toFixed(6)}`
+        `Invested ${formatUSD2(amountCents / 100)} into ${fund.symbol}. ${sharesIssued} shares issued at NAV ${fund.nav_share_price.toFixed(4)}.`
       );
 
-      // Refresh cash balance using user from context
       if (user?.id) {
         const bal = await CashBalanceService.getUserBalance(user.id);
         setCashCents(bal?.available_cents || 0);
       }
     } catch (e: any) {
       console.error('Fund buy failed:', e);
-      setError(e?.message || 'Buy failed');
+      setError(e?.message || 'Investment failed. Please try again.');
     } finally {
       setBuying(false);
     }
   };
 
-  if (!fund) {
+  // Loading skeleton
+  if (loading) {
     return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
-        Fund not found.
-        <div style={{ marginTop: '10px' }}>
-          <button className="button button-secondary" onClick={() => navigate('/market/exchange')}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
+        <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }`}</style>
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'grid', gap: '8px', width: '300px' }}>
+              <SkeletonBlock height="28px" width="160px" />
+              <SkeletonBlock height="14px" width="220px" />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <SkeletonBlock width="80px" height="34px" />
+              <SkeletonBlock width="90px" height="34px" />
+            </div>
+          </div>
+          <div style={{ marginBottom: '14px' }}>
+            <SkeletonBlock height="80px" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+            {[1, 2].map(i => (
+              <div key={i} className="card">
+                <div className="card-body" style={{ display: 'grid', gap: '10px' }}>
+                  <SkeletonBlock height="14px" width="60%" />
+                  <SkeletonBlock height="12px" />
+                  <SkeletonBlock height="12px" width="80%" />
+                  <SkeletonBlock height="12px" width="70%" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not found
+  if (notFound) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
+        <div style={{ maxWidth: '600px', margin: '80px auto', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--fs-11)', fontWeight: 800, marginBottom: '10px' }}>
+            Fund Not Found
+          </div>
+          <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', marginBottom: '24px' }}>
+            The fund "{symbol}" doesn't exist or is no longer active.
+          </div>
+          <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
             Back to Exchange
           </button>
         </div>
@@ -164,22 +232,61 @@ export default function MarketFundDetail() {
     );
   }
 
+  // Error with no fund loaded
+  if (error && !fund) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
+        <div style={{ maxWidth: '600px', margin: '80px auto', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--fs-11)', fontWeight: 800, marginBottom: '10px' }}>
+            Unable to Load Fund
+          </div>
+          <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', marginBottom: '24px' }}>
+            {error}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button className="button button-primary" onClick={() => window.location.reload()}>
+              Try Again
+            </button>
+            <button className="button button-secondary" onClick={() => navigate('/market/exchange')}>
+              Back to Exchange
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!fund) return null;
+
   const seg = fund.segment;
+  const pct7d = fund.stats?.change_7d_pct ?? null;
+  const pct30d = fund.stats?.change_30d_pct ?? null;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gap: '14px' }}>
+
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'baseline', flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0, fontSize: '14pt' }}>{fund.symbol}</h1>
-              <div style={{ fontSize: '10pt', color: 'var(--text-muted)' }}>
-                {seg?.manager_type ? seg.manager_type.toUpperCase() : 'AI'} • NAV {fund.nav_share_price.toFixed(2)}
-              </div>
+              <h1 style={{ margin: 0, fontSize: 'var(--fs-12)', fontWeight: 900 }}>{fund.symbol}</h1>
+              <span style={{
+                fontSize: 'var(--fs-8)',
+                color: 'var(--text-secondary)',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                padding: '2px 6px',
+                borderRadius: '3px',
+              }}>
+                {seg?.manager_type ? seg.manager_type.toUpperCase() : 'AI'} ETF
+              </span>
             </div>
-            <div style={{ marginTop: '6px', fontWeight: 800 }}>{seg?.name || 'Market Fund'}</div>
+            <div style={{ marginTop: '6px', fontWeight: 800, fontSize: 'var(--fs-11)' }}>{seg?.name || 'Market Fund'}</div>
             {seg?.description && (
-              <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>{seg.description}</div>
+              <div style={{ marginTop: '6px', fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', maxWidth: '500px' }}>
+                {seg.description}
+              </div>
             )}
           </div>
 
@@ -193,79 +300,193 @@ export default function MarketFundDetail() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+        {/* NAV hero strip */}
+        <div style={{
+          padding: '20px',
+          border: '2px solid var(--border)',
+          borderRadius: '6px',
+          background: 'var(--surface)',
+          display: 'flex',
+          gap: '32px',
+          flexWrap: 'wrap',
+          alignItems: 'flex-end',
+        }}>
+          <div>
+            <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>NAV per Share</div>
+            <div style={{ fontSize: 'var(--fs-12)', fontWeight: 900 }}>${fund.nav_share_price.toFixed(4)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>7-Day</div>
+            <div style={{
+              fontSize: 'var(--fs-12)',
+              fontWeight: 800,
+              color: pct7d === null ? 'var(--text-secondary)' : pct7d > 0 ? 'var(--success)' : pct7d < 0 ? 'var(--error)' : 'var(--text)',
+            }}>
+              {formatPct(pct7d)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>30-Day</div>
+            <div style={{
+              fontSize: 'var(--fs-12)',
+              fontWeight: 800,
+              color: pct30d === null ? 'var(--text-secondary)' : pct30d > 0 ? 'var(--success)' : pct30d < 0 ? 'var(--error)' : 'var(--text)',
+            }}>
+              {formatPct(pct30d)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Market Cap</div>
+            <div style={{ fontSize: 'var(--fs-12)', fontWeight: 800 }}>
+              {formatLargeUSD(fund?.stats?.market_cap_usd || 0)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Vehicles</div>
+            <div style={{ fontSize: 'var(--fs-12)', fontWeight: 800 }}>
+              {(fund?.stats?.vehicle_count || 0).toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Cards row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+
+          {/* Fund Composition */}
           <div className="card">
             <div className="card-header">
-              <h3 className="heading-3">Market Stats</h3>
+              <h3 className="heading-3">Fund Composition</h3>
             </div>
-            <div className="card-body" style={{ display: 'grid', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Vehicles</span>
-                <strong>{(fund?.stats?.vehicle_count || 0).toLocaleString()}</strong>
+            <div className="card-body" style={{ display: 'grid', gap: '10px', fontSize: 'var(--fs-9)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Year Range</span>
+                <span style={{ fontWeight: 600 }}>
+                  {seg?.year_min && seg?.year_max
+                    ? `${seg.year_min} – ${seg.year_max}`
+                    : seg?.year_min ? `${seg.year_min}+`
+                    : seg?.year_max ? `up to ${seg.year_max}`
+                    : 'All years'}
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Market Cap</span>
-                <strong>{formatUSD0(fund?.stats?.market_cap_usd || 0)}</strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Makes</span>
+                <span style={{ fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>
+                  {seg?.makes?.length ? seg.makes.join(', ') : 'All makes'}
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>7d</span>
-                <strong>{formatPct(fund?.stats?.change_7d_pct ?? null)}</strong>
+              {seg?.model_keywords && seg.model_keywords.length > 0 && (
+                <div>
+                  <div style={{ color: 'var(--text-secondary)', marginBottom: '6px' }}>Keywords</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {seg.model_keywords.map(kw => (
+                      <span key={kw} style={{
+                        padding: '2px 6px',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '3px',
+                        fontSize: 'var(--fs-8)',
+                      }}>
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Management</span>
+                <span style={{ fontWeight: 600 }}>
+                  {seg?.manager_type === 'ai' ? 'AI-managed' : seg?.manager_type || 'AI-managed'}
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>30d</span>
-                <strong>{formatPct(fund?.stats?.change_30d_pct ?? null)}</strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Fund AUM</span>
+                <span style={{ fontWeight: 600 }}>{formatUSD0(fund.total_aum_usd)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Shares Outstanding</span>
+                <span style={{ fontWeight: 600 }}>{fund.total_shares_outstanding.toLocaleString()}</span>
               </div>
             </div>
           </div>
 
+          {/* Invest */}
           <div className="card">
             <div className="card-header">
-              <h3 className="heading-3">Rules</h3>
+              <h3 className="heading-3">Invest in {fund.symbol}</h3>
             </div>
-            <div className="card-body" style={{ display: 'grid', gap: '8px', fontSize: '9pt' }}>
-              <div>
-                <strong>Year</strong>: {seg?.year_min ?? '—'} to {seg?.year_max ?? '—'}
+            <div className="card-body" style={{ display: 'grid', gap: '12px' }}>
+              {user ? (
+                <>
+                  <div style={{ fontSize: 'var(--fs-9)', display: 'flex', justifyContent: 'space-between', padding: '10px', background: 'var(--bg)', borderRadius: '4px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Your cash balance</span>
+                    <strong>{formatUSD2(cashCents / 100)}</strong>
+                  </div>
+                  <div style={{ display: 'grid', gap: '6px' }}>
+                    <label style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Amount (USD)
+                    </label>
+                    <input
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      style={{
+                        border: '2px solid var(--border)',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        background: 'var(--white)',
+                        color: 'var(--text)',
+                        fontSize: 'var(--fs-9)',
+                      }}
+                      inputMode="decimal"
+                      placeholder="100"
+                    />
+                    {parsedAmountUSD && (
+                      <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>
+                        ≈ {(parsedAmountUSD / fund.nav_share_price).toFixed(6)} shares at NAV ${fund.nav_share_price.toFixed(4)}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="button button-primary"
+                    disabled={buying || !parsedAmountUSD}
+                    onClick={handleBuy}
+                    style={{ width: '100%' }}
+                  >
+                    {buying ? 'Processing...' : `Invest ${parsedAmountUSD ? formatUSD2(parsedAmountUSD) : ''}`}
+                  </button>
+                  {error && (
+                    <div style={{ fontSize: 'var(--fs-9)', color: 'var(--error)', padding: '10px', background: 'var(--error-dim)', borderRadius: '4px' }}>
+                      {error}
+                    </div>
+                  )}
+                  {success && (
+                    <div style={{ fontSize: 'var(--fs-9)', color: 'var(--success)', padding: '10px', background: 'var(--success-dim)', borderRadius: '4px' }}>
+                      {success}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.6 }}>
+                    Sign in to invest in {fund.symbol}. Shares are priced at current NAV, updated every 15 minutes from verified auction data.
+                  </div>
+                  <button
+                    className="button button-primary"
+                    onClick={() => navigate('/login')}
+                    style={{ width: '100%' }}
+                  >
+                    Sign In to Invest
+                  </button>
+                </div>
+              )}
+              <div style={{
+                fontSize: 'var(--fs-8)',
+                color: 'var(--text-secondary)',
+                paddingTop: '10px',
+                borderTop: '1px solid var(--border)',
+                lineHeight: 1.5,
+              }}>
+                Beta — pending SEC Reg A+ approval. Positions are tracked in your portfolio.
               </div>
-              <div>
-                <strong>Makes</strong>: {seg?.makes?.length ? seg.makes.join(', ') : 'Any'}
-              </div>
-              <div>
-                <strong>Keywords</strong>: {seg?.model_keywords?.length ? seg.model_keywords.join(', ') : 'None'}
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header">
-              <h3 className="heading-3">Invest</h3>
-            </div>
-            <div className="card-body" style={{ display: 'grid', gap: '10px' }}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                Available cash: <strong>{formatUSD2(cashCents / 100)}</strong>
-              </div>
-              <div style={{ display: 'grid', gap: '6px' }}>
-                <label style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Amount (USD)</label>
-                <input
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  style={{
-                    border: '2px solid var(--border)',
-                    padding: '8px',
-                    borderRadius: '4px',
-                    background: 'var(--white)',
-                    color: 'var(--text)'
-                  }}
-                  inputMode="decimal"
-                />
-              </div>
-              <button className="button button-primary" disabled={buying} onClick={handleBuy}>
-                {buying ? 'Investing...' : 'Invest'}
-              </button>
-              <div style={{ fontSize: '8.5pt', color: 'var(--text-muted)' }}>
-                MVP: shares are issued at current NAV. NAV updates can be automated later (nightly/real-time).
-              </div>
-              {error && <div style={{ fontSize: '9pt', color: 'var(--danger, #b91c1c)' }}>{error}</div>}
-              {success && <div style={{ fontSize: '9pt', color: 'var(--text)' }}>{success}</div>}
             </div>
           </div>
         </div>
@@ -273,10 +494,3 @@ export default function MarketFundDetail() {
     </div>
   );
 }
-
-
-
-
-
-
-
