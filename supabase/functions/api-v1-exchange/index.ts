@@ -59,7 +59,6 @@ interface VehicleOffering {
   status: string;
   current_share_price: number;
   total_shares: number;
-  available_shares: number;
   vehicle: {
     id: string;
     year: number | null;
@@ -128,7 +127,7 @@ async function getOfferings(supabase: ReturnType<typeof createClient>): Promise<
   const { data, error } = await supabase
     .from("vehicle_offerings")
     .select(`
-      id, vehicle_id, status, current_share_price, total_shares, available_shares,
+      id, vehicle_id, status, current_share_price, total_shares,
       vehicle:vehicles (
         id, year, make, model, vin, nuke_estimate, sale_price,
         primary_image_url
@@ -145,7 +144,6 @@ async function getOfferings(supabase: ReturnType<typeof createClient>): Promise<
     status: r.status as string,
     current_share_price: Number(r.current_share_price),
     total_shares: Number(r.total_shares),
-    available_shares: Number(r.available_shares),
     vehicle: r.vehicle as VehicleOffering["vehicle"],
   }));
 }
