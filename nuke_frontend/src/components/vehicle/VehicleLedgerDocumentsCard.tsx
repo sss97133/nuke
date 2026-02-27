@@ -192,17 +192,17 @@ export function VehicleLedgerDocumentsCard(props: {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {canManage && (
             <>
-              <button className="button button-small" disabled={running || loading} onClick={runAll} style={{ fontSize: '8pt' }}>
+              <button className="button button-small" disabled={running || loading} onClick={runAll} style={{ fontSize: '11px' }}>
                 {running ? 'Analyzing…' : 'Analyze all'}
               </button>
               {running && (
-                <button className="button button-small" onClick={stop} style={{ fontSize: '8pt' }}>
+                <button className="button button-small" onClick={stop} style={{ fontSize: '11px' }}>
                   Stop
                 </button>
               )}
             </>
           )}
-          <button className="button button-small" disabled={loading} onClick={load} style={{ fontSize: '8pt' }}>
+          <button className="button button-small" disabled={loading} onClick={load} style={{ fontSize: '11px' }}>
             Refresh
           </button>
         </div>
@@ -215,7 +215,7 @@ export function VehicleLedgerDocumentsCard(props: {
           <div className="text-small" style={{ color: '#b91c1c' }}>{error}</div>
         ) : (
           <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: '8pt' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: '11px' }}>
               <div><strong>Total docs:</strong> {totals.totalDocs}</div>
               <div><strong>Analyzed:</strong> {totals.parsed}</div>
               <div><strong>Processing:</strong> {totals.processing}</div>

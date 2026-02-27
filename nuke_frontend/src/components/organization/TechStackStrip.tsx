@@ -76,7 +76,7 @@ function TechLogo({ slug, name }: { slug: string; name: string }) {
 export default function TechStackStrip() {
   return (
     <>
-      <h3 style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+      <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
         Tech stack
       </h3>
       <div

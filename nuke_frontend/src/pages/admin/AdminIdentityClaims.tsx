@@ -134,8 +134,8 @@ export default function AdminIdentityClaims() {
     <div>
       {/* Header */}
       <div style={{ marginBottom: 'var(--space-4)' }}>
-        <div style={{ fontSize: '10pt', fontWeight: 600 }}>Identity Claims</div>
-        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600 }}>Identity Claims</div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
           Review user identity claims
         </div>
       </div>
@@ -148,7 +148,7 @@ export default function AdminIdentityClaims() {
         padding: 'var(--space-3)',
         backgroundColor: 'var(--grey-50)',
         borderRadius: '4px',
-        fontSize: '8pt'
+        fontSize: '11px'
       }}>
         <div><strong>{stats.total.toLocaleString()}</strong> total identities</div>
         <div><strong>{stats.claimed}</strong> claimed</div>
@@ -165,7 +165,7 @@ export default function AdminIdentityClaims() {
             key={f}
             className={filter === f ? 'button' : 'button button-secondary'}
             onClick={() => setFilter(f)}
-            style={{ fontSize: '8pt', padding: '6px 12px' }}
+            style={{ fontSize: '11px', padding: '6px 12px' }}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
@@ -174,7 +174,7 @@ export default function AdminIdentityClaims() {
           className="button button-secondary"
           onClick={() => void loadClaims()}
           disabled={loading}
-          style={{ fontSize: '8pt', padding: '6px 12px', marginLeft: 'auto' }}
+          style={{ fontSize: '11px', padding: '6px 12px', marginLeft: 'auto' }}
         >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
@@ -186,7 +186,7 @@ export default function AdminIdentityClaims() {
           padding: 'var(--space-6)',
           textAlign: 'center',
           color: 'var(--text-muted)',
-          fontSize: '9pt'
+          fontSize: '12px'
         }}>
           No {filter === 'all' ? '' : filter} claims
         </div>
@@ -213,7 +213,7 @@ export default function AdminIdentityClaims() {
             >
               {/* Platform badge */}
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 padding: '2px 6px',
                 backgroundColor: 'var(--grey-100)',
@@ -226,21 +226,21 @@ export default function AdminIdentityClaims() {
 
               {/* Handle */}
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '9pt', fontWeight: 600 }}>{identity?.handle}</div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600 }}>{identity?.handle}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {requester?.email || claim.requested_by_user_id.slice(0, 8)}
                 </div>
               </div>
 
               {/* Proof type */}
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 {claim.proof_type.replace(/_/g, ' ')}
               </div>
 
               {/* Confidence */}
               {claim.confidence_score !== null && (
                 <div style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   color: claim.confidence_score >= 70 ? 'var(--success)' : 'var(--text-muted)'
                 }}>
@@ -255,7 +255,7 @@ export default function AdminIdentityClaims() {
                     className="button"
                     onClick={() => approveClaim(claim.id)}
                     disabled={processing === claim.id}
-                    style={{ fontSize: '8pt', padding: '4px 8px' }}
+                    style={{ fontSize: '11px', padding: '4px 8px' }}
                   >
                     Approve
                   </button>
@@ -263,14 +263,14 @@ export default function AdminIdentityClaims() {
                     className="button button-secondary"
                     onClick={() => rejectClaim(claim.id)}
                     disabled={processing === claim.id}
-                    style={{ fontSize: '8pt', padding: '4px 8px' }}
+                    style={{ fontSize: '11px', padding: '4px 8px' }}
                   >
                     Reject
                   </button>
                 </div>
               ) : (
                 <div style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   padding: '2px 8px',
                   backgroundColor: claim.status === 'approved' ? 'var(--success-bg)' : '#fef2f2',
                   color: claim.status === 'approved' ? 'var(--success)' : '#dc2626',
@@ -286,7 +286,7 @@ export default function AdminIdentityClaims() {
                   href={identity.profile_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: '8pt', color: 'var(--text-muted)' }}
+                  style={{ fontSize: '11px', color: 'var(--text-muted)' }}
                 >
                   View
                 </a>

@@ -113,14 +113,14 @@ export default function StreamActionPanel({
           background: '#e0e0e0',
           padding: '8px',
           borderBottom: '1px solid #bdbdbd',
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 'bold',
         }}
       >
         STREAM ACTIONS
       </div>
 
-      <div style={{ padding: '8px', fontSize: '8pt' }}>
+      <div style={{ padding: '8px', fontSize: '11px' }}>
         {!user?.id && (
           <div style={{ color: '#757575' }}>
             Login to purchase packs and trigger overlays.
@@ -147,7 +147,7 @@ export default function StreamActionPanel({
                     disabled={!canInteract || owned || buyingPackId === p.id}
                     style={{
                       padding: '6px 8px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid #bdbdbd',
                       background: owned ? '#d1fae5' : '#f5f5f5',
                       color: '#111827',
@@ -172,7 +172,7 @@ export default function StreamActionPanel({
                     disabled={!canInteract || sendingActionId === a.id}
                     style={{
                       padding: '6px 8px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid #bdbdbd',
                       background: '#424242',
                       color: 'white',

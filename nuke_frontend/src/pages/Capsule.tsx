@@ -128,7 +128,7 @@ const Capsule: React.FC = () => {
                     background: activeTab === tab.key ? 'var(--surface-hover)' : 'transparent',
                     border: activeTab === tab.key ? '2px solid var(--border)' : '1px solid transparent',
                     cursor: 'pointer',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     fontWeight: activeTab === tab.key ? 'bold' : 'normal'
                   }}
                 >
@@ -176,7 +176,7 @@ const Capsule: React.FC = () => {
                   </div>
                   <button
                     className="button button-secondary"
-                    style={{ fontSize: '9pt', whiteSpace: 'nowrap' }}
+                    style={{ fontSize: '12px', whiteSpace: 'nowrap' }}
                     onClick={() => handleTabChange('appearance')}
                   >
                     Open Appearance →

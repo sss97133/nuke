@@ -402,6 +402,10 @@ async function fetchGoodingPageData(url: string, supabase?: any): Promise<Goodin
 async function discoverLotsFromSitemap(): Promise<string[]> {
   console.log('[gooding] Fetching sitemap...');
 
+  // NOTE: raw fetch acceptable here — sitemap.xml is used only for URL discovery (extracting lot slugs).
+  // The XML content is parsed for URLs but never stored. archiveFetch is intended for listing pages
+  // that we want to re-extract later, not for sitemap census data.
+  // Decision recorded: 2026-02-27 — acceptable exception, URL-discovery-only pattern.
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch('https://www.goodingco.com/sitemap.xml', {

@@ -127,7 +127,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
             background: 'var(--white)',
             border: '1px solid var(--border)',
             marginBottom: '16px',
-            fontSize: '8pt',
+            fontSize: '11px',
             scrollMarginTop: 'var(--header-height, 40px)'
           }}>
             {/* Compact stats bar */}
@@ -139,14 +139,14 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
               background: 'var(--grey-100)',
               borderBottom: '1px solid var(--border)',
               fontFamily: 'monospace',
-              fontSize: '7pt',
+              fontSize: '9px',
               flexWrap: 'wrap'
             }}>
               <span
                 title="Total visible public vehicles in the feed (excludes pending + non-vehicle items)"
                 style={{
                   fontFamily: 'monospace',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text)'
                 }}
               >
@@ -172,7 +172,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       fontWeight: 900,
                       cursor: 'pointer',
                       fontFamily: 'monospace',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                     }}
                   >
                     +{displayStats.vehiclesAddedToday} today
@@ -187,7 +187,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 }
                 style={{
                   fontFamily: 'monospace',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text)',
                   display: 'inline-flex',
                   alignItems: 'baseline',
@@ -196,7 +196,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
               >
                 <b>{formatCurrency(displayStats.totalValue)}</b>
                 {displayStats.marketInterestValue > 0 && (
-                  <span style={{ color: '#f59e0b', fontSize: '6pt', fontWeight: 500 }}>
+                  <span style={{ color: '#f59e0b', fontSize: '8px', fontWeight: 500 }}>
                     +{formatCurrency(displayStats.marketInterestValue)}
                   </span>
                 )}
@@ -222,7 +222,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       margin: 0,
                       cursor: 'pointer',
                       fontFamily: 'monospace',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       color: filters.forSale ? '#059669' : 'var(--text)',
                       fontWeight: filters.forSale ? 700 : 400,
                     }}
@@ -249,7 +249,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       margin: 0,
                       cursor: 'pointer',
                       fontFamily: 'monospace',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       color: statsPanel === 'sold_today' ? '#7c3aed' : 'var(--text)',
                       fontWeight: statsPanel === 'sold_today' ? 700 : 400,
                     }}
@@ -276,7 +276,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       margin: 0,
                       cursor: 'pointer',
                       fontFamily: 'monospace',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       color: 'white',
                       borderRadius: '4px',
                       fontWeight: 700,
@@ -294,7 +294,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     title="Average value across current filtered set"
                     style={{
                       fontFamily: 'monospace',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       color: 'var(--text-muted)'
                     }}
                   >
@@ -308,7 +308,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   title={`${cardsPerRow} per row`}
                 >
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                     {cardsPerRow}/row
                   </div>
                   <input
@@ -330,7 +330,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 }}
                 style={{
                   padding: '2px 6px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   border: '1px solid var(--border)',
                   background: 'transparent',
                   cursor: 'pointer',
@@ -355,7 +355,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   background: !collapsedSections.yearFilters ? 'var(--grey-600)' : (filters.yearMin || filters.yearMax) ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.yearFilters ? 'var(--white)' : 'var(--text)',
                   fontWeight: (!collapsedSections.yearFilters || filters.yearMin || filters.yearMax) ? 700 : 400,
@@ -371,7 +371,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   background: !collapsedSections.makeFilters ? 'var(--grey-600)' : filters.makes.length > 0 ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.makeFilters ? 'var(--white)' : 'var(--text)',
                   fontWeight: (!collapsedSections.makeFilters || filters.makes.length > 0) ? 700 : 400,
@@ -387,7 +387,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   background: !collapsedSections.priceFilters ? 'var(--grey-600)' : ((filters.priceMin || filters.priceMax) || (sortBy === 'price_high' || sortBy === 'price_low')) ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.priceFilters ? 'var(--white)' : 'var(--text)',
                   fontWeight: (!collapsedSections.priceFilters || (filters.priceMin || filters.priceMax) || (sortBy === 'price_high' || sortBy === 'price_low')) ? 700 : 400,
@@ -410,7 +410,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   background: !collapsedSections.locationFilters ? 'var(--grey-600)' : ((filters.locations && filters.locations.length > 0) || filters.zipCode) ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.locationFilters ? 'var(--white)' : 'var(--text)',
                   fontWeight: (!collapsedSections.locationFilters || (filters.locations && filters.locations.length > 0) || filters.zipCode) ? 700 : 400,
@@ -430,7 +430,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   background: !collapsedSections.typeFilters ? 'var(--grey-600)' : (filters.bodyStyles.length > 0 || filters.is4x4) ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.typeFilters ? 'var(--white)' : 'var(--text)',
                   fontWeight: (!collapsedSections.typeFilters || filters.bodyStyles.length > 0 || filters.is4x4) ? 700 : 400,
@@ -448,7 +448,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   background: !collapsedSections.sourcePogs ? 'var(--grey-600)' : sourcePogs.selected.length < sourcePogs.all.length ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.sourcePogs ? 'var(--white)' : 'var(--text)',
                   fontWeight: (!collapsedSections.sourcePogs || sourcePogs.selected.length < sourcePogs.all.length) ? 700 : 400,
@@ -464,7 +464,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   background: !collapsedSections.statusFilters ? 'var(--grey-600)' : (filters.forSale || filters.hideSold || filters.showPending || filters.privateParty || filters.dealer) ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.statusFilters ? 'var(--white)' : 'var(--text)',
                   fontWeight: (!collapsedSections.statusFilters || filters.forSale || filters.hideSold || filters.showPending || filters.privateParty || filters.dealer) ? 700 : 400,
@@ -482,7 +482,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   cursor: 'pointer',
                   fontFamily: '"MS Sans Serif", sans-serif',
                   color: 'var(--text-muted)'
@@ -513,7 +513,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   style={{
                     marginLeft: '6px',
                     padding: '3px 7px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     border: '1px solid var(--border)',
                     background: 'transparent',
                     cursor: 'pointer',
@@ -562,11 +562,11 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         width: '80px',
                         padding: '3px 5px',
                         border: '1px solid var(--border)',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontFamily: '"MS Sans Serif", sans-serif'
                       }}
                     />
-                    <span style={{ fontSize: '7pt' }}>to</span>
+                    <span style={{ fontSize: '9px' }}>to</span>
                     <input
                       type="number"
                       placeholder="Max year"
@@ -579,7 +579,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         width: '80px',
                         padding: '3px 5px',
                         border: '1px solid var(--border)',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontFamily: '"MS Sans Serif", sans-serif'
                       }}
                     />
@@ -587,7 +587,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       <button
                         onClick={() => setFilters({...filters, yearMin: null, yearMax: null})}
                         className="button-win95"
-                        style={{ padding: '3px 7px', fontSize: '7pt' }}
+                        style={{ padding: '3px 7px', fontSize: '9px' }}
                       >
                         clear
                       </button>
@@ -630,7 +630,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           className="button-win95"
                           style={{
                             padding: '3px 7px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             background: isActive ? 'var(--grey-600)' : 'var(--white)',
                             color: isActive ? 'var(--white)' : 'var(--text)',
                             fontWeight: isActive ? 700 : 400,
@@ -655,7 +655,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   padding: '6px',
                   background: 'var(--grey-50)',
                   border: '1px solid var(--border)',
-                  fontSize: '7pt'
+                  fontSize: '9px'
                 }}>
                   <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
                     <button
@@ -672,7 +672,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         }));
                       }}
                       className="button-win95"
-                      style={{ padding: '2px 6px', fontSize: '7pt' }}
+                      style={{ padding: '2px 6px', fontSize: '9px' }}
                     >
                       all
                     </button>
@@ -690,7 +690,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         }));
                       }}
                       className="button-win95"
-                      style={{ padding: '2px 6px', fontSize: '7pt' }}
+                      style={{ padding: '2px 6px', fontSize: '9px' }}
                     >
                       none
                     </button>
@@ -814,7 +814,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       style={{
                         flex: 1,
                         padding: '2px 6px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         border: '1px solid var(--border)',
                         fontFamily: '"MS Sans Serif", sans-serif',
                         minWidth: '80px'
@@ -824,7 +824,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       <button
                         onClick={() => setSourceSearchText('')}
                         className="button-win95"
-                        style={{ padding: '2px 6px', fontSize: '7pt' }}
+                        style={{ padding: '2px 6px', fontSize: '9px' }}
                       >
                         x
                       </button>
@@ -929,7 +929,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                             padding: '1px 5px',
                             background: 'var(--grey-600)',
                             color: 'var(--white)',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             borderRadius: '2px',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -949,7 +949,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                               color: 'var(--white)',
                               cursor: 'pointer',
                               padding: 0,
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               lineHeight: 1,
                               opacity: 0.8
                             }}
@@ -1025,7 +1025,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           border: 'none',
                           outline: 'none',
                           padding: '2px 0',
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           fontFamily: '"MS Sans Serif", sans-serif',
                           background: 'transparent'
                         }}
@@ -1061,7 +1061,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                             style={{
                               padding: '4px 8px',
                               cursor: 'pointer',
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               background: idx === makeSuggestionIndex ? 'var(--grey-200)' : 'var(--white)',
                               borderBottom: '1px solid var(--grey-100)'
                             }}
@@ -1131,7 +1131,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                             padding: '1px 5px',
                             background: 'var(--grey-600)',
                             color: 'var(--white)',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             borderRadius: '2px',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -1151,7 +1151,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                               color: 'var(--white)',
                               cursor: 'pointer',
                               padding: 0,
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               lineHeight: 1,
                               opacity: 0.8
                             }}
@@ -1223,7 +1223,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           border: 'none',
                           outline: 'none',
                           padding: '2px 0',
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           fontFamily: '"MS Sans Serif", sans-serif',
                           background: 'transparent'
                         }}
@@ -1259,7 +1259,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                             style={{
                               padding: '4px 8px',
                               cursor: 'pointer',
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               background: idx === modelSuggestionIndex ? 'var(--grey-200)' : 'var(--white)',
                               borderBottom: '1px solid var(--grey-100)'
                             }}
@@ -1280,7 +1280,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   padding: '6px',
                   background: 'var(--grey-50)',
                   border: '1px solid var(--border)',
-                  fontSize: '7pt'
+                  fontSize: '9px'
                 }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
                     {[
@@ -1308,7 +1308,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           className="button-win95"
                           style={{
                             padding: '3px 10px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             background: isSelected ? 'var(--grey-600)' : 'var(--white)',
                             color: isSelected ? 'var(--white)' : 'var(--text)',
                             fontWeight: isSelected ? 700 : 400
@@ -1323,7 +1323,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       className="button-win95"
                       style={{
                         padding: '3px 10px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         background: filters.is4x4 ? 'var(--grey-600)' : 'var(--white)',
                         color: filters.is4x4 ? 'var(--white)' : 'var(--text)',
                         fontWeight: filters.is4x4 ? 700 : 400
@@ -1335,7 +1335,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       <button
                         onClick={() => setFilters({...filters, bodyStyles: [], is4x4: false})}
                         className="button-win95"
-                        style={{ padding: '3px 6px', fontSize: '7pt' }}
+                        style={{ padding: '3px 6px', fontSize: '9px' }}
                       >
                         clear
                       </button>
@@ -1360,7 +1360,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         className="button-win95"
                         style={{
                           padding: '2px 6px',
-                          fontSize: '6pt',
+                          fontSize: '8px',
                           background: filters.bodyStyles.includes(style) ? 'var(--grey-500)' : 'var(--grey-100)',
                           color: filters.bodyStyles.includes(style) ? 'var(--white)' : 'var(--text-muted)'
                         }}
@@ -1386,7 +1386,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 }}>
                   {/* Sort direction toggle */}
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>sort:</span>
+                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>sort:</span>
                     <button
                       onClick={() => {
                         if (sortBy === 'price_high') {
@@ -1403,7 +1403,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       className="button-win95"
                       style={{
                         padding: '3px 7px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         background: (sortBy === 'price_high' || sortBy === 'price_low') ? 'var(--grey-600)' : 'var(--white)',
                         color: (sortBy === 'price_high' || sortBy === 'price_low') ? 'var(--white)' : 'var(--text)',
                         fontWeight: (sortBy === 'price_high' || sortBy === 'price_low') ? 700 : 400,
@@ -1416,7 +1416,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
 
                   {/* Price range inputs */}
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>range:</span>
+                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>range:</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1428,11 +1428,11 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         width: '70px',
                         padding: '3px 5px',
                         border: '1px solid var(--border)',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontFamily: '"MS Sans Serif", sans-serif'
                       }}
                     />
-                    <span style={{ fontSize: '7pt' }}>–</span>
+                    <span style={{ fontSize: '9px' }}>–</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1444,7 +1444,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         width: '70px',
                         padding: '3px 5px',
                         border: '1px solid var(--border)',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontFamily: '"MS Sans Serif", sans-serif'
                       }}
                     />
@@ -1452,7 +1452,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       <button
                         onClick={() => setFilters({...filters, priceMin: null, priceMax: null})}
                         className="button-win95"
-                        style={{ padding: '3px 7px', fontSize: '7pt' }}
+                        style={{ padding: '3px 7px', fontSize: '9px' }}
                       >
                         clear
                       </button>
@@ -1571,18 +1571,18 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           width: '60px',
                           padding: '3px 5px',
                           border: '1px solid var(--border)',
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           fontFamily: '"MS Sans Serif", sans-serif'
                         }}
                       />
-                      <span style={{ fontSize: '7pt' }}>within</span>
+                      <span style={{ fontSize: '9px' }}>within</span>
                       <select
                         value={currentRadius}
                         onChange={(e) => setCurrentRadius(Number(e.target.value))}
                         style={{
                           padding: '3px 5px',
                           border: '1px solid var(--border)',
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           fontFamily: '"MS Sans Serif", sans-serif',
                           width: '80px',
                           background: 'var(--white)',
@@ -1600,7 +1600,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         className="button-win95"
                         style={{
                           padding: '3px 7px',
-                          fontSize: '7pt'
+                          fontSize: '9px'
                         }}
                         disabled={currentZip.length !== 5}
                       >
@@ -1611,7 +1611,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         className="button-win95"
                         style={{
                           padding: '3px 7px',
-                          fontSize: '7pt'
+                          fontSize: '9px'
                         }}
                         disabled={currentZip.length !== 5}
                         title="Save to favorites"
@@ -1621,7 +1621,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       {/* Active locations inline on same row */}
                       {((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.zipCode.length === 5 && filters.radiusMiles > 0)) && (
                         <>
-                          <span style={{ fontSize: '7pt', marginLeft: '4px' }}>active:</span>
+                          <span style={{ fontSize: '9px', marginLeft: '4px' }}>active:</span>
                           {(filters.locations && filters.locations.length > 0
                             ? filters.locations
                             : [{ zipCode: filters.zipCode!, radiusMiles: filters.radiusMiles }]
@@ -1636,7 +1636,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                               className="button-win95"
                               style={{
                                 padding: '2px 5px',
-                                fontSize: '7pt',
+                                fontSize: '9px',
                                 background: 'var(--grey-300)',
                                 border: '1px solid var(--border)'
                               }}
@@ -1652,7 +1652,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     {/* Favorites */}
                     {locationFavorites.length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '7pt', fontWeight: 700 }}>favorites:</span>
+                        <span style={{ fontSize: '9px', fontWeight: 700 }}>favorites:</span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
                           {locationFavorites.map((fav, idx) => {
                             const isActive = filters.locations?.some(loc => loc.zipCode === fav.zipCode && loc.radiusMiles === fav.radiusMiles);
@@ -1663,7 +1663,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                                   className="button-win95"
                                   style={{
                                     padding: '2px 5px',
-                                    fontSize: '7pt',
+                                    fontSize: '9px',
                                     background: isActive ? 'var(--grey-600)' : 'var(--white)',
                                     color: isActive ? 'var(--white)' : 'var(--text)',
                                     fontWeight: isActive ? 700 : 400,
@@ -1678,7 +1678,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                                   className="button-win95"
                                   style={{
                                     padding: '2px 4px',
-                                    fontSize: '6pt',
+                                    fontSize: '8px',
                                     background: 'var(--grey-100)',
                                     border: '1px solid var(--border)',
                                     color: 'var(--text-muted)'
@@ -1708,7 +1708,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
                   gap: '4px'
                 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
                       type="checkbox"
                       checked={filters.forSale}
@@ -1716,7 +1716,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     />
                     <span>for sale only</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
                       type="checkbox"
                       checked={filters.hideSold}
@@ -1724,7 +1724,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     />
                     <span>hide sold</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
                       type="checkbox"
                       checked={filters.showPending}
@@ -1732,7 +1732,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     />
                     <span>show pending</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
                       type="checkbox"
                       checked={filters.privateParty}
@@ -1740,7 +1740,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     />
                     <span>private party</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
                       type="checkbox"
                       checked={filters.dealer}

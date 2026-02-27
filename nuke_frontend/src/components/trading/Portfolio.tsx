@@ -62,7 +62,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
       borderRadius: '4px',
       padding: '16px'
     }}>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '11pt', fontWeight: 'bold' }}>Portfolio</h2>
+      <h2 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: 'bold' }}>Portfolio</h2>
 
       {/* Summary */}
       <div style={{
@@ -72,11 +72,11 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
         borderRadius: '4px',
         marginBottom: '16px'
       }}>
-        <div style={{ fontSize: '9pt', color: '#6b7280', marginBottom: '4px' }}>
+        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
           Total Value
         </div>
         <div style={{
-          fontSize: '18pt',
+          fontSize: '24px',
           fontWeight: 'bold',
           color: isPositive ? '#10b981' : '#dc2626',
           marginBottom: '8px'
@@ -84,7 +84,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
           ${totalValue.toFixed(2)}
         </div>
         <div style={{
-          fontSize: '11pt',
+          fontSize: '15px',
           fontWeight: 'bold',
           color: isPositive ? '#10b981' : '#dc2626'
         }}>
@@ -119,21 +119,21 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
             >
               <div>
                 <div style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 'bold',
                   marginBottom: '4px',
                   color: '#1f2937'
                 }}>
                   {holding.vehicle_title}
                 </div>
-                <div style={{ fontSize: '8pt', color: '#6b7280' }}>
+                <div style={{ fontSize: '11px', color: '#6b7280' }}>
                   {holding.shares_owned} shares @ ${holding.current_mark.toFixed(2)}/share
                 </div>
               </div>
 
               <div style={{ textAlign: 'right' }}>
                 <div style={{
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   fontWeight: 'bold',
                   marginBottom: '4px',
                   color: holding.unrealized_gain_loss >= 0 ? '#10b981' : '#dc2626'
@@ -141,7 +141,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
                   ${(holding.shares_owned * holding.current_mark).toFixed(2)}
                 </div>
                 <div style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   color: holding.unrealized_gain_loss >= 0 ? '#10b981' : '#dc2626',
                   fontWeight: 'bold'
                 }}>
@@ -158,7 +158,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
           textAlign: 'center',
           marginTop: '12px',
           color: '#6b7280',
-          fontSize: '8pt'
+          fontSize: '11px'
         }}>
           Loading...
         </div>

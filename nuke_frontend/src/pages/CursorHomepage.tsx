@@ -1854,10 +1854,19 @@ const CursorHomepage: React.FC = () => {
             statsPanel={statsPanel}
           />
         )}
-        {/* Show loading indicator inline if still loading */}
+        {/* Show skeleton grid while loading */}
         {loading && filteredVehicles.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px', fontSize: '9pt', color: 'var(--text-muted)' }}>
-            Loading vehicles...
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', padding: '8px 0' }}>
+            <style>{`@keyframes cursor-sk-pulse { 0%,100%{opacity:.6} 50%{opacity:.3} }`}</style>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden', background: 'var(--surface)' }}>
+                <div style={{ width: '100%', paddingBottom: '75%', background: 'var(--border)', animation: 'cursor-sk-pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ padding: '8px 10px' }}>
+                  <div style={{ height: 12, background: 'var(--border)', borderRadius: 2, marginBottom: 6, width: '65%', animation: 'cursor-sk-pulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ height: 9, background: 'var(--border)', borderRadius: 2, width: '40%', animation: 'cursor-sk-pulse 1.5s ease-in-out infinite' }} />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

@@ -768,7 +768,7 @@ const EditVehicle: React.FC = () => {
                       <div className="form-group">
                         <label className="form-label">Trim & Styling</label>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               name="has_molding"
@@ -778,7 +778,7 @@ const EditVehicle: React.FC = () => {
                             />
                             <span>Has Molding/Trim</span>
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               name="has_pinstriping"
@@ -788,7 +788,7 @@ const EditVehicle: React.FC = () => {
                             />
                             <span>Has Pinstriping</span>
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               name="has_racing_stripes"
@@ -798,7 +798,7 @@ const EditVehicle: React.FC = () => {
                             />
                             <span>Has Racing Stripes</span>
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               name="has_body_kit"
@@ -1099,7 +1099,7 @@ const EditVehicle: React.FC = () => {
                       <div className="form-group">
                         <label className="form-label">Acquisition Method</label>
                         <div style={{ marginTop: '8px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={formData.received_in_trade || false}
@@ -1117,13 +1117,13 @@ const EditVehicle: React.FC = () => {
                             border: '2px solid #e5e7eb',
                             borderRadius: '4px'
                           }}>
-                            <div style={{ fontSize: '8pt', color: '#6b7280', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
                               Trade details will be managed in the vehicle profile after saving.
                               You'll be able to link the vehicle(s) you traded and specify values.
                             </div>
                             <a 
                               href="#trade-details" 
-                              style={{ fontSize: '8pt', color: '#2563eb', textDecoration: 'underline' }}
+                              style={{ fontSize: '11px', color: '#2563eb', textDecoration: 'underline' }}
                               onClick={(e) => {
                                 e.preventDefault();
                                 alert('Save this vehicle first, then use the "Manage Trade Details" button in the Financial Information section of the vehicle profile.');

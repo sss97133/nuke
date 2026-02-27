@@ -162,7 +162,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
       <div className="card">
         <div className="card-header">Document Intelligence</div>
         <div className="card-body">
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
             Loading document intelligence...
           </div>
         </div>
@@ -176,10 +176,10 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
       <div className="card">
         <div className="card-header">Document Intelligence</div>
         <div className="card-body">
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
             <FileText size={20} style={{ marginBottom: '8px', opacity: 0.5 }} />
             <div>No service documents uploaded yet.</div>
-            <div style={{ fontSize: '8pt', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', marginTop: '4px' }}>
               Upload receipts and invoices to build a maintenance history.
             </div>
           </div>
@@ -204,7 +204,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
             <div style={{ textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
                 <Loader2 size={16} className="animate-spin" color="var(--primary)" />
-                <span style={{ fontSize: '10pt', fontWeight: 600, color: 'var(--primary)' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>
                   Analyzing Receipts...
                 </span>
               </div>
@@ -223,7 +223,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                   borderRadius: '2px'
                 }} />
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Processed {analysisProgress.processed} of {analysisProgress.total} documents...
               </div>
             </div>
@@ -231,11 +231,11 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
             <div style={{ textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
                 <FileText size={16} color="var(--primary)" />
-                <span style={{ fontSize: '10pt', fontWeight: 600 }}>
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>
                   {documentStats.pending} Receipts Ready to Analyze
                 </span>
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
                 {documentStats.processed > 0 && `${documentStats.processed} already processed · `}
                 AI will extract vendor, date, cost, and service details
               </div>
@@ -260,7 +260,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: '#666'
         }}>
           <span>
@@ -283,7 +283,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
             gap: '8px'
           }}>
             <Wrench size={14} />
-            <span style={{ fontWeight: 600, fontSize: '10pt' }}>Service History</span>
+            <span style={{ fontWeight: 600, fontSize: '13px' }}>Service History</span>
           </div>
 
           <div style={{ maxHeight: '400px', overflow: 'auto' }}>
@@ -303,24 +303,24 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                       color: 'white',
                       padding: '1px 6px',
                       borderRadius: '2px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 600,
                       textTransform: 'uppercase'
                     }}>
                       {record.service_type || 'service'}
                     </span>
-                    <span style={{ fontWeight: 600, fontSize: '9pt' }}>
+                    <span style={{ fontWeight: 600, fontSize: '12px' }}>
                       {record.shop_name || 'Unknown Shop'}
                     </span>
                   </div>
                   {record.cost && (
-                    <span style={{ fontWeight: 700, fontSize: '9pt', color: '#374151', fontFamily: 'monospace' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#374151', fontFamily: 'monospace' }}>
                       {formatCurrency(record.cost)}
                     </span>
                   )}
                 </div>
 
-                <div style={{ fontSize: '8pt', color: '#666', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
                   <Calendar size={10} style={{ display: 'inline', marginRight: '4px' }} />
                   {formatDate(record.service_date)}
                   {record.shop_location && (
@@ -333,7 +333,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                 </div>
 
                 {record.work_performed && (
-                  <div style={{ fontSize: '8pt', color: '#4b5563', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '11px', color: '#4b5563', lineHeight: 1.4 }}>
                     {record.work_performed.length > 150
                       ? record.work_performed.substring(0, 150) + '...'
                       : record.work_performed}
@@ -348,14 +348,14 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                         border: '1px solid #e5e7eb',
                         padding: '1px 6px',
                         borderRadius: '2px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         color: '#4b5563'
                       }}>
                         {part}
                       </span>
                     ))}
                     {record.parts_replaced.length > 5 && (
-                      <span style={{ fontSize: '7pt', color: '#9ca3af' }}>
+                      <span style={{ fontSize: '9px', color: '#9ca3af' }}>
                         +{record.parts_replaced.length - 5} more
                       </span>
                     )}
@@ -363,7 +363,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                 )}
 
                 {record.confidence_score && record.confidence_score < 0.7 && (
-                  <div style={{ marginTop: '4px', fontSize: '7pt', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ marginTop: '4px', fontSize: '9px', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <AlertCircle size={10} />
                     Low confidence extraction - verify details
                   </div>
@@ -377,7 +377,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
               padding: '8px 12px',
               background: '#f9fafb',
               borderTop: '1px solid #e5e7eb',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: '#666',
               textAlign: 'center'
             }}>
@@ -394,10 +394,10 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
     <div className="card">
       <div className="card-header">Document Intelligence</div>
       <div className="card-body">
-        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
           <CheckCircle size={20} style={{ marginBottom: '8px', color: 'var(--success)' }} />
           <div>All {documentStats.processed} documents processed.</div>
-          <div style={{ fontSize: '8pt', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', marginTop: '4px' }}>
             No service records could be extracted. Documents may not be receipts.
           </div>
         </div>

@@ -25,14 +25,14 @@ Agents read this to avoid rebuilding things that already exist.
 - **Tasks completed**: ba1593fd (TTLRM eval, NO-GO), b6b693ab (Bearer auth, DONE)
 - **Training status**: German tier-2 running (PID 28401, epoch 4/25), watcher PID 7390 waiting; zone classifier DONE (72.8% val_acc)
 
-### [deal-flow] Transfer system audit + wiring — VP Deal Flow session
-- **Twilio status**: Local .env has placeholder values (your-twilio-account-sid). Supabase secrets were set to those placeholders = Twilio returns 401 invalid username. Filed CFO task (P92) to fund account + set real credentials.
-- **Crons 223-227**: NOT re-enabled. Would fire ~300K SMS/email to historical auction buyers/sellers. Two blockers: (1) Twilio not configured, (2) transfer-automator needs suppress_notifications param before backfill safe to run.
-- **stripe-webhook wired to transfer-automator**: On `checkout.session.completed` with purchase_type=vehicle_transaction → now calls transfer-advance:advance_manual for payment_confirmed milestone. Two paths: (a) transfer_id in session.metadata (preferred), (b) fallback lookup via vehicle_transactions.ownership_transfer_id FK.
-- **vehicle_transactions.ownership_transfer_id**: New FK column added via migration 20260227120000_vehicle_transactions_transfer_fk.sql. Links System B (Stripe facilitation fee) to System A (ownership_transfers milestone process).
-- **get_transfer bug fixed**: Was returning "{error: '[object Object]'}" — now properly extracts error.message from Supabase error objects. Deployed.
-- **Confirmed working**: ownership_transfers columns (inbox_email, buyer_access_token, seller_access_token, buyer_phone, buyer_email, seller_phone, seller_email) already exist in DB. Migration 20260227110000 documenting this for repo consistency.
-- **Schema cache note**: DB pool heavily saturated during session (PGRST002 on all PostgREST queries). Edge functions using direct Supabase client still functional. Will recover as cron activity reduces.
+### [deal-flow] Transfer system wiring + suppress_notifications — VP Deal Flow 2026-02-27
+- **suppress_notifications (P78 COMPLETED)**: transfer-automator seed_from_auction + seed_from_listing now accept suppress_notifications param. backfill_transfers_for_sold_auctions DB function updated to always pass suppress_notifications:true. Both deployed.
+- **Crons 223-227**: Still paused. Email blast risk eliminated. Re-enable ONLY after Twilio working (CFO task P92). Command: UPDATE cron.job SET active = true WHERE jobid BETWEEN 223 AND 227;
+- **stripe-webhook wired**: checkout.session.completed with purchase_type=vehicle_transaction now calls transfer-advance:advance_manual for payment_confirmed milestone. Deployed.
+- **vehicle_transactions.ownership_transfer_id**: UUID FK column added (Management API). Migration 20260227120000. Links Stripe fee record to parent ownership_transfer.
+- **get_transfer bug fixed**: Was "{error: '[object Object]'}" — now uses error.message. Deployed.
+- **Twilio diagnosis**: .env has placeholders → Supabase secrets set to placeholders → 401 on every SMS. Filed CFO task (P92).
+- **ownership_transfers schema**: inbox_email, buyer/seller_access_token, buyer/seller phone/email columns exist (deployed outside migration tracking — added doc migration 20260227110000).
 
 ### [frontend] Vehicle profile page — comprehensive UX quality pass — commit 475c6ce1b
 - VehicleProfileTabs: rewrote tab bar with human-readable labels (Overview/Media/Specs/Comps/Taxonomy/Bids), URL deep-linking via ?tab=, hover states, comps count badge

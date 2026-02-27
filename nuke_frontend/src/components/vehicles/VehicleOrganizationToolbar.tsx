@@ -147,7 +147,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
 
   if (loading) {
     return (
-      <div style={{ padding: '4px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '4px', fontSize: '9px', color: 'var(--text-muted)' }}>
         Loading...
       </div>
     );
@@ -166,7 +166,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
         onClick={toggleFavorite}
         style={{
           padding: '4px 8px',
-          fontSize: '7pt',
+          fontSize: '9px',
           fontWeight: 600,
           border: '1px solid var(--border)',
           background: preferences?.is_favorite ? '#fef3c7' : 'white',
@@ -185,7 +185,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
         onClick={toggleHidden}
         style={{
           padding: '4px 8px',
-          fontSize: '7pt',
+          fontSize: '9px',
           fontWeight: 600,
           border: '1px solid var(--border)',
           background: preferences?.is_hidden ? '#fee2e2' : 'white',
@@ -204,7 +204,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <span style={{
             padding: '4px 8px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 600,
             background: '#dbeafe',
             color: '#1e40af',
@@ -217,7 +217,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
             onClick={removeFromCollection}
             style={{
               padding: '2px 6px',
-              fontSize: '7pt',
+              fontSize: '9px',
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               color: 'var(--text-muted)',
@@ -248,7 +248,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                 placeholder="Collection name"
                 style={{
                   padding: '4px 8px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   border: '1px solid var(--border)',
                   borderRadius: '3px',
                   width: '120px'
@@ -259,7 +259,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                 onClick={() => addToCollection(newCollectionName)}
                 style={{
                   padding: '4px 8px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   border: '1px solid var(--accent)',
                   background: 'var(--accent)',
                   color: 'white',
@@ -276,7 +276,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                 }}
                 style={{
                   padding: '4px 8px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-muted)',
@@ -293,7 +293,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                 onClick={() => setShowCollectionInput(true)}
                 style={{
                   padding: '4px 8px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 600,
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
@@ -329,7 +329,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                         display: 'block',
                         width: '100%',
                         padding: '6px 12px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         textAlign: 'left',
                         border: 'none',
                         background: 'var(--surface)',

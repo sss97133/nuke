@@ -295,7 +295,7 @@ export default function Dashboard() {
           padding: '16px',
           textAlign: 'center',
           fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-          fontSize: '8pt'
+          fontSize: '11px'
         }}
       >
         <div style={{ marginBottom: '16px', color: '#424242' }}>
@@ -304,7 +304,7 @@ export default function Dashboard() {
         <button
           onClick={() => navigate(`/login?returnUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`)}
           style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
             padding: '8px 16px',
             border: '1px solid #bdbdbd',
@@ -382,7 +382,7 @@ export default function Dashboard() {
       style={{
         padding: '16px',
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-        fontSize: '8pt',
+        fontSize: '11px',
         background: 'var(--surface)',
         maxWidth: '800px',
         margin: '0 auto'
@@ -396,9 +396,9 @@ export default function Dashboard() {
           borderBottom: '1px solid #bdbdbd'
         }}
       >
-        <h1 style={{ fontSize: '10pt', fontWeight: '600', margin: 0 }}>Dashboard</h1>
+        <h1 style={{ fontSize: '13px', fontWeight: '600', margin: 0 }}>Dashboard</h1>
         {totalPending > 0 && (
-          <div style={{ fontSize: '7pt', color: '#757575', marginTop: '4px' }}>
+          <div style={{ fontSize: '9px', color: '#757575', marginTop: '4px' }}>
             {totalPending} item{totalPending !== 1 ? 's' : ''} need attention
           </div>
         )}
@@ -406,15 +406,11 @@ export default function Dashboard() {
 
       {/* Simple List - No Categories */}
       {isLoading ? (
-        <div
-          style={{
-            padding: '32px',
-            textAlign: 'center',
-            color: '#757575',
-            fontSize: '8pt'
-          }}
-        >
-          Loading...
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px' }}>
+          <style>{`@keyframes dash-pulse { 0%,100%{opacity:.7} 50%{opacity:.3} }`}</style>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} style={{ height: 56, background: 'var(--surface, #f5f5f5)', border: '1px solid #e0e0e0', borderRadius: 2, animation: 'dash-pulse 1.5s ease-in-out infinite' }} />
+          ))}
         </div>
       ) : allItems.length === 0 ? (
         <div
@@ -422,7 +418,7 @@ export default function Dashboard() {
             padding: '32px',
             textAlign: 'center',
             color: '#757575',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}
         >
           All caught up! No pending items.
@@ -468,13 +464,13 @@ export default function Dashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '4px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
                 Rejection Reason
               </div>
-              <div style={{ fontSize: '8pt', color: '#757575', marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: '#757575', marginBottom: '12px' }}>
                 {rejectionModal.title}
               </div>
-              <div style={{ fontSize: '8pt', color: '#757575', marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', color: '#757575', marginBottom: '8px' }}>
                 Why are you rejecting this? (Optional)
               </div>
               <textarea
@@ -486,7 +482,7 @@ export default function Dashboard() {
                   padding: '8px',
                   border: '1px solid #bdbdbd',
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   resize: 'vertical'
                 }}
                 autoFocus
@@ -500,7 +496,7 @@ export default function Dashboard() {
                   border: '1px solid #bdbdbd',
                   background: 'var(--surface)',
                   cursor: 'pointer',
-                  fontSize: '8pt'
+                  fontSize: '11px'
                 }}
               >
                 Cancel
@@ -522,7 +518,7 @@ export default function Dashboard() {
                   background: '#dc2626',
                   color: 'white',
                   cursor: 'pointer',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: '600'
                 }}
               >

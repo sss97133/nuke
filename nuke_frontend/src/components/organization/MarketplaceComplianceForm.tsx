@@ -281,7 +281,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
       <label className="text-small" style={{ fontWeight: 600 }}>{label}</label>
       <textarea
         className="form-input"
-        style={{ minHeight: 72, fontSize: '9pt' }}
+        style={{ minHeight: 72, fontSize: '12px' }}
         value={value}
         onChange={(e) => setter(e.target.value)}
         placeholder={placeholder}
@@ -292,7 +292,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
 
   return (
     <div className="card">
-      <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
+      <div className="card-header" style={{ fontSize: '15px', fontWeight: 700 }}>
         Marketplace Compliance Profile
       </div>
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -301,10 +301,10 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {error && (
-              <div className="alert alert-error" style={{ fontSize: '9pt' }}>{error}</div>
+              <div className="alert alert-error" style={{ fontSize: '12px' }}>{error}</div>
             )}
             {success && (
-              <div className="alert alert-success" style={{ fontSize: '9pt' }}>{success}</div>
+              <div className="alert alert-success" style={{ fontSize: '12px' }}>{success}</div>
             )}
 
             <section className="card" style={{ border: '1px solid var(--border)', padding: 12 }}>

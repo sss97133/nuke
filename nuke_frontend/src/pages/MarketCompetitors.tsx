@@ -294,10 +294,10 @@ export default function MarketCompetitors() {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '13pt', fontWeight: 800 }}>
+            <h1 style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>
               Fractional Vehicle Ownership — Market Landscape
             </h1>
-            <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
               Rally: $112M raised, 9 cars, SEC fined 2023 · TheCarCrowd: NOT FCA-regulated per own site, 12.5% fee · MCQ: $20/share, SEC Reg A+ · Fraction: 2 app reviews, no SEC filing · Total market AUM: &lt;$100M
             </div>
           </div>
@@ -328,11 +328,11 @@ export default function MarketCompetitors() {
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <h3 className="heading-3" style={{ color: c.isNuke ? 'var(--accent, #2563eb)' : undefined }}>
                   {c.name}
-                  {c.isNuke && <span style={{ marginLeft: '6px', fontSize: '7pt', fontWeight: 700, color: 'var(--accent, #2563eb)', background: 'rgba(37,99,235,0.1)', padding: '1px 5px', borderRadius: '3px' }}>THIS</span>}
+                  {c.isNuke && <span style={{ marginLeft: '6px', fontSize: '9px', fontWeight: 700, color: 'var(--accent, #2563eb)', background: 'rgba(37,99,235,0.1)', padding: '1px 5px', borderRadius: '3px' }}>THIS</span>}
                 </h3>
-                {c.url !== '#' && <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{c.url}</span>}
+                {c.url !== '#' && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.url}</span>}
               </div>
-              <div className="card-body" style={{ display: 'grid', gap: '6px', fontSize: '8.5pt' }}>
+              <div className="card-body" style={{ display: 'grid', gap: '6px', fontSize: '11px' }}>
                 <div style={{ color: 'var(--text-muted)' }}>{c.tagline}</div>
                 <div style={{ display: 'grid', gap: '4px', marginTop: '4px' }}>
                   <Row label="Founded"    value={c.founded} />
@@ -342,7 +342,7 @@ export default function MarketCompetitors() {
                   <Row label="AUM"        value={c.aum} />
                   <Row label="Regulatory" value={c.regulatory} />
                 </div>
-                <div style={{ marginTop: '6px', fontSize: '8pt', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '6px' }}>
+                <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '6px' }}>
                   {c.notes}
                 </div>
               </div>
@@ -361,7 +361,7 @@ export default function MarketCompetitors() {
                   onClick={() => setActiveCategory(cat)}
                   style={{
                     padding: '3px 9px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 600,
                     fontFamily: 'Arial, sans-serif',
                     border: '1px solid var(--border)',
@@ -377,7 +377,7 @@ export default function MarketCompetitors() {
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg)' }}>
                   <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', minWidth: '200px' }}>
@@ -441,7 +441,7 @@ export default function MarketCompetitors() {
                                 background: cfg.bg,
                                 color: cfg.color,
                                 fontWeight: 800,
-                                fontSize: '10pt',
+                                fontSize: '13px',
                                 minWidth: '28px',
                               }}>
                                 {cfg.label}
@@ -456,7 +456,7 @@ export default function MarketCompetitors() {
               </tbody>
             </table>
           </div>
-          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '16px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>
             {Object.entries(TIER_CONFIG).map(([tier, cfg]) => (
               <span key={tier} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <span style={{ background: cfg.bg, color: cfg.color, fontWeight: 800, padding: '1px 6px', borderRadius: '3px' }}>{cfg.label}</span>
@@ -481,7 +481,7 @@ export default function MarketCompetitors() {
                 <div style={{ background: 'var(--accent, #2563eb)', borderRadius: '2px' }} />
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '9.5pt', marginBottom: '4px' }}>{adv.title}</div>
-                  <div style={{ fontSize: '8.5pt', color: 'var(--text-muted)', lineHeight: 1.6 }}>{adv.body}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.6 }}>{adv.body}</div>
                 </div>
               </div>
             ))}
@@ -533,9 +533,9 @@ export default function MarketCompetitors() {
           background: 'var(--surface)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '8.5pt', color: 'var(--text-muted)' }}>Share this page:</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Share this page:</span>
             <code style={{
-              fontSize: '8.5pt',
+              fontSize: '11px',
               padding: '3px 8px',
               background: 'var(--bg)',
               border: '1px solid var(--border)',
@@ -559,8 +559,8 @@ export default function MarketCompetitors() {
             borderRadius: '6px',
             background: 'rgba(37,99,235,0.04)',
           }}>
-            <div style={{ fontWeight: 800, fontSize: '10pt', marginBottom: '6px' }}>Ready to trade?</div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '6px' }}>Ready to trade?</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
               Invest in segment ETFs (PORS, TRUK, SQBD, Y79) or browse individual vehicle offerings.
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -579,8 +579,8 @@ export default function MarketCompetitors() {
             borderRadius: '6px',
             background: 'var(--surface)',
           }}>
-            <div style={{ fontWeight: 800, fontSize: '10pt', marginBottom: '6px' }}>Investor inquiry?</div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '6px' }}>Investor inquiry?</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
               Access the full data room: business plan, revenue model, technical exhibits, and information memorandum.
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -630,9 +630,9 @@ function SummaryCard({ title, verdict, color, accentColor, body }: {
       display: 'grid',
       gap: '8px',
     }}>
-      <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--text-muted)' }}>{title}</div>
-      <div style={{ fontWeight: 800, fontSize: '10pt', color: accentColor }}>{verdict}</div>
-      <div style={{ fontSize: '8.5pt', color: 'var(--text-muted)', lineHeight: 1.6 }}>{body}</div>
+      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>{title}</div>
+      <div style={{ fontWeight: 800, fontSize: '13px', color: accentColor }}>{verdict}</div>
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.6 }}>{body}</div>
     </div>
   );
 }

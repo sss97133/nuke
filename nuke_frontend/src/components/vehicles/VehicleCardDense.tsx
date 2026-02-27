@@ -1449,7 +1449,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           color: 'inherit',
           transition: 'all 0.12s ease',
           marginBottom: '1px',
-          fontSize: '8pt',
+          fontSize: '11px',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = 'var(--grey-50)';
@@ -1494,7 +1494,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         
         {/* Vehicle - single line */}
         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          <span style={{ fontWeight: 700, fontSize: '9pt' }}>
+          <span style={{ fontWeight: 700, fontSize: '12px' }}>
             {vehicleTitle}
           </span>
           <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
@@ -1503,7 +1503,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         </div>
         
         {/* Stats - compact */}
-        <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
           {typeof vehicle.mileage === 'number' && vehicle.mileage > 0 ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               {/* Clean numeric mileage for extraction (no "k", no "mi", no stroke). */}
@@ -1523,12 +1523,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         </div>
         
         {/* Counts */}
-        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           {vehicle.image_count || 0} img • {vehicle.event_count || 0} evt
         </div>
         
         {/* Value - Show LotBadge for Mecum, otherwise show price */}
-        <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '9pt' }}>
+        <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '12px' }}>
           {mecumLotData ? (
             <LotBadge
               lotNumber={mecumLotData.lotNumber}
@@ -1545,7 +1545,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         </div>
         
         {/* Profit (if valid) */}
-        <div style={{ textAlign: 'right', fontSize: '8pt', fontWeight: 600 }}>
+        <div style={{ textAlign: 'right', fontSize: '11px', fontWeight: 600 }}>
           {vehicle.current_value && vehicle.purchase_price && 
            vehicle.purchase_price > 0 && 
            vehicle.purchase_price < vehicle.current_value * 5 ? (
@@ -1637,7 +1637,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         color: 'white',
                         padding: '4px 10px',
                         borderRadius: '4px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 700,
                         letterSpacing: '0.5px',
                         boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
@@ -1655,7 +1655,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         color: 'white',
                         padding: '4px 8px',
                         borderRadius: '6px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 700,
                         fontFamily: 'monospace',
                         display: 'inline-flex',
@@ -1731,7 +1731,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                           BID
                         </div>
                         {auctionHighBidText && (
-                          <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 800, lineHeight: 1 }}>
                             {auctionHighBidText}
                           </div>
                         )}
@@ -1746,7 +1746,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                             : null;
                           const bidCount = externalBidCount ?? vehicleBidCount;
                           return bidCount ? (
-                            <div style={{ fontSize: '6pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
+                            <div style={{ fontSize: '8px', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
                               {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
                             </div>
                           ) : null;
@@ -1770,13 +1770,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                           {badgeParts.label}
                         </div>
                         {badgeParts.value ? (
-                          <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 800, lineHeight: 1 }}>
                             {badgeParts.value}
                           </div>
                         ) : null}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '9pt', fontWeight: 800 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 800 }}>
                         {badgeParts.value || badgeMainText}
                       </div>
                     )}
@@ -1822,7 +1822,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               {/* Vehicle name */}
               <div
                 style={{
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   fontWeight: 700,
                   lineHeight: 1.2,
                   marginBottom: '4px',
@@ -1834,7 +1834,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               {/* Metadata row - clean by default; infoDense adds extras */}
               <div
                 style={{
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   display: 'flex',
                   gap: '10px',
                   flexWrap: 'wrap',
@@ -1926,10 +1926,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       <div style={{ fontWeight: 700, marginBottom: '4px' }}>
                         <span style={{ color: getTierColor(tierLabel) }}>{tierLabel}</span> Data Profile
                       </div>
-                      <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.7)', marginBottom: '6px' }}>
+                      <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', marginBottom: '6px' }}>
                         {getTierDescription(tierLabel)}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.85)', fontSize: '7pt' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.85)', fontSize: '9px' }}>
                         <div>{vehicle.year && vehicle.make && vehicle.model ? '\u2705' : '\u274C'} Year / Make / Model</div>
                         <div>{hasVIN ? '\u2705' : '\u274C'} VIN</div>
                         <div>{hasPrice ? '\u2705' : '\u274C'} Price / Estimate</div>
@@ -1938,7 +1938,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         <div>{(vehicle.receipt_count || 0) >= 1 ? '\u2705' : '\u274C'} Receipts ({vehicle.receipt_count || 0})</div>
                       </div>
                       {nextSteps.length > 0 && (
-                        <div style={{ marginTop: '6px', paddingTop: '5px', borderTop: '1px solid rgba(255,255,255,0.15)', fontSize: '7pt', color: 'rgba(255,255,255,0.6)' }}>
+                        <div style={{ marginTop: '6px', paddingTop: '5px', borderTop: '1px solid rgba(255,255,255,0.15)', fontSize: '9px', color: 'rgba(255,255,255,0.6)' }}>
                           <div style={{ fontWeight: 600, marginBottom: '2px' }}>Next steps to level up:</div>
                           {nextSteps.map((s, i) => <div key={i}>{'\u2192'} {s}</div>)}
                         </div>
@@ -1961,7 +1961,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 color: 'white',
                 padding: '3px 8px',
                 borderRadius: '12px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 fontWeight: 600,
               }}
             >
@@ -2212,7 +2212,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--text-muted)',
-              fontSize: '9pt',
+              fontSize: '12px',
               background: 'var(--grey-100)',
               border: '1px dashed var(--border)'
             }}
@@ -2244,7 +2244,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       color: 'white',
                       padding: '3px 8px',
                       borderRadius: '3px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 700,
                       letterSpacing: '0.5px',
                       animation: 'pulse 2s ease-in-out infinite',
@@ -2436,7 +2436,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       color: 'white',
                       padding: '2px 6px',
                       borderRadius: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                       fontWeight: 800,
                       letterSpacing: '0.3px',
@@ -2463,7 +2463,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       color: 'white',
                       padding: '2px 5px',
                       borderRadius: '4px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 800,
                       lineHeight: 1,
                       animation: 'badgeFadeIn 0.2s ease-in',
@@ -2484,7 +2484,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       color: 'white',
                       padding: '2px 5px',
                       borderRadius: '4px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 800,
                       lineHeight: 1,
                       animation: 'badgeFadeIn 0.2s ease-in',
@@ -2543,10 +2543,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       <div style={{ fontWeight: 700, marginBottom: '4px' }}>
                         <span style={{ color: getTierColor(tierLabel) }}>{tierLabel}</span> Data Profile
                       </div>
-                      <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.7)', marginBottom: '6px' }}>
+                      <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', marginBottom: '6px' }}>
                         {getTierDescription(tierLabel)}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.85)', fontSize: '7pt' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.85)', fontSize: '9px' }}>
                         <div>{vehicle.year && vehicle.make && vehicle.model ? '\u2705' : '\u274C'} Year / Make / Model</div>
                         <div>{hasVIN ? '\u2705' : '\u274C'} VIN</div>
                         <div>{hasPrice ? '\u2705' : '\u274C'} Price / Estimate</div>
@@ -2555,7 +2555,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         <div>{(vehicle.receipt_count || 0) >= 1 ? '\u2705' : '\u274C'} Receipts ({vehicle.receipt_count || 0})</div>
                       </div>
                       {nextSteps.length > 0 && (
-                        <div style={{ marginTop: '6px', paddingTop: '5px', borderTop: '1px solid rgba(255,255,255,0.15)', fontSize: '7pt', color: 'rgba(255,255,255,0.6)' }}>
+                        <div style={{ marginTop: '6px', paddingTop: '5px', borderTop: '1px solid rgba(255,255,255,0.15)', fontSize: '9px', color: 'rgba(255,255,255,0.6)' }}>
                           <div style={{ fontWeight: 600, marginBottom: '2px' }}>Next steps to level up:</div>
                           {nextSteps.map((s, i) => <div key={i}>{'\u2192'} {s}</div>)}
                         </div>
@@ -2781,7 +2781,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         }}>
           {/* Title - with better truncation for square cards */}
           <div style={{
-            fontSize: '10pt',
+            fontSize: '13px',
             fontWeight: 700,
             lineHeight: 1.2,
             overflow: 'hidden',
@@ -2967,14 +2967,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 800 }}>
+                <div style={{ fontSize: '11px', fontWeight: 800 }}>
                   {specPopover.def.kind === 'engine'
                     ? 'ENGINE'
                     : specPopover.def.kind === 'transmission'
                       ? 'TRANSMISSION'
                       : 'BODY STYLE'}
                 </div>
-                <div style={{ fontSize: '10pt', fontWeight: 800, lineHeight: 1.1 }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, lineHeight: 1.1 }}>
                   {specPopover.def.title}
                 </div>
               </div>
@@ -2986,18 +2986,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   e.stopPropagation();
                   closeSpecPopover();
                 }}
-                style={{ height: 22, padding: '0 8px', fontSize: '8pt' }}
+                style={{ height: 22, padding: '0 8px', fontSize: '11px' }}
               >
                 CLOSE
               </button>
             </div>
 
-            <div style={{ marginTop: '8px', fontSize: '9pt', lineHeight: 1.25 }}>
+            <div style={{ marginTop: '8px', fontSize: '12px', lineHeight: 1.25 }}>
               {specPopover.def.summary}
             </div>
 
             {Array.isArray(specPopover.def.details) && specPopover.def.details.length > 0 && (
-              <ul style={{ margin: '8px 0 0 16px', padding: 0, fontSize: '8.5pt', lineHeight: 1.25 }}>
+              <ul style={{ margin: '8px 0 0 16px', padding: 0, fontSize: '11px', lineHeight: 1.25 }}>
                 {specPopover.def.details.slice(0, 6).map((d, i) => (
                   <li key={i} style={{ marginBottom: '4px' }}>{d}</li>
                 ))}
@@ -3008,18 +3008,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             {(specPopover.def.kind === 'engine' || specPopover.def.kind === 'transmission') && (
               <div style={{ marginTop: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px' }}>
-                  <div style={{ fontSize: '8pt', fontWeight: 800, letterSpacing: '0.4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.4px' }}>
                     EVIDENCE
                   </div>
                   {!specEvidence.loading && specEvidence.images.length > 0 && (
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                       {specEvidence.images.length} photos
                     </div>
                   )}
                 </div>
 
                 {specEvidence.loading ? (
-                  <div style={{ marginTop: '6px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
                     Loading…
                   </div>
                 ) : specEvidence.images.length > 0 ? (
@@ -3076,7 +3076,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     })}
                   </div>
                 ) : (
-                  <div style={{ marginTop: '6px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
                     No AI-tagged {specPopover.def.kind === 'transmission' ? 'transmission' : 'engine'} photos yet.
                   </div>
                 )}
@@ -3084,7 +3084,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             )}
 
             {!specPopover.def.known && (
-              <div style={{ marginTop: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
                 Unmapped token. We’ll promote it to canon once it’s seen consistently (and ideally backed by sources/photos).
               </div>
             )}

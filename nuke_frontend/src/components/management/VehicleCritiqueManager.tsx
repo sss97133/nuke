@@ -162,7 +162,7 @@ export default function VehicleCritiqueManager({
         style={{
           ...styles[status as keyof typeof styles],
           padding: '2px 6px',
-          fontSize: '7pt',
+          fontSize: '9px',
           borderRadius: '2px',
           textTransform: 'uppercase',
           fontWeight: 'bold'
@@ -210,17 +210,17 @@ export default function VehicleCritiqueManager({
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '12px' }}>Vehicle Critiques & Business Feedback</h3>
-          <p style={{ margin: 0, fontSize: '8pt', color: '#666' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: '#666' }}>
             {critiques.length} critique{critiques.length !== 1 ? 's' : ''} found
           </p>
         </div>
 
         {/* Filters */}
-        <div style={{ display: 'flex', gap: '8px', fontSize: '8pt' }}>
+        <div style={{ display: 'flex', gap: '8px', fontSize: '11px' }}>
           <select
             value={filter.status}
             onChange={(e) => setFilter(prev => ({ ...prev, status: e.target.value }))}
-            style={{ fontSize: '8pt', padding: '2px' }}
+            style={{ fontSize: '11px', padding: '2px' }}
           >
             <option value="all">All Statuses</option>
             <option value="pending">Pending</option>
@@ -231,7 +231,7 @@ export default function VehicleCritiqueManager({
           <select
             value={filter.category}
             onChange={(e) => setFilter(prev => ({ ...prev, category: e.target.value }))}
-            style={{ fontSize: '8pt', padding: '2px' }}
+            style={{ fontSize: '11px', padding: '2px' }}
           >
             <option value="all">All Categories</option>
             <option value="categorization">Categorization</option>
@@ -242,7 +242,7 @@ export default function VehicleCritiqueManager({
           <select
             value={filter.priority}
             onChange={(e) => setFilter(prev => ({ ...prev, priority: e.target.value }))}
-            style={{ fontSize: '8pt', padding: '2px' }}
+            style={{ fontSize: '11px', padding: '2px' }}
           >
             <option value="all">All Priorities</option>
             <option value="urgent">Urgent</option>
@@ -260,7 +260,7 @@ export default function VehicleCritiqueManager({
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ width: '100%', fontSize: '8pt' }}>
+            <table className="data-table" style={{ width: '100%', fontSize: '11px' }}>
               <thead>
                 <tr>
                   <th>Vehicle</th>
@@ -279,13 +279,13 @@ export default function VehicleCritiqueManager({
                   <tr key={critique.id}>
                     <td>
                       {critique.year} {critique.make} {critique.model}
-                      <div style={{ fontSize: '7pt', color: '#666' }}>
+                      <div style={{ fontSize: '9px', color: '#666' }}>
                         {critique.vehicle_status}
                       </div>
                     </td>
                     <td style={{ textTransform: 'capitalize' }}>
                       {critique.category.replace('_', ' ')}
-                      <div style={{ fontSize: '7pt', color: '#666' }}>
+                      <div style={{ fontSize: '9px', color: '#666' }}>
                         {critique.subcategory.replace('_', ' ')}
                       </div>
                     </td>
@@ -310,7 +310,7 @@ export default function VehicleCritiqueManager({
                     </td>
                     <td>
                       {critique.critique_author}
-                      <div style={{ fontSize: '7pt', color: '#666' }}>
+                      <div style={{ fontSize: '9px', color: '#666' }}>
                         {critique.author_role}
                       </div>
                     </td>
@@ -322,13 +322,13 @@ export default function VehicleCritiqueManager({
                         <button
                           onClick={() => setSelectedCritique(critique)}
                           className="button button-primary"
-                          style={{ fontSize: '7pt', padding: '2px 4px' }}
+                          style={{ fontSize: '9px', padding: '2px 4px' }}
                         >
                           Resolve
                         </button>
                       )}
                       {critique.resolved_at && (
-                        <div style={{ fontSize: '7pt', color: '#666' }}>
+                        <div style={{ fontSize: '9px', color: '#666' }}>
                           Resolved {new Date(critique.resolved_at).toLocaleDateString()}
                         </div>
                       )}
@@ -406,7 +406,7 @@ export default function VehicleCritiqueManager({
                   background: '#f8f9fa',
                   padding: '8px',
                   border: '1px solid #e9ecef',
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   marginTop: '4px'
                 }}>
                   {selectedCritique.description}
@@ -416,7 +416,7 @@ export default function VehicleCritiqueManager({
               {selectedCritique.business_impact && Object.keys(selectedCritique.business_impact).length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
                   <strong>Business Impact:</strong>
-                  <div style={{ fontSize: '9pt', marginTop: '4px' }}>
+                  <div style={{ fontSize: '12px', marginTop: '4px' }}>
                     {formatBusinessImpact(selectedCritique.business_impact)}
                   </div>
                 </div>
@@ -433,7 +433,7 @@ export default function VehicleCritiqueManager({
                   rows={3}
                   style={{
                     width: '100%',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     padding: '8px',
                     border: '1px solid #e9ecef',
                     borderRadius: '4px'
@@ -446,7 +446,7 @@ export default function VehicleCritiqueManager({
                   onClick={() => handleStatusUpdate(selectedCritique.id, 'rejected', resolutionNotes)}
                   disabled={isResolving}
                   className="button button-secondary"
-                  style={{ fontSize: '9pt', padding: '4px 8px' }}
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
                 >
                   Reject
                 </button>
@@ -454,7 +454,7 @@ export default function VehicleCritiqueManager({
                   onClick={() => handleStatusUpdate(selectedCritique.id, 'reviewed', resolutionNotes)}
                   disabled={isResolving}
                   className="button button-warning"
-                  style={{ fontSize: '9pt', padding: '4px 8px' }}
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
                 >
                   Mark Reviewed
                 </button>
@@ -462,7 +462,7 @@ export default function VehicleCritiqueManager({
                   onClick={() => handleStatusUpdate(selectedCritique.id, 'implemented', resolutionNotes)}
                   disabled={isResolving}
                   className="button button-success"
-                  style={{ fontSize: '9pt', padding: '4px 8px' }}
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
                 >
                   Mark Implemented
                 </button>

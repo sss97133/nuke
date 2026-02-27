@@ -162,13 +162,13 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <h2 style={{ margin: 0, fontSize: '16pt' }}>Part: {partName}</h2>
+          <h2 style={{ margin: 0, fontSize: '21px' }}>Part: {partName}</h2>
           <button
             onClick={onClose}
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '24pt',
+              fontSize: '32px',
               cursor: 'pointer',
               color: 'var(--text)'
             }}
@@ -190,7 +190,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
               color: activeTab === 'search' ? '#fff' : 'var(--text)',
               border: 'none',
               cursor: 'pointer',
-              fontSize: '10pt',
+              fontSize: '13px',
               fontWeight: activeTab === 'search' ? 600 : 400
             }}
           >
@@ -206,7 +206,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                   color: activeTab === 'order' ? '#fff' : 'var(--text)',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   fontWeight: activeTab === 'order' ? 600 : 400
                 }}
               >
@@ -220,7 +220,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                   color: activeTab === 'install' ? '#fff' : 'var(--text)',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   fontWeight: activeTab === 'install' ? 600 : 400
                 }}
               >
@@ -262,16 +262,16 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                         }}
                       >
                         <div>
-                          <h3 style={{ margin: 0, fontSize: '12pt', marginBottom: '4px' }}>
+                          <h3 style={{ margin: 0, fontSize: '16px', marginBottom: '4px' }}>
                             {supplier.name}
                           </h3>
                           {supplier.location && (
-                            <p style={{ margin: 0, fontSize: '9pt', color: 'var(--text-muted)' }}>
+                            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
                               {supplier.location}
                             </p>
                           )}
                           {supplier.shippingDays && (
-                            <p style={{ margin: '4px 0 0 0', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
                               Ships in {supplier.shippingDays} day{supplier.shippingDays !== 1 ? 's' : ''}
                             </p>
                           )}
@@ -287,7 +287,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                               color: 'var(--text)',
                               textDecoration: 'none',
                               borderRadius: '4px',
-                              fontSize: '9pt',
+                              fontSize: '12px',
                               border: '1px solid var(--border)'
                             }}
                           >
@@ -303,7 +303,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: '4px',
-                                fontSize: '9pt',
+                                fontSize: '12px',
                                 cursor: loading ? 'not-allowed' : 'pointer'
                               }}
                             >
@@ -352,7 +352,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                   color: '#fff',
                   textDecoration: 'none',
                   borderRadius: '4px',
-                  fontSize: '10pt'
+                  fontSize: '13px'
                 }}
               >
                 View Order on {orderTracking.supplier_name}
@@ -367,7 +367,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '10pt', fontWeight: 600 }}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>
                     Installation Date
                   </label>
                   <input
@@ -379,13 +379,13 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                       padding: '8px',
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
-                      fontSize: '10pt'
+                      fontSize: '13px'
                     }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '10pt', fontWeight: 600 }}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>
                     Difficulty
                   </label>
                   <select
@@ -396,7 +396,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                       padding: '8px',
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
-                      fontSize: '10pt'
+                      fontSize: '13px'
                     }}
                   >
                     <option value="easy">Easy</option>
@@ -407,7 +407,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '10pt', fontWeight: 600 }}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>
                     Labor Hours (optional)
                   </label>
                   <input
@@ -421,13 +421,13 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                       padding: '8px',
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
-                      fontSize: '10pt'
+                      fontSize: '13px'
                     }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '10pt', fontWeight: 600 }}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>
                     Notes (optional)
                   </label>
                   <textarea
@@ -440,7 +440,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                       padding: '8px',
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
-                      fontSize: '10pt',
+                      fontSize: '13px',
                       fontFamily: 'inherit'
                     }}
                   />
@@ -455,7 +455,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                     color: '#fff',
                     border: 'none',
                     borderRadius: '4px',
-                    fontSize: '10pt',
+                    fontSize: '13px',
                     cursor: loading ? 'not-allowed' : 'pointer',
                     fontWeight: 600
                   }}

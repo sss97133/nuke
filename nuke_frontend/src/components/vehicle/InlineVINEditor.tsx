@@ -131,7 +131,7 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
             VIN
           </div>
           <div style={{ 
-            fontSize: '10pt', 
+            fontSize: '13px', 
             fontFamily: 'monospace',
             color: isFakeVIN ? 'var(--warning)' : 'var(--text)'
           }}>

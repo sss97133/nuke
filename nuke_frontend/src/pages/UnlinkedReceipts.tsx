@@ -111,10 +111,10 @@ export default function UnlinkedReceipts() {
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Unlinked Receipts</span>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="button button-secondary" onClick={loadReceipts} style={{ fontSize: '8pt' }}>
+                <button className="button button-secondary" onClick={loadReceipts} style={{ fontSize: '11px' }}>
                   Refresh
                 </button>
-                <button className="button button-secondary" onClick={() => navigate('/org/dashboard')} style={{ fontSize: '8pt' }}>
+                <button className="button button-secondary" onClick={() => navigate('/org/dashboard')} style={{ fontSize: '11px' }}>
                   Back to Dashboard
                 </button>
               </div>
@@ -160,7 +160,7 @@ export default function UnlinkedReceipts() {
                               {receipt.vehicle_id && (
                                 <button
                                   className="button button-link"
-                                  style={{ fontSize: '8pt', padding: 0 }}
+                                  style={{ fontSize: '11px', padding: 0 }}
                                   onClick={() => navigate(`/vehicle/${receipt.vehicle_id}`)}
                                 >
                                   Open vehicle
@@ -180,7 +180,7 @@ export default function UnlinkedReceipts() {
                                   target="_blank"
                                   rel="noreferrer"
                                   className="button button-small"
-                                  style={{ fontSize: '8pt' }}
+                                  style={{ fontSize: '11px' }}
                                 >
                                   Open file
                                 </a>

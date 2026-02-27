@@ -143,14 +143,14 @@ export const FollowAuctionCard: React.FC<FollowAuctionCardProps> = ({
         borderRadius: '0px',
         boxShadow: '0 12px 24px rgba(15, 23, 42, 0.15)',
         padding: '16px',
-        fontSize: '9pt',
+        fontSize: '12px',
         color: 'var(--text)',
         width: '320px'
       }}
       onClick={(e) => e.stopPropagation()}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-        <div style={{ fontWeight: 700, fontSize: '10pt' }}>
+        <div style={{ fontWeight: 700, fontSize: '13px' }}>
           {platformName} Auction
         </div>
         <button
@@ -171,12 +171,12 @@ export const FollowAuctionCard: React.FC<FollowAuctionCardProps> = ({
       </div>
 
       {formattedDate && (
-        <div style={{ marginBottom: '12px', color: 'var(--text-secondary)', fontSize: '8pt' }}>
+        <div style={{ marginBottom: '12px', color: 'var(--text-secondary)', fontSize: '11px' }}>
           Auction Date: <strong>{formattedDate}</strong>
         </div>
       )}
 
-      <div style={{ marginBottom: '16px', fontSize: '8pt', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+      <div style={{ marginBottom: '16px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
         Follow this auction to get notified when:
       </div>
 
@@ -184,7 +184,7 @@ export const FollowAuctionCard: React.FC<FollowAuctionCardProps> = ({
         margin: 0, 
         paddingLeft: '20px', 
         marginBottom: '16px',
-        fontSize: '8pt',
+        fontSize: '11px',
         color: 'var(--text-secondary)',
         lineHeight: 1.6
       }}>
@@ -202,7 +202,7 @@ export const FollowAuctionCard: React.FC<FollowAuctionCardProps> = ({
             rel="noopener noreferrer"
             style={{
               display: 'inline-block',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--link-color)',
               textDecoration: 'underline',
               cursor: 'pointer'
@@ -222,7 +222,7 @@ export const FollowAuctionCard: React.FC<FollowAuctionCardProps> = ({
           border: '2px solid var(--border)',
           background: isFollowing ? 'var(--surface)' : 'var(--button-bg, #000)',
           color: isFollowing ? 'var(--text)' : 'var(--button-text, #fff)',
-          fontSize: '9pt',
+          fontSize: '12px',
           fontWeight: 700,
           cursor: loading || checkingFollow ? 'not-allowed' : 'pointer',
           borderRadius: '0px',
@@ -244,7 +244,7 @@ export const FollowAuctionCard: React.FC<FollowAuctionCardProps> = ({
       </button>
 
       {!user && (
-        <div style={{ marginTop: '12px', fontSize: '7pt', color: 'var(--text-secondary)', textAlign: 'center' }}>
+        <div style={{ marginTop: '12px', fontSize: '9px', color: 'var(--text-secondary)', textAlign: 'center' }}>
           <a href="/login" style={{ color: 'var(--link-color)', textDecoration: 'underline' }}>
             Sign in to follow auctions
           </a>

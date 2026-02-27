@@ -100,14 +100,14 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, valueColor }) => (
     borderRadius: '2px'
   }}>
     <div style={{
-      fontSize: '14pt',
+      fontSize: '19px',
       fontWeight: 700,
       color: valueColor || 'var(--text)'
     }}>
       {value}
     </div>
     <div style={{
-      fontSize: '7pt',
+      fontSize: '9px',
       color: 'var(--text-muted)',
       textTransform: 'uppercase',
       letterSpacing: '0.5px'

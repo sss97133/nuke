@@ -575,7 +575,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         alignItems: 'center',
         cursor: 'pointer'
       }} onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Expand' : 'Collapse'}>
-        <span style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+        <span style={{ fontSize: '11px', fontWeight: 'bold' }}>
           {collapsed ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}${vehicle.vin ? ' • ' + String(vehicle.vin).slice(0,8) + '…' : ''}`.trim() || 'Vehicle' : 'Basic Information'}
         </span>
         {canEdit && (
@@ -591,7 +591,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               border: '1px solid var(--border)',
               borderRadius: '0px',
               padding: '2px 6px',
-              fontSize: '7pt',
+              fontSize: '9px',
               cursor: 'pointer'
             }}
           >
@@ -621,7 +621,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 <>
                   {vehicle.vin || vinFromImages}
                   {vinFromImages && !vehicle.vin && (
-                    <span style={{ fontSize: '6pt', color: 'var(--text-muted)', marginLeft: '4px', fontStyle: 'italic' }}>
+                    <span style={{ fontSize: '8px', color: 'var(--text-muted)', marginLeft: '4px', fontStyle: 'italic' }}>
                       (from image analysis*)
                     </span>
                   )}
@@ -642,14 +642,14 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
               <span>Owner</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontFamily: 'monospace', fontSize: '8pt', color: 'var(--success)' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--success)' }}>
                   @{currentOwnerUsername}
                 </span>
                 <span style={{ 
                   background: 'var(--success)', 
                   color: 'var(--white)', 
                   padding: '1px 4px', 
-                  fontSize: '6pt',
+                  fontSize: '8px',
                   fontWeight: 'bold'
                 }}>
                   VERIFIED
@@ -664,7 +664,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             alignItems: 'center',
             padding: '2px 0',
             borderBottom: '1px solid var(--border)',
-            fontSize: '8pt',
+            fontSize: '11px',
             marginBottom: '2px'
           }}>
             <span>Year</span>
@@ -759,7 +759,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               {vehicle.transmission ? (
                 vehicle.transmission
               ) : (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '8pt' }}>Unknown</span>
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>
               )}
             </span>
           </div>
@@ -777,7 +777,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               {typeof vehicle.mileage === 'number' && Number.isFinite(vehicle.mileage) && vehicle.mileage > 0 ? (
                 `${vehicle.mileage.toLocaleString()} miles`
               ) : (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '8pt' }}>Unknown</span>
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>
               )}
             </span>
           </div>
@@ -826,7 +826,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {sanitizeInlineValue(vehicle.color) || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '8pt' }}>Unknown</span>}
+              {sanitizeInlineValue(vehicle.color) || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>}
             </span>
           </div>
 
@@ -842,7 +842,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                   fontWeight: 700,
                   color: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
                          (vehicle as any).data_quality_score >= 40 ? '#eab308' : '#ef4444',
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontFamily: 'monospace'
                 }}>
                   {(vehicle as any).data_quality_score}/100

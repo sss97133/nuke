@@ -151,7 +151,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         padding: '12px',
         minWidth: '280px',
         maxWidth: '320px',
-        fontSize: '9pt',
+        fontSize: '12px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         pointerEvents: 'auto',
         opacity: 1,
@@ -163,7 +163,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
     >
       {/* Header: Year Make Model — each token is a clickable portal */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
-        <div style={{ fontWeight: 600, fontSize: '10pt', lineHeight: 1.2 }}>
+        <div style={{ fontWeight: 600, fontSize: '13px', lineHeight: 1.2 }}>
           {vehicle.year ? (
             <YearPortal year={vehicle.year} activePortal={activePortal} onOpen={setActivePortal} />
           ) : null}
@@ -189,7 +189,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             color: 'white',
             padding: '2px 6px',
             borderRadius: '3px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 600,
             whiteSpace: 'nowrap',
           }}>
@@ -208,12 +208,12 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           onOpen={setActivePortal}
         />
         {priceLabel && price && (
-          <span style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
             {priceLabel}
           </span>
         )}
         {saleDate && (
-          <span style={{ marginLeft: 'auto', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-muted)' }}>
             {saleDate}
           </span>
         )}
@@ -230,7 +230,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         borderRadius: '4px',
       }}>
         <div>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Miles</div>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Miles</div>
           <div style={{ fontWeight: 600 }}>
             <MileagePortal
               vehicleId={vehicle.id}
@@ -242,7 +242,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Trans</div>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Trans</div>
           <div style={{ fontWeight: 600 }}>
             <TransmissionPortal
               transmission={vehicle.transmission}
@@ -252,7 +252,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Color</div>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Color</div>
           <div style={{ fontWeight: 600 }}>
             <ColorPortal
               make={vehicle.make}
@@ -283,7 +283,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             />
           )}
           {vehicle.location && (
-            <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               {vehicle.location.slice(0, 20)}
             </span>
           )}
@@ -302,7 +302,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         <div style={{
           display: 'flex',
           gap: '12px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-muted)',
           marginBottom: '10px',
         }}>
@@ -326,9 +326,9 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           background: 'var(--grey-50, #f9fafb)',
           border: '1px solid var(--border)',
           borderRadius: '4px',
-          fontSize: '8pt',
+          fontSize: '11px',
         }}>
-          <div style={{ fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
             AI Take
           </div>
 
@@ -387,7 +387,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
                 color: '#78350f',
                 padding: '1px 6px',
                 borderRadius: '3px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 fontWeight: 600,
               }}>
                 RECORD
@@ -402,7 +402,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
               <span style={{ fontWeight: 600, color: 'var(--text)' }}>
                 {formatCurrencyAmount(vehicle.nuke_estimate)}
               </span>
-              <span style={{ fontSize: '7pt' }}>
+              <span style={{ fontSize: '9px' }}>
                 Nuke estimate
                 {vehicle.nuke_estimate_confidence != null && (
                   <> ({vehicle.nuke_estimate_confidence}% conf)</>
@@ -424,7 +424,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 500,
             cursor: 'pointer',
           }}
@@ -448,7 +448,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             color: isFollowing ? 'white' : 'var(--text)',
             border: isFollowing ? 'none' : '1px solid var(--border)',
             borderRadius: '4px',
-            fontSize: '8pt',
+            fontSize: '11px',
             cursor: followLoading ? 'wait' : 'pointer',
             opacity: followLoading ? 0.6 : 1,
             transition: 'all 0.15s ease',
@@ -460,7 +460,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
 
       {/* Last updated */}
       {lastUpdated && (
-        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'right' }}>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'right' }}>
           Updated {lastUpdated}
         </div>
       )}

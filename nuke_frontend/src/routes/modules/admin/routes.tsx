@@ -44,7 +44,7 @@ const ProxyBidOperations = React.lazy(() => import('../../../pages/admin/ProxyBi
 const UnifiedScraperDashboard = React.lazy(() => import('../../../pages/admin/UnifiedScraperDashboard'));
 
 const LazyFallback = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '9pt' }}>
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '12px' }}>
     loading...
   </div>
 );

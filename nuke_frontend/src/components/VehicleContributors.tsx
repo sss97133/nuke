@@ -96,7 +96,7 @@ const VehicleContributors: React.FC<VehicleContributorsProps> = ({ vehicleId }) 
   };
 
   if (loading) {
-    return <div className="text text-muted" style={{ fontSize: '7pt' }}>Loading contributors...</div>;
+    return <div className="text text-muted" style={{ fontSize: '9px' }}>Loading contributors...</div>;
   }
 
   if (contributors.length === 0) {
@@ -105,7 +105,7 @@ const VehicleContributors: React.FC<VehicleContributorsProps> = ({ vehicleId }) 
 
   return (
     <div className="contributors-section">
-      <h3 className="text" style={{ fontSize: '8pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>Contributors</h3>
+      <h3 className="text" style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>Contributors</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         {contributors.map((contributor) => (
           <div
@@ -123,21 +123,21 @@ const VehicleContributors: React.FC<VehicleContributorsProps> = ({ vehicleId }) 
                 />
               ) : (
                 <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'var(--grey-300)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="text" style={{ fontSize: '6pt', color: 'var(--grey-600)' }}>
+                  <span className="text" style={{ fontSize: '8px', color: 'var(--grey-600)' }}>
                     {(contributor.full_name || contributor.username || '?')[0].toUpperCase()}
                   </span>
                 </div>
               )}
               <div>
-                <div className="text" style={{ fontSize: '7pt', fontWeight: 'bold' }}>
+                <div className="text" style={{ fontSize: '9px', fontWeight: 'bold' }}>
                   {contributor.full_name || contributor.username || 'Anonymous'}
                 </div>
-                <div className="text text-muted" style={{ fontSize: '6pt' }}>
+                <div className="text text-muted" style={{ fontSize: '8px' }}>
                   {contributor.image_count} image{contributor.image_count !== 1 ? 's' : ''}
                 </div>
               </div>
             </div>
-            <div className="text text-muted" style={{ fontSize: '6pt' }}>
+            <div className="text text-muted" style={{ fontSize: '8px' }}>
               {new Date(contributor.latest_upload).toLocaleDateString()}
             </div>
           </div>

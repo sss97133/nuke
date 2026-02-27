@@ -45,7 +45,7 @@ const formatDate = (iso: string) => {
 
 function StatRow({ label, value }: { label: string; value: string | number }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '9pt' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '12px' }}>
       <span style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span style={{ fontWeight: 600, fontFamily: 'monospace' }}>{value}</span>
     </div>
@@ -160,14 +160,14 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
           onClick={onClose}
           style={{
             position: 'absolute', top: 12, right: 12, background: 'none', border: 'none',
-            cursor: 'pointer', fontSize: '14pt', color: 'var(--text-muted)', lineHeight: 1,
+            cursor: 'pointer', fontSize: '19px', color: 'var(--text-muted)', lineHeight: 1,
           }}
         >
           &times;
         </button>
 
         {isLoading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
             Loading bidder profile...
           </div>
         ) : (
@@ -175,17 +175,17 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
             {/* ─── Header ──────────────────────────────── */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: '14pt', fontWeight: 700 }}>{username}</span>
+                <span style={{ fontSize: '19px', fontWeight: 700 }}>{username}</span>
                 {mvProfile && (
                   <span style={{
-                    fontSize: '7pt', background: 'var(--primary, #3b82f6)', color: '#fff',
+                    fontSize: '9px', background: 'var(--primary, #3b82f6)', color: '#fff',
                     borderRadius: 10, padding: '1px 8px', fontWeight: 600,
                   }}>
                     {mvProfile.total_bids} bids
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 2 }}>
                 Since {formatDate(profile.first_bid_date)} &middot; {profile.auctions_participated ?? '—'} auctions &middot; {profile.auctions_won ?? 0} wins
               </div>
             </div>
@@ -196,11 +196,11 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
               padding: '6px 10px', borderRadius: 0,
               background: `${styleMeta.color}10`, border: `1px solid ${styleMeta.color}30`,
             }}>
-              <span style={{ fontWeight: 700, color: styleMeta.color, fontSize: '10pt' }}>
+              <span style={{ fontWeight: 700, color: styleMeta.color, fontSize: '13px' }}>
                 {biddingStyle}
               </span>
               {styleMeta.description && (
-                <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {styleMeta.description}
                 </span>
               )}
@@ -217,7 +217,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
             {/* ─── Preferred Makes ─────────────────────── */}
             {preferredMakes.length > 0 && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>
                   Preferred Makes
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -225,7 +225,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
                     <span
                       key={m.make}
                       style={{
-                        fontSize: '8pt', padding: '2px 8px', borderRadius: 12,
+                        fontSize: '11px', padding: '2px 8px', borderRadius: 12,
                         background: 'var(--grey-100, #f3f4f6)', color: 'var(--text)',
                         border: '1px solid var(--border-light, #e5e7eb)',
                       }}
@@ -240,7 +240,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
             {/* ─── Activity Sparkline ──────────────────── */}
             {sparklineSeries.length > 0 && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>
                   Recent Activity
                 </div>
                 <MiniLineChart
@@ -255,10 +255,10 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
             {/* ─── Recent Auctions ─────────────────────── */}
             {profileData?.recent_activity?.length > 0 && (
               <div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>
                   Recent Auctions
                 </div>
-                <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: '8pt' }}>
+                <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: '11px' }}>
                   {profileData.recent_activity.slice(0, 5).map((a: any, i: number) => (
                     <div
                       key={i}
@@ -271,7 +271,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
                       <span style={{ fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6 }}>
                         {formatUsd(a.highest_bid)}
                         {a.won && (
-                          <span style={{ color: '#22c55e', fontSize: '7pt', fontWeight: 700 }}>WON</span>
+                          <span style={{ color: '#22c55e', fontSize: '9px', fontWeight: 700 }}>WON</span>
                         )}
                       </span>
                     </div>

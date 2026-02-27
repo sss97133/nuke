@@ -124,7 +124,7 @@ function PlatformFavicon({
     >
       <span
         style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 700,
           color: platform.color,
           opacity: showImage && loaded ? 0 : 1,
@@ -391,7 +391,7 @@ export default function SocialConnections({ userId }: Props) {
   return (
     <div className="card">
       <div className="card-header">
-        <h3 className="text font-bold" style={{ fontSize: '8pt', margin: 0 }}>
+        <h3 className="text font-bold" style={{ fontSize: '11px', margin: 0 }}>
           Social Connections
         </h3>
       </div>
@@ -408,14 +408,14 @@ export default function SocialConnections({ userId }: Props) {
             border: '1px solid #fecaca',
             borderRadius: '4px',
             color: '#dc2626',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}>
             {error}
           </div>
         )}
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '8pt' }}>
+          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '11px' }}>
             Loading connections...
           </div>
         ) : (
@@ -448,14 +448,14 @@ export default function SocialConnections({ userId }: Props) {
 
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '9pt', fontWeight: 600 }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600 }}>
                         @{conn.handle}
                       </span>
                       <span style={{
                         display: 'inline-block',
                         padding: '2px 8px',
                         borderRadius: '10px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 600,
                         background: isExpired ? '#fef3c7' : '#dcfce7',
                         color: isExpired ? '#d97706' : '#16a34a'
@@ -463,7 +463,7 @@ export default function SocialConnections({ userId }: Props) {
                         {isExpired ? 'Reconnect Needed' : 'Connected'}
                       </span>
                     </div>
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                       {platform.name} • Connected {new Date(conn.claimed_at).toLocaleDateString()}
                     </div>
                   </div>
@@ -475,7 +475,7 @@ export default function SocialConnections({ userId }: Props) {
                       alignItems: 'center',
                       gap: '4px',
                       cursor: 'pointer',
-                      fontSize: '7pt'
+                      fontSize: '9px'
                     }}>
                       <input
                         type="checkbox"
@@ -491,7 +491,7 @@ export default function SocialConnections({ userId }: Props) {
                         className="button button-small"
                         onClick={() => initiateOAuth(platform)}
                         disabled={connecting === platform.id}
-                        style={{ fontSize: '7pt', background: '#fef3c7', borderColor: '#f59e0b', color: '#92400e' }}
+                        style={{ fontSize: '9px', background: '#fef3c7', borderColor: '#f59e0b', color: '#92400e' }}
                       >
                         {connecting === platform.id ? '...' : 'Reconnect'}
                       </button>
@@ -499,7 +499,7 @@ export default function SocialConnections({ userId }: Props) {
                       <button
                         className="button button-small"
                         onClick={() => disconnectPlatform(conn)}
-                        style={{ fontSize: '7pt' }}
+                        style={{ fontSize: '9px' }}
                       >
                         Disconnect
                       </button>
@@ -531,10 +531,10 @@ export default function SocialConnections({ userId }: Props) {
                 />
 
                 <div style={{ flex: 1, opacity: platform.oauthEndpoint ? 1 : 0.6 }}>
-                  <div style={{ fontSize: '9pt', fontWeight: 600 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600 }}>
                     {platform.name}
                   </div>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                     {platform.description}
                   </div>
                 </div>
@@ -544,7 +544,7 @@ export default function SocialConnections({ userId }: Props) {
                   onClick={() => initiateOAuth(platform)}
                   disabled={!platform.oauthEndpoint || connecting === platform.id}
                   style={{
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     opacity: platform.oauthEndpoint ? 1 : 0.5
                   }}
                 >

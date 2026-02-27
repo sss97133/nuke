@@ -178,11 +178,11 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-header">
-          <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
             Request Work from {organizationName}
           </h3>
           {laborRate && (
-            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
               Shop rate: ${laborRate}/hr
             </div>
           )}
@@ -193,14 +193,14 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
             {/* Vehicle Selection */}
             {userVehicles.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
-                <label className="form-label" style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
+                <label className="form-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
                   Vehicle (Optional)
                 </label>
                 <select
                   value={vehicleId}
                   onChange={(e) => setVehicleId(e.target.value)}
                   className="form-select"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                 >
                   <option value="">Select a vehicle...</option>
                   {userVehicles.map((v) => (
@@ -214,7 +214,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
 
             {/* Work Title */}
             <div style={{ marginBottom: '16px' }}>
-              <label className="form-label" style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
                 Work Needed *
               </label>
               <input
@@ -223,14 +223,14 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Upholstery repair, engine tune-up, brake replacement"
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
                 required
               />
             </div>
 
             {/* Description */}
             <div style={{ marginBottom: '16px' }}>
-              <label className="form-label" style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
                 Description *
               </label>
               <textarea
@@ -238,21 +238,21 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Please describe the work you need done in detail..."
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt', minHeight: '100px', resize: 'vertical' }}
+                style={{ width: '100%', fontSize: '12px', minHeight: '100px', resize: 'vertical' }}
                 required
               />
             </div>
 
             {/* Urgency */}
             <div style={{ marginBottom: '16px' }}>
-              <label className="form-label" style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
                 Urgency
               </label>
               <select
                 value={urgency}
                 onChange={(e) => setUrgency(e.target.value)}
                 className="form-select"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
               >
                 <option value="low">Low - Flexible timeline</option>
                 <option value="normal">Normal - Standard priority</option>
@@ -265,7 +265,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
 
             {/* Photo Upload */}
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
                 Add Photos (Recommended)
               </div>
               <div style={{ 
@@ -289,11 +289,11 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImages}
                   className="button button-secondary"
-                  style={{ fontSize: '9pt', marginBottom: '8px' }}
+                  style={{ fontSize: '12px', marginBottom: '8px' }}
                 >
                   {uploadingImages ? 'Uploading...' : '📸 Take Photos / Upload'}
                 </button>
-                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                   Photos help the shop provide an accurate quote
                 </div>
                 
@@ -346,12 +346,12 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
             <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-light)' }} />
 
             {/* Contact Info */}
-            <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
               Contact Information
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label className="form-label" style={{ fontSize: '9pt', marginBottom: '4px', display: 'block' }}>
+              <label className="form-label" style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>
                 Your Name
               </label>
               <input
@@ -359,12 +359,12 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
               />
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label className="form-label" style={{ fontSize: '9pt', marginBottom: '4px', display: 'block' }}>
+              <label className="form-label" style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>
                 Phone Number
               </label>
               <input
@@ -373,12 +373,12 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="(555) 123-4567"
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
               />
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label className="form-label" style={{ fontSize: '9pt', marginBottom: '4px', display: 'block' }}>
+              <label className="form-label" style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>
                 Email
               </label>
               <input
@@ -386,7 +386,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '9pt' }}
+                style={{ width: '100%', fontSize: '12px' }}
               />
             </div>
 
@@ -395,7 +395,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                 type="button"
                 onClick={onClose}
                 className="button button-secondary"
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
                 disabled={submitting}
               >
                 Cancel
@@ -403,7 +403,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
               <button
                 type="submit"
                 className="button button-primary"
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
                 disabled={submitting}
               >
                 {submitting ? 'Submitting...' : 'Submit Work Request'}

@@ -186,11 +186,11 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
   }, [vehicleId]);
 
   if (loading) {
-    return <div style={{ padding: 12, fontSize: '10pt', color: 'var(--text-muted)' }}>Loading forensics...</div>;
+    return <div style={{ padding: 12, fontSize: '13px', color: 'var(--text-muted)' }}>Loading forensics...</div>;
   }
 
   if (!summary) return (
-    <div style={{ padding: '8px', fontSize: '9pt', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+    <div style={{ padding: '8px', fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
       No deal jacket forensics available for this vehicle.
     </div>
   );
@@ -207,7 +207,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       {/* Headline */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '10pt' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '13px' }}>
         <FileWarning size={14} color="#ef4444" />
         <span style={{ fontWeight: 700 }}>
           {summary.red_flag_count} red flag{summary.red_flag_count !== 1 ? 's' : ''} detected
@@ -225,26 +225,26 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         padding: 8,
         background: 'var(--grey-50)',
         borderRadius: 4,
-        fontSize: '8pt'
+        fontSize: '11px'
       }}>
         <div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 2 }}>REPORTED PROFIT</div>
-          <div style={{ fontSize: '10pt', fontWeight: 700 }}>{formatUSD(summary.reported_profit)}</div>
+          <div style={{ fontSize: '13px', fontWeight: 700 }}>{formatUSD(summary.reported_profit)}</div>
         </div>
         <div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 2 }}>ESTIMATED TRUE PROFIT</div>
-          <div style={{ fontSize: '10pt', fontWeight: 700, color: '#ef4444' }}>{formatUSD(summary.true_profit_estimate)}</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>{formatUSD(summary.true_profit_estimate)}</div>
         </div>
         <div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 2 }}>HIDDEN PROFIT</div>
-          <div style={{ fontSize: '10pt', fontWeight: 700, color: Number.isFinite(profitDelta) && profitDelta > 0 ? '#ef4444' : Number.isFinite(profitDelta) && profitDelta < 0 ? '#22c55e' : 'inherit' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: Number.isFinite(profitDelta) && profitDelta > 0 ? '#ef4444' : Number.isFinite(profitDelta) && profitDelta < 0 ? '#22c55e' : 'inherit' }}>
             {Number.isFinite(profitDelta) ? (profitDelta >= 0 ? '+' : '') + formatUSD(profitDelta) : formatUSD(profitDelta)}
           </div>
         </div>
       </div>
 
       {/* Cost Breakdown Bar */}
-      <div style={{ fontSize: '8pt' }}>
+      <div style={{ fontSize: '11px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
           <span>Purchase: {formatUSD(summary.purchase_cost)}</span>
           <span>Recon: {formatUSD(summary.total_recon)} ({reconPct}%)</span>
@@ -259,7 +259,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
       </div>
 
       {/* Deal Info */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: '8pt', color: 'var(--text-muted)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: '11px', color: 'var(--text-muted)' }}>
         <div>Stock: {summary.stock_number}</div>
         <div>Sold: {summary.sold_date}</div>
         <div>Buyer: {summary.buyer}</div>
@@ -271,7 +271,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
 
       {/* Expense Trust Summary */}
       <div style={{
-        display: 'flex', gap: 8, fontSize: '8pt',
+        display: 'flex', gap: 8, fontSize: '11px',
         padding: '4px 0',
         borderTop: '1px solid var(--border-light)',
         borderBottom: '1px solid var(--border-light)'
@@ -287,7 +287,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         <button
           onClick={() => setShowDetails(!showDetails)}
           style={{
-            fontSize: '8pt', padding: '2px 8px', border: '1px solid var(--border-medium)',
+            fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)',
             borderRadius: 3, background: showDetails ? 'var(--grey-100)' : 'var(--white)',
             cursor: 'pointer'
           }}
@@ -298,7 +298,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
           <button
             onClick={() => setShowLineItems(!showLineItems)}
             style={{
-              fontSize: '8pt', padding: '2px 8px', border: '1px solid var(--border-medium)',
+              fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)',
               borderRadius: 3, background: showLineItems ? 'var(--grey-100)' : 'var(--white)',
               cursor: 'pointer'
             }}
@@ -313,7 +313,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
               window.open(`/vehicle/${vehicleId}?image=${summary.image_id}`, '_blank');
             }}
             style={{
-              fontSize: '8pt', padding: '2px 8px', border: '1px solid var(--border-medium)',
+              fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)',
               borderRadius: 3, background: 'var(--white)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 3
             }}
@@ -325,7 +325,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
 
       {/* Red Flags */}
       {showDetails && fullExtraction?.forensic_summary?.red_flags && (
-        <div style={{ fontSize: '8pt', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {fullExtraction.forensic_summary.red_flags.map((flag, i) => (
             <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
               <AlertTriangle size={10} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
@@ -350,7 +350,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
 
       {/* Line Items with Trust Scores */}
       {showLineItems && fullExtraction?.trust_analysis?.expense_trust && (
-        <div style={{ fontSize: '8pt', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{
             display: 'grid', gridTemplateColumns: '20px 1fr 80px 80px 80px',
             gap: 4, fontWeight: 700, padding: '2px 0',

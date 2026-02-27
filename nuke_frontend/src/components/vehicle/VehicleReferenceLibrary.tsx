@@ -574,10 +574,10 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                   borderRadius: '4px',
                   padding: '8px'
                 }}>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '8pt', fontWeight: 700 }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700 }}>
                     Upload Reference Documents
                   </h4>
-                  <p style={{ fontSize: '7pt', color: 'var(--text-muted)', margin: '0 0 8px 0' }}>
+                  <p style={{ fontSize: '9px', color: 'var(--text-muted)', margin: '0 0 8px 0' }}>
                     Drop brochures, manuals, or images. Everything is detected automatically.
                   </p>
 
@@ -590,7 +590,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                         disabled={uploading || extracting}
                         multiple
                         style={{ 
-                          fontSize: '7pt', 
+                          fontSize: '9px', 
                           width: '100%',
                           padding: '6px',
                           border: '2px dashed var(--border)',
@@ -600,7 +600,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                         }}
                       />
                       {files.length > 0 && (
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                           {files.length} file{files.length > 1 ? 's' : ''} selected • {(files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)} MB
                         </div>
                       )}
@@ -610,7 +610,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                             const fileName = key.split('-').slice(1).join('-');
                             return (
                               <div key={key} style={{ marginBottom: '4px' }}>
-                                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px', display: 'flex', justifyContent: 'space-between' }}>
+                                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px', display: 'flex', justifyContent: 'space-between' }}>
                                   <span>{fileName}</span>
                                   <span>{progress}%</span>
                                 </div>
@@ -628,7 +628,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                       onClick={handleUpload}
                       disabled={files.length === 0 || uploading || extracting}
                       className="button button-primary"
-                      style={{ fontSize: '7pt', width: '100%', padding: '6px 8px' }}
+                      style={{ fontSize: '9px', width: '100%', padding: '6px 8px' }}
                     >
                       {uploading ? `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...` : extracting ? 'Extracting data...' : `Upload ${files.length > 0 ? files.length : ''} Document${files.length > 1 ? 's' : ''}`}
                     </button>
@@ -642,10 +642,10 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                       borderRadius: '4px',
                       padding: '8px'
                     }}>
-                      <div style={{ fontSize: '7pt', fontWeight: 700, color: '#15803d', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 700, color: '#15803d', marginBottom: '4px' }}>
                         ✓ {uploadedFiles.length} Document{uploadedFiles.length > 1 ? 's' : ''} Uploaded!
                       </div>
-                      <div style={{ fontSize: '7pt', color: '#166534', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '9px', color: '#166534', marginBottom: '4px' }}>
                         Extraction processing in background.
                       </div>
                       <button
@@ -655,7 +655,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                           setExtracting(false);
                         }}
                         style={{
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           background: 'transparent',
                           border: '1px solid #22c55e',
                           color: '#15803d',
@@ -674,16 +674,16 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
               {/* Factory Library Section - Only show if there are books OR user is logged in */}
               {(books.length > 0 || userId) && (
                 <div className="card" style={{ marginTop: 'var(--space-3)' }}>
-                  <div className="card-header" style={{ fontSize: '9pt', fontWeight: 700 }}>
+                  <div className="card-header" style={{ fontSize: '12px', fontWeight: 700 }}>
                     Factory Library
                   </div>
                   <div className="card-body">
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
                       Brochures, manuals, and parts catalogs for {year} {make} {series || model}
                     </div>
 
                 {books.length === 0 ? (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     No factory library docs found yet for this vehicle. Upload above to add manuals, brochures, and parts catalogs.
                   </div>
                 ) : (
@@ -746,7 +746,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                               color: 'white',
                               padding: '4px 8px',
                               borderRadius: '4px',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               fontWeight: 600
                             }}>
                               {book.page_count} pages
@@ -755,17 +755,17 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                         </div>
                         
                         <div className="card-body">
-                          <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px', lineHeight: 1.3 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', lineHeight: 1.3 }}>
                             {book.title}
                           </div>
-                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                             {(book.total_size / 1024 / 1024).toFixed(1)} MB
                           </div>
                           
                           {/* Extraction Status */}
                           {book.extraction && (
                             <div style={{ 
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               padding: '4px 6px',
                               background: book.extraction.status === 'pending_review' ? '#fef3c7' : '#f0fdf4',
                               borderRadius: '4px',
@@ -779,7 +779,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                           
                           {/* Attribution */}
                           <div style={{ 
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             color: 'var(--text-muted)',
                             paddingTop: '8px',
                             borderTop: '1px solid var(--border)'
@@ -798,46 +798,46 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
               {/* Your Profile Library Section - Only show if user is logged in */}
               {userId && (
                 <div className="card" style={{ marginTop: 'var(--space-3)' }}>
-                  <div className="card-header" style={{ fontSize: '9pt', fontWeight: 700 }}>
+                  <div className="card-header" style={{ fontSize: '12px', fontWeight: 700 }}>
                     Your Profile Library
                   </div>
                   <div className="card-body">
 
                   {loadingUserDocs ? (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Loading...</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading...</div>
                   ) : (
                     <>
                       {linkedDocs.length === 0 && suggestedDocs.length === 0 ? (
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           No matching Profile Library docs found for this vehicle.
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           {linkedDocs.length > 0 && (
                             <div>
-                              <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '6px' }}>Linked to this vehicle</div>
+                              <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '6px' }}>Linked to this vehicle</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {linkedDocs.slice(0, 25).map((d) => (
                                   <div key={d.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'center' }}>
                                     <div style={{ minWidth: 0 }}>
-                                      <div style={{ fontSize: '9pt', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      <div style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {d.title}
                                       </div>
-                                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                                         {docLabel(d.document_type)}
                                       </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '6px' }}>
                                       <button
                                         className="btn-utility"
-                                        style={{ fontSize: '8pt' }}
+                                        style={{ fontSize: '11px' }}
                                         onClick={() => window.open(d.file_url, '_blank')}
                                       >
                                         Open
                                       </button>
                                       <button
                                         className="btn-utility"
-                                        style={{ fontSize: '8pt' }}
+                                        style={{ fontSize: '11px' }}
                                         onClick={() => handleUnlink(d.id)}
                                         disabled={unlinkingId === d.id}
                                       >
@@ -852,31 +852,31 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
 
                           {suggestedDocs.length > 0 && (
                             <div>
-                              <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '6px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '6px' }}>
                                 Matches ({vehicleCtx.year} {vehicleCtx.make}{vehicleCtx.series ? ` ${vehicleCtx.series}` : ''})
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {suggestedDocs.map((d) => (
                                   <div key={d.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'center' }}>
                                     <div style={{ minWidth: 0 }}>
-                                      <div style={{ fontSize: '9pt', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      <div style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {d.title}
                                       </div>
-                                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                                         {docLabel(d.document_type)}
                                       </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '6px' }}>
                                       <button
                                         className="btn-utility"
-                                        style={{ fontSize: '8pt' }}
+                                        style={{ fontSize: '11px' }}
                                         onClick={() => window.open(d.file_url, '_blank')}
                                       >
                                         Preview
                                       </button>
                                       <button
                                         className="button button-primary"
-                                        style={{ fontSize: '8pt', padding: '6px 10px' }}
+                                        style={{ fontSize: '11px', padding: '6px 10px' }}
                                         onClick={() => handleLink(d.id)}
                                         disabled={linkingId === d.id}
                                       >

@@ -35,14 +35,14 @@ export default function ColorPortal({ make, color, year, activePortal, onOpen }:
         state={!color ? 'empty' : state}
         emptyContent={
           <div style={{ padding: '8px 0' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
               What color is this?
             </div>
             <div style={{
               padding: '6px 8px',
               border: '1px dashed var(--border)',
               borderRadius: '4px',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--primary, #3b82f6)',
               cursor: 'pointer',
               textAlign: 'center',
@@ -64,16 +64,16 @@ export default function ColorPortal({ make, color, year, activePortal, onOpen }:
                 flexShrink: 0,
               }} />
               <div>
-                <div style={{ fontWeight: 600, fontSize: '9pt' }}>{data.name || color}</div>
+                <div style={{ fontWeight: 600, fontSize: '12px' }}>{data.name || color}</div>
                 {data.type && (
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
                     {data.type}
                   </div>
                 )}
               </div>
             </div>
             {!data.code && (
-              <div style={{ fontSize: '7pt', color: 'var(--primary, #3b82f6)', cursor: 'pointer' }}>
+              <div style={{ fontSize: '9px', color: 'var(--primary, #3b82f6)', cursor: 'pointer' }}>
                 Know the paint code?
               </div>
             )}
@@ -91,15 +91,15 @@ export default function ColorPortal({ make, color, year, activePortal, onOpen }:
                 flexShrink: 0,
               }} />
               <div>
-                <div style={{ fontWeight: 600, fontSize: '9pt' }}>{data.name || color}</div>
+                <div style={{ fontWeight: 600, fontSize: '12px' }}>{data.name || color}</div>
                 {data.type && (
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
                     {data.type}
                   </div>
                 )}
               </div>
             </div>
-            <div style={{ fontSize: '8pt' }}>
+            <div style={{ fontSize: '11px' }}>
               {data.code && (
                 <InfoRow label="Paint Code" value={data.code} />
               )}

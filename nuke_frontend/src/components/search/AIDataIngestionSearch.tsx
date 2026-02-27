@@ -1133,7 +1133,7 @@ export default function AIDataIngestionSearch() {
             flex: 1,
             border: 'none',
             outline: 'none',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontFamily: '"MS Sans Serif", sans-serif',
             background: 'transparent',
             minWidth: '80px',
@@ -1150,7 +1150,7 @@ export default function AIDataIngestionSearch() {
           style={{
             flexShrink: 0,
             padding: '1px 3px',
-            fontSize: '7pt',
+            fontSize: '9px',
             height: '18px',
             minWidth: '18px',
             width: '18px',
@@ -1184,7 +1184,7 @@ export default function AIDataIngestionSearch() {
             zIndex: 1203,
             maxHeight: '420px',
             overflowY: 'auto',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}
         >
           {/* AI Suggestion banner */}
@@ -1193,7 +1193,7 @@ export default function AIDataIngestionSearch() {
               padding: '10px 12px',
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: 'white',
-              fontSize: '8pt',
+              fontSize: '11px',
               borderBottom: '1px solid var(--border-light)'
             }}>
               <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>AI Assistant</div>
@@ -1257,7 +1257,7 @@ export default function AIDataIngestionSearch() {
                   <div style={{
                     fontWeight: 600,
                     color: typeColors[result.type] || '#333',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis'
@@ -1266,7 +1266,7 @@ export default function AIDataIngestionSearch() {
                   </div>
                   {result.subtitle && (
                     <div style={{
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       color: '#666',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -1279,7 +1279,7 @@ export default function AIDataIngestionSearch() {
 
                 {/* Type badge */}
                 <div style={{
-                  fontSize: '6pt',
+                  fontSize: '8px',
                   color: 'white',
                   background: typeColors[result.type] || '#999',
                   padding: '2px 6px',
@@ -1300,7 +1300,7 @@ export default function AIDataIngestionSearch() {
               padding: '8px 12px',
               background: '#f5f5f5',
               color: '#666',
-              fontSize: '7pt',
+              fontSize: '9px',
               borderTop: '1px solid var(--border-light)'
             }}>
               💡 {autocompleteAISuggestion}
@@ -1323,7 +1323,7 @@ export default function AIDataIngestionSearch() {
                 background: '#f9fafb',
                 border: 'none',
                 borderTop: '1px solid var(--border-light)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 cursor: 'pointer'
               }}
             >
@@ -1360,7 +1360,7 @@ export default function AIDataIngestionSearch() {
               className="button-win95"
               style={{
                 padding: '2px 6px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 height: '20px',
                 minWidth: 'auto',
                 opacity: 1,
@@ -1388,7 +1388,7 @@ export default function AIDataIngestionSearch() {
             className="button-win95"
             style={{
               padding: '2px 6px',
-              fontSize: '8pt',
+              fontSize: '11px',
               height: '20px',
               minWidth: '40px',
               opacity: isProcessing ? 0.5 : 1
@@ -1413,7 +1413,7 @@ export default function AIDataIngestionSearch() {
               className="button-win95"
               style={{
                 padding: '2px 8px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 height: '20px',
                 minWidth: '35px',
                 opacity: (isProcessing || (!input.trim() && !attachedImage)) ? 0.5 : 1
@@ -1433,7 +1433,7 @@ export default function AIDataIngestionSearch() {
               className="button-win95"
               style={{
                 padding: '2px 8px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 height: '20px',
                 minWidth: '35px',
                 opacity: isProcessing ? 0.5 : 1
@@ -1472,7 +1472,7 @@ export default function AIDataIngestionSearch() {
               border: '1px solid var(--border)'
             }}
           />
-          <div style={{ flex: 1, fontSize: '8pt' }}>
+          <div style={{ flex: 1, fontSize: '11px' }}>
             {attachedImage?.name}
           </div>
           <button
@@ -1482,7 +1482,7 @@ export default function AIDataIngestionSearch() {
               border: 'none',
               background: 'transparent',
               cursor: 'pointer',
-              fontSize: '10pt',
+              fontSize: '13px',
               padding: '2px 4px'
             }}
             title="Remove image"
@@ -1508,12 +1508,12 @@ export default function AIDataIngestionSearch() {
           overflowY: 'auto',
           boxShadow: '2px 2px 8px rgba(0,0,0,0.2)'
         }}>
-          <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '8px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>
             Extracted Data Preview
           </div>
 
           {extractionPreview.result.vehicleData && (
-            <div style={{ marginBottom: '12px', fontSize: '8pt' }}>
+            <div style={{ marginBottom: '12px', fontSize: '11px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Vehicle:</div>
               <div style={{ paddingLeft: '8px' }}>
                 {extractionPreview.result.vehicleData.year && (
@@ -1539,7 +1539,7 @@ export default function AIDataIngestionSearch() {
           {extractionPreview.matchResult && extractionPreview.existingVehicleId && (
             <div style={{ 
               marginBottom: '12px', 
-              fontSize: '8pt',
+              fontSize: '11px',
               background: extractionPreview.matchResult.shouldMerge ? '#e8f5e9' : '#fff3cd',
               border: `2px solid ${extractionPreview.matchResult.shouldMerge ? '#4caf50' : '#ffc107'}`,
               padding: '8px',
@@ -1548,13 +1548,13 @@ export default function AIDataIngestionSearch() {
               <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
                 {extractionPreview.matchResult.shouldMerge ? 'STRONG MATCH FOUND' : 'POTENTIAL MATCH'}
               </div>
-              <div style={{ paddingLeft: '8px', fontSize: '7pt' }}>
+              <div style={{ paddingLeft: '8px', fontSize: '9px' }}>
                 <div>Match Score: {(extractionPreview.matchResult.matchScore * 100).toFixed(0)}%</div>
                 {extractionPreview.matchResult.evidence.length > 0 && (
                   <div style={{ marginTop: '4px' }}>
                     <div style={{ fontWeight: 'bold' }}>Evidence:</div>
                     {extractionPreview.matchResult.evidence.slice(0, 3).map((evidence, idx) => (
-                      <div key={idx} style={{ paddingLeft: '8px', fontSize: '7pt', color: '#666' }}>
+                      <div key={idx} style={{ paddingLeft: '8px', fontSize: '9px', color: '#666' }}>
                         • {evidence.matchType}: {evidence.details}
                       </div>
                     ))}
@@ -1566,7 +1566,7 @@ export default function AIDataIngestionSearch() {
 
           {/* Organization Preview */}
           {extractionPreview.result.rawData?.organization && (
-            <div style={{ marginBottom: '12px', fontSize: '8pt' }}>
+            <div style={{ marginBottom: '12px', fontSize: '11px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
                 {extractionPreview.result.rawData.exists ? 'Organization Found' : 'Organization Created'}
               </div>
@@ -1575,12 +1575,12 @@ export default function AIDataIngestionSearch() {
                   {extractionPreview.result.rawData.organization.name}
                 </div>
                 {extractionPreview.result.rawData.organization.website && (
-                  <div style={{ fontSize: '7pt', color: '#666', marginTop: '2px' }}>
+                  <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
                     {extractionPreview.result.rawData.organization.website}
                   </div>
                 )}
                 {extractionPreview.result.rawData.organization.description && (
-                  <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '9px', color: '#666', marginTop: '4px', fontStyle: 'italic' }}>
                     {extractionPreview.result.rawData.organization.description}
                   </div>
                 )}
@@ -1594,7 +1594,7 @@ export default function AIDataIngestionSearch() {
                         setInput('');
                       }}
                       className="button button-primary"
-                      style={{ fontSize: '8pt', padding: '4px 8px' }}
+                      style={{ fontSize: '11px', padding: '4px 8px' }}
                     >
                       View Organization
                     </button>
@@ -1605,7 +1605,7 @@ export default function AIDataIngestionSearch() {
           )}
 
           {extractionPreview.result.receiptData && !extractionPreview.result.vehicleData && (
-            <div style={{ marginBottom: '12px', fontSize: '8pt' }}>
+            <div style={{ marginBottom: '12px', fontSize: '11px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Receipt:</div>
               <div style={{ paddingLeft: '8px' }}>
                 {extractionPreview.result.receiptData.vendor && (
@@ -1619,7 +1619,7 @@ export default function AIDataIngestionSearch() {
           )}
 
           {extractionPreview.operationPlan && (
-            <div style={{ marginBottom: '12px', fontSize: '8pt', color: '#666' }}>
+            <div style={{ marginBottom: '12px', fontSize: '11px', color: '#666' }}>
               {extractionPreview.operationPlan.vehicleOperation.isNew 
                 ? 'Will create new vehicle profile'
                 : 'Will update existing vehicle profile'}
@@ -1627,7 +1627,7 @@ export default function AIDataIngestionSearch() {
           )}
 
           {extractionPreview.result.provider && (
-            <div style={{ marginTop: '8px', fontSize: '7pt', color: '#999', fontStyle: 'italic' }}>
+            <div style={{ marginTop: '8px', fontSize: '9px', color: '#999', fontStyle: 'italic' }}>
               Processed with {extractionPreview.result.provider}
               {extractionPreview.result.model && ` / ${extractionPreview.result.model}`}
             </div>
@@ -1639,7 +1639,7 @@ export default function AIDataIngestionSearch() {
               onClick={confirmAndSave}
               disabled={isProcessing}
               className="button button-primary"
-              style={{ fontSize: '8pt', padding: '4px 8px' }}
+              style={{ fontSize: '11px', padding: '4px 8px' }}
             >
               Confirm & Save
             </button>
@@ -1650,7 +1650,7 @@ export default function AIDataIngestionSearch() {
                 setExtractionPreview(null);
               }}
               className="button button-secondary"
-              style={{ fontSize: '8pt', padding: '4px 8px' }}
+              style={{ fontSize: '11px', padding: '4px 8px' }}
             >
               Cancel
             </button>
@@ -1683,7 +1683,7 @@ export default function AIDataIngestionSearch() {
           maxHeight: '360px',
           overflowY: 'auto',
           boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
-          fontSize: '8pt',
+          fontSize: '11px',
           whiteSpace: 'pre-wrap',
           lineHeight: 1.35
         }}>
@@ -1692,7 +1692,7 @@ export default function AIDataIngestionSearch() {
             <button
               type="button"
               className="button-win95"
-              style={{ padding: '2px 6px', fontSize: '8pt', height: '20px' }}
+              style={{ padding: '2px 6px', fontSize: '11px', height: '20px' }}
               onClick={() => setShowWiringWorkbench(false)}
               title="Close"
             >
@@ -1718,7 +1718,7 @@ export default function AIDataIngestionSearch() {
               <button
                 type="button"
                 className="button-win95"
-                style={{ padding: '2px 8px', fontSize: '8pt', height: '20px' }}
+                style={{ padding: '2px 8px', fontSize: '11px', height: '20px' }}
                 onClick={() => setShowWiringUploader(true)}
                 title="Upload receipts/manuals so the workbench can prove parts + extract pinouts"
               >
@@ -1729,7 +1729,7 @@ export default function AIDataIngestionSearch() {
               <button
                 type="button"
                 className="button-win95"
-                style={{ padding: '2px 8px', fontSize: '8pt', height: '20px' }}
+                style={{ padding: '2px 8px', fontSize: '11px', height: '20px' }}
                 onClick={() => navigate(`/vehicle/${currentVehicleData.id}/wiring`)}
                 title="Open full Wiring Plan page (long-form output)"
               >
@@ -1765,7 +1765,7 @@ export default function AIDataIngestionSearch() {
           background: '#fee',
           border: '2px solid #fcc',
           padding: '8px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: '#c00',
           zIndex: 1202
         }}>

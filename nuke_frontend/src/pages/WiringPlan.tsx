@@ -109,8 +109,8 @@ export default function WiringPlan() {
     <div style={{ padding: '16px', maxWidth: '1000px', margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
         <div>
-          <div style={{ fontWeight: 'bold', fontSize: '12pt' }}>Wiring Plan</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{vehicleLabel}</div>
+          <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Wiring Plan</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{vehicleLabel}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button
@@ -124,7 +124,7 @@ export default function WiringPlan() {
       </div>
 
       <div className="card" style={{ padding: '12px' }}>
-        <div style={{ fontWeight: 'bold', fontSize: '9pt', marginBottom: '6px' }}>Describe what you’re building</div>
+        <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '6px' }}>Describe what you’re building</div>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -132,7 +132,7 @@ export default function WiringPlan() {
           style={{
             width: '100%',
             minHeight: '84px',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontFamily: '"MS Sans Serif", sans-serif',
             padding: '8px',
             border: '2px solid var(--border)',
@@ -151,7 +151,7 @@ export default function WiringPlan() {
           >
             {isProcessing ? 'Generating…' : 'Generate Plan'}
           </button>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
             Tip: use the top chat bar to upload receipts/manuals and answer missing questions—this page is for long-form output.
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function WiringPlan() {
       )}
 
       {error && (
-        <div style={{ marginTop: '12px', padding: '8px', background: '#ffebee', border: '1px solid #f44336', borderRadius: '2px', fontSize: '8pt', color: '#c62828' }}>
+        <div style={{ marginTop: '12px', padding: '8px', background: '#ffebee', border: '1px solid #f44336', borderRadius: '2px', fontSize: '11px', color: '#c62828' }}>
           {error}
         </div>
       )}
@@ -175,7 +175,7 @@ export default function WiringPlan() {
         <div style={{ marginTop: '12px', display: 'grid', gap: '12px' }}>
           <div className="card" style={{ padding: '12px' }}>
             <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Overview</div>
-            <div style={{ fontSize: '8pt', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontSize: '11px', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
               {result.system_description || 'No system description returned.'}
             </div>
           </div>
@@ -183,7 +183,7 @@ export default function WiringPlan() {
           <div className="card" style={{ padding: '12px' }}>
             <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Parts (starter list)</div>
             {recommendations.length === 0 ? (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>No recommendations returned.</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No recommendations returned.</div>
             ) : (
               <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc', lineHeight: 1.35 }}>
                 {recommendations.slice(0, 25).map((rec: any, idx: number) => {
@@ -200,13 +200,13 @@ export default function WiringPlan() {
                         <span style={{ fontWeight: 600 }}>{label}</span>
                         {part && name && <span style={{ color: 'var(--text-muted)' }}>({part})</span>}
                         {required !== null && (
-                          <span style={{ fontSize: '7pt', color: required ? '#0b7a0b' : 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '9px', color: required ? '#0b7a0b' : 'var(--text-muted)' }}>
                             {required ? 'Required' : 'Optional'}
                           </span>
                         )}
                       </div>
                       {reason && (
-                        <div style={{ marginTop: '2px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+                        <div style={{ marginTop: '2px', fontSize: '9px', color: 'var(--text-muted)' }}>
                           {reason}
                         </div>
                       )}
@@ -220,13 +220,13 @@ export default function WiringPlan() {
           <div className="card" style={{ padding: '12px' }}>
             <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Next steps</div>
             {Array.isArray(nextSteps) ? (
-              <ol style={{ margin: 0, paddingLeft: '18px', listStyleType: 'decimal', lineHeight: 1.35, fontSize: '8pt' }}>
+              <ol style={{ margin: 0, paddingLeft: '18px', listStyleType: 'decimal', lineHeight: 1.35, fontSize: '11px' }}>
                 {nextSteps.slice(0, 20).map((step: any, idx: number) => (
                   <li key={idx} style={{ marginBottom: '4px', display: 'list-item' }}>{String(step)}</li>
                 ))}
               </ol>
             ) : (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>
                 {nextSteps ? String(nextSteps) : 'No next steps returned.'}
               </div>
             )}
@@ -235,7 +235,7 @@ export default function WiringPlan() {
           {result.quote && (
             <div className="card" style={{ padding: '12px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Quote (rough)</div>
-              <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
+              <div style={{ fontSize: '11px', lineHeight: 1.35 }}>
                 <div>Parts: ${result.quote?.pricing?.parts_subtotal?.toFixed?.(2) ?? '0.00'}</div>
                 <div>Labor: ${result.quote?.pricing?.labor_total?.toFixed?.(2) ?? '0.00'}</div>
                 <div style={{ fontWeight: 'bold', marginTop: '4px' }}>
@@ -247,7 +247,7 @@ export default function WiringPlan() {
 
           <div className="card" style={{ padding: '12px' }}>
             <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Coming next</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.35 }}>
               Blueprints/diagrams, pinouts, labeling plan, harness segmentation, and export (PDF) belong here. We’ll evolve the edge function output into a multi-page “wiring package” once the UI home is correct.
             </div>
           </div>

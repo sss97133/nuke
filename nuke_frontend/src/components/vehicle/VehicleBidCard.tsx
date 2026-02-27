@@ -78,11 +78,11 @@ const formatDuration = (hours: number) => {
 function StatPill({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div style={{ flex: '1 1 0', minWidth: 100 }}>
-      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         {label}
       </div>
-      <div style={{ fontSize: '13pt', fontWeight: 700 }}>{value}</div>
-      {sub && <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{sub}</div>}
+      <div style={{ fontSize: '17px', fontWeight: 700 }}>{value}</div>
+      {sub && <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{sub}</div>}
     </div>
   );
 }
@@ -96,7 +96,7 @@ function BidTooltip({ active, payload }: any) {
   return (
     <div style={{
       background: 'var(--grey-800, #1f2937)', color: '#fff', padding: '4px 8px',
-      borderRadius: 0, fontSize: '8pt', fontFamily: 'monospace', boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+      borderRadius: 0, fontSize: '11px', fontFamily: 'monospace', boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
     }}>
       <div style={{ fontWeight: 700 }}>{formatUsd(d.amount)}</div>
       <div style={{ opacity: 0.7 }}>{d.username} &middot; {formatTime(d.timestamp)}</div>
@@ -163,7 +163,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
   if (isLoading) {
     return (
       <CollapsibleWidget title="Bid Activity" className="vehicle-profile-section" defaultCollapsed={false}>
-        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
           Loading bid data...
         </div>
       </CollapsibleWidget>
@@ -173,7 +173,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
   if (error || !summary || summary.bid_count === 0) {
     return (
       <CollapsibleWidget title="Bid Activity" className="vehicle-profile-section" defaultCollapsed={true}>
-        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
           No bid data available for this vehicle.
         </div>
       </CollapsibleWidget>
@@ -190,14 +190,14 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
           <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {data?.platform && data.platform !== 'bat' && (
               <span style={{
-                fontSize: '7pt', background: data.platform === 'cars_and_bids' ? '#e8590c' : '#6b7280',
+                fontSize: '9px', background: data.platform === 'cars_and_bids' ? '#e8590c' : '#6b7280',
                 color: '#fff', borderRadius: 10, padding: '1px 6px', fontWeight: 600,
               }}>
                 {data.platform === 'cars_and_bids' ? 'C&B' : data.platform}
               </span>
             )}
             <span style={{
-              fontSize: '8pt', background: 'var(--primary, #3b82f6)', color: '#fff',
+              fontSize: '11px', background: 'var(--primary, #3b82f6)', color: '#fff',
               borderRadius: 10, padding: '1px 8px', fontWeight: 600,
             }}>
               {summary.bid_count} bids
@@ -208,7 +208,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
           <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
             <button
               className="button button-small"
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
               onClick={() => setShowCompare(!showCompare)}
             >
               {showCompare ? 'Hide compare' : 'Compare to market'}
@@ -309,7 +309,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
             onClick={() => setShowTimeline(!showTimeline)}
             style={{
               background: 'none', border: '1px solid var(--border-light, #e5e7eb)',
-              borderRadius: 0, padding: '4px 10px', fontSize: '8pt', cursor: 'pointer',
+              borderRadius: 0, padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
               color: 'var(--text-muted)', width: '100%',
             }}
           >
@@ -318,7 +318,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
 
           {/* ─── Bid Timeline Table ───────────────────────── */}
           {showTimeline && (
-            <div style={{ maxHeight: 300, overflowY: 'auto', fontSize: '8pt' }}>
+            <div style={{ maxHeight: 300, overflowY: 'auto', fontSize: '11px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-light, #e5e7eb)', color: 'var(--text-muted)' }}>
@@ -353,7 +353,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                         </span>
                         {b.is_winning && (
                           <span style={{
-                            marginLeft: 4, fontSize: '7pt', background: '#22c55e', color: '#fff',
+                            marginLeft: 4, fontSize: '9px', background: '#22c55e', color: '#fff',
                             borderRadius: 4, padding: '1px 4px',
                           }}>
                             winner

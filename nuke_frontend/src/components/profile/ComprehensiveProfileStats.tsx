@@ -56,17 +56,17 @@ export const ComprehensiveProfileStats: React.FC<ProfileStatsProps> = ({
         marginBottom: 'var(--space-2)',
       }}>
         <div>
-          <h2 style={{ fontSize: '10pt', fontWeight: 'bold', margin: 0 }}>
+          <h2 style={{ fontSize: '13px', fontWeight: 'bold', margin: 0 }}>
             {profileType === 'user' ? 'Member' : 'Organization'} Profile
           </h2>
           {stats.member_since && (
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               Member since {formatDate(stats.member_since)}
             </div>
           )}
         </div>
         {location && (
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'right' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
             <div style={{ fontWeight: 'bold' }}>Location</div>
             <div>{location}</div>
           </div>
@@ -141,7 +141,7 @@ const StatCard: React.FC<{ label: string; value: string; link?: string }> = ({ l
     }}
     >
       <div style={{
-        fontSize: '14pt',
+        fontSize: '19px',
         fontWeight: 'bold',
         color: 'var(--text)',
         marginBottom: '4px',
@@ -149,7 +149,7 @@ const StatCard: React.FC<{ label: string; value: string; link?: string }> = ({ l
         {value}
       </div>
       <div style={{
-        fontSize: '8pt',
+        fontSize: '11px',
         color: 'var(--text-muted)',
         textTransform: 'uppercase',
         letterSpacing: '0.5px',

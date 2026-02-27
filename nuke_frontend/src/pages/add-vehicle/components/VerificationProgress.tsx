@@ -20,7 +20,7 @@ const VerificationProgress: React.FC<VerificationProgressProps> = memo(({
         display: 'flex',
         alignItems: 'center',
         gap: '16px',
-        fontSize: '8pt',
+        fontSize: '11px',
         height: '16px',
         color: 'var(--text-muted)'
       }}>
@@ -56,7 +56,7 @@ const VerificationProgress: React.FC<VerificationProgressProps> = memo(({
         {/* Next Milestone - compact with ellipsis */}
         {progress.tier < 5 && (
           <div style={{ 
-            fontSize: '7pt', 
+            fontSize: '9px', 
             opacity: 0.7,
             maxWidth: '180px',
             overflow: 'hidden',

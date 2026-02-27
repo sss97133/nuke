@@ -402,24 +402,24 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 border: 'none',
                 padding: '8px 16px',
                 cursor: prevEvent ? 'pointer' : 'not-allowed',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 600
               }}
             >
               ← PREV
               {prevEvent && prevDateStr && (
-                <span style={{ display: 'block', fontSize: '7pt', marginTop: '2px', opacity: 0.8 }}>
+                <span style={{ display: 'block', fontSize: '9px', marginTop: '2px', opacity: 0.8 }}>
                   {prevDateStr}
                 </span>
               )}
             </button>
             
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '15px', fontWeight: 700 }}>
                 {formattedDateTime}
               </div>
               {allAuctionEvents.length > 0 && (
-                <div style={{ fontSize: '7pt', color: '#666', marginTop: '2px' }}>
+                <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
                   Event {allAuctionEvents.findIndex(e => e.id === event.id) + 1} of {allAuctionEvents.length}
                 </div>
               )}
@@ -439,13 +439,13 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 border: 'none',
                 padding: '8px 16px',
                 cursor: nextEvent ? 'pointer' : 'not-allowed',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 600
               }}
             >
               NEXT →
               {nextEvent && nextDateStr && (
-                <span style={{ display: 'block', fontSize: '7pt', marginTop: '2px', opacity: 0.8 }}>
+                <span style={{ display: 'block', fontSize: '9px', marginTop: '2px', opacity: 0.8 }}>
                   {nextDateStr}
                 </span>
               )}
@@ -455,7 +455,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
           {/* Auction Details */}
           <div style={{ padding: '20px', overflow: 'auto', flex: 1 }}>
             <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '10pt', color: '#666', marginBottom: '4px' }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>
                 {auctionPlatform}
                 {lotNumber && ` • Lot #${lotNumber}`}
               </div>
@@ -463,7 +463,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 <a
                   href={`/vehicle/${vehicleId}`}
                   style={{ 
-                    fontSize: '14pt', 
+                    fontSize: '19px', 
                     fontWeight: 700, 
                     color: '#000',
                     textDecoration: 'none',
@@ -475,11 +475,11 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                   {vehicleName}
                 </a>
               )}
-              <div style={{ fontSize: '12pt', fontWeight: 600, color: '#333', marginBottom: '12px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 600, color: '#333', marginBottom: '12px' }}>
                 {event.title}
               </div>
               {event.description && (
-                <div style={{ fontSize: '9pt', color: '#666', lineHeight: 1.5, marginBottom: '16px' }}>
+                <div style={{ fontSize: '12px', color: '#666', lineHeight: 1.5, marginBottom: '16px' }}>
                   {event.description}
                 </div>
               )}
@@ -494,16 +494,16 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 borderRadius: '4px',
                 marginBottom: '16px'
               }}>
-                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', color: '#666' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', color: '#666' }}>
                   {isSold ? 'Final Sale' : event.event_type === 'auction_listed' ? 'Auction Listed' : 'Bid Information'}
                 </div>
                 {bidAmount && (
-                  <div style={{ fontSize: '18pt', fontWeight: 700, color: '#000', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#000', marginBottom: '4px' }}>
                     ${bidAmount.toLocaleString()}
                   </div>
                 )}
                 {bidder && (
-                  <div style={{ fontSize: '9pt', color: '#666', marginTop: '4px' }}>
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
                     {event.event_type === 'auction_bid_placed' && bidSequence ? (
                       <>Bid #{bidSequence} by <strong>{bidder}</strong></>
                     ) : bidder ? (
@@ -517,7 +517,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                     padding: '4px 8px',
                     background: '#d4edda',
                     color: '#155724',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 600,
                     display: 'inline-block',
                     borderRadius: '3px'
@@ -531,7 +531,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                     padding: '4px 8px',
                     background: '#d1ecf1',
                     color: '#0c5460',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 600,
                     display: 'inline-block',
                     borderRadius: '3px'
@@ -555,7 +555,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                     background: '#000',
                     color: '#fff',
                     textDecoration: 'none',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     fontWeight: 600,
                     borderRadius: '4px'
                   }}
@@ -573,7 +573,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 background: '#f8f9fa',
                 border: '1px solid #ddd',
                 borderRadius: '4px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 color: '#666'
               }}>
                 <div style={{ fontWeight: 700, marginBottom: '6px' }}>Event Details</div>
@@ -604,7 +604,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#666'
           }}>
             <span>[ESC TO CLOSE]</span>
@@ -616,7 +616,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 border: 'none',
                 padding: '6px 12px',
                 cursor: 'pointer',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 600
               }}
             >
@@ -672,28 +672,28 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                 {new Date(event.event_date).toLocaleDateString('en-US', { 
                   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
                 })}
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--accent)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '8px' }}>
                 {organizationName} {laborRate > 0 && `• $${laborRate}/hr`}
               </div>
               {vehicleId ? (
                 <a
                   href={`/vehicle/${vehicleId}`}
-                  style={{ fontSize: '13pt', fontWeight: 700, color: 'var(--text)', textDecoration: 'none' }}
+                  style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text)', textDecoration: 'none' }}
                   className="hover:underline"
                 >
                   {vehicleName}
                 </a>
               ) : (
-                <div style={{ fontSize: '13pt', fontWeight: 700, color: 'var(--text)' }}>
+                <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text)' }}>
                   {vehicleName}
                 </div>
               )}
-              <div style={{ fontSize: '11pt', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              <div style={{ fontSize: '15px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                 {event.title}
               </div>
             </div>
@@ -706,7 +706,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
               background: isBookmarked ? 'var(--accent)' : 'transparent',
               border: '2px solid var(--accent)',
               cursor: 'pointer',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               padding: '6px 12px',
               borderRadius: '4px',
@@ -725,7 +725,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  fontSize: '24pt',
+                  fontSize: '32px',
                   cursor: 'pointer',
                   color: 'var(--text-muted)',
                   padding: '0',
@@ -745,7 +745,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {partsTotal > 0 && (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: '4px 10px',
                 borderRadius: '4px',
                 background: '#d4edda',
@@ -758,7 +758,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
             )}
             {totalHours > 0 && (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: '4px 10px',
                 borderRadius: '4px',
                 background: '#d1ecf1',
@@ -771,7 +771,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
             )}
             {totalImages > 0 && (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: '4px 10px',
                 borderRadius: '4px',
                 background: '#fff3cd',
@@ -784,7 +784,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
             )}
             {qualityRating > 0 && (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: '4px 10px',
                 borderRadius: '4px',
                 background: qualityRating >= 80 ? '#d4edda' : qualityRating >= 60 ? '#fff3cd' : '#f8d7da',
@@ -797,7 +797,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
             )}
             {bookmarkCount > 0 && (
               <div style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: '4px 10px',
                 borderRadius: '4px',
                 background: '#e2e8f0',
@@ -834,7 +834,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 border: 'none',
                 borderBottom: activeTab === tab.id ? '3px solid var(--accent)' : '3px solid transparent',
                 background: activeTab === tab.id ? 'var(--white)' : 'transparent',
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: activeTab === tab.id ? 700 : 400,
                 cursor: 'pointer',
                 color: activeTab === tab.id ? 'var(--accent)' : 'var(--text)',
@@ -865,10 +865,10 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                   border: '1px solid var(--border)',
                   marginBottom: '20px'
                 }}>
-                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
                     Work Summary
                   </div>
-                  <div style={{ fontSize: '9pt', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                     {aiDescription}
                   </div>
                 </div>
@@ -876,10 +876,10 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
               
               {workPerformed.length > 0 && (
                 <div style={{ marginBottom: '20px' }}>
-                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '10px', color: 'var(--text)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '10px', color: 'var(--text)' }}>
                     Work Performed
                   </div>
-                  <ul style={{ margin: 0, paddingLeft: '24px', fontSize: '9pt', color: 'var(--text-secondary)' }}>
+                  <ul style={{ margin: 0, paddingLeft: '24px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                     {workPerformed.map((work, idx) => (
                       <li key={idx} style={{ marginBottom: '6px', lineHeight: 1.5 }}>{work}</li>
                     ))}
@@ -895,10 +895,10 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                   border: `1px solid ${qualityRating >= 80 ? '#c3e6cb' : '#ffeaa7'}`,
                   marginBottom: '20px'
                 }}>
-                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
                     Quality Rating: {qualityRating}/100
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                     {event.metadata.concerns}
                   </div>
                 </div>
@@ -913,7 +913,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                   border: '1px solid var(--border)',
                   marginBottom: '20px'
                 }}>
-                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text)' }}>
                     Work Order Attribution
                   </div>
                   {collaborators.map(collab => (
@@ -930,12 +930,12 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                       <div style={{ flex: 1 }}>
                         <a
                           href={`/org/${collab.organization_id}`}
-                          style={{ fontSize: '9pt', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}
+                          style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}
                           className="hover:underline"
                         >
                           {collab.businesses?.business_name}
                         </a>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>
                           {collab.role === 'originator' ? 'Work Order Originator' : 
                            collab.role === 'location' ? 'Location / Host' :
                            collab.role === 'performer' ? 'Work Performed By' :
@@ -944,11 +944,11 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                       </div>
                       {collab.revenue_attribution > 0 && (
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--accent)' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)' }}>
                             ${parseFloat(collab.revenue_attribution).toLocaleString()}
                           </div>
                           {collab.revenue_percentage && (
-                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                               {parseFloat(collab.revenue_percentage).toFixed(0)}%
                             </div>
                           )}
@@ -960,9 +960,9 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
               )}
               
               {workPerformed.length === 0 && !aiDescription && (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
                   <div>No detailed work summary available yet.</div>
-                  <div style={{ marginTop: '8px', fontSize: '8pt' }}>
+                  <div style={{ marginTop: '8px', fontSize: '11px' }}>
                     Shop owners can add notes and details to this work order.
                   </div>
                 </div>
@@ -985,7 +985,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
             <div>
               {laborItems.length > 0 ? (
                 <div>
-                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '16px', color: 'var(--text)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '16px', color: 'var(--text)' }}>
                     Labor Breakdown
                     <span style={{ float: 'right', color: 'var(--accent)' }}>
                       {totalHours}h × ${laborRate}/hr = ${laborTotal.toLocaleString()}
@@ -1007,12 +1007,12 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                       }}
                     >
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '2px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '2px' }}>
                           {labor.task_name}
                         </div>
                         {labor.task_category && (
                           <div style={{
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             color: 'var(--text-muted)',
                             textTransform: 'uppercase',
                             marginBottom: '4px'
@@ -1021,16 +1021,16 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                           </div>
                         )}
                         {labor.notes && (
-                          <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                             {labor.notes}
                           </div>
                         )}
                       </div>
                       <div style={{ textAlign: 'right', marginLeft: '16px' }}>
-                        <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700 }}>
                           {parseFloat(labor.hours).toFixed(1)}h
                         </div>
-                        <div style={{ fontSize: '9pt', color: 'var(--accent)' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--accent)' }}>
                           ${parseFloat(labor.total_cost || 0).toLocaleString()}
                         </div>
                       </div>
@@ -1046,11 +1046,11 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                     border: '1px solid var(--border)',
                     marginBottom: '16px'
                   }}>
-                    <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '8px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
                       Total Labor: {event.labor_hours}h
                     </div>
                     {laborRate > 0 && (
-                      <div style={{ fontSize: '9pt', color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                         Estimated cost: ${(event.labor_hours * laborRate).toLocaleString()} at ${laborRate}/hr
                       </div>
                     )}
@@ -1060,14 +1060,14 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                     background: '#fff3cd',
                     borderRadius: '6px',
                     border: '1px solid #ffeaa7',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: '#856404'
                   }}>
                     Detailed labor breakdown not available. Shop owners can add itemized tasks for transparency.
                   </div>
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
                   <div>No labor information available yet.</div>
                 </div>
               )}
@@ -1117,7 +1117,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                             borderRadius: '50%',
                             width: '40px',
                             height: '40px',
-                            fontSize: '20pt',
+                            fontSize: '27px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -1139,7 +1139,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                             borderRadius: '50%',
                             width: '40px',
                             height: '40px',
-                            fontSize: '20pt',
+                            fontSize: '27px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -1160,7 +1160,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                       color: 'white',
                       padding: '4px 12px',
                       borderRadius: '20px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       fontWeight: 600
                     }}>
                       {currentImageIndex + 1} / {images.length}
@@ -1196,7 +1196,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                   )}
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
                   <div>No photos available for this work order.</div>
                 </div>
               )}
@@ -1211,12 +1211,12 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
               borderRadius: '8px',
               border: '1px solid var(--border)'
             }}>
-              <div style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '16px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>
                 {organizationName}
               </div>
               
               {laborRate > 0 && (
-                <div style={{ fontSize: '9pt', marginBottom: '8px' }}>
+                <div style={{ fontSize: '12px', marginBottom: '8px' }}>
                   Labor Rate: <strong>${laborRate}/hr</strong>
                 </div>
               )}
@@ -1225,7 +1225,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                 <a
                   href={`/org/${event.organization_id || event.business_id}`}
                   className="button button-primary"
-                  style={{ fontSize: '9pt', textDecoration: 'none', display: 'inline-block' }}
+                  style={{ fontSize: '12px', textDecoration: 'none', display: 'inline-block' }}
                 >
                   View Full Profile
                 </a>
@@ -1272,7 +1272,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
               borderRadius: '50%',
               width: '50px',
               height: '50px',
-              fontSize: '30pt',
+              fontSize: '40px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',

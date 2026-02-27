@@ -90,7 +90,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4)', borderBottom: '2px solid var(--border)' }}>
-          <div style={{ fontSize: '9pt', fontWeight: 900 }}>
+          <div style={{ fontSize: '12px', fontWeight: 900 }}>
             {statsPanel === 'vehicles'
               ? 'Vehicles'
               : statsPanel === 'value'
@@ -111,7 +111,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                   e.stopPropagation();
                   toggleAddedTodayOnly();
                 }}
-                style={{ padding: '4px 8px', fontSize: '8pt' }}
+                style={{ padding: '4px 8px', fontSize: '11px' }}
                 title="Toggle filter: vehicles created today"
               >
                 +today
@@ -127,7 +127,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                   closeStatsPanel();
                   toggleShowSoldOnly();
                 }}
-                style={{ padding: '4px 8px', fontSize: '8pt' }}
+                style={{ padding: '4px 8px', fontSize: '11px' }}
                 title="Filter feed to sold vehicles only"
               >
                 Filter feed
@@ -141,7 +141,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                 e.stopPropagation();
                 closeStatsPanel();
               }}
-              style={{ padding: '4px 8px', fontSize: '8pt' }}
+              style={{ padding: '4px 8px', fontSize: '11px' }}
             >
               Close
             </button>
@@ -161,13 +161,13 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginBottom: '16px' }}>
                     <div style={{ border: '2px solid var(--border)', background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BEST-KNOWN VALUE</div>
-                      <div style={{ fontSize: '12pt', fontWeight: 900 }}>{formatCurrency(displayStats.totalValue)}</div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BEST-KNOWN VALUE</div>
+                      <div style={{ fontSize: '16px', fontWeight: 900 }}>{formatCurrency(displayStats.totalValue)}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         Uses priority: sale &gt; bids &gt; ask &gt; mark &gt; cost.
                       </div>
                       <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HEADER:</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HEADER:</div>
                         {([
                           { mode: 'best_known' as ValueMetricMode, label: 'val' },
                           { mode: 'mark' as ValueMetricMode, label: 'mark' },
@@ -185,7 +185,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                             }}
                             style={{
                               padding: '2px 6px',
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               border: '1px solid var(--border)',
                               background: valueMetricMode === m.mode ? 'var(--grey-600)' : 'transparent',
                               color: valueMetricMode === m.mode ? 'var(--white)' : 'var(--text)',
@@ -202,8 +202,8 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                       </div>
                     </div>
                     <div style={{ border: '2px solid var(--border)', background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BREAKDOWN</div>
-                      <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BREAKDOWN</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.35 }}>
                         <div><b>{formatCurrency(displayStats.valueMarkTotal)}</b> mark (current_value)</div>
                         <div><b>{formatCurrency(displayStats.valueAskTotal)}</b> ask (for sale)</div>
                         <div><b>{formatCurrency(displayStats.valueRealizedTotal)}</b> realized (sale_price)</div>
@@ -211,13 +211,13 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                       </div>
                     </div>
                     <div style={{ border: '2px solid var(--border)', background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>VALUE ADDED (IMPORTS)</div>
-                      <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>VALUE ADDED (IMPORTS)</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.35 }}>
                         <div><b>{formatCurrency(displayStats.valueImportedToday)}</b> today</div>
                         <div><b>{formatCurrency(displayStats.valueImported24h)}</b> last 24h</div>
                         <div><b>{formatCurrency(displayStats.valueImported7d)}</b> last 7d</div>
                       </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '6px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
                         Note: &quot;Sold date&quot; can be old, but &quot;import date&quot; is created_at.
                       </div>
                     </div>
@@ -227,7 +227,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
 
               {/* Vehicles panel */}
               {statsPanel === 'vehicles' && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
                   <div><b>{displayStats.totalVehicles.toLocaleString()}</b> vehicles</div>
                   {displayStats.vehiclesAddedToday > 0 && <div><b>+{displayStats.vehiclesAddedToday.toLocaleString()}</b> today</div>}
                 </div>
@@ -254,34 +254,34 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                 const tempColor = volPercentile >= 80 ? '#dc2626' : volPercentile >= 50 ? '#f59e0b' : volPercentile >= 20 ? '#3b82f6' : '#6b7280';
                 return (
                   <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontSize: '8pt', fontWeight: 900, marginBottom: '8px' }}>Today&apos;s market</div>
+                    <div style={{ fontSize: '11px', fontWeight: 900, marginBottom: '8px' }}>Today&apos;s market</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginBottom: '12px' }}>
                       <div style={{ border: '2px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>SOLD TODAY</div>
-                        <div style={{ fontSize: '12pt', fontWeight: 900 }}>{todayCnt}</div>
-                        <div style={{ fontSize: '9pt' }}>{formatCurrency(todayVol)}</div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>avg {formatCurrency(Number(today.avg_sale_price) || 0)}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>SOLD TODAY</div>
+                        <div style={{ fontSize: '16px', fontWeight: 900 }}>{todayCnt}</div>
+                        <div style={{ fontSize: '12px' }}>{formatCurrency(todayVol)}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>avg {formatCurrency(Number(today.avg_sale_price) || 0)}</div>
                       </div>
                       <div style={{ border: '2px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>GOOD DAY?</div>
-                        <div style={{ fontSize: '11pt', fontWeight: 900, color: goodDay ? '#059669' : 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>GOOD DAY?</div>
+                        <div style={{ fontSize: '15px', fontWeight: 900, color: goodDay ? '#059669' : 'var(--text-muted)' }}>
                           {goodDay ? 'Yes' : 'No'}
                         </div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                           {sortedCnt.length > 0 || sortedVol.length > 0
                             ? `vs 30d median (${todayCnt} vs ${cntMedian} count, ${formatCurrency(todayVol)} vs ${formatCurrency(volMedian)} vol)`
                             : 'Not enough history yet'}
                         </div>
                       </div>
                       <div style={{ border: '2px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>MARKET TEMPERATURE</div>
-                        <div style={{ fontSize: '11pt', fontWeight: 900, color: tempColor }}>{tempLabel}</div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>volume in top {Math.round(100 - volPercentile)}% (30d)</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>MARKET TEMPERATURE</div>
+                        <div style={{ fontSize: '15px', fontWeight: 900, color: tempColor }}>{tempLabel}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>volume in top {Math.round(100 - volPercentile)}% (30d)</div>
                       </div>
                     </div>
                     {whales.length > 0 && (
                       <>
-                        <div style={{ fontSize: '8pt', fontWeight: 900, marginBottom: '6px' }}>Whales (top buyers today)</div>
+                        <div style={{ fontSize: '11px', fontWeight: 900, marginBottom: '6px' }}>Whales (top buyers today)</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
                           {whales.slice(0, 10).map((w: any, i: number) => (
                             <span
@@ -291,7 +291,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                                 background: 'var(--grey-200)',
                                 border: '1px solid var(--border)',
                                 borderRadius: 6,
-                                fontSize: '7pt',
+                                fontSize: '9px',
                                 fontFamily: 'monospace',
                               }}
                               title={`${Number(w.vehicle_count) || 0} vehicles`}
@@ -309,7 +309,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
               {/* Vehicle preview cards — shared across all panel types */}
               {(statsPanel === 'for_sale' || statsPanel === 'sold_today' || statsPanel === 'auctions' || statsPanel === 'vehicles' || statsPanel === 'value') && (
                 <>
-                  <div style={{ fontSize: '8pt', fontWeight: 900, marginTop: statsPanel === 'value' ? '12px' : 0 }}>
+                  <div style={{ fontSize: '11px', fontWeight: 900, marginTop: statsPanel === 'value' ? '12px' : 0 }}>
                     {statsPanel === 'vehicles'
                       ? 'Newest profiles'
                       : statsPanel === 'value'
@@ -379,17 +379,17 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                             />
                           </div>
                           <div style={{ padding: '6px' }}>
-                            <div style={{ fontSize: '8pt', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={title}>
+                            <div style={{ fontSize: '11px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={title}>
                               {title}
                             </div>
-                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</div>
-                            {metaLine ? <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 2 }}>{metaLine}</div> : null}
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</div>
+                            {metaLine ? <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 2 }}>{metaLine}</div> : null}
                           </div>
                         </Link>
                       );
                     })}
                     {(!statsPanelRows || statsPanelRows.length === 0) && (
-                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)', padding: '10px 0' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '10px 0' }}>
                         No rows found for this panel.
                       </div>
                     )}

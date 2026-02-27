@@ -237,9 +237,9 @@ const FeedGrid: React.FC<FeedGridProps> = ({
       {!error && filteredVehicles.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
           <div ref={infiniteSentinelRef} style={{ width: '1px', height: '1px' }} />
-          {loadingMore && <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Loading...</div>}
+          {loadingMore && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Loading...</div>}
           {!hasMore && !loadingMore && (
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>End of results</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>End of results</div>
           )}
         </div>
       )}
@@ -275,7 +275,7 @@ const FeedGrid: React.FC<FeedGridProps> = ({
           margin: 'var(--space-4)',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text)' }}>
             {error}
           </div>
           <button
@@ -286,7 +286,7 @@ const FeedGrid: React.FC<FeedGridProps> = ({
               color: 'white',
               border: '2px solid var(--border)',
               padding: '6px 16px',
-              fontSize: '9pt',
+              fontSize: '12px',
               cursor: 'pointer',
               fontFamily: '"MS Sans Serif", sans-serif',
             }}
@@ -304,10 +304,10 @@ const FeedGrid: React.FC<FeedGridProps> = ({
           padding: 'var(--space-8)',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>
             No vehicles found
           </div>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
             {feedVehicles.length === 0
               ? 'Be the first to add a build and start the hype train!'
               : 'Try adjusting your filters to see more results.'
@@ -321,7 +321,7 @@ const FeedGrid: React.FC<FeedGridProps> = ({
                 color: 'var(--white)',
                 border: '2px solid var(--border)',
                 padding: '8px 16px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 cursor: 'pointer',
                 fontFamily: '"MS Sans Serif", sans-serif',
               }}

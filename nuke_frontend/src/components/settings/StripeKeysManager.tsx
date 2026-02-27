@@ -208,7 +208,7 @@ const StripeKeysManager: React.FC = () => {
               onChange={(e) => setPublishableKey(e.target.value)}
               placeholder="pk_test_..."
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt', padding: '6px 8px' }}
+              style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
             />
           </div>
 
@@ -222,7 +222,7 @@ const StripeKeysManager: React.FC = () => {
               onChange={(e) => setSecretKey(e.target.value)}
               placeholder={isActive ? "Enter new key to update" : "sk_test_..."}
               className="form-input"
-              style={{ width: '100%', fontSize: '9pt', padding: '6px 8px' }}
+              style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
             />
             {isActive && secretKey === '••••••••' && (
               <div className="text text-small text-muted" style={{ marginTop: '4px' }}>
@@ -236,7 +236,7 @@ const StripeKeysManager: React.FC = () => {
               onClick={handleSave}
               disabled={saving}
               className="button button-primary"
-              style={{ fontSize: '9pt', padding: '8px 16px' }}
+              style={{ fontSize: '12px', padding: '8px 16px' }}
             >
               {saving ? 'Saving...' : 'Save Keys'}
             </button>
@@ -244,7 +244,7 @@ const StripeKeysManager: React.FC = () => {
               <button
                 onClick={handleDelete}
                 className="button button-secondary"
-                style={{ fontSize: '9pt', padding: '8px 16px' }}
+                style={{ fontSize: '12px', padding: '8px 16px' }}
               >
                 Delete Keys
               </button>
@@ -257,7 +257,7 @@ const StripeKeysManager: React.FC = () => {
               background: 'var(--success-dim)',
               border: '1px solid var(--success)',
               borderRadius: '4px',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               ✓ Stripe keys are active and will be used for AI tool payments
             </div>

@@ -94,7 +94,7 @@ export const UploadStatusBar: React.FC = () => {
             alignItems: 'center',
             padding: '0 var(--space-4)',
             zIndex: 99,
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 700,
             gap: 'var(--space-3)'
           }}
@@ -143,7 +143,7 @@ export const UploadStatusBar: React.FC = () => {
             alignItems: 'center',
             padding: '0 var(--space-4)',
             zIndex: 97,
-            fontSize: '8pt',
+            fontSize: '11px',
             fontWeight: 700,
             gap: 'var(--space-3)'
           }}

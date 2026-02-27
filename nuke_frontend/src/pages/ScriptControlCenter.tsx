@@ -236,7 +236,7 @@ export default function ScriptControlCenter() {
             className="button button-secondary cursor-button"
             style={{ 
               marginBottom: '16px',
-              fontSize: '8pt', 
+              fontSize: '11px', 
               padding: '6px 12px',
               border: '2px solid var(--border-light)',
               transition: 'all 0.12s ease'
@@ -244,10 +244,10 @@ export default function ScriptControlCenter() {
           >
             ← Back to Mission Control
           </button>
-          <h1 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Script Control Center
           </h1>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Monitor and control all processing scripts
           </p>
         </div>
@@ -256,7 +256,7 @@ export default function ScriptControlCenter() {
           className="button cursor-button"
           style={{
             padding: '8px 16px',
-            fontSize: '8pt',
+            fontSize: '11px',
             border: `2px solid ${autoRefresh ? 'var(--success)' : 'var(--border-light)'}`,
             background: autoRefresh ? 'var(--success-light)' : 'var(--surface)',
             color: autoRefresh ? 'var(--success)' : 'var(--text-muted)',
@@ -281,12 +281,12 @@ export default function ScriptControlCenter() {
                 {/* Script Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <div>
-                    <h3 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>{script.name}</h3>
-                    <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '2px' }}>{script.description}</p>
-                    <p style={{ fontSize: '8pt', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{script.purpose}</p>
+                    <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>{script.name}</h3>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>{script.description}</p>
+                    <p style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{script.purpose}</p>
                   </div>
                   <div style={{ 
-                    fontSize: '8pt', 
+                    fontSize: '11px', 
                     fontWeight: 700, 
                     textTransform: 'uppercase', 
                     color: statusColor,
@@ -300,7 +300,7 @@ export default function ScriptControlCenter() {
 
                 {/* Progress Bar */}
                 <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8pt', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
                     <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PROGRESS</span>
                     <span style={{ fontFamily: 'monospace' }}>
                       {script.progress.current.toLocaleString()} / {script.progress.total.toLocaleString()}
@@ -316,7 +316,7 @@ export default function ScriptControlCenter() {
                       }}
                     />
                   </div>
-                  <div style={{ fontSize: '8pt', textAlign: 'right', marginTop: '2px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', textAlign: 'right', marginTop: '2px', color: 'var(--text-muted)' }}>
                     {script.progress.percent.toFixed(1)}%
                   </div>
                 </div>
@@ -324,20 +324,20 @@ export default function ScriptControlCenter() {
                 {/* Metrics */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>COST</div>
-                    <div style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--warning)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>COST</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--warning)' }}>
                       ${script.metrics.cost.toFixed(4)}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>SUCCESS</div>
-                    <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>SUCCESS</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700 }}>
                       {script.metrics.successRate.toFixed(0)}%
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>ETA</div>
-                    <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ETA</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700 }}>
                       {script.metrics.eta}
                     </div>
                   </div>
@@ -347,14 +347,14 @@ export default function ScriptControlCenter() {
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     className="button button-primary cursor-button"
-                    style={{ flex: 1, fontSize: '8pt', padding: '8px' }}
+                    style={{ flex: 1, fontSize: '11px', padding: '8px' }}
                     onClick={() => triggerScript(script.name)}
                   >
                     Trigger Now
                   </button>
                   <button
                     className="button button-secondary cursor-button"
-                    style={{ fontSize: '8pt', padding: '8px' }}
+                    style={{ fontSize: '11px', padding: '8px' }}
                     onClick={() => window.open('/admin/image-processing', '_blank')}
                   >
                     Monitor
@@ -363,7 +363,7 @@ export default function ScriptControlCenter() {
 
                 {/* Last Run */}
                 {script.lastRun && (
-                  <div style={{ marginTop: '12px', fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
                     Last activity: {new Date(script.lastRun).toLocaleString()}
                   </div>
                 )}
@@ -378,14 +378,14 @@ export default function ScriptControlCenter() {
         <button
           onClick={loadScriptStatus}
           className="button button-primary cursor-button"
-          style={{ padding: '10px 20px', fontSize: '8pt' }}
+          style={{ padding: '10px 20px', fontSize: '11px' }}
         >
           REFRESH ALL
         </button>
         <button
           onClick={() => navigate('/admin/image-processing')}
           className="button button-secondary cursor-button"
-          style={{ padding: '10px 20px', fontSize: '8pt' }}
+          style={{ padding: '10px 20px', fontSize: '11px' }}
         >
           LEGACY DASHBOARD
         </button>
@@ -393,30 +393,30 @@ export default function ScriptControlCenter() {
 
       {/* Summary Stats */}
       <div className="card" style={{ border: '2px solid var(--border-light)' }}>
-        <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700 }}>
+        <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
           OVERALL PROGRESS
         </div>
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL IMAGES</div>
-              <div style={{ fontSize: '12pt', fontWeight: 700 }}>2,742</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL IMAGES</div>
+              <div style={{ fontSize: '16px', fontWeight: 700 }}>2,742</div>
             </div>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>ANGLES SET</div>
-              <div style={{ fontSize: '12pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ANGLES SET</div>
+              <div style={{ fontSize: '16px', fontWeight: 700 }}>
                 {scripts.find(s => s.name === 'Angle Detection')?.progress.current || 0}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COST</div>
-              <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--warning)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COST</div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--warning)' }}>
                 ${scripts.reduce((sum, s) => sum + s.metrics.cost, 0).toFixed(4)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>ACTIVE SCRIPTS</div>
-              <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--success)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ACTIVE SCRIPTS</div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--success)' }}>
                 {scripts.filter(s => s.status === 'running').length}
               </div>
             </div>

@@ -370,8 +370,8 @@ export default function MemeLibraryAdmin() {
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <div style={{ fontSize: '14pt', fontWeight: 700 }}>Meme Library Indexer</div>
-          <div style={{ fontSize: '9pt', color: '#6b7280' }}>
+          <div style={{ fontSize: '19px', fontWeight: 700 }}>Meme Library Indexer</div>
+          <div style={{ fontSize: '12px', color: '#6b7280' }}>
             Upload assets into <code>meme-assets</code>, then attach them to packs as <code>image_popup</code> actions.
           </div>
         </div>
@@ -384,7 +384,7 @@ export default function MemeLibraryAdmin() {
         <div className="card-header">Packs</div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontSize: '8pt', color: '#6b7280' }}>Active pack</div>
+            <div style={{ fontSize: '11px', color: '#6b7280' }}>Active pack</div>
             <select value={selectedPackId} onChange={(e) => setSelectedPackId(e.target.value)} disabled={loading}>
               {packs.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -395,18 +395,18 @@ export default function MemeLibraryAdmin() {
           </label>
 
           <div style={{ borderTop: '1px solid #eee', paddingTop: 10 }}>
-            <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: 8 }}>Create / Update Pack</div>
+            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: 8 }}>Create / Update Pack</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: '8pt', color: '#6b7280' }}>Name</span>
+                <span style={{ fontSize: '11px', color: '#6b7280' }}>Name</span>
                 <input value={packName} onChange={(e) => setPackName(e.target.value)} disabled={loading} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: '8pt', color: '#6b7280' }}>Slug</span>
+                <span style={{ fontSize: '11px', color: '#6b7280' }}>Slug</span>
                 <input value={packSlug} onChange={(e) => setPackSlug(e.target.value)} disabled={loading} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: '8pt', color: '#6b7280' }}>Price (cents)</span>
+                <span style={{ fontSize: '11px', color: '#6b7280' }}>Price (cents)</span>
                 <input
                   type="number"
                   value={packPriceCents}
@@ -415,25 +415,25 @@ export default function MemeLibraryAdmin() {
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: '8pt', color: '#6b7280' }}>Active</span>
+                <span style={{ fontSize: '11px', color: '#6b7280' }}>Active</span>
                 <select value={packActive ? 'true' : 'false'} onChange={(e) => setPackActive(e.target.value === 'true')} disabled={loading}>
                   <option value="true">true</option>
                   <option value="false">false</option>
                 </select>
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
-                <span style={{ fontSize: '8pt', color: '#6b7280' }}>Description</span>
+                <span style={{ fontSize: '11px', color: '#6b7280' }}>Description</span>
                 <input value={packDescription} onChange={(e) => setPackDescription(e.target.value)} disabled={loading} />
               </label>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, alignItems: 'center' }}>
-              <div style={{ fontSize: '8pt', color: '#6b7280' }}>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>
                 {selectedPackId && selectedPack ? (
                   <button
                     className="button button-secondary"
                     onClick={() => void deletePack(selectedPack.id)}
                     disabled={loading}
-                    style={{ fontSize: '8pt', padding: '6px 10px' }}
+                    style={{ fontSize: '11px', padding: '6px 10px' }}
                   >
                     DELETE PACK
                   </button>
@@ -450,23 +450,23 @@ export default function MemeLibraryAdmin() {
       <div className="card">
         <div className="card-header">Index a Meme (Upload + Create Action)</div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: '9pt', color: '#6b7280' }}>
+          <div style={{ fontSize: '12px', color: '#6b7280' }}>
             You can upload a file, or import by URL from an allowlisted source (with license/provenance).
           </div>
 
           {(selectedPackSlug === 'frog' || selectedPackSlug === 'pepe') ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-              <div style={{ fontSize: '8pt', color: '#6b7280' }}>Quick tags</div>
-              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['frog', 'reaction'])} style={{ fontSize: '8pt', padding: '6px 10px' }}>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>Quick tags</div>
+              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['frog', 'reaction'])} style={{ fontSize: '11px', padding: '6px 10px' }}>
                 frog + reaction
               </button>
-              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['pepe', 'frog'])} style={{ fontSize: '8pt', padding: '6px 10px' }}>
+              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['pepe', 'frog'])} style={{ fontSize: '11px', padding: '6px 10px' }}>
                 pepe + frog
               </button>
-              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['template', 'blank'])} style={{ fontSize: '8pt', padding: '6px 10px' }}>
+              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['template', 'blank'])} style={{ fontSize: '11px', padding: '6px 10px' }}>
                 template + blank
               </button>
-              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['wojak_adjacent'])} style={{ fontSize: '8pt', padding: '6px 10px' }}>
+              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['wojak_adjacent'])} style={{ fontSize: '11px', padding: '6px 10px' }}>
                 wojak_adjacent
               </button>
             </div>
@@ -474,31 +474,31 @@ export default function MemeLibraryAdmin() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Title</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Title</span>
               <input value={actionTitle} onChange={(e) => setActionTitle(e.target.value)} disabled={loading} />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Slug</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Slug</span>
               <input value={actionSlug} onChange={(e) => setActionSlug(e.target.value)} disabled={loading} />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Tags (comma-separated)</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Tags (comma-separated)</span>
               <input value={actionTags} onChange={(e) => setActionTags(e.target.value)} disabled={loading} placeholder="chad, stick_guys, reaction" />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Source URL</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Source URL</span>
               <input value={actionSourceUrl} onChange={(e) => setActionSourceUrl(e.target.value)} disabled={loading} placeholder="Where did this come from?" />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Attribution</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Attribution</span>
               <input value={actionAttribution} onChange={(e) => setActionAttribution(e.target.value)} disabled={loading} placeholder="Author/creator, if known" />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>License</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>License</span>
               <input value={actionLicense} onChange={(e) => setActionLicense(e.target.value)} disabled={loading} placeholder="CC0, CC-BY, original, unknown" />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Import URL (https)</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Import URL (https)</span>
               <input
                 value={actionImportUrl}
                 onChange={(e) => setActionImportUrl(e.target.value)}
@@ -507,7 +507,7 @@ export default function MemeLibraryAdmin() {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Duration (ms)</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Duration (ms)</span>
               <input
                 type="number"
                 value={actionDurationMs}
@@ -516,7 +516,7 @@ export default function MemeLibraryAdmin() {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Cooldown (ms)</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Cooldown (ms)</span>
               <input
                 type="number"
                 value={actionCooldownMs}
@@ -525,14 +525,14 @@ export default function MemeLibraryAdmin() {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>Active</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>Active</span>
               <select value={actionActive ? 'true' : 'false'} onChange={(e) => setActionActive(e.target.value === 'true')} disabled={loading}>
                 <option value="true">true</option>
                 <option value="false">false</option>
               </select>
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: '8pt', color: '#6b7280' }}>File (png/jpg/webp/gif)</span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>File (png/jpg/webp/gif)</span>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"
@@ -543,7 +543,7 @@ export default function MemeLibraryAdmin() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-            <div style={{ fontSize: '8pt', color: '#6b7280' }}>
+            <div style={{ fontSize: '11px', color: '#6b7280' }}>
               Target pack: <b>{selectedPack ? `${selectedPack.name} (${selectedPack.slug})` : 'none'}</b>
               {editingActionId ? <span style={{ marginLeft: 8, color: '#f59e0b' }}>(EDITING)</span> : null}
             </div>
@@ -597,11 +597,11 @@ export default function MemeLibraryAdmin() {
                       }}
                     />
                   ) : null}
-                  <div style={{ fontSize: '9pt', fontWeight: 700 }}>{action.title}</div>
-                  <div style={{ fontSize: '7pt', color: '#6b7280' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700 }}>{action.title}</div>
+                  <div style={{ fontSize: '9px', color: '#6b7280' }}>
                     {action.tags?.length ? `Tags: ${action.tags.join(', ')}` : 'No tags'}
                   </div>
-                  <div style={{ fontSize: '7pt', color: '#6b7280' }}>
+                  <div style={{ fontSize: '9px', color: '#6b7280' }}>
                     {action.is_active ? 'Active' : 'Inactive'} · {action.duration_ms}ms
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
@@ -609,7 +609,7 @@ export default function MemeLibraryAdmin() {
                       className="button button-secondary"
                       onClick={() => loadActionForEdit(action)}
                       disabled={loading}
-                      style={{ fontSize: '8pt', padding: '6px 10px', flex: 1 }}
+                      style={{ fontSize: '11px', padding: '6px 10px', flex: 1 }}
                     >
                       EDIT
                     </button>
@@ -617,7 +617,7 @@ export default function MemeLibraryAdmin() {
                       className="button button-secondary"
                       onClick={() => void deleteAction(action.id)}
                       disabled={loading}
-                      style={{ fontSize: '8pt', padding: '6px 10px', flex: 1, color: '#dc2626' }}
+                      style={{ fontSize: '11px', padding: '6px 10px', flex: 1, color: '#dc2626' }}
                     >
                       DELETE
                     </button>

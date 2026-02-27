@@ -24,7 +24,7 @@ const s = {
     display: 'flex',
     maxWidth: '1100px',
     margin: '0 auto',
-    fontSize: '8pt',
+    fontSize: '11px',
     fontFamily: 'Arial, sans-serif',
     color: 'var(--text)',
     minHeight: 'calc(100vh - 60px)',
@@ -43,7 +43,7 @@ const s = {
     marginBottom: 'var(--space-4)',
   },
   sidebarLabel: {
-    fontSize: '7pt',
+    fontSize: '9px',
     fontWeight: 'bold' as const,
     color: 'var(--text-muted)',
     textTransform: 'uppercase' as const,
@@ -52,7 +52,7 @@ const s = {
   },
   sidebarLink: (active: boolean) => ({
     display: 'block',
-    fontSize: '8pt',
+    fontSize: '11px',
     padding: '3px var(--space-2)',
     color: active ? 'var(--text)' : 'var(--text-muted)',
     fontWeight: active ? 'bold' as const : 'normal' as const,
@@ -69,12 +69,12 @@ const s = {
     overflowY: 'auto' as const,
   },
   h1: {
-    fontSize: '12pt',
+    fontSize: '16px',
     fontWeight: 'bold' as const,
     marginBottom: 'var(--space-2)',
   },
   h2: {
-    fontSize: '10pt',
+    fontSize: '13px',
     fontWeight: 'bold' as const,
     marginBottom: 'var(--space-2)',
     marginTop: 'var(--space-6)',
@@ -82,7 +82,7 @@ const s = {
     borderBottom: '1px solid var(--border-light)',
   },
   h3: {
-    fontSize: '9pt',
+    fontSize: '12px',
     fontWeight: 'bold' as const,
     marginBottom: 'var(--space-2)',
     marginTop: 'var(--space-4)',
@@ -97,7 +97,7 @@ const s = {
     border: '1px solid var(--border-light)',
     padding: 'var(--space-3)',
     fontFamily: 'monospace',
-    fontSize: '8pt',
+    fontSize: '11px',
     overflow: 'auto' as const,
     whiteSpace: 'pre' as const,
     lineHeight: '1.5',
@@ -107,7 +107,7 @@ const s = {
     background: 'var(--grey-200)',
     padding: '1px 4px',
     fontFamily: 'monospace',
-    fontSize: '8pt',
+    fontSize: '11px',
     border: '1px solid var(--border-light)',
   },
   card: {
@@ -119,7 +119,7 @@ const s = {
   methodBadge: (method: string) => ({
     display: 'inline-block',
     padding: '2px 6px',
-    fontSize: '8pt',
+    fontSize: '11px',
     fontFamily: 'monospace',
     fontWeight: 'bold' as const,
     background: method === 'GET' ? '#e8f5e9' : method === 'POST' ? '#e3f2fd' : method === 'PATCH' ? '#fff3e0' : method === 'DELETE' ? '#ffebee' : 'var(--grey-100)',
@@ -129,7 +129,7 @@ const s = {
   table: {
     width: '100%',
     borderCollapse: 'collapse' as const,
-    fontSize: '8pt',
+    fontSize: '11px',
     marginBottom: 'var(--space-3)',
   },
   th: {
@@ -154,7 +154,7 @@ const s = {
     lineHeight: '1.4',
   },
   buttonPrimary: {
-    fontSize: '8pt',
+    fontSize: '11px',
     padding: 'var(--space-2) var(--space-4)',
     background: 'var(--text)',
     color: 'var(--white)',
@@ -164,7 +164,7 @@ const s = {
     fontWeight: 'bold' as const,
   },
   buttonSecondary: {
-    fontSize: '8pt',
+    fontSize: '11px',
     padding: 'var(--space-2) var(--space-4)',
     background: 'var(--grey-200)',
     border: '2px outset var(--border-light)',
@@ -183,16 +183,16 @@ const s = {
     gap: 'var(--space-2)',
     marginBottom: 'var(--space-2)',
     fontFamily: 'monospace',
-    fontSize: '9pt',
+    fontSize: '12px',
   },
   paramRequired: {
     color: '#d13438',
-    fontSize: '7pt',
+    fontSize: '9px',
     fontWeight: 'bold' as const,
   },
   paramOptional: {
     color: 'var(--text-muted)',
-    fontSize: '7pt',
+    fontSize: '9px',
   },
 };
 
@@ -211,7 +211,7 @@ function CodeBlock({ code, title }: { code: string; title?: string }) {
     <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
       {title && (
         <div style={{
-          fontSize: '7pt',
+          fontSize: '9px',
           color: 'var(--text-muted)',
           background: 'var(--grey-200)',
           border: '1px solid var(--border-light)',
@@ -231,7 +231,7 @@ function CodeBlock({ code, title }: { code: string; title?: string }) {
           right: 'var(--space-2)',
           ...s.buttonSecondary,
           padding: '2px 8px',
-          fontSize: '7pt',
+          fontSize: '9px',
         }}
       >
         {copied ? 'Copied' : 'Copy'}
@@ -346,7 +346,7 @@ function OverviewSection() {
               padding: 'var(--space-3)',
               textAlign: 'center',
             }}>
-              <div style={{ fontSize: '10pt', fontWeight: 'bold', fontFamily: 'monospace' }}>{stat.value}</div>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace' }}>{stat.value}</div>
               <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>{stat.label}</div>
             </div>
           ))}
@@ -1954,11 +1954,11 @@ function McpSection() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
             <div>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>Input</div>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' }}>Input</div>
               <pre style={{ ...s.code, margin: 0, padding: '6px 8px' }}>{tool.input}</pre>
             </div>
             <div>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>Output</div>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' }}>Output</div>
               <pre style={{ ...s.code, margin: 0, padding: '6px 8px' }}>{tool.output}</pre>
             </div>
           </div>
@@ -2205,7 +2205,7 @@ function ChangelogSection() {
               <span style={{
                 display: 'inline-block',
                 padding: '1px 6px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 fontFamily: 'monospace',
                 background: change.type === 'new' ? '#e8f5e9' : change.type === 'fix' ? '#ffebee' : 'var(--grey-100)',
                 border: '1px solid var(--border-light)',
@@ -2279,10 +2279,10 @@ export default function DevelopersPage() {
       {/* Sidebar */}
       <nav style={s.sidebar}>
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
             Nuke Docs
           </div>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
             Vehicle Intelligence API
           </div>
         </div>

@@ -150,15 +150,15 @@ export default function CitationModal({
           alignItems: 'center'
         }}>
           <div>
-            <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>{componentName}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '15px', fontWeight: 'bold' }}>{componentName}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               Value: ${valueUsd.toLocaleString()} · {citations.length} source{citations.length === 1 ? '' : 's'}
             </div>
           </div>
           <button
             onClick={onClose}
             className="button button-small"
-            style={{ fontSize: '8pt', padding: '4px 8px' }}
+            style={{ fontSize: '11px', padding: '4px 8px' }}
           >
             ✕
           </button>
@@ -167,13 +167,13 @@ export default function CitationModal({
         {/* Content */}
         <div style={{ padding: '16px' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
               Loading citations...
             </div>
           ) : citations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
               No citation data available for this value.
-              <div style={{ marginTop: '12px', fontSize: '8pt' }}>
+              <div style={{ marginTop: '12px', fontSize: '11px' }}>
                 This value may be AI-estimated or system-calculated without source attribution.
               </div>
             </div>
@@ -196,13 +196,13 @@ export default function CitationModal({
                     {/* Primary row: WHO, WHEN, VALUE */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
                       <div>
-                        <div style={{ fontSize: '9pt', fontWeight: 600 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600 }}>
                           {cit.submitter_name || 'Unknown'}
                           {cit.submitter_role && (
                             <span
                               style={{
                                 marginLeft: '6px',
-                                fontSize: '7pt',
+                                fontSize: '9px',
                                 padding: '2px 6px',
                                 background: roleBadge?.color ? `${roleBadge.color}22` : '#f3f4f6',
                                 color: roleBadge?.color || '#6b7280',
@@ -214,7 +214,7 @@ export default function CitationModal({
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           Submitted: {formatDate(cit.submitted_at)}
                           {cit.effective_date && (
                             <> · Effective: {new Date(cit.effective_date).toLocaleDateString()}</>
@@ -222,10 +222,10 @@ export default function CitationModal({
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+                        <div style={{ fontSize: '15px', fontWeight: 700 }}>
                           ${cit.value_usd.toLocaleString()}
                         </div>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                           {cit.value_type || 'price'}
                         </div>
                       </div>
@@ -235,7 +235,7 @@ export default function CitationModal({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <span
                         style={{
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           padding: '3px 8px',
                           background: `${evidenceBadge.color}22`,
                           color: evidenceBadge.color,
@@ -247,7 +247,7 @@ export default function CitationModal({
                       </span>
                       <span
                         style={{
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           padding: '3px 8px',
                           background: cit.confidence_score >= 80 ? '#10b98122' : '#f59e0b22',
                           color: cit.confidence_score >= 80 ? '#10b981' : '#f59e0b',
@@ -258,7 +258,7 @@ export default function CitationModal({
                       </span>
                       <span
                         style={{
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           padding: '3px 8px',
                           background:
                             cit.verification_status === 'receipt_confirmed' ? '#10b98122' :
@@ -279,7 +279,7 @@ export default function CitationModal({
 
                     {/* Evidence links */}
                     {(cit.source_document_id || cit.source_image_id || cit.source_image_tag_id) && (
-                      <div style={{ fontSize: '8pt', color: 'var(--text)', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '8px' }}>
                         <div style={{ fontWeight: 600, marginBottom: '4px' }}>Evidence:</div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {cit.source_document_id && (
@@ -307,7 +307,7 @@ export default function CitationModal({
                                 textDecoration: 'underline',
                                 cursor: 'pointer',
                                 padding: 0,
-                                fontSize: '8pt'
+                                fontSize: '11px'
                               }}
                             >
                               View Image
@@ -327,7 +327,7 @@ export default function CitationModal({
 
                     {/* Labor details */}
                     {(cit.shop_id || cit.laborer_user_id || cit.mitchell_operation_code) && (
-                      <div style={{ fontSize: '8pt', background: 'var(--bg)', padding: '8px', borderRadius: '2px' }}>
+                      <div style={{ fontSize: '11px', background: 'var(--bg)', padding: '8px', borderRadius: '2px' }}>
                         <div style={{ fontWeight: 600, marginBottom: '4px' }}>Labor Details:</div>
                         {cit.shop_id && <div>Shop: {cit.shop_id.slice(0, 8)}...</div>}
                         {cit.laborer_user_id && <div>Laborer: {cit.laborer_user_id.slice(0, 8)}...</div>}
@@ -338,14 +338,14 @@ export default function CitationModal({
 
                     {/* Notes */}
                     {cit.notes && (
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic' }}>
                         "{cit.notes}"
                       </div>
                     )}
 
                     {/* Verification */}
                     {cit.verified_by && cit.verified_at && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
                         Verified by user {cit.verified_by.slice(0, 8)}... on {formatDate(cit.verified_at)}
                       </div>
                     )}
@@ -386,7 +386,7 @@ export default function CitationModal({
                 background: 'var(--surface)',
                 border: 'none',
                 padding: '8px 12px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 cursor: 'pointer',
                 borderRadius: '4px'
               }}

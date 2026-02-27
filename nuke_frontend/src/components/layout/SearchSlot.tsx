@@ -14,7 +14,7 @@ export const SearchSlot: React.FC = () => {
         style={{
           width: '100%',
           padding: '6px 10px',
-          fontSize: '9pt',
+          fontSize: '12px',
           border: '2px inset var(--border)',
           background: 'var(--white)',
           outline: 'none',
@@ -35,7 +35,7 @@ export const SearchSlot: React.FC = () => {
           style={{
             width: '100%',
             padding: '6px 10px',
-            fontSize: '9pt',
+            fontSize: '12px',
             border: '2px inset var(--border)',
             background: 'var(--white)',
             outline: 'none',

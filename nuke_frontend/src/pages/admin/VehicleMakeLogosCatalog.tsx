@@ -34,7 +34,7 @@ function badgeStyle(kind: 'active' | 'defunct' | 'unknown') {
     gap: '6px',
     padding: '2px 8px',
     border: '1px solid #000',
-    fontSize: '7pt',
+    fontSize: '9px',
     fontWeight: 700,
     background: '#fff'
   };
@@ -113,10 +113,10 @@ export default function VehicleMakeLogosCatalog() {
       <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: '14pt', fontWeight: 700, textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '19px', fontWeight: 700, textTransform: 'uppercase' }}>
               Vehicle Make Logos Catalog
             </div>
-            <div style={{ fontSize: '8pt', color: '#666', marginTop: '6px' }}>
+            <div style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
               Source: Wikidata + Wikimedia Commons • Generated: {payload?.generated_at || '—'}
             </div>
           </div>
@@ -125,7 +125,7 @@ export default function VehicleMakeLogosCatalog() {
               href="/admin_catalog/vehicle_make_logos.csv"
               style={{
                 padding: '8px 10px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
                 background: '#000',
@@ -152,7 +152,7 @@ export default function VehicleMakeLogosCatalog() {
         }}
       >
         <div>
-          <label style={{ fontSize: '8pt', fontWeight: 700, display: 'block', marginBottom: '4px' }}>SEARCH</label>
+          <label style={{ fontSize: '11px', fontWeight: 700, display: 'block', marginBottom: '4px' }}>SEARCH</label>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -160,7 +160,7 @@ export default function VehicleMakeLogosCatalog() {
             style={{
               width: '100%',
               padding: '6px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid #000',
               fontFamily: 'inherit'
             }}
@@ -168,14 +168,14 @@ export default function VehicleMakeLogosCatalog() {
         </div>
 
         <div>
-          <label style={{ fontSize: '8pt', fontWeight: 700, display: 'block', marginBottom: '4px' }}>STATUS</label>
+          <label style={{ fontSize: '11px', fontWeight: 700, display: 'block', marginBottom: '4px' }}>STATUS</label>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as any)}
             style={{
               width: '100%',
               padding: '6px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid #000',
               fontFamily: 'inherit'
             }}
@@ -188,12 +188,12 @@ export default function VehicleMakeLogosCatalog() {
         </div>
 
         <div>
-          <label style={{ fontSize: '8pt', fontWeight: 700, display: 'block', marginBottom: '4px' }}>LOGO</label>
-          <label style={{ fontSize: '8pt', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+          <label style={{ fontSize: '11px', fontWeight: 700, display: 'block', marginBottom: '4px' }}>LOGO</label>
+          <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
             <input type="checkbox" checked={hasLogo} onChange={(e) => setHasLogo(e.target.checked)} />
             Has logo (P154)
           </label>
-          <div style={{ fontSize: '7pt', color: '#666', marginTop: '6px' }}>
+          <div style={{ fontSize: '9px', color: '#666', marginTop: '6px' }}>
             Showing {filtered.length.toLocaleString()} / {(payload?.count || 0).toLocaleString()}
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function VehicleMakeLogosCatalog() {
             }}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               border: '2px solid #000',
               background: 'var(--surface)',
@@ -221,9 +221,9 @@ export default function VehicleMakeLogosCatalog() {
 
       {/* Body */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', fontSize: '8pt', color: '#999' }}>Loading…</div>
+        <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: '#999' }}>Loading…</div>
       ) : error ? (
-        <div style={{ padding: '16px', border: '2px solid #991b1b', background: '#fff', color: '#991b1b', fontSize: '8pt' }}>
+        <div style={{ padding: '16px', border: '2px solid #991b1b', background: '#fff', color: '#991b1b', fontSize: '11px' }}>
           Failed to load admin catalog: {error}
           <div style={{ marginTop: '8px', color: '#111' }}>
             Expected file: <code>/admin_catalog/vehicle_make_logos.json</code>
@@ -232,7 +232,7 @@ export default function VehicleMakeLogosCatalog() {
       ) : (
         <div style={{ background: '#fff', border: '2px solid #000', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
               <thead style={{ position: 'sticky', top: 0, background: '#f8f8f8', borderBottom: '2px solid #000' }}>
                 <tr>
                   <th style={{ padding: '10px', textAlign: 'left', fontWeight: 700, width: '70px' }}>LOGO</th>
@@ -273,7 +273,7 @@ export default function VehicleMakeLogosCatalog() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               color: '#999'
                             }}
                           >
@@ -284,7 +284,7 @@ export default function VehicleMakeLogosCatalog() {
                       <td style={{ padding: '10px' }}>
                         <div style={{ fontWeight: 700 }}>{it.label}</div>
                         {it.alt_labels && it.alt_labels.length > 0 ? (
-                          <div style={{ marginTop: '2px', fontSize: '7pt', color: '#666' }}>
+                          <div style={{ marginTop: '2px', fontSize: '9px', color: '#666' }}>
                             {it.alt_labels.slice(0, 3).join(' • ')}
                             {it.alt_labels.length > 3 ? ` • +${it.alt_labels.length - 3} more` : ''}
                           </div>
@@ -297,11 +297,11 @@ export default function VehicleMakeLogosCatalog() {
                       </td>
                       <td style={{ padding: '10px', fontFamily: 'monospace' }}>{years}</td>
                       <td style={{ padding: '10px' }}>{it.country || '—'}</td>
-                      <td style={{ padding: '10px', fontSize: '7pt', color: '#111' }}>
+                      <td style={{ padding: '10px', fontSize: '9px', color: '#111' }}>
                         {(it.types || []).slice(0, 3).join(' • ') || '—'}
                         {(it.types || []).length > 3 ? <span style={{ color: '#666' }}> • +{(it.types || []).length - 3} more</span> : null}
                       </td>
-                      <td style={{ padding: '10px', fontSize: '7pt' }}>
+                      <td style={{ padding: '10px', fontSize: '9px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {it.wikidata_url ? (
                             <a href={it.wikidata_url} target="_blank" rel="noreferrer" style={{ color: '#0066cc', textDecoration: 'none' }}>
@@ -343,7 +343,7 @@ export default function VehicleMakeLogosCatalog() {
               disabled={currentPage === 1}
               style={{
                 padding: '8px 16px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
                 background: currentPage === 1 ? '#ccc' : '#fff',
@@ -352,7 +352,7 @@ export default function VehicleMakeLogosCatalog() {
             >
               ← PREV
             </button>
-            <div style={{ fontSize: '8pt' }}>
+            <div style={{ fontSize: '11px' }}>
               Page {currentPage} of {totalPages} • Showing {pageItems.length} rows (of {filtered.length.toLocaleString()})
             </div>
             <button
@@ -360,7 +360,7 @@ export default function VehicleMakeLogosCatalog() {
               disabled={currentPage === totalPages}
               style={{
                 padding: '8px 16px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
                 background: currentPage === totalPages ? '#ccc' : '#fff',

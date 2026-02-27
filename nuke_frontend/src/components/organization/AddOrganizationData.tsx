@@ -352,8 +352,8 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
         }}
       >
         <div style={{ padding: '16px', borderBottom: '2px solid var(--border)', background: 'var(--surface)' }}>
-          <h2 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>Contribute Organization Data</h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Contribute Organization Data</h2>
+          <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
             All submissions are attributed to you and tracked in the org timeline
           </p>
         </div>
@@ -372,7 +372,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
               className="button button-secondary"
               style={{
                 flex: 1,
-                fontSize: '9pt',
+                fontSize: '12px',
                 borderRadius: 0,
                 borderBottom: dataType === tab.key ? '2px solid var(--accent)' : 'none',
                 background: dataType === tab.key ? 'var(--white)' : 'var(--surface)'
@@ -388,7 +388,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
           {dataType === 'info' && (
             <form onSubmit={handleInfoSubmit}>
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Business Name *
                 </label>
                 <input
@@ -397,13 +397,13 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   onChange={(e) => setBusinessName(e.target.value)}
                   required
                   className="form-input"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                   placeholder="e.g., Desert Performance"
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Legal Name
                 </label>
                 <input
@@ -411,20 +411,20 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   value={legalName}
                   onChange={(e) => setLegalName(e.target.value)}
                   className="form-input"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                   placeholder="e.g., Desert Performance LLC"
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Business Type
                 </label>
                 <select
                   value={businessType}
                   onChange={(e) => setBusinessType(e.target.value)}
                   className="form-select"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                 >
                   <option value="">Select type...</option>
                   <option value="garage">Garage</option>
@@ -443,14 +443,14 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Description
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="form-input"
-                  style={{ width: '100%', fontSize: '9pt', minHeight: '80px' }}
+                  style={{ width: '100%', fontSize: '12px', minHeight: '80px' }}
                   placeholder="Brief description of the business..."
                 />
               </div>
@@ -460,7 +460,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   type="button"
                   onClick={onClose}
                   className="button button-secondary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   Cancel
                 </button>
@@ -468,7 +468,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   type="submit"
                   disabled={submitting || !businessName}
                   className="button button-primary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   {submitting ? 'Submitting...' : 'Submit Info'}
                 </button>
@@ -480,7 +480,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
           {dataType === 'contact' && (
             <form onSubmit={handleContactSubmit}>
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Phone
                 </label>
                 <input
@@ -488,13 +488,13 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="form-input"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                   placeholder="(555) 123-4567"
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Email
                 </label>
                 <input
@@ -502,13 +502,13 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="form-input"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                   placeholder="contact@business.com"
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Website
                 </label>
                 <input
@@ -516,13 +516,13 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
                   className="form-input"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                   placeholder="https://business.com"
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Address
                 </label>
                 <input
@@ -530,14 +530,14 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="form-input"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                   placeholder="123 Main St"
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                     City
                   </label>
                   <input
@@ -545,12 +545,12 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     className="form-input"
-                    style={{ width: '100%', fontSize: '9pt' }}
+                    style={{ width: '100%', fontSize: '12px' }}
                     placeholder="Phoenix"
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                     State
                   </label>
                   <input
@@ -558,13 +558,13 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                     value={state}
                     onChange={(e) => setState(e.target.value)}
                     className="form-input"
-                    style={{ width: '100%', fontSize: '9pt' }}
+                    style={{ width: '100%', fontSize: '12px' }}
                     placeholder="AZ"
                     maxLength={2}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                     ZIP
                   </label>
                   <input
@@ -572,7 +572,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                     value={zipCode}
                     onChange={(e) => setZipCode(e.target.value)}
                     className="form-input"
-                    style={{ width: '100%', fontSize: '9pt' }}
+                    style={{ width: '100%', fontSize: '12px' }}
                     placeholder="85001"
                   />
                 </div>
@@ -583,7 +583,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   type="button"
                   onClick={onClose}
                   className="button button-secondary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   Cancel
                 </button>
@@ -591,7 +591,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   type="submit"
                   disabled={submitting}
                   className="button button-primary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   {submitting ? 'Submitting...' : 'Submit Contact Info'}
                 </button>
@@ -603,7 +603,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
           {dataType === 'members' && (
             <form onSubmit={handleMemberSubmit}>
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   User Email *
                 </label>
                 <input
@@ -612,23 +612,23 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   onChange={(e) => setMemberEmail(e.target.value)}
                   required
                   className="form-input"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                   placeholder="user@example.com"
                 />
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
                   User must be registered on the platform
                 </div>
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Role
                 </label>
                 <select
                   value={memberRole}
                   onChange={(e) => setMemberRole(e.target.value)}
                   className="form-select"
-                  style={{ width: '100%', fontSize: '9pt' }}
+                  style={{ width: '100%', fontSize: '12px' }}
                 >
                   <option value="employee">Employee</option>
                   <option value="contractor">Contractor</option>
@@ -644,7 +644,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   type="button"
                   onClick={onClose}
                   className="button button-secondary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   Cancel
                 </button>
@@ -652,7 +652,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   type="submit"
                   disabled={submitting}
                   className="button button-primary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   {submitting ? 'Adding...' : 'Add Member'}
                 </button>
@@ -664,7 +664,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
           {dataType === 'images' && (
             <form onSubmit={handleImageUpload}>
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Upload Location/Facility Images
                 </label>
 
@@ -712,19 +712,19 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                 >
                   {selectedFiles.length > 0 ? (
                     <div>
-                      <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '4px', color: 'var(--accent)' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', color: 'var(--accent)' }}>
                         {selectedFiles.length} file{selectedFiles.length === 1 ? '' : 's'} selected
                       </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         {selectedFiles.map(f => f.name).join(', ')}
                       </div>
                     </div>
                   ) : (
                     <div>
-                      <div style={{ fontSize: '9pt', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '12px', marginBottom: '4px' }}>
                         {isDragging ? 'Drop images here' : 'Drag & drop images or click to choose'}
                       </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         Select multiple images of the facility, team, equipment, or work
                       </div>
                     </div>
@@ -738,7 +738,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   type="button"
                   onClick={onClose}
                   className="button button-secondary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   Cancel
                 </button>
@@ -746,7 +746,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   type="submit"
                   disabled={submitting || selectedFiles.length === 0}
                   className="button button-primary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   {submitting ? 'Uploading...' : `Upload ${selectedFiles.length} Image${selectedFiles.length === 1 ? '' : 's'}`}
                 </button>
@@ -755,7 +755,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
           )}
         </div>
 
-        <div style={{ padding: '12px', background: 'var(--surface)', borderTop: '1px solid var(--border)', fontSize: '7pt', color: 'var(--text-muted)' }}>
+        <div style={{ padding: '12px', background: 'var(--surface)', borderTop: '1px solid var(--border)', fontSize: '9px', color: 'var(--text-muted)' }}>
           💡 Your submissions create a verified chain of data. Each contribution is linked back to you in the organization timeline.
         </div>
       </div>

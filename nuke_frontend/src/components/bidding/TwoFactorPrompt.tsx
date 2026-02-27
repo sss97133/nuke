@@ -270,15 +270,15 @@ export default function TwoFactorPrompt({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '14pt'
+              fontSize: '19px'
             }}>
               🔐
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '11pt', fontWeight: 700 }}>
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>
                 {methodInfo.title}
               </h2>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 {getPlatformName(request.platform)}
               </div>
             </div>
@@ -288,7 +288,7 @@ export default function TwoFactorPrompt({
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '16pt',
+              fontSize: '21px',
               cursor: 'pointer',
               padding: '0 4px',
               color: 'var(--text-muted)'
@@ -311,11 +311,11 @@ export default function TwoFactorPrompt({
             alignItems: 'center',
             justifyContent: 'space-between'
           }}>
-            <span style={{ fontSize: '8pt', color: isExpired ? '#991b1b' : '#92400e' }}>
+            <span style={{ fontSize: '11px', color: isExpired ? '#991b1b' : '#92400e' }}>
               {isExpired ? 'Code expired' : 'Time remaining'}
             </span>
             <span style={{
-              fontSize: '11pt',
+              fontSize: '15px',
               fontWeight: 700,
               color: isExpired ? '#ef4444' : '#f59e0b',
               fontFamily: 'monospace'
@@ -332,14 +332,14 @@ export default function TwoFactorPrompt({
               padding: '10px 12px',
               borderRadius: '4px',
               marginBottom: '16px',
-              fontSize: '9pt'
+              fontSize: '12px'
             }}>
               {error}
             </div>
           )}
 
           <p style={{
-            fontSize: '9pt',
+            fontSize: '12px',
             color: 'var(--text-secondary)',
             marginBottom: '16px'
           }}>
@@ -361,7 +361,7 @@ export default function TwoFactorPrompt({
                   padding: '14px 16px',
                   border: '2px solid var(--border)',
                   borderRadius: '4px',
-                  fontSize: '16pt',
+                  fontSize: '21px',
                   fontFamily: 'monospace',
                   textAlign: 'center',
                   letterSpacing: '8px',
@@ -376,7 +376,7 @@ export default function TwoFactorPrompt({
                 onClick={onClose}
                 disabled={loading}
                 className="button"
-                style={{ fontSize: '9pt', flex: 1 }}
+                style={{ fontSize: '12px', flex: 1 }}
               >
                 Cancel
               </button>
@@ -384,7 +384,7 @@ export default function TwoFactorPrompt({
                 type="submit"
                 disabled={loading || isExpired || !code.trim()}
                 className="button button-primary"
-                style={{ fontSize: '9pt', flex: 1 }}
+                style={{ fontSize: '12px', flex: 1 }}
               >
                 {loading ? 'Verifying...' : 'Verify'}
               </button>
@@ -393,7 +393,7 @@ export default function TwoFactorPrompt({
 
           {isExpired && (
             <p style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--text-muted)',
               textAlign: 'center',
               marginTop: '16px'

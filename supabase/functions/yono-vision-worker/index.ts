@@ -26,6 +26,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SIDECAR_URL =
   Deno.env.get("YONO_SIDECAR_URL") || "http://127.0.0.1:8472";
+const SIDECAR_TOKEN = Deno.env.get("MODAL_SIDECAR_TOKEN") || "";
 
 const DEFAULT_BATCH_SIZE = 10;
 const MAX_BATCH_SIZE = 20;
@@ -47,6 +48,7 @@ function json(body: unknown, status = 200) {
 async function checkSidecarVision(): Promise<boolean> {
   try {
     // 15s timeout — Modal cold start takes 10-12s even with min_containers=1
+    // /health is public (no auth required)
     const resp = await fetch(`${SIDECAR_URL}/health`, {
       signal: AbortSignal.timeout(15000),
     });
@@ -111,7 +113,10 @@ serve(async (req) => {
   try {
     const sidecarResp = await fetch(`${SIDECAR_URL}/analyze/batch`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(SIDECAR_TOKEN ? { "Authorization": `Bearer ${SIDECAR_TOKEN}` } : {}),
+      },
       body: JSON.stringify({
         images: batch.map((row: { image_url: string }) => ({
           image_url: row.image_url,

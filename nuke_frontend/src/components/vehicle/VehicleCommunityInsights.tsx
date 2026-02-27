@@ -43,7 +43,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {isConcern ? <AlertTriangle size={14} color="var(--error)" /> : <Star size={14} color="var(--success)" />}
-            <span style={{ fontSize: '10pt', fontWeight: 700 }}>
+            <span style={{ fontSize: '13px', fontWeight: 700 }}>
               {isConcern ? 'Concern' : 'Highlight'}
             </span>
           </div>
@@ -54,7 +54,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
               border: '1px solid var(--border)',
               cursor: 'pointer',
               padding: '2px 6px',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}
           >
             ✕
@@ -67,8 +67,8 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
           borderBottom: '1px solid var(--border)',
           background: isConcern ? 'var(--upload-red-light)' : 'var(--upload-green-light)'
         }}>
-          <div style={{ fontSize: '10pt', fontWeight: 500, color: 'var(--text)' }}>{issue}</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{issue}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             From community discussion
           </div>
         </div>
@@ -76,7 +76,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
         {/* Actions for Concerns */}
         {isConcern && (
           <div style={{ padding: 'var(--space-3)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
               Solutions
             </div>
 
@@ -99,7 +99,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
               }}
             >
               <Search size={12} />
-              <span style={{ flex: 1, fontSize: '8pt' }}>Search Parts Pricing</span>
+              <span style={{ flex: 1, fontSize: '11px' }}>Search Parts Pricing</span>
               <ExternalLink size={10} color="var(--text-muted)" />
             </a>
 
@@ -122,7 +122,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
               }}
             >
               <MessageCircle size={12} />
-              <span style={{ flex: 1, fontSize: '8pt' }}>Forum Discussions</span>
+              <span style={{ flex: 1, fontSize: '11px' }}>Forum Discussions</span>
               <ExternalLink size={10} color="var(--text-muted)" />
             </a>
 
@@ -138,7 +138,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
                 cursor: 'pointer',
                 color: 'white',
                 width: '100%',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600
               }}
               onClick={() => alert('Repair network coming soon')}
@@ -147,7 +147,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
               <span>Get Repair Quote</span>
             </button>
 
-            <div style={{ marginTop: '8px', fontSize: '7pt', color: 'var(--text-disabled)', textAlign: 'center' }}>
+            <div style={{ marginTop: '8px', fontSize: '9px', color: 'var(--text-disabled)', textAlign: 'center' }}>
               Technician network coming soon
             </div>
           </div>
@@ -156,14 +156,14 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
         {/* Verification for Highlights */}
         {!isConcern && (
           <div style={{ padding: 'var(--space-3)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', color: 'var(--text)' }}>
               Verification
             </div>
             <div style={{
               padding: '8px',
               background: 'var(--surface)',
               border: '1px solid var(--border)',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--text-muted)'
             }}>
               Owner verification coming soon.
@@ -353,7 +353,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
       <div className="card">
         <div className="card-header">Community Insights</div>
         <div className="card-body">
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
             Loading community insights...
           </div>
         </div>
@@ -376,7 +376,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             <div style={{ textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
                 <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} color="var(--primary)" />
-                <span style={{ fontSize: '10pt', fontWeight: 600, color: 'var(--primary)' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>
                   Generating Insights...
                 </span>
               </div>
@@ -395,17 +395,17 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   borderRadius: '2px'
                 }} />
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Analyzing auction comments, forum discussions, and social media...
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '10pt' }}>
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '4px' }}>
                 <Sparkles size={14} color="var(--primary)" />
                 <span>No community insights available yet.</span>
               </div>
-              <div style={{ fontSize: '8pt', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', marginTop: '4px' }}>
                 Insights are generated from auction comments, forum discussions, and social media.
               </div>
               <div
@@ -430,7 +430,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
   return (
     <div className="space-y-3">
       {/* Header with source info */}
-      <div style={{ fontSize: '8pt', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ fontSize: '11px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>
           Based on {observationCount} observations from {sourceCategories.join(', ')}
         </span>
@@ -454,14 +454,14 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <MessageCircle size={14} />
-              <span style={{ fontWeight: 600, fontSize: '10pt' }}>Community Sentiment</span>
+              <span style={{ fontWeight: 600, fontSize: '13px' }}>Community Sentiment</span>
             </div>
             <div style={{
               background: getSentimentColor(sentimentData.overall_sentiment),
               color: 'white',
               padding: '2px 8px',
               borderRadius: '2px',
-              fontSize: '9pt',
+              fontSize: '12px',
               fontWeight: 600
             }}>
               {sentimentData.overall_sentiment.toUpperCase()}
@@ -471,7 +471,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
           <div style={{ padding: '12px' }}>
             {/* Sentiment Score Bar */}
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8pt', color: '#666', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#666', marginBottom: '4px' }}>
                 <span>Negative</span>
                 <span>Score: {(sentimentData.sentiment_score * 100).toFixed(0)}%</span>
                 <span>Positive</span>
@@ -508,7 +508,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {/* Themes - handles both string[] and {theme,frequency,sentiment}[] formats */}
             {sentimentData.themes && sentimentData.themes.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
                   Key Themes
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -524,7 +524,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                         border: '1px solid #e5e7eb',
                         padding: '4px 8px',
                         borderRadius: '2px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
@@ -551,7 +551,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {sentimentData.red_flags && sentimentData.red_flags.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 600,
                   marginBottom: '8px',
                   color: '#dc2626',
@@ -572,7 +572,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                     <div
                       key={i}
                       style={{
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         color: '#991b1b',
                         marginBottom: i < Math.min(sentimentData.red_flags.length, 5) - 1 ? '4px' : 0,
                         cursor: 'pointer',
@@ -588,7 +588,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       onClick={() => setSelectedIssue({ issue: flag, type: 'concern' })}
                     >
                       <span>• {flag}</span>
-                      <span style={{ fontSize: '7pt', color: '#b91c1c', opacity: 0.7 }}>Get Quote →</span>
+                      <span style={{ fontSize: '9px', color: '#b91c1c', opacity: 0.7 }}>Get Quote →</span>
                     </div>
                   ))}
                 </div>
@@ -599,7 +599,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {sentimentData.highlights && sentimentData.highlights.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 600,
                   marginBottom: '8px',
                   color: '#16a34a',
@@ -620,7 +620,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                     <div
                       key={i}
                       style={{
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         color: '#166534',
                         marginBottom: i < Math.min(sentimentData.highlights.length, 5) - 1 ? '4px' : 0,
                         cursor: 'pointer',
@@ -636,7 +636,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       onClick={() => setSelectedIssue({ issue: highlight, type: 'highlight' })}
                     >
                       <span>✓ {highlight}</span>
-                      <span style={{ fontSize: '7pt', color: '#15803d', opacity: 0.7 }}>Verify →</span>
+                      <span style={{ fontSize: '9px', color: '#15803d', opacity: 0.7 }}>Verify →</span>
                     </div>
                   ))}
                 </div>
@@ -647,7 +647,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {sentimentData.notable_quotes && sentimentData.notable_quotes.length > 0 && (
               <div>
                 <div style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 600,
                   marginBottom: '8px',
                   color: '#374151',
@@ -664,7 +664,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       background: '#f9fafb',
                       borderLeft: '3px solid #3b82f6',
                       padding: '8px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       color: '#4b5563',
                       fontStyle: 'italic'
                     }}>
@@ -680,7 +680,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
               marginTop: '12px',
               paddingTop: '12px',
               borderTop: '1px solid #e5e7eb',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: '#9ca3af',
               textAlign: 'right'
             }}>
@@ -713,7 +713,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <TrendingUp size={14} />
-              <span style={{ fontWeight: 600, fontSize: '10pt' }}>Market Signals</span>
+              <span style={{ fontWeight: 600, fontSize: '13px' }}>Market Signals</span>
             </div>
             <div style={{
               background: marketData.market_trend === 'rising' ? '#16a34a' :
@@ -721,7 +721,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
               color: 'white',
               padding: '2px 8px',
               borderRadius: '2px',
-              fontSize: '9pt',
+              fontSize: '12px',
               fontWeight: 600
             }}>
               {getTrendLabel(marketData.market_trend)}
@@ -733,7 +733,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {marketData.price_mentions && marketData.price_mentions.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 600,
                   marginBottom: '8px',
                   color: '#374151',
@@ -751,12 +751,12 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       border: '1px solid #bae6fd',
                       borderRadius: '2px',
                       padding: '6px 10px',
-                      fontSize: '8pt'
+                      fontSize: '11px'
                     }}>
                       <div style={{ fontWeight: 'bold', fontFamily: 'monospace', color: '#0369a1' }}>
                         {formatCurrency(mention.amount)}
                       </div>
-                      <div style={{ color: '#64748b', fontSize: '7pt' }}>
+                      <div style={{ color: '#64748b', fontSize: '9px' }}>
                         {mention.source_type}
                       </div>
                     </div>
@@ -768,7 +768,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {/* Value Factors */}
             {marketData.value_factors && marketData.value_factors.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
                   Value Factors
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -783,7 +783,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       border: `1px solid ${factor.impact === 'positive' ? '#bbf7d0' :
                               factor.impact === 'negative' ? '#fecaca' : '#e5e7eb'}`,
                       borderRadius: '2px',
-                      fontSize: '8pt'
+                      fontSize: '11px'
                     }}>
                       <span style={{
                         color: factor.impact === 'positive' ? '#166534' :
@@ -806,7 +806,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {/* Demand Indicators */}
             {marketData.demand_indicators && marketData.demand_indicators.length > 0 && (
               <div>
-                <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
                   Demand Indicators
                 </div>
                 <div style={{
@@ -817,7 +817,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                 }}>
                   {marketData.demand_indicators.slice(0, 4).map((indicator, i) => (
                     <div key={i} style={{
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       color: '#4b5563',
                       marginBottom: i < Math.min(marketData.demand_indicators.length, 4) - 1 ? '4px' : 0
                     }}>
@@ -833,7 +833,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
               marginTop: '12px',
               paddingTop: '12px',
               borderTop: '1px solid #e5e7eb',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: '#9ca3af',
               textAlign: 'right'
             }}>

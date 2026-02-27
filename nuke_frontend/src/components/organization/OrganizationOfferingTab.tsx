@@ -202,55 +202,55 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
 
   const markdownComponents = {
     h1: ({ children }: { children?: React.ReactNode }) => (
-      <h1 style={{ fontSize: '16pt', fontWeight: 'bold', borderBottom: '2px solid var(--border-medium)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-6)' }}>{children}</h1>
+      <h1 style={{ fontSize: '21px', fontWeight: 'bold', borderBottom: '2px solid var(--border-medium)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)', marginTop: 'var(--space-6)' }}>{children}</h1>
     ),
     h2: ({ children }: { children?: React.ReactNode }) => (
-      <h2 style={{ fontSize: '13pt', fontWeight: 'bold', borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-3)', marginTop: 'var(--space-6)' }}>{children}</h2>
+      <h2 style={{ fontSize: '17px', fontWeight: 'bold', borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-3)', marginTop: 'var(--space-6)' }}>{children}</h2>
     ),
     h3: ({ children }: { children?: React.ReactNode }) => (
-      <h3 style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: 'var(--space-2)', marginTop: 'var(--space-4)' }}>{children}</h3>
+      <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: 'var(--space-2)', marginTop: 'var(--space-4)' }}>{children}</h3>
     ),
     p: ({ children }: { children?: React.ReactNode }) => (
-      <p style={{ fontSize: '9pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>{children}</p>
+      <p style={{ fontSize: '12px', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>{children}</p>
     ),
     ul: ({ children }: { children?: React.ReactNode }) => (
-      <ul style={{ fontSize: '9pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ul>
+      <ul style={{ fontSize: '12px', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ul>
     ),
     ol: ({ children }: { children?: React.ReactNode }) => (
-      <ol style={{ fontSize: '9pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ol>
+      <ol style={{ fontSize: '12px', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>{children}</ol>
     ),
     li: ({ children }: { children?: React.ReactNode }) => (
       <li style={{ marginBottom: 'var(--space-1)' }}>{children}</li>
     ),
     table: ({ children }: { children?: React.ReactNode }) => (
       <div style={{ overflowX: 'auto', marginBottom: 'var(--space-4)' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '8pt' }}>{children}</table>
+        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '11px' }}>{children}</table>
       </div>
     ),
     thead: ({ children }: { children?: React.ReactNode }) => (
       <thead style={{ background: 'var(--grey-100)' }}>{children}</thead>
     ),
     th: ({ children }: { children?: React.ReactNode }) => (
-      <th style={{ border: '1px solid var(--border-medium)', padding: '6px 10px', textAlign: 'left', fontWeight: 'bold', fontSize: '8pt' }}>{children}</th>
+      <th style={{ border: '1px solid var(--border-medium)', padding: '6px 10px', textAlign: 'left', fontWeight: 'bold', fontSize: '11px' }}>{children}</th>
     ),
     td: ({ children }: { children?: React.ReactNode }) => (
-      <td style={{ border: '1px solid var(--border-light)', padding: '5px 10px', fontSize: '8pt' }}>{children}</td>
+      <td style={{ border: '1px solid var(--border-light)', padding: '5px 10px', fontSize: '11px' }}>{children}</td>
     ),
     code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
       if (className?.includes('language-')) {
         return (
-          <pre style={{ background: 'var(--grey-100)', border: '1px solid var(--border-light)', padding: 'var(--space-4)', fontSize: '8pt', fontFamily: "'SF Mono', monospace", overflowX: 'auto', lineHeight: '1.5', marginBottom: 'var(--space-4)' }}>
+          <pre style={{ background: 'var(--grey-100)', border: '1px solid var(--border-light)', padding: 'var(--space-4)', fontSize: '11px', fontFamily: "'SF Mono', monospace", overflowX: 'auto', lineHeight: '1.5', marginBottom: 'var(--space-4)' }}>
             <code>{children}</code>
           </pre>
         );
       }
       return (
-        <code style={{ background: 'var(--grey-100)', padding: '1px 4px', fontSize: '8pt', fontFamily: "'SF Mono', monospace", border: '1px solid var(--border-light)' }}>{children}</code>
+        <code style={{ background: 'var(--grey-100)', padding: '1px 4px', fontSize: '11px', fontFamily: "'SF Mono', monospace", border: '1px solid var(--border-light)' }}>{children}</code>
       );
     },
     pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
     blockquote: ({ children }: { children?: React.ReactNode }) => (
-      <blockquote style={{ borderLeft: '3px solid var(--border-medium)', paddingLeft: 'var(--space-4)', margin: 'var(--space-3) 0', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '9pt' }}>{children}</blockquote>
+      <blockquote style={{ borderLeft: '3px solid var(--border-medium)', paddingLeft: 'var(--space-4)', margin: 'var(--space-3) 0', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '12px' }}>{children}</blockquote>
     ),
     hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: 'var(--space-6) 0' }} />,
     strong: ({ children }: { children?: React.ReactNode }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,
@@ -278,7 +278,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
               border: activeDoc === key ? '2px solid var(--border-medium)' : '1px solid var(--border-light)',
               borderBottom: activeDoc === key ? '2px solid var(--white)' : 'none',
               marginBottom: activeDoc === key ? '-2px' : '0',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: activeDoc === key ? 'bold' : 'normal',
               cursor: 'pointer',
               fontFamily: 'var(--font-family)',
@@ -286,7 +286,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
             }}
           >
             {d.title}
-            <span style={{ fontSize: '7pt', color: 'var(--text-disabled)', marginLeft: '6px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-disabled)', marginLeft: '6px' }}>
               {d.pages}
             </span>
           </button>
@@ -301,7 +301,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
               background: '#1a1a1a',
               color: '#fff',
               border: '1px solid var(--border-medium)',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 'bold',
               letterSpacing: '1px',
               textTransform: 'uppercase',
@@ -322,7 +322,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
         minHeight: '600px',
       }}>
         <div style={{
-          fontSize: '7pt',
+          fontSize: '9px',
           color: 'var(--text-disabled)',
           borderBottom: '1px solid var(--border-light)',
           paddingBottom: 'var(--space-2)',
@@ -354,7 +354,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
           borderTop: '1px solid var(--border-light)',
           paddingTop: 'var(--space-4)',
           marginTop: 'var(--space-8)',
-          fontSize: '7pt',
+          fontSize: '9px',
           color: 'var(--text-disabled)',
           textAlign: 'center',
           lineHeight: '1.6',

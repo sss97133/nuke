@@ -63,14 +63,14 @@ export const MyVehiclesZone: React.FC<MyVehiclesZoneProps> = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 700,
             color: 'var(--text)'
           }}>
             MY VEHICLES
           </span>
           <span style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)',
             background: 'var(--surface-hover)',
             padding: '2px 6px',
@@ -88,7 +88,7 @@ export const MyVehiclesZone: React.FC<MyVehiclesZoneProps> = ({
             }}
             style={{
               padding: '4px 8px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 600,
               background: 'var(--primary)',
               color: 'white',
@@ -100,7 +100,7 @@ export const MyVehiclesZone: React.FC<MyVehiclesZoneProps> = ({
             + ADD
           </button>
           <span style={{
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-muted)',
             width: '50px',
             textAlign: 'right'

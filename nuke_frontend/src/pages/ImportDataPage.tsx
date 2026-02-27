@@ -244,7 +244,7 @@ export default function ImportDataPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', paddingTop: '100px' }}>
-          <p style={{ fontSize: '10pt', color: 'var(--text-muted)' }}>Loading...</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading...</p>
         </div>
       </div>
     );
@@ -259,10 +259,10 @@ export default function ImportDataPage() {
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '14pt', marginBottom: '8px', color: 'var(--text)' }}>
+          <h1 style={{ fontSize: '19px', marginBottom: '8px', color: 'var(--text)' }}>
             Import Data
           </h1>
-          <p style={{ fontSize: '10pt', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
             Drop files or paste URLs to import vehicle data. Supports images, spreadsheets, PDFs, and web links.
           </p>
         </div>
@@ -276,7 +276,7 @@ export default function ImportDataPage() {
               color: activeTab === 'files' ? 'var(--bg)' : 'var(--text)',
               border: '1px solid var(--border)',
               padding: '8px 16px',
-              fontSize: '10pt',
+              fontSize: '13px',
               cursor: 'pointer',
             }}
           >
@@ -289,7 +289,7 @@ export default function ImportDataPage() {
               color: activeTab === 'url' ? 'var(--bg)' : 'var(--text)',
               border: '1px solid var(--border)',
               padding: '8px 16px',
-              fontSize: '10pt',
+              fontSize: '13px',
               cursor: 'pointer',
             }}
           >
@@ -303,7 +303,7 @@ export default function ImportDataPage() {
                 color: activeTab === 'results' ? 'var(--bg)' : 'var(--text)',
                 border: '1px solid var(--border)',
                 padding: '8px 16px',
-                fontSize: '10pt',
+                fontSize: '13px',
                 cursor: 'pointer',
               }}
             >
@@ -334,10 +334,10 @@ export default function ImportDataPage() {
               <div style={{ fontSize: '24px', marginBottom: '12px' }}>
                 {isDragging ? '[ DROP HERE ]' : '[ + ]'}
               </div>
-              <div style={{ fontSize: '10pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Drop files here or click to browse
               </div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 Images, PDFs, CSV, XLSX, Numbers files supported
               </div>
               <input
@@ -354,7 +354,7 @@ export default function ImportDataPage() {
             {uploads.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '10pt', color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                     {uploads.length} file(s) selected
                   </span>
                   <button
@@ -365,7 +365,7 @@ export default function ImportDataPage() {
                       color: 'var(--bg)',
                       border: 'none',
                       padding: '8px 16px',
-                      fontSize: '10pt',
+                      fontSize: '13px',
                       cursor: 'pointer',
                       opacity: uploads.some(u => u.status === 'pending') ? 1 : 0.5,
                     }}
@@ -402,7 +402,7 @@ export default function ImportDataPage() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           background: 'var(--bg)',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           fontFamily: 'monospace',
                           color: 'var(--accent)',
                         }}>
@@ -413,7 +413,7 @@ export default function ImportDataPage() {
                       {/* File Info */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontSize: '10pt',
+                          fontSize: '13px',
                           color: 'var(--text)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -421,13 +421,13 @@ export default function ImportDataPage() {
                         }}>
                           {upload.file.name}
                         </div>
-                        <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                           {formatFileSize(upload.file.size)}
                         </div>
                       </div>
 
                       {/* Status */}
-                      <div style={{ fontSize: '9pt', textAlign: 'right' }}>
+                      <div style={{ fontSize: '12px', textAlign: 'right' }}>
                         {upload.status === 'pending' && (
                           <span style={{ color: 'var(--text-muted)' }}>Pending</span>
                         )}
@@ -458,7 +458,7 @@ export default function ImportDataPage() {
                           color: 'var(--text-muted)',
                           cursor: 'pointer',
                           padding: '4px',
-                          fontSize: '14pt',
+                          fontSize: '19px',
                         }}
                       >
                         x
@@ -475,7 +475,7 @@ export default function ImportDataPage() {
         {activeTab === 'url' && (
           <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', padding: '24px' }}>
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '10pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Paste a URL to extract vehicle data
               </label>
               <input
@@ -486,14 +486,14 @@ export default function ImportDataPage() {
                 style={{
                   width: '100%',
                   padding: '12px',
-                  fontSize: '10pt',
+                  fontSize: '13px',
                   background: 'var(--bg)',
                   border: '1px solid var(--border)',
                   color: 'var(--text)',
                 }}
               />
             </div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Supported: Bring a Trailer, Cars & Bids, Hagerty, Craigslist, eBay, and many more
             </div>
             <button
@@ -504,7 +504,7 @@ export default function ImportDataPage() {
                 color: 'var(--bg)',
                 border: 'none',
                 padding: '12px 24px',
-                fontSize: '10pt',
+                fontSize: '13px',
                 cursor: 'pointer',
                 opacity: urlProcessing || !urlInput.trim() ? 0.5 : 1,
               }}
@@ -517,7 +517,7 @@ export default function ImportDataPage() {
         {/* Results Tab */}
         {activeTab === 'results' && extractedVehicles.length > 0 && (
           <div>
-            <div style={{ marginBottom: '16px', fontSize: '10pt', color: 'var(--text-muted)' }}>
+            <div style={{ marginBottom: '16px', fontSize: '13px', color: 'var(--text-muted)' }}>
               Review extracted vehicles and create profiles
             </div>
 
@@ -533,10 +533,10 @@ export default function ImportDataPage() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
                         {vehicle.year} {vehicle.make} {vehicle.model}
                       </div>
-                      <div style={{ fontSize: '10pt', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                      <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                         {vehicle.vin && <span>VIN: {vehicle.vin}</span>}
                         {vehicle.mileage && <span>{vehicle.mileage.toLocaleString()} miles</span>}
                         {vehicle.price && <span>${vehicle.price.toLocaleString()}</span>}
@@ -551,7 +551,7 @@ export default function ImportDataPage() {
                           color: 'var(--bg)',
                           border: 'none',
                           padding: '8px 16px',
-                          fontSize: '10pt',
+                          fontSize: '13px',
                           cursor: 'pointer',
                         }}
                       >
@@ -564,7 +564,7 @@ export default function ImportDataPage() {
                           color: 'var(--text-muted)',
                           border: '1px solid var(--border)',
                           padding: '8px 16px',
-                          fontSize: '10pt',
+                          fontSize: '13px',
                           cursor: 'pointer',
                         }}
                       >
@@ -584,7 +584,7 @@ export default function ImportDataPage() {
           padding: '16px',
           background: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          fontSize: '9pt',
+          fontSize: '12px',
           color: 'var(--text-muted)',
         }}>
           <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Supported file types:</div>

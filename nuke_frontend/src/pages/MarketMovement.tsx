@@ -6,12 +6,12 @@ const MarketMovement: React.FC = () => {
 
   return (
     <div style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '16pt', fontWeight: 700, marginBottom: '16px' }}>Market Movement</h1>
+      <h1 style={{ fontSize: '21px', fontWeight: 700, marginBottom: '16px' }}>Market Movement</h1>
       <div style={{
         background: 'var(--white)',
         border: '1px solid var(--border)',
         padding: '16px',
-        fontSize: '9pt'
+        fontSize: '12px'
       }}>
         <p style={{ color: 'var(--text-muted)', marginBottom: '12px' }}>
           This page is under construction. Market movement analytics and trends will be displayed here.

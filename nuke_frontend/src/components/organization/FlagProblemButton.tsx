@@ -80,7 +80,7 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
         onClick={() => handleUnflag()}
         className="button button-secondary"
         style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           padding: '4px 8px',
           background: 'var(--warning-dim)',
           border: '1px solid var(--warning)',
@@ -101,7 +101,7 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
         aria-haspopup="menu"
         aria-expanded={showMenu}
         style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           padding: '4px 8px',
           whiteSpace: 'nowrap'
         }}
@@ -147,7 +147,7 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleFlag(flag.value); } }}
                 style={{
                   padding: '10px 12px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   cursor: 'pointer',
                   borderBottom: '1px solid var(--border-light)'
                 }}
@@ -157,7 +157,7 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
                 <div style={{ fontWeight: 700, marginBottom: '2px' }}>
                   {flag.label}
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {flag.description}
                 </div>
               </div>

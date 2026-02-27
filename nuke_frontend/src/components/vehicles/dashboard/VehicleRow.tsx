@@ -119,7 +119,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
       {/* Vehicle Title */}
       <div style={{ flex: '1 1 200px', minWidth: '150px' }}>
         <div style={{
-          fontSize: '9pt',
+          fontSize: '12px',
           fontWeight: 600,
           color: 'var(--text)',
           whiteSpace: 'nowrap',
@@ -129,7 +129,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
           {vehicleTitle}
         </div>
         <div style={{
-          fontSize: '7pt',
+          fontSize: '9px',
           color: 'var(--text-muted)',
           marginTop: '2px'
         }}>
@@ -143,7 +143,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
           flex: '0 0 auto',
           display: 'flex',
           gap: '12px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-muted)',
           fontFamily: 'monospace'
         }}>
@@ -180,7 +180,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
           title="Edit Vehicle"
           style={{
             padding: '4px 8px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 600,
             background: 'var(--surface-hover)',
             border: '1px solid var(--border)',
@@ -197,7 +197,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
           title="Log Work"
           style={{
             padding: '4px 8px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 600,
             background: 'var(--surface-hover)',
             border: '1px solid var(--border)',
@@ -214,7 +214,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
           title="Upload Images"
           style={{
             padding: '4px 8px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 600,
             background: 'var(--surface-hover)',
             border: '1px solid var(--border)',

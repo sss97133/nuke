@@ -49,11 +49,11 @@ export const MemelordPanel: React.FC<{ userId: string }> = ({ userId }) => {
     <div className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>Meme Library Activity</div>
-        <div style={{ fontSize: '8pt', color: '#6b7280' }}>
+        <div style={{ fontSize: '11px', color: '#6b7280' }}>
           Total: {stats.total} · Spent: ${((stats.spentCents || 0) / 100).toFixed(2)}
         </div>
       </div>
-      <div className="card-body" style={{ fontSize: '9pt' }}>
+      <div className="card-body" style={{ fontSize: '12px' }}>
         {loading && <div className="text text-muted">Loading…</div>}
         {error && <div style={{ color: '#b91c1c' }}>{error}</div>}
         {!loading && !error && events.length === 0 && (

@@ -144,7 +144,7 @@ export const MiniLineChart: React.FC<MiniLineChartProps> = ({
 
   if (!series.length) {
     return (
-      <div style={{ width, height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '8pt', ...style }}>
+      <div style={{ width, height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '11px', ...style }}>
         No data
       </div>
     );
@@ -220,7 +220,7 @@ export const MiniLineChart: React.FC<MiniLineChartProps> = ({
             color: 'var(--white)',
             padding: '2px 6px',
             borderRadius: 4,
-            fontSize: '7pt',
+            fontSize: '9px',
             fontFamily: 'monospace',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
@@ -235,7 +235,7 @@ export const MiniLineChart: React.FC<MiniLineChartProps> = ({
       {showLegend && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
           {series.map(s => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '7pt' }}>
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px' }}>
               <div style={{ width: 12, height: 2, background: s.color }} />
               <span style={{ color: 'var(--text-muted)' }}>{s.label}</span>
               {showTrendArrow && trends[s.id] && (

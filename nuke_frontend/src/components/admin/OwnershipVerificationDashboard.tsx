@@ -231,7 +231,7 @@ const OwnershipVerificationDashboard = () => {
         margin: '16px',
         fontFamily: 'Arial, sans-serif',
         textAlign: 'center',
-        fontSize: '8pt'
+        fontSize: '11px'
       }}>
         Please log in to access the admin dashboard.
       </div>
@@ -247,7 +247,7 @@ const OwnershipVerificationDashboard = () => {
         margin: '16px',
         fontFamily: 'Arial, sans-serif',
         textAlign: 'center',
-        fontSize: '8pt',
+        fontSize: '11px',
         color: '#721c24'
       }}>
         Access denied. Admin privileges required.
@@ -276,7 +276,7 @@ const OwnershipVerificationDashboard = () => {
               onClick={() => setFilter(status)}
               style={{
                 padding: '4px 8px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid #bdbdbd',
                 background: filter === status ? '#424242' : '#f5f5f5',
                 color: filter === status ? 'white' : '#424242',
@@ -298,7 +298,7 @@ const OwnershipVerificationDashboard = () => {
           border: '1px solid #b8daff',
           padding: '12px',
           textAlign: 'center',
-          fontSize: '8pt',
+          fontSize: '11px',
           marginBottom: '12px'
         }}>
           Loading verifications...
@@ -316,7 +316,7 @@ const OwnershipVerificationDashboard = () => {
           <div style={{
             padding: '24px',
             textAlign: 'center',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#757575'
           }}>
             No {filter === 'all' ? '' : filter + ' '}verifications found
@@ -334,26 +334,26 @@ const OwnershipVerificationDashboard = () => {
               onClick={() => setSelectedVerification(verification)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold' }}>
                   {verification.profiles?.full_name || 'Unknown User'}
                 </div>
                 <div style={{
                   background: getStatusColor(verification.status),
                   color: 'white',
                   padding: '2px 6px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 'bold'
                 }}>
                   {getStatusIcon(verification.status)} {verification.status.toUpperCase()}
                 </div>
               </div>
 
-              <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                 <strong>Vehicle:</strong> {verification.vehicle?.year} {verification.vehicle?.make} {verification.vehicle?.model}
                 {verification.vehicle?.vin && <span> (VIN: {verification.vehicle.vin})</span>}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', color: '#757575' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#757575' }}>
                 <div>Type: {verification.verification_type}</div>
                 <div>Submitted: {formatDate(verification.created_at)}</div>
               </div>
@@ -396,7 +396,7 @@ const OwnershipVerificationDashboard = () => {
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <span style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold' }}>
                 Ownership Verification Details
               </span>
               <button
@@ -404,7 +404,7 @@ const OwnershipVerificationDashboard = () => {
                 style={{
                   background: 'none',
                   border: 'none',
-                  fontSize: '12pt',
+                  fontSize: '16px',
                   cursor: 'pointer'
                 }}
               >
@@ -416,20 +416,20 @@ const OwnershipVerificationDashboard = () => {
             <div style={{ padding: '16px' }}>
               {/* User & Vehicle Info */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' }}>
                   User Information
                 </div>
-                <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                   <strong>Name:</strong> {selectedVerification.profiles?.full_name}
                 </div>
-                <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                   <strong>Email:</strong> {selectedVerification.profiles?.email}
                 </div>
-                <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                   <strong>Vehicle:</strong> {selectedVerification.vehicle?.year} {selectedVerification.vehicle?.make} {selectedVerification.vehicle?.model}
                 </div>
                 {selectedVerification.vehicle?.vin && (
-                  <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                     <strong>VIN:</strong> {selectedVerification.vehicle.vin}
                   </div>
                 )}
@@ -437,19 +437,19 @@ const OwnershipVerificationDashboard = () => {
 
               {/* Verification Details */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' }}>
                   Verification Details
                 </div>
-                <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                   <strong>Type:</strong> {selectedVerification.verification_type}
                 </div>
-                <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                   <strong>Status:</strong> {selectedVerification.status}
                 </div>
-                <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                   <strong>Submitted:</strong> {formatDate(selectedVerification.created_at)}
                 </div>
-                <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                   <strong>Documents:</strong> {selectedVerification.documents?.length || 0} files
                 </div>
               </div>
@@ -466,7 +466,7 @@ const OwnershipVerificationDashboard = () => {
                       border: '1px solid #bdbdbd',
                       borderRadius: '0px',
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
                   >
@@ -481,7 +481,7 @@ const OwnershipVerificationDashboard = () => {
                       border: '1px solid #bdbdbd',
                       borderRadius: '0px',
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
                   >
@@ -496,7 +496,7 @@ const OwnershipVerificationDashboard = () => {
                       border: '1px solid #bdbdbd',
                       borderRadius: '0px',
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
                   >
@@ -516,7 +516,7 @@ const OwnershipVerificationDashboard = () => {
                       border: '1px solid #bdbdbd',
                       borderRadius: '0px',
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
                   >
@@ -531,7 +531,7 @@ const OwnershipVerificationDashboard = () => {
                       border: '1px solid #bdbdbd',
                       borderRadius: '0px',
                       padding: '6px 12px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
                   >

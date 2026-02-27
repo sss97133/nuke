@@ -90,7 +90,7 @@ export default function VehicleMemeOverlay({
             )}
             <div style={{ 
               marginTop: '4px',
-              fontSize: '8pt', 
+              fontSize: '11px', 
               color: 'var(--text-muted)',
               textAlign: 'center',
             }}>

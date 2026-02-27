@@ -86,7 +86,7 @@ const MessageList: React.FC<MessageListProps> = ({
       <div className="p-8 text-center">
         <div className="text-gray-400">
           <Clock className="w-8 h-8 mx-auto mb-3 text-gray-300" />
-          <p className="text-gray-500" style={{ fontSize: '8pt' }}>No messages in this mailbox yet.</p>
+          <p className="text-gray-500" style={{ fontSize: '11px' }}>No messages in this mailbox yet.</p>
         </div>
       </div>
     )
@@ -103,7 +103,7 @@ const MessageList: React.FC<MessageListProps> = ({
             className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors border-l-2 ${getPriorityColor(
               message.priority
             )} ${!read ? 'bg-gray-100 font-semibold' : 'bg-white'}`}
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
           >
             {/* Checkbox area */}
             <div className="flex-shrink-0">
@@ -126,7 +126,7 @@ const MessageList: React.FC<MessageListProps> = ({
 
             {/* Sender */}
             <div className="flex-shrink-0 w-32">
-              <div className={`${!read ? 'text-gray-900 font-semibold' : 'text-gray-700'}`} style={{ fontSize: '8pt' }}>
+              <div className={`${!read ? 'text-gray-900 font-semibold' : 'text-gray-700'}`} style={{ fontSize: '11px' }}>
                 {getSenderName(message)}
               </div>
             </div>
@@ -134,25 +134,25 @@ const MessageList: React.FC<MessageListProps> = ({
             {/* Subject and snippet */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className={`truncate ${!read ? 'text-gray-900 font-semibold' : 'text-gray-700'}`} style={{ fontSize: '8pt' }}>
+                <span className={`truncate ${!read ? 'text-gray-900 font-semibold' : 'text-gray-700'}`} style={{ fontSize: '11px' }}>
                   {message.title}
                 </span>
                 {!read && (
                   <span className="w-1.5 h-1.5 bg-gray-900 rounded-full flex-shrink-0"></span>
                 )}
                 {message.priority === 'urgent' && (
-                  <span className="bg-red-100 text-red-800 px-1 py-0.5 rounded font-semibold flex-shrink-0" style={{ fontSize: '7pt' }}>
+                  <span className="bg-red-100 text-red-800 px-1 py-0.5 rounded font-semibold flex-shrink-0" style={{ fontSize: '9px' }}>
                     URGENT
                   </span>
                 )}
               </div>
-              <div className="text-gray-500 truncate mt-0.5" style={{ fontSize: '8pt' }}>
+              <div className="text-gray-500 truncate mt-0.5" style={{ fontSize: '11px' }}>
                 {getSnippet(message.content)}
               </div>
             </div>
 
             {/* Date */}
-            <div className="flex-shrink-0 text-gray-500 w-20 text-right" style={{ fontSize: '8pt' }}>
+            <div className="flex-shrink-0 text-gray-500 w-20 text-right" style={{ fontSize: '11px' }}>
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </div>
 

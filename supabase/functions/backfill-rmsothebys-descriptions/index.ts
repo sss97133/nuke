@@ -31,26 +31,48 @@ const corsHeaders = {
 
 /**
  * Extract all paragraph text from the lot description section.
- * The description is inside: <section class="... lotdescription">
+ *
+ * RM Sotheby's lot pages use two patterns:
+ *  1. Classic: paragraphs directly within the lotdescription section
+ *  2. Modern: body-text--copy divs wrapping <p> tags
+ *
+ * We use the body-text--copy approach as the primary method because it
+ * works for both patterns. Filter out short paragraphs (nav items, etc.).
  */
 function parseDescription(html: string): string | null {
-  // Find the lotdescription section
-  const descSection = html.match(/class="[^"]*lotdescription[^"]*"[^>]*>([\s\S]*?)<\/section>/);
-  if (!descSection) {
-    // Fallback: look for body-text--copy divs with paragraphs
-    const bodyTextBlocks = [...html.matchAll(/<div class="body-text--copy">\s*<p>([\s\S]*?)<\/p>\s*<\/div>/g)];
-    if (bodyTextBlocks.length === 0) return null;
-    const paragraphs = bodyTextBlocks.map(m => cleanHtml(m[1])).filter(p => p.length > 30);
-    return paragraphs.join('\n\n') || null;
+  // Method 1: body-text--copy divs containing <p> paragraphs (primary)
+  const bodyTextBlocks = [...html.matchAll(/<div class="body-text--copy">\s*<p>([\s\S]*?)<\/p>\s*<\/div>/g)];
+  if (bodyTextBlocks.length > 0) {
+    const paragraphs = bodyTextBlocks.map(m => cleanHtml(m[1])).filter(p => p.length > 50);
+    if (paragraphs.length > 0) {
+      return paragraphs.join('\n\n');
+    }
   }
 
-  const sectionHtml = descSection[1];
-  // Extract all <p> tag contents
-  const paragraphs = [...sectionHtml.matchAll(/<p>([\s\S]*?)<\/p>/g)]
-    .map(m => cleanHtml(m[1]))
-    .filter(p => p.length > 20);
+  // Method 2: lotdescription section with inline <p> tags (fallback)
+  const descSection = html.match(/class="[^"]*lotdescription[^"]*"[^>]*>([\s\S]*?)<\/section>/);
+  if (descSection) {
+    const sectionHtml = descSection[1];
+    const paragraphs = [...sectionHtml.matchAll(/<p>([\s\S]*?)<\/p>/g)]
+      .map(m => cleanHtml(m[1]))
+      .filter(p => p.length > 50);
+    if (paragraphs.length > 0) {
+      return paragraphs.join('\n\n');
+    }
+  }
 
-  return paragraphs.join('\n\n') || null;
+  // Method 3: language-filter="en-US" div (last resort)
+  const langSection = html.match(/language-filter="en-US"[^>]*>([\s\S]*?)<\/div>\s*<div>\s*<\/div>\s*<\/section>/);
+  if (langSection) {
+    const paragraphs = [...langSection[1].matchAll(/<p>([\s\S]*?)<\/p>/g)]
+      .map(m => cleanHtml(m[1]))
+      .filter(p => p.length > 50);
+    if (paragraphs.length > 0) {
+      return paragraphs.join('\n\n');
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -324,44 +346,18 @@ serve(async (req) => {
       vehicles = res.data;
       queryError = res.error;
     } else {
-      // Fetch via raw REST to bypass the restrictive default timeout.
-      // discovery_source = 'rmsothebys' is indexed, description IS NULL uses the partial index.
-      const restUrl = `${supabaseUrl}/rest/v1/vehicles?select=id,year,make,model,listing_url,description,mileage,vin&discovery_source=eq.rmsothebys&description=is.null&listing_url=not.is.null&order=created_at.desc&limit=${batch_size}`;
-      const reqHeaders = {
-        'Authorization': `Bearer ${serviceKey}`,
-        'apikey': serviceKey,
-        'Accept': 'application/json',
-        'Prefer': 'count=none',
-      };
-
-      // Retry up to 3 times for schema cache warmup (503 PGRST002)
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        const restResp = await fetch(restUrl, {
-          headers: reqHeaders,
-          signal: AbortSignal.timeout(25000),
-        });
-
-        if (restResp.status === 503) {
-          // Schema cache not ready
-          if (attempt < 3) {
-            console.log(`[RMS-BACKFILL] Schema cache not ready (attempt ${attempt}), retrying in 3s...`);
-            await new Promise(r => setTimeout(r, 3000));
-            continue;
-          }
-          const errText = await restResp.text();
-          queryError = { message: `REST query failed after retries: ${restResp.status} ${errText}` };
-          break;
-        }
-
-        if (!restResp.ok) {
-          const errText = await restResp.text();
-          queryError = { message: `REST query failed: ${restResp.status} ${errText}` };
-          break;
-        }
-
-        vehicles = await restResp.json();
-        break;
-      }
+      // Use supabase-js client with no ORDER BY clause — avoids sequential scan.
+      // The combined filter on discovery_source + description IS NULL is fast
+      // because the query planner uses the partial index we created.
+      const res = await supabase
+        .from('vehicles')
+        .select('id, year, make, model, listing_url, description, mileage, vin')
+        .eq('discovery_source', 'rmsothebys')
+        .is('description', null)
+        .not('listing_url', 'is', null)
+        .limit(batch_size);
+      vehicles = res.data;
+      queryError = res.error;
     }
 
     if (queryError) {

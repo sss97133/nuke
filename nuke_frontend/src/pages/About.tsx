@@ -13,16 +13,16 @@ const About: React.FC = () => {
 
           {/* Executive Summary */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Executive Summary
             </h2>
-            <p style={{ fontSize: '10pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
+            <p style={{ fontSize: '13px', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
               <strong>Nuke</strong> is a vehicle identity platform that treats every Vehicle Identification Number (VIN) as a persistent digital entity. Our mission is to create canonical, verifiable records of vehicle history, condition, and value that transcend ownership changes—building the definitive digital identity for every vehicle.
             </p>
-            <p style={{ fontSize: '10pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
+            <p style={{ fontSize: '13px', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
               The platform serves three primary stakeholders:
             </p>
-            <ol style={{ fontSize: '10pt', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>
+            <ol style={{ fontSize: '13px', lineHeight: '1.7', marginLeft: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>
               <li><strong>Vehicle Enthusiasts/Owners:</strong> Documenting history, managing restoration, tracking value</li>
               <li><strong>Organizations/Dealers:</strong> Managing inventory, processing trade-ins, marketing vehicles</li>
               <li><strong>Marketplace Participants:</strong> Buyers and sellers requiring trusted, verified data</li>
@@ -31,14 +31,14 @@ const About: React.FC = () => {
 
           {/* Three-Layer Architecture */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Three-Layer Data Architecture
             </h2>
-            <p style={{ fontSize: '10pt', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
+            <p style={{ fontSize: '13px', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
               Every vehicle profile processes information through three distinct layers to ensure accuracy and context:
             </p>
             
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌─────────────────────────────────────────────────────────────────────────┐
 │                  THREE-LAYER DATA ARCHITECTURE                           │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -93,10 +93,10 @@ Example: "1974 K5 Blazers often have rust in frame locations X, Y, Z
 `}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)' }}>
               Data Flow Through Layers
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`USER UPLOADS IMAGE
         ↓
 ┌───────────────────────────────────┐
@@ -126,14 +126,14 @@ Example: "1974 K5 Blazers often have rust in frame locations X, Y, Z
 
           {/* Core System ERD */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Core Database Schema (ERD)
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Primary Entity: Vehicles
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌─────────────────────────────────────────────────────────────┐
 │ VEHICLES (Core Entity)                                       │
 ├─────────────────────────────────────────────────────────────┤
@@ -163,10 +163,10 @@ Example: "1974 K5 Blazers often have rust in frame locations X, Y, Z
 └────────┘└────────┘└──────────┘└────────┘└──────────┘└──────────┘`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Timeline Events (Central Ledger)
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌─────────────────────────────────────────────────────────────┐
 │ TIMELINE_EVENTS (Immutable Ledger)                          │
 ├─────────────────────────────────────────────────────────────┤
@@ -193,10 +193,10 @@ DUAL VALUE PRINCIPLE:
    2. User Contributions: "Who verified this?"`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Vehicle Images & AI Processing
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌─────────────────────────────────────────────────────────────┐
 │ VEHICLE_IMAGES                                              │
 ├─────────────────────────────────────────────────────────────┤
@@ -238,10 +238,10 @@ DUAL VALUE PRINCIPLE:
 └──────────┘└────────┘└────────────┘└───────────┘`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Organizations & Business Intelligence
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌─────────────────────────────────────────────────────────────┐
 │ BUSINESSES (Organizations)                                  │
 ├─────────────────────────────────────────────────────────────┤
@@ -282,14 +282,14 @@ Auto-tagging:
 
           {/* Image Processing Pipeline Map */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Image Processing Pipeline
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Context-Driven Tiered Processing Flow
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`IMAGE UPLOADED
     ↓
 EXTRACT EXIF DATA
@@ -359,10 +359,10 @@ AUTOMATED TAGS CREATED:
         └─ ai_detection_data (source attribution)`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Context Scoring System
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`CONTEXT SCORE CALCULATION:
 
 Available Context Sources:
@@ -410,14 +410,14 @@ VIRTUOUS CYCLE:
 
           {/* Data Extraction Flow Map */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Universal Data Ingestion System
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               AI Data Ingestion Flow
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`USER INPUT (Header Search Bar)
     │
     ├─ Text: "1974 Chevy Blazer"
@@ -477,10 +477,10 @@ EXECUTE DATABASE OPERATIONS
     └─ Navigate to Vehicle Profile`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Document Extraction Flow (Reference Library)
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`USER UPLOADS BROCHURE/MANUAL
     ↓
 ┌─────────────────────────────────────────┐
@@ -532,14 +532,14 @@ EXECUTE DATABASE OPERATIONS
 
           {/* Auction System Framework */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Auction Marketplace Framework
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Dual-Revenue Auction System
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`REVENUE STREAM 1: NUKE AUCTIONS (3-5% commission)
 ─────────────────────────────────────────────────────────────────────────
 Seller lists vehicle on NUKE platform
@@ -600,10 +600,10 @@ Vehicle sells on external platform
 User reports sale → NUKE earns 1-2% commission`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Bid Deposit Flow
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`BIDDER PLACES $50,000 BID
     ↓
 CHECK: Has payment method?
@@ -647,14 +647,14 @@ BENEFITS:
 
           {/* Organization System Framework */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Organization System & GPS Auto-Assignment
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               GPS-Based Auto-Assignment Flow
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`VEHICLE IMAGES UPLOADED WITH GPS COORDINATES
     ↓
 EXTRACT GPS FROM EXIF DATA
@@ -697,10 +697,10 @@ RECEIPT-BASED AUTO-ASSIGNMENT:
         └─ Confidence increases with each matching receipt`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Investment Intelligence System
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`FACILITY IMAGES UPLOADED
     ↓
 BATCH ANALYSIS (Edge Function: analyze-organization-images)
@@ -752,14 +752,14 @@ PUBLIC VISIBILITY
 
           {/* Financial System Framework */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Financial Infrastructure Framework
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Transaction System (Dual Value Principle)
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`ONE TRANSACTION ENTRY → SERVES TWO PURPOSES
     │
     ├─ VEHICLE TIMELINE
@@ -802,10 +802,10 @@ TOTAL COST OF OWNERSHIP (TCO) CALCULATION:
   Net Gain: $11,300`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Invoice & Payment System Flow
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`TIMELINE EVENT (Work Completed)
     ↓
 GENERATE INVOICE FROM EVENT
@@ -844,14 +844,14 @@ ONBOARDING HOOK (Optional)
 
           {/* Verification Framework */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Multi-Tier Verification System
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Verification Hierarchy (6 Tiers)
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`TIER 1: BASIC USER INPUT (1-5 points)
 ─────────────────────────────────────────────────────────────────────────
 Example: Engine Size Field
@@ -927,14 +927,14 @@ MULTI-SOURCE CONSENSUS:
 
           {/* Work Documentation Framework */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Work Documentation & Contribution System
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Contractor Contribution Flow
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`CONTRACTOR UPLOADS WORK IMAGES
     ↓
 EXTRACT EXIF DATA
@@ -997,14 +997,14 @@ VERIFIED CONTRIBUTION CREATES:
 
           {/* Valuation Framework */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Automated Valuation Intelligence Framework
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Vehicle Expert Agent Pipeline
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`STEP 1: RESEARCH VEHICLE & BECOME INSTANT EXPERT
 ─────────────────────────────────────────────────────────────────────────
   • Load vehicle Y/M/M/specs
@@ -1073,10 +1073,10 @@ STEP 4: GENERATE EXPERT VALUATION
     • Warnings: Undercarriage not fully documented`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Pricing Equation Engine
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`HUMAN-CONTROLLABLE PRICING EQUATIONS:
 
 STANDARD EQUATION (Default):
@@ -1128,14 +1128,14 @@ AUTOMATIC ADJUSTMENTS:
 
           {/* Personal Photo Library Framework */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Personal Photo Library System
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Inbox Zero Workflow
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`BULK UPLOAD 30,000 PHOTOS
     ↓
 PHOTOS STORED IN vehicle_images
@@ -1179,11 +1179,11 @@ SYSTEM FEATURES:
 
           {/* Technical Stack */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Technical Stack & Infrastructure
             </h2>
             
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`FRONTEND:
   • React 18 with Vite
   • TypeScript
@@ -1239,14 +1239,14 @@ DEPLOYMENT:
 
           {/* System Interconnection Map */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               System Interconnection Map
             </h2>
             
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Complete System Architecture
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌─────────────────────────────────────────────────────────────────────────────┐
 │                    NUKE PLATFORM SYSTEM ARCHITECTURE                        │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -1320,10 +1320,10 @@ INTELLIGENCE SYSTEMS:
 └──────────────┘     └──────────────┘     └──────────────┘`}
             </div>
 
-            <h3 style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
               Data Flow Between Systems
             </h3>
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`EXAMPLE: Complete Vehicle Sale Flow
 
 1. VEHICLE CREATED
@@ -1379,11 +1379,11 @@ ALL DATA FLOWS THROUGH TIMELINE_EVENTS AS CENTRAL LEDGER`}
 
           {/* Comprehensive ERD */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Complete Database ERD (Entity Relationship Diagram)
             </h2>
             
-            <div style={{ fontFamily: 'monospace', fontSize: '8pt', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌─────────────────────────────────────────────────────────────────────────────┐
 │                    COMPLETE DATABASE ERD                                     │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -1573,11 +1573,11 @@ SHIPPING SYSTEM:
 
           {/* System Statistics */}
           <section style={{ marginBottom: 'var(--space-6)' }}>
-            <h2 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 'bold', marginBottom: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
               Platform Statistics
             </h2>
             
-            <div style={{ fontSize: '10pt', lineHeight: '1.7' }}>
+            <div style={{ fontSize: '13px', lineHeight: '1.7' }}>
               <ul style={{ marginLeft: 'var(--space-6)' }}>
                 <li><strong>Database Tables:</strong> 50+ core tables with complete referential integrity</li>
                 <li><strong>Edge Functions:</strong> 100+ Deno functions handling AI processing, scraping, payments</li>
@@ -1594,8 +1594,8 @@ SHIPPING SYSTEM:
           </section>
 
           {/* Footer */}
-          <div style={{ marginTop: 'var(--space-8)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-medium)', fontSize: '9pt', fontStyle: 'italic', color: '#666', textAlign: 'center' }}>
-            <strong>NUKE Platform</strong> - Building the definitive digital identity for every vehicle.<br/>
+          <div style={{ marginTop: 'var(--space-8)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-medium)', fontSize: '12px', fontStyle: 'italic', color: '#666', textAlign: 'center' }}>
+            <strong>Nuke</strong> - Building the definitive digital identity for every vehicle.<br/>
             Every data point sourced. Every claim verified. Every timeline preserved. Every contribution recognized.
           </div>
         </div>

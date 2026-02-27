@@ -151,7 +151,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
       <div
         style={{
           fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-          fontSize: '8pt',
+          fontSize: '11px',
           background: 'var(--bg)',
           borderLeft: '1px solid #bdbdbd',
           padding: '8px',
@@ -182,7 +182,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
     <div
       style={{
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-        fontSize: '8pt',
+        fontSize: '11px',
         lineHeight: '1.2',
         background: backgroundColor,
         borderLeft: `${borderWidth} solid ${borderColor}`,
@@ -270,7 +270,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
         )}
 
         {/* Timestamp */}
-        <div style={{ color: '#9e9e9e', marginTop: '4px', fontSize: '7pt' }}>
+        <div style={{ color: '#9e9e9e', marginTop: '4px', fontSize: '9px' }}>
           created: {formatTimeAgo(created_at)}
         </div>
 
@@ -292,7 +292,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                   yesAction.handler();
                 }}
                 style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   padding: '6px 16px',
                   border: '1px solid #059669',
@@ -322,7 +322,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                   }
                 }}
                 style={{
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   padding: '6px 16px',
                   border: '1px solid #dc2626',
@@ -354,7 +354,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                   action.handler();
                 }}
                 style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   padding: '4px 8px',
                   border: '1px solid #bdbdbd',
@@ -389,7 +389,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
           >
             <button
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                 padding: '2px 6px',
                 border: '1px solid #bdbdbd',

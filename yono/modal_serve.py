@@ -342,6 +342,7 @@ _MOD_KEYWORDS = {
 @app.function(
     image=image,
     volumes={"/data": volume},
+    secrets=[modal.Secret.from_name("nuke-sidecar-secrets")],
     min_containers=1,        # keep 1 warm — cold start is 10-15s with Florence-2
     scaledown_window=600,    # keep warm 10 min after last request
     timeout=600,             # 10 min — batch of 20 images @ ~10s each needs ~200s
@@ -352,12 +353,14 @@ def fastapi_app():
     import asyncio
     import io
     import json
+    import os
     import time
 
     import httpx
     import numpy as np
-    from fastapi import FastAPI
+    from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
     from PIL import Image
 
     api = FastAPI(title="YONO Inference Server")
@@ -367,6 +370,23 @@ def fastapi_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ---- Bearer token auth middleware ----
+    # GET /health is public (monitoring). All other endpoints require Authorization: Bearer <token>.
+    # Token is stored in Modal secret nuke-sidecar-secrets + Supabase secrets MODAL_SIDECAR_TOKEN.
+    _SIDECAR_TOKEN = os.environ.get("MODAL_SIDECAR_TOKEN", "")
+
+    @api.middleware("http")
+    async def auth_middleware(request: Request, call_next):
+        if request.url.path == "/health":
+            return await call_next(request)
+        if not _SIDECAR_TOKEN:
+            # No token configured — allow all (shouldn't happen in prod)
+            return await call_next(request)
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {_SIDECAR_TOKEN}":
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        return await call_next(request)
 
     # ---- Load ONNX classify models ----
     (flat_sess, flat_labels, flat_input,

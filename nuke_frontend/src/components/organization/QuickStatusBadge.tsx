@@ -91,7 +91,7 @@ const QuickStatusBadge: React.FC<Props> = ({
           padding: '4px 10px',
           background: currentBadge.color,
           color: 'white',
-          fontSize: '7pt',
+          fontSize: '9px',
           fontWeight: 700,
           borderRadius: '3px',
           cursor: updating ? 'wait' : 'pointer',
@@ -129,7 +129,7 @@ const QuickStatusBadge: React.FC<Props> = ({
               onClick={(e) => handleStatusChange(badge.value, e)}
               style={{
                 padding: '8px 12px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 background: currentStatus === badge.value ? 'var(--accent-dim)' : 'transparent',

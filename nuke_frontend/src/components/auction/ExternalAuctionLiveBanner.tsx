@@ -218,7 +218,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
         borderRadius: '6px',
         padding: '10px 14px',
         marginBottom: '12px',
-        fontSize: '8pt',
+        fontSize: '11px',
         color: colors.text,
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
       }}
@@ -239,7 +239,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                   boxShadow: `0 0 8px ${['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? '#ef4444' : '#22c55e'}`,
                 }}
               />
-              <span style={{ fontWeight: 700, fontSize: '7pt', letterSpacing: '0.5px' }}>LIVE</span>
+              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px' }}>LIVE</span>
             </div>
           )}
 
@@ -247,7 +247,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             <span
               style={{
                 fontWeight: 700,
-                fontSize: '7pt',
+                fontSize: '9px',
                 background: 'rgba(255,255,255,0.2)',
                 padding: '2px 6px',
                 borderRadius: '3px',
@@ -257,7 +257,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             </span>
           )}
 
-          <span style={{ opacity: 0.8, fontSize: '7pt' }}>on {platformName}</span>
+          <span style={{ opacity: 0.8, fontSize: '9px' }}>on {platformName}</span>
         </div>
 
         {/* Timer - with urgency colors (NO YELLOW - BaT uses yellow) */}
@@ -292,10 +292,10 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 3px rgba(0,0,0,0.1)`,
           }}
         >
-          <span style={{ fontSize: '6pt', opacity: 0.7, textTransform: 'uppercase' }}>Current Bid</span>
+          <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Current Bid</span>
           <span
             style={{
-              fontSize: '12pt',
+              fontSize: '16px',
               fontWeight: 700,
               color: colors.accent,
               transition: 'all 0.3s ease',
@@ -319,8 +319,8 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
-          <span style={{ fontSize: '6pt', opacity: 0.7, textTransform: 'uppercase' }}>Bids</span>
-          <span style={{ fontSize: '10pt', fontWeight: 600 }}>{bidCount ?? '--'}</span>
+          <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Bids</span>
+          <span style={{ fontSize: '13px', fontWeight: 600 }}>{bidCount ?? '--'}</span>
         </div>
 
         {/* Watchers */}
@@ -336,8 +336,8 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
           >
-            <span style={{ fontSize: '6pt', opacity: 0.7, textTransform: 'uppercase' }}>Watching</span>
-            <span style={{ fontSize: '10pt', fontWeight: 600 }}>{watcherCount.toLocaleString()}</span>
+            <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Watching</span>
+            <span style={{ fontSize: '13px', fontWeight: 600 }}>{watcherCount.toLocaleString()}</span>
           </div>
         )}
 
@@ -354,18 +354,18 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
           >
-            <span style={{ fontSize: '6pt', opacity: 0.7, textTransform: 'uppercase' }}>Comments</span>
-            <span style={{ fontSize: '10pt', fontWeight: 600 }}>{commentCount}</span>
+            <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Comments</span>
+            <span style={{ fontSize: '13px', fontWeight: 600 }}>{commentCount}</span>
           </div>
         )}
 
         {/* Actions */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           {syncing && (
-            <span style={{ fontSize: '6pt', opacity: 0.6 }}>syncing...</span>
+            <span style={{ fontSize: '8px', opacity: 0.6 }}>syncing...</span>
           )}
           {pollingInterval && !syncing && (
-            <span style={{ fontSize: '6pt', opacity: 0.5 }}>
+            <span style={{ fontSize: '8px', opacity: 0.5 }}>
               {pollingInterval < 10000 ? 'FAST' : pollingInterval < 30000 ? 'MED' : ''} sync
             </span>
           )}
@@ -380,7 +380,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                 color: '#000',
                 padding: '6px 12px',
                 borderRadius: '4px',
-                fontSize: '7pt',
+                fontSize: '9px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
@@ -408,7 +408,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                 color: '#22c55e',
                 padding: '4px 8px',
                 borderRadius: '4px',
-                fontSize: '6pt',
+                fontSize: '8px',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
@@ -427,7 +427,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               color: colors.text,
               padding: '4px 10px',
               borderRadius: '4px',
-              fontSize: '7pt',
+              fontSize: '9px',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.15s ease',

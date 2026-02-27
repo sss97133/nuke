@@ -38,7 +38,7 @@ export const VehicleTabBar: React.FC = () => {
                     background: 'transparent',
                     color: 'inherit',
                     cursor: 'pointer',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     padding: '0 8px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -72,7 +72,7 @@ export const VehicleTabBar: React.FC = () => {
                     background: 'transparent',
                     color: 'inherit',
                     cursor: 'pointer',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     padding: '0 6px',
                     height: '100%',
                   }}

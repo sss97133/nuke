@@ -387,18 +387,18 @@ const PriceChart: React.FC<PriceChartProps> = ({
         }}
       >
         <div>
-          <h3 style={{ margin: 0, fontSize: '10pt', fontWeight: 'bold', color: colors.text }}>
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: colors.text }}>
             Price Chart
           </h3>
           {lastPrice !== null && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
-              <span style={{ fontSize: '16pt', fontWeight: 'bold', color: colors.text }}>
+              <span style={{ fontSize: '21px', fontWeight: 'bold', color: colors.text }}>
                 ${lastPrice.toFixed(2)}
               </span>
               {priceChange && (
                 <span
                   style={{
-                    fontSize: '10pt',
+                    fontSize: '13px',
                     fontWeight: 600,
                     color: priceChange.value >= 0 ? colors.upColor : colors.downColor,
                   }}
@@ -415,7 +415,7 @@ const PriceChart: React.FC<PriceChartProps> = ({
             <span
               key={period}
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: '2px 6px',
                 borderRadius: '4px',
                 background: [colors.ma1, colors.ma2][index] || colors.ma1,
@@ -454,7 +454,7 @@ const PriceChart: React.FC<PriceChartProps> = ({
         >
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>📈</div>
           <div>No trading data available</div>
-          <div style={{ fontSize: '9pt', color: '#6b7280', marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
             Chart will populate once trades occur
           </div>
         </div>

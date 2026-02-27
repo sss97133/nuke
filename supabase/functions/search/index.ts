@@ -516,7 +516,7 @@ serve(async (req: Request) => {
     if (vehicleIds.length > 0) {
       const { data: vMeta } = await supabase
         .from("vehicles")
-        .select("id, city, state, is_for_sale, sale_price, asking_price, mileage, transmission, vin, image_count, event_count")
+        .select("id, city, state, is_for_sale, sale_price, asking_price, mileage, transmission, vin")
         .in("id", vehicleIds);
       (vMeta || []).forEach((v: any) => {
         vehicleMetaById[String(v.id)] = v;
@@ -596,8 +596,7 @@ serve(async (req: Request) => {
           asking_price: vMeta?.asking_price ?? v.asking_price ?? undefined,
           mileage: vMeta?.mileage ?? v.mileage ?? undefined,
           transmission: vMeta?.transmission ?? v.transmission ?? undefined,
-          image_count: vMeta?.image_count ?? undefined,
-          event_count: vMeta?.event_count ?? undefined,
+          image_count: vehicleImageById[String(v.id)] ? 1 : 0,
           city: vMeta?.city ?? undefined,
           state: vMeta?.state ?? undefined,
           fts_relevance: usedFts ? v.relevance : undefined,

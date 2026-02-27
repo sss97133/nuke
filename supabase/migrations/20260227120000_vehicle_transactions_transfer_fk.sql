@@ -34,3 +34,65 @@ VALUES
 ON CONFLICT (table_name, column_name) DO UPDATE
   SET owned_by = EXCLUDED.owned_by,
       description = EXCLUDED.description;
+
+-- Also update backfill_transfers_for_sold_auctions to pass suppress_notifications:true
+-- This prevents historical backfill (crons 223-227) from sending 150K emails
+-- NOTE: This function body is also managed via Management API. See session notes 2026-02-27.
+CREATE OR REPLACE FUNCTION public.backfill_transfers_for_sold_auctions(
+  batch_size integer DEFAULT 20
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_row record;
+  v_key text;
+  v_url text := 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/transfer-automator';
+  v_count integer := 0;
+BEGIN
+  v_key := COALESCE(
+    (SELECT value FROM public._app_secrets WHERE key = 'service_role_key' LIMIT 1),
+    current_setting('app.settings.service_role_key', true),
+    current_setting('app.service_role_key', true)
+  );
+
+  FOR v_row IN
+    SELECT ae.id, ae.vehicle_id
+    FROM public.auction_events ae
+    WHERE ae.outcome = 'sold'
+      AND NOT EXISTS (
+        SELECT 1 FROM public.ownership_transfers ot
+        WHERE ot.trigger_id = ae.id
+          AND ot.trigger_table = 'auction_events'
+      )
+    ORDER BY ae.auction_end_date DESC
+    LIMIT batch_size
+  LOOP
+    BEGIN
+      PERFORM net.http_post(
+        url := v_url,
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || COALESCE(v_key, '')
+        ),
+        body := jsonb_build_object(
+          'action', 'seed_from_auction',
+          'auction_event_id', v_row.id::text,
+          'suppress_notifications', true   -- CRITICAL: prevents 150K email blast on backfill
+        ),
+        timeout_milliseconds := 30000
+      );
+      v_count := v_count + 1;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING '[backfill_transfers] pg_net call failed for %: %', v_row.id, SQLERRM;
+    END;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'queued', v_count,
+    'ran_at', NOW(),
+    'suppress_notifications', true
+  );
+END;
+$$;

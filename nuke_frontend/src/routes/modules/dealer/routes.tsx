@@ -7,7 +7,7 @@ const DealerBulkEditor = React.lazy(() => import('../../../pages/DealerBulkEdito
 const DealerAIAssistant = React.lazy(() => import('../../../pages/DealerAIAssistant'));
 
 const LazyFallback = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '9pt' }}>
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '12px' }}>
     loading...
   </div>
 );

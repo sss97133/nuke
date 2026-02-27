@@ -35,6 +35,15 @@ const corsHeaders = {
 const SIDECAR_URL =
   Deno.env.get("YONO_SIDECAR_URL") || "http://127.0.0.1:8472";
 const SIDECAR_TIMEOUT_MS = 10_000;
+const SIDECAR_TOKEN = Deno.env.get("MODAL_SIDECAR_TOKEN") || "";
+
+function sidecarHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    ...(SIDECAR_TOKEN ? { "Authorization": `Bearer ${SIDECAR_TOKEN}` } : {}),
+    ...extra,
+  };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -85,7 +94,7 @@ serve(async (req) => {
     // Call classify endpoint
     const classifyResp = await fetch(`${SIDECAR_URL}/classify`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: sidecarHeaders(),
       body: JSON.stringify({ image_url, top_k }),
       signal: AbortSignal.timeout(SIDECAR_TIMEOUT_MS),
     });

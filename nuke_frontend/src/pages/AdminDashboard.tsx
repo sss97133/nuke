@@ -150,7 +150,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   if (!isAdmin) {
-    return <div style={{ padding: '40px', textAlign: 'center', fontSize: '8pt', color: 'var(--text-muted)' }}>Loading...</div>;
+    return <div style={{ padding: '40px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>Loading...</div>;
   }
 
   return (
@@ -163,7 +163,7 @@ const AdminDashboard: React.FC = () => {
             className="button button-secondary cursor-button"
             style={{ 
               marginBottom: '16px',
-              fontSize: '8pt', 
+              fontSize: '11px', 
               padding: '6px 12px',
               border: '2px solid var(--border-light)',
               transition: 'all 0.12s ease'
@@ -171,10 +171,10 @@ const AdminDashboard: React.FC = () => {
           >
             ← Back to Mission Control
           </button>
-          <h1 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Legacy Admin Dashboard
           </h1>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Manage user approvals and legacy verification requests
           </p>
         </div>
@@ -196,7 +196,7 @@ const AdminDashboard: React.FC = () => {
               color: activeTab === tab ? 'var(--accent)' : 'var(--text-muted)',
               position: 'relative',
               marginBottom: '-2px',
-              fontSize: '8pt',
+              fontSize: '11px',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
               transition: 'all 0.12s ease'
@@ -213,7 +213,7 @@ const AdminDashboard: React.FC = () => {
                 color: 'white',
                 borderRadius: '2px',
                 padding: '1px 4px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: '700'
               }}>
                 {approvals.length}
@@ -226,15 +226,15 @@ const AdminDashboard: React.FC = () => {
       {/* Reviews Tab */}
       {activeTab === 'reviews' && (
         <div>
-          <h2 style={{ marginBottom: '16px', fontSize: '8pt', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <h2 style={{ marginBottom: '16px', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             PENDING CONTRIBUTOR APPROVALS
           </h2>
 
           {loading ? (
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Loading...</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading...</div>
           ) : approvals.length === 0 ? (
             <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
-              <div style={{ fontSize: '8pt' }}>No pending approvals</div>
+              <div style={{ fontSize: '11px' }}>No pending approvals</div>
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '16px' }}>
@@ -245,10 +245,10 @@ const AdminDashboard: React.FC = () => {
                   style={{ padding: '20px' }}
                 >
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '4px' }}>
                       {approval.year} {approval.make} {approval.model}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       {approval.user_email} • {approval.requested_role.replace(/_/g, ' ')}
                       {approval.shop_name && (
                         <span style={{ marginLeft: '8px', color: 'var(--accent)' }}>
@@ -259,13 +259,13 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
-                    <div style={{ fontWeight: '700', marginBottom: '4px', fontSize: '8pt' }}>JUSTIFICATION</div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text)' }}>{approval.role_justification}</div>
+                    <div style={{ fontWeight: '700', marginBottom: '4px', fontSize: '11px' }}>JUSTIFICATION</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text)' }}>{approval.role_justification}</div>
                   </div>
 
                   {approval.uploaded_document_ids && approval.uploaded_document_ids.length > 0 && (
                     <div style={{ marginBottom: '16px' }}>
-                      <div style={{ fontSize: '8pt', fontWeight: '700', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
                         DOCUMENTS: {approval.uploaded_document_ids.length}
                       </div>
                     </div>
@@ -277,7 +277,7 @@ const AdminDashboard: React.FC = () => {
                       className="button button-primary cursor-button"
                       style={{
                         padding: '8px 16px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         backgroundColor: 'var(--success)',
                         borderColor: 'var(--success)'
                       }}
@@ -289,7 +289,7 @@ const AdminDashboard: React.FC = () => {
                       className="button button-secondary cursor-button"
                       style={{
                         padding: '8px 16px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         color: 'var(--error)',
                         borderColor: 'var(--error)'
                       }}
@@ -301,7 +301,7 @@ const AdminDashboard: React.FC = () => {
                       className="button button-secondary cursor-button"
                       style={{
                         padding: '8px 16px',
-                        fontSize: '8pt'
+                        fontSize: '11px'
                       }}
                     >
                       VIEW VEHICLE
@@ -324,7 +324,7 @@ const AdminDashboard: React.FC = () => {
       {/* Todo Tab */}
       {activeTab === 'todo' && (
         <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
-          <div style={{ fontSize: '8pt' }}>Admin task management coming soon</div>
+          <div style={{ fontSize: '11px' }}>Admin task management coming soon</div>
         </div>
       )}
 
@@ -336,7 +336,7 @@ const AdminDashboard: React.FC = () => {
       {/* Users Tab */}
       {activeTab === 'users' && (
         <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
-          <div style={{ fontSize: '8pt' }}>User management coming soon</div>
+          <div style={{ fontSize: '11px' }}>User management coming soon</div>
         </div>
       )}
 

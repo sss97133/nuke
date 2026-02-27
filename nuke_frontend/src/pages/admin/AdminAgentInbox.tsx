@@ -51,7 +51,7 @@ function RolePill({ role }: { role: string }) {
     <span style={{
       display: 'inline-block',
       padding: '1px 6px',
-      fontSize: '7pt',
+      fontSize: '9px',
       fontFamily: 'monospace',
       fontWeight: 600,
       color: '#fff',
@@ -157,7 +157,7 @@ export default function AdminAgentInbox() {
         gap: 12,
         flexWrap: 'wrap',
       }}>
-        <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>
+        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>
           Agent Inbox
           {unreadCount > 0 && (
             <span style={{ marginLeft: 8, color: '#b91c1c', fontFamily: 'monospace' }}>
@@ -167,13 +167,13 @@ export default function AdminAgentInbox() {
         </div>
 
         {/* To filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '8pt' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px' }}>
           <span style={{ color: 'var(--text-muted)' }}>to:</span>
           <select
             value={toFilter}
             onChange={e => setToFilter(e.target.value)}
             style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               padding: '2px 6px',
               border: '1px solid var(--border-light)',
               borderRadius: '0px',
@@ -186,13 +186,13 @@ export default function AdminAgentInbox() {
         </div>
 
         {/* From filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '8pt' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px' }}>
           <span style={{ color: 'var(--text-muted)' }}>from:</span>
           <select
             value={fromFilter}
             onChange={e => setFromFilter(e.target.value)}
             style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               padding: '2px 6px',
               border: '1px solid var(--border-light)',
               borderRadius: '0px',
@@ -204,7 +204,7 @@ export default function AdminAgentInbox() {
           </select>
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '8pt', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px', cursor: 'pointer' }}>
           <input
             type="checkbox"
             checked={unreadOnly}
@@ -213,7 +213,7 @@ export default function AdminAgentInbox() {
           <span style={{ color: 'var(--text-muted)' }}>unread only</span>
         </label>
 
-        <span style={{ fontSize: '8pt', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+        <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>
           {loading ? '…' : `${messages.length} messages`}
         </span>
       </div>
@@ -229,9 +229,9 @@ export default function AdminAgentInbox() {
           transition: 'width 0.15s ease',
         }}>
           {loading ? (
-            <div style={{ padding: '16px', fontSize: '8pt', color: 'var(--text-muted)' }}>Loading…</div>
+            <div style={{ padding: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>Loading…</div>
           ) : messages.length === 0 ? (
-            <div style={{ padding: '16px', fontSize: '8pt', color: 'var(--text-muted)' }}>No messages.</div>
+            <div style={{ padding: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>No messages.</div>
           ) : (
             messages.map(msg => (
               <div
@@ -252,16 +252,16 @@ export default function AdminAgentInbox() {
                       <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#3b82f6', flexShrink: 0 }} />
                     )}
                     <RolePill role={msg.from_role} />
-                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>→</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                     <RolePill role={msg.to_role} />
                   </div>
-                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace', flexShrink: 0 }}>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', flexShrink: 0 }}>
                     {timeAgo(msg.created_at)}
                   </span>
                 </div>
                 <div style={{
                   marginTop: 4,
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: msg.read_at == null ? 600 : 400,
                   color: 'var(--text)',
                   whiteSpace: 'nowrap',
@@ -273,7 +273,7 @@ export default function AdminAgentInbox() {
                 {!selected && (
                   <div style={{
                     marginTop: 2,
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-muted)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -301,18 +301,18 @@ export default function AdminAgentInbox() {
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                 <div>
-                  <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>{selected.subject}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>{selected.subject}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                     <RolePill role={selected.from_role} />
-                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>→</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                     <RolePill role={selected.to_role} />
                     {selected.sent_via === 'resend' && (
-                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                         (real email)
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'monospace' }}>
                     {new Date(selected.created_at).toLocaleString()}
                     {selected.thread_id && (
                       <span> · thread: {selected.thread_id.slice(0, 8)}</span>
@@ -324,7 +324,7 @@ export default function AdminAgentInbox() {
                   style={{
                     all: 'unset',
                     cursor: 'pointer',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     color: 'var(--text-muted)',
                     padding: '4px 8px',
                     border: '1px solid var(--border-light)',
@@ -339,7 +339,7 @@ export default function AdminAgentInbox() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
               {thread.length > 1 ? (
                 <div>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: 12, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 12, fontFamily: 'monospace' }}>
                     {thread.length} messages in thread
                   </div>
                   {thread.map((m, idx) => (
@@ -353,14 +353,14 @@ export default function AdminAgentInbox() {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                         <RolePill role={m.from_role} />
-                        <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>→</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                         <RolePill role={m.to_role} />
-                        <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', marginLeft: 'auto' }}>
                           {timeAgo(m.created_at)}
                         </span>
                       </div>
                       <pre style={{
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         color: 'var(--text)',
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-word',
@@ -375,7 +375,7 @@ export default function AdminAgentInbox() {
                 </div>
               ) : (
                 <pre style={{
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   color: 'var(--text)',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',

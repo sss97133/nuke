@@ -61,8 +61,8 @@ export default function DataGrowthChart() {
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Data Growth</div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Data Growth</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
             Live database statistics
           </div>
         </div>
@@ -70,14 +70,14 @@ export default function DataGrowthChart() {
           className="button button-secondary"
           onClick={() => void loadStats()}
           disabled={loading}
-          style={{ fontSize: '8pt' }}
+          style={{ fontSize: '11px' }}
         >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
 
       {error && (
-        <div style={{ marginTop: 'var(--space-3)', fontSize: '8pt', color: '#b91c1c' }}>
+        <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: '#b91c1c' }}>
           {error}
         </div>
       )}
@@ -89,7 +89,7 @@ export default function DataGrowthChart() {
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                fontSize: '8pt',
+                fontSize: '11px',
                 marginBottom: '4px'
               }}>
                 <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
@@ -117,7 +117,7 @@ export default function DataGrowthChart() {
           {stats.generated_at && (
             <div style={{
               marginTop: 'var(--space-3)',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--text-muted)',
               textAlign: 'right'
             }}>

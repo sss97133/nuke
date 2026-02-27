@@ -209,7 +209,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
 
   if (loading) {
     return (
-      <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
         Checking for duplicate profiles...
       </div>
     );
@@ -233,13 +233,13 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
           <line x1="12" y1="9" x2="12" y2="13"/>
           <line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
-        <span style={{ fontSize: '10pt', fontWeight: 700, color: '#92400e' }}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: '#92400e' }}>
           Duplicate Profiles Detected ({proposals.length})
         </span>
       </div>
 
       <div className="card-body" style={{ padding: '16px', background: '#fffbeb' }}>
-        <div style={{ fontSize: '8pt', color: '#78350f', marginBottom: '16px' }}>
+        <div style={{ fontSize: '11px', color: '#78350f', marginBottom: '16px' }}>
           AI detected potential duplicate vehicle profiles. Review and merge to consolidate your data.
         </div>
 
@@ -267,12 +267,12 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   color: 'white',
                   padding: '3px 8px',
                   borderRadius: '2px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 700
                 }}>
                   {proposal.confidence_score}% MATCH
                 </div>
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                   {proposal.match_type.replace(/_/g, ' ').toUpperCase()}
                 </div>
               </div>
@@ -292,30 +292,30 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   background: '#ecfdf5'
                 }}>
                   <div style={{
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 700,
                     color: '#059669',
                     marginBottom: '4px'
                   }}>
                     PRIMARY (KEEP)
                   </div>
-                  <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '6px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
                     {primary.year} {primary.make} {primary.model}
                   </div>
                   {primary.trim && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                       {primary.trim}
                     </div>
                   )}
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' }}>
                     VIN: {primary.vin || 'None'}
                     {isPrimaryFake && <span style={{ color: '#dc2626' }}> (auto-generated)</span>}
                   </div>
-                  <div style={{ fontSize: '7pt', fontWeight: 600, color: '#059669' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: '#059669' }}>
                     {primary.image_count} photos • {primary.event_count} events
                   </div>
                   {primary.discovery_source && (
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       Source: {primary.discovery_source}
                     </div>
                   )}
@@ -337,30 +337,30 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   background: '#fef2f2'
                 }}>
                   <div style={{
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 700,
                     color: '#dc2626',
                     marginBottom: '4px'
                   }}>
                     DUPLICATE (MERGE)
                   </div>
-                  <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '6px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
                     {duplicate.year} {duplicate.make} {duplicate.model}
                   </div>
                   {duplicate.trim && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                       {duplicate.trim}
                     </div>
                   )}
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' }}>
                     VIN: {duplicate.vin || 'None'}
                     {isDupFake && <span style={{ color: '#dc2626' }}> (auto-generated)</span>}
                   </div>
-                  <div style={{ fontSize: '7pt', fontWeight: 600, color: '#dc2626' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: '#dc2626' }}>
                     {duplicate.image_count} photos • {duplicate.event_count} events
                   </div>
                   {duplicate.discovery_source && (
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       Source: {duplicate.discovery_source}
                     </div>
                   )}
@@ -374,7 +374,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   background: 'var(--bg)',
                   border: '1px solid #d1d5db',
                   borderRadius: '3px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   color: 'var(--text-secondary)',
                   marginBottom: '12px'
                 }}>
@@ -388,7 +388,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   onClick={() => handleReject(proposal.id)}
                   disabled={merging !== null}
                   className="button button-secondary button-small"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   Not a Duplicate
                 </button>
@@ -401,7 +401,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   disabled={merging !== null}
                   className="button button-primary button-small"
                   style={{
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     background: merging === proposal.id ? '#6b7280' : undefined
                   }}
                 >
@@ -419,7 +419,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
           background: 'var(--surface)',
           border: '1px solid #d1d5db',
           borderRadius: '3px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-muted)'
         }}>
           <strong>How merging works:</strong> All images, timeline events, and data from the duplicate profile will be moved to the primary profile. The duplicate will then be deleted. This action cannot be undone.

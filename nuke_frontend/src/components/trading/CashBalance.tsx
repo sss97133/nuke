@@ -214,7 +214,7 @@ export default function CashBalance({ compact = false, showActions = true }: Pro
           <button
             onClick={handleDeposit}
             className="button button-primary"
-            style={{ fontSize: '9pt', padding: '6px 10px', fontWeight: 700, borderRadius: 4 }}
+            style={{ fontSize: '12px', padding: '6px 10px', fontWeight: 700, borderRadius: 4 }}
           >
             + Deposit
           </button>
@@ -224,7 +224,7 @@ export default function CashBalance({ compact = false, showActions = true }: Pro
             disabled={balance.available_cents === 0}
             className="button button-secondary"
             style={{
-              fontSize: '9pt',
+              fontSize: '12px',
               padding: '6px 10px',
               fontWeight: 700,
               borderRadius: 4,

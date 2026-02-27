@@ -138,37 +138,37 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
 
       {/* Incorporation Details */}
       <div className="card">
-        <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14pt' }}>🏛️</span>
+        <div className="card-header" style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '19px' }}>🏛️</span>
           Corporate Structure
         </div>
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Legal Name</div>
-              <div style={{ fontSize: '10pt', fontWeight: 600 }}>{organization.legal_name || organization.business_name}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Legal Name</div>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>{organization.legal_name || organization.business_name}</div>
             </div>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Jurisdiction</div>
-              <div style={{ fontSize: '10pt', fontWeight: 600 }}>{organization.incorporation_jurisdiction || '-'}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Jurisdiction</div>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>{organization.incorporation_jurisdiction || '-'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Year Incorporated</div>
-              <div style={{ fontSize: '10pt', fontWeight: 600 }}>{organization.year_incorporated || '-'}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Year Incorporated</div>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>{organization.year_incorporated || '-'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>NAICS Code</div>
-              <div style={{ fontSize: '10pt', fontWeight: 600 }}>{organization.naics_code || '-'}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>NAICS Code</div>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>{organization.naics_code || '-'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Revenue Range</div>
-              <div style={{ fontSize: '10pt', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Revenue Range</div>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>
                 {organization.revenue_range?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || '-'}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>SEC Filer</div>
-              <div style={{ fontSize: '10pt', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>SEC Filer</div>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>
                 {organization.is_sec_filer ? (
                   <span style={{ color: 'var(--success)' }}>Yes {organization.cik_number && `(CIK: ${organization.cik_number})`}</span>
                 ) : (
@@ -182,22 +182,22 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
 
       {/* Cap Table / Share Classes */}
       <div className="card">
-        <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14pt' }}>📊</span>
+        <div className="card-header" style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '19px' }}>📊</span>
           Capitalization Table
           {shareClasses.length > 0 && (
-            <span style={{ marginLeft: 'auto', fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 400 }}>
+            <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>
               {shareClasses.reduce((sum, sc) => sum + (sc.outstanding_shares || 0), 0).toLocaleString()} total shares outstanding
             </span>
           )}
         </div>
         <div className="card-body">
           {shareClasses.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '9pt', textAlign: 'center', padding: '20px' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center', padding: '20px' }}>
               No share classes defined
               {canEdit && (
                 <div style={{ marginTop: '8px' }}>
-                  <button className="button button-secondary" style={{ fontSize: '9pt' }}>
+                  <button className="button button-secondary" style={{ fontSize: '12px' }}>
                     + Add Share Class
                   </button>
                 </div>
@@ -205,7 +205,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', fontSize: '9pt', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
                     <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: 'var(--text-muted)' }}>Class</th>
@@ -221,7 +221,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                       <td style={{ padding: '10px 12px' }}>
                         <div style={{ fontWeight: 600 }}>{sc.share_class_name}</div>
                         {sc.share_class_code && (
-                          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{sc.share_class_code}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{sc.share_class_code}</div>
                         )}
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
@@ -250,13 +250,13 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
 
       {/* Officers, Directors & Beneficial Owners */}
       <div className="card">
-        <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14pt' }}>👥</span>
+        <div className="card-header" style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '19px' }}>👥</span>
           Officers, Directors & Beneficial Owners
         </div>
         <div className="card-body">
           {relatedPersons.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '9pt', textAlign: 'center', padding: '20px' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center', padding: '20px' }}>
               No related persons disclosed
             </div>
           ) : (
@@ -283,22 +283,22 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 700,
-                    fontSize: '14pt',
+                    fontSize: '19px',
                   }}>
                     {person.full_legal_name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '10pt' }}>{person.full_legal_name}</div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontWeight: 600, fontSize: '13px' }}>{person.full_legal_name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       {person.title || person.person_type?.map(t => personTypeLabels[t] || t).join(', ')}
                     </div>
                   </div>
                   {person.ownership_percentage && (
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--accent)' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent)' }}>
                         {formatPercent(person.ownership_percentage)}
                       </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         {formatNumber(person.share_count)} shares
                       </div>
                     </div>
@@ -313,8 +313,8 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
       {/* Active Offerings */}
       {offerings.length > 0 && (
         <div className="card">
-          <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14pt' }}>💰</span>
+          <div className="card-header" style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '19px' }}>💰</span>
             Securities Offerings
           </div>
           <div className="card-body">
@@ -330,10 +330,10 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '11pt' }}>
+                    <div style={{ fontWeight: 600, fontSize: '15px' }}>
                       {offering.federal_exemption?.join(', ').toUpperCase() || 'Private Offering'}
                     </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       {offering.security_type?.replace(/_/g, ' ')}
                       {offering.price_per_share && ` @ ${formatCurrency(offering.price_per_share)}/share`}
                     </div>
@@ -341,7 +341,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                   <div style={{
                     padding: '4px 8px',
                     borderRadius: '4px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 600,
                     background: offering.status === 'active' ? 'var(--success)' : 'var(--text-muted)',
                     color: 'white',
@@ -352,7 +352,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
 
                 {/* Progress bar */}
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8pt', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
                     <span>{formatCurrency(offering.amount_sold)} raised</span>
                     <span>{formatCurrency(offering.total_offering_amount)} goal</span>
                   </div>
@@ -371,7 +371,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '16px', fontSize: '9pt' }}>
+                <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}>
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>Investors: </span>
                     <span style={{ fontWeight: 600 }}>{offering.total_investors || 0}</span>
@@ -398,13 +398,13 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
       {/* Financial Statements */}
       {financials.length > 0 && (
         <div className="card">
-          <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14pt' }}>📈</span>
+          <div className="card-header" style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '19px' }}>📈</span>
             Financial Statements
           </div>
           <div className="card-body">
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', fontSize: '9pt', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
                     <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: 'var(--text-muted)' }}>Period</th>
@@ -457,12 +457,12 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
       {/* Risk Factors */}
       {organization.risk_factors && (
         <div className="card">
-          <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14pt' }}>⚠️</span>
+          <div className="card-header" style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '19px' }}>⚠️</span>
             Risk Factors
           </div>
           <div className="card-body">
-            <div style={{ fontSize: '9pt', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontSize: '12px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
               {organization.risk_factors}
             </div>
           </div>
@@ -478,17 +478,17 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
           background: 'var(--surface-elevated)',
           borderRadius: '8px',
         }}>
-          <div style={{ fontSize: '32pt', marginBottom: '12px' }}>📋</div>
-          <div style={{ fontSize: '11pt', fontWeight: 600, marginBottom: '8px' }}>
+          <div style={{ fontSize: '43px', marginBottom: '12px' }}>📋</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>
             No Legal Information Available
           </div>
-          <div style={{ fontSize: '9pt', maxWidth: '400px', margin: '0 auto' }}>
+          <div style={{ fontSize: '12px', maxWidth: '400px', margin: '0 auto' }}>
             This organization hasn't disclosed corporate structure, ownership, or financial information yet.
           </div>
           {canEdit && (
             <button
               className="button button-primary"
-              style={{ marginTop: '16px', fontSize: '9pt' }}
+              style={{ marginTop: '16px', fontSize: '12px' }}
             >
               Add Legal Information
             </button>

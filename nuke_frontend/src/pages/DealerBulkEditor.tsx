@@ -330,10 +330,10 @@ const DealerBulkEditor: React.FC = () => {
         marginBottom: '20px'
       }}>
         <div>
-          <h1 style={{ fontSize: '14pt', fontWeight: 700, margin: 0 }}>
+          <h1 style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>
             Dealer Bulk Editor
           </h1>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
             {organization?.business_name || 'Loading...'}
           </p>
         </div>
@@ -342,7 +342,7 @@ const DealerBulkEditor: React.FC = () => {
             onClick={() => navigate(`/org/${orgId}`)}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               cursor: 'pointer'
@@ -354,7 +354,7 @@ const DealerBulkEditor: React.FC = () => {
             onClick={addNewRow}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--accent)',
               background: 'var(--accent)',
               color: 'white',
@@ -369,7 +369,7 @@ const DealerBulkEditor: React.FC = () => {
             disabled={saving}
             style={{
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--success)',
               background: 'var(--success)',
               color: 'white',
@@ -391,7 +391,7 @@ const DealerBulkEditor: React.FC = () => {
         padding: '16px',
         marginBottom: '20px'
       }}>
-        <h3 style={{ fontSize: '10pt', fontWeight: 700, margin: '0 0 12px 0' }}>
+        <h3 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 12px 0' }}>
           AI Spreadsheet Parser
         </h3>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -400,7 +400,7 @@ const DealerBulkEditor: React.FC = () => {
             type="file"
             accept=".xlsx,.xls,.csv"
             onChange={handleFileSelect}
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
           />
           {selectedFile && (
             <button
@@ -408,7 +408,7 @@ const DealerBulkEditor: React.FC = () => {
               disabled={aiParsing}
               style={{
                 padding: '6px 12px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid var(--accent)',
                 background: 'var(--accent)',
                 color: 'white',
@@ -420,7 +420,7 @@ const DealerBulkEditor: React.FC = () => {
             </button>
           )}
         </div>
-        <p style={{ fontSize: '7pt', color: 'var(--text-muted)', margin: '8px 0 0 0' }}>
+        <p style={{ fontSize: '9px', color: 'var(--text-muted)', margin: '8px 0 0 0' }}>
           Upload your dealer inventory spreadsheet. AI will automatically map columns to fields.
         </p>
       </div>
@@ -435,7 +435,7 @@ const DealerBulkEditor: React.FC = () => {
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
-          fontSize: '8pt'
+          fontSize: '11px'
         }}>
           <thead>
             <tr style={{ background: 'var(--grey-50)' }}>
@@ -489,7 +489,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)',
                       fontFamily: 'monospace'
                     }}
@@ -505,7 +505,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="2024"
@@ -519,7 +519,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="Chevrolet"
@@ -533,7 +533,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="Silverado"
@@ -547,7 +547,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="LT"
@@ -561,7 +561,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="50000"
@@ -575,7 +575,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="Black"
@@ -589,7 +589,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="45000"
@@ -603,7 +603,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="38000"
@@ -617,7 +617,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="40000"
@@ -630,7 +630,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                   >
@@ -648,7 +648,7 @@ const DealerBulkEditor: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)'
                     }}
                     placeholder="Notes..."
@@ -659,7 +659,7 @@ const DealerBulkEditor: React.FC = () => {
                     onClick={() => deleteRow(index)}
                     style={{
                       padding: '4px 8px',
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       border: '1px solid var(--danger)',
                       background: 'var(--surface)',
                       color: 'var(--danger)',
@@ -684,12 +684,12 @@ const DealerBulkEditor: React.FC = () => {
           border: '1px solid var(--danger)',
           borderRadius: '4px'
         }}>
-          <h4 style={{ fontSize: '9pt', fontWeight: 700, margin: '0 0 8px 0', color: 'var(--danger)' }}>
+          <h4 style={{ fontSize: '12px', fontWeight: 700, margin: '0 0 8px 0', color: 'var(--danger)' }}>
             Validation Errors
           </h4>
           {vehicles.map((v, i) => (
             v._errors && v._errors.length > 0 && (
-              <div key={i} style={{ fontSize: '8pt', marginBottom: '4px' }}>
+              <div key={i} style={{ fontSize: '11px', marginBottom: '4px' }}>
                 Row {i + 1}: {v._errors.join(', ')}
               </div>
             )

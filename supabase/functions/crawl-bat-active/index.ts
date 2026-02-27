@@ -6,6 +6,16 @@
  * 1. RSS feed (new listings)
  * 2. Firecrawl map (all discoverable links)
  * 3. Existing active listings (re-sync)
+ *
+ * NOTE — archiveFetch exception: This function uses raw fetch() for BaT RSS feeds
+ * (/auctions/feed/?paged=N, /feed/) and XML sitemaps. This is intentional:
+ * - These feeds/sitemaps are used ONLY for URL enumeration (extracting listing URLs from XML)
+ * - The RSS/XML content itself is never stored or used for extraction
+ * - Archiving ephemeral paginated RSS feeds (up to 30 pages, changes every few minutes)
+ *   would pollute listing_page_snapshots with non-reproducible census data
+ * - archiveFetch is designed for listing pages (content we want to re-extract later)
+ * - The Firecrawl API call is also intentionally raw (it's an API endpoint, not HTML)
+ * Decision recorded: 2026-02-27 — acceptable exception, URL-discovery-only pattern
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -31,6 +41,7 @@ async function getListingsFromRss(): Promise<string[]> {
 
   try {
     // Paginate through auctions feed - BaT has ~400 active auctions typically
+    // NOTE: raw fetch acceptable here — XML parsed for URLs only, content not archived (see file header)
     for (let page = 1; page <= 30; page++) {
       const response = await fetch(`https://bringatrailer.com/auctions/feed/?paged=${page}`, {
         headers: BROWSER_HEADERS,
@@ -60,6 +71,7 @@ async function getListingsFromRss(): Promise<string[]> {
     }
 
     // Also get main feed for newest listings
+    // NOTE: raw fetch acceptable — RSS XML parsed for URLs only (see file header)
     const mainFeed = await fetch('https://bringatrailer.com/feed/', {
       headers: BROWSER_HEADERS,
       signal: AbortSignal.timeout(15000),
@@ -135,6 +147,7 @@ async function getListingsFromSitemap(): Promise<string[]> {
 
     for (const sitemapUrl of sitemapUrls) {
       try {
+        // NOTE: raw fetch acceptable — sitemap XML parsed for URLs only (see file header)
         const response = await fetch(sitemapUrl, {
           headers: BROWSER_HEADERS,
           signal: AbortSignal.timeout(15000),

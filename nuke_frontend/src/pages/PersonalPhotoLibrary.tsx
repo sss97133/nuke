@@ -613,7 +613,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="button button-secondary"
-            style={{ padding: '2px 4px', fontSize: '7pt' }}
+            style={{ padding: '2px 4px', fontSize: '9px' }}
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {sidebarCollapsed ? '›' : '‹'}
@@ -638,7 +638,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
           <button
             onClick={() => document.getElementById('upload-input')?.click()}
             className="button button-primary"
-            style={{ width: '100%', padding: '8px', fontSize: '9pt' }}
+            style={{ width: '100%', padding: '8px', fontSize: '12px' }}
           >
             UPLOAD PHOTOS
           </button>
@@ -754,7 +754,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
             onClick={() => setVehicleSectionCollapsed(!vehicleSectionCollapsed)}
           >
             <span>VEHICLE</span>
-            <span style={{ fontSize: '9pt' }}>{vehicleSectionCollapsed ? '▼' : '▲'}</span>
+            <span style={{ fontSize: '12px' }}>{vehicleSectionCollapsed ? '▼' : '▲'}</span>
           </div>
           {!vehicleSectionCollapsed && (
             <>
@@ -798,7 +798,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
             onClick={() => setAnglesSectionCollapsed(!anglesSectionCollapsed)}
           >
             <span>ANGLE</span>
-            <span style={{ fontSize: '9pt' }}>{anglesSectionCollapsed ? '▼' : '▲'}</span>
+            <span style={{ fontSize: '12px' }}>{anglesSectionCollapsed ? '▼' : '▲'}</span>
           </div>
           {!anglesSectionCollapsed && (
             <>
@@ -847,7 +847,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
             onClick={() => setVehicleProfilesCollapsed(!vehicleProfilesCollapsed)}
           >
             <span>VEHICLE PROFILES</span>
-            <span style={{ fontSize: '9pt' }}>{vehicleProfilesCollapsed ? '▼' : '▲'}</span>
+            <span style={{ fontSize: '12px' }}>{vehicleProfilesCollapsed ? '▼' : '▲'}</span>
           </div>
           {!vehicleProfilesCollapsed && (
             <>
@@ -857,7 +857,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 value={vehicleSearch}
                 onChange={(e) => setVehicleSearch(e.target.value)}
                 className="form-input"
-                style={{ width: '100%', fontSize: '8pt', marginBottom: '6px', padding: '4px 6px' }}
+                style={{ width: '100%', fontSize: '11px', marginBottom: '6px', padding: '4px 6px' }}
               />
               <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
                 {filteredVehicles.length === 0 ? (
@@ -885,7 +885,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                           cursor: 'pointer',
                           background: isActive ? 'var(--grey-200)' : 'transparent',
                           border: isActive ? '1px solid var(--border-medium)' : '1px solid transparent',
-                          fontSize: '8pt'
+                          fontSize: '11px'
                         }}
                       >
                         {label}
@@ -901,7 +901,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                     setShowSubmitWizard(true);
                   }}
                   className="button button-primary"
-                  style={{ width: '100%', marginTop: '6px', fontSize: '8pt', padding: '4px 6px' }}
+                  style={{ width: '100%', marginTop: '6px', fontSize: '11px', padding: '4px 6px' }}
                 >
                   SUBMIT TO PROFILE
                 </button>
@@ -946,12 +946,12 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         }}
                         autoFocus
                         className="form-input"
-                        style={{ fontSize: '8pt', padding: '2px 4px', flex: 1 }}
+                        style={{ fontSize: '11px', padding: '2px 4px', flex: 1 }}
                       />
                       <button
                         onClick={() => handleUpdateAlbumName(album.id, editingAlbumName)}
                         className="button button-primary"
-                        style={{ fontSize: '7pt', padding: '2px 4px' }}
+                        style={{ fontSize: '9px', padding: '2px 4px' }}
                       >
                         ✓
                       </button>
@@ -961,7 +961,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                           setEditingAlbumName('');
                         }}
                         className="button button-secondary"
-                        style={{ fontSize: '7pt', padding: '2px 4px' }}
+                        style={{ fontSize: '9px', padding: '2px 4px' }}
                       >
                         ✕
                       </button>
@@ -970,7 +970,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                     <div 
                       className="text" 
                       style={{ 
-                        fontSize: '8pt', 
+                        fontSize: '11px', 
                         fontWeight: 600, 
                         marginBottom: '2px',
                         cursor: 'pointer',
@@ -985,13 +985,13 @@ export const PersonalPhotoLibrary: React.FC = () => {
                       {album.name}
                     </div>
                   )}
-                  <div className="text text-small text-muted" style={{ fontSize: '7pt', marginBottom: '4px' }}>
+                  <div className="text text-small text-muted" style={{ fontSize: '9px', marginBottom: '4px' }}>
                     {(album.image_count || 0).toLocaleString()} photos
                   </div>
                   <button
                     onClick={() => handleConvertAlbumToVehicle(album)}
                     className="button button-secondary"
-                    style={{ width: '100%', fontSize: '7pt', padding: '3px 4px' }}
+                    style={{ width: '100%', fontSize: '9px', padding: '3px 4px' }}
                   >
                     CONVERT TO PROFILE
                   </button>
@@ -1003,7 +1003,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
             <button
               onClick={() => handleAddToAlbum()}
               className="button button-secondary"
-              style={{ width: '100%', fontSize: '8pt', padding: '6px 10px' }}
+              style={{ width: '100%', fontSize: '11px', padding: '6px 10px' }}
             >
               {personalAlbums.length === 0 ? 'CREATE ALBUM' : 'ADD TO ALBUM'}
             </button>
@@ -1035,7 +1035,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 <button
                   onClick={() => handleAcceptSuggestion(s)}
                   className="button button-primary"
-                  style={{ width: '100%', padding: '6px', fontSize: '8pt' }}
+                  style={{ width: '100%', padding: '6px', fontSize: '11px' }}
                 >
                   ACCEPT & CREATE
                 </button>
@@ -1067,7 +1067,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
             <button
               onClick={() => setActiveFilter(null)}
               className="button button-secondary"
-              style={{ padding: '4px 8px', fontSize: '8pt' }}
+              style={{ padding: '4px 8px', fontSize: '11px' }}
             >
               CLEAR FILTER
             </button>
@@ -1084,7 +1084,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 className={`button ${gridDensity === size ? 'button-primary' : 'button-secondary'}`}
                 style={{
                   padding: '6px 10px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   marginLeft: idx > 0 ? '-1px' : '0',
                   textTransform: 'uppercase'
                 }}
@@ -1111,7 +1111,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 gap: '6px'
               }}
             >
-              <div className="text font-bold" style={{ fontSize: '11pt' }}>
+              <div className="text font-bold" style={{ fontSize: '15px' }}>
                 Uploading {uploadProgress.current} / {uploadProgress.total}
               </div>
               <div
@@ -1141,7 +1141,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
               border: '1px solid var(--border-light)',
               margin: '20px'
             }}>
-              <div className="text font-bold" style={{ fontSize: '12pt', marginBottom: '8px' }}>
+              <div className="text font-bold" style={{ fontSize: '16px', marginBottom: '8px' }}>
                 {activeFilter ? 'No photos match filter' : hideOrganized ? 'All photos organized!' : 'No photos yet'}
               </div>
               <div className="text text-small text-muted">
@@ -1221,7 +1221,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         padding: '2px 4px',
                         background: 'rgba(0,0,0,0.75)',
                         color: 'white',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         borderRadius: '0px',
                         border: '1px solid var(--border)'
                       }}>
@@ -1258,7 +1258,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         padding: '2px 5px',
                         background: photo.ai_processing_status === 'processing' ? '#ff9d00' : '#999',
                         color: 'white',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 'bold'
                       }}>
                         {photo.ai_processing_status === 'processing'
@@ -1282,11 +1282,11 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         borderTop: '1px solid var(--border)',
                         padding: '4px 6px'
                       }}>
-                        <div className="text font-bold" style={{ fontSize: '8pt' }}>
+                        <div className="text font-bold" style={{ fontSize: '11px' }}>
                           {photo.ai_detected_vehicle.year} {photo.ai_detected_vehicle.make}
                         </div>
                         {photo.ai_detected_angle && (
-                          <div className="text text-muted" style={{ fontSize: '7pt' }}>
+                          <div className="text text-muted" style={{ fontSize: '9px' }}>
                             {photo.ai_detected_angle.replace('_', ' ').toUpperCase()}
                           </div>
                         )}
@@ -1320,7 +1320,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
               <button
                 onClick={handleAddToAlbum}
                 className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '6px 10px' }}
+                style={{ fontSize: '11px', padding: '6px 10px' }}
               >
                 ADD TO ALBUM
               </button>
@@ -1329,7 +1329,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 <button
                   onClick={() => handleLinkToVehicle(activeVehicleId)}
                   className="button button-secondary"
-                  style={{ fontSize: '8pt', padding: '6px 10px' }}
+                  style={{ fontSize: '11px', padding: '6px 10px' }}
                 >
                   LINK TO ACTIVE PROFILE
                 </button>
@@ -1343,7 +1343,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                   }
                 }}
                 className="form-select"
-                style={{ fontSize: '9pt', padding: '4px 8px' }}
+                style={{ fontSize: '12px', padding: '4px 8px' }}
               >
                 <option value="">Link to...</option>
                 {vehicles.map(v => (
@@ -1356,7 +1356,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
               <button
                 onClick={handleDelete}
                 className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '6px 10px' }}
+                style={{ fontSize: '11px', padding: '6px 10px' }}
               >
                 DELETE
               </button>
@@ -1364,7 +1364,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
               <button
                 onClick={() => setSelectedPhotos(new Set())}
                 className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '6px 10px' }}
+                style={{ fontSize: '11px', padding: '6px 10px' }}
               >
                 CLEAR
               </button>
@@ -1374,7 +1374,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
           <button
             onClick={() => setSelectedPhotos(new Set(displayPhotos.map(p => p.id)))}
             className="button button-secondary"
-            style={{ marginLeft: 'auto', fontSize: '8pt', padding: '6px 10px' }}
+            style={{ marginLeft: 'auto', fontSize: '11px', padding: '6px 10px' }}
           >
             SELECT ALL
           </button>
@@ -1409,7 +1409,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text font-bold" style={{ marginBottom: '12px', fontSize: '11pt' }}>
+            <div className="text font-bold" style={{ marginBottom: '12px', fontSize: '15px' }}>
               Restart AI Processing
             </div>
             <div className="text text-small" style={{ marginBottom: '16px' }}>
@@ -1420,14 +1420,14 @@ export const PersonalPhotoLibrary: React.FC = () => {
               <button
                 onClick={() => setShowRestartWizard(false)}
                 className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '6px 12px' }}
+                style={{ fontSize: '11px', padding: '6px 12px' }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleRestartAIProcessing}
                 className="button button-primary"
-                style={{ fontSize: '8pt', padding: '6px 12px' }}
+                style={{ fontSize: '11px', padding: '6px 12px' }}
               >
                 Restart Processing
               </button>
@@ -1467,7 +1467,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text font-bold" style={{ marginBottom: '12px', fontSize: '11pt' }}>
+            <div className="text font-bold" style={{ marginBottom: '12px', fontSize: '15px' }}>
               Submit to Vehicle
             </div>
             {(() => {
@@ -1488,14 +1488,14 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         setSubmitVehicleId(null);
                       }}
                       className="button button-secondary"
-                      style={{ fontSize: '8pt', padding: '6px 12px' }}
+                      style={{ fontSize: '11px', padding: '6px 12px' }}
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleSubmitToVehicle}
                       className="button button-primary"
-                      style={{ fontSize: '8pt', padding: '6px 12px' }}
+                      style={{ fontSize: '11px', padding: '6px 12px' }}
                     >
                       Submit
                     </button>

@@ -35,7 +35,7 @@ export default function PortalShell({
     <div style={{ padding: '10px 12px' }}>
       {/* Header */}
       <div style={{
-        fontSize: '7pt',
+        fontSize: '9px',
         fontWeight: 700,
         color: 'var(--text-muted, #6b7280)',
         textTransform: 'uppercase',
@@ -53,7 +53,7 @@ export default function PortalShell({
           justifyContent: 'center',
           padding: '16px 0',
           color: 'var(--text-muted)',
-          fontSize: '8pt',
+          fontSize: '11px',
           gap: '6px',
         }}>
           <span style={{
@@ -76,7 +76,7 @@ export default function PortalShell({
           background: '#fef2f2',
           border: '1px solid #fecaca',
           borderRadius: '4px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: '#dc2626',
         }}>
           {error}

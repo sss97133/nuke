@@ -183,7 +183,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
         border: '2px solid var(--border)',
         marginBottom: '16px'
       }}>
-        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           Analyzing fleet health...
         </div>
       </div>
@@ -210,8 +210,8 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
         onClick={onToggleCollapse}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ fontSize: '9pt', fontWeight: 700 }}>Fleet Health</span>
-          <div style={{ display: 'flex', gap: '12px', fontSize: '8pt' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700 }}>Fleet Health</span>
+          <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
             <span style={{ color: '#15803d' }}>
               {healthDistribution.healthy.length} healthy
             </span>
@@ -223,7 +223,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
             </span>
           </div>
         </div>
-        <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>EXPAND</span>
+        <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>EXPAND</span>
       </div>
     );
   }
@@ -242,7 +242,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <span style={{ fontSize: '9pt', fontWeight: 700 }}>Fleet Health Overview</span>
+        <span style={{ fontSize: '12px', fontWeight: 700 }}>Fleet Health Overview</span>
         {onToggleCollapse && (
           <button
             type="button"
@@ -250,7 +250,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '7pt',
+              fontSize: '9px',
               color: 'var(--text-muted)',
               cursor: 'pointer',
               padding: '4px 8px'
@@ -278,10 +278,10 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
               textAlign: 'left'
             }}
           >
-            <div style={{ fontSize: '20pt', fontWeight: 700, color: '#15803d' }}>
+            <div style={{ fontSize: '27px', fontWeight: 700, color: '#15803d' }}>
               {healthDistribution.healthy.length}
             </div>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: '#166534' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#166534' }}>
               Healthy (75%+)
             </div>
           </button>
@@ -300,10 +300,10 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
               textAlign: 'left'
             }}
           >
-            <div style={{ fontSize: '20pt', fontWeight: 700, color: '#d97706' }}>
+            <div style={{ fontSize: '27px', fontWeight: 700, color: '#d97706' }}>
               {healthDistribution.needsWork.length}
             </div>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: '#92400e' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#92400e' }}>
               Needs Work (50-74%)
             </div>
           </button>
@@ -322,10 +322,10 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
               textAlign: 'left'
             }}
           >
-            <div style={{ fontSize: '20pt', fontWeight: 700, color: '#dc2626' }}>
+            <div style={{ fontSize: '27px', fontWeight: 700, color: '#dc2626' }}>
               {healthDistribution.critical.length}
             </div>
-            <div style={{ fontSize: '8pt', fontWeight: 600, color: '#991b1b' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#991b1b' }}>
               Critical (&lt;50%)
             </div>
           </button>
@@ -339,10 +339,10 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
             alignItems: 'center',
             marginBottom: '8px'
           }}>
-            <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
               Migration Progress
             </span>
-            <span style={{ fontSize: '8pt', fontWeight: 700 }}>
+            <span style={{ fontSize: '11px', fontWeight: 700 }}>
               {migrationProgress.percentage}% Complete
             </span>
           </div>
@@ -364,7 +364,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             marginTop: '6px',
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-muted)'
           }}>
             <span>{migrationProgress.complete} complete</span>
@@ -377,7 +377,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
         {missingFields.length > 0 && (
           <div>
             <div style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               color: 'var(--text-muted)',
               marginBottom: '10px'
@@ -416,14 +416,14 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         background: '#e5e7eb',
                         padding: '2px 6px',
                         borderRadius: '2px'
                       }}>
                         {fieldIcons[field]}
                       </span>
-                      <span style={{ fontSize: '8pt' }}>
+                      <span style={{ fontSize: '11px' }}>
                         <strong>{count}</strong> vehicles missing {fieldLabels[field]}
                       </span>
                     </div>
@@ -432,7 +432,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
                       onClick={() => onQuickFix(field as any, vehicles.map(v => v.id))}
                       style={{
                         padding: '4px 10px',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 600,
                         background: '#1e40af',
                         color: '#fff',

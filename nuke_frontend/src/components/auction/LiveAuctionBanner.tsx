@@ -260,7 +260,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
             padding: '8px 12px',
             marginBottom: '8px',
             borderRadius: '4px',
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
@@ -283,7 +283,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
           padding: '8px 12px',
           marginBottom: '12px',
           borderRadius: '4px',
-          fontSize: '8pt',
+          fontSize: '11px',
           lineHeight: '1.4'
         }}
       >
@@ -322,7 +322,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
                 color: 'white',
                 border: 'none',
                 borderRadius: '3px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'all 0.12s ease',
@@ -338,13 +338,13 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
               BID NOW
             </button>
           ) : (
-            <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
               settling…
             </span>
           )}
         </div>
         
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '11px', color: 'var(--text-muted)' }}>
           {isEnded && typeof finalPrice === 'number' && finalPrice > 0 ? (
             <span>
               <strong style={{ color: 'var(--text)' }}>Final:</strong> {formatCurrency(finalPrice)}
@@ -367,7 +367,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
               background: 'transparent',
               border: 'none',
               color: 'var(--primary)',
-              fontSize: '8pt',
+              fontSize: '11px',
               cursor: 'pointer',
               textDecoration: 'underline',
               padding: 0,
@@ -411,7 +411,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>Place Your Bid</h2>
+              <h2 style={{ margin: 0, fontSize: '19px', fontWeight: 700 }}>Place Your Bid</h2>
               <button
                 onClick={() => setShowBidInterface(false)}
                 style={{

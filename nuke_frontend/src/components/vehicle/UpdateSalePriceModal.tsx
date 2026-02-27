@@ -132,10 +132,10 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <h3 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
             Update Sale Price
           </h3>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)', margin: 0 }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
             {vehicleName}
           </p>
         </div>
@@ -147,7 +147,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
             border: '1px solid var(--warning-border, #fbbf24)',
             borderRadius: '4px',
             marginBottom: 'var(--space-3)',
-            fontSize: '8pt'
+            fontSize: '11px'
           }}>
             <strong>Note:</strong> Auction bid was ${auctionBid.toLocaleString()}. This update will record the final sale price.
           </div>
@@ -155,7 +155,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
               Sale Type *
             </label>
             <select
@@ -164,7 +164,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
               style={{
                 width: '100%',
                 padding: 'var(--space-2)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
                 background: 'var(--white)'
@@ -177,7 +177,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
           </div>
 
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
               Sale Price ($) *
             </label>
             <input
@@ -188,7 +188,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
               style={{
                 width: '100%',
                 padding: 'var(--space-2)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px'
               }}
@@ -197,7 +197,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
           </div>
 
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
               Sale Date *
             </label>
             <input
@@ -207,7 +207,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
               style={{
                 width: '100%',
                 padding: 'var(--space-2)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px'
               }}
@@ -216,7 +216,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
           </div>
 
           <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
               Buyer Name
             </label>
             <input
@@ -227,20 +227,20 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
               style={{
                 width: '100%',
                 padding: 'var(--space-2)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px'
               }}
             />
             {saleType === 'post_auction' && (
-              <p style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
+              <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
                 Leave blank if buyer is unknown
               </p>
             )}
           </div>
 
           <div style={{ marginBottom: 'var(--space-4)' }}>
-            <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
               Additional Notes
             </label>
             <textarea
@@ -251,7 +251,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
               style={{
                 width: '100%',
                 padding: 'var(--space-2)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
                 fontFamily: 'inherit',
@@ -267,7 +267,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
               border: '1px solid var(--error-border, #ef4444)',
               borderRadius: '4px',
               marginBottom: 'var(--space-3)',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--error-text, #dc2626)'
             }}>
               {error}
@@ -281,7 +281,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
               disabled={saving}
               style={{
                 padding: 'var(--space-2) var(--space-4)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 'bold',
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
@@ -296,7 +296,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
               disabled={saving}
               style={{
                 padding: 'var(--space-2) var(--space-4)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 'bold',
                 background: 'var(--accent)',
                 color: 'var(--white)',

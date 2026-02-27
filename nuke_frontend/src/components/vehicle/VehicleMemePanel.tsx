@@ -251,7 +251,7 @@ export default function VehicleMemePanel({
     <div className="card">
       <div className="card-body">
         {!user?.id && (
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
             Login to drop memes
           </div>
         )}
@@ -317,7 +317,7 @@ export default function VehicleMemePanel({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '8pt',
+                fontSize: '11px',
               }}
             >
               +{imageMemes.length - 6}
@@ -330,7 +330,7 @@ export default function VehicleMemePanel({
             <button
               className="button button-secondary"
               onClick={() => setExpanded(false)}
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               Collapse
             </button>

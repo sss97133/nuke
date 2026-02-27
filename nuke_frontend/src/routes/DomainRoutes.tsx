@@ -59,6 +59,9 @@ const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
 // Acquisition Pipeline
 const AcquisitionPipeline = React.lazy(() => import('../pages/AcquisitionPipeline'));
 
+// Team Inbox
+const TeamInbox = React.lazy(() => import('../pages/TeamInbox'));
+
 // Predictions (betting)
 const BettingPage = React.lazy(() => import('../pages/betting/index'));
 const MarketDetail = React.lazy(() => import('../pages/betting/MarketDetail'));
@@ -173,6 +176,9 @@ export const DomainRoutes = () => {
         {/* Acquisition Pipeline */}
         <Route path="/pipeline" element={<AcquisitionPipeline />} />
         <Route path="/acquisitions" element={<AcquisitionPipeline />} />
+
+        {/* Team Inbox */}
+        <Route path="/inbox" element={<TeamInbox />} />
 
         {/* Predictions (betting) */}
         <Route path="/predictions" element={<BettingPage />} />

@@ -157,7 +157,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
         flex: 1,
         overflowY: 'auto',
         padding: '8px',
-        fontSize: '7pt',
+        fontSize: '9px',
         lineHeight: '1.4'
       }}>
         {messages.map((msg) => (
@@ -176,7 +176,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
             }}
           >
             <div style={{
-              fontSize: '6pt',
+              fontSize: '8px',
               color: 'rgba(255,255,255,0.5)',
               marginBottom: '2px',
               textTransform: 'uppercase'
@@ -187,7 +187,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
               {msg.content}
             </div>
             {msg.actions && msg.actions.length > 0 && (
-              <div style={{ marginTop: '4px', fontSize: '6pt', color: 'rgba(0,255,0,0.7)' }}>
+              <div style={{ marginTop: '4px', fontSize: '8px', color: 'rgba(0,255,0,0.7)' }}>
                 {msg.actions.map((action, idx) => (
                   <div key={idx}>
                     {action.type === 'field_update' && `✓ Updated ${action.field}`}
@@ -202,7 +202,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
         {isProcessing && (
           <div style={{
             padding: '4px 6px',
-            fontSize: '6pt',
+            fontSize: '8px',
             color: 'rgba(255,255,255,0.5)',
             fontStyle: 'italic'
           }}>
@@ -229,7 +229,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
           style={{
             flex: 1,
             padding: '4px 6px',
-            fontSize: '7pt',
+            fontSize: '9px',
             backgroundColor: 'rgba(0,0,0,0.5)',
             border: '2px inset rgba(255,255,255,0.2)',
             color: '#fff',
@@ -241,7 +241,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
           disabled={!input.trim() || isProcessing}
           style={{
             padding: '4px 8px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 'bold',
             backgroundColor: input.trim() && !isProcessing 
               ? 'rgba(255,255,255,0.2)' 

@@ -76,10 +76,10 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
         <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
           {isOwnProfile ? (
             <div>
-              <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
                 No vehicles yet
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
                 Add your first vehicle to start tracking ownership history, photos, and events.
               </div>
               <button
@@ -90,7 +90,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
               </button>
             </div>
           ) : (
-            <div className="text text-muted" style={{ fontSize: '8pt' }}>
+            <div className="text text-muted" style={{ fontSize: '11px' }}>
               No public vehicles to display.
             </div>
           )}

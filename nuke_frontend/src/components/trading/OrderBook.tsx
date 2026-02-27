@@ -147,7 +147,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
         background: 'var(--surface)',
         border: '2px solid #bdbdbd',
         borderRadius: '4px',
-        fontSize: '9pt',
+        fontSize: '12px',
         overflow: 'hidden',
       }}
     >
@@ -162,7 +162,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
           background: '#f9fafb',
         }}
       >
-        <h3 style={{ margin: 0, fontSize: '10pt', fontWeight: 'bold' }}>Order Book</h3>
+        <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>Order Book</h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
@@ -174,7 +174,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
             title={isConnected ? 'Connected' : 'Disconnected'}
           />
           {lastUpdate && (
-            <span style={{ fontSize: '8pt', color: '#6b7280' }}>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
               {lastUpdate.toLocaleTimeString()}
             </span>
           )}
@@ -189,7 +189,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
           gap: '4px',
           padding: '6px 8px',
           borderBottom: '1px solid #e5e7eb',
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 600,
           color: '#6b7280',
           textTransform: 'uppercase',
@@ -238,7 +238,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
             display: 'flex',
             justifyContent: 'center',
             gap: '16px',
-            fontSize: '9pt',
+            fontSize: '12px',
           }}
         >
           <div>
@@ -269,7 +269,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
           style={{
             padding: '6px 12px',
             borderTop: '1px solid #e5e7eb',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#6b7280',
             display: 'flex',
             justifyContent: 'space-between',

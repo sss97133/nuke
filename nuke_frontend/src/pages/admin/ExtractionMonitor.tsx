@@ -428,7 +428,7 @@ const ExtractionMonitor: React.FC = () => {
           <div style={{ fontSize: '32px', fontWeight: 'bold' }}>
             {stats.models.length}
           </div>
-          <div style={{ fontSize: '8pt', marginTop: '4px', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-muted)' }}>
             {stats.models.length > 0 ? (
               stats.models.map((model, idx) => (
                 <React.Fragment key={model}>
@@ -520,7 +520,7 @@ const ExtractionMonitor: React.FC = () => {
                   </span>
                 </div>
                 <div style={{ 
-                  fontSize: '8pt', 
+                  fontSize: '11px', 
                   color: 'var(--text-muted)',
                   marginTop: '4px',
                   wordBreak: 'break-all'
@@ -599,7 +599,7 @@ const ExtractionMonitor: React.FC = () => {
                     </span>
                   </div>
                   <div style={{ 
-                    fontSize: '8pt', 
+                    fontSize: '11px', 
                     color: 'var(--text-muted)',
                     marginTop: '4px',
                     wordBreak: 'break-all',
@@ -617,7 +617,7 @@ const ExtractionMonitor: React.FC = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ 
-                            fontSize: '8pt', 
+                            fontSize: '11px', 
                             color: 'var(--accent)',
                             textDecoration: 'underline'
                           }}

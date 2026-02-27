@@ -280,7 +280,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <h2 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
             {step === 'agreement' ? 'Buyer Agency Agreement' : step === 'credentials' ? 'Add Platform Login' : 'Place Proxy Bid'}
           </h2>
           <button
@@ -288,7 +288,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '16pt',
+              fontSize: '21px',
               cursor: 'pointer',
               padding: '0 4px',
               color: 'var(--text-muted)'
@@ -308,7 +308,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
               padding: '10px 12px',
               borderRadius: '4px',
               marginBottom: '16px',
-              fontSize: '9pt'
+              fontSize: '12px'
             }}>
               {error}
             </div>
@@ -316,7 +316,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
 
           {/* Loading state */}
           {step === 'check' && loading && (
-            <div style={{ textAlign: 'center', padding: '40px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            <div style={{ textAlign: 'center', padding: '40px', fontSize: '12px', color: 'var(--text-muted)' }}>
               Checking your account...
             </div>
           )}
@@ -339,10 +339,10 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 borderRadius: '4px',
                 marginBottom: '16px'
               }}>
-                <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
                   Platform Login Required
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                   To bid automatically on {getPlatformName(listing.platform)}, we need your login credentials.
                   Your credentials are encrypted and stored securely.
                 </div>
@@ -369,10 +369,10 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   />
                 )}
                 <div>
-                  <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700 }}>
                     {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     on {getPlatformName(listing.platform)}
                   </div>
                 </div>
@@ -383,7 +383,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   type="button"
                   className="button"
                   onClick={onClose}
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                 >
                   Cancel
                 </button>
@@ -391,7 +391,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   type="button"
                   className="button button-primary"
                   onClick={() => setShowCredentialForm(true)}
-                  style={{ fontSize: '9pt', flex: 1 }}
+                  style={{ fontSize: '12px', flex: 1 }}
                 >
                   Add {getPlatformName(listing.platform)} Login
                 </button>
@@ -406,7 +406,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                     background: 'none',
                     border: 'none',
                     color: 'var(--text-muted)',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     cursor: 'pointer',
                     textDecoration: 'underline'
                   }}
@@ -454,14 +454,14 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   />
                 )}
                 <div>
-                  <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700 }}>
                     {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     on {getPlatformName(listing.platform)}
                   </div>
                   {currentBid > 0 && (
-                    <div style={{ fontSize: '9pt', marginTop: '4px' }}>
+                    <div style={{ fontSize: '12px', marginTop: '4px' }}>
                       Current bid: <strong>${currentBid.toLocaleString()}</strong>
                     </div>
                   )}
@@ -470,7 +470,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
 
               {/* Max bid input */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
                   Maximum Bid Amount *
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -479,7 +479,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                     left: '10px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     color: 'var(--text-muted)'
                   }}>$</span>
                   <input
@@ -491,19 +491,19 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                       width: '100%',
                       padding: '10px 12px 10px 24px',
                       border: '1px solid var(--border)',
-                      fontSize: '11pt',
+                      fontSize: '15px',
                       fontWeight: 600
                     }}
                   />
                 </div>
-                <p style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Minimum bid: ${minBid.toLocaleString()}. We'll bid up to this amount on your behalf.
                 </p>
               </div>
 
               {/* Bid strategy */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>
                   Bidding Strategy
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -525,8 +525,8 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                       style={{ marginTop: '2px' }}
                     />
                     <div>
-                      <div style={{ fontSize: '9pt', fontWeight: 600 }}>Standard Proxy</div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600 }}>Standard Proxy</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         Bid incrementally as needed to stay winning
                       </div>
                     </div>
@@ -549,8 +549,8 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                       style={{ marginTop: '2px' }}
                     />
                     <div>
-                      <div style={{ fontSize: '9pt', fontWeight: 600 }}>Last-Minute Snipe</div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600 }}>Last-Minute Snipe</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         Place bid in the final minutes of the auction
                       </div>
                     </div>
@@ -565,7 +565,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   padding: '12px',
                   borderRadius: '4px',
                   marginBottom: '16px',
-                  fontSize: '8pt'
+                  fontSize: '11px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span>Maximum bid:</span>
@@ -579,7 +579,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                     <span>Estimated commission ({commissionRateDisplay}%):</span>
                     <span>${commissionAmount.toLocaleString()}</span>
                   </div>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '6px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px' }}>
                     Risk tier: {commissionTier.label} — {commissionTier.description}. Final commission is based on the winning price.
                   </div>
                 </div>
@@ -599,7 +599,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   onChange={(e) => setAgreedToDeposit(e.target.checked)}
                   style={{ marginTop: '2px' }}
                 />
-                <span style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                   I authorize Nuke to hold a refundable deposit of ${depositAmount.toLocaleString()} (10% of max bid).
                   This will be refunded if I don't win, or applied toward my commission if I do win.
                 </span>
@@ -610,7 +610,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   type="button"
                   className="button"
                   onClick={onClose}
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                 >
                   Cancel
                 </button>
@@ -619,7 +619,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   className="button button-primary"
                   onClick={handleSubmitBid}
                   disabled={!maxBidCents || !agreedToDeposit || maxBidCents < minBid * 100}
-                  style={{ fontSize: '9pt', flex: 1 }}
+                  style={{ fontSize: '12px', flex: 1 }}
                 >
                   Review Bid
                 </button>
@@ -636,7 +636,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 padding: '12px',
                 borderRadius: '4px',
                 marginBottom: '16px',
-                fontSize: '9pt'
+                fontSize: '12px'
               }}>
                 <strong>Please confirm your proxy bid:</strong>
               </div>
@@ -648,42 +648,42 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 marginBottom: '16px'
               }}>
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Vehicle</div>
-                  <div style={{ fontSize: '10pt', fontWeight: 600 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vehicle</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600 }}>
                     {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
                   </div>
                 </div>
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Platform</div>
-                  <div style={{ fontSize: '9pt' }}>{getPlatformName(listing.platform)}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Platform</div>
+                  <div style={{ fontSize: '12px' }}>{getPlatformName(listing.platform)}</div>
                 </div>
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Maximum Bid</div>
-                  <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--accent)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Maximum Bid</div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent)' }}>
                     ${maxBidAmount.toLocaleString()}
                   </div>
                 </div>
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Strategy</div>
-                  <div style={{ fontSize: '9pt' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Strategy</div>
+                  <div style={{ fontSize: '12px' }}>
                     {bidStrategy === 'proxy_auto' ? 'Standard Proxy' : 'Last-Minute Snipe'}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Deposit to Authorize</div>
-                  <div style={{ fontSize: '10pt', fontWeight: 600 }}>${depositAmount.toLocaleString()}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Deposit to Authorize</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600 }}>${depositAmount.toLocaleString()}</div>
                 </div>
                 {maxBidCents > 0 && (
                   <div style={{ marginTop: '12px' }}>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Estimated Commission</div>
-                    <div style={{ fontSize: '10pt', fontWeight: 600 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Estimated Commission</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>
                       ${commissionAmount.toLocaleString()} ({commissionRateDisplay}% · {commissionTier.label})
                     </div>
                   </div>
                 )}
               </div>
 
-              <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
                 By confirming, you authorize Nuke to bid up to ${maxBidAmount.toLocaleString()} on
                 this vehicle. A deposit hold of ${depositAmount.toLocaleString()} will be placed on your
                 payment method.
@@ -695,7 +695,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   className="button"
                   onClick={() => setStep('bid')}
                   disabled={loading}
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                 >
                   Back
                 </button>
@@ -704,7 +704,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   className="button button-primary"
                   onClick={handleConfirmBid}
                   disabled={loading}
-                  style={{ fontSize: '9pt', flex: 1 }}
+                  style={{ fontSize: '12px', flex: 1 }}
                 >
                   {loading ? 'Placing Bid...' : 'Confirm & Place Bid'}
                 </button>
@@ -724,14 +724,14 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                fontSize: '24pt'
+                fontSize: '32px'
               }}>
                 ✓
               </div>
-              <h3 style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '8px' }}>
                 Proxy Bid Placed!
               </h3>
-              <p style={{ fontSize: '9pt', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
                 We'll bid on your behalf up to ${maxBidAmount.toLocaleString()}.
                 You'll receive notifications as the auction progresses.
               </p>
@@ -739,7 +739,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 type="button"
                 className="button button-primary"
                 onClick={onClose}
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
               >
                 Done
               </button>

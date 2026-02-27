@@ -24,7 +24,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Minimum Investment ($)
               </label>
               <input
@@ -38,7 +38,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Maximum Investment ($) - Optional
               </label>
               <input
@@ -52,7 +52,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Share Structure
               </label>
               <select
@@ -68,7 +68,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Initial Share Price ($) - Optional
               </label>
               <input
@@ -92,7 +92,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Management Fee (% annually)
               </label>
               <input
@@ -107,7 +107,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Performance Fee (% of gains)
               </label>
               <input
@@ -122,7 +122,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Performance Fee Hurdle (%)
               </label>
               <input
@@ -137,7 +137,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Transaction Fee (%)
               </label>
               <input
@@ -152,7 +152,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Setup Fee ($)
               </label>
               <input
@@ -166,7 +166,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Early Exit Fee (%)
               </label>
               <input
@@ -191,7 +191,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Liquidity Type
               </label>
               <select
@@ -212,7 +212,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
 
             {contract.liquidity_type === 'lockup_period' && (
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Lockup Period (days)
                 </label>
                 <input
@@ -226,7 +226,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             )}
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Redemption Frequency
               </label>
               <select
@@ -242,7 +242,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Redemption Notice (days)
               </label>
               <input
@@ -265,7 +265,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Entity Type
               </label>
               <select
@@ -283,7 +283,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Legal Entity Name
               </label>
               <input
@@ -296,7 +296,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Jurisdiction
               </label>
               <input
@@ -308,7 +308,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Regulatory Status
               </label>
               <select
@@ -336,7 +336,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
         <div className="card-body">
           <div style={{ display: 'grid', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Investment Strategy Description
               </label>
               <textarea
@@ -350,7 +350,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Target Returns (% annually)
                 </label>
                 <input
@@ -365,7 +365,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Risk Level
                 </label>
                 <select
@@ -381,7 +381,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                   Rebalancing Frequency
                 </label>
                 <select
@@ -409,7 +409,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Transparency Level
               </label>
               <select
@@ -424,7 +424,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Reporting Frequency
               </label>
               <select
@@ -441,7 +441,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', fontWeight: 700 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 700 }}>
                 <input
                   type="checkbox"
                   checked={contract.audit_required || false}
@@ -452,7 +452,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
                 Custodian Name (Optional)
               </label>
               <input

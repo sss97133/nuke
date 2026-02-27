@@ -118,7 +118,7 @@ export default function WiringQueryContextBar({
             flex: 1,
             border: 'none',
             outline: 'none',
-            fontSize: '8pt',
+            fontSize: '11px',
             fontFamily: '"MS Sans Serif", sans-serif',
             background: 'transparent',
             minWidth: 0,
@@ -135,7 +135,7 @@ export default function WiringQueryContextBar({
           className="button-win95"
           style={{
             padding: '2px 8px',
-            fontSize: '8pt',
+            fontSize: '11px',
             height: '20px',
             minWidth: '35px',
             opacity: (isProcessing || !input.trim()) ? 0.5 : 1,
@@ -156,7 +156,7 @@ export default function WiringQueryContextBar({
             background: '#ffebee',
             border: '1px solid #f44336',
             borderRadius: '2px',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#c62828'
           }}
         >

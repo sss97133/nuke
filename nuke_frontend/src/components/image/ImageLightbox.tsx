@@ -1709,12 +1709,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
               {/* Info Tab */}
               {activeTab === 'info' && (
-                <div className="space-y-4" style={{ fontSize: '8pt' }}>
+                <div className="space-y-4" style={{ fontSize: '11px' }}>
                   {/* Date/Time */}
                   {imageMetadata && (
                     <div>
-                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Date & Time</h4>
-                      <div style={{ fontSize: '8pt', color: '#fff' }}>
+                      <h4 style={{ fontSize: '9px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Date & Time</h4>
+                      <div style={{ fontSize: '11px', color: '#fff' }}>
                         {(() => {
                           const date = imageMetadata.taken_at || imageMetadata.created_at;
                           if (!date) return 'Unknown';
@@ -1734,8 +1734,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Camera & EXIF */}
                   {imageMetadata?.exif_data?.camera && (
                     <div>
-                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Camera & EXIF</h4>
-                      <div style={{ fontSize: '8pt', color: '#fff' }}>
+                      <h4 style={{ fontSize: '9px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Camera & EXIF</h4>
+                      <div style={{ fontSize: '11px', color: '#fff' }}>
                         <div>
                           {typeof imageMetadata.exif_data.camera === 'string' 
                             ? imageMetadata.exif_data.camera 
@@ -1768,12 +1768,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                             parts.push(`ISO ${exif.iso || exif.technical?.iso}`);
                           }
                           if (parts.length > 0) {
-                            return <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)' }}>{parts.join(' • ')}</div>;
+                            return <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)' }}>{parts.join(' • ')}</div>;
                           }
                           return null;
                         })()}
                         {imageMetadata.exif_data.dimensions && (
-                          <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)' }}>
+                          <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)' }}>
                             {imageMetadata.exif_data.dimensions.width} × {imageMetadata.exif_data.dimensions.height}
                           </div>
                         )}
@@ -1784,8 +1784,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Location */}
                   {imageMetadata?.exif_data?.location && (imageMetadata.exif_data.location.city || imageMetadata.exif_data.location.latitude) && (
                     <div>
-                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Location</h4>
-                      <div style={{ fontSize: '8pt', color: '#fff' }}>
+                      <h4 style={{ fontSize: '9px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Location</h4>
+                      <div style={{ fontSize: '11px', color: '#fff' }}>
                         {imageMetadata.exif_data.location.city && imageMetadata.exif_data.location.state
                           ? `${imageMetadata.exif_data.location.city}, ${imageMetadata.exif_data.location.state}`
                           : imageMetadata.exif_data.location.latitude
@@ -1799,8 +1799,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Stats */}
                   {(imageMetadata?.view_count || imageMetadata?.comment_count || comments.length > 0) && (
                     <div>
-                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Stats</h4>
-                      <div style={{ fontSize: '8pt', color: '#fff' }}>
+                      <h4 style={{ fontSize: '9px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Stats</h4>
+                      <div style={{ fontSize: '11px', color: '#fff' }}>
                         {[
                           imageMetadata?.view_count ? `${imageMetadata.view_count} ${imageMetadata.view_count === 1 ? 'view' : 'views'}` : null,
                           comments.length > 0 ? `${comments.length} ${comments.length === 1 ? 'comment' : 'comments'}` : null
@@ -1812,8 +1812,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Tags Preview */}
                   {tags.length > 0 && (
                     <div>
-                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Tags</h4>
-                      <div style={{ fontSize: '8pt', color: '#fff' }}>
+                      <h4 style={{ fontSize: '9px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Tags</h4>
+                      <div style={{ fontSize: '11px', color: '#fff' }}>
                         {tags.slice(0, 5).map(tag => tag.tag_text || tag.tag_name || tag.text || 'tag').filter(Boolean).join(' • ')}
                         {tags.length > 5 && <span style={{ color: 'rgba(255,255,255,0.5)' }}> • +{tags.length - 5} more</span>}
                       </div>
@@ -1822,8 +1822,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
                   {attribution && (
                     <div>
-                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Provenance</h4>
-                      <div style={{ fontSize: '8pt', color: '#fff' }}>
+                      <h4 style={{ fontSize: '9px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Provenance</h4>
+                      <div style={{ fontSize: '11px', color: '#fff' }}>
                         {(() => {
                           const platformUrl =
                             attribution?.seller?.listingUrl ||
@@ -1848,7 +1848,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               {/* Origin (photographer or seller) */}
                               {attribution.seller?.handle && (
                                 <div style={{ marginBottom: '8px' }}>
-                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
                                     Origin (seller)
                                   </div>
                                   <a
@@ -1858,7 +1858,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                     style={{
                                       color: '#4A9EFF',
                                       textDecoration: 'underline',
-                                      fontSize: '7pt',
+                                      fontSize: '9px',
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '3px'
@@ -1869,11 +1869,11 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                       ? `${attribution.seller.displayName} (@${attribution.seller.handle})`
                                       : `@${attribution.seller.handle}`}
                                   </a>
-                                  <div style={{ fontSize: '6pt', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>
+                                  <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>
                                     Inferred from auction listing (seller-provided photos)
                                   </div>
                                   {attribution.seller.claimedByUserId ? (
-                                    <div style={{ fontSize: '6pt', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+                                    <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
                                       Claimed •{' '}
                                       <a
                                         href={`/profile/${attribution.seller.claimedByUserId}`}
@@ -1899,7 +1899,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                       style={{
                                         marginTop: '6px',
                                         padding: '4px 8px',
-                                        fontSize: '7pt',
+                                        fontSize: '9px',
                                         fontWeight: 'bold',
                                         backgroundColor: 'rgba(255,255,255,0.05)',
                                         color: 'rgba(255,255,255,0.7)',
@@ -1916,13 +1916,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
                               {attribution.photographer && (
                                 <div style={{ marginBottom: '8px' }}>
-                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
                                     Origin (photographer)
                                   </div>
-                                  <div style={{ fontSize: '7pt' }}>
+                                  <div style={{ fontSize: '9px' }}>
                                     {attribution.photographer.name}
                                     {attribution.photographer.camera && (
-                                      <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '4px', fontSize: '6pt' }}>
+                                      <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '4px', fontSize: '8px' }}>
                                         ({attribution.photographer.camera})
                                       </span>
                                     )}
@@ -1933,7 +1933,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               {/* Platform (listing/discovery URL) */}
                               {platformUrl && (
                                 <div style={{ marginBottom: '8px' }}>
-                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
                                     Platform
                                   </div>
                                   <a
@@ -1944,7 +1944,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                       color: '#4A9EFF',
                                       textDecoration: 'underline',
                                       wordBreak: 'break-all',
-                                      fontSize: '7pt',
+                                      fontSize: '9px',
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '3px'
@@ -1959,7 +1959,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               {/* Acquisition method (ingestion pipeline) */}
                               {attribution.source && (
                                 <div style={{ marginBottom: '6px' }}>
-                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
                                     Acquired via
                                   </div>
                                   {ingestionUrl ? (
@@ -1971,7 +1971,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '4px',
-                                        fontSize: '7pt',
+                                        fontSize: '9px',
                                         color: 'var(--text-muted)',
                                         padding: '1px 6px',
                                         background: 'rgba(255,255,255,0.05)',
@@ -1990,7 +1990,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '4px',
-                                        fontSize: '7pt',
+                                        fontSize: '9px',
                                         color: 'var(--text-muted)',
                                         padding: '1px 6px',
                                         background: 'rgba(255,255,255,0.05)',
@@ -2008,10 +2008,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               {/* Imported/uploaded by (if known) */}
                               {attribution.uploader && (
                                 <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
                                     Imported by
                                   </div>
-                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.8)' }}>
+                                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>
                                     {attribution.uploader.full_name || attribution.uploader.username || 'User'}
                                   </div>
                                 </div>
@@ -2020,13 +2020,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               {/* Organization relationship (not the photo source) */}
                               {attribution.organization && (
                                 <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
                                     Linked organization
                                   </div>
-                                  <div style={{ fontSize: '7pt' }}>
+                                  <div style={{ fontSize: '9px' }}>
                                     {attribution.organization.name}
                                     {attribution.organization.relationshipLabel ? (
-                                      <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '4px', fontSize: '6pt' }}>
+                                      <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '4px', fontSize: '8px' }}>
                                         ({attribution.organization.relationshipLabel})
                                       </span>
                                     ) : null}
@@ -2095,13 +2095,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           borderBottom: '1px solid rgba(255,255,255,0.05)'
                         }}>
                           <span style={{ 
-                            fontSize: '7pt', 
+                            fontSize: '9px', 
                             color: 'rgba(255,255,255,0.5)',
                             minWidth: '100px',
                             flexShrink: 0
                           }}>{label}</span>
                           <span style={{ 
-                            fontSize: '7pt', 
+                            fontSize: '9px', 
                             color: mono ? '#4ade80' : 'white',
                             fontFamily: mono ? 'monospace' : 'inherit',
                             textAlign: 'right',
@@ -2127,7 +2127,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               style={{
                                 width: '100%',
                                 padding: '8px',
-                                fontSize: '8pt',
+                                fontSize: '11px',
                                 fontWeight: 'bold',
                                 backgroundColor: analyzing ? '#4b5563' : '#ca8a04',
                                 color: 'white',
@@ -2142,12 +2142,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
                         {/* Live progress + last error (so “nothing happened” is obvious) */}
                         {analyzing && analysisProgress && (
-                          <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>
                             {analysisProgress}
                           </div>
                         )}
                         {analysisError && (
-                          <div style={{ fontSize: '7pt', color: '#fca5a5', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '9px', color: '#fca5a5', marginBottom: '8px' }}>
                             {analysisError}
                           </div>
                         )}
@@ -2156,7 +2156,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {imageMetadata && (
                           <div style={{ marginBottom: '12px' }}>
                             <div style={{ 
-                              fontSize: '6pt', 
+                              fontSize: '8px', 
                               color: 'rgba(255,255,255,0.3)', 
                               textTransform: 'uppercase',
                               marginBottom: '4px',
@@ -2181,7 +2181,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {tier1Analysis && (
                           <div style={{ marginBottom: '12px' }}>
                             <div style={{ 
-                              fontSize: '6pt', 
+                              fontSize: '8px', 
                               color: 'rgba(255,255,255,0.3)', 
                               textTransform: 'uppercase',
                               marginBottom: '4px',
@@ -2208,7 +2208,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {tier1Analysis?.image_quality && (
                           <div style={{ marginBottom: '12px' }}>
                             <div style={{ 
-                              fontSize: '6pt', 
+                              fontSize: '8px', 
                               color: 'rgba(255,255,255,0.3)', 
                               textTransform: 'uppercase',
                               marginBottom: '4px',
@@ -2233,7 +2233,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {tier1Analysis?.basic_observations && (
                           <div style={{ marginBottom: '12px' }}>
                             <div style={{ 
-                              fontSize: '6pt', 
+                              fontSize: '8px', 
                               color: 'rgba(255,255,255,0.3)', 
                               textTransform: 'uppercase',
                               marginBottom: '4px',
@@ -2243,7 +2243,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               background: 'rgba(0,0,0,0.3)', 
                               padding: '8px',
                               border: '1px solid rgba(255,255,255,0.1)',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               color: 'white',
                               lineHeight: '1.4'
                             }}>
@@ -2256,7 +2256,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {imageMetadata?.ai_scan_metadata && (
                           <div style={{ marginBottom: '12px' }}>
                             <div style={{ 
-                              fontSize: '6pt', 
+                              fontSize: '8px', 
                               color: 'rgba(255,255,255,0.3)', 
                               textTransform: 'uppercase',
                               marginBottom: '4px',
@@ -2277,7 +2277,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {appraiser && (
                           <div style={{ marginBottom: '12px' }}>
                             <div style={{ 
-                              fontSize: '6pt', 
+                              fontSize: '8px', 
                               color: 'rgba(255,255,255,0.3)', 
                               textTransform: 'uppercase',
                               marginBottom: '4px',
@@ -2291,7 +2291,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               <DataRow label="Model" value={appraiser.model} mono />
                               <DataRow label="Angle" value={appraiser.angle} mono />
                               {appraiser.description && (
-                                <div style={{ marginTop: '4px', fontSize: '8pt', color: 'white', lineHeight: '1.4' }}>
+                                <div style={{ marginTop: '4px', fontSize: '11px', color: 'white', lineHeight: '1.4' }}>
                                   {appraiser.description}
                                 </div>
                               )}
@@ -2303,7 +2303,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {imageMetadata?.ai_scan_metadata?.spid_data?.is_spid_sheet && (
                           <div style={{ marginBottom: '12px' }}>
                             <div style={{ 
-                              fontSize: '6pt', 
+                              fontSize: '8px', 
                               color: '#4ade80', 
                               textTransform: 'uppercase',
                               marginBottom: '4px',
@@ -2337,7 +2337,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                             style={{
                               width: '100%',
                               padding: '6px',
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               backgroundColor: 'rgba(255,255,255,0.05)',
                               color: 'rgba(255,255,255,0.5)',
                               border: '1px solid rgba(255,255,255,0.1)',

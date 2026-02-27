@@ -201,7 +201,7 @@ export default function NLQueryConsole() {
 
   if (adminLoading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
         Checking admin access...
       </div>
     );
@@ -209,13 +209,13 @@ export default function NLQueryConsole() {
 
   if (!isAdmin) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
         <div style={{ marginBottom: '16px', fontWeight: 700 }}>Access Denied</div>
         <div style={{ marginBottom: '16px' }}>Admin privileges are required to access this page.</div>
         <button
           className="button button-secondary"
           onClick={() => navigate('/org/dashboard')}
-          style={{ fontSize: '8pt', padding: '8px 16px' }}
+          style={{ fontSize: '11px', padding: '8px 16px' }}
         >
           Return to Dashboard
         </button>
@@ -226,22 +226,22 @@ export default function NLQueryConsole() {
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
       <div style={{ marginBottom: '20px' }}>
-        <h1 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <h1 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Query Chat
         </h1>
-        <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           Chat to query <span style={{ fontFamily: 'monospace' }}>public.vehicles</span>. Results and SQL are shown on the right.
         </p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.1fr) minmax(380px, 1.9fr)', gap: '16px' }}>
         <div className="card" style={{ border: '2px solid var(--border-light)', display: 'flex', flexDirection: 'column', minHeight: '560px' }}>
-          <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700 }}>
+          <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
             Chat
           </div>
           <div className="card-body" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {messages.length === 0 && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Ask a question to start. You can keep multiple queries in this thread.
               </div>
             )}
@@ -253,7 +253,7 @@ export default function NLQueryConsole() {
                     color: message.role === 'user' ? 'var(--white)' : 'var(--text)',
                     padding: '8px 10px',
                     borderRadius: '10px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     border: message.role === 'assistant' ? '1px solid var(--border-light)' : 'none',
                   }}>
                     {message.content}
@@ -270,7 +270,7 @@ export default function NLQueryConsole() {
                       color: 'var(--accent)',
                       cursor: 'pointer',
                       padding: 0,
-                      fontSize: '8pt',
+                      fontSize: '11px',
                     }}
                   >
                     View details →
@@ -281,7 +281,7 @@ export default function NLQueryConsole() {
             <div ref={messagesEndRef} />
           </div>
           <div style={{ borderTop: '1px solid var(--border)', padding: '12px', display: 'grid', gap: '10px' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               Try: {EXAMPLES.map((ex, i) => (
                 <button
                   key={ex}
@@ -294,7 +294,7 @@ export default function NLQueryConsole() {
                     cursor: 'pointer',
                     padding: 0,
                     marginRight: i === EXAMPLES.length - 1 ? 0 : 10,
-                    fontSize: '8pt',
+                    fontSize: '11px',
                   }}
                 >
                   {ex}
@@ -310,14 +310,14 @@ export default function NLQueryConsole() {
               style={{
                 width: '100%',
                 padding: '10px',
-                fontSize: '9pt',
+                fontSize: '12px',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
                 background: 'var(--surface)',
               }}
             />
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 Row limit
                 <input
                   type="number"
@@ -330,11 +330,11 @@ export default function NLQueryConsole() {
                     width: 90,
                     padding: '6px 8px',
                     border: '1px solid var(--border)',
-                    fontSize: '9pt',
+                    fontSize: '12px',
                   }}
                 />
               </label>
-              <label style={{ fontSize: '8pt', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <input
                   type="checkbox"
                   checked={includeMerged}
@@ -351,7 +351,7 @@ export default function NLQueryConsole() {
                     setActiveResultId(null);
                   }}
                   disabled={loading}
-                  style={{ fontSize: '8pt', padding: '8px 12px' }}
+                  style={{ fontSize: '11px', padding: '8px 12px' }}
                 >
                   Clear chat
                 </button>
@@ -359,7 +359,7 @@ export default function NLQueryConsole() {
                   className="button button-primary"
                   onClick={() => runQuery()}
                   disabled={loading || !query.trim()}
-                  style={{ fontSize: '8pt', padding: '8px 12px' }}
+                  style={{ fontSize: '11px', padding: '8px 12px' }}
                 >
                   {loading ? 'Running...' : 'Send'}
                 </button>
@@ -369,18 +369,18 @@ export default function NLQueryConsole() {
         </div>
 
         <div className="card" style={{ border: '2px solid var(--border-light)' }}>
-          <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700 }}>
+          <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
             Research View
           </div>
           <div className="card-body" style={{ display: 'grid', gap: '12px' }}>
             {!activeResult && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Ask a question to see SQL and results here.
               </div>
             )}
             {activeResult && (
               <>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   <div><b>Question</b>: {activeResult.question}</div>
                   <div><b>Rows</b>: {activeResult.response.row_count ?? rows.length}</div>
                   <div><b>Provider</b>: {activeResult.response.provider || 'unknown'} {activeResult.response.model ? `(${activeResult.response.model})` : ''}</div>
@@ -393,11 +393,11 @@ export default function NLQueryConsole() {
                 {activeResult.response?.sql && (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <div style={{ fontSize: '8pt', fontWeight: 600 }}>SQL</div>
+                      <div style={{ fontSize: '11px', fontWeight: 600 }}>SQL</div>
                       <button
                         className="button button-secondary"
                         onClick={handleCopySql}
-                        style={{ fontSize: '8pt', padding: '6px 10px' }}
+                        style={{ fontSize: '11px', padding: '6px 10px' }}
                       >
                         {copiedId === activeResult.id ? 'Copied' : 'Copy SQL'}
                       </button>
@@ -407,7 +407,7 @@ export default function NLQueryConsole() {
                       background: 'var(--grey-50)',
                       padding: '10px',
                       borderRadius: '4px',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       border: '1px solid var(--border)',
                     }}>
                       {activeResult.response.sql}
@@ -417,9 +417,9 @@ export default function NLQueryConsole() {
 
                 {rows.length > 0 ? (
                   <div>
-                    <div style={{ fontSize: '8pt', fontWeight: 600, marginBottom: '6px' }}>Results</div>
+                    <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>Results</div>
                     <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                         <thead>
                           <tr style={{ background: 'var(--grey-50)' }}>
                             {columns.map((col) => (
@@ -445,7 +445,7 @@ export default function NLQueryConsole() {
                   </div>
                 ) : (
                   activeResult.response && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>No rows returned.</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No rows returned.</div>
                   )
                 )}
 
@@ -454,7 +454,7 @@ export default function NLQueryConsole() {
                     <button
                       className="button button-secondary"
                       onClick={() => setShowRaw((v) => !v)}
-                      style={{ fontSize: '8pt', padding: '6px 10px' }}
+                      style={{ fontSize: '11px', padding: '6px 10px' }}
                     >
                       {showRaw ? 'Hide raw JSON' : 'Show raw JSON'}
                     </button>
@@ -465,7 +465,7 @@ export default function NLQueryConsole() {
                         background: 'var(--grey-50)',
                         padding: '10px',
                         borderRadius: '4px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         border: '1px solid var(--border)',
                       }}>
                         {JSON.stringify(activeResult.response, null, 2)}

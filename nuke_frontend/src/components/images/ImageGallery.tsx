@@ -2220,7 +2220,7 @@ const ImageGallery = ({
           borderRadius: '0px',
           marginBottom: 'var(--space-3)'
         }}>
-          <p className="text" style={{ marginBottom: 'var(--space-2)', fontWeight: 700, fontSize: '12pt' }}>
+          <p className="text" style={{ marginBottom: 'var(--space-2)', fontWeight: 700, fontSize: '16px' }}>
             No images yet
           </p>
           <p className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
@@ -2243,7 +2243,7 @@ const ImageGallery = ({
             className="button button-primary"
             style={{ 
               cursor: 'pointer',
-              fontSize: '9pt',
+              fontSize: '12px',
               padding: '10px 20px'
             }}
           >
@@ -2251,12 +2251,12 @@ const ImageGallery = ({
           </button>
           {normalizeFallbackUrls(fallbackImageUrls).length > 0 && (
             <div style={{ marginTop: 12 }}>
-              <div className="text-small text-muted" style={{ fontSize: '8pt', marginBottom: 8 }}>
+              <div className="text-small text-muted" style={{ fontSize: '11px', marginBottom: 8 }}>
                 We found listing images for this vehicle, but the database has not been backfilled yet.
               </div>
               <button
                 className="button button-secondary"
-                style={{ fontSize: '9pt', padding: '10px 20px' }}
+                style={{ fontSize: '12px', padding: '10px 20px' }}
                 onClick={() => {
                   // Trigger a refetch via state: simplest is to just reload the page section
                   window.location.reload();
@@ -2266,7 +2266,7 @@ const ImageGallery = ({
               </button>
             </div>
           )}
-          <div className="text-small text-muted" style={{ marginTop: '10px', fontSize: '8pt' }}>
+          <div className="text-small text-muted" style={{ marginTop: '10px', fontSize: '11px' }}>
             Ownership/title documents should be submitted via the Ownership panel (not the gallery).
           </div>
         </div>
@@ -2287,7 +2287,7 @@ const ImageGallery = ({
     <div>
       {usingFallback && (
         <div className="card" style={{ marginBottom: 'var(--space-3)' }}>
-          <div className="card-body" style={{ fontSize: '8pt', lineHeight: 1.4 }}>
+          <div className="card-body" style={{ fontSize: '11px', lineHeight: 1.4 }}>
             <div style={{ fontWeight: 800, marginBottom: 6 }}>
               Showing listing images (read-only)
             </div>
@@ -2298,13 +2298,13 @@ const ImageGallery = ({
               <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
                   className="button button-secondary"
-                  style={{ fontSize: '8pt', padding: '6px 10px', cursor: importingFallback ? 'not-allowed' : 'pointer', opacity: importingFallback ? 0.7 : 1 }}
+                  style={{ fontSize: '11px', padding: '6px 10px', cursor: importingFallback ? 'not-allowed' : 'pointer', opacity: importingFallback ? 0.7 : 1 }}
                   onClick={importFallbackImages}
                   disabled={importingFallback}
                 >
                   {importingFallback ? 'Importing...' : `Import ${Math.min(normalizeFallbackUrls(fallbackImageUrls).length, 120)} Images`}
                 </button>
-                <span className="text-muted" style={{ fontSize: '8pt' }}>
+                <span className="text-muted" style={{ fontSize: '11px' }}>
                   Imports these into the vehicle gallery for dedupe, tagging, and AI analysis.
                 </span>
               </div>
@@ -2339,7 +2339,7 @@ const ImageGallery = ({
       {/* Upload Result Notice (answers "where did it go?" and surfaces failures) */}
       {uploadNotice && !uploadProgress.uploading && (
         <div className="card" style={{ marginBottom: 'var(--space-3)' }}>
-          <div className="card-body" style={{ fontSize: '8pt' }}>
+          <div className="card-body" style={{ fontSize: '11px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ fontWeight: 800, color: uploadNotice.kind === 'error' ? 'var(--warning-dark)' : 'var(--text)' }}>
                 {uploadNotice.message}
@@ -2348,7 +2348,7 @@ const ImageGallery = ({
                 {recentUploadIds.length > 0 && (
                   <button
                     className="button button-secondary"
-                    style={{ fontSize: '8pt', padding: '4px 10px' }}
+                    style={{ fontSize: '11px', padding: '4px 10px' }}
                     onClick={() => {
                       const nextSort: 'quality' | 'date_desc' | 'date_asc' = 'date_desc';
                       setSortBy(nextSort);
@@ -2370,7 +2370,7 @@ const ImageGallery = ({
                 {uploadNotice.details && uploadNotice.details.length > 0 && (
                   <button
                     className="button"
-                    style={{ fontSize: '8pt', padding: '4px 10px' }}
+                    style={{ fontSize: '11px', padding: '4px 10px' }}
                     onClick={() => setShowUploadNoticeDetails((v) => !v)}
                   >
                     {showUploadNoticeDetails ? 'Hide details' : 'Details'}
@@ -2378,7 +2378,7 @@ const ImageGallery = ({
                 )}
                 <button
                   className="button"
-                  style={{ fontSize: '8pt', padding: '4px 10px' }}
+                  style={{ fontSize: '11px', padding: '4px 10px' }}
                   onClick={() => {
                     setUploadNotice(null);
                     setShowUploadNoticeDetails(false);
@@ -2418,7 +2418,7 @@ const ImageGallery = ({
         }}>
           {/* Image Count - positioned on the left */}
           <span style={{ 
-            fontSize: '8pt', 
+            fontSize: '11px', 
             color: 'var(--text-muted)', 
             fontWeight: 600,
             whiteSpace: 'nowrap',
@@ -2440,7 +2440,7 @@ const ImageGallery = ({
               className={viewMode === 'grid' ? 'button button-primary' : 'button'}
               style={{ 
                 padding: '4px 12px', 
-                fontSize: '8pt', 
+                fontSize: '11px', 
                 margin: 0, 
                 border: 'none', 
                 borderRadius: 0, 
@@ -2457,7 +2457,7 @@ const ImageGallery = ({
               className={viewMode === 'masonry' ? 'button button-primary' : 'button'}
               style={{ 
                 padding: '4px 12px', 
-                fontSize: '8pt', 
+                fontSize: '11px', 
                 margin: 0, 
                 border: 'none', 
                 borderRadius: 0, 
@@ -2474,7 +2474,7 @@ const ImageGallery = ({
               className={viewMode === 'list' ? 'button button-primary' : 'button'}
               style={{
                 padding: '4px 12px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 margin: 0,
                 border: 'none',
                 borderRadius: 0,
@@ -2491,7 +2491,7 @@ const ImageGallery = ({
               className={viewMode === 'bundles' ? 'button button-primary' : 'button'}
               style={{
                 padding: '4px 12px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 margin: 0,
                 border: 'none',
                 borderRadius: 0,
@@ -2533,7 +2533,7 @@ const ImageGallery = ({
               }}
               className={groupBySource ? 'button button-primary' : 'button'}
               style={{ 
-                fontSize: '8pt', 
+                fontSize: '11px', 
                 padding: '4px 8px', 
                 height: '24px', 
                 minHeight: '24px',
@@ -2552,7 +2552,7 @@ const ImageGallery = ({
               }}
               className={groupByCategory ? 'button button-primary' : 'button'}
               style={{ 
-                fontSize: '8pt', 
+                fontSize: '11px', 
                 padding: '4px 8px', 
                 height: '24px', 
                 minHeight: '24px',
@@ -2573,7 +2573,7 @@ const ImageGallery = ({
               }}
               className={chronologicalMode !== 'off' ? 'button button-primary' : 'button'}
               style={{ 
-                fontSize: '8pt', 
+                fontSize: '11px', 
                 padding: '4px 8px', 
                 height: '24px', 
                 minHeight: '24px',
@@ -2615,7 +2615,7 @@ const ImageGallery = ({
               onClick={uploadFromQueue}
               className="button cursor-button"
               style={{ 
-                fontSize: '8pt', 
+                fontSize: '11px', 
                 padding: '4px 12px',
                 height: '24px',
                 minHeight: '24px',
@@ -2647,7 +2647,7 @@ const ImageGallery = ({
             onClick={handleUploadClick}
             className="button button-primary"
             style={{ 
-              fontSize: '8pt', 
+              fontSize: '11px', 
               padding: '4px 12px', 
               cursor: 'pointer', 
               height: '24px', 
@@ -2671,7 +2671,7 @@ const ImageGallery = ({
           >
             Show Images ({allImages.length})
           </button>
-          <p className="text text-muted" style={{ fontSize: '7pt' }}>
+          <p className="text text-muted" style={{ fontSize: '9px' }}>
             Images load progressively for better performance
           </p>
         </div>
@@ -2759,7 +2759,7 @@ const ImageGallery = ({
                       border: '1px solid var(--border)'
                     }} />
                     <span style={{ 
-                      fontSize: '9pt', 
+                      fontSize: '12px', 
                       fontWeight: 700, 
                       color: 'var(--text)',
                       textTransform: 'uppercase'
@@ -2857,7 +2857,7 @@ const ImageGallery = ({
                               onClick={(e) => handleImageSelect(image.id, e)}
                             >
                               {isSelected && (
-                                <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '10pt' }}>X</span>
+                                <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '13px' }}>X</span>
                               )}
                             </div>
                           )}
@@ -2903,7 +2903,7 @@ const ImageGallery = ({
                                 borderRadius: '0px',
                                 border: '1px solid #fff',
                                 padding: '2px 6px',
-                                fontSize: '7pt',
+                                fontSize: '9px',
                                 fontWeight: 'bold',
                                 fontFamily: '"MS Sans Serif", sans-serif',
                                 zIndex: 10,
@@ -2931,7 +2931,7 @@ const ImageGallery = ({
                               borderRadius: '0px',
                               border: '1px solid #fff',
                               padding: '2px 6px',
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               fontWeight: 'bold',
                               fontFamily: '"MS Sans Serif", sans-serif',
                               zIndex: 10,
@@ -2958,7 +2958,7 @@ const ImageGallery = ({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               fontWeight: 'bold',
                               fontFamily: '"MS Sans Serif", sans-serif',
                               zIndex: 10
@@ -3022,7 +3022,7 @@ const ImageGallery = ({
                           onClick={(e) => handleImageSelect(image.id, e)}
                         >
                           {isSelected && (
-                            <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '10pt' }}>X</span>
+                            <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '13px' }}>X</span>
                           )}
                         </div>
                       )}
@@ -3068,7 +3068,7 @@ const ImageGallery = ({
                             borderRadius: '0px',
                             border: '1px solid #fff',
                             padding: '2px 6px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             fontWeight: 'bold',
                             fontFamily: '"MS Sans Serif", sans-serif',
                             zIndex: 10,
@@ -3099,7 +3099,7 @@ const ImageGallery = ({
                             borderRadius: '0px',
                             border: '1px solid #fff',
                             padding: '2px 6px',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             fontWeight: 'bold',
                             fontFamily: '"MS Sans Serif", sans-serif',
                             zIndex: 10,
@@ -3127,7 +3127,7 @@ const ImageGallery = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           fontWeight: 'bold',
                           fontFamily: '"MS Sans Serif", sans-serif',
                           zIndex: 10
@@ -3189,7 +3189,7 @@ const ImageGallery = ({
                   onClick={(e) => handleImageSelect(image.id, e)}
                 >
                   {isSelected && (
-                    <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '10pt' }}>X</span>
+                    <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '13px' }}>X</span>
                   )}
                 </div>
               )}
@@ -3238,7 +3238,7 @@ const ImageGallery = ({
                     borderRadius: '0px',
                     border: '1px solid #fff',
                     padding: '2px 6px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 'bold',
                     fontFamily: '"MS Sans Serif", sans-serif',
                     zIndex: 10,
@@ -3325,7 +3325,7 @@ const ImageGallery = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   fontFamily: '"MS Sans Serif", sans-serif',
                   zIndex: 10
@@ -3345,7 +3345,7 @@ const ImageGallery = ({
                   borderRadius: '0px',
                   border: '1px solid #fff',
                   padding: '2px 6px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 'bold',
                   fontFamily: '"MS Sans Serif", sans-serif',
                   zIndex: 10
@@ -3365,7 +3365,7 @@ const ImageGallery = ({
                   borderRadius: '0px',
                   border: '2px solid #fff',
                   padding: '2px 6px',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   fontWeight: 'bold',
                   fontFamily: '"MS Sans Serif", sans-serif',
                   zIndex: 10
@@ -3377,14 +3377,14 @@ const ImageGallery = ({
               {/* Image Info Overlay */}
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', padding: 'var(--space-2)' }}>
                 {image.is_primary && (
-                  <div className="button button-small" style={{ fontSize: '6pt', padding: '2px 6px', marginBottom: 'var(--space-1)', backgroundColor: 'var(--grey-600)', color: 'var(--white)' }}>
+                  <div className="button button-small" style={{ fontSize: '8px', padding: '2px 6px', marginBottom: 'var(--space-1)', backgroundColor: 'var(--grey-600)', color: 'var(--white)' }}>
                     PRIMARY
                   </div>
                 )}
                 {image.caption && (
-                  <p className="text" style={{ color: 'var(--white)', fontSize: '7pt', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
+                  <p className="text" style={{ color: 'var(--white)', fontSize: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
                 )}
-                <p className="text" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '6pt', marginTop: '2px' }}>
+                <p className="text" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '8px', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {imageTagCounts[image.id] && ` • ${imageTagCounts[image.id]} tags`}
                   {showSetCount && imageSetCounts[image.id] && ` • ${imageSetCounts[image.id]} sets`}
@@ -3410,7 +3410,7 @@ const ImageGallery = ({
       {showImages && displayedImages.length < allImages.length && (
         <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
           {loadingMore && (
-            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '8pt' }}>
+            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '11px' }}>
               Loading more images...
             </div>
           )}
@@ -3467,7 +3467,7 @@ const ImageGallery = ({
                     borderRadius: '0px',
                     border: '1px solid #fff',
                     padding: '2px 6px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 'bold',
                     fontFamily: '"MS Sans Serif", sans-serif',
                     zIndex: 10
@@ -3526,14 +3526,14 @@ const ImageGallery = ({
               {/* Image Info Overlay */}
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', padding: 'var(--space-2)' }}>
                 {image.is_primary && (
-                  <div className="button button-small" style={{ fontSize: '6pt', padding: '2px 6px', marginBottom: 'var(--space-1)', backgroundColor: 'var(--grey-600)', color: 'var(--white)' }}>
+                  <div className="button button-small" style={{ fontSize: '8px', padding: '2px 6px', marginBottom: 'var(--space-1)', backgroundColor: 'var(--grey-600)', color: 'var(--white)' }}>
                     PRIMARY
                   </div>
                 )}
                 {image.caption && (
-                  <p className="text" style={{ color: 'var(--white)', fontSize: '7pt', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
+                  <p className="text" style={{ color: 'var(--white)', fontSize: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
                 )}
-                <p className="text" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '6pt', marginTop: '2px' }}>
+                <p className="text" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '8px', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {(() => {
                     const metadata = image.ai_scan_metadata;
@@ -3628,11 +3628,11 @@ const ImageGallery = ({
 
               {/* Info - Everything compressed */}
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {image.is_primary && <span style={{ backgroundColor: 'var(--grey-900)', color: 'var(--white)', padding: '1px 4px', marginRight: '4px', fontSize: '6pt' }}>PRIMARY</span>}
+                <div style={{ fontSize: '11px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {image.is_primary && <span style={{ backgroundColor: 'var(--grey-900)', color: 'var(--white)', padding: '1px 4px', marginRight: '4px', fontSize: '8px' }}>PRIMARY</span>}
                   {image.caption || 'Vehicle Image'}
                 </div>
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                   {getDisplayDate(image)}
                   {getTimeOfDayLabel(image.taken_at || image.created_at) && ` • ${getTimeOfDayLabel(image.taken_at || image.created_at)}`}
                   {(() => {
@@ -3656,7 +3656,7 @@ const ImageGallery = ({
                   })()}
                 </div>
                 {/* Everything else on one line */}
-                <div style={{ fontSize: '6pt', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {getCameraText(image.exif_data) && <span>{getCameraText(image.exif_data)}</span>}
                   {(() => {
                     const locationText = getLocationText(image.exif_data);

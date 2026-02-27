@@ -36,7 +36,7 @@ export const ProfileSuccessStoriesTab: React.FC<ProfileSuccessStoriesTabProps> =
         padding: 'var(--space-6)',
         textAlign: 'center',
         color: 'var(--text-muted)',
-        fontSize: '8pt',
+        fontSize: '11px',
       }}>
         No success stories yet
       </div>
@@ -68,7 +68,7 @@ export const ProfileSuccessStoriesTab: React.FC<ProfileSuccessStoriesTabProps> =
             {/* Header */}
             <div style={{ marginBottom: 'var(--space-3)' }}>
               <h3 style={{
-                fontSize: '10pt',
+                fontSize: '13px',
                 fontWeight: 'bold',
                 margin: 0,
                 marginBottom: '4px',
@@ -87,7 +87,7 @@ export const ProfileSuccessStoriesTab: React.FC<ProfileSuccessStoriesTabProps> =
                 )}
               </h3>
               {story.story_date && (
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                   {formatDate(story.story_date)}
                 </div>
               )}
@@ -100,7 +100,7 @@ export const ProfileSuccessStoriesTab: React.FC<ProfileSuccessStoriesTabProps> =
                   <VehicleThumbnail vehicleId={vehicle.id} />
                 </Link>
                 {vehicleName && (
-                  <div style={{ fontSize: '8pt', marginTop: '4px', fontWeight: 'bold' }}>
+                  <div style={{ fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>
                     <Link
                       to={`/vehicle/${vehicle.id}`}
                       style={{ color: 'var(--text)', textDecoration: 'none' }}
@@ -114,7 +114,7 @@ export const ProfileSuccessStoriesTab: React.FC<ProfileSuccessStoriesTabProps> =
 
             {/* Story Text */}
             <div style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               lineHeight: '1.6',
               color: 'var(--text)',
               whiteSpace: 'pre-wrap',
@@ -126,7 +126,7 @@ export const ProfileSuccessStoriesTab: React.FC<ProfileSuccessStoriesTabProps> =
             {story.view_count !== undefined && story.view_count > 0 && (
               <div style={{
                 marginTop: 'var(--space-3)',
-                fontSize: '7pt',
+                fontSize: '9px',
                 color: 'var(--text-muted)',
               }}>
                 {story.view_count.toLocaleString()} views

@@ -27,7 +27,7 @@ export default function SourcePortal({
       color: platformColor,
       padding: '2px 6px',
       borderRadius: '3px',
-      fontSize: '7pt',
+      fontSize: '9px',
       fontWeight: 500,
     }}>
       {platformDisplayName}
@@ -48,17 +48,17 @@ export default function SourcePortal({
         error={error}
         state={state}
         emptyContent={
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', padding: '8px 0' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '8px 0' }}>
             No platform data for this listing
           </div>
         }
         sparseContent={
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', padding: '4px 0' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '4px 0' }}>
             Listed on {platformDisplayName}
           </div>
         }
         richContent={data && (
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             {/* Engagement metrics */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px', marginBottom: '8px' }}>
               {data.bid_count != null && (
@@ -91,7 +91,7 @@ export default function SourcePortal({
               <div style={{
                 marginTop: '6px', padding: '4px 6px',
                 background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px',
-                fontSize: '7pt', color: 'var(--text-muted)',
+                fontSize: '9px', color: 'var(--text-muted)',
               }}>
                 {vehiclePrice > data.platform_avg_price
                   ? `${Math.round(((vehiclePrice - data.platform_avg_price) / data.platform_avg_price) * 100)}% above ${platformDisplayName} average`
@@ -109,8 +109,8 @@ export default function SourcePortal({
 function MetricBox({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ textAlign: 'center', padding: '4px', background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px' }}>
-      <div style={{ fontSize: '11pt', fontWeight: 700 }}>{value}</div>
-      <div style={{ fontSize: '6pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontSize: '15px', fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: '8px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{label}</div>
     </div>
   );
 }

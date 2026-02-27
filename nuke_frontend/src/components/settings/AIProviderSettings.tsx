@@ -165,7 +165,7 @@ const AIProviderSettings: React.FC = () => {
         <button
           onClick={() => setShowAddForm(true)}
           className="button button-primary"
-          style={{ fontSize: '8pt', padding: '6px 12px' }}
+          style={{ fontSize: '11px', padding: '6px 12px' }}
         >
           + Add Key
         </button>
@@ -173,7 +173,7 @@ const AIProviderSettings: React.FC = () => {
       <div className="card-body">
         {showAddForm && (
           <div style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg)', border: '1px solid #e0e0e0' }}>
-            <div className="text font-bold" style={{ marginBottom: '8px', fontSize: '9pt' }}>Add API Key</div>
+            <div className="text font-bold" style={{ marginBottom: '8px', fontSize: '12px' }}>Add API Key</div>
             <ProviderForm
               provider={{
                 provider: 'openai',
@@ -194,9 +194,9 @@ const AIProviderSettings: React.FC = () => {
 
         {providers.length === 0 && !showAddForm && (
           <div style={{ textAlign: 'center', padding: '24px', background: 'var(--bg)', border: '1px dashed #ccc' }}>
-            <div style={{ fontSize: '24pt', marginBottom: '8px' }}>🔑</div>
-            <div className="text font-bold" style={{ marginBottom: '4px', fontSize: '9pt' }}>No API Keys</div>
-            <div className="text text-small text-muted" style={{ fontSize: '8pt' }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔑</div>
+            <div className="text font-bold" style={{ marginBottom: '4px', fontSize: '12px' }}>No API Keys</div>
+            <div className="text text-small text-muted" style={{ fontSize: '11px' }}>
               Click "+ Add Key" to configure OpenAI, Anthropic, or Google.<br/>
               Or leave empty to use system keys automatically.
             </div>
@@ -218,7 +218,7 @@ const AIProviderSettings: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
                     {provider.provider === 'openai' && ''}
                     {provider.provider === 'anthropic' && '🧠 '}
                     {provider.provider === 'google' && '🔷 '}
@@ -227,7 +227,7 @@ const AIProviderSettings: React.FC = () => {
                     {provider.provider.toUpperCase()}
                     {provider.is_default && ' (PRIMARY)'}
                   </div>
-                  <div style={{ fontSize: '8pt', color: '#666', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '11px', color: '#666', fontFamily: 'monospace' }}>
                     {(() => {
                       if (!provider.api_key_encrypted) return '••••••••';
                       try {
@@ -241,10 +241,10 @@ const AIProviderSettings: React.FC = () => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <button onClick={() => setEditingProvider(provider)} className="button button-secondary" style={{ fontSize: '8pt', padding: '4px 8px' }}>
+                  <button onClick={() => setEditingProvider(provider)} className="button button-secondary" style={{ fontSize: '11px', padding: '4px 8px' }}>
                     Edit
                   </button>
-                  <button onClick={() => provider.id && handleDelete(provider.id)} className="button button-secondary" style={{ fontSize: '8pt', padding: '4px 8px' }}>
+                  <button onClick={() => provider.id && handleDelete(provider.id)} className="button button-secondary" style={{ fontSize: '11px', padding: '4px 8px' }}>
                     Delete
                   </button>
                 </div>
@@ -271,8 +271,8 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ provider, onSave, onCancel,
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
       <div>
-        <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '4px' }}>Provider</label>
-        <select value={formData.provider} onChange={(e) => setFormData({ ...formData, provider: e.target.value as any })} className="form-select" style={{ width: '100%', fontSize: '9pt', padding: '4px' }}>
+        <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Provider</label>
+        <select value={formData.provider} onChange={(e) => setFormData({ ...formData, provider: e.target.value as any })} className="form-select" style={{ width: '100%', fontSize: '12px', padding: '4px' }}>
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic</option>
           <option value="google">Google</option>
@@ -280,8 +280,8 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ provider, onSave, onCancel,
       </div>
 
       <div>
-        <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '4px' }}>Model</label>
-        <select value={formData.model_name} onChange={(e) => setFormData({ ...formData, model_name: e.target.value })} className="form-select" style={{ width: '100%', fontSize: '9pt', padding: '4px' }}>
+        <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Model</label>
+        <select value={formData.model_name} onChange={(e) => setFormData({ ...formData, model_name: e.target.value })} className="form-select" style={{ width: '100%', fontSize: '12px', padding: '4px' }}>
           {defaultModels.filter(m => m.provider === formData.provider).map(m => (
             <option key={m.modelName} value={m.modelName}>{m.displayName}</option>
           ))}
@@ -289,25 +289,25 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ provider, onSave, onCancel,
       </div>
 
       <div style={{ gridColumn: '1 / -1' }}>
-        <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '4px' }}>API Key</label>
+        <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>API Key</label>
         <input
           type="password"
           value={apiKey}
           onChange={(e) => { setApiKey(e.target.value); setFormData({ ...formData, api_key_encrypted: e.target.value }); }}
           placeholder={provider.api_key_encrypted ? "Enter new key" : "sk-..."}
           className="form-input"
-          style={{ width: '100%', fontSize: '9pt', padding: '6px' }}
+          style={{ width: '100%', fontSize: '12px', padding: '6px' }}
         />
       </div>
 
       <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px' }}>
         <input type="checkbox" checked={formData.is_default} onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })} id={`default-${provider.id || 'new'}`} />
-        <label htmlFor={`default-${provider.id || 'new'}`} style={{ fontSize: '8pt' }}>Set as primary</label>
+        <label htmlFor={`default-${provider.id || 'new'}`} style={{ fontSize: '11px' }}>Set as primary</label>
       </div>
 
       <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button onClick={() => onSave(formData, apiKey)} className="button button-primary" style={{ fontSize: '8pt', padding: '6px 12px' }}>Save</button>
-        <button onClick={onCancel} className="button button-secondary" style={{ fontSize: '8pt', padding: '6px 12px' }}>Cancel</button>
+        <button onClick={() => onSave(formData, apiKey)} className="button button-primary" style={{ fontSize: '11px', padding: '6px 12px' }}>Save</button>
+        <button onClick={onCancel} className="button button-secondary" style={{ fontSize: '11px', padding: '6px 12px' }}>Cancel</button>
       </div>
     </div>
   );

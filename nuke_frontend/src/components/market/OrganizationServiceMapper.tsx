@@ -162,15 +162,15 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
       border: '1px solid var(--border)',
       borderRadius: '4px',
     }}>
-      <h3 style={{ fontSize: '10pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
+      <h3 style={{ fontSize: '13px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
         Organization Service Mapper
       </h3>
-      <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
         Extract services from organization websites or add them manually for market data analysis.
       </p>
 
       <div style={{ marginBottom: 'var(--space-3)' }}>
-        <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+        <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
           Website URL
         </label>
         <input
@@ -181,7 +181,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
           style={{
             width: '100%',
             padding: 'var(--space-2)',
-            fontSize: '8pt',
+            fontSize: '11px',
             border: '1px solid var(--border)',
             borderRadius: '4px',
             background: 'var(--surface-hover)',
@@ -194,7 +194,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
         disabled={mapping || !websiteUrl}
         style={{
           padding: 'var(--space-2) var(--space-4)',
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 'bold',
           background: mapping ? 'var(--text-muted)' : 'var(--accent)',
           color: 'var(--white)',
@@ -212,7 +212,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
         onClick={addManualService}
         style={{
           padding: 'var(--space-2) var(--space-4)',
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 'bold',
           background: 'var(--surface-hover)',
           color: 'var(--text)',
@@ -231,7 +231,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
           background: 'var(--danger-light)',
           border: '1px solid var(--danger)',
           borderRadius: '4px',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--danger)',
           marginBottom: 'var(--space-3)',
         }}>
@@ -241,7 +241,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
 
       {services.length > 0 && (
         <div style={{ marginBottom: 'var(--space-3)' }}>
-          <h4 style={{ fontSize: '9pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
+          <h4 style={{ fontSize: '12px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
             Services ({services.length})
           </h4>
           {services.map((service, index) => (
@@ -263,7 +263,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                   placeholder="Service Name"
                   style={{
                     padding: 'var(--space-1)',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     border: '1px solid var(--border)',
                     borderRadius: '4px',
                     background: 'var(--surface)',
@@ -273,7 +273,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                   onClick={() => removeService(index)}
                   style={{
                     padding: 'var(--space-1) var(--space-2)',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     background: 'var(--danger)',
                     color: 'var(--white)',
                     border: 'none',
@@ -290,7 +290,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                 style={{
                   width: '100%',
                   padding: 'var(--space-1)',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
                   background: 'var(--surface)',
@@ -322,7 +322,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                 style={{
                   width: '100%',
                   padding: 'var(--space-1)',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
                   background: 'var(--surface)',
@@ -338,7 +338,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
             disabled={saving || services.some(s => !s.service_name)}
             style={{
               padding: 'var(--space-2) var(--space-4)',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 'bold',
               background: saving ? 'var(--text-muted)' : 'var(--success)',
               color: 'var(--white)',

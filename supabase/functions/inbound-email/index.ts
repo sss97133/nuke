@@ -4,6 +4,11 @@
  * Receives Resend inbound email webhooks (email.received events),
  * fetches full email content via Resend API, and stores in contact_inbox.
  *
+ * Routing:
+ *   - alerts@nuke.ag → process-alert-email (extracts listing URLs → import_queue)
+ *   - coo@nuke.ag, cto@nuke.ag, etc. → agent_messages table
+ *   - all others → contact_inbox only
+ *
  * Webhook URL: https://qkgaybvrernstplzjaam.supabase.co/functions/v1/inbound-email
  */
 
@@ -19,6 +24,8 @@ const VALID_ADDRESSES = [
   "investors@nuke.ag",
   "support@nuke.ag",
   "hello@nuke.ag",
+  // Vehicle listing alert forwarding — routes to process-alert-email → import_queue
+  "alerts@nuke.ag",
   // Agent addresses — routed to agent_messages
   "coo@nuke.ag",
   "cto@nuke.ag",
@@ -205,6 +212,34 @@ Deno.serve(async (req) => {
         metadata: { contact_inbox_id: inserted.id, sender_name: senderName },
       });
       console.log(`[inbound-email] Routed to agent_messages for role: ${agentRole}`);
+    }
+
+    // Route alerts@nuke.ag to process-alert-email → import_queue
+    // Gmail forwarding: user forwards toymachine91@gmail.com alerts to alerts@nuke.ag
+    if (nukeAddress === "alerts@nuke.ag") {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const alertRes = await fetch(`${supabaseUrl}/functions/v1/process-alert-email`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: nukeAddress,
+            subject: data.subject || "",
+            html: bodyHtml || "",
+            text: bodyText || "",
+            messageId: emailId,
+          }),
+        });
+        const alertResult = await alertRes.json().catch(() => ({}));
+        console.log(`[inbound-email] alerts routing → process-alert-email: queued=${alertResult.queued ?? 0}, source=${alertResult.source ?? "unknown"}`);
+      } catch (alertErr) {
+        console.warn("[inbound-email] Failed to forward to process-alert-email:", alertErr);
+      }
     }
 
     return new Response(

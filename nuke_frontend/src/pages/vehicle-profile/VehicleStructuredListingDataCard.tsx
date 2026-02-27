@@ -74,12 +74,12 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
         {/* Craigslist Attributes Table */}
         {craigslistAttrs.length > 0 && (
           <details open>
-            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
               {isCraigslist && <FaviconIcon url={sourceUrl || 'https://craigslist.org'} size={12} preserveAspectRatio={true} />}
               Listing Attributes ({craigslistAttrs.length})
             </summary>
             <div style={{ marginTop: '8px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                 <tbody>
                   {craigslistAttrs.map((attr, idx) => (
                     <tr key={idx} style={{ borderBottom: idx < craigslistAttrs.length - 1 ? '1px solid var(--border)' : 'none' }}>
@@ -100,10 +100,10 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
         {/* Location / Map Data */}
         {(locationData.lat || locationData.location) && (
           <details>
-            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700 }}>
+            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
               Last Known Location
             </summary>
-            <div style={{ marginTop: '8px', fontSize: '8pt', lineHeight: 1.5 }}>
+            <div style={{ marginTop: '8px', fontSize: '11px', lineHeight: 1.5 }}>
               {locationData.location && (
                 <div style={{ marginBottom: '4px' }}>
                   <strong>Location:</strong> {String(locationData.location)}
@@ -128,8 +128,8 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
 
         {infoBullets.length > 0 && (
           <details>
-            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700 }}>Information</summary>
-            <div style={{ marginTop: '8px', fontSize: '9pt', lineHeight: 1.5 }}>
+            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>Information</summary>
+            <div style={{ marginTop: '8px', fontSize: '12px', lineHeight: 1.5 }}>
               {infoBullets.map((line, idx) => (
                 <div key={idx} style={{ padding: '2px 0' }}>
                   - {String(line).trim()}
@@ -141,17 +141,17 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
 
         {options.length > 0 && (
           <details open>
-            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700 }}>
+            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
               Options ({options.length})
             </summary>
 
             <div style={{ marginTop: '8px' }}>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Parsed from the listing. Codes will populate automatically when present (RPO/SPID-style).
               </div>
 
               <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-secondary)' }}>
                       <th style={{ textAlign: 'left', padding: '8px', borderBottom: '1px solid var(--border)', width: '110px' }}>
@@ -185,11 +185,11 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
 
         {serviceHistory.length > 0 && (
           <details>
-            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700 }}>
+            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
               Service Record Mentions ({serviceHistory.length})
             </summary>
-            <div style={{ marginTop: '8px', fontSize: '9pt', lineHeight: 1.5 }}>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+            <div style={{ marginTop: '8px', fontSize: '12px', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 These lines are breadcrumbs from the listing, not verified invoices. We will attribute them to the listing source.
               </div>
               {serviceHistory.map((line, idx) => (

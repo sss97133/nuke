@@ -52,14 +52,14 @@ export const BusinessFleetZone: React.FC<BusinessFleetZoneProps> = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{
-            fontSize: '9pt',
+            fontSize: '12px',
             fontWeight: 700,
             color: 'var(--text)'
           }}>
             BUSINESS FLEET
           </span>
           <span style={{
-            fontSize: '8pt',
+            fontSize: '11px',
             color: 'var(--text-muted)',
             background: 'var(--surface-hover)',
             padding: '2px 6px',
@@ -69,7 +69,7 @@ export const BusinessFleetZone: React.FC<BusinessFleetZoneProps> = ({
           </span>
         </div>
         <span style={{
-          fontSize: '7pt',
+          fontSize: '9px',
           color: 'var(--text-muted)',
           width: '50px',
           textAlign: 'right'
@@ -101,20 +101,20 @@ export const BusinessFleetZone: React.FC<BusinessFleetZoneProps> = ({
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       color: 'var(--text-muted)'
                     }}>
                       {isBusinessExpanded ? '▼' : '▶'}
                     </span>
                     <span style={{
-                      fontSize: '9pt',
+                      fontSize: '12px',
                       fontWeight: 600,
                       color: 'var(--text)'
                     }}>
                       {fleet.business_name}
                     </span>
                     <span style={{
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       color: 'var(--text-muted)'
                     }}>
                       ({fleet.vehicle_count})

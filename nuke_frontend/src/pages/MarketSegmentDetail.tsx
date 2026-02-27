@@ -163,7 +163,7 @@ export default function MarketSegmentDetail() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
         Loading segment...
       </div>
     );
@@ -176,7 +176,7 @@ export default function MarketSegmentDetail() {
     }
     
     return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
         Segment not found.
         <div style={{ marginTop: '10px' }}>
           <button className="button button-secondary" onClick={() => navigate('/market')}>
@@ -193,14 +193,14 @@ export default function MarketSegmentDetail() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
           <div>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'baseline', flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0, fontSize: '14pt' }}>{segment.name}</h1>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{segment.manager_type.toUpperCase()}</div>
+              <h1 style={{ margin: 0, fontSize: '19px' }}>{segment.name}</h1>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{segment.manager_type.toUpperCase()}</div>
             </div>
-            <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
               Slug: <strong style={{ color: 'var(--text)' }}>{segment.slug}</strong>
             </div>
             {segment.description && (
-              <div style={{ marginTop: '8px', fontSize: '9pt', color: 'var(--text-muted)' }}>{segment.description}</div>
+              <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>{segment.description}</div>
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -216,7 +216,7 @@ export default function MarketSegmentDetail() {
         {error && (
           <div style={{ padding: '12px', border: '2px solid var(--border)', background: 'var(--surface)' }}>
             <div style={{ fontWeight: 800, marginBottom: '6px' }}>Error</div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{error}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{error}</div>
           </div>
         )}
 
@@ -249,7 +249,7 @@ export default function MarketSegmentDetail() {
             <div className="card-header">
               <h3 className="heading-3">Definition</h3>
             </div>
-            <div className="card-body" style={{ display: 'grid', gap: '8px', fontSize: '9pt' }}>
+            <div className="card-body" style={{ display: 'grid', gap: '8px', fontSize: '12px' }}>
               <div>
                 <strong>Year</strong>: {segment.year_min ?? '—'} to {segment.year_max ?? '—'}
               </div>
@@ -284,23 +284,23 @@ export default function MarketSegmentDetail() {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'baseline' }}>
                         <div style={{ fontWeight: 900 }}>{sc.name}</div>
-                        <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{sc.slug}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{sc.slug}</div>
                       </div>
                       {sc.description && (
-                        <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>{sc.description}</div>
+                        <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>{sc.description}</div>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>No subcategories yet.</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No subcategories yet.</div>
               )}
 
               {sessionUserId ? (
                 <div style={{ borderTop: '2px solid var(--border)', paddingTop: '10px' }}>
-                  <div style={{ fontWeight: 900, marginBottom: '6px', fontSize: '9pt' }}>Add subcategory</div>
+                  <div style={{ fontWeight: 900, marginBottom: '6px', fontSize: '12px' }}>Add subcategory</div>
                   {subcatError && (
-                    <div style={{ marginBottom: '8px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                    <div style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
                       Error: <strong style={{ color: 'var(--text)' }}>{subcatError}</strong>
                     </div>
                   )}
@@ -332,7 +332,7 @@ export default function MarketSegmentDetail() {
                       }}
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         Slug preview: <strong style={{ color: 'var(--text)' }}>{slugify(subcatName.trim()) || '—'}</strong>
                       </div>
                       <button className="button button-secondary" onClick={handleAddSubcategory} disabled={subcatSaving}>
@@ -342,7 +342,7 @@ export default function MarketSegmentDetail() {
                   </div>
                 </div>
               ) : (
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                   Sign in to add subcategories.
                 </div>
               )}

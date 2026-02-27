@@ -142,10 +142,10 @@ export default function ContractorWorkInput({
           borderBottom: '2px solid var(--border)',
           background: 'var(--surface)'
         }}>
-          <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
             Log Contractor Work
           </h3>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             {organizationName}
           </div>
         </div>
@@ -153,7 +153,7 @@ export default function ContractorWorkInput({
         {/* Work Order Image Preview */}
         {imageUrl && (
           <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
               Extracting from work order:
             </div>
             <img
@@ -168,7 +168,7 @@ export default function ContractorWorkInput({
               }}
             />
             <div style={{
-              fontSize: '7pt',
+              fontSize: '9px',
               color: 'var(--warning)',
               marginTop: '8px',
               padding: '8px',
@@ -185,7 +185,7 @@ export default function ContractorWorkInput({
         <form onSubmit={handleSubmit} style={{ padding: '16px' }}>
           {/* Work Description */}
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Work Performed
             </label>
             <textarea
@@ -194,21 +194,21 @@ export default function ContractorWorkInput({
               required
               placeholder="Brief description of work performed..."
               className="form-input"
-              style={{ fontSize: '9pt', minHeight: '80px', width: '100%', fontFamily: 'Arial' }}
+              style={{ fontSize: '12px', minHeight: '80px', width: '100%', fontFamily: 'Arial' }}
             />
           </div>
           
           {/* Category & Date */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 Category
               </label>
               <select
                 value={workCategory}
                 onChange={(e) => setWorkCategory(e.target.value)}
                 className="form-select"
-                style={{ fontSize: '9pt', width: '100%' }}
+                style={{ fontSize: '12px', width: '100%' }}
               >
                 <option value="mechanical">Mechanical</option>
                 <option value="electrical">Electrical</option>
@@ -223,7 +223,7 @@ export default function ContractorWorkInput({
             </div>
             
             <div>
-              <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 Date
               </label>
               <input
@@ -232,7 +232,7 @@ export default function ContractorWorkInput({
                 onChange={(e) => setWorkDate(e.target.value)}
                 required
                 className="form-input"
-                style={{ fontSize: '9pt', width: '100%' }}
+                style={{ fontSize: '12px', width: '100%' }}
               />
             </div>
           </div>
@@ -240,7 +240,7 @@ export default function ContractorWorkInput({
           {/* Labor Hours & Rate */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 Hours
               </label>
               <input
@@ -250,12 +250,12 @@ export default function ContractorWorkInput({
                 onChange={(e) => setLaborHours(e.target.value)}
                 placeholder="0.0"
                 className="form-input"
-                style={{ fontSize: '9pt', width: '100%' }}
+                style={{ fontSize: '12px', width: '100%' }}
               />
             </div>
             
             <div>
-              <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 Rate (/hr)
               </label>
               <input
@@ -265,12 +265,12 @@ export default function ContractorWorkInput({
                 onChange={(e) => setHourlyRate(e.target.value)}
                 placeholder="$0"
                 className="form-input"
-                style={{ fontSize: '9pt', width: '100%' }}
+                style={{ fontSize: '12px', width: '100%' }}
               />
             </div>
             
             <div>
-              <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 Materials
               </label>
               <input
@@ -280,7 +280,7 @@ export default function ContractorWorkInput({
                 onChange={(e) => setMaterialsCost(e.target.value)}
                 placeholder="$0.00"
                 className="form-input"
-                style={{ fontSize: '9pt', width: '100%' }}
+                style={{ fontSize: '12px', width: '100%' }}
               />
             </div>
           </div>
@@ -294,13 +294,13 @@ export default function ContractorWorkInput({
               marginBottom: '12px',
               border: '2px solid var(--accent)'
             }}>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                 Total Contribution Value
               </div>
-              <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--accent)' }}>
+              <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--accent)' }}>
                 ${((parseFloat(laborHours) || 0) * (parseFloat(hourlyRate) || 0) + (parseFloat(materialsCost) || 0)).toFixed(2)}
               </div>
-              <div style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                 {laborHours && hourlyRate && `${laborHours}h × $${hourlyRate}/hr = $${((parseFloat(laborHours) || 0) * (parseFloat(hourlyRate) || 0)).toFixed(2)}`}
                 {laborHours && hourlyRate && materialsCost && ' + '}
                 {materialsCost && `$${materialsCost} materials`}
@@ -310,7 +310,7 @@ export default function ContractorWorkInput({
           
           {/* Optional: Vehicle Name */}
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Vehicle (Optional)
             </label>
             <input
@@ -319,7 +319,7 @@ export default function ContractorWorkInput({
               onChange={(e) => setVehicleName(e.target.value)}
               placeholder="e.g., 1977 K5 Blazer, Customer's truck, etc."
               className="form-input"
-              style={{ fontSize: '9pt', width: '100%' }}
+              style={{ fontSize: '12px', width: '100%' }}
             />
           </div>
           
@@ -331,11 +331,11 @@ export default function ContractorWorkInput({
             marginBottom: '16px',
             border: '1px solid var(--border)'
           }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '12px' }}>
               Privacy & Profile Settings
             </div>
             
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px', fontSize: '8pt', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px', fontSize: '11px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={showOnProfile}
@@ -344,13 +344,13 @@ export default function ContractorWorkInput({
               />
               <div>
                 <div style={{ fontWeight: 600 }}>Show on my contractor profile</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '9px' }}>
                   Builds your professional portfolio. Hours and work type visible, but not exact pay.
                 </div>
               </div>
             </label>
             
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px', fontSize: '8pt', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px', fontSize: '11px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={isPublic}
@@ -358,13 +358,13 @@ export default function ContractorWorkInput({
               />
               <div>
                 <div style={{ fontWeight: 600 }}>Make this work visible to public</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '9px' }}>
                   Show this contribution on the shop's public profile (still respects financial privacy).
                 </div>
               </div>
             </label>
             
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '8pt', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '11px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={showFinancials}
@@ -373,7 +373,7 @@ export default function ContractorWorkInput({
               />
               <div>
                 <div style={{ fontWeight: 600 }}>Show financial details publicly</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '7pt' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '9px' }}>
                   If public, also show exact hourly rate and total value. Otherwise only hours are shown.
                 </div>
               </div>
@@ -386,7 +386,7 @@ export default function ContractorWorkInput({
               type="button"
               onClick={onClose}
               className="button button-secondary"
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
               disabled={loading}
             >
               Cancel
@@ -394,7 +394,7 @@ export default function ContractorWorkInput({
             <button
               type="submit"
               className="button button-primary"
-              style={{ fontSize: '9pt' }}
+              style={{ fontSize: '12px' }}
               disabled={loading}
             >
               {loading ? 'Saving...' : 'Log Work Contribution'}

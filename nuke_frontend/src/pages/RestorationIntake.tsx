@@ -301,7 +301,7 @@ export default function RestorationIntake() {
   // Loading state
   if (loading) {
     return (
-      <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+      <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
         Loading...
       </div>
     );
@@ -313,19 +313,19 @@ export default function RestorationIntake() {
       <div style={{ padding: 'var(--space-6)', maxWidth: '480px', margin: '0 auto' }}>
         <div className="card">
           <div className="card-header">
-            <h1 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>Restoration Intake</h1>
-            <p style={{ margin: '4px 0 0', fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <h1 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Restoration Intake</h1>
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
               Telegram-based photo intake for restoration shops
             </p>
           </div>
           <div className="card-body" style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '8pt', marginBottom: 'var(--space-4)' }}>
+            <p style={{ fontSize: '11px', marginBottom: 'var(--space-4)' }}>
               Sign in to set up your shop and start receiving work photos from your technicians.
             </p>
             <button
               onClick={() => navigate('/login')}
               className="button button-primary"
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               Sign In
             </button>
@@ -341,15 +341,15 @@ export default function RestorationIntake() {
       <div style={{ padding: 'var(--space-6)', maxWidth: '560px', margin: '0 auto' }}>
         <div className="card">
           <div className="card-header">
-            <h1 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>Set Up Your Shop</h1>
-            <p style={{ margin: '4px 0 0', fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <h1 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Set Up Your Shop</h1>
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
               Create a profile for your restoration shop to start receiving work photos
             </p>
           </div>
           <div className="card-body">
             <form onSubmit={handleCreateBusiness}>
               <div style={{ marginBottom: 'var(--space-4)' }}>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
                   Shop Name *
                 </label>
                 <input
@@ -358,14 +358,14 @@ export default function RestorationIntake() {
                   onChange={(e) => setBusinessName(e.target.value)}
                   required
                   className="form-input"
-                  style={{ width: '100%', fontSize: '8pt' }}
+                  style={{ width: '100%', fontSize: '11px' }}
                   placeholder="e.g., Desert Performance Restorations"
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
                     City
                   </label>
                   <input
@@ -373,12 +373,12 @@ export default function RestorationIntake() {
                     value={businessCity}
                     onChange={(e) => setBusinessCity(e.target.value)}
                     className="form-input"
-                    style={{ width: '100%', fontSize: '8pt' }}
+                    style={{ width: '100%', fontSize: '11px' }}
                     placeholder="Phoenix"
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
                     State
                   </label>
                   <input
@@ -386,7 +386,7 @@ export default function RestorationIntake() {
                     value={businessState}
                     onChange={(e) => setBusinessState(e.target.value)}
                     className="form-input"
-                    style={{ width: '100%', fontSize: '8pt' }}
+                    style={{ width: '100%', fontSize: '11px' }}
                     placeholder="AZ"
                     maxLength={2}
                   />
@@ -394,7 +394,7 @@ export default function RestorationIntake() {
               </div>
 
               <div style={{ marginBottom: 'var(--space-5)' }}>
-                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
                   Phone
                 </label>
                 <input
@@ -402,7 +402,7 @@ export default function RestorationIntake() {
                   value={businessPhone}
                   onChange={(e) => setBusinessPhone(e.target.value)}
                   className="form-input"
-                  style={{ width: '100%', fontSize: '8pt' }}
+                  style={{ width: '100%', fontSize: '11px' }}
                   placeholder="(555) 123-4567"
                 />
               </div>
@@ -412,7 +412,7 @@ export default function RestorationIntake() {
                   type="submit"
                   disabled={submittingBusiness || !businessName.trim()}
                   className="button button-primary"
-                  style={{ fontSize: '8pt', width: '100%' }}
+                  style={{ fontSize: '11px', width: '100%' }}
                 >
                   {submittingBusiness ? 'Creating...' : 'Create Shop'}
                 </button>
@@ -426,7 +426,7 @@ export default function RestorationIntake() {
           padding: 'var(--space-3)',
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-muted)'
         }}>
           <strong>How it works:</strong> After setup, you'll get invite codes. Share them with your technicians.
@@ -447,7 +447,7 @@ export default function RestorationIntake() {
               value={business.id}
               onChange={(e) => handleSwitchBusiness(e.target.value)}
               className="form-select"
-              style={{ fontSize: '12pt', fontWeight: 700, padding: 'var(--space-2) var(--space-3)' }}
+              style={{ fontSize: '16px', fontWeight: 700, padding: 'var(--space-2) var(--space-3)' }}
             >
               {businesses.map((biz) => (
                 <option key={biz.id} value={biz.id}>
@@ -456,12 +456,12 @@ export default function RestorationIntake() {
               ))}
             </select>
           ) : (
-            <h1 style={{ fontSize: '14pt', fontWeight: 700, margin: 0 }}>
+            <h1 style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>
               {business.business_name}
             </h1>
           )}
         </div>
-        <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           {businesses.length > 1 && (
             <span style={{ marginRight: 'var(--space-2)' }}>
               {businesses.length} businesses •
@@ -487,7 +487,7 @@ export default function RestorationIntake() {
             onClick={() => setActiveTab(tab.id)}
             style={{
               padding: 'var(--space-2) var(--space-4)',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: activeTab === tab.id ? 700 : 400,
               background: activeTab === tab.id ? 'var(--white)' : 'var(--surface)',
               border: '1px solid var(--border)',
@@ -504,7 +504,7 @@ export default function RestorationIntake() {
                 marginLeft: 'var(--space-2)',
                 background: activeTab === tab.id ? 'var(--grey-300)' : 'var(--grey-400)',
                 padding: '1px 5px',
-                fontSize: '7pt'
+                fontSize: '9px'
               }}>
                 {tab.count}
               </span>
@@ -519,28 +519,28 @@ export default function RestorationIntake() {
         {activeTab === 'submissions' && (
           <div className="card-body">
             {submissionsLoading ? (
-              <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-muted)', fontSize: '8pt' }}>
+              <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-muted)', fontSize: '11px' }}>
                 Loading submissions...
               </div>
             ) : submissions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
-                <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                   No submissions yet
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
                   Photos from your technicians will appear here
                 </div>
                 <button
                   onClick={() => setActiveTab('invites')}
                   className="button button-secondary"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   Generate Invite Code
                 </button>
               </div>
             ) : (
               <>
-                <div style={{ marginBottom: 'var(--space-3)', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--text-muted)' }}>
                   {submissions.length} photo{submissions.length !== 1 ? 's' : ''} received
                 </div>
 
@@ -571,14 +571,14 @@ export default function RestorationIntake() {
                           borderBottom: '1px solid var(--border)'
                         }} />
                         <div style={{ padding: 'var(--space-2)' }}>
-                          <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '2px' }}>
+                          <div style={{ fontSize: '9px', fontWeight: 700, marginBottom: '2px' }}>
                             {sub.detected_work_type?.replace(/_/g, ' ') || 'Photo'}
                           </div>
-                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                             {sub.technician?.display_name || 'Tech'} • {new Date(sub.received_at).toLocaleDateString()}
                           </div>
                           {sub.vehicle?.vin && (
-                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                               ...{sub.vehicle.vin.slice(-6)}
                             </div>
                           )}
@@ -606,10 +606,10 @@ export default function RestorationIntake() {
               alignItems: 'center'
             }}>
               <div>
-                <div style={{ fontSize: '9pt', fontWeight: 700 }}>
+                <div style={{ fontSize: '12px', fontWeight: 700 }}>
                   Generate Invite Code
                 </div>
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                   Each code allows up to 10 technicians to join (expires in 30 days)
                 </div>
               </div>
@@ -617,7 +617,7 @@ export default function RestorationIntake() {
                 onClick={handleGenerateCode}
                 disabled={generatingCode}
                 className="button button-primary"
-                style={{ fontSize: '8pt', whiteSpace: 'nowrap' }}
+                style={{ fontSize: '11px', whiteSpace: 'nowrap' }}
               >
                 {generatingCode ? 'Generating...' : 'Generate Code'}
               </button>
@@ -629,7 +629,7 @@ export default function RestorationIntake() {
               border: '1px solid var(--border)',
               padding: 'var(--space-3)',
               marginBottom: 'var(--space-4)',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               <div style={{ fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                 How to invite a technician:
@@ -643,11 +643,11 @@ export default function RestorationIntake() {
 
             {/* Codes List */}
             {inviteCodes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--text-muted)', fontSize: '8pt' }}>
+              <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--text-muted)', fontSize: '11px' }}>
                 No invite codes yet. Generate one above.
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                 <thead>
                   <tr style={{ background: 'var(--grey-200)', borderBottom: '1px solid var(--border)' }}>
                     <th style={{ textAlign: 'left', padding: 'var(--space-2)', fontWeight: 700 }}>Code</th>
@@ -690,7 +690,7 @@ export default function RestorationIntake() {
                             <button
                               onClick={() => copyToClipboard(code.code)}
                               className="button button-secondary"
-                              style={{ fontSize: '7pt', padding: '2px 6px' }}
+                              style={{ fontSize: '9px', padding: '2px 6px' }}
                             >
                               Copy
                             </button>
@@ -698,7 +698,7 @@ export default function RestorationIntake() {
                               <button
                                 onClick={() => handleRevokeCode(code.id)}
                                 className="button button-secondary"
-                                style={{ fontSize: '7pt', padding: '2px 6px', color: 'var(--error)' }}
+                                style={{ fontSize: '9px', padding: '2px 6px', color: 'var(--error)' }}
                               >
                                 Revoke
                               </button>
@@ -719,26 +719,26 @@ export default function RestorationIntake() {
           <div className="card-body">
             {technicians.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
-                <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                   No technicians yet
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
                   Invite codes become technicians when used
                 </div>
                 <button
                   onClick={() => setActiveTab('invites')}
                   className="button button-secondary"
-                  style={{ fontSize: '8pt' }}
+                  style={{ fontSize: '11px' }}
                 >
                   Generate Invite Code
                 </button>
               </div>
             ) : (
               <>
-                <div style={{ marginBottom: 'var(--space-3)', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--text-muted)' }}>
                   {technicians.length} technician{technicians.length !== 1 ? 's' : ''} connected
                 </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                   <thead>
                     <tr style={{ background: 'var(--grey-200)', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ textAlign: 'left', padding: 'var(--space-2)', fontWeight: 700 }}>Name</th>
@@ -790,7 +790,7 @@ export default function RestorationIntake() {
         padding: 'var(--space-3)',
         background: 'var(--surface)',
         border: '1px solid var(--border)',
-        fontSize: '8pt'
+        fontSize: '11px'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -805,7 +805,7 @@ export default function RestorationIntake() {
           <button
             onClick={() => navigate('/settings/api-keys')}
             className="button button-secondary"
-            style={{ fontSize: '7pt' }}
+            style={{ fontSize: '9px' }}
           >
             Manage API Keys
           </button>
@@ -849,7 +849,7 @@ export default function RestorationIntake() {
               borderBottom: '1px solid var(--border)',
               background: 'var(--grey-200)'
             }}>
-              <div style={{ fontSize: '9pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '12px', fontWeight: 700 }}>
                 Submission Detail
               </div>
               <button
@@ -857,7 +857,7 @@ export default function RestorationIntake() {
                 style={{
                   background: 'none',
                   border: 'none',
-                  fontSize: '14pt',
+                  fontSize: '19px',
                   cursor: 'pointer',
                   color: 'var(--text-muted)'
                 }}
@@ -881,7 +881,7 @@ export default function RestorationIntake() {
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
                 gap: 'var(--space-3)',
-                fontSize: '8pt'
+                fontSize: '11px'
               }}>
                 <div>
                   <div style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>Work Type</div>
@@ -929,15 +929,15 @@ export default function RestorationIntake() {
 
               {selectedSubmission.detected_description && (
                 <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--border-light)' }}>
-                  <div style={{ color: 'var(--text-muted)', marginBottom: '2px', fontSize: '8pt' }}>AI Description</div>
-                  <div style={{ fontSize: '8pt' }}>{selectedSubmission.detected_description}</div>
+                  <div style={{ color: 'var(--text-muted)', marginBottom: '2px', fontSize: '11px' }}>AI Description</div>
+                  <div style={{ fontSize: '11px' }}>{selectedSubmission.detected_description}</div>
                 </div>
               )}
 
               {selectedSubmission.message_text && (
                 <div style={{ marginTop: 'var(--space-3)' }}>
-                  <div style={{ color: 'var(--text-muted)', marginBottom: '2px', fontSize: '8pt' }}>Tech's Note</div>
-                  <div style={{ fontSize: '8pt', fontStyle: 'italic' }}>"{selectedSubmission.message_text}"</div>
+                  <div style={{ color: 'var(--text-muted)', marginBottom: '2px', fontSize: '11px' }}>Tech's Note</div>
+                  <div style={{ fontSize: '11px', fontStyle: 'italic' }}>"{selectedSubmission.message_text}"</div>
                 </div>
               )}
             </div>

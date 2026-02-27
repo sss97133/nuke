@@ -370,10 +370,10 @@ const Library: React.FC = () => {
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: 'var(--space-4)' }}>
       {/* Header */}
       <div style={{ marginBottom: 'var(--space-4)' }}>
-        <h1 style={{ fontSize: '18pt', fontWeight: 700, marginBottom: '8px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>
           Reference Library
         </h1>
-        <p style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
           Your factory documentation collection - brochures, manuals, specs, and technical references
         </p>
       </div>
@@ -387,26 +387,26 @@ const Library: React.FC = () => {
       }}>
         <div className="card">
           <div className="card-body" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20pt', fontWeight: 700 }}>{stats.total_documents}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Documents</div>
+            <div style={{ fontSize: '27px', fontWeight: 700 }}>{stats.total_documents}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Documents</div>
           </div>
         </div>
         <div className="card">
           <div className="card-body" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20pt', fontWeight: 700 }}>{stats.vehicles_helped}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Vehicles Helped</div>
+            <div style={{ fontSize: '27px', fontWeight: 700 }}>{stats.vehicles_helped}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vehicles Helped</div>
           </div>
         </div>
         <div className="card">
           <div className="card-body" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20pt', fontWeight: 700 }}>{stats.total_downloads}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Downloads</div>
+            <div style={{ fontSize: '27px', fontWeight: 700 }}>{stats.total_downloads}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Downloads</div>
           </div>
         </div>
         <div className="card">
           <div className="card-body" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20pt', fontWeight: 700 }}>{stats.libraries_contributed}</div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Libraries</div>
+            <div style={{ fontSize: '27px', fontWeight: 700 }}>{stats.libraries_contributed}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Libraries</div>
           </div>
         </div>
       </div>
@@ -416,7 +416,7 @@ const Library: React.FC = () => {
         <button
           className="button button-primary"
           onClick={() => fileInputRef.current?.click()}
-          style={{ fontSize: '9pt' }}
+          style={{ fontSize: '12px' }}
         >
           + Upload Document
         </button>
@@ -433,11 +433,11 @@ const Library: React.FC = () => {
       {documents.length === 0 ? (
         <div className="card">
           <div className="card-body" style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <div style={{ fontSize: '40pt', marginBottom: '16px' }}>📚</div>
-            <div style={{ fontSize: '11pt', fontWeight: 600, marginBottom: '8px' }}>
+            <div style={{ fontSize: '53px', marginBottom: '16px' }}>📚</div>
+            <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>
               No documents yet
             </div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>
               Upload factory brochures, manuals, and specs to build your reference library
             </div>
             <button
@@ -457,22 +457,22 @@ const Library: React.FC = () => {
           {documents.map((book) => (
             <div key={book.id} className="card" style={{ cursor: 'pointer' }}>
               <div className="card-body">
-                <div style={{ fontSize: '32pt', textAlign: 'center', marginBottom: '8px' }}>
+                <div style={{ fontSize: '43px', textAlign: 'center', marginBottom: '8px' }}>
                   {getDocumentIcon(book.document_type)}
                 </div>
-                <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                   {book.is_book && book.page_count > 1 
                     ? `${book.page_count} Pages - ${book.pages[0]?.title || book.title}`
                     : book.title}
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                   {book.library_year} {book.library_make} {book.library_series}
                   {book.library_body_style && ` ${book.library_body_style}`}
                 </div>
                 
                 {/* Book Stats */}
                 {book.is_book && book.page_count > 1 && (
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                     {book.page_count} pages • {(book.total_size / 1024 / 1024).toFixed(1)} MB
                   </div>
                 )}
@@ -484,7 +484,7 @@ const Library: React.FC = () => {
                     padding: '6px',
                     background: book.extraction.status === 'pending_review' ? '#fef3c7' : '#f0fdf4',
                     borderRadius: '4px',
-                    fontSize: '7pt'
+                    fontSize: '9px'
                   }}>
                     <div style={{ fontWeight: 600, marginBottom: '4px' }}>
                       {book.extraction.status === 'pending_review' ? 'Processing...' : 
@@ -492,7 +492,7 @@ const Library: React.FC = () => {
                        book.extraction.status === 'rejected' ? '✗ Rejected' : 'Processing'}
                     </div>
                     {book.extraction.extracted_data && (
-                      <div style={{ fontSize: '6pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '8px', color: 'var(--text-muted)' }}>
                         {book.extraction.extracted_data.colors?.length || 0} colors • {' '}
                         {book.extraction.extracted_data.specifications?.engines?.length || 0} engines • {' '}
                         {book.extraction.extracted_data.options?.length || 0} options
@@ -505,7 +505,7 @@ const Library: React.FC = () => {
                   display: 'flex', 
                   gap: '4px', 
                   marginTop: '8px',
-                  fontSize: '7pt'
+                  fontSize: '9px'
                 }}>
                   {book.is_factory_original && (
                     <span className="badge badge-secondary">Factory</span>
@@ -521,7 +521,7 @@ const Library: React.FC = () => {
                   marginTop: '8px',
                   paddingTop: '8px',
                   borderTop: '1px solid var(--border)',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text-muted)',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -533,7 +533,7 @@ const Library: React.FC = () => {
                 </div>
                 {/* Attribution */}
                 <div style={{
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text-muted)',
                   marginTop: '8px',
                   paddingTop: '8px',
@@ -547,7 +547,7 @@ const Library: React.FC = () => {
                 <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
                   <button
                     className="button button-small"
-                    style={{ fontSize: '7pt', flex: 1 }}
+                    style={{ fontSize: '9px', flex: 1 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       window.open(doc.file_url, '_blank');
@@ -561,7 +561,7 @@ const Library: React.FC = () => {
                   </button>
                   <button
                     className="button button-small"
-                    style={{ fontSize: '7pt', flex: 1 }}
+                    style={{ fontSize: '9px', flex: 1 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       const link = document.createElement('a');
@@ -606,7 +606,7 @@ const Library: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="card-header">
-              <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
                 Upload Reference Document
               </h3>
             </div>
@@ -615,8 +615,8 @@ const Library: React.FC = () => {
                 {/* File info */}
                 {uploadForm.file && (
                   <div style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
-                    <div style={{ fontSize: '8pt', fontWeight: 600 }}>{uploadForm.file.name}</div>
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600 }}>{uploadForm.file.name}</div>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                       {formatBytes(uploadForm.file.size)}
                     </div>
                   </div>
@@ -624,14 +624,14 @@ const Library: React.FC = () => {
 
                 {/* Document Type */}
                 <div>
-                  <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Document Type
                   </label>
                   <select
                     className="form-select"
                     value={uploadForm.document_type}
                     onChange={(e) => setUploadForm(prev => ({ ...prev, document_type: e.target.value }))}
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   >
                     <option value="brochure">Sales Brochure</option>
                     <option value="owners_manual">Owner's Manual</option>
@@ -648,7 +648,7 @@ const Library: React.FC = () => {
 
                 {/* Title */}
                 <div>
-                  <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Title *
                   </label>
                   <input
@@ -657,14 +657,14 @@ const Library: React.FC = () => {
                     value={uploadForm.title}
                     onChange={(e) => setUploadForm(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="1973 Chevrolet Trucks - Blazer"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   />
                 </div>
 
                 {/* YMM */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: 'var(--space-2)' }}>
                   <div>
-                    <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                       Year *
                     </label>
                     <input
@@ -673,11 +673,11 @@ const Library: React.FC = () => {
                       value={uploadForm.year}
                       onChange={(e) => setUploadForm(prev => ({ ...prev, year: e.target.value }))}
                       placeholder="1973"
-                      style={{ fontSize: '8pt' }}
+                      style={{ fontSize: '11px' }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                       Make *
                     </label>
                     <input
@@ -686,11 +686,11 @@ const Library: React.FC = () => {
                       value={uploadForm.make}
                       onChange={(e) => setUploadForm(prev => ({ ...prev, make: e.target.value }))}
                       placeholder="Chevrolet"
-                      style={{ fontSize: '8pt' }}
+                      style={{ fontSize: '11px' }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                       Series
                     </label>
                     <input
@@ -699,14 +699,14 @@ const Library: React.FC = () => {
                       value={uploadForm.series}
                       onChange={(e) => setUploadForm(prev => ({ ...prev, series: e.target.value }))}
                       placeholder="K5"
-                      style={{ fontSize: '8pt' }}
+                      style={{ fontSize: '11px' }}
                     />
                   </div>
                 </div>
 
                 {/* Body Style */}
                 <div>
-                  <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Body Style
                   </label>
                   <input
@@ -715,13 +715,13 @@ const Library: React.FC = () => {
                     value={uploadForm.body_style}
                     onChange={(e) => setUploadForm(prev => ({ ...prev, body_style: e.target.value }))}
                     placeholder="Blazer"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   />
                 </div>
 
                 {/* Publisher */}
                 <div>
-                  <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Publisher
                   </label>
                   <input
@@ -730,13 +730,13 @@ const Library: React.FC = () => {
                     value={uploadForm.publisher}
                     onChange={(e) => setUploadForm(prev => ({ ...prev, publisher: e.target.value }))}
                     placeholder="General Motors"
-                    style={{ fontSize: '8pt' }}
+                    style={{ fontSize: '11px' }}
                   />
                 </div>
 
                 {/* Factory Original */}
                 <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '8pt' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
                     <input
                       type="checkbox"
                       checked={uploadForm.is_factory_original}
@@ -752,7 +752,7 @@ const Library: React.FC = () => {
                     className="button button-secondary"
                     onClick={() => setShowUploadModal(false)}
                     disabled={uploading}
-                    style={{ flex: 1, fontSize: '8pt' }}
+                    style={{ flex: 1, fontSize: '11px' }}
                   >
                     Cancel
                   </button>
@@ -760,7 +760,7 @@ const Library: React.FC = () => {
                     className="button button-primary"
                     onClick={handleUpload}
                     disabled={uploading || !uploadForm.title || !uploadForm.year || !uploadForm.make}
-                    style={{ flex: 1, fontSize: '8pt' }}
+                    style={{ flex: 1, fontSize: '11px' }}
                   >
                     {uploading ? 'Uploading...' : 'Upload'}
                   </button>

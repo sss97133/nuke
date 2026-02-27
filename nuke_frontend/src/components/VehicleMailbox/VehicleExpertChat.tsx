@@ -306,8 +306,8 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
 
             return (
               <div key={idx} className="border border-gray-300 bg-white p-2">
-                <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>Context</div>
-                <div style={{ fontSize: '8pt', lineHeight: '1.35' }} className="text-gray-800">
+                <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>Context</div>
+                <div style={{ fontSize: '11px', lineHeight: '1.35' }} className="text-gray-800">
                   <div><strong>Docs:</strong> {counts.vehicle_documents_loaded ?? '—'} (receipts {counts.receipts_in_vehicle_documents ?? '—'}, manuals {counts.manuals_in_vehicle_documents ?? '—'})</div>
                   <div><strong>Receipt-like images:</strong> {counts.receipt_like_images ?? '—'}</div>
                   <div><strong>Timeline events:</strong> {counts.timeline_events_loaded ?? '—'}</div>
@@ -315,8 +315,8 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
 
                 {recentDocs.length > 0 && (
                   <div className="mt-2">
-                    <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>Recent documents</div>
-                    <ul className="list-disc pl-4" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                    <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>Recent documents</div>
+                    <ul className="list-disc pl-4" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                       {recentDocs.slice(0, 6).map((d: any, i: number) => {
                         const ref = String(d?.ref || '')
                         const label = [d?.document_type, d?.title].filter(Boolean).join(': ')
@@ -354,8 +354,8 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
 
                 {receiptLikeImages.length > 0 && (
                   <div className="mt-2">
-                    <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>Receipt-like images</div>
-                    <ul className="list-disc pl-4" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                    <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>Receipt-like images</div>
+                    <ul className="list-disc pl-4" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                       {receiptLikeImages.slice(0, 6).map((img: any, i: number) => {
                         const ref = String(img?.ref || '')
                         const label = [img?.classification, img?.category, img?.caption].filter(Boolean).join(' — ')
@@ -405,7 +405,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                             if (typeof suggested === 'string' && suggested.trim()) setInput(suggested.trim())
                           }}
                           className="px-2 py-1 border-2 border-gray-300 bg-white hover:bg-gray-100 font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                         >
                           {label}
                         </button>
@@ -421,8 +421,8 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
             const title = String(card?.title || '3D model')
             return (
               <div key={idx} className="border border-gray-300 bg-white p-2">
-                <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>{title}</div>
-                <div style={{ fontSize: '8pt', lineHeight: '1.35' }} className="text-gray-700">
+                <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>{title}</div>
+                <div style={{ fontSize: '11px', lineHeight: '1.35' }} className="text-gray-700">
                   The 3D panel should appear above once the model is loaded.
                 </div>
               </div>
@@ -436,13 +436,13 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
 
             return (
               <div key={idx} className="border border-gray-300 bg-white p-2">
-                <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>Search results</div>
-                <div style={{ fontSize: '8pt', lineHeight: '1.35' }} className="text-gray-700">
+                <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>Search results</div>
+                <div style={{ fontSize: '11px', lineHeight: '1.35' }} className="text-gray-700">
                   <div><strong>Query:</strong> {query || '—'}</div>
                   <div><strong>Matches:</strong> docs {totals.documents ?? 0}, images {totals.images ?? 0}, events {totals.timeline_events ?? 0}</div>
                 </div>
                 {results.length > 0 ? (
-                  <ul className="mt-2 list-disc pl-4" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                  <ul className="mt-2 list-disc pl-4" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                     {results.slice(0, 10).map((r: any, i: number) => {
                       const ref = String(r?.ref || '')
                       const title = String(r?.title || ref || 'Result')
@@ -477,7 +477,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                     })}
                   </ul>
                 ) : (
-                  <div className="mt-2 text-gray-700" style={{ fontSize: '8pt' }}>No matches found.</div>
+                  <div className="mt-2 text-gray-700" style={{ fontSize: '11px' }}>No matches found.</div>
                 )}
               </div>
             )
@@ -494,8 +494,8 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
 
             return (
               <div key={idx} className="border border-gray-300 bg-white p-2">
-                <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>Source</div>
-                <div style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>Source</div>
+                <div style={{ fontSize: '11px', lineHeight: '1.35' }}>
                   <div><strong>{title}</strong></div>
                   {ref ? (
                     <div className="text-gray-700">
@@ -514,7 +514,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                 </div>
 
                 {metadata && typeof metadata === 'object' && Object.keys(metadata).length > 0 && (
-                  <div className="mt-2 text-gray-800" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                  <div className="mt-2 text-gray-800" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                     <div className="font-semibold mb-1">Metadata</div>
                     <ul className="list-disc pl-4">
                       {Object.entries(metadata).slice(0, 10).map(([k, v]) => (
@@ -525,7 +525,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                 )}
 
                 {links.length > 0 && (
-                  <div className="mt-2" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                  <div className="mt-2" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                     <div className="font-semibold mb-1">Links</div>
                     <ul className="list-disc pl-4">
                       {links.slice(0, 4).map((l: any, i: number) => {
@@ -546,7 +546,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                 )}
 
                 {receipt?.ref ? (
-                  <div className="mt-2" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                  <div className="mt-2" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                     <div className="font-semibold mb-1">Linked receipt</div>
                     <div className="text-gray-800">
                       <span>{String(receipt.ref)}</span>
@@ -573,7 +573,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                 ) : null}
 
                 {receiptItems.length > 0 && (
-                  <div className="mt-2" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                  <div className="mt-2" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                     <div className="font-semibold mb-1">Receipt items (top)</div>
                     <ul className="list-disc pl-4">
                       {receiptItems.slice(0, 12).map((it: any, i: number) => (
@@ -588,7 +588,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                 )}
 
                 {excerpts.length > 0 && (
-                  <div className="mt-2" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                  <div className="mt-2" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                     <div className="font-semibold mb-1">Excerpts</div>
                     <div className="space-y-2">
                       {excerpts.slice(0, 4).map((ex: any, i: number) => (
@@ -607,8 +607,8 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           if (type === 'clarifying_questions' && Array.isArray(card?.questions) && card.questions.length > 0) {
             return (
               <div key={idx} className="border border-gray-300 bg-gray-50 p-2">
-                <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>Questions</div>
-                <ul className="list-disc pl-4" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>Questions</div>
+                <ul className="list-disc pl-4" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                   {card.questions.slice(0, 6).map((q: string, i: number) => (
                     <li key={i}>{q}</li>
                   ))}
@@ -621,14 +621,14 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
             const t = card.totals
             return (
               <div key={idx} className="border border-gray-300 bg-white p-2">
-                <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>Estimated total</div>
-                <div style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>Estimated total</div>
+                <div style={{ fontSize: '11px', lineHeight: '1.35' }}>
                   <div><strong>Total:</strong> {t.total_low ? `$${t.total_low}` : '—'} to {t.total_high ? `$${t.total_high}` : '—'}</div>
                   <div><strong>Parts:</strong> {t.parts_low ? `$${t.parts_low}` : '—'} to {t.parts_high ? `$${t.parts_high}` : '—'}</div>
                   <div><strong>Labor:</strong> {t.labor_hours_low ?? '—'} to {t.labor_hours_high ?? '—'} hrs @ {t.labor_rate_usd_per_hr ?? '—'}/hr</div>
                 </div>
                 {Array.isArray(card?.assumptions) && card.assumptions.length > 0 && (
-                  <div className="mt-2 text-gray-700" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                  <div className="mt-2 text-gray-700" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                     <div className="font-semibold mb-1">Assumptions</div>
                     <ul className="list-disc pl-4">
                       {card.assumptions.slice(0, 6).map((a: string, i: number) => <li key={i}>{a}</li>)}
@@ -642,18 +642,18 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           if (type === 'parts_options' && Array.isArray(card?.items) && card.items.length > 0) {
             return (
               <div key={idx} className="border border-gray-300 bg-white p-2">
-                <div className="font-semibold mb-1" style={{ fontSize: '8pt' }}>Parts options</div>
+                <div className="font-semibold mb-1" style={{ fontSize: '11px' }}>Parts options</div>
                 <div className="space-y-2">
                   {card.items.slice(0, 6).map((item: any, i: number) => (
                     <div key={i} className="border border-gray-200 p-2">
-                      <div className="font-semibold" style={{ fontSize: '8pt' }}>{item?.name || 'Part'}</div>
+                      <div className="font-semibold" style={{ fontSize: '11px' }}>{item?.name || 'Part'}</div>
                       {item?.qty ? (
-                        <div style={{ fontSize: '8pt' }} className="text-gray-700">Qty: {item.qty}</div>
+                        <div style={{ fontSize: '11px' }} className="text-gray-700">Qty: {item.qty}</div>
                       ) : null}
                       {Array.isArray(item?.options) && item.options.length > 0 && (
                         <div className="mt-1 space-y-1">
                           {item.options.slice(0, 3).map((opt: any, j: number) => (
-                            <div key={j} style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                            <div key={j} style={{ fontSize: '11px', lineHeight: '1.35' }}>
                               <strong>{opt?.vendor || 'Option'}</strong>
                               {opt?.price_estimate_usd ? `: $${opt.price_estimate_usd}` : ''}
                               {opt?.part_number ? ` (PN: ${opt.part_number})` : ''}
@@ -669,7 +669,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 text-gray-600" style={{ fontSize: '8pt', lineHeight: '1.35' }}>
+                <div className="mt-2 text-gray-600" style={{ fontSize: '11px', lineHeight: '1.35' }}>
                   Links are limited to trusted vendor search pages. If you want exact pricing, share a part number or vendor preference.
                 </div>
               </div>
@@ -679,7 +679,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           if (type === 'next_actions' && Array.isArray(card?.actions) && card.actions.length > 0) {
             return (
               <div key={idx} className="border border-gray-300 bg-white p-2">
-                <div className="font-semibold mb-2" style={{ fontSize: '8pt' }}>Next actions</div>
+                <div className="font-semibold mb-2" style={{ fontSize: '11px' }}>Next actions</div>
                 <div className="flex flex-wrap gap-2">
                   {card.actions.slice(0, 4).map((a: any, i: number) => {
                     const actionId = String(a?.id || '')
@@ -693,7 +693,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                           type="button"
                           onClick={() => onDraftWorkOrder(draft)}
                           className="px-3 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                         >
                           {label}
                         </button>
@@ -707,7 +707,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                           type="button"
                           onClick={() => setShowUploader(true)}
                           className="px-3 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           title={String(a?.payload?.hint || 'Upload receipts/manuals for better accuracy')}
                         >
                           {label}
@@ -722,7 +722,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                           type="button"
                           onClick={() => setInput('/context')}
                           className="px-3 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 font-semibold"
-                          style={{ fontSize: '8pt' }}
+                          style={{ fontSize: '11px' }}
                           title="Show what evidence is currently attached to this vehicle"
                         >
                           {label}
@@ -740,7 +740,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                           if (typeof suggested === 'string' && suggested.trim()) setInput(suggested.trim())
                         }}
                         className="px-3 py-1 border-2 border-gray-300 bg-white hover:bg-gray-100 font-semibold"
-                        style={{ fontSize: '8pt' }}
+                        style={{ fontSize: '11px' }}
                       >
                         {label}
                       </button>
@@ -910,7 +910,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-4 right-4 bg-gray-900 text-white rounded-full p-3 shadow-lg hover:bg-gray-800 transition-colors flex items-center justify-center"
-        style={{ fontSize: '8pt' }}
+        style={{ fontSize: '11px' }}
         title={`Chat with ${vehicleDisplayName}`}
       >
         <MessageCircle className="w-4 h-4" />
@@ -925,7 +925,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
       ? 'fixed top-4 bottom-4 right-4 left-4 md:left-auto md:w-[45vw] md:min-w-[420px] md:max-w-[760px] bg-white border-2 border-gray-300 shadow-lg flex flex-col'
       : 'fixed bottom-4 right-4 w-80 h-96 bg-white border-2 border-gray-300 shadow-lg flex flex-col'
 
-  const containerStyle: React.CSSProperties = { fontSize: '8pt' }
+  const containerStyle: React.CSSProperties = { fontSize: '11px' }
 
   return (
     <div className={containerClass} style={containerStyle}>
@@ -935,14 +935,14 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           <div className="w-6 h-6 rounded-full bg-gray-900 flex items-center justify-center">
             <MessageCircle className="w-3 h-3 text-white" />
           </div>
-          <span className="font-semibold" style={{ fontSize: '8pt' }}>{vehicleDisplayName} - Expert</span>
+          <span className="font-semibold" style={{ fontSize: '11px' }}>{vehicleDisplayName} - Expert</span>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => sendCommand('/context')}
             className="px-2 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 font-semibold"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
             title="Show context (docs, receipt-like images, timeline)"
           >
             Context
@@ -951,7 +951,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
             type="button"
             onClick={() => setShowUploader(true)}
             className="px-2 py-1 border-2 border-gray-900 bg-white hover:bg-gray-100 font-semibold"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
             title="Upload receipts/invoices/manuals to this vehicle"
           >
             Upload
@@ -960,7 +960,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
             <button
               onClick={() => setIsOpen(false)}
               className="text-gray-600 hover:text-gray-900"
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               ×
             </button>
@@ -972,11 +972,11 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
       {activeModelSignedUrl && (
         <div className="p-3 border-b border-gray-200 bg-white">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
-            <div style={{ fontWeight: 700, fontSize: '8pt' }}>Attached 3D model</div>
+            <div style={{ fontWeight: 700, fontSize: '11px' }}>Attached 3D model</div>
             <button
               type="button"
               className="underline text-gray-900"
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
               onClick={() => {
                 setActiveModelSignedUrl(null)
                 setActiveModelPath(null)
@@ -990,12 +990,12 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           </div>
           <ErrorBoundary
             fallback={
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '8pt', color: '#666', border: '1px solid var(--border)', borderRadius: '4px' }}>
+              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: '#666', border: '1px solid var(--border)', borderRadius: '4px' }}>
                 3D model viewer unavailable
               </div>
             }
           >
-            <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', fontSize: '8pt', color: '#666' }}>Loading 3D model...</div>}>
+            <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: '#666' }}>Loading 3D model...</div>}>
               <ModelHarnessAnnotator vehicleId={vehicleId} defaultImportUrl={activeModelSignedUrl} autoImportOnLoad={true} />
             </Suspense>
           </ErrorBoundary>
@@ -1017,7 +1017,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                   ? 'bg-gray-100 text-gray-700 border border-gray-300'
                   : 'bg-gray-50 text-gray-900 border border-gray-300'
               }`}
-              style={{ fontSize: '8pt', lineHeight: '1.3' }}
+              style={{ fontSize: '11px', lineHeight: '1.3' }}
             >
               <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
               {message.role === 'assistant' && renderAssistantUI(message.ui)}
@@ -1027,7 +1027,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
         {isProcessing && (
           <div className="flex justify-start">
             <div className="bg-gray-50 border border-gray-300 px-2 py-1 rounded flex items-center gap-1"
-              style={{ fontSize: '8pt' }}>
+              style={{ fontSize: '11px' }}>
               <Loader className="w-3 h-3 animate-spin" />
               <span>Thinking...</span>
             </div>
@@ -1090,7 +1090,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about your vehicle..."
             className="flex-1 border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
             disabled={isProcessing}
           />
           {allowManualModelAttach && (
@@ -1112,7 +1112,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
                 })()
               }}
               className="bg-white text-gray-900 px-2 py-1 border-2 border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
               disabled={isProcessing}
               title="Attach a 3D model (.glb or .fbx)"
             >
@@ -1123,13 +1123,13 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
             type="submit"
             disabled={!input.trim() || isProcessing}
             className="bg-gray-900 text-white px-3 py-1 border-2 border-gray-900 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
           >
             <Send className="w-3 h-3" />
           </button>
         </div>
         {modelError && (
-          <div className="mt-2 text-red-700" style={{ fontSize: '8pt' }}>
+          <div className="mt-2 text-red-700" style={{ fontSize: '11px' }}>
             {modelError}
           </div>
         )}

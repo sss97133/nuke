@@ -374,11 +374,11 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
       {/* Collapsible Header */}
       <div 
         className="card-header" 
-        style={{ fontSize: '11pt', fontWeight: 700, cursor: 'pointer' }}
+        style={{ fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
         onClick={() => setIsExpanded(!isExpanded)}
       >
         {title}
-        <span style={{ float: 'right', fontSize: '9pt' }}>{isExpanded ? '▼' : '▶'}</span>
+        <span style={{ float: 'right', fontSize: '12px' }}>{isExpanded ? '▼' : '▶'}</span>
       </div>
 
       {isExpanded && (
@@ -402,7 +402,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 padding: '6px 10px',
                 border: '1px solid var(--border)',
                 borderRadius: '3px',
-                fontSize: '9pt'
+                fontSize: '12px'
               }}
             />
 
@@ -414,7 +414,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 padding: '6px 8px',
                 border: '1px solid var(--border)',
                 borderRadius: '3px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 cursor: 'pointer'
               }}
             >
@@ -432,7 +432,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 padding: '6px 8px',
                 border: '1px solid var(--border)',
                 borderRadius: '3px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 cursor: 'pointer',
                 background: 'var(--white)',
                 minWidth: '40px'
@@ -453,7 +453,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     border: 'none',
                     background: viewMode === mode ? 'var(--accent)' : 'transparent',
                     color: viewMode === mode ? 'white' : 'var(--text)',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     cursor: 'pointer',
                     fontWeight: viewMode === mode ? 600 : 400,
                     textTransform: 'capitalize',
@@ -467,7 +467,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           </div>
 
           {/* Results count */}
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
             Showing {filteredVehicles.length} of {soldVehicles.length} sold vehicles
           </div>
 
@@ -514,7 +514,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     color: 'white',
                     padding: '4px 10px',
                     borderRadius: '2px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'background 0.12s',
@@ -537,7 +537,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     color: 'white',
                     padding: '4px 8px',
                     borderRadius: '2px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     fontWeight: 600
                   }}>
                     {vehicle.image_count} photos
@@ -547,16 +547,16 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
 
               {/* Compact Info */}
               <div style={{ padding: '10px' }}>
-                <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                   {vehicle.year} {vehicle.make} {vehicle.model}
                 </div>
                 {vehicle.trim && (
-                  <div style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                     {vehicle.trim}
                   </div>
                 )}
                 <div style={{
-                  fontSize: '12pt',
+                  fontSize: '16px',
                   fontWeight: 700,
                   color: 'var(--accent)',
                   marginBottom: '6px'
@@ -566,7 +566,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text-muted)',
                   paddingTop: '6px',
                   borderTop: '1px solid var(--border-light)'
@@ -622,7 +622,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     color: 'white',
                     padding: '3px 8px',
                     borderRadius: '2px',
-                    fontSize: '6pt',
+                    fontSize: '8px',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'background 0.12s',
@@ -636,13 +636,13 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 </div>
               </div>
               <div style={{ padding: '6px' }}>
-                <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '2px' }}>
+                <div style={{ fontSize: '9px', fontWeight: 700, marginBottom: '2px' }}>
                   {vehicle.year} {vehicle.make}
                 </div>
-                <div style={{ fontSize: '6pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                   {vehicle.model}
                 </div>
-                <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--accent)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)' }}>
                   {formatPrice(vehicle)}
                 </div>
               </div>
@@ -685,18 +685,18 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                       }}
                     />
                   )}
-                  <div style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '4px' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
                     {hoveredVehicle.year} {hoveredVehicle.make} {hoveredVehicle.model}
                   </div>
                   {hoveredVehicle.trim && (
-                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                       {hoveredVehicle.trim}
                     </div>
                   )}
-                  <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--accent)', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--accent)', marginBottom: '8px' }}>
                     {formatPrice(hoveredVehicle)}
                   </div>
-                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     Sold on {formatPlatform(hoveredVehicle)}
                     {hoveredVehicle.sale_date && ` • ${new Date(hoveredVehicle.sale_date).toLocaleDateString()}`}
                   </div>
@@ -707,7 +707,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 <table style={{
                   width: '100%',
                   borderCollapse: 'collapse',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   background: 'var(--white)',
                   border: '1px solid var(--border)'
                 }}>
@@ -773,7 +773,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                         <td style={{ padding: '10px' }}>
                           {vehicle.engine_size || '—'}
                           {vehicle.displacement && (
-                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                               ({vehicle.displacement}ci)
                             </div>
                           )}
@@ -843,7 +843,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>
+              <h3 style={{ margin: 0, fontSize: '19px', fontWeight: 700 }}>
                 Sale Proof: {selectedProof.year} {selectedProof.make} {selectedProof.model}
               </h3>
               <button
@@ -851,7 +851,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  fontSize: '18pt',
+                  fontSize: '24px',
                   cursor: 'pointer',
                   color: 'var(--text-muted)',
                   padding: '0',
@@ -866,7 +866,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '9pt' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '12px' }}>
               {/* Proof Type */}
               <div>
                 <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>Proof Type:</div>
@@ -879,7 +879,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 }}>
                   {formatProofType(selectedProof.proof_type)}
                   {selectedProof.proof_confidence && (
-                    <span style={{ marginLeft: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
                       ({selectedProof.proof_confidence}% confidence)
                     </span>
                   )}
@@ -941,7 +941,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                   padding: '8px', 
                   background: 'var(--success-dim)', 
                   borderRadius: '4px',
-                  fontSize: '8pt'
+                  fontSize: '11px'
                 }}>
                   <strong>External Listing Record:</strong> Verified sale through external_listings table (ID: {selectedProof.external_listing_id})
                 </div>
@@ -952,7 +952,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                   padding: '8px', 
                   background: 'var(--info-dim)', 
                   borderRadius: '4px',
-                  fontSize: '8pt'
+                  fontSize: '11px'
                 }}>
                   <strong>Timeline Event:</strong> Sale recorded in timeline_events (ID: {selectedProof.timeline_event_id})
                 </div>
@@ -963,7 +963,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                   padding: '8px', 
                   background: 'var(--warning-dim)', 
                   borderRadius: '4px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   color: 'var(--warning)'
                 }}>
                   <strong>No external proof available.</strong> This vehicle was marked as sold manually or imported from a source without listing URLs.

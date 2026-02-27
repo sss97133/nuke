@@ -405,11 +405,11 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '10pt', fontWeight: '600' }}>Notifications</span>
+          <span style={{ fontSize: '13px', fontWeight: '600' }}>Notifications</span>
           {unreadCount > 0 && (
             <span
               style={{
-                fontSize: '7pt',
+                fontSize: '9px',
                 padding: '2px 6px',
                 background: '#dc2626',
                 color: 'white',
@@ -429,7 +429,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                 border: '1px solid var(--border)',
                 background: 'var(--surface)',
                 cursor: 'pointer',
-                fontSize: '7pt',
+                fontSize: '9px',
                 color: 'var(--text)'
               }}
             >
@@ -443,7 +443,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               cursor: 'pointer',
-              fontSize: '7pt',
+              fontSize: '9px',
               color: 'var(--text)'
             }}
           >
@@ -461,11 +461,11 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         }}
       >
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '8pt' }}>
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '11px' }}>
             Loading...
           </div>
         ) : notifications.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '8pt' }}>
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '11px' }}>
             No notifications
           </div>
         ) : (
@@ -516,13 +516,13 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
 
                     {/* Content */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '9pt', fontWeight: notification.is_read ? '400' : '600', marginBottom: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: notification.is_read ? '400' : '600', marginBottom: '6px' }}>
                         {notification.title}
                       </div>
                       
                       {/* Data Point */}
                       <div style={{ 
-                        fontSize: '8pt', 
+                        fontSize: '11px', 
                         color: 'var(--text-secondary)', 
                         marginBottom: requiresConfirmation ? '8px' : '4px',
                         fontWeight: '500'
@@ -543,7 +543,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                               background: 'var(--success)',
                               color: 'white',
                               cursor: 'pointer',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               fontWeight: '600'
                             }}
                           >
@@ -560,7 +560,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                               background: 'var(--surface)',
                               color: 'var(--error)',
                               cursor: 'pointer',
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               fontWeight: '600'
                             }}
                           >
@@ -569,7 +569,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                         </div>
                       )}
 
-                      <div style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                         {new Date(notification.created_at).toLocaleString()}
                       </div>
                     </div>

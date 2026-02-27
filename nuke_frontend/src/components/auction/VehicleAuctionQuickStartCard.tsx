@@ -318,7 +318,7 @@ export default function VehicleAuctionQuickStartCard(props: {
               <select
                 value={saleType}
                 onChange={(e) => setSaleType(e.target.value as SaleType)}
-                style={{ padding: '6px', fontSize: '9pt' }}
+                style={{ padding: '6px', fontSize: '12px' }}
                 disabled={submitting}
               >
                 <option value="auction">Standard auction (days)</option>
@@ -336,7 +336,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                 onChange={(e) => setStartingBidUsd(e.target.value)}
                 placeholder="1000"
                 disabled={submitting}
-                style={{ padding: '6px', fontSize: '9pt' }}
+                style={{ padding: '6px', fontSize: '12px' }}
               />
             </div>
 
@@ -349,7 +349,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                   onChange={(e) => setHasReserve(e.target.checked)}
                   disabled={submitting}
                 />
-                <span className="text text-muted" style={{ fontSize: '9pt' }}>
+                <span className="text text-muted" style={{ fontSize: '12px' }}>
                   Enable reserve
                 </span>
               </label>
@@ -366,7 +366,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                   onChange={(e) => setReserveUsd(e.target.value)}
                   placeholder="25000"
                   disabled={submitting}
-                  style={{ padding: '6px', fontSize: '9pt' }}
+                  style={{ padding: '6px', fontSize: '12px' }}
                 />
               </div>
             ) : null}
@@ -381,7 +381,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                   value={durationMinutes}
                   onChange={(e) => setDurationMinutes(Number(e.target.value))}
                   disabled={submitting}
-                  style={{ padding: '6px', fontSize: '9pt' }}
+                  style={{ padding: '6px', fontSize: '12px' }}
                 />
               </div>
             ) : (
@@ -394,7 +394,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                   value={durationDays}
                   onChange={(e) => setDurationDays(Number(e.target.value))}
                   disabled={submitting}
-                  style={{ padding: '6px', fontSize: '9pt' }}
+                  style={{ padding: '6px', fontSize: '12px' }}
                 />
               </div>
             )}
@@ -409,7 +409,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                     onChange={() => setStartMode('now')}
                     disabled={submitting}
                   />
-                  <span style={{ fontSize: '9pt' }}>Start now</span>
+                  <span style={{ fontSize: '12px' }}>Start now</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input
@@ -419,30 +419,30 @@ export default function VehicleAuctionQuickStartCard(props: {
                     onChange={() => setStartMode('schedule')}
                     disabled={submitting}
                   />
-                  <span style={{ fontSize: '9pt' }}>Schedule</span>
+                  <span style={{ fontSize: '12px' }}>Schedule</span>
                 </label>
               </div>
 
               {startMode === 'schedule' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
                   <div>
-                    <div className="text text-muted" style={{ fontSize: '9pt', marginBottom: 4 }}>Date</div>
+                    <div className="text text-muted" style={{ fontSize: '12px', marginBottom: 4 }}>Date</div>
                     <input
                       type="date"
                       value={scheduledDate}
                       onChange={(e) => setScheduledDate(e.target.value)}
                       disabled={submitting}
-                      style={{ padding: '6px', fontSize: '9pt', width: '100%' }}
+                      style={{ padding: '6px', fontSize: '12px', width: '100%' }}
                     />
                   </div>
                   <div>
-                    <div className="text text-muted" style={{ fontSize: '9pt', marginBottom: 4 }}>Time</div>
+                    <div className="text text-muted" style={{ fontSize: '12px', marginBottom: 4 }}>Time</div>
                     <input
                       type="time"
                       value={scheduledTime}
                       onChange={(e) => setScheduledTime(e.target.value)}
                       disabled={submitting}
-                      style={{ padding: '6px', fontSize: '9pt', width: '100%' }}
+                      style={{ padding: '6px', fontSize: '12px', width: '100%' }}
                     />
                   </div>
                 </div>
@@ -450,15 +450,15 @@ export default function VehicleAuctionQuickStartCard(props: {
             </div>
 
             {submitError ? (
-              <div className="text" style={{ fontSize: '9pt', color: 'var(--error-text, #dc2626)' }}>
+              <div className="text" style={{ fontSize: '12px', color: 'var(--error-text, #dc2626)' }}>
                 {submitError}
               </div>
             ) : null}
 
             {readinessIssues && readinessIssues.length > 0 ? (
               <div style={{ border: '1px solid var(--border-light)', padding: 10, background: 'var(--grey-50)' }}>
-                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 6 }}>Readiness issues</div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: '9pt' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: 6 }}>Readiness issues</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: '12px' }}>
                   {readinessIssues.slice(0, 6).map((i, idx) => (
                     <li key={idx}>
                       <span style={{ fontWeight: 700 }}>{String(i?.severity || 'info').toUpperCase()}:</span>{' '}
@@ -466,7 +466,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                     </li>
                   ))}
                 </ul>
-                <div className="text text-muted" style={{ fontSize: '9pt', marginTop: 6 }}>
+                <div className="text text-muted" style={{ fontSize: '12px', marginTop: 6 }}>
                   Fix the profile data gaps (images, description, etc.) and try again.
                 </div>
               </div>
@@ -495,9 +495,9 @@ export default function VehicleAuctionQuickStartCard(props: {
       </div>
       <div className="card-body">
         {loading ? (
-          <div className="text text-muted" style={{ fontSize: '9pt' }}>Loading auction status...</div>
+          <div className="text text-muted" style={{ fontSize: '12px' }}>Loading auction status...</div>
         ) : error ? (
-          <div className="text" style={{ fontSize: '9pt', color: 'var(--error-text, #dc2626)' }}>{error}</div>
+          <div className="text" style={{ fontSize: '12px', color: 'var(--error-text, #dc2626)' }}>{error}</div>
         ) : listing ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div className="vehicle-detail">
@@ -520,7 +520,7 @@ export default function VehicleAuctionQuickStartCard(props: {
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: 4 }}>
               <button
                 className="button button-secondary"
-                style={{ fontSize: '9pt' }}
+                style={{ fontSize: '12px' }}
                 disabled={!canOpen}
                 onClick={() => listing?.id && openListing(listing.id)}
               >
@@ -529,7 +529,7 @@ export default function VehicleAuctionQuickStartCard(props: {
               {canManage && isDraft ? (
                 <button
                   className="button button-primary"
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                   disabled={submitting}
                   onClick={handleStartExistingDraft}
                 >
@@ -539,7 +539,7 @@ export default function VehicleAuctionQuickStartCard(props: {
               {canManage ? (
                 <button
                   className="button"
-                  style={{ fontSize: '9pt' }}
+                  style={{ fontSize: '12px' }}
                   disabled={!canCreateNew}
                   title={
                     canCreateNew
@@ -555,14 +555,14 @@ export default function VehicleAuctionQuickStartCard(props: {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div className="text text-muted" style={{ fontSize: '9pt' }}>
+            <div className="text text-muted" style={{ fontSize: '12px' }}>
               Auctions are a culmination of your profile data. Starting runs a readiness scan and blocks if required
               info is missing.
             </div>
             {canManage ? (
               <button
                 className="button button-primary"
-                style={{ fontSize: '9pt', width: 'fit-content' }}
+                style={{ fontSize: '12px', width: 'fit-content' }}
                 onClick={() => {
                   openModalWithDefaults();
                 }}
@@ -570,7 +570,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                 Auction This Vehicle
               </button>
             ) : (
-              <div className="text text-muted" style={{ fontSize: '9pt' }}>
+              <div className="text text-muted" style={{ fontSize: '12px' }}>
                 Claim or verify ownership to start an auction.
               </div>
             )}

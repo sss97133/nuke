@@ -122,7 +122,7 @@ export default function DebugMarketSegment() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+          <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
             Loading segment "{slug}"...
           </div>
         </div>
@@ -139,11 +139,11 @@ export default function DebugMarketSegment() {
               <h3 className="heading-3">Error Loading Segment</h3>
             </div>
             <div className="card-body">
-              <div style={{ color: 'var(--danger, #ef4444)', fontSize: '9pt', marginBottom: '16px' }}>
+              <div style={{ color: 'var(--danger, #ef4444)', fontSize: '12px', marginBottom: '16px' }}>
                 {error}
               </div>
               {debugInfo && (
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
                   <strong>Debug Info:</strong><br/>
                   Slug: {debugInfo.slug}<br/>
                   Segment Found: {debugInfo.segmentFound ? 'Yes' : 'No'}<br/>
@@ -172,14 +172,14 @@ export default function DebugMarketSegment() {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '16pt', fontWeight: 900 }}>
+            <h1 style={{ margin: 0, fontSize: '21px', fontWeight: 900 }}>
               {segment?.name || 'Market Segment'}
             </h1>
-            <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
               {vehicles.length} vehicles • {formatUSD(totalValue)} total value
             </div>
             {segment?.description && (
-              <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
                 {segment.description}
               </div>
             )}
@@ -201,7 +201,7 @@ export default function DebugMarketSegment() {
               <h3 className="heading-3">Debug Information</h3>
             </div>
             <div className="card-body">
-              <pre style={{ fontSize: '8pt', background: 'var(--surface)', padding: '12px', borderRadius: '4px', overflow: 'auto' }}>
+              <pre style={{ fontSize: '11px', background: 'var(--surface)', padding: '12px', borderRadius: '4px', overflow: 'auto' }}>
                 {JSON.stringify(debugInfo, null, 2)}
               </pre>
             </div>
@@ -213,33 +213,33 @@ export default function DebugMarketSegment() {
           <div className="card">
             <div className="card-header"><h3 className="heading-3">Contract Vehicles</h3></div>
             <div className="card-body">
-              <div style={{ fontSize: '18pt', fontWeight: 900 }}>{vehicles.length}</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>Real underlying assets</div>
+              <div style={{ fontSize: '24px', fontWeight: 900 }}>{vehicles.length}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Real underlying assets</div>
             </div>
           </div>
           <div className="card">
             <div className="card-header"><h3 className="heading-3">Total Value</h3></div>
             <div className="card-body">
-              <div style={{ fontSize: '18pt', fontWeight: 900 }}>{formatUSD(totalValue)}</div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>Market capitalization</div>
+              <div style={{ fontSize: '24px', fontWeight: 900 }}>{formatUSD(totalValue)}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Market capitalization</div>
             </div>
           </div>
           <div className="card">
             <div className="card-header"><h3 className="heading-3">Year Focus</h3></div>
             <div className="card-body">
-              <div style={{ fontSize: '18pt', fontWeight: 900 }}>
+              <div style={{ fontSize: '24px', fontWeight: 900 }}>
                 {segment?.year_min || 'Any'}{segment?.year_min !== segment?.year_max ? `-${segment?.year_max}` : ''}
               </div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>Target years</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Target years</div>
             </div>
           </div>
           <div className="card">
             <div className="card-header"><h3 className="heading-3">Average Value</h3></div>
             <div className="card-body">
-              <div style={{ fontSize: '18pt', fontWeight: 900 }}>
+              <div style={{ fontSize: '24px', fontWeight: 900 }}>
                 {vehicles.length > 0 ? formatUSD(totalValue / vehicles.length) : '$0'}
               </div>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>Per vehicle</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Per vehicle</div>
             </div>
           </div>
         </div>
@@ -253,7 +253,7 @@ export default function DebugMarketSegment() {
             {vehicles.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
                 No vehicles currently match this segment criteria.
-                <div style={{ marginTop: '8px', fontSize: '8pt' }}>
+                <div style={{ marginTop: '8px', fontSize: '11px' }}>
                   Criteria: Year {segment?.year_min}-{segment?.year_max}, 
                   Makes: {segment?.makes?.join(', ') || 'Any'}, 
                   Keywords: {segment?.model_keywords?.join(', ') || 'None'}
@@ -265,7 +265,7 @@ export default function DebugMarketSegment() {
                   display: 'grid', 
                   gridTemplateColumns: '2fr 1fr 2fr 1fr 100px',
                   gap: '12px',
-                  fontSize: '9pt',
+                  fontSize: '12px',
                   fontWeight: 700,
                   padding: '12px 8px',
                   borderBottom: '2px solid var(--border)',
@@ -290,7 +290,7 @@ export default function DebugMarketSegment() {
                         display: 'grid',
                         gridTemplateColumns: '2fr 1fr 2fr 1fr 100px',
                         gap: '12px',
-                        fontSize: '9pt',
+                        fontSize: '12px',
                         padding: '12px 8px',
                         borderBottom: '1px solid var(--border)',
                         transition: 'background 0.12s ease'
@@ -299,10 +299,10 @@ export default function DebugMarketSegment() {
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '10pt' }}>
+                        <div style={{ fontWeight: 700, fontSize: '13px' }}>
                           {vehicle.year} {vehicle.make} {vehicle.model}
                         </div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '8pt', marginTop: '2px' }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>
                           ID: {vehicle.id.slice(-8)}
                         </div>
                       </div>
@@ -311,7 +311,7 @@ export default function DebugMarketSegment() {
                         {formatUSD(Number(vehicle.current_value))}
                       </div>
                       
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         {location}
                       </div>
                       
@@ -328,7 +328,7 @@ export default function DebugMarketSegment() {
                             borderRadius: '2px',
                             background: 'var(--primary)',
                             color: 'var(--white)',
-                            fontSize: '8pt',
+                            fontSize: '11px',
                             fontWeight: 700,
                             cursor: 'pointer'
                           }}
@@ -353,7 +353,7 @@ export default function DebugMarketSegment() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div>
                 <div style={{ fontWeight: 700, marginBottom: '8px' }}>Contract Structure</div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
                   • <strong>Legal Entity:</strong> Market Segment Fund<br/>
                   • <strong>Share Class:</strong> Common investment shares<br/>
                   • <strong>Management:</strong> AI-optimized portfolio<br/>
@@ -364,7 +364,7 @@ export default function DebugMarketSegment() {
               
               <div>
                 <div style={{ fontWeight: 700, marginBottom: '8px' }}>Investment Details</div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
                   • <strong>Minimum Investment:</strong> $100<br/>
                   • <strong>Management Fee:</strong> 0.10% annually<br/>
                   • <strong>Transaction Fee:</strong> 0.05% per trade<br/>
@@ -378,7 +378,7 @@ export default function DebugMarketSegment() {
               <button 
                 className="button button-primary"
                 onClick={() => navigate('/market/exchange/Y79')}
-                style={{ padding: '12px 24px', fontSize: '10pt' }}
+                style={{ padding: '12px 24px', fontSize: '13px' }}
               >
                 INVEST IN {segment?.name || 'ETF'} NOW
               </button>

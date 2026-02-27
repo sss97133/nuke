@@ -61,11 +61,11 @@ export default function StreamTipOverlay({ lastTip }: { lastTip: StreamTipEvent 
             maxWidth: '360px',
           }}
         >
-          <div style={{ fontSize: '10pt', fontWeight: 'bold', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase' }}>
             TIP: ${((t.amountCents || 0) / 100).toFixed(2)}
           </div>
           {t.message && (
-            <div style={{ marginTop: 6, fontSize: '9pt', opacity: 0.95 }}>
+            <div style={{ marginTop: 6, fontSize: '12px', opacity: 0.95 }}>
               {t.message}
             </div>
           )}

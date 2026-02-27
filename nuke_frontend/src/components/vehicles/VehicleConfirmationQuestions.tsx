@@ -96,7 +96,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
 
   if (loading) {
     return (
-      <div style={{ padding: '12px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
         Loading questions...
       </div>
     );
@@ -117,7 +117,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
         padding: '12px',
         background: 'var(--accent)',
         color: 'white',
-        fontSize: '9pt',
+        fontSize: '12px',
         fontWeight: 700
       }}>
         {questions.length} Vehicle{questions.length !== 1 ? 's' : ''} Need Your Confirmation
@@ -136,7 +136,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
             }}
           >
             <div style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 600,
               marginBottom: '8px',
               color: 'var(--text)'
@@ -145,7 +145,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
             </div>
 
             <div style={{
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--text-muted)',
               marginBottom: '12px'
             }}>
@@ -154,7 +154,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
 
             {question.evidence_details && (
               <div style={{
-                fontSize: '7pt',
+                fontSize: '9px',
                 color: 'var(--text-muted)',
                 marginBottom: '12px',
                 padding: '6px',
@@ -179,7 +179,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
                 disabled={responding.has(question.question_id)}
                 style={{
                   padding: '6px 16px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   border: '1px solid #059669',
                   background: '#059669',
@@ -197,7 +197,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
                 disabled={responding.has(question.question_id)}
                 style={{
                   padding: '6px 16px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   fontWeight: 600,
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',

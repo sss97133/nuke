@@ -481,7 +481,7 @@ export default function EnhancedImageTagger({
                 color: 'white',
                 padding: '1px 3px',
                 borderRadius: '0',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontFamily: '"MS Sans Serif", sans-serif',
                 whiteSpace: 'nowrap',
                 zIndex: 10,

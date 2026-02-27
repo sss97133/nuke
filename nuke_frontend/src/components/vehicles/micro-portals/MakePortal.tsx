@@ -28,12 +28,12 @@ export default function MakePortal({ make, activePortal, onOpen }: MakePortalPro
         error={error}
         state={state}
         emptyContent={
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', padding: '8px 0' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '8px 0' }}>
             No {make} data yet
           </div>
         }
         richContent={data && (
-          <div style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '11px' }}>
             {/* Stat grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
               <StatBox label="Volume" value={String(data.total_listings)} />
@@ -70,7 +70,7 @@ export default function MakePortal({ make, activePortal, onOpen }: MakePortalPro
             {/* Top models table */}
             {data.top_models && data.top_models.length > 0 && (
               <div>
-                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Top Models</div>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px' }}>Top Models</div>
                 {data.top_models.slice(0, 5).map((m) => (
                   <div key={m.model} style={{
                     display: 'flex', justifyContent: 'space-between', padding: '2px 0',
@@ -92,8 +92,8 @@ export default function MakePortal({ make, activePortal, onOpen }: MakePortalPro
 function StatBox({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div style={{ padding: '4px 6px', background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px' }}>
-      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{label}</div>
-      <div style={{ fontWeight: 600, fontSize: '9pt', color: color || 'var(--text)' }}>{value}</div>
+      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{label}</div>
+      <div style={{ fontWeight: 600, fontSize: '12px', color: color || 'var(--text)' }}>{value}</div>
     </div>
   );
 }

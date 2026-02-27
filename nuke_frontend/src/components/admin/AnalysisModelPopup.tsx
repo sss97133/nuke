@@ -259,17 +259,17 @@ export const AnalysisModelPopup: React.FC<AnalysisModelPopupProps> = ({
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-4)' }}>
             <div>
-              <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
                 {modelInfo.name}
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 {modelInfo.description}
               </div>
             </div>
             <button
               onClick={() => setShowPopup(false)}
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 padding: 'var(--space-1) var(--space-2)',
                 border: '2px solid var(--border-light)',
                 backgroundColor: 'var(--bg)',
@@ -287,7 +287,7 @@ export const AnalysisModelPopup: React.FC<AnalysisModelPopupProps> = ({
               backgroundColor: 'var(--bg)',
               border: '1px solid var(--border-light)',
               marginBottom: 'var(--space-4)',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               <div style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>Usage Statistics</div>
               <div style={{ color: 'var(--text-muted)' }}>
@@ -306,7 +306,7 @@ export const AnalysisModelPopup: React.FC<AnalysisModelPopupProps> = ({
               backgroundColor: modelInfo.tier === 'premium' ? 'var(--warning-dim)' : 'var(--success-dim)',
               border: '1px solid var(--border-light)',
               marginBottom: 'var(--space-4)',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               <div style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>
                 Tier: {modelInfo.tier === 'premium' ? 'Premium' : 'Free'}
@@ -321,10 +321,10 @@ export const AnalysisModelPopup: React.FC<AnalysisModelPopupProps> = ({
 
           {/* Searches For */}
           <div style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               What This Model Searches For
             </div>
-            <ul style={{ margin: 0, paddingLeft: 'var(--space-4)', fontSize: '8pt', color: 'var(--text)' }}>
+            <ul style={{ margin: 0, paddingLeft: 'var(--space-4)', fontSize: '11px', color: 'var(--text)' }}>
               {modelInfo.searchesFor.map((item, idx) => (
                 <li key={idx} style={{ marginBottom: 'var(--space-1)' }}>{item}</li>
               ))}
@@ -333,10 +333,10 @@ export const AnalysisModelPopup: React.FC<AnalysisModelPopupProps> = ({
 
           {/* Outputs */}
           <div>
-            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: 'var(--space-2)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               What This Model Outputs
             </div>
-            <ul style={{ margin: 0, paddingLeft: 'var(--space-4)', fontSize: '8pt', color: 'var(--text)' }}>
+            <ul style={{ margin: 0, paddingLeft: 'var(--space-4)', fontSize: '11px', color: 'var(--text)' }}>
               {modelInfo.outputs.map((item, idx) => (
                 <li key={idx} style={{ marginBottom: 'var(--space-1)' }}>{item}</li>
               ))}

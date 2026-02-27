@@ -442,7 +442,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '40px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
         Loading inventory...
       </div>
     );
@@ -460,8 +460,8 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
         gap: '12px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h2 style={{ fontSize: '14pt', fontWeight: 700, margin: 0 }}>Inventory</h2>
-          <span style={{ fontSize: '10pt', color: 'var(--text-muted)' }}>
+          <h2 style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>Inventory</h2>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
             {filteredAndSorted.length} vehicles
             {filteredAndSorted.length > itemsPerPage && (
               <span style={{ marginLeft: '8px' }}>
@@ -476,7 +476,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             style={{
               marginLeft: 'auto',
               padding: '6px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               border: '1px solid var(--border)',
               background: 'var(--surface)',
@@ -510,7 +510,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             }}
             style={{
               padding: '4px 12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               border: editMode ? '2px solid var(--accent)' : '1px solid var(--border)',
               background: editMode ? 'var(--accent)' : 'white',
@@ -528,7 +528,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
               background: 'var(--accent-dim)',
               border: '1px solid var(--accent)',
               borderRadius: '4px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               color: 'var(--accent)',
               display: 'flex',
@@ -540,7 +540,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                 onClick={() => setSelectedVehicles(new Set())}
                 style={{
                   padding: '2px 8px',
-                  fontSize: '8pt',
+                  fontSize: '11px',
                   background: 'var(--accent)',
                   border: 'none',
                   color: 'white',
@@ -574,7 +574,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             flex: 1,
             minWidth: '200px',
             padding: '8px 12px',
-            fontSize: '8pt',
+            fontSize: '11px',
             border: '1px solid var(--border)',
             borderRadius: '4px'
           }}
@@ -586,7 +586,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           onChange={(e) => setSortBy(e.target.value as SortBy)}
           style={{
             padding: '8px 12px',
-            fontSize: '8pt',
+            fontSize: '11px',
             border: '1px solid var(--border)',
             borderRadius: '4px'
           }}
@@ -610,7 +610,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
               onClick={() => setViewMode(mode)}
               style={{
                 padding: '4px 10px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 border: 'none',
                 background: viewMode === mode ? 'var(--accent)' : 'transparent',
@@ -639,7 +639,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             onClick={() => setCategory(cat)}
             style={{
               padding: '8px 16px',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               border: category === cat ? '2px solid var(--accent)' : '1px solid var(--border)',
               background: category === cat ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
@@ -663,7 +663,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             padding: '60px 20px',
             color: 'var(--text-muted)'
           }}>
-            <div style={{ fontSize: '12pt', fontWeight: 600, marginBottom: '8px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
               Loading vehicles...
             </div>
           </div>
@@ -675,13 +675,13 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             padding: '60px 20px',
             color: 'var(--text-muted)'
           }}>
-            <div style={{ fontSize: '12pt', fontWeight: 600, marginBottom: '8px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
               No vehicles found
             </div>
-            <div style={{ fontSize: '9pt', marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', marginBottom: '8px' }}>
               {searchTerm ? 'Try adjusting your search' : 'No vehicles in this category'}
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '16px', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '16px', fontFamily: 'monospace' }}>
               Debug: Total loaded: {vehicles.length} | Filtered: {filteredAndSorted.length} | Category: {category} | Search: {searchTerm || 'none'}
             </div>
           </div>
@@ -759,7 +759,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         padding: '4px 10px',
                         background: badge.color,
                         color: 'white',
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         fontWeight: 700,
                         borderRadius: '3px'
                       }}>
@@ -776,7 +776,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           background: 'rgba(0,0,0,0.75)',
                           backdropFilter: 'blur(5px)',
                           color: 'white',
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           fontWeight: 800,
                           borderRadius: '3px',
                           letterSpacing: '0.5px'
@@ -795,7 +795,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           background: 'rgba(0,0,0,0.7)',
                           backdropFilter: 'blur(5px)',
                           color: 'white',
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           fontWeight: 600,
                           borderRadius: '3px'
                         }}>
@@ -813,7 +813,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           background: 'rgba(0,0,0,0.8)',
                           backdropFilter: 'blur(5px)',
                           color: 'white',
-                          fontSize: '9pt',
+                          fontSize: '12px',
                           fontWeight: 700,
                           borderRadius: '3px'
                         }}>
@@ -824,12 +824,12 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
 
                     {/* Info */}
                     <div className="card-body">
-                      <div style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '6px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>
                         {v.vehicles.year} {v.vehicles.make} {v.vehicles.model}
                       </div>
                       
                       {v.vehicles.trim && (
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                           {v.vehicles.trim}
                         </div>
                       )}
@@ -841,7 +841,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           background: v.vehicles.vin_is_valid === false ? '#fef2f2' : '#fef3c7',
                           border: `2px solid ${v.vehicles.vin_is_valid === false ? '#dc2626' : '#fbbf24'}`,
                           borderRadius: '4px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           fontWeight: 600,
                           color: v.vehicles.vin_is_valid === false ? '#dc2626' : '#92400e',
                           marginBottom: '8px'
@@ -854,7 +854,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                       <div style={{
                         display: 'flex',
                         gap: '12px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         color: 'var(--text-muted)',
                         marginTop: '8px',
                         alignItems: 'center'
@@ -884,7 +884,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           padding: '6px',
                           background: profit > 0 ? '#ecfdf5' : '#fef2f2',
                           borderRadius: '4px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           fontWeight: 600,
                           color: profit > 0 ? '#059669' : '#dc2626'
                         }}>
@@ -903,7 +903,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                             className="button button-secondary"
                             style={{
                               flex: 1,
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               padding: '6px 8px'
                             }}
                           >
@@ -986,14 +986,14 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
 
                         {/* Info */}
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '4px' }}>
+                          <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>
                             {v.featured && <span style={{ fontWeight: 800 }}>FEATURED </span>}
                             {v.vehicles.year} {v.vehicles.make} {v.vehicles.model}
                             {v.vehicles.trim && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> {v.vehicles.trim}</span>}
                           </div>
                           
                           <div style={{
-                            fontSize: '8pt',
+                            fontSize: '11px',
                             color: 'var(--text-muted)',
                             display: 'flex',
                             gap: '12px',
@@ -1022,7 +1022,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                             padding: '4px 10px',
                             background: badge.color,
                             color: 'white',
-                            fontSize: '7pt',
+                            fontSize: '9px',
                             fontWeight: 700,
                             borderRadius: '3px'
                           }}>
@@ -1030,7 +1030,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           </div>
 
                           {v.asking_price && (
-                            <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+                            <div style={{ fontSize: '15px', fontWeight: 700 }}>
                               ${v.asking_price.toLocaleString()}
                             </div>
                           )}
@@ -1044,7 +1044,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                                 }}
                                 className="button button-secondary"
                                 style={{
-                                  fontSize: '7pt',
+                                  fontSize: '9px',
                                   padding: '4px 8px',
                                   whiteSpace: 'nowrap'
                                 }}
@@ -1073,7 +1073,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           {viewMode === 'compact' && (
             <div className="card">
               <div className="card-body" style={{ padding: 0 }}>
-                <table style={{ width: '100%', fontSize: '8pt', borderCollapse: 'collapse' }}>
+                <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg-secondary)' }}>
                       {editMode && <th style={{ padding: '8px', width: '40px' }}></th>}
@@ -1122,7 +1122,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                               background: badge.color,
                               color: 'white',
                               borderRadius: '3px',
-                              fontSize: '7pt',
+                              fontSize: '9px',
                               fontWeight: 700
                             }}>
                               {badge.text}
@@ -1134,7 +1134,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           <td style={{ padding: '8px', textAlign: 'center' }}>
                             {displayCategory !== 'sold' && v.days_on_lot > 0 ? v.days_on_lot : '—'}
                           </td>
-                          <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '7pt' }}>
+                          <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '9px' }}>
                             {v.vehicles.vin || '—'}
                           </td>
                           {editMode && (
@@ -1147,7 +1147,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                                   }}
                                   className="button button-secondary"
                                   style={{
-                                    fontSize: '7pt',
+                                    fontSize: '9px',
                                     padding: '4px 8px'
                                   }}
                                 >
@@ -1184,7 +1184,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
               border: '1px solid var(--border)',
               borderRadius: '4px'
             }}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 Showing {startIndex + 1} - {Math.min(endIndex, filteredAndSorted.length)} of {filteredAndSorted.length} vehicles
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1193,7 +1193,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                   disabled={currentPage === 1}
                   style={{
                     padding: '6px 12px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     border: '1px solid var(--border)',
                     background: currentPage === 1 ? 'var(--grey-100)' : 'white',
                     color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text)',
@@ -1203,7 +1203,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                 >
                   ← Previous
                 </button>
-                <div style={{ fontSize: '9pt', color: 'var(--text)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text)' }}>
                   Page {currentPage} of {totalPages}
                 </div>
                 <button
@@ -1211,7 +1211,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                   disabled={currentPage === totalPages}
                   style={{
                     padding: '6px 12px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     border: '1px solid var(--border)',
                     background: currentPage === totalPages ? 'var(--grey-100)' : 'white',
                     color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text)',
@@ -1414,12 +1414,12 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
           }}
         >
           <div>
-            <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+            <div style={{ fontSize: '13px', fontWeight: 700 }}>
               Add Vehicles to Organization
             </div>
             <div
               style={{
-                fontSize: '8pt',
+                fontSize: '11px',
                 color: 'var(--text-muted)',
                 marginTop: '2px',
               }}
@@ -1433,7 +1433,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               padding: '2px 8px',
-              fontSize: '8pt',
+              fontSize: '11px',
               cursor: 'pointer',
             }}
           >
@@ -1450,7 +1450,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
             style={{
               width: '100%',
               padding: '6px 10px',
-              fontSize: '8pt',
+              fontSize: '11px',
               border: '1px solid var(--border)',
             }}
           />
@@ -1468,7 +1468,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
               style={{
                 padding: '40px 0',
                 textAlign: 'center',
-                fontSize: '9pt',
+                fontSize: '12px',
                 color: 'var(--text-muted)',
               }}
             >
@@ -1479,7 +1479,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
               style={{
                 padding: '40px 0',
                 textAlign: 'center',
-                fontSize: '9pt',
+                fontSize: '12px',
                 color: 'var(--text-muted)',
               }}
             >
@@ -1506,7 +1506,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
                       background: isSelected ? 'var(--accent-dim)' : 'var(--white)',
                       padding: '8px',
                       cursor: 'pointer',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                     }}
                   >
                     <div
@@ -1540,7 +1540,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
                     {(v.current_value || v.asking_price) && (
                       <div
                         style={{
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           color: 'var(--text-secondary)',
                         }}
                       >
@@ -1565,7 +1565,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            fontSize: '8pt',
+            fontSize: '11px',
           }}
         >
           <div style={{ color: 'var(--text-muted)' }}>
@@ -1578,7 +1578,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
                 padding: '4px 10px',
                 border: '1px solid var(--border)',
                 background: 'var(--surface)',
-                fontSize: '8pt',
+                fontSize: '11px',
                 cursor: 'pointer',
               }}
             >
@@ -1594,7 +1594,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
                   ? 'var(--accent-dim)'
                   : 'var(--accent)',
                 color: 'white',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 700,
                 cursor: linking || selectedIds.size === 0 ? 'default' : 'pointer',
               }}

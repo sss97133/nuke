@@ -106,17 +106,17 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
 
   return (
     <div className="card" style={{ marginBottom: '16px' }}>
-      <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
+      <div className="card-header" style={{ fontSize: '15px', fontWeight: 700 }}>
         Dropbox Bulk Import
       </div>
       <div className="card-body">
         {connected ? (
           <div>
-            <div style={{ fontSize: '9pt', color: 'var(--success)', marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--success)', marginBottom: '12px' }}>
               ✓ Dropbox connected
             </div>
             {lastSync && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
                 Last sync: {new Date(lastSync).toLocaleString()}
               </div>
             )}
@@ -124,14 +124,14 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
               onClick={startImport}
               disabled={importing}
               className="button button-primary"
-              style={{ fontSize: '9pt', marginRight: '8px' }}
+              style={{ fontSize: '12px', marginRight: '8px' }}
             >
               {importing ? 'Importing...' : 'Import from Dropbox'}
             </button>
             <button
               onClick={checkConnection}
               className="button button-secondary"
-              style={{ fontSize: '9pt' }}
+              style={{ fontSize: '12px' }}
             >
               Refresh Status
             </button>
@@ -139,7 +139,7 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
             {/* Import History */}
             {importJobs.length > 0 && (
               <div style={{ marginTop: '20px' }}>
-                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>
                   Import History
                 </div>
                 {importJobs.map(job => (
@@ -154,11 +154,11 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '8pt' }}>
+                      <div style={{ fontSize: '11px' }}>
                         {new Date(job.created_at).toLocaleString()}
                       </div>
                       <div style={{
-                        fontSize: '7pt',
+                        fontSize: '9px',
                         padding: '2px 6px',
                         borderRadius: '2px',
                         background: job.status === 'completed' ? '#d4edda' :
@@ -171,11 +171,11 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
                         {job.status}
                       </div>
                     </div>
-                    <div style={{ fontSize: '8pt', marginTop: '4px', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-secondary)' }}>
                       {job.processed_files}/{job.total_files} folders • {job.vehicles_created} vehicles created
                     </div>
                     {job.error_message && (
-                      <div style={{ fontSize: '7pt', color: 'var(--error)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--error)', marginTop: '4px' }}>
                         Error: {job.error_message}
                       </div>
                     )}
@@ -186,7 +186,7 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: '9pt', marginBottom: '12px', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '12px', marginBottom: '12px', color: 'var(--text-secondary)' }}>
               Connect your Dropbox to automatically import deal jackets and create vehicle profiles.
             </div>
             <div style={{
@@ -194,11 +194,11 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
               background: '#f8f9fa',
               borderRadius: '4px',
               marginBottom: '12px',
-              fontSize: '8pt',
+              fontSize: '11px',
               color: 'var(--text-secondary)'
             }}>
               <div style={{ fontWeight: 700, marginBottom: '8px' }}>Expected folder structure:</div>
-              <div style={{ fontFamily: 'monospace', fontSize: '7pt' }}>
+              <div style={{ fontFamily: 'monospace', fontSize: '9px' }}>
                 /Viva Inventory/<br />
                 &nbsp;&nbsp;├── /In Stock/<br />
                 &nbsp;&nbsp;│   ├── /1977 K5 Blazer - #VIN123/<br />
@@ -211,7 +211,7 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
             <button
               onClick={connectDropbox}
               className="button button-primary"
-              style={{ fontSize: '9pt' }}
+              style={{ fontSize: '12px' }}
             >
               Connect Dropbox
             </button>

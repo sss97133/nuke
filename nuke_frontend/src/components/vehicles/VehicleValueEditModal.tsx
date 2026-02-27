@@ -146,7 +146,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
             padding: '16px',
             background: 'var(--accent)',
             color: 'white',
-            fontSize: '10pt',
+            fontSize: '13px',
             fontWeight: 700
           }}
         >
@@ -155,7 +155,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
 
         {/* Content */}
         <div style={{ padding: '20px' }}>
-          <div style={{ marginBottom: '20px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          <div style={{ marginBottom: '20px', fontSize: '11px', color: 'var(--text-muted)' }}>
             Track your investment by setting purchase price and current value. This helps calculate ROI over time.
           </div>
 
@@ -164,7 +164,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
             <label
               style={{
                 display: 'block',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 marginBottom: '6px',
                 color: 'var(--text)'
@@ -182,7 +182,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
               onFocus={(e) => e.target.select()}
             />
             {purchasePriceNum !== null && (
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {formatCurrency(purchasePriceNum)}
               </div>
             )}
@@ -193,7 +193,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
             <label
               style={{
                 display: 'block',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 marginBottom: '6px',
                 color: 'var(--text)'
@@ -211,7 +211,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
               onFocus={(e) => e.target.select()}
             />
             {currentPriceNum !== null && (
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {formatCurrency(currentPriceNum)}
               </div>
             )}
@@ -228,10 +228,10 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
                 marginBottom: '16px'
               }}
             >
-              <div style={{ fontSize: '7pt', fontWeight: 600, marginBottom: '4px', color: roi >= 0 ? '#15803d' : '#dc2626' }}>
+              <div style={{ fontSize: '9px', fontWeight: 600, marginBottom: '4px', color: roi >= 0 ? '#15803d' : '#dc2626' }}>
                 ROI Preview
               </div>
-              <div style={{ fontSize: '10pt', fontWeight: 700, color: roi >= 0 ? '#15803d' : '#dc2626' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: roi >= 0 ? '#15803d' : '#dc2626' }}>
                 {roi >= 0 ? '+' : ''}{formatCurrency(roi)}
               </div>
             </div>
@@ -246,7 +246,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
                 border: '1px solid #dc2626',
                 borderRadius: '4px',
                 color: '#991b1b',
-                fontSize: '8pt',
+                fontSize: '11px',
                 marginBottom: '16px'
               }}
             >

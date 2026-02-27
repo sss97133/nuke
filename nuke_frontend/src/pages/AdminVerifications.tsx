@@ -792,7 +792,7 @@ const AdminVerifications: React.FC = () => {
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      fontSize: '18pt',
+                                      fontSize: '24px',
                                       fontWeight: 'bold',
                                       color: 'var(--text-muted)'
                                     }}
@@ -841,7 +841,7 @@ const AdminVerifications: React.FC = () => {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        fontSize: '8pt',
+                                        fontSize: '11px',
                                         fontWeight: 'bold',
                                         border: '1px solid var(--border)'
                                       }}
@@ -977,7 +977,7 @@ const AdminVerifications: React.FC = () => {
                                 background: 'var(--surface)',
                                 padding: '4px 8px',
                                 borderRadius: 4,
-                                fontSize: '8pt',
+                                fontSize: '11px',
                                 zIndex: 10
                               }}>
                                 Processing...
@@ -1050,7 +1050,7 @@ const AdminVerifications: React.FC = () => {
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
-                                          fontSize: '8pt',
+                                          fontSize: '11px',
                                           fontWeight: 'bold',
                                           border: '1px solid var(--border)',
                                           flexShrink: 0

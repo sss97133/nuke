@@ -1691,7 +1691,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                 <div className="card-body flex flex-col" style={{ flex: 1, minHeight: 0 }}>
                   {/* Image Info Section */}
                   <div style={{ marginBottom: 'var(--space-3)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
-                    <h3 style={{ fontSize: '11pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
                       Image Info
                     </h3>
                     <div className="detail-section">
@@ -1712,7 +1712,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
 
                   {/* Tags Section */}
                   <div className="tags-header" style={{ marginBottom: 'var(--space-3)', paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--border-light)' }}>
-                    <h3 style={{ fontSize: '11pt', fontWeight: 'bold', margin: 0 }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 'bold', margin: 0 }}>
                       Image Tags ({imageTags.length})
                     </h3>
                     {tagsLoading && (

@@ -161,7 +161,7 @@ const SpendingDashboard = () => {
       margin: '16px',
       fontFamily: 'Arial, sans-serif'
     }}>
-      <h3 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 12px 0' }}>
+      <h3 style={{ fontSize: '11px', fontWeight: 'bold', margin: '0 0 12px 0' }}>
         📊 Spending Analytics
       </h3>
 
@@ -177,7 +177,7 @@ const SpendingDashboard = () => {
         flexWrap: 'wrap'
       }}>
         <div>
-          <label style={{ fontSize: '8pt', marginRight: '4px' }}>Vehicle:</label>
+          <label style={{ fontSize: '11px', marginRight: '4px' }}>Vehicle:</label>
           <select
             value={selectedVehicle}
             onChange={(e) => setSelectedVehicle(e.target.value)}
@@ -185,7 +185,7 @@ const SpendingDashboard = () => {
               padding: '2px',
               border: '1px solid #bdbdbd',
               borderRadius: '0px',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}
           >
             <option value="all">All Vehicles</option>
@@ -198,7 +198,7 @@ const SpendingDashboard = () => {
         </div>
 
         <div>
-          <label style={{ fontSize: '8pt', marginRight: '4px' }}>Time Range:</label>
+          <label style={{ fontSize: '11px', marginRight: '4px' }}>Time Range:</label>
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
@@ -206,7 +206,7 @@ const SpendingDashboard = () => {
               padding: '2px',
               border: '1px solid #bdbdbd',
               borderRadius: '0px',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}
           >
             <option value="week">Last 7 Days</option>
@@ -221,7 +221,7 @@ const SpendingDashboard = () => {
           disabled={loading}
           style={{
             padding: '4px 8px',
-            fontSize: '8pt',
+            fontSize: '11px',
             border: '1px solid #bdbdbd',
             background: loading ? '#e0e0e0' : '#424242',
             color: loading ? '#9e9e9e' : 'white',
@@ -239,7 +239,7 @@ const SpendingDashboard = () => {
           border: '1px solid #b8daff',
           padding: '12px',
           textAlign: 'center',
-          fontSize: '8pt',
+          fontSize: '11px',
           marginBottom: '12px'
         }}>
           Analyzing spending patterns...
@@ -254,13 +254,13 @@ const SpendingDashboard = () => {
             border: '1px solid #bdbdbd',
             padding: '12px'
           }}>
-            <h4 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 8px 0' }}>
+            <h4 style={{ fontSize: '11px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
               💰 Total Spending
             </h4>
-            <div style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '4px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
               {formatCurrency(analytics.total_spent)}
             </div>
-            <div style={{ fontSize: '7pt', color: '#6b7280' }}>
+            <div style={{ fontSize: '9px', color: '#6b7280' }}>
               {analytics.receipt_count} receipts
             </div>
           </div>
@@ -271,13 +271,13 @@ const SpendingDashboard = () => {
             border: '1px solid #bdbdbd',
             padding: '12px'
           }}>
-            <h4 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 8px 0' }}>
+            <h4 style={{ fontSize: '11px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
               📋 Average Receipt
             </h4>
-            <div style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '4px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
               {formatCurrency(analytics.average_receipt_amount)}
             </div>
-            <div style={{ fontSize: '7pt', color: '#6b7280' }}>
+            <div style={{ fontSize: '9px', color: '#6b7280' }}>
               Largest: {formatCurrency(analytics.largest_purchase)}
             </div>
           </div>
@@ -289,25 +289,25 @@ const SpendingDashboard = () => {
             padding: '12px',
             gridColumn: 'span 2'
           }}>
-            <h4 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 8px 0' }}>
+            <h4 style={{ fontSize: '11px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
               🔧 Spending Breakdown
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
               {getSpendingBreakdown().map(item => (
                 <div key={item.label}>
-                  <div style={{ fontSize: '7pt', color: '#6b7280', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '9px', color: '#6b7280', marginBottom: '2px' }}>
                     {item.label}
                   </div>
                   <div style={{
                     background: item.color,
                     color: 'white',
                     padding: '4px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 'bold'
                   }}>
                     {formatCurrency(item.amount)}
                   </div>
-                  <div style={{ fontSize: '7pt', color: '#6b7280', marginTop: '2px' }}>
+                  <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '2px' }}>
                     {Math.round((item.amount / analytics.total_spent) * 100)}%
                   </div>
                 </div>
@@ -321,7 +321,7 @@ const SpendingDashboard = () => {
             border: '1px solid #bdbdbd',
             padding: '12px'
           }}>
-            <h4 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 8px 0' }}>
+            <h4 style={{ fontSize: '11px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
               📦 Top Categories
             </h4>
             <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
@@ -334,7 +334,7 @@ const SpendingDashboard = () => {
                     alignItems: 'center',
                     padding: '2px 0',
                     borderBottom: '1px solid #f0f0f0',
-                    fontSize: '8pt'
+                    fontSize: '11px'
                   }}
                 >
                   <div>{item.category.replace('_', ' ')}</div>
@@ -350,7 +350,7 @@ const SpendingDashboard = () => {
             border: '1px solid #bdbdbd',
             padding: '12px'
           }}>
-            <h4 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 8px 0' }}>
+            <h4 style={{ fontSize: '11px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
               🏪 Top Vendors
             </h4>
             <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
@@ -363,7 +363,7 @@ const SpendingDashboard = () => {
                     alignItems: 'center',
                     padding: '2px 0',
                     borderBottom: '1px solid #f0f0f0',
-                    fontSize: '8pt'
+                    fontSize: '11px'
                   }}
                 >
                   <div>{item.vendor}</div>
@@ -379,7 +379,7 @@ const SpendingDashboard = () => {
           border: '1px solid #bdbdbd',
           padding: '24px',
           textAlign: 'center',
-          fontSize: '8pt',
+          fontSize: '11px',
           color: '#757575'
         }}>
           No spending data available for the selected time range

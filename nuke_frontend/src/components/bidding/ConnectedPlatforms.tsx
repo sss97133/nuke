@@ -86,7 +86,7 @@ function PlatformFavicon({
     >
       <span
         style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 700,
           color: platform.color,
           opacity: showImage && loaded ? 0 : 1,
@@ -207,7 +207,7 @@ export default function ConnectedPlatforms() {
         display: 'inline-block',
         padding: '2px 8px',
         borderRadius: '10px',
-        fontSize: '7pt',
+        fontSize: '9px',
         fontWeight: 600,
         background: style.bg,
         color: style.color
@@ -232,14 +232,14 @@ export default function ConnectedPlatforms() {
   return (
     <div className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 className="text font-bold" style={{ fontSize: '8pt', margin: 0 }}>
+        <h3 className="text font-bold" style={{ fontSize: '11px', margin: 0 }}>
           Connected Auction Platforms
         </h3>
         {availablePlatforms.length > 0 && (
           <button
             className="button button-small button-primary"
             onClick={() => setShowAddForm(true)}
-            style={{ fontSize: '7pt' }}
+            style={{ fontSize: '9px' }}
           >
             + Add Platform
           </button>
@@ -252,7 +252,7 @@ export default function ConnectedPlatforms() {
         </p>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '8pt' }}>
+          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '11px' }}>
             Loading connected platforms...
           </div>
         ) : credentials.length === 0 ? (
@@ -271,23 +271,23 @@ export default function ConnectedPlatforms() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 700,
               color: 'var(--text-muted)',
               margin: '0 auto 8px'
             }}>
               LOGIN
             </div>
-            <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
               No platforms connected
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
               Add your auction platform logins to enable automated bidding
             </div>
             <button
               className="button button-primary"
               onClick={() => setShowAddForm(true)}
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               Connect Your First Platform
             </button>
@@ -321,21 +321,21 @@ export default function ConnectedPlatforms() {
                     {/* Platform info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '9pt', fontWeight: 600 }}>{platform.name}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 600 }}>{platform.name}</span>
                         {getStatusBadge(cred)}
                       </div>
                       {cred.status === 'active' && cred.last_validated_at && (
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                           Last verified: {new Date(cred.last_validated_at).toLocaleDateString()}
                         </div>
                       )}
                       {cred.status === 'invalid' && cred.validation_error && (
-                        <div style={{ fontSize: '7pt', color: '#dc2626' }}>
+                        <div style={{ fontSize: '9px', color: '#dc2626' }}>
                           {cred.validation_error}
                         </div>
                       )}
                       {cred.status === '2fa_required' && (
-                        <div style={{ fontSize: '7pt', color: '#d97706' }}>
+                        <div style={{ fontSize: '9px', color: '#d97706' }}>
                           Two-factor authentication code required
                         </div>
                       )}
@@ -363,7 +363,7 @@ export default function ConnectedPlatforms() {
                             });
                         }}
                         style={{
-                          fontSize: '7pt',
+                          fontSize: '9px',
                           background: '#fef3c7',
                           borderColor: '#f59e0b',
                           color: '#92400e'
@@ -375,7 +375,7 @@ export default function ConnectedPlatforms() {
                     <button
                       className="button button-small"
                       onClick={() => setEditingCredential(cred)}
-                      style={{ fontSize: '7pt' }}
+                      style={{ fontSize: '9px' }}
                     >
                       {cred.status === 'invalid' || cred.status === 'expired' ? 'Fix' : 'Edit'}
                     </button>
@@ -395,7 +395,7 @@ export default function ConnectedPlatforms() {
             borderRadius: '4px',
             border: '1px dashed var(--border)'
           }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '6px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
               Also available:
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -410,7 +410,7 @@ export default function ConnectedPlatforms() {
                     alignItems: 'center',
                     gap: '4px',
                     padding: '4px 8px',
-                    fontSize: '7pt',
+                    fontSize: '9px',
                     background: 'var(--surface-hover)',
                     border: '1px solid var(--border)',
                     borderRadius: '4px',

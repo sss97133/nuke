@@ -55,7 +55,7 @@ export const ProfileListingsTab: React.FC<ProfileListingsTabProps> = ({ listings
     const statusInfo = statusMap[status] || { label: status, color: 'var(--text-muted)' };
     return (
       <span style={{
-        fontSize: '7pt',
+        fontSize: '9px',
         padding: '2px 6px',
         background: statusInfo.color,
         color: 'var(--white)',
@@ -73,7 +73,7 @@ export const ProfileListingsTab: React.FC<ProfileListingsTabProps> = ({ listings
         padding: 'var(--space-6)',
         textAlign: 'center',
         color: 'var(--text-muted)',
-        fontSize: '8pt',
+        fontSize: '11px',
       }}>
         No listings yet
       </div>
@@ -128,7 +128,7 @@ export const ProfileListingsTab: React.FC<ProfileListingsTabProps> = ({ listings
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text-muted)',
                 }}>
                   No Image
@@ -141,7 +141,7 @@ export const ProfileListingsTab: React.FC<ProfileListingsTabProps> = ({ listings
               <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                 <div>
                   <h3 style={{
-                    fontSize: '9pt',
+                    fontSize: '12px',
                     fontWeight: 'bold',
                     margin: 0,
                     marginBottom: '4px',
@@ -168,7 +168,7 @@ export const ProfileListingsTab: React.FC<ProfileListingsTabProps> = ({ listings
                       )
                     )}
                   </h3>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                     {listing.auction_start_date && listing.auction_end_date && (
                       <>
                         {formatDate(listing.auction_start_date)} - {formatDate(listing.auction_end_date)}
@@ -186,7 +186,7 @@ export const ProfileListingsTab: React.FC<ProfileListingsTabProps> = ({ listings
 
               {/* Price */}
               <div style={{
-                fontSize: '9pt',
+                fontSize: '12px',
                 fontWeight: 'bold',
                 color: 'var(--text)',
               }}>

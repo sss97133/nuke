@@ -78,7 +78,7 @@ const FeedTableView: React.FC<FeedTableViewProps> = ({
       overflowY: 'visible',
       position: 'relative',
     }}>
-      <table style={{ width: '100%', fontSize: '8pt', borderCollapse: 'collapse' }}>
+      <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
         <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--grey-50)' }}>
           <tr style={{ background: 'var(--grey-50)', borderBottom: '2px solid var(--border)' }}>
             <th style={{
@@ -142,7 +142,7 @@ const FeedTableView: React.FC<FeedTableViewProps> = ({
               <td style={{ padding: '8px', borderRight: '1px solid var(--border)' }}>
                 {vehicle.model || '—'}
                 {vehicle.hype_reason && (
-                  <div style={{ fontSize: '7pt', color: 'var(--accent)', fontWeight: 'bold', marginTop: '2px' }}>{vehicle.hype_reason}</div>
+                  <div style={{ fontSize: '9px', color: 'var(--accent)', fontWeight: 'bold', marginTop: '2px' }}>{vehicle.hype_reason}</div>
                 )}
               </td>
               <td style={{ padding: '8px', textAlign: 'right', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap' }}>

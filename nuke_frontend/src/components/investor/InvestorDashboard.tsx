@@ -128,10 +128,10 @@ export default function InvestorDashboard() {
         }}>
           <div className="card">
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Total Invested
               </div>
-              <div style={{ fontSize: '16pt', fontWeight: 700, color: 'var(--color-danger)' }}>
+              <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--color-danger)' }}>
                 {formatCurrency(stats.total_invested)}
               </div>
             </div>
@@ -139,10 +139,10 @@ export default function InvestorDashboard() {
 
           <div className="card">
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Total Returned
               </div>
-              <div style={{ fontSize: '16pt', fontWeight: 700, color: 'var(--color-success)' }}>
+              <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--color-success)' }}>
                 {formatCurrency(stats.total_returned)}
               </div>
             </div>
@@ -150,11 +150,11 @@ export default function InvestorDashboard() {
 
           <div className="card">
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Net Return
               </div>
               <div style={{
-                fontSize: '16pt',
+                fontSize: '21px',
                 fontWeight: 700,
                 color: stats.net_return >= 0 ? 'var(--color-success)' : 'var(--color-danger)'
               }}>
@@ -165,11 +165,11 @@ export default function InvestorDashboard() {
 
           <div className="card">
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 ROI
               </div>
               <div style={{
-                fontSize: '16pt',
+                fontSize: '21px',
                 fontWeight: 700,
                 color: stats.roi_percentage >= 0 ? 'var(--color-success)' : 'var(--color-danger)'
               }}>
@@ -180,10 +180,10 @@ export default function InvestorDashboard() {
 
           <div className="card">
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Vehicles Funded
               </div>
-              <div style={{ fontSize: '16pt', fontWeight: 700 }}>
+              <div style={{ fontSize: '21px', fontWeight: 700 }}>
                 {stats.vehicles_funded}
               </div>
             </div>
@@ -199,21 +199,21 @@ export default function InvestorDashboard() {
             <button
               onClick={() => setFilter('all')}
               className={`button button-small ${filter === 'all' ? 'button-primary' : 'button-secondary'}`}
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               All
             </button>
             <button
               onClick={() => setFilter('investments')}
               className={`button button-small ${filter === 'investments' ? 'button-primary' : 'button-secondary'}`}
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               Investments
             </button>
             <button
               onClick={() => setFilter('returns')}
               className={`button button-small ${filter === 'returns' ? 'button-primary' : 'button-secondary'}`}
-              style={{ fontSize: '8pt' }}
+              style={{ fontSize: '11px' }}
             >
               Returns
             </button>
@@ -221,12 +221,12 @@ export default function InvestorDashboard() {
         </div>
         <div className="card-body">
           {filteredTransactions.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '12px' }}>
               No transactions found
             </div>
           ) : (
             <div style={{ overflow: 'auto' }}>
-              <table style={{ width: '100%', fontSize: '9pt' }}>
+              <table style={{ width: '100%', fontSize: '12px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border)' }}>
                     <th style={{ padding: '8px', textAlign: 'left' }}>Date</th>

@@ -194,7 +194,7 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
               <option value="curated">Curator</option>
             </select>
             {formData.relationship_type === 'owned' && formData.scanned_fields && formData.scanned_fields.length > 0 && (
-              <div className="text-small text-muted" style={{ marginTop: 'var(--space-1)', fontSize: '8pt' }}>
+              <div className="text-small text-muted" style={{ marginTop: 'var(--space-1)', fontSize: '11px' }}>
                 ✓ Ownership pre-certified via title document scan
               </div>
             )}
@@ -272,7 +272,7 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
             {renderField('purchase_date', 'Actual Purchase Date', 'date')}
             {renderField('purchase_location', 'Purchase Location')}
           </div>
-          <div className="text-small text-muted" style={{ marginTop: 'var(--space-1)', fontSize: '8pt' }}>
+          <div className="text-small text-muted" style={{ marginTop: 'var(--space-1)', fontSize: '11px' }}>
             Note: Purchase Date is when you actually bought the vehicle. Confirm with bill of sale or receipt. Photos can document timeline but don't confirm purchase date.
           </div>
         </div>
@@ -307,7 +307,7 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
               {renderField('registration_expiry', 'Registration Expiry', 'date')}
               {renderField('inspection_expiry', 'Inspection Expiry', 'date')}
             </div>
-            <div className="text-small text-muted" style={{ marginTop: 'var(--space-1)', fontSize: '8pt' }}>
+            <div className="text-small text-muted" style={{ marginTop: 'var(--space-1)', fontSize: '11px' }}>
               Note: Title Transfer Date is extracted from title scan. This is when ownership officially changed, not necessarily the purchase date.
             </div>
           </div>

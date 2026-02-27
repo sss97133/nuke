@@ -148,7 +148,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
         alignItems: 'center',
         gap: '8px',
         flex: '0 0 auto',
-        fontSize: '8pt',
+        fontSize: '11px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
       }}>
         {/* Vehicle count */}
@@ -176,7 +176,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                   : '1px solid rgba(16,185,129,0.25)',
                 background: filters.addedTodayOnly ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.08)',
                 color: '#059669',
-                fontSize: '8pt',
+                fontSize: '11px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -215,7 +215,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
             {formatCurrency(displayStats.totalValue)}
           </span>
           {displayStats.marketInterestValue > 0 && (
-            <span style={{ color: '#d97706', fontSize: '7pt', fontWeight: 500, cursor: 'help' }}>
+            <span style={{ color: '#d97706', fontSize: '9px', fontWeight: 500, cursor: 'help' }}>
               +{formatCurrency(displayStats.marketInterestValue)} interest
             </span>
           )}
@@ -242,7 +242,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 margin: 0,
                 cursor: 'pointer',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontSize: '8pt',
+                fontSize: '11px',
                 color: filters.forSale ? '#059669' : 'var(--text-muted)',
                 fontWeight: filters.forSale ? 700 : 400,
                 transition: 'color 0.15s ease',
@@ -399,7 +399,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 margin: 0,
                 cursor: 'pointer',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontSize: '8pt',
+                fontSize: '11px',
                 color: statsPanel === 'sold_today' ? '#7c3aed' : 'var(--text-muted)',
                 fontWeight: statsPanel === 'sold_today' ? 700 : 400,
                 transition: 'color 0.15s ease',
@@ -482,7 +482,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                     padding: '0',
                     margin: 0,
                     cursor: 'pointer',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     lineHeight: 1,
                     color: 'var(--text-muted)',
                     fontWeight: 'bold',
@@ -556,7 +556,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '7pt',
+                  fontSize: '9px',
                   color: 'var(--text-muted)',
                   fontFamily: 'system-ui, -apple-system, sans-serif',
                   userSelect: 'none',

@@ -332,7 +332,7 @@ export default function Organizations() {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
         Loading organizations...
       </div>
     );
@@ -343,17 +343,17 @@ export default function Organizations() {
       {/* Header */}
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 style={{ fontSize: '14pt', fontWeight: 700, marginBottom: '4px', letterSpacing: '-0.02em' }}>
+          <h1 style={{ fontSize: '19px', fontWeight: 700, marginBottom: '4px', letterSpacing: '-0.02em' }}>
             Organizations
           </h1>
-          <p style={{ fontSize: '8pt', color: 'var(--text-muted)', margin: 0 }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
             Auction houses, dealerships, shops, and collections as investable commodities
           </p>
         </div>
         <button
           onClick={() => navigate('/org/create')}
           className="button button-primary"
-          style={{ fontSize: '8pt', display: 'flex', alignItems: 'center', gap: '4px' }}
+          style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
         >
           <Plus size={12} /> Add Organization
         </button>
@@ -382,10 +382,10 @@ export default function Organizations() {
             padding: '10px 12px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--text)' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>
               {stat.value}
             </div>
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
               {stat.label}
             </div>
           </div>
@@ -412,7 +412,7 @@ export default function Organizations() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name, location..."
             className="form-input"
-            style={{ fontSize: '9pt', paddingLeft: '28px', width: '100%' }}
+            style={{ fontSize: '12px', paddingLeft: '28px', width: '100%' }}
           />
         </div>
 
@@ -421,7 +421,7 @@ export default function Organizations() {
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
           className="form-select"
-          style={{ fontSize: '8pt', minWidth: '120px' }}
+          style={{ fontSize: '11px', minWidth: '120px' }}
         >
           <option value="all">All Types</option>
           {availableTypes.map(type => (
@@ -438,7 +438,7 @@ export default function Organizations() {
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
             className="form-select"
-            style={{ fontSize: '8pt', minWidth: '100px' }}
+            style={{ fontSize: '11px', minWidth: '100px' }}
           >
             {SORT_OPTIONS.map(opt => (
               <option key={opt.key} value={opt.key}>{opt.label}</option>
@@ -447,7 +447,7 @@ export default function Organizations() {
         </div>
 
         {/* Count */}
-        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {displayOrgs.length} result{displayOrgs.length !== 1 ? 's' : ''}
         </div>
       </div>
@@ -461,16 +461,16 @@ export default function Organizations() {
           padding: '60px 20px',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '8px' }}>
             No organizations match your filters
           </div>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
             Try adjusting your search or filters
           </div>
           <button
             onClick={() => { setSearchQuery(''); setTypeFilter('all'); }}
             className="button button-secondary button-small"
-            style={{ fontSize: '8pt' }}
+            style={{ fontSize: '11px' }}
           >
             Clear Filters
           </button>
@@ -580,7 +580,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
           color: '#fff',
           padding: '2px 7px',
           borderRadius: '2px',
-          fontSize: '7pt',
+          fontSize: '9px',
           fontWeight: 600,
           backdropFilter: 'blur(4px)',
         }}>
@@ -597,7 +597,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
             color: '#00ff00',
             padding: '2px 7px',
             borderRadius: '2px',
-            fontSize: '7pt',
+            fontSize: '9px',
             fontWeight: 700,
             fontFamily: 'monospace',
           }}>
@@ -614,7 +614,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
           color: signalTier.color,
           padding: '2px 7px',
           borderRadius: '2px',
-          fontSize: '6pt',
+          fontSize: '8px',
           fontWeight: 700,
           letterSpacing: '0.05em',
           backdropFilter: 'blur(4px)',
@@ -637,7 +637,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
               style={{ flexShrink: 0 }}
             />
             <h3 style={{
-              fontSize: '9pt',
+              fontSize: '12px',
               fontWeight: 700,
               margin: 0,
               flex: 1,
@@ -649,7 +649,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
             </h3>
           </div>
           {location && (
-            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginLeft: '22px' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginLeft: '22px' }}>
               {location}
             </div>
           )}
@@ -713,7 +713,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
             {metrics.slice(0, 3).map((m, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
                 <div style={{
-                  fontSize: '11pt',
+                  fontSize: '15px',
                   fontWeight: 700,
                   color: 'var(--text)',
                   display: 'flex',
@@ -740,7 +740,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
             paddingTop: '8px',
             borderTop: '1px solid var(--border-light, #eee)',
             textAlign: 'center',
-            fontSize: '7pt',
+            fontSize: '9px',
             color: 'var(--text-muted)',
             fontStyle: 'italic',
           }}>

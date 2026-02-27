@@ -93,7 +93,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--text)',
-              fontSize: '10pt',
+              fontSize: '13px',
               fontWeight: 700,
               fontFamily: '"MS Sans Serif", sans-serif',
               userSelect: 'none',
@@ -149,7 +149,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '14pt',
+                fontSize: '19px',
                 fontWeight: 700,
                 color: 'var(--text)'
               }}
@@ -185,6 +185,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
             {[
               { label: 'Capsule', action: '/capsule' },
               { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
+              { label: 'Inbox', action: '/inbox' },
               { label: 'Vehicles', action: '/vehicle/list' },
               { label: 'Auctions', action: '/auctions' },
               { label: 'Organizations', action: '/org' },

@@ -261,7 +261,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
             Validation: {fieldName.replace(/_/g, ' ').toUpperCase()}
           </h3>
           <button
@@ -269,7 +269,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
             style={{
               background: 'transparent',
               border: 'none',
-              fontSize: '18pt',
+              fontSize: '24px',
               cursor: 'pointer',
               padding: '0 8px'
             }}
@@ -291,8 +291,8 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                 borderRadius: '4px',
                 marginBottom: '16px'
               }}>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Current Value</div>
-                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{fieldValue}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Current Value</div>
+                <div style={{ fontSize: '19px', fontWeight: 700 }}>{fieldValue}</div>
               </div>
 
               {/* Consensus Summary */}
@@ -305,17 +305,17 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                 }}>
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                     <div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Sources</div>
-                      <div style={{ fontSize: '12pt', fontWeight: 700 }}>{consensus.source_count}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sources</div>
+                      <div style={{ fontSize: '16px', fontWeight: 700 }}>{consensus.source_count}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Validators</div>
-                      <div style={{ fontSize: '12pt', fontWeight: 700 }}>{consensus.validator_count}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Validators</div>
+                      <div style={{ fontSize: '16px', fontWeight: 700 }}>{consensus.validator_count}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Avg Confidence</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Avg Confidence</div>
                       <div style={{
-                        fontSize: '12pt',
+                        fontSize: '16px',
                         fontWeight: 700,
                         color: getConfidenceColor(consensus.avg_confidence)
                       }}>
@@ -327,12 +327,12 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
               )}
 
               {/* Validation Sources */}
-              <div style={{ marginBottom: '8px', fontSize: '10pt', fontWeight: 700 }}>
+              <div style={{ marginBottom: '8px', fontSize: '13px', fontWeight: 700 }}>
                 Validation Sources ({validations.length})
               </div>
 
               {validations.length === 0 ? (
-                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
                   No validation data yet. This field was manually entered but not verified by multiple sources.
                 </div>
               ) : (
@@ -349,7 +349,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '9pt', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
                             {getSourceLabel(validation.validation_source)}
                           </span>
                         </div>
@@ -358,7 +358,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                           borderRadius: '12px',
                           background: getConfidenceColor(validation.confidence_score),
                           color: '#fff',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           fontWeight: 700
                         }}>
                           {validation.confidence_score}% confidence
@@ -366,7 +366,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                       </div>
 
                       {validation.notes && (
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
                           {validation.notes}
                         </div>
                       )}
@@ -400,7 +400,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
-                              fontSize: '8pt',
+                              fontSize: '11px',
                               color: 'var(--accent)',
                               textDecoration: 'none'
                             }}
@@ -411,7 +411,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                         </div>
                       )}
 
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '6px' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px' }}>
                         Validated {new Date(validation.created_at).toLocaleDateString()}
                       </div>
                     </div>
@@ -427,10 +427,10 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                 borderRadius: '4px',
                 border: '1px dashed var(--border)'
               }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
                   Have additional proof?
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Upload a title, receipt, or registration to add another validation source and increase confidence.
                 </div>
               </div>

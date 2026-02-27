@@ -174,7 +174,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
   };
 
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center', fontSize: '9pt', color: 'var(--text-muted)' }}>
+    return <div style={{ padding: '20px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
       Loading activity...
     </div>;
   }
@@ -227,7 +227,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
 
         {/* Mobile scroll hint */}
         <div style={{
-          fontSize: '8pt',
+          fontSize: '11px',
           color: 'var(--text-secondary)',
           textAlign: 'center',
           marginBottom: '8px',
@@ -290,7 +290,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                         style={{
                           gridColumn: `${weekIdx + 1} / span ${(monthLabels[i + 1]?.weekIdx ?? 53) - weekIdx}`,
                           textAlign: 'left',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           color: 'var(--text-secondary)',
                           lineHeight: '8px'
                         }}
@@ -371,7 +371,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                     className="text-small font-bold"
                     style={{
                       padding: 'var(--space-1) var(--space-2)',
-                      fontSize: '8pt',
+                      fontSize: '11px',
                       background: 'var(--grey-200)',
                       border: '1px solid var(--border-medium)',
                       borderRadius: '2px',

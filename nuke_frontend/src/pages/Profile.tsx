@@ -330,7 +330,7 @@ const Profile: React.FC = () => {
         <div className="main">
           <div className="card">
             <div className="card-body text-center">
-              <h2 className="text font-bold" style={{ fontSize: '8pt' }}>Loading...</h2>
+              <h2 className="text font-bold" style={{ fontSize: '11px' }}>Loading...</h2>
             </div>
           </div>
         </div>
@@ -344,7 +344,7 @@ const Profile: React.FC = () => {
         <div className="main">
           <div className="card">
             <div className="card-body text-center">
-              <h2 className="text font-bold" style={{ fontSize: '8pt' }}>Error</h2>
+              <h2 className="text font-bold" style={{ fontSize: '11px' }}>Error</h2>
               <p className="text-small text-muted">{error}</p>
               <button className="button button-primary" onClick={() => loadProfileData()}>
                 Retry
@@ -362,7 +362,7 @@ const Profile: React.FC = () => {
         <div className="main">
           <div className="card">
             <div className="card-body text-center">
-              <h2 className="text font-bold" style={{ fontSize: '8pt' }}>Profile Not Found</h2>
+              <h2 className="text font-bold" style={{ fontSize: '11px' }}>Profile Not Found</h2>
               <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
                 Unable to load profile data. You may need to sign out and try again.
               </p>
@@ -469,7 +469,7 @@ const Profile: React.FC = () => {
                     alignItems: 'center', 
                     justifyContent: 'center',
                     background: 'var(--surface-hover)',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     fontWeight: 'bold'
                   }}>
                     {(profile.full_name || profile.username || 'U').charAt(0).toUpperCase()}
@@ -481,12 +481,12 @@ const Profile: React.FC = () => {
               {/* Username + Meta */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                  <h2 className="text font-bold" style={{ margin: 0, fontSize: '8pt' }}>
+                  <h2 className="text font-bold" style={{ margin: 0, fontSize: '11px' }}>
                     @{profile.username || 'username'}
                   </h2>
                   {profile.is_verified && (
                     <span style={{
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 700,
                       padding: '1px 6px',
                       background: 'var(--success, #28a745)',
@@ -497,7 +497,7 @@ const Profile: React.FC = () => {
                   )}
                   {profile.user_type && profile.user_type !== 'user' && (
                     <span style={{
-                      fontSize: '7pt',
+                      fontSize: '9px',
                       fontWeight: 700,
                       padding: '1px 6px',
                       background: 'var(--text-muted)',
@@ -703,7 +703,7 @@ const Profile: React.FC = () => {
                         console.error('Failed to update user_type:', err);
                       }
                     }}
-                    style={{ padding: '4px 8px', fontSize: '8pt' }}
+                    style={{ padding: '4px 8px', fontSize: '11px' }}
                   >
                     <option value="user">User</option>
                     <option value="professional">Professional</option>
@@ -786,12 +786,12 @@ const Profile: React.FC = () => {
                     padding: 'var(--space-4)',
                     borderRadius: '0px',
                   }}>
-                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-3)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-3)' }}>
                       Get started
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                       {!profileData.completion?.avatar_uploaded && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '8pt' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '11px' }}>
                           <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
                           <button
                             style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
@@ -802,7 +802,7 @@ const Profile: React.FC = () => {
                         </div>
                       )}
                       {!profileData.completion?.bio_added && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '8pt' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '11px' }}>
                           <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
                           <button
                             style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
@@ -813,7 +813,7 @@ const Profile: React.FC = () => {
                         </div>
                       )}
                       {!profileData.completion?.first_vehicle_added && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '8pt' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '11px' }}>
                           <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
                           <button
                             style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
@@ -962,10 +962,10 @@ const Profile: React.FC = () => {
             {activeTab === 'duplicates' && isOwnProfile && (
               <div>
                 <div className="card" style={{ marginBottom: '16px' }}>
-                  <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700 }}>
+                  <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
                     Duplicate Vehicle Detection
                   </div>
-                  <div className="card-body" style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  <div className="card-body" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     When potential duplicate vehicles are detected in your profile, they'll appear below for review.
                     You can merge duplicates to consolidate all images, events, and data into a single vehicle profile.
                   </div>
@@ -984,12 +984,12 @@ const Profile: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
                 {/* ── ACCOUNT ── */}
-                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Account</h3>
+                <h3 style={{ fontSize: '12px', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Account</h3>
 
                 {/* Email Management */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Email Settings</h3>
+                    <h3 className="text font-bold" style={{ fontSize: '11px' }}>Email Settings</h3>
                   </div>
                   <div className="card-body">
                     <div className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
@@ -1037,7 +1037,7 @@ const Profile: React.FC = () => {
                 {/* Password Change */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Change Password</h3>
+                    <h3 className="text font-bold" style={{ fontSize: '11px' }}>Change Password</h3>
                   </div>
                   <div className="card-body">
                     <div className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
@@ -1055,17 +1055,17 @@ const Profile: React.FC = () => {
                 </div>
 
                 {/* ── CONNECTIONS ── */}
-                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Connections</h3>
+                <h3 style={{ fontSize: '12px', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Connections</h3>
 
                 <ConnectedPlatforms />
                 <SocialConnections userId={profile.id} />
 
                 {/* ── VERIFICATION ── */}
-                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification</h3>
+                <h3 style={{ fontSize: '12px', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification</h3>
 
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Identity Verification</h3>
+                    <h3 className="text font-bold" style={{ fontSize: '11px' }}>Identity Verification</h3>
                   </div>
                   <div className="card-body">
                     <ProfileVerification />
@@ -1073,11 +1073,11 @@ const Profile: React.FC = () => {
                 </div>
 
                 {/* ── ACTIVITY ── */}
-                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Activity</h3>
+                <h3 style={{ fontSize: '12px', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Activity</h3>
 
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>History</h3>
+                    <h3 className="text font-bold" style={{ fontSize: '11px' }}>History</h3>
                   </div>
                   <div className="card-body">
                     <ActivityTimeline scope="user" id={profile.id} limit={200} />
@@ -1085,7 +1085,7 @@ const Profile: React.FC = () => {
                 </div>
 
                 {/* ── ADVANCED ── */}
-                <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Advanced</h3>
+                <h3 style={{ fontSize: '12px', fontWeight: 700, marginBottom: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Advanced</h3>
 
                 <DatabaseDiagnostic />
               </div>

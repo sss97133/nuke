@@ -369,7 +369,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
         border: '1px solid #bdbdbd',
         padding: '16px',
         margin: '16px',
-        fontSize: '8pt',
+        fontSize: '11px',
         textAlign: 'center'
       }}>
         Loading stream...
@@ -384,7 +384,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
         border: '1px solid #bdbdbd',
         padding: '16px',
         margin: '16px',
-        fontSize: '8pt',
+        fontSize: '11px',
         textAlign: 'center'
       }}>
         Stream not found
@@ -422,7 +422,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
-              fontSize: '8pt'
+              fontSize: '11px'
             }}>
               {stream.status === 'scheduled' ? 'Stream scheduled' : 'Stream offline'}
             </div>
@@ -440,7 +440,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
             background: 'rgba(0, 0, 0, 0.8)',
             color: 'white',
             padding: '8px',
-            fontSize: '8pt',
+            fontSize: '11px',
             maxWidth: '300px'
           }}>
             <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
@@ -461,7 +461,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               <span>{stream.streamer_name}</span>
               <span>VIEWERS: {stream.viewer_count}</span>
             </div>
-            <div style={{ fontSize: '7pt', color: '#ccc' }}>
+            <div style={{ fontSize: '9px', color: '#ccc' }}>
               {stream.tags.map(tag => `#${tag}`).join(' ')}
             </div>
           </div>
@@ -482,7 +482,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               background: '#e0e0e0',
               padding: '8px',
               borderBottom: '1px solid #bdbdbd',
-              fontSize: '8pt',
+              fontSize: '11px',
               fontWeight: 'bold'
             }}>
               LIVE CHAT
@@ -495,7 +495,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                 flex: '1',
                 overflowY: 'auto',
                 padding: '8px',
-                fontSize: '8pt'
+                fontSize: '11px'
               }}
             >
               {chatMessages.map(msg => (
@@ -527,11 +527,11 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       {msg.user_name}
                     </span>
                     {(msg.donation_cents || 0) > 0 && (
-                      <span style={{ fontSize: '7pt', color: '#92400e', fontWeight: 'bold' }}>
+                      <span style={{ fontSize: '9px', color: '#92400e', fontWeight: 'bold' }}>
                         TIP ${((msg.donation_cents || 0) / 100).toFixed(2)}
                       </span>
                     )}
-                    <span style={{ fontSize: '7pt', color: '#9e9e9e' }}>
+                    <span style={{ fontSize: '9px', color: '#9e9e9e' }}>
                       {formatTimestamp(msg.created_at)}
                     </span>
                   </div>
@@ -541,7 +541,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
             </div>
 
             {/* Tip Panel */}
-            <div style={{ borderTop: '1px solid #bdbdbd', padding: '8px', fontSize: '8pt' }}>
+            <div style={{ borderTop: '1px solid #bdbdbd', padding: '8px', fontSize: '11px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: 6 }}>TIP STREAMER</div>
               {!user && (
                 <div style={{ color: '#757575' }}>Login to tip.</div>
@@ -560,7 +560,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         disabled={tipping}
                         style={{
                           padding: '4px 8px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           border: '1px solid #bdbdbd',
                           background: '#111827',
                           color: 'white',
@@ -586,7 +586,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         padding: '4px',
                         border: '1px solid #bdbdbd',
                         borderRadius: '0px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                       }}
                     />
                     <input
@@ -599,7 +599,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         padding: '4px',
                         border: '1px solid #bdbdbd',
                         borderRadius: '0px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                       }}
                     />
                     <button
@@ -611,7 +611,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       disabled={tipping || !parseTipAmountCents()}
                       style={{
                         padding: '4px 8px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         border: '1px solid #bdbdbd',
                         background: '#111827',
                         color: 'white',
@@ -628,7 +628,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
             </div>
 
             {/* Invest Panel */}
-            <div style={{ borderTop: '1px solid #bdbdbd', padding: '8px', fontSize: '8pt' }}>
+            <div style={{ borderTop: '1px solid #bdbdbd', padding: '8px', fontSize: '11px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: 6 }}>INVEST</div>
               {loadingDeals && <div style={{ color: '#757575' }}>Loading deals...</div>}
               {dealError && <div style={{ color: '#b91c1c' }}>{dealError}</div>}
@@ -656,9 +656,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ fontWeight: 'bold' }}>{d.title}</div>
-                      <div style={{ fontSize: '7pt', color: '#6b7280', fontWeight: 'bold' }}>{typeLabel}</div>
+                      <div style={{ fontSize: '9px', color: '#6b7280', fontWeight: 'bold' }}>{typeLabel}</div>
                     </div>
-                    <div style={{ fontSize: '7pt', color: '#6b7280', marginTop: 2 }}>
+                    <div style={{ fontSize: '9px', color: '#6b7280', marginTop: 2 }}>
                       Rate: {ratePct.toFixed(2)}%
                       {capMult ? ` • Cap: ${capMult}x` : ''}
                       {d.term_end_at ? ` • Ends: ${new Date(d.term_end_at).toLocaleDateString()}` : ''}
@@ -679,7 +679,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                           padding: '4px',
                           border: '1px solid #bdbdbd',
                           borderRadius: '0px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                         }}
                       />
                       <button
@@ -687,7 +687,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         disabled={!user || investing}
                         style={{
                           padding: '4px 8px',
-                          fontSize: '8pt',
+                          fontSize: '11px',
                           border: '1px solid #bdbdbd',
                           background: '#111827',
                           color: 'white',
@@ -712,7 +712,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       disabled={creatingDeal}
                       style={{
                         padding: '4px 8px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         border: '1px solid #bdbdbd',
                         background: '#111827',
                         color: 'white',
@@ -728,7 +728,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       disabled={creatingDeal}
                       style={{
                         padding: '4px 8px',
-                        fontSize: '8pt',
+                        fontSize: '11px',
                         border: '1px solid #bdbdbd',
                         background: '#111827',
                         color: 'white',
@@ -740,7 +740,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       {creatingDeal ? 'CREATING...' : 'CREATE REV SHARE'}
                     </button>
                   </div>
-                  <div style={{ color: '#757575', fontSize: '7pt', marginTop: 6 }}>
+                  <div style={{ color: '#757575', fontSize: '9px', marginTop: 6 }}>
                     Tips create cashflow events and auto-sweep payouts when deals are active.
                   </div>
                 </div>
@@ -766,7 +766,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                     padding: '4px',
                     border: '1px solid #bdbdbd',
                     borderRadius: '0px',
-                    fontSize: '8pt'
+                    fontSize: '11px'
                   }}
                 />
                 <button
@@ -774,7 +774,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   disabled={!newMessage.trim()}
                   style={{
                     padding: '4px 8px',
-                    fontSize: '8pt',
+                    fontSize: '11px',
                     border: '1px solid #bdbdbd',
                     background: newMessage.trim() ? '#424242' : '#e0e0e0',
                     color: newMessage.trim() ? 'white' : '#9e9e9e',
@@ -791,7 +791,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               <div style={{
                 padding: '8px',
                 borderTop: '1px solid #bdbdbd',
-                fontSize: '8pt',
+                fontSize: '11px',
                 textAlign: 'center',
                 color: '#757575'
               }}>
@@ -810,10 +810,10 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
         background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '12px',
-        fontSize: '8pt'
+        fontSize: '11px'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <h3 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0' }}>
+          <h3 style={{ fontSize: '11px', fontWeight: 'bold', margin: '0' }}>
             {stream.title}
           </h3>
           {user && (
@@ -821,7 +821,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               onClick={toggleFollow}
               style={{
                 padding: '4px 8px',
-                fontSize: '8pt',
+                fontSize: '11px',
                 border: '1px solid #bdbdbd',
                 background: isFollowing ? '#e0e0e0' : '#424242',
                 color: isFollowing ? '#424242' : 'white',
@@ -840,7 +840,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '16px', fontSize: '7pt', color: '#6b7280' }}>
+        <div style={{ display: 'flex', gap: '16px', fontSize: '9px', color: '#6b7280' }}>
           <div>Type: {stream.stream_type.replace('_', ' ')}</div>
           <div>Status: {stream.status}</div>
           {stream.started_at && (

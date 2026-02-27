@@ -28,7 +28,7 @@ export const Terminal: React.FC<TerminalProps> = ({ logs, maxLines = 10 }) => {
       ref={containerRef}
       style={{
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-        fontSize: '8pt',
+        fontSize: '11px',
         background: 'var(--bg)',
         borderTop: '1px solid #bdbdbd',
         padding: '8px',

@@ -135,7 +135,7 @@ const TradeTape: React.FC<TradeTapeProps> = ({
         background: 'var(--surface)',
         border: '2px solid #bdbdbd',
         borderRadius: '4px',
-        fontSize: '9pt',
+        fontSize: '12px',
         overflow: 'hidden',
       }}
     >
@@ -151,11 +151,11 @@ const TradeTape: React.FC<TradeTapeProps> = ({
             background: '#f9fafb',
           }}
         >
-          <h3 style={{ margin: 0, fontSize: '10pt', fontWeight: 'bold' }}>
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>
             Time & Sales
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '8pt', color: '#6b7280' }}>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
               {recentTrades.length} trades
             </span>
             <div
@@ -179,7 +179,7 @@ const TradeTape: React.FC<TradeTapeProps> = ({
           gap: '8px',
           padding: '6px 12px',
           borderBottom: '1px solid #e5e7eb',
-          fontSize: '8pt',
+          fontSize: '11px',
           fontWeight: 600,
           color: '#6b7280',
           textTransform: 'uppercase',
@@ -230,7 +230,7 @@ const TradeTape: React.FC<TradeTapeProps> = ({
           style={{
             padding: '4px 12px',
             borderTop: '1px solid #e5e7eb',
-            fontSize: '8pt',
+            fontSize: '11px',
             color: '#9ca3af',
             textAlign: 'right',
           }}
