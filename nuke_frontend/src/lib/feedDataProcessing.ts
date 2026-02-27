@@ -17,7 +17,9 @@ export function isPoorQualityImage(url: string | null, fileSize: number | null =
     urlLower.includes('placeholder') ||
     urlLower.includes('no-image') ||
     urlLower.includes('default') ||
-    urlLower.includes('missing')
+    urlLower.includes('missing') ||
+    urlLower.includes('/auctionsites/') ||
+    urlLower.includes('/images/auctionsites')
   ) {
     return true;
   }

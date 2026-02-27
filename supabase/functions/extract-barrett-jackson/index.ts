@@ -607,7 +607,9 @@ function extractImageUrls(html: string): string[] {
     urls.add(ogImage[1]);
   }
 
-  return [...urls];
+  // Filter out non-vehicle images (venue maps, logos, site chrome)
+  const junkPatterns = ['/AuctionSites/', '/auctionsites/', '/Images/AuctionSites'];
+  return [...urls].filter(u => !junkPatterns.some(p => u.includes(p)));
 }
 
 // ─── Mileage extraction helper ──────────────────────────────────────────────

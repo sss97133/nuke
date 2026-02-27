@@ -74,6 +74,9 @@ function isKnownNoiseUrl(url: string): boolean {
   if (s.includes('/flags/') && s.includes('.png')) return true;
   if (s.includes('flags/us.png') || s.includes('flags/US.png')) return true;
 
+  // Barrett-Jackson auction venue maps (palm_beach.jpg, scottsdale.jpg, etc.)
+  if (s.includes('/auctionsites/')) return true;
+
   return false;
 }
 
