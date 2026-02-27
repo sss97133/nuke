@@ -97,6 +97,12 @@ function timeAgo(date: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
+function formatTimestamp(date: string) {
+  const d = new Date(date);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+    ', ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
 function isAlertEmail(email: InboxEmail) {
   return (
     email.to_address === 'alerts@nuke.ag' ||
@@ -125,6 +131,15 @@ function roleColor(role: string) {
   return ROLE_COLORS[role] || '#6b7280';
 }
 
+function getInitials(name: string | null, email: string): string {
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return email.slice(0, 2).toUpperCase();
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function RolePill({ role }: { role: string }) {
@@ -133,11 +148,12 @@ function RolePill({ role }: { role: string }) {
       display: 'inline-block',
       padding: '1px 6px',
       fontSize: '9px',
-      fontFamily: 'monospace',
+      fontFamily: 'var(--font-mono)',
       fontWeight: 600,
       color: '#fff',
       backgroundColor: roleColor(role),
-      borderRadius: '3px',
+      borderRadius: 3,
+      letterSpacing: '0.02em',
     }}>
       {role}
     </span>
@@ -146,7 +162,7 @@ function RolePill({ role }: { role: string }) {
 
 function StatusBadge({ status }: { status: InboxEmail['status'] }) {
   const styles: Record<string, React.CSSProperties> = {
-    unread:   { background: 'var(--primary)', color: '#fff' },
+    unread:   { background: 'var(--accent)', color: '#fff' },
     read:     { background: 'var(--surface-hover)', color: 'var(--text-muted)' },
     replied:  { background: 'var(--success)', color: '#fff' },
     archived: { background: 'var(--border)', color: 'var(--text-muted)' },
@@ -154,10 +170,12 @@ function StatusBadge({ status }: { status: InboxEmail['status'] }) {
   };
   return (
     <span style={{
-      padding: '1px 5px',
+      padding: '1px 6px',
       fontSize: '9px',
       borderRadius: 2,
-      fontFamily: 'monospace',
+      fontFamily: 'var(--font-mono)',
+      letterSpacing: '0.04em',
+      textTransform: 'uppercase',
       ...styles[status],
     }}>
       {status}
@@ -174,17 +192,60 @@ function UnreadBadge({ count }: { count: number }) {
       justifyContent: 'center',
       minWidth: 18,
       height: 18,
-      padding: '0 4px',
+      padding: '0 5px',
       borderRadius: 999,
       background: 'var(--error)',
       color: '#fff',
-      fontSize: '11px',
+      fontSize: '10px',
       fontWeight: 700,
-      fontFamily: 'monospace',
+      fontFamily: 'var(--font-mono)',
       lineHeight: 1,
+      letterSpacing: 0,
     }}>
       {count > 99 ? '99+' : count}
     </span>
+  );
+}
+
+function SenderAvatar({ name, email, size = 36 }: { name: string | null; email: string; size?: number }) {
+  const initials = getInitials(name, email);
+  // Deterministic color from email string
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  const hue = Math.abs(hash) % 360;
+  return (
+    <div style={{
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      background: `hsl(${hue}, 55%, 42%)`,
+      color: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: size < 30 ? '10px' : '13px',
+      fontWeight: 700,
+      fontFamily: 'var(--font-family)',
+      flexShrink: 0,
+      letterSpacing: '0.02em',
+      userSelect: 'none',
+    }}>
+      {initials}
+    </div>
+  );
+}
+
+function MailboxDot({ address }: { address: string }) {
+  const color = MAILBOX_COLORS[address] || 'var(--text-muted)';
+  return (
+    <span style={{
+      display: 'inline-block',
+      width: 7,
+      height: 7,
+      borderRadius: '50%',
+      background: color,
+      flexShrink: 0,
+    }} />
   );
 }
 
@@ -199,6 +260,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [counts, setCounts] = useState<Record<string, { total: number; unread: number }>>({});
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
 
   const fetchEmails = useCallback(async () => {
     setLoading(true);
@@ -259,6 +321,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
   const openEmail = async (email: InboxEmail) => {
     setSelected(email);
     setReplyText('');
+    setShowMobileDetail(true);
     if (email.status === 'unread') {
       await supabase
         .from('contact_inbox')
@@ -308,258 +371,299 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
   );
 
   return (
-    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
-      {/* Toolbar */}
-      {!alertsOnly && (
-        <div style={{
-          padding: '8px 12px',
-          borderBottom: '1px solid var(--border)',
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* ── Middle pane: email list (360px) ── */}
+      <div
+        className="inbox-middle-pane"
+        style={{
+          width: 360,
+          minWidth: 360,
+          maxWidth: 360,
+          borderRight: '1px solid var(--border)',
           display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          flexWrap: 'wrap',
-          background: 'var(--surface)',
-        }}>
-          {/* Status filters */}
-          <div style={{ display: 'flex', gap: 3 }}>
+          flexDirection: 'column',
+          overflow: 'hidden',
+          flexShrink: 0,
+          background: 'var(--bg)',
+        }}
+      >
+        {/* Filter bar */}
+        {!alertsOnly && (
+          <div style={{
+            padding: '8px 12px',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface)',
+            display: 'flex',
+            gap: 4,
+            flexWrap: 'wrap',
+          }}>
             {(['all', 'unread', 'read', 'replied', 'archived'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setStatusFilter(f)}
                 style={{
-                  padding: '2px 7px',
+                  padding: '3px 8px',
                   fontSize: '11px',
-                  background: statusFilter === f ? 'var(--primary)' : 'transparent',
+                  background: statusFilter === f ? 'var(--accent)' : 'transparent',
                   color: statusFilter === f ? '#fff' : 'var(--text-muted)',
                   border: '1px solid var(--border)',
                   borderRadius: 2,
                   cursor: 'pointer',
-                  fontFamily: 'monospace',
+                  fontFamily: 'var(--font-mono)',
                   textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  transition: 'background 0.1s',
                 }}
               >
                 {f}
               </button>
             ))}
           </div>
+        )}
 
-          {/* Mailbox filter */}
-          <div style={{ display: 'flex', gap: 3, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setMailboxFilter('all')}
-              style={{
-                padding: '2px 7px',
-                fontSize: '11px',
-                background: mailboxFilter === 'all' ? 'var(--grey-800)' : 'transparent',
-                color: mailboxFilter === 'all' ? '#fff' : 'var(--text-muted)',
-                border: '1px solid var(--border)',
-                borderRadius: 2,
-                cursor: 'pointer',
-                fontFamily: 'monospace',
-              }}
-            >
-              all
-            </button>
-            {mailboxesWithEmails.map(addr => {
-              const c = counts[addr];
-              return (
-                <button
-                  key={addr}
-                  onClick={() => setMailboxFilter(addr)}
-                  style={{
-                    padding: '2px 7px',
-                    fontSize: '11px',
-                    background: mailboxFilter === addr ? (MAILBOX_COLORS[addr] || 'var(--grey-800)') : 'transparent',
-                    color: mailboxFilter === addr ? '#fff' : (MAILBOX_COLORS[addr] || 'var(--text-muted)'),
-                    border: `1px solid ${MAILBOX_COLORS[addr] || 'var(--border)'}`,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    fontFamily: 'monospace',
-                  }}
-                >
-                  {addr.split('@')[0]}{c?.unread > 0 ? ` (${c.unread})` : ''}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Split pane */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Email list */}
-        <div style={{
-          width: selected ? '40%' : '100%',
-          borderRight: selected ? '1px solid var(--border)' : 'none',
-          overflowY: 'auto',
-          transition: 'width 0.15s ease',
-          background: 'var(--bg)',
-        }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading ? (
-            <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: '12px' }}>loading...</div>
+            <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
+              Loading...
+            </div>
           ) : emails.length === 0 ? (
-            <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: '12px' }}>
+            <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: '12px' }}>
               {alertsOnly ? 'No alert emails received' : 'No emails in this view'}
             </div>
           ) : (
-            emails.map(email => (
-              <div
-                key={email.id}
-                onClick={() => void openEmail(email)}
-                style={{
-                  padding: '10px 12px',
-                  borderBottom: '1px solid var(--border)',
-                  cursor: 'pointer',
-                  background: selected?.id === email.id
-                    ? 'var(--surface-hover)'
-                    : email.status === 'unread' ? 'var(--surface)' : 'var(--bg)',
-                  opacity: email.status === 'archived' ? 0.5 : 1,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                    {email.status === 'unread' && (
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
-                    )}
-                    <span style={{
-                      fontSize: '12px',
-                      color: email.status === 'unread' ? 'var(--text)' : 'var(--text-muted)',
-                      fontWeight: email.status === 'unread' ? 600 : 400,
+            emails.map(email => {
+              const isUnread = email.status === 'unread';
+              const isSelected = selected?.id === email.id;
+              const accentColor = MAILBOX_COLORS[email.to_address] || 'var(--border)';
+              return (
+                <div
+                  key={email.id}
+                  onClick={() => void openEmail(email)}
+                  style={{
+                    height: 64,
+                    padding: '0 14px 0 0',
+                    borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer',
+                    background: isSelected
+                      ? 'var(--surface-hover)'
+                      : isUnread ? 'var(--surface)' : 'var(--bg)',
+                    opacity: email.status === 'archived' ? 0.5 : 1,
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    borderLeft: isSelected
+                      ? '3px solid var(--accent)'
+                      : isUnread
+                        ? `3px solid ${accentColor}`
+                        : '3px solid transparent',
+                    transition: 'background 0.1s',
+                  }}
+                >
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingLeft: 12 }}>
+                    {/* Row 1: sender + time */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        fontSize: '14px',
+                        fontWeight: isUnread ? 700 : 400,
+                        color: 'var(--text)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '65%',
+                      }}>
+                        {email.from_name || email.from_address}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        color: 'var(--text-muted)',
+                        fontFamily: 'var(--font-mono)',
+                        flexShrink: 0,
+                      }}>
+                        {timeAgo(email.received_at)}
+                      </span>
+                    </div>
+
+                    {/* Row 2: subject */}
+                    <div style={{
+                      fontSize: '13px',
+                      color: isUnread ? 'var(--text)' : 'var(--text-muted)',
+                      fontWeight: isUnread ? 600 : 400,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
+                      marginTop: 2,
                     }}>
-                      {email.from_name || email.from_address}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                    <span style={{
-                      fontSize: '9px',
-                      padding: '1px 5px',
-                      borderRadius: 2,
-                      background: MAILBOX_COLORS[email.to_address] || 'var(--grey-800)',
-                      color: '#fff',
-                      fontFamily: 'monospace',
-                    }}>
-                      {email.to_address.split('@')[0]}
-                    </span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                      {timeAgo(email.received_at)}
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{
-                  fontSize: '12px',
-                  color: email.status === 'unread' ? 'var(--text)' : 'var(--text-muted)',
-                  marginTop: 3,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  fontWeight: email.status === 'unread' ? 500 : 400,
-                }}>
-                  {email.subject}
-                </div>
-
-                {!selected && (
-                  <div style={{
-                    fontSize: '11px',
-                    color: 'var(--text-muted)',
-                    marginTop: 2,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}>
-                    {(email.body_text || '').slice(0, 100)}
-                  </div>
-                )}
-
-                {alertsOnly && (() => {
-                  const urls = extractVehicleUrls(email.body_text);
-                  return urls.length > 0 ? (
-                    <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                        {urls.length} vehicle URL{urls.length !== 1 ? 's' : ''}
-                      </span>
+                      {email.subject}
                     </div>
-                  ) : null;
-                })()}
-              </div>
-            ))
+
+                    {/* Row 3: snippet */}
+                    <div style={{
+                      fontSize: '12px',
+                      color: 'var(--text-muted)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      marginTop: 1,
+                    }}>
+                      {(email.body_text || '').slice(0, 80)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
+      </div>
 
-        {/* Email detail */}
-        {selected && (
+      {/* ── Right pane: email detail (flex-1) ── */}
+      <div
+        className="inbox-detail-pane"
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          background: 'var(--bg)',
+          minWidth: 0,
+        }}
+      >
+        {!selected ? (
+          /* Empty state */
           <div style={{
             flex: 1,
             display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             flexDirection: 'column',
-            overflow: 'hidden',
-            background: 'var(--bg)',
+            gap: 8,
+            color: 'var(--text-muted)',
           }}>
+            <div style={{ fontSize: '32px', opacity: 0.3 }}>✉</div>
+            <div style={{ fontSize: '14px', fontWeight: 500 }}>Select a message</div>
+            <div style={{ fontSize: '12px', opacity: 0.7 }}>
+              {emails.length > 0 ? `${emails.length} email${emails.length !== 1 ? 's' : ''} in this view` : 'No emails'}
+            </div>
+          </div>
+        ) : (
+          <>
             {/* Detail header */}
             <div style={{
-              padding: '12px 14px',
+              padding: '16px 20px 12px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface)',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 600, wordBreak: 'break-word' }}>
-                    {selected.subject}
+              {/* Sender row */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <SenderAvatar name={selected.from_name} email={selected.from_address} size={40} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>
+                    {selected.from_name || selected.from_address}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 4 }}>
-                    From: <span style={{ color: 'var(--text)' }}>
-                      {selected.from_name ? `${selected.from_name} <${selected.from_address}>` : selected.from_address}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    To: <span style={{ color: MAILBOX_COLORS[selected.to_address] || 'var(--text)' }}>
-                      {selected.to_address}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace' }}>
-                    {new Date(selected.received_at).toLocaleString()}
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: 2 }}>
+                    {selected.from_name ? selected.from_address : ''}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {/* Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <StatusBadge status={selected.status} />
                   {!alertsOnly && (
                     <>
                       <button
                         onClick={() => archiveEmail(selected.id)}
                         style={{
-                          fontSize: '11px', padding: '2px 7px',
-                          background: 'var(--surface-hover)', color: 'var(--text-muted)',
-                          border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          background: 'transparent',
+                          color: 'var(--text-muted)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 3,
+                          cursor: 'pointer',
+                          transition: 'background 0.1s',
                         }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                       >
-                        archive
+                        Archive
                       </button>
                       <button
                         onClick={() => markSpam(selected.id)}
                         style={{
-                          fontSize: '11px', padding: '2px 7px',
-                          background: 'var(--surface-hover)', color: 'var(--error)',
-                          border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          background: 'transparent',
+                          color: 'var(--error)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 3,
+                          cursor: 'pointer',
+                          transition: 'background 0.1s',
                         }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                       >
-                        spam
+                        Spam
                       </button>
                     </>
                   )}
                   <button
                     onClick={() => setSelected(null)}
                     style={{
-                      fontSize: '11px', padding: '2px 7px',
-                      background: 'var(--surface-hover)', color: 'var(--text-muted)',
-                      border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
+                      padding: '4px 10px',
+                      fontSize: '12px',
+                      background: 'transparent',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      transition: 'background 0.1s',
                     }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                   >
-                    close
+                    Close
                   </button>
                 </div>
+              </div>
+
+              {/* Meta strip */}
+              <div style={{
+                marginTop: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+                paddingLeft: 52,
+              }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>To:</span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '2px 8px',
+                  background: 'var(--surface-hover)',
+                  borderRadius: 999,
+                  fontSize: '12px',
+                  color: 'var(--text)',
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  <MailboxDot address={selected.to_address} />
+                  {selected.to_address}
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                  {formatTimestamp(selected.received_at)}
+                </span>
+              </div>
+
+              {/* Subject */}
+              <div style={{
+                marginTop: 8,
+                paddingLeft: 52,
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--text)',
+                wordBreak: 'break-word',
+              }}>
+                {selected.subject}
               </div>
             </div>
 
@@ -568,11 +672,11 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
               const urls = extractVehicleUrls(selected.body_text);
               return urls.length > 0 ? (
                 <div style={{
-                  padding: '8px 14px',
+                  padding: '10px 20px',
                   borderBottom: '1px solid var(--border)',
                   background: 'var(--surface)',
                 }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 6, fontFamily: 'monospace', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 6, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Vehicle URLs ({urls.length})
                   </div>
                   {urls.map((url, i) => (
@@ -583,10 +687,10 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                         rel="noopener noreferrer"
                         style={{
                           fontSize: '11px',
-                          color: 'var(--primary)',
+                          color: 'var(--accent)',
                           wordBreak: 'break-all',
                           textDecoration: 'none',
-                          fontFamily: 'monospace',
+                          fontFamily: 'var(--font-mono)',
                         }}
                       >
                         {url}
@@ -598,37 +702,42 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
             })()}
 
             {/* Email body */}
-            <div style={{ flex: 1, overflow: 'auto', padding: '14px' }}>
+            <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
               {selected.body_html ? (
                 <div
                   dangerouslySetInnerHTML={{ __html: selected.body_html }}
-                  style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, maxWidth: 700 }}
+                  style={{
+                    fontSize: '15px',
+                    color: 'var(--text)',
+                    lineHeight: 1.6,
+                    maxWidth: 700,
+                  }}
                 />
               ) : selected.body_text ? (
                 <pre style={{
-                  fontSize: '12px',
+                  fontSize: '14px',
                   color: 'var(--text)',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
-                  lineHeight: 1.5,
+                  lineHeight: 1.6,
                   maxWidth: 700,
-                  fontFamily: 'monospace',
+                  fontFamily: 'var(--font-family)',
                   margin: 0,
                 }}>
                   {selected.body_text}
                 </pre>
               ) : (
-                <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>(no body content)</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>(no body content)</div>
               )}
 
               {selected.attachments && selected.attachments.length > 0 && (
-                <div style={{ marginTop: 16, padding: '8px 12px', background: 'var(--surface)', borderRadius: 4, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>
+                <div style={{ marginTop: 20, padding: '10px 14px', background: 'var(--surface)', borderRadius: 4, border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 6, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Attachments ({selected.attachments.length})
                   </div>
                   {selected.attachments.map((att: any, i: number) => (
-                    <div key={i} style={{ fontSize: '12px', color: 'var(--text)' }}>
-                      {att.filename} ({att.content_type})
+                    <div key={i} style={{ fontSize: '13px', color: 'var(--text)', padding: '2px 0' }}>
+                      {att.filename} <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>({att.content_type})</span>
                     </div>
                   ))}
                 </div>
@@ -637,57 +746,64 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
 
             {/* Reply box (not for alerts) */}
             {!alertsOnly && (
-              <div style={{ borderTop: '1px solid var(--border)', padding: '10px 14px', background: 'var(--surface)' }}>
+              <div style={{
+                borderTop: '1px solid var(--border)',
+                padding: '14px 20px',
+                background: 'var(--surface)',
+              }}>
                 <textarea
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
                   placeholder={`Reply as ${selected.to_address}...`}
                   style={{
                     width: '100%',
-                    minHeight: 72,
+                    minHeight: 80,
                     background: 'var(--bg)',
                     color: 'var(--text)',
                     border: '1px solid var(--border)',
                     borderRadius: 3,
-                    padding: 8,
-                    fontSize: '12px',
-                    fontFamily: 'monospace',
+                    padding: '10px 12px',
+                    fontSize: '14px',
+                    fontFamily: 'var(--font-family)',
                     resize: 'vertical',
                     boxSizing: 'border-box',
                     outline: 'none',
+                    lineHeight: 1.5,
                   }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
                     Sending from {selected.to_address}
                   </span>
                   <button
                     onClick={sendReply}
                     disabled={sending || !replyText.trim()}
                     style={{
-                      padding: '4px 14px',
-                      fontSize: '12px',
-                      background: replyText.trim() && !sending ? 'var(--primary)' : 'var(--surface-hover)',
+                      padding: '7px 20px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      background: replyText.trim() && !sending ? 'var(--accent)' : 'var(--surface-hover)',
                       color: replyText.trim() && !sending ? '#fff' : 'var(--text-muted)',
                       border: 'none',
                       borderRadius: 3,
                       cursor: replyText.trim() && !sending ? 'pointer' : 'default',
-                      fontFamily: 'monospace',
+                      transition: 'background 0.1s',
+                      letterSpacing: '0.01em',
                     }}
                   >
-                    {sending ? 'sending...' : 'Send Reply'}
+                    {sending ? 'Sending...' : 'Send Reply'}
                   </button>
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 }
 
-// ─── Messages Tab ─────────────────────────────────────────────────────────────
+// ─── Compose Message Modal ─────────────────────────────────────────────────────
 
 function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
   const [toRole, setToRole] = useState('');
@@ -728,40 +844,73 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
     }
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 10px',
+    fontSize: '13px',
+    background: 'var(--bg)',
+    color: 'var(--text)',
+    border: '1px solid var(--border)',
+    borderRadius: 3,
+    fontFamily: 'var(--font-family)',
+    boxSizing: 'border-box',
+    outline: 'none',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '11px',
+    color: 'var(--text-muted)',
+    display: 'block',
+    marginBottom: 5,
+    fontFamily: 'var(--font-mono)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    fontWeight: 600,
+  };
+
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'fixed',
+      inset: 0,
+      zIndex: 1000,
+      background: 'rgba(0,0,0,0.4)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     }}>
       <div style={{
         background: 'var(--surface)',
-        border: '2px solid var(--border)',
-        padding: 20,
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        padding: 24,
         width: '100%',
-        maxWidth: 480,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        maxWidth: 500,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>New Message to Agent</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16 }}>×</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>New Message to Agent</span>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              fontSize: '20px',
+              lineHeight: 1,
+              padding: '0 4px',
+            }}
+          >
+            ×
+          </button>
         </div>
 
-        <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>To Role</label>
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>To Role</label>
           <select
             value={toRole}
             onChange={e => setToRole(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '6px 8px',
-              fontSize: '12px',
-              background: 'var(--bg)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-              borderRadius: 2,
-              fontFamily: 'monospace',
-            }}
+            style={inputStyle}
           >
             <option value="">Select agent role...</option>
             {ALL_ROLES.filter(r => r !== 'founder').map(r => (
@@ -770,68 +919,56 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
           </select>
         </div>
 
-        <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>Subject</label>
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>Subject</label>
           <input
             type="text"
             value={subject}
             onChange={e => setSubject(e.target.value)}
             placeholder="Message subject..."
-            style={{
-              width: '100%',
-              padding: '6px 8px',
-              fontSize: '12px',
-              background: 'var(--bg)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-              borderRadius: 2,
-              fontFamily: 'monospace',
-              boxSizing: 'border-box',
-              outline: 'none',
-            }}
+            style={inputStyle}
           />
         </div>
 
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'monospace', textTransform: 'uppercase' }}>Message</label>
+        <div style={{ marginBottom: 20 }}>
+          <label style={labelStyle}>Message</label>
           <textarea
             value={body}
             onChange={e => setBody(e.target.value)}
             placeholder="Write your message..."
             rows={5}
-            style={{
-              width: '100%',
-              padding: '6px 8px',
-              fontSize: '12px',
-              background: 'var(--bg)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-              borderRadius: 2,
-              fontFamily: 'monospace',
-              resize: 'vertical',
-              boxSizing: 'border-box',
-              outline: 'none',
-            }}
+            style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
           />
         </div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{
-            padding: '5px 14px', fontSize: '12px',
-            background: 'var(--surface-hover)', color: 'var(--text-muted)',
-            border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
-          }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '7px 16px',
+              fontSize: '13px',
+              background: 'var(--surface-hover)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border)',
+              borderRadius: 3,
+              cursor: 'pointer',
+            }}
+          >
             Cancel
           </button>
           <button
             onClick={send}
             disabled={sending || !toRole || !subject.trim() || !body.trim()}
             style={{
-              padding: '5px 14px', fontSize: '12px',
-              background: toRole && subject.trim() && body.trim() && !sending ? 'var(--primary)' : 'var(--surface-hover)',
+              padding: '7px 20px',
+              fontSize: '13px',
+              fontWeight: 600,
+              background: toRole && subject.trim() && body.trim() && !sending ? 'var(--accent)' : 'var(--surface-hover)',
               color: toRole && subject.trim() && body.trim() && !sending ? '#fff' : 'var(--text-muted)',
-              border: 'none', borderRadius: 2, cursor: 'pointer',
-              fontFamily: 'monospace',
+              border: 'none',
+              borderRadius: 3,
+              cursor: 'pointer',
+              transition: 'background 0.1s',
             }}
           >
             {sending ? 'Sending...' : 'Send Message'}
@@ -841,6 +978,8 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
     </div>
   );
 }
+
+// ─── Messages Tab ─────────────────────────────────────────────────────────────
 
 function MessagesTab() {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -911,220 +1050,262 @@ function MessagesTab() {
   const uniqueFromRoles = Array.from(new Set(messages.map(m => m.from_role))).sort();
   const uniqueToRoles = Array.from(new Set(messages.map(m => m.to_role))).sort();
 
+  const selectStyle: React.CSSProperties = {
+    fontSize: '11px',
+    padding: '3px 6px',
+    border: '1px solid var(--border)',
+    borderRadius: 2,
+    background: 'var(--bg)',
+    color: 'var(--text)',
+    fontFamily: 'var(--font-mono)',
+    outline: 'none',
+  };
+
   return (
-    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
-      {/* Toolbar */}
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* Middle pane */}
       <div style={{
-        padding: '8px 12px',
-        borderBottom: '1px solid var(--border)',
+        width: 360,
+        minWidth: 360,
+        maxWidth: 360,
+        borderRight: '1px solid var(--border)',
         display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        flexWrap: 'wrap',
-        background: 'var(--surface)',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        flexShrink: 0,
+        background: 'var(--bg)',
       }}>
-        <button
-          onClick={() => setShowCompose(true)}
-          style={{
-            padding: '4px 12px',
-            fontSize: '11px',
-            background: 'var(--primary)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 2,
-            cursor: 'pointer',
-            fontFamily: 'monospace',
-            fontWeight: 600,
-          }}
-        >
-          + New Message
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px' }}>
-          <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>to:</span>
-          <select
-            value={toFilter}
-            onChange={e => setToFilter(e.target.value)}
-            style={{
-              fontSize: '11px', padding: '2px 6px',
-              border: '1px solid var(--border)', borderRadius: 2,
-              background: 'var(--bg)', color: 'var(--text)',
-              fontFamily: 'monospace',
-            }}
-          >
-            <option value="all">all</option>
-            {uniqueToRoles.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px' }}>
-          <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>from:</span>
-          <select
-            value={fromFilter}
-            onChange={e => setFromFilter(e.target.value)}
-            style={{
-              fontSize: '11px', padding: '2px 6px',
-              border: '1px solid var(--border)', borderRadius: 2,
-              background: 'var(--bg)', color: 'var(--text)',
-              fontFamily: 'monospace',
-            }}
-          >
-            <option value="all">all</option>
-            {uniqueFromRoles.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
-
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px', cursor: 'pointer', fontFamily: 'monospace' }}>
-          <input
-            type="checkbox"
-            checked={unreadOnly}
-            onChange={e => setUnreadOnly(e.target.checked)}
-          />
-          <span style={{ color: 'var(--text-muted)' }}>unread only</span>
-        </label>
-
-        {unreadCount > 0 && (
-          <span style={{ fontSize: '11px', color: 'var(--error)', fontFamily: 'monospace', marginLeft: 4 }}>
-            {unreadCount} unread (founder)
-          </span>
-        )}
-
-        <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto', fontFamily: 'monospace' }}>
-          {loading ? '...' : `${messages.length} messages`}
-        </span>
-      </div>
-
-      {/* Split pane */}
-      <div style={{ display: 'flex', flex: 1, gap: 0, overflow: 'hidden' }}>
-        {/* Message list */}
+        {/* Toolbar */}
         <div style={{
-          width: selected ? '40%' : '100%',
-          overflowY: 'auto',
-          borderRight: selected ? '1px solid var(--border)' : 'none',
-          background: 'var(--bg)',
-          transition: 'width 0.15s ease',
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+          background: 'var(--surface)',
         }}>
-          {loading ? (
-            <div style={{ padding: 20, fontSize: '12px', color: 'var(--text-muted)' }}>Loading...</div>
-          ) : messages.length === 0 ? (
-            <div style={{ padding: 20, fontSize: '12px', color: 'var(--text-muted)' }}>No messages.</div>
-          ) : (
-            messages.map(msg => (
-              <div
-                key={msg.id}
-                onClick={() => void openMessage(msg)}
-                style={{
-                  padding: '10px 12px',
-                  borderBottom: '1px solid var(--border)',
-                  cursor: 'pointer',
-                  background: selected?.id === msg.id
-                    ? 'var(--surface-hover)'
-                    : msg.read_at == null ? 'var(--surface)' : 'var(--bg)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                    {msg.read_at == null && (
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
-                    )}
-                    <RolePill role={msg.from_role} />
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
-                    <RolePill role={msg.to_role} />
-                  </div>
-                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', flexShrink: 0 }}>
-                    {timeAgo(msg.created_at)}
-                  </span>
-                </div>
-                <div style={{
-                  marginTop: 4,
-                  fontSize: '11px',
-                  fontWeight: msg.read_at == null ? 600 : 400,
-                  color: 'var(--text)',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}>
-                  {msg.subject}
-                </div>
-                {!selected && (
-                  <div style={{
-                    marginTop: 2,
-                    fontSize: '11px',
-                    color: 'var(--text-muted)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}>
-                    {msg.body.slice(0, 120)}
-                  </div>
-                )}
-              </div>
-            ))
+          <button
+            onClick={() => setShowCompose(true)}
+            style={{
+              padding: '5px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              background: 'var(--accent)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 3,
+              cursor: 'pointer',
+              letterSpacing: '0.01em',
+            }}
+          >
+            + Compose
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>to:</span>
+            <select value={toFilter} onChange={e => setToFilter(e.target.value)} style={selectStyle}>
+              <option value="all">all</option>
+              {uniqueToRoles.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>from:</span>
+            <select value={fromFilter} onChange={e => setFromFilter(e.target.value)} style={selectStyle}>
+              <option value="all">all</option>
+              {uniqueFromRoles.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
+            <input
+              type="checkbox"
+              checked={unreadOnly}
+              onChange={e => setUnreadOnly(e.target.checked)}
+            />
+            <span style={{ color: 'var(--text-muted)' }}>unread</span>
+          </label>
+
+          {unreadCount > 0 && (
+            <span style={{ fontSize: '11px', color: 'var(--error)', fontFamily: 'var(--font-mono)', marginLeft: 'auto' }}>
+              {unreadCount} new
+            </span>
           )}
         </div>
 
-        {/* Detail pane */}
-        {selected && (
+        {/* Message list */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {loading ? (
+            <div style={{ padding: 24, fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Loading...</div>
+          ) : messages.length === 0 ? (
+            <div style={{ padding: 24, fontSize: '12px', color: 'var(--text-muted)' }}>No messages.</div>
+          ) : (
+            messages.map(msg => {
+              const isUnread = msg.read_at == null;
+              const isSelected = selected?.id === msg.id;
+              return (
+                <div
+                  key={msg.id}
+                  onClick={() => void openMessage(msg)}
+                  style={{
+                    height: 64,
+                    padding: '0 14px 0 0',
+                    borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer',
+                    background: isSelected
+                      ? 'var(--surface-hover)'
+                      : isUnread ? 'var(--surface)' : 'var(--bg)',
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    borderLeft: isSelected
+                      ? '3px solid var(--accent)'
+                      : isUnread ? '3px solid var(--accent)' : '3px solid transparent',
+                    transition: 'background 0.1s',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingLeft: 12 }}>
+                    {/* Row 1: roles + time */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                        {isUnread && (
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+                        )}
+                        <RolePill role={msg.from_role} />
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>→</span>
+                        <RolePill role={msg.to_role} />
+                      </div>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                        {timeAgo(msg.created_at)}
+                      </span>
+                    </div>
+                    {/* Row 2: subject */}
+                    <div style={{
+                      marginTop: 3,
+                      fontSize: '13px',
+                      fontWeight: isUnread ? 600 : 400,
+                      color: 'var(--text)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {msg.subject}
+                    </div>
+                    {/* Row 3: snippet */}
+                    <div style={{
+                      marginTop: 1,
+                      fontSize: '12px',
+                      color: 'var(--text-muted)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {msg.body.slice(0, 80)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Detail pane */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        background: 'var(--bg)',
+        minWidth: 0,
+      }}>
+        {!selected ? (
           <div style={{
             flex: 1,
             display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             flexDirection: 'column',
-            overflow: 'hidden',
-            background: 'var(--bg)',
+            gap: 8,
+            color: 'var(--text-muted)',
           }}>
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <div style={{ fontSize: '32px', opacity: 0.3 }}>💬</div>
+            <div style={{ fontSize: '14px', fontWeight: 500 }}>Select a message</div>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{selected.subject}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', wordBreak: 'break-word' }}>
+                    {selected.subject}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
                     <RolePill role={selected.from_role} />
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                     <RolePill role={selected.to_role} />
                     {selected.sent_via === 'resend' && (
-                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>(real email)</span>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>(real email)</span>
                     )}
                   </div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'monospace' }}>
-                    {new Date(selected.created_at).toLocaleString()}
-                    {selected.thread_id && <span> · thread: {selected.thread_id.slice(0, 8)}</span>}
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+                    {formatTimestamp(selected.created_at)}
+                    {selected.thread_id && (
+                      <span style={{ marginLeft: 8, opacity: 0.6 }}>thread: {selected.thread_id.slice(0, 8)}</span>
+                    )}
                   </div>
                 </div>
                 <button
                   onClick={() => { setSelected(null); setThread([]); }}
                   style={{
-                    all: 'unset', cursor: 'pointer', fontSize: '11px',
-                    color: 'var(--text-muted)', padding: '3px 8px',
-                    border: '1px solid var(--border)', borderRadius: 2,
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    background: 'transparent',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 3,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    transition: 'background 0.1s',
                   }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                 >
-                  close
+                  Close
                 </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+            {/* Thread body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
               {thread.length > 1 ? (
                 <div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 12, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 14, fontFamily: 'var(--font-mono)' }}>
                     {thread.length} messages in thread
                   </div>
                   {thread.map((m, idx) => (
                     <div key={m.id} style={{
-                      marginBottom: 16, paddingBottom: 16,
+                      marginBottom: 18,
+                      paddingBottom: 18,
                       borderBottom: idx < thread.length - 1 ? '1px solid var(--border)' : 'none',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                         <RolePill role={m.from_role} />
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>→</span>
                         <RolePill role={m.to_role} />
-                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginLeft: 'auto' }}>
                           {timeAgo(m.created_at)}
                         </span>
                       </div>
                       <pre style={{
-                        fontSize: '11px', color: 'var(--text)',
-                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                        lineHeight: 1.5, margin: 0, fontFamily: 'monospace',
+                        fontSize: '13px',
+                        color: 'var(--text)',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.6,
+                        margin: 0,
+                        fontFamily: 'var(--font-family)',
                       }}>
                         {m.body}
                       </pre>
@@ -1133,15 +1314,19 @@ function MessagesTab() {
                 </div>
               ) : (
                 <pre style={{
-                  fontSize: '11px', color: 'var(--text)',
-                  whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                  lineHeight: 1.6, margin: 0, fontFamily: 'monospace',
+                  fontSize: '14px',
+                  color: 'var(--text)',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.6,
+                  margin: 0,
+                  fontFamily: 'var(--font-family)',
                 }}>
                   {selected.body}
                 </pre>
               )}
             </div>
-          </div>
+          </>
         )}
       </div>
 
@@ -1206,7 +1391,7 @@ export default function TeamInbox() {
 
   if (authLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-muted)', fontSize: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-muted)', fontSize: '13px' }}>
         Loading...
       </div>
     );
@@ -1214,81 +1399,210 @@ export default function TeamInbox() {
 
   if (!user) return null;
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: 'emails',   label: 'Emails',   count: emailUnread },
-    { key: 'messages', label: 'Messages', count: messageUnread },
-    { key: 'alerts',   label: 'Alerts',   count: alertUnread },
+  const tabs: { key: Tab; label: string; icon: string; count: number }[] = [
+    { key: 'emails',   label: 'Emails',   icon: '✉',  count: emailUnread },
+    { key: 'messages', label: 'Messages', icon: '💬', count: messageUnread },
+    { key: 'alerts',   label: 'Alerts',   icon: '🔔', count: alertUnread },
   ];
 
+  const totalUnread = emailUnread + messageUnread + alertUnread;
+
   return (
-    <div style={{
-      display: 'flex',
-      height: 'calc(100vh - var(--header-height, 44px) - var(--vehicle-tabbar-height, 0px))',
-      fontFamily: 'monospace',
-      overflow: 'hidden',
-      background: 'var(--bg)',
-    }}>
-      {/* Left sidebar — tab navigation */}
+    <>
+      {/* Scoped styles for responsive behavior */}
+      <style>{`
+        @media (max-width: 768px) {
+          .inbox-middle-pane { width: 100% !important; max-width: 100% !important; min-width: 0 !important; border-right: none !important; }
+          .inbox-detail-pane { display: none !important; }
+          .inbox-left-sidebar { display: none !important; }
+          .inbox-mobile-tabbar { display: flex !important; }
+        }
+        .inbox-mobile-tabbar { display: none; }
+        .inbox-email-row:hover { background: var(--surface-hover) !important; }
+      `}</style>
+
       <div style={{
-        width: 160,
-        minWidth: 160,
-        borderRight: '2px solid var(--border)',
         display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--surface)',
-        flexShrink: 0,
+        height: 'calc(100vh - var(--header-height, 44px) - var(--vehicle-tabbar-height, 0px))',
+        fontFamily: 'var(--font-family)',
+        overflow: 'hidden',
+        background: 'var(--bg)',
       }}>
-        <div style={{
-          padding: '12px 12px 8px',
-          borderBottom: '1px solid var(--border)',
-          fontSize: '12px',
-          fontWeight: 700,
-          color: 'var(--text)',
-          textTransform: 'uppercase',
-          letterSpacing: 1,
-        }}>
-          Team Inbox
+        {/* ── Left sidebar (220px) ── */}
+        <div
+          className="inbox-left-sidebar"
+          style={{
+            width: 220,
+            minWidth: 220,
+            maxWidth: 220,
+            borderRight: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'var(--surface)',
+            flexShrink: 0,
+          }}
+        >
+          {/* Title row */}
+          <div style={{
+            padding: '16px 16px 12px',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            <div style={{
+              fontSize: '12px',
+              fontWeight: 700,
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              fontFamily: 'var(--font-mono)',
+            }}>
+              Inbox
+            </div>
+            {totalUnread > 0 && (
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 3 }}>
+                {totalUnread} unread
+              </div>
+            )}
+          </div>
+
+          {/* Tab navigation */}
+          <nav style={{ padding: '8px 0', flex: 1 }}>
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  height: 40,
+                  padding: '0 16px',
+                  background: activeTab === tab.key ? 'var(--surface-hover)' : 'transparent',
+                  color: 'var(--text)',
+                  border: 'none',
+                  borderLeft: activeTab === tab.key ? '3px solid var(--accent)' : '3px solid transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontSize: '13px',
+                  fontFamily: 'var(--font-family)',
+                  fontWeight: activeTab === tab.key ? 600 : 400,
+                  transition: 'background 0.1s',
+                }}
+              >
+                <span style={{ fontSize: '14px', lineHeight: 1 }}>{tab.icon}</span>
+                <span style={{ flex: 1 }}>{tab.label}</span>
+                {tab.count > 0 && <UnreadBadge count={tab.count} />}
+              </button>
+            ))}
+          </nav>
+
+          {/* Divider + mailbox filter pills */}
+          {activeTab === 'emails' && (
+            <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px 16px' }}>
+              <div style={{
+                fontSize: '10px',
+                color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginBottom: 8,
+              }}>
+                Mailboxes
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {MAILBOXES.map(addr => (
+                  <div
+                    key={addr}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      fontSize: '12px',
+                      color: 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '2px 0',
+                    }}
+                  >
+                    <MailboxDot address={addr} />
+                    {addr.split('@')[0]}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <nav style={{ flex: 1, padding: '6px 0' }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              style={{
+        {/* ── Main content area ── */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
+          {activeTab === 'emails'   && <EmailsTab alertsOnly={false} />}
+          {activeTab === 'messages' && <MessagesTab />}
+          {activeTab === 'alerts'   && <EmailsTab alertsOnly={true} />}
+        </div>
+      </div>
+
+      {/* Mobile bottom tab bar */}
+      <div
+        className="inbox-mobile-tabbar"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 56,
+          background: 'var(--surface)',
+          borderTop: '1px solid var(--border)',
+          zIndex: 100,
+          alignItems: 'stretch',
+          justifyContent: 'space-around',
+        }}
+      >
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+              background: 'none',
+              border: 'none',
+              borderTop: activeTab === tab.key ? '2px solid var(--accent)' : '2px solid transparent',
+              cursor: 'pointer',
+              color: activeTab === tab.key ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: '10px',
+              fontFamily: 'var(--font-family)',
+              padding: '4px 0 8px',
+              position: 'relative',
+            }}
+          >
+            <span style={{ fontSize: '18px', lineHeight: 1 }}>{tab.icon}</span>
+            <span>{tab.label}</span>
+            {tab.count > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: 6,
+                right: '50%',
+                transform: 'translateX(8px)',
+                minWidth: 16,
+                height: 16,
+                borderRadius: 999,
+                background: 'var(--error)',
+                color: '#fff',
+                fontSize: '9px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '8px 12px',
-                background: activeTab === tab.key ? 'var(--primary)' : 'transparent',
-                color: activeTab === tab.key ? '#fff' : 'var(--text)',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontFamily: 'monospace',
-                fontWeight: activeTab === tab.key ? 600 : 400,
-                borderLeft: activeTab === tab.key ? '3px solid var(--primary)' : '3px solid transparent',
-              }}
-            >
-              <span>{tab.label}</span>
-              {tab.count > 0 && <UnreadBadge count={tab.count} />}
-            </button>
-          ))}
-        </nav>
-
-        <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', fontSize: '9px', color: 'var(--text-muted)' }}>
-          nuke.ag mailboxes
-        </div>
+                justifyContent: 'center',
+                fontWeight: 700,
+              }}>
+                {tab.count > 9 ? '9+' : tab.count}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
-
-      {/* Right pane — content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        {activeTab === 'emails' && <EmailsTab alertsOnly={false} />}
-        {activeTab === 'messages' && <MessagesTab />}
-        {activeTab === 'alerts' && <EmailsTab alertsOnly={true} />}
-      </div>
-    </div>
+    </>
   );
 }
