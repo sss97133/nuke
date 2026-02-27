@@ -5,6 +5,15 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [comms] Gmail OAuth alert poller — direct Gmail API polling (backup to Gmail forwarding)
+- Built `scripts/gmail-poller.mjs`: local Node.js poller — `--setup` runs OAuth2 consent, `--once`/`--daemon`/`--dry-run` modes
+- Built `supabase/functions/gmail-alert-poller/index.ts`: Supabase edge function; polls Gmail API via OAuth2, dispatches to `process-alert-email`
+- Migration `20260227130000_gmail_alert_poller_cron.sql`: pg_cron job 265 schedules every 5 min (active)
+- Edge function deployed live: returns `{success:false, setup_required:true}` until GOOGLE_REFRESH_TOKEN set
+- GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET already set in Supabase secrets
+- **ONE STEP remaining**: `dotenvx run -- node scripts/gmail-poller.mjs --setup` → log in as toymachine91@gmail.com → then `supabase secrets set GOOGLE_REFRESH_TOKEN=<token>`
+- NOTE: Resend-based approach (alerts@nuke.ag forwarding) is simpler — see entry below. Gmail forwarding is preferred path; OAuth poller is the backup/primary polling option.
+
 ### [platform] Resend Inbound Email — Audit, Fix, alerts@nuke.ag wiring
 - **Status**: Pipeline was already working. 5 real emails in contact_inbox including shkylar@gmail.com → info@nuke.ag and Amazon SES DMARC reports → privacy@nuke.ag
 - **Root finding**: RESEND_API_KEY in Supabase is send-only scope (restricted_api_key) — cannot read domains/webhooks via API. Inbound routing IS configured in Resend dashboard (confirmed by working emails)

@@ -43,13 +43,6 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Key finding: batch-vin-decode NOT DEPLOYED, no crons for compute-vehicle-valuation or analyze-market-signals
 - DO NOT touch: compute-vehicle-valuation, analyze-market-signals functions
 
-### Worker Agent — Gmail Alert Poller — 2026-02-27
-- Building: `scripts/gmail-poller.mjs` (OAuth2 Gmail poller → process-alert-email)
-- Also building: `supabase/functions/gmail-alert-poller/index.ts` (edge function for cron)
-- Also creating: DB migration for `alert_email_log` table (if needed)
-- Touching: scripts/gmail-poller.mjs, supabase/functions/gmail-alert-poller/, supabase/migrations/
-- DO NOT: modify process-alert-email/index.ts
-
 ### VP Photos — Health Check + K10 Vision Audit — 2026-02-27 07:30 UTC
 - Checking: YONO vision worker (jobs 247+248), organization status, K10 photos, agent_tasks
 - Finding: DB pool saturated + PostgREST schema cache reload loop (system-wide incident)
