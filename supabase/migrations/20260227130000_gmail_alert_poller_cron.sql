@@ -10,8 +10,8 @@
 --
 --   2. Set Supabase secret:
 --      supabase secrets set GOOGLE_REFRESH_TOKEN=<token from step 1>
---      supabase secrets set GOOGLE_CLIENT_ID=930832753018-5s69stakgquu6nktmp60d05dfq0ljjpe.apps.googleusercontent.com
---      supabase secrets set GOOGLE_CLIENT_SECRET=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
+--      supabase secrets set GOOGLE_CLIENT_ID=<your-google-client-id>
+--      supabase secrets set GOOGLE_CLIENT_SECRET=<your-google-client-secret>
 --
 --   3. Deploy the edge function:
 --      supabase functions deploy gmail-alert-poller --no-verify-jwt
