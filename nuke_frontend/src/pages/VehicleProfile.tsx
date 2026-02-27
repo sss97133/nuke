@@ -10,7 +10,6 @@ import { useAdminAccess } from '../hooks/useAdminAccess';
 import { TimelineEventService } from '../services/timelineEventService';
 // Lazy-load heavy tab-specific and modal components
 const AddEventWizard = React.lazy(() => import('../components/AddEventWizard'));
-const VehicleDataEditor = React.lazy(() => import('../components/vehicle/VehicleDataEditor'));
 // Lazy load vehicle profile components to avoid circular dependencies
 const VehicleHeader = React.lazy(() => import('./vehicle-profile/VehicleHeader'));
 const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroImage'));
@@ -120,7 +119,6 @@ const VehicleProfile: React.FC = () => {
   // STATE DECLARATIONS
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [responsibleName, setResponsibleName] = useState<string | null>(null);
-  const [showDataEditor, setShowDataEditor] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
   const [presenceCount, setPresenceCount] = useState<number>(0);
@@ -131,7 +129,6 @@ const VehicleProfile: React.FC = () => {
   const [loading, setLoading] = useState(true); // Start true to show loading state until data loads
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
-  const [showMap, setShowMap] = useState(false);
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
   const auctionCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
@@ -158,7 +155,6 @@ const VehicleProfile: React.FC = () => {
       v?.origin_metadata?.priceCurrencyCode,
     );
   }, [vehicle, auctionPulse]);
-  const presenceAvailableRef = React.useRef<boolean>(true);
   const vehicleHeaderRef = React.useRef<HTMLDivElement | null>(null);
   const [vehicleHeaderHeight, setVehicleHeaderHeight] = React.useState<number>(88);
   
@@ -195,9 +191,6 @@ const VehicleProfile: React.FC = () => {
     reserve: ''
   });
   const [savingSale, setSavingSale] = useState(false);
-  const [showCompose, setShowCompose] = useState(false);
-  const [bookmarklets, setBookmarklets] = useState<{ key: string; label: string; href: string }[]>([]);
-  const [composeText, setComposeText] = useState<{ title: string; description: string; specs: string[] }>({ title: '', description: '', specs: [] });
   const [userProfile, setUserProfile] = useState<any>(null);
   // Start as true if we have a cached session — eliminates the auth-gate waterfall
   // for returning users. The async checkInitialAuth() still runs to validate/refresh.
@@ -1610,7 +1603,6 @@ const VehicleProfile: React.FC = () => {
   const handleSetPrimaryImage = async (imageId: string) => {
     if (!vehicle || !isAdmin) {
       return; // Admin privileges required
-      return;
     }
 
     try {
@@ -1913,18 +1905,6 @@ const VehicleProfile: React.FC = () => {
             }));
           }}
           currentUser={session?.user || null}
-        /></React.Suspense>
-      )}
-
-      {/* Data Editor Modal */}
-      {showDataEditor && (
-        <React.Suspense fallback={null}><VehicleDataEditor
-          vehicleId={vehicle?.id || ''}
-          onClose={() => {
-            setShowDataEditor(false);
-            // Reload vehicle data after editing
-            loadVehicle();
-          }}
         /></React.Suspense>
       )}
 

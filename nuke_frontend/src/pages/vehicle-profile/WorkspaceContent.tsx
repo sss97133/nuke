@@ -210,7 +210,7 @@ const FactExplorerPanel: React.FC<FactExplorerPanelProps> = ({ vehicleId, readin
   );
 };
 
-export type WorkspaceTabId = 'evidence' | 'facts' | 'commerce' | 'financials';
+export type { WorkspaceTabId } from './WorkspaceTabBar';
 
 export interface WorkspaceContentProps {
   vehicle: Vehicle;
