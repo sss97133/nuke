@@ -119,7 +119,7 @@ const Profile: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   // Set current user ID when auth state changes
   useEffect(() => {
@@ -161,6 +161,7 @@ const Profile: React.FC = () => {
       const targetUserId = userId || currentUserId;
       if (!targetUserId) {
         setError('No user ID provided');
+        setLoading(false);
         return;
       }
 
@@ -232,8 +233,11 @@ const Profile: React.FC = () => {
   useEffect(() => {
     if (currentUserId || userId || externalIdentityId) {
       loadProfileData();
+    } else if (!authLoading && !userId && !externalIdentityId) {
+      // Auth resolved with no user and no URL-provided ID — redirect to login
+      navigate(`/login?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`);
     }
-  }, [currentUserId, userId, externalIdentityId]);
+  }, [currentUserId, userId, externalIdentityId, authLoading]);
 
   // Handle URL query parameters for tab navigation
   useEffect(() => {
