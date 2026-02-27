@@ -18,8 +18,8 @@ export function isPoorQualityImage(url: string | null, fileSize: number | null =
     urlLower.includes('no-image') ||
     urlLower.includes('default') ||
     urlLower.includes('missing') ||
-    urlLower.includes('/auctionsites/') ||
-    urlLower.includes('/images/auctionsites')
+    urlLower.includes('/auctionsite') ||
+    urlLower.includes('location_map')
   ) {
     return true;
   }
