@@ -19,6 +19,13 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
+### Worker — Import Queue Cleanup + Task Triage — 2026-02-27 11:49 UTC
+- Reset 243 failed PCarMarket records to pending (extractor fix was deployed)
+- Closed stale/superseded tasks: BAT queue stall (2), YONO sidecar unreachable (2), source-census audit
+- Fixed malformed import_queue URLs: 44 port-80 BaT URLs (deduped/fixed), N/A + /carfax suffix junk
+- Touching: import_queue (data fixes), agent_tasks (status updates)
+- DO NOT: touch any edge functions or cron jobs
+
 ### VP Platform — Resend Inbound Email Audit + alerts@nuke.ag wiring — 2026-02-27 12:00 UTC — COMPLETED
 - Audited Resend inbound config: pipeline IS working (5 real emails in contact_inbox)
 - Root issue: RESEND_API_KEY is send-only (restricted_api_key scope) — inbound routing configured in Resend dashboard, not discoverable via API
@@ -103,11 +110,11 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 ### Frontend Worker — Admin + Onboarding UX — COMPLETED 2026-02-27
 - Login overhaul, admin route fixes, first-run onboarding. See DONE.md. Commit 5a62f7c34.
 
-### VP Extraction — RM Sotheby's Lot Page Scraper — 2026-02-27
-- Building: `backfill-rmsothebys-descriptions` edge function
-- Touching: supabase/functions/backfill-rmsothebys-descriptions/, supabase/functions/extract-rmsothebys/
-- Approach: Firecrawl to fetch individual lot pages, parse description + highlights + chassis info
-- DO NOT: touch extract-rmsothebys (enhancement goes in new backfill function)
+### VP Extraction — RM Sotheby's Lot Page Scraper — COMPLETED 2026-02-27
+- Built + deployed: `backfill-rmsothebys-descriptions` edge function
+- Cron job 268: every 30min, batch_size=10 — 71/1,251 done (5.7% desc rate, was 1.3%)
+- Also extracts: mileage, VIN (from chassis field), engine_number, estimate, highlights
+- REMOVED: session complete
 
 ### VP Orgs — Cron Gap Fix — COMPLETED 2026-02-27
 - 3 cron jobs added (jobs 262, 263, 264), 2 functions deployed, 109 queue items reset and draining

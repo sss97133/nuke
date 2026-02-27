@@ -5,6 +5,15 @@ Agents read this to avoid rebuilding things that already exist.
 
 ## 2026-02-27
 
+### [extraction] RM Sotheby's description backfill — backfill-rmsothebys-descriptions edge function
+- Root cause: SearchLots API returns no description/mileage — only auction metadata
+- Built `supabase/functions/backfill-rmsothebys-descriptions/index.ts`
+- Fetches individual lot pages via archiveFetch (Firecrawl, cache-first)
+- Parsers: description (body-text--copy paragraphs), highlights (list-bullets), ID fields (chassis/engine), estimate ($LOW - $HIGH), mileage (regex in text), VIN (17-char detection from chassis field)
+- Deployed, verified: 71/1,251 vehicles backfilled, desc rate 1.3% → 5.7%
+- Cron job 268: every 30min, batch_size=10 — will drain remaining ~1,180 in ~2.5 days
+- Key discovery: `order=id.asc` avoids statement timeout; `discovery_source='rmsothebys'` is the indexed filter
+
 ### [comms] Gmail OAuth alert poller — direct Gmail API polling (backup to Gmail forwarding)
 - Built `scripts/gmail-poller.mjs`: local Node.js poller — `--setup` runs OAuth2 consent, `--once`/`--daemon`/`--dry-run` modes
 - Built `supabase/functions/gmail-alert-poller/index.ts`: Supabase edge function; polls Gmail API via OAuth2, dispatches to `process-alert-email`
