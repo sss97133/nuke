@@ -60,7 +60,7 @@ export default function AdminAnalytics() {
         .gte('updated_at', new Date(Date.now() - 2 * 60 * 1000).toISOString())
         .limit(1);
       
-      const isProcessing = recentUpdates && recentUpdates.length > 0;
+      const isProcessing = !!(recentUpdates && recentUpdates.length > 0);
 
       // Get table populations with actual queries
       const tableCounts = await Promise.all([

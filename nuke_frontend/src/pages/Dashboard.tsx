@@ -262,7 +262,7 @@ export default function Dashboard() {
       id: string;
       label: string;
       type: 'primary' | 'secondary' | 'danger' | 'link';
-      handler: () => void;
+      handler: (notes?: string) => void;
     }> = [];
 
     if (notification.vehicle_id) {

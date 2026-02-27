@@ -238,8 +238,8 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
           .then(({ data: agents }) => {
             // Match by curator name or by profile later
             const match = (agents || []).find((a: any) =>
-              a.name.toLowerCase() === (contractData.curator_name || '').toLowerCase() ||
-              a.id.toLowerCase() === (contractData.curator_name || '').toLowerCase()
+              a.name.toLowerCase() === (contract?.curator_name || '').toLowerCase() ||
+              a.id.toLowerCase() === (contract?.curator_name || '').toLowerCase()
             );
             return { data: match || null, error: null };
           }) as any,

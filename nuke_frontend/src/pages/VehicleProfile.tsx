@@ -1927,6 +1927,10 @@ const VehicleProfile: React.FC = () => {
         if (effective?.listing_url && effective?.platform) {
           // CRITICAL: Only load comments/bids if vehicle actually came from this BAT listing
           // Don't load BAT comments for KSL vehicles
+          const effectivePlatform = String((effective as any)?.platform || '').toLowerCase().replace(/[_\-\s]+/g, '');
+          const effectiveUrl = String((effective as any)?.listing_url || '').toLowerCase();
+          const isFromBat = effectivePlatform === 'bat' || effectivePlatform === 'bringatrailer' || effectiveUrl.includes('bringatrailer.com');
+          const isFromKsl = effectiveUrl.includes('ksl.com') || effectivePlatform === 'ksl';
           const shouldLoadComments = isFromBat && !isFromKsl;
           
           // Lightweight comment telemetry (best-effort; table may not exist in some envs)

@@ -550,10 +550,10 @@ const Library: React.FC = () => {
                     style={{ fontSize: '9px', flex: 1 }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.open(doc.file_url, '_blank');
-                      supabase.rpc('increment_document_stat', { 
-                        p_document_id: doc.id, 
-                        p_stat_type: 'view' 
+                      window.open(book.file_url, '_blank');
+                      supabase.rpc('increment_document_stat', {
+                        p_document_id: book.id,
+                        p_stat_type: 'view'
                       });
                     }}
                   >
@@ -565,12 +565,12 @@ const Library: React.FC = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       const link = document.createElement('a');
-                      link.href = doc.file_url;
-                      link.download = doc.title;
+                      link.href = book.file_url;
+                      link.download = book.title;
                       link.click();
-                      supabase.rpc('increment_document_stat', { 
-                        p_document_id: doc.id, 
-                        p_stat_type: 'download' 
+                      supabase.rpc('increment_document_stat', {
+                        p_document_id: book.id,
+                        p_stat_type: 'download'
                       });
                     }}
                   >

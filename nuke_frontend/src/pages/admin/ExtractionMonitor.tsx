@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import '../../design-system.css';
-import { ImageHoverPreview, IDHoverCard, AutoIDWrapper } from '../../components/admin';
+import { ImageHoverPreview, IDHoverCard, AutoIDWrapper, AnalysisModelPopup } from '../../components/admin';
 
 const ExtractionMonitor: React.FC = () => {
   const [stats, setStats] = useState({
@@ -188,13 +188,13 @@ const ExtractionMonitor: React.FC = () => {
     const metadata = image.ai_scan_metadata || {};
     if (metadata.extractions) {
       const models = Object.keys(metadata.extractions);
-      const latest = models.reduce((latest, model) => {
+      const latest = models.reduce((latest: any, model: string) => {
         const extracted = metadata.extractions[model];
         if (!latest || new Date(extracted.extracted_at) > new Date(latest.extracted_at)) {
           return extracted;
         }
         return latest;
-      }, null);
+      }, null as any);
       return {
         angle: latest?.angle || 'unknown',
         model: latest?.model || 'unknown',

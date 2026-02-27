@@ -25,7 +25,7 @@ interface MessageCardProps {
     id: string;
     label: string;
     type: 'primary' | 'secondary' | 'danger' | 'link';
-    handler: () => void;
+    handler: (notes?: string) => void;
   }>;
   onMarkRead?: (id: string) => void;
   onClick?: () => void;

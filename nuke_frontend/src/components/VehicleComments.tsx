@@ -647,7 +647,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                 vehicle_id: vehicleId,
                 from_owner_id: currentOwner?.owner_profile_id || null,
                 to_owner_id: buyerProfileId || null, // null if buyer not found in profiles
-                transfer_date: auctionDate,
+                transfer_date: scrapedData.sale_date || auctionStartDate,
                 source: 'bring_a_trailer',
                 source_url: batUrl,
                 price: scrapedData.sale_price || null,
