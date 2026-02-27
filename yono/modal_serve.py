@@ -268,6 +268,7 @@ _MOD_KEYWORDS = {
     volumes={"/data": volume},
     min_containers=1,        # keep 1 warm — cold start is 10-15s with Florence-2
     scaledown_window=600,    # keep warm 10 min after last request
+    timeout=600,             # 10 min — batch of 20 images @ ~10s each needs ~200s
 )
 @modal.concurrent(max_inputs=10)
 @modal.asgi_app()
