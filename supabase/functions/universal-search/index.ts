@@ -8,10 +8,22 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitHeaders,
+  rateLimitResponse,
+} from '../_shared/rateLimit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const RATE_LIMIT_CONFIG = {
+  namespace: 'universal-search',
+  windowSeconds: 60,
+  maxRequests: 60, // 60 searches per minute per IP
 };
 
 interface SearchRequest {
@@ -96,6 +108,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // ── Rate limiting ──────────────────────────────────────────────────────────
+    const clientIp = getClientIp(req);
+    const rl = await checkRateLimit(supabase, clientIp, RATE_LIMIT_CONFIG);
+    if (!rl.allowed) {
+      return rateLimitResponse(rl, corsHeaders, RATE_LIMIT_CONFIG.maxRequests);
+    }
+    const rlHeaders = rateLimitHeaders(rl, RATE_LIMIT_CONFIG.maxRequests);
+    // ──────────────────────────────────────────────────────────────────────────
+
     const body: SearchRequest = await req.json().catch(() => ({} as any));
     const { query = '', limit = 20, types, includeAI = true } = body;
 
@@ -119,6 +140,33 @@ serve(async (req) => {
     const trimmedQuery = sanitizedQuery.trim();
     const results: SearchResult[] = [];
 
+    // Shared rich vehicle SELECT — includes all fields needed for tier calculation and UI display
+    const VEHICLE_SELECT = 'id, year, make, model, vin, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size';
+
+    // Build a rich metadata object from a vehicle row
+    const buildVehicleMetadata = (v: any) => ({
+      year: v.year,
+      make: v.make,
+      model: v.model,
+      vin: v.vin,
+      owner: v.seller_name || v.bat_seller || undefined,
+      sale_price: v.sale_price,
+      current_value: v.current_value,
+      asking_price: v.asking_price,
+      data_quality_score: v.data_quality_score,
+      // Use bat_view_count as view_count fallback for BAT imports
+      view_count: v.view_count || v.bat_view_count || 0,
+      profile_origin: v.profile_origin,
+      ownership_verified: v.ownership_verified || false,
+      // comment_count is a solid engagement proxy (BaT comments, auction comments)
+      event_count: v.comment_count || 0,
+      // If primary_image_url is set, there's at least 1 image; real count loaded on card
+      image_count: v.primary_image_url ? 1 : 0,
+      mileage: v.mileage,
+      transmission: v.transmission,
+      engine_size: v.engine_size,
+    });
+
     // ============================================
     // VIN SEARCH - Direct lookup
     // ============================================
@@ -127,13 +175,14 @@ serve(async (req) => {
 
       const { data: vehicles } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, vin, status, primary_image_url, seller_name, bat_seller')
+        .select(VEHICLE_SELECT)
         .eq('vin', vin)
         .eq('is_public', true)
         .limit(5);
 
       if (vehicles?.length) {
         for (const v of vehicles) {
+          const price = v.sale_price || v.current_value || v.asking_price;
           results.push({
             id: v.id,
             type: 'vin_match',
@@ -141,7 +190,7 @@ serve(async (req) => {
             subtitle: `VIN: ${v.vin}`,
             image_url: v.primary_image_url,
             relevance_score: 1.0,
-            metadata: { vin: v.vin, status: v.status, owner: v.seller_name || v.bat_seller || undefined }
+            metadata: { ...buildVehicleMetadata(v), status: v.status, subtitle: price ? `$${price.toLocaleString()}` : undefined }
           });
         }
       }
@@ -152,7 +201,7 @@ serve(async (req) => {
         query_type: 'vin',
         total_count: results.length,
         search_time_ms: Date.now() - startTime
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }), { headers: { ...corsHeaders, ...rlHeaders, 'Content-Type': 'application/json' } });
     }
 
     // ============================================
@@ -167,7 +216,7 @@ serve(async (req) => {
         ai_suggestion: 'This looks like a URL. Route to extraction pipeline.',
         metadata: { url: trimmedQuery },
         search_time_ms: Date.now() - startTime
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }), { headers: { ...corsHeaders, ...rlHeaders, 'Content-Type': 'application/json' } });
     }
 
     // ============================================
@@ -178,7 +227,7 @@ serve(async (req) => {
 
       const { data: vehicles } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url, seller_name, bat_seller')
+        .select(VEHICLE_SELECT)
         .eq('year', year)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
@@ -186,7 +235,7 @@ serve(async (req) => {
 
       if (vehicles?.length) {
         for (const v of vehicles) {
-          const price = v.sale_price || v.current_value;
+          const price = v.sale_price || v.current_value || v.asking_price;
           results.push({
             id: v.id,
             type: 'vehicle',
@@ -194,7 +243,7 @@ serve(async (req) => {
             subtitle: price ? `$${price.toLocaleString()}` : undefined,
             image_url: v.primary_image_url,
             relevance_score: 0.95,
-            metadata: { year: v.year, make: v.make, model: v.model, owner: v.seller_name || v.bat_seller || undefined }
+            metadata: buildVehicleMetadata(v),
           });
         }
       }
@@ -205,7 +254,7 @@ serve(async (req) => {
         query_type: 'year',
         total_count: results.length,
         search_time_ms: Date.now() - startTime
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }), { headers: { ...corsHeaders, ...rlHeaders, 'Content-Type': 'application/json' } });
     }
 
     // ============================================
@@ -230,6 +279,8 @@ serve(async (req) => {
         let vehicles: any[] = [];
 
         // Try full-text search first (uses GIN index on search_vector)
+        // Only accept high-confidence results (>= 0.85) — strategy 2 in the RPC uses raw FTS
+        // which can return garbage matches (e.g. "997" matching Austin-Healey Sprite 997cc).
         if (tsqueryStr) {
           const { data: ftsResults, error: ftsError } = await supabase
             .rpc('search_vehicles_fts', {
@@ -238,13 +289,31 @@ serve(async (req) => {
             });
 
           if (!ftsError && ftsResults?.length) {
-            vehicles = ftsResults;
-          } else {
-            // Fallback: use direct textSearch filter on search_vector
-            // This works even if the RPC has schema issues
+            // Filter to high-confidence results only (relevance >= 0.85 = strategies 1a/1b).
+            // Strategy 2 (raw FTS, relevance = 0.8) produces too many false positives.
+            const highConfidence = ftsResults.filter((r: any) => (r.relevance || 0) >= 0.85);
+            const useFts = highConfidence.length > 0 ? highConfidence : ftsResults;
+
+            // FTS RPC returns limited columns — enrich with full vehicle data in one query
+            const ftsIds = useFts.map((r: any) => r.id);
+            const { data: enriched } = await supabase
+              .from('vehicles')
+              .select(VEHICLE_SELECT)
+              .in('id', ftsIds);
+
+            if (enriched?.length) {
+              const enrichedMap = new Map(enriched.map((v: any) => [v.id, v]));
+              vehicles = useFts
+                .map((r: any) => ({ ...enrichedMap.get(r.id), relevance: r.relevance }))
+                .filter((v: any) => v.id);
+            } else {
+              vehicles = useFts;
+            }
+          } else if (ftsError) {
+            // Fallback: direct textSearch on search_vector (handles RPC schema issues)
             const { data: directResults } = await supabase
               .from('vehicles')
-              .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url, seller_name, bat_seller')
+              .select(VEHICLE_SELECT)
               .eq('is_public', true)
               .textSearch('search_vector', tsqueryStr, { type: 'plain', config: 'english' })
               .limit(vehicleLimit);
@@ -255,58 +324,87 @@ serve(async (req) => {
           }
         }
 
-        // If full-text search returned nothing, fallback to ILIKE (catches partial matches)
-        if (!vehicles.length) {
+        // ILIKE fallback — always try this and merge; structured field matching is more reliable
+        // than FTS for make/model queries like "Porsche 997 GT3"
+        {
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
-          let vehicleQuery = supabase
+          let ilikeQuery = supabase
             .from('vehicles')
-            .select('id, year, make, model, vin, status, sale_price, current_value, primary_image_url, seller_name, bat_seller')
+            .select(VEHICLE_SELECT)
             .eq('is_public', true);
 
           if (yearMatch) {
+            // "1973 Porsche 911" → year=1973 AND (make|model ILIKE '%porsche 911%')
             const year = parseInt(yearMatch[1], 10);
-            const rest = yearMatch[2].toLowerCase();
-            vehicleQuery = vehicleQuery
+            const rest = escapeIlike(escapePostgrestValue(yearMatch[2].toLowerCase()));
+            ilikeQuery = ilikeQuery
               .eq('year', year)
-              .or(`make.ilike.%${escapeIlike(escapePostgrestValue(rest))}%,model.ilike.%${escapeIlike(escapePostgrestValue(rest))}%`);
+              .or(`make.ilike.%${rest}%,model.ilike.%${rest}%`);
           } else if (tokens.length >= 2) {
-            // Try both orderings: token0=make+rest=model OR token0=model+rest=make
+            // Build filter: first token assumed to be make, rest is model — AND also try all
+            // tokens against model independently (catches "Porsche 997 GT3" → model ILIKE '%997%')
             const t0 = escapeIlike(escapePostgrestValue(tokens[0]));
+            // All tokens after the first joined as model substring
             const tRest = escapeIlike(escapePostgrestValue(tokens.slice(1).join(' ')));
-            vehicleQuery = vehicleQuery.or(
-              `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),and(model.ilike.%${t0}%,make.ilike.%${tRest}%)`
+            // Each individual token for broader model matching
+            const tokenClauses = tokens
+              .map(t => `model.ilike.%${escapeIlike(escapePostgrestValue(t))}%`)
+              .join(',');
+
+            ilikeQuery = ilikeQuery.or(
+              // Primary: make=token[0], model contains rest
+              `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),` +
+              // Reverse: model=token[0], make contains rest
+              `and(model.ilike.%${t0}%,make.ilike.%${tRest}%),` +
+              // Broad: make matches any token (e.g. "gt3" alone won't match but "porsche" will)
+              `and(make.ilike.%${t0}%,${tokenClauses.split(',')[1] || tokenClauses})`
             );
           } else {
-            vehicleQuery = vehicleQuery.or(
-              `make.ilike.${escapePostgrestValue(searchPattern)},model.ilike.${escapePostgrestValue(searchPattern)}`
-            );
+            // Single token: search both make and model
+            const t = escapePostgrestValue(searchPattern);
+            ilikeQuery = ilikeQuery.or(`make.ilike.${t},model.ilike.${t}`);
           }
 
-          const { data: fallbackResults } = await vehicleQuery.limit(vehicleLimit);
-          if (fallbackResults?.length) vehicles = fallbackResults;
+          const { data: ilikeResults } = await ilikeQuery
+            .order('sale_price', { ascending: false, nullsFirst: false })
+            .limit(vehicleLimit);
+
+          if (ilikeResults?.length) {
+            if (!vehicles.length) {
+              // No FTS results — use ILIKE exclusively
+              vehicles = ilikeResults;
+            } else {
+              // Merge: ILIKE results get higher relevance than low-confidence FTS
+              const ftsIds = new Set(vehicles.map((v: any) => v.id));
+              for (const r of ilikeResults) {
+                if (!ftsIds.has(r.id)) vehicles.push({ ...r, _from_ilike: true });
+              }
+            }
+          }
         }
 
         if (vehicles?.length) {
-          // Deduplicate by year+make+model to prevent showing identical vehicles
-          const seen = new Set<string>();
+          // Deduplicate by ID only — year+make+model dedup incorrectly collapsed distinct
+          // vehicles (e.g. all 1973 Porsche 911s became one result). ID dedup at the end
+          // of the function handles final deduplication.
+          const seenIds = new Set<string>();
 
           for (const v of vehicles) {
-            const dedupeKey = `${v.year}|${(v.make||'').toLowerCase()}|${(v.model||'').toLowerCase()}`;
-            if (seen.has(dedupeKey)) continue;
-            seen.add(dedupeKey);
+            if (seenIds.has(v.id)) continue;
+            seenIds.add(v.id);
 
             const titleLower = `${v.year} ${v.make} ${v.model}`.toLowerCase();
             const queryLower = trimmedQuery.toLowerCase();
 
             // Score based on match quality
-            let score = v.relevance || 0.5; // Use ts_rank if available
+            let score = v.relevance || (v._from_ilike ? 0.75 : 0.5);
             if (titleLower === queryLower) score = Math.max(score, 1.0);
             else if (titleLower.startsWith(queryLower)) score = Math.max(score, 0.9);
             else if (v.make?.toLowerCase() === queryLower || v.model?.toLowerCase() === queryLower) score = Math.max(score, 0.85);
-            // Boost score if ALL search terms appear in the title
+            // Boost if ALL search terms appear in the title
             else if (tsqueryTerms.every(t => titleLower.includes(t.toLowerCase()))) score = Math.max(score, 0.8);
 
-            const price = v.sale_price || v.current_value;
+            const price = v.sale_price || v.current_value || v.asking_price;
             results.push({
               id: v.id,
               type: 'vehicle',
@@ -314,7 +412,7 @@ serve(async (req) => {
               subtitle: price ? `$${price.toLocaleString()}` : v.vin ? `VIN: ${v.vin.slice(-6)}` : undefined,
               image_url: v.primary_image_url,
               relevance_score: score,
-              metadata: { year: v.year, make: v.make, model: v.model, vin: v.vin, owner: v.seller_name || v.bat_seller || undefined }
+              metadata: buildVehicleMetadata(v),
             });
           }
         }
@@ -490,7 +588,7 @@ serve(async (req) => {
       total_count: dedupedResults.length,
       ai_suggestion: aiSuggestion,
       search_time_ms: Date.now() - startTime
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }), { headers: { ...corsHeaders, ...rlHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
     console.error('Universal search error:', error);
