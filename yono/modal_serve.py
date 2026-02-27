@@ -343,7 +343,7 @@ _MOD_KEYWORDS = {
     image=image,
     volumes={"/data": volume},
     secrets=[modal.Secret.from_name("nuke-sidecar-secrets")],
-    min_containers=1,        # keep 1 warm — cold start is 10-15s with Florence-2
+    min_containers=2,        # keep 2 warm — handles concurrent worker batches without cold start
     scaledown_window=600,    # keep warm 10 min after last request
     timeout=600,             # 10 min — batch of 20 images @ ~10s each needs ~200s
 )

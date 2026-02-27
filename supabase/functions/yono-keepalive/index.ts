@@ -12,7 +12,7 @@ const SIDECAR_URL =
 serve(async () => {
   try {
     const resp = await fetch(`${SIDECAR_URL}/health`, {
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(55000), // 55s — Modal network from Supabase edge can be slow
     });
     const health = resp.ok ? await resp.json() : null;
     return new Response(

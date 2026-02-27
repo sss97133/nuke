@@ -28,7 +28,7 @@ SELECT cron.schedule(
   '*/10 * * * *',
   $$
     SELECT net.http_post(
-      url := get_service_url() || '/functions/v1/compute-vehicle-valuation',
+      url := 'https://qkgaybvrernstplzjaam.supabase.co' || '/functions/v1/compute-vehicle-valuation',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || get_service_role_key_for_cron()
@@ -55,7 +55,7 @@ SELECT cron.schedule(
   '*/30 * * * *',
   $$
     SELECT net.http_post(
-      url := get_service_url() || '/functions/v1/batch-vin-decode',
+      url := 'https://qkgaybvrernstplzjaam.supabase.co' || '/functions/v1/batch-vin-decode',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || get_service_role_key_for_cron()
@@ -82,7 +82,7 @@ SELECT cron.schedule(
   '0 */4 * * *',
   $$
     SELECT net.http_post(
-      url := get_service_url() || '/functions/v1/batch-ymm-propagate',
+      url := 'https://qkgaybvrernstplzjaam.supabase.co' || '/functions/v1/batch-ymm-propagate',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || get_service_role_key_for_cron()
