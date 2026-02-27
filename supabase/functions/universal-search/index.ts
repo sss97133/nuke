@@ -141,7 +141,7 @@ serve(async (req) => {
     const results: SearchResult[] = [];
 
     // Shared rich vehicle SELECT — includes all fields needed for tier calculation and UI display
-    const VEHICLE_SELECT = 'id, year, make, model, vin, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size';
+    const VEHICLE_SELECT = 'id, year, make, model, vin, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, image_count, mileage, transmission, engine_size';
 
     // Build a rich metadata object from a vehicle row
     const buildVehicleMetadata = (v: any) => ({
@@ -160,8 +160,8 @@ serve(async (req) => {
       ownership_verified: v.ownership_verified || false,
       // comment_count is a solid engagement proxy (BaT comments, auction comments)
       event_count: v.comment_count || 0,
-      // If primary_image_url is set, there's at least 1 image; real count loaded on card
-      image_count: v.primary_image_url ? 1 : 0,
+      // Use actual image_count from DB (aggregated count from vehicle_images table)
+      image_count: v.image_count || (v.primary_image_url ? 1 : 0),
       mileage: v.mileage,
       transmission: v.transmission,
       engine_size: v.engine_size,
