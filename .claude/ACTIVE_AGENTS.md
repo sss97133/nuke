@@ -153,12 +153,14 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Next after tier2+export: upload ONNX to Modal volume yono-data, redeploy sidecar
 
 
-### VP Deal Flow — Transfer System Wiring — 2026-02-27 11:30 UTC (THIS SESSION)
-- Tasks: Twilio credential check, cron 223-227 status, stripe-checkout→transfer-automator wiring
-- Key finding: ownership_transfers table MISSING columns used by deployed functions (inbox_email, buyer/seller access tokens, phones, emails) — building migration
-- Key finding: Twilio secrets ARE set in Supabase (encrypted hashes present), local .env has placeholders (irrelevant)
-- Touching: supabase/migrations/ (new transfer columns migration), supabase/functions/stripe-checkout, supabase/functions/stripe-webhook
-- DO NOT: re-enable crons 223-227 without suppress_notifications param (would fire 300K emails to historical buyers)
+### VP Deal Flow — Transfer System Wiring — COMPLETED 2026-02-27 12:00 UTC
+- suppress_notifications added to transfer-automator (P78 done)
+- stripe-webhook wired to transfer-advance for payment_confirmed milestone
+- vehicle_transactions.ownership_transfer_id FK column added
+- get_transfer bug fixed (error.message vs String(error))
+- Twilio diagnosis: placeholders in Supabase secrets → 401, filed CFO task P92
+- Crons 223-227 remain paused (safe now, waiting on Twilio CFO)
+- REMOVED: session complete
 
 
 
