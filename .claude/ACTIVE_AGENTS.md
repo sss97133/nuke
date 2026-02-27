@@ -19,12 +19,6 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
-### CDO — Data Quality Audit — 2026-02-27 (this session)
-- Full data quality audit: source coverage, VIN/desc gaps, BAT stall, YONO training balance
-- Filed 7 agent_tasks to vp-extraction, vp-vehicle-intel, vp-ai
-- Read-only (no code changes, DB inserts to agent_tasks only)
-- COMPLETE — removing on session end
-
 
 ### VP AI — Zone Classifier + Bearer Auth + interior_quality — 2026-02-27 11:20 UTC — COMPLETE
 - Zone classifier: uploaded safetensors to Modal, redeployed, live (72.8% val_acc, 41 classes)
