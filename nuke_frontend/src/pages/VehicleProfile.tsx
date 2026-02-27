@@ -7,6 +7,7 @@ import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
 import { useAdminAccess } from '../hooks/useAdminAccess';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { TimelineEventService } from '../services/timelineEventService';
 // Lazy-load heavy tab-specific and modal components
 const AddEventWizard = React.lazy(() => import('../components/AddEventWizard'));
@@ -73,10 +74,10 @@ const VehicleStreamingCard = React.lazy(() => import('../components/vehicle/Vehi
 import { CollapsibleWidget } from '../components/ui/CollapsibleWidget';
 
 const WORKSPACE_TABS = [
-  { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
-  { id: 'facts', label: 'Facts', helper: 'AI confidence & valuations' },
-  { id: 'commerce', label: 'Commerce', helper: 'Listings, supporters, offers' },
-  { id: 'financials', label: 'Financials', helper: 'Pricing, history & docs' }
+  { id: 'evidence', label: 'Photos & History', shortLabel: 'Photos', helper: 'Timeline, gallery, intake' },
+  { id: 'facts', label: 'Specs & Analysis', shortLabel: 'Specs', helper: 'AI confidence, details, research' },
+  { id: 'commerce', label: 'Market & Value', shortLabel: 'Market', helper: 'Pricing, comps, auction history' },
+  { id: 'financials', label: 'Documents', shortLabel: 'Docs', helper: 'Records, wiring, investment docs' }
 ] as const;
 
 type WorkspaceTabId = typeof WORKSPACE_TABS[number]['id'];
@@ -176,6 +177,7 @@ const QuickStatsBar: React.FC<{
       padding: '8px 16px',
       maxWidth: '1600px',
       margin: '0 auto',
+      background: 'transparent',
     }}>
       <div style={{
         fontSize: '11px',
@@ -201,7 +203,8 @@ const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  
+  const isMobile = useIsMobile();
+
   // All state hooks must be declared before any conditional returns
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   // Initialize session from localStorage cache so loadVehicle() doesn't have to
@@ -4112,17 +4115,6 @@ const VehicleProfile: React.FC = () => {
   // Render vehicle profile (responsive for mobile and desktop)
   return (
       <div>
-        {/* Back navigation */}
-        <div style={{ padding: '8px 12px 4px', maxWidth: '1600px', margin: '0 auto' }}>
-          <button
-            className="button button-secondary"
-            onClick={() => navigate(-1)}
-            style={{ fontSize: '11px', padding: '4px 12px', letterSpacing: '0.01em' }}
-          >
-            &larr; Back
-          </button>
-        </div>
-
         {/* Vehicle Header with Price */}
         <div ref={vehicleHeaderRef}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
@@ -4268,9 +4260,12 @@ const VehicleProfile: React.FC = () => {
         <div style={{
           display: 'flex',
           alignItems: 'stretch',
-          background: 'var(--grey-900)',
-          borderTop: '1px solid var(--grey-800)',
-          borderBottom: '2px solid var(--grey-900)',
+          flexWrap: 'nowrap',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          background: 'var(--grey-800)',
+          borderTop: '1px solid var(--grey-700)',
+          borderBottom: '2px solid var(--grey-800)',
           height: 32,
           position: 'sticky',
           top: 0,
@@ -4291,9 +4286,12 @@ const VehicleProfile: React.FC = () => {
                   fontWeight: active ? 700 : 500,
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   border: 'none',
                   borderBottom: active ? '2px solid #fff' : '2px solid transparent',
-                  background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  borderRadius: active ? '4px 4px 0 0' : '0',
+                  background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
                   color: active ? '#fff' : 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
                   marginBottom: '-2px',
@@ -4306,7 +4304,7 @@ const VehicleProfile: React.FC = () => {
                   if (!active) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)';
                 }}
               >
-                {t.label}
+                {isMobile ? t.shortLabel : t.label}
               </button>
             );
           })}
