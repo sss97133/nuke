@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import type { Vehicle } from './types';
 import type { VehiclePermissions } from './types';
@@ -26,14 +27,16 @@ interface VehicleProfileTabsProps {
 
 type TabId = 'description' | 'media' | 'specs' | 'comps' | 'taxonomy' | 'bids';
 
-const TABS: Array<{ id: TabId; label: string; count?: number }> = [
-  { id: 'description', label: 'DESCRIPTION' },
-  { id: 'media', label: 'MEDIA' },
-  { id: 'specs', label: 'SPECS' },
-  { id: 'comps', label: 'COMPS' },
-  { id: 'taxonomy', label: 'TAXONOMY' },
-  { id: 'bids', label: 'BIDS' }
+const TABS: Array<{ id: TabId; label: string }> = [
+  { id: 'description', label: 'Overview' },
+  { id: 'media', label: 'Media' },
+  { id: 'specs', label: 'Specs' },
+  { id: 'comps', label: 'Comps' },
+  { id: 'taxonomy', label: 'Taxonomy' },
+  { id: 'bids', label: 'Bids' },
 ];
+
+const VALID_TAB_IDS = new Set(TABS.map(t => t.id));
 
 export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
   vehicle,
@@ -48,12 +51,33 @@ export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
   referenceLibraryRefreshKey,
   onReferenceLibraryRefresh
 }) => {
-  const [activeTab, setActiveTab] = useState<TabId>('description');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Deep-link support: ?tab=comps
+  const getTabFromUrl = (): TabId => {
+    try {
+      const params = new URLSearchParams(location.search);
+      const t = params.get('tab');
+      if (t && VALID_TAB_IDS.has(t as TabId)) return t as TabId;
+    } catch { /* ignore */ }
+    return 'description';
+  };
+
+  const [activeTab, setActiveTab] = useState<TabId>(getTabFromUrl);
   const [compsCount, setCompsCount] = useState<number | null>(null);
   const [selectedBidder, setSelectedBidder] = useState<string | null>(null);
 
+  // Sync tab from URL on navigation
+  useEffect(() => {
+    const tabFromUrl = getTabFromUrl();
+    setActiveTab(tabFromUrl);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
+
   useEffect(() => {
     loadComparablesCount();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle.id]);
 
   const loadComparablesCount = async () => {
@@ -74,63 +98,89 @@ export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
 
   const handleTabChange = (tabId: TabId) => {
     setActiveTab(tabId);
+    // Update URL for deep-linking
+    try {
+      const params = new URLSearchParams(location.search);
+      if (tabId === 'description') {
+        params.delete('tab');
+      } else {
+        params.set('tab', tabId);
+      }
+      const newSearch = params.toString();
+      navigate(
+        { pathname: location.pathname, search: newSearch ? `?${newSearch}` : '' },
+        { replace: true }
+      );
+    } catch { /* ignore */ }
   };
 
   return (
     <div style={{ marginTop: 'var(--space-4)' }}>
       {/* Tab Navigation */}
       <div style={{
-        borderBottom: '2px solid var(--border-light)',
-        marginBottom: '24px',
-        position: 'relative'
+        borderBottom: '1px solid var(--border-light)',
+        marginBottom: '20px',
       }}>
-        <ul style={{
+        <div style={{
           display: 'flex',
-          whiteSpace: 'nowrap',
           overflowX: 'auto',
-          marginTop: '16px',
-          padding: 0,
-          listStyle: 'none',
-          gap: '8px',
-          fontSize: '14px',
-          fontWeight: 500,
-          color: 'var(--text-muted)'
+          gap: '0',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
         }}>
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id;
-            const count = tab.id === 'comps' ? compsCount : tab.count;
-            const displayLabel = count !== undefined && count !== null && count > 0 
-              ? `${tab.label} (${count})` 
-              : tab.label;
-            
+            const count = tab.id === 'comps' ? compsCount : null;
+
             return (
-              <li
+              <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
                 style={{
-                  padding: '8px 16px',
+                  padding: '10px 18px',
+                  fontSize: '13px',
+                  fontWeight: isActive ? 600 : 400,
                   cursor: 'pointer',
-                  borderBottom: isActive ? '4px solid var(--primary)' : '4px solid transparent',
-                  color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                  transition: 'all 0.12s ease',
-                  userSelect: 'none'
+                  border: 'none',
+                  borderBottom: isActive ? '2px solid var(--text)' : '2px solid transparent',
+                  background: 'transparent',
+                  color: isActive ? 'var(--text)' : 'var(--text-muted)',
+                  transition: 'color 0.1s ease, border-color 0.1s ease',
+                  userSelect: 'none',
+                  whiteSpace: 'nowrap',
+                  marginBottom: '-1px',
+                  letterSpacing: '0.01em',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.color = 'var(--text)';
+                    (e.currentTarget as HTMLElement).style.color = 'var(--text)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.color = 'var(--text-muted)';
+                    (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
                   }
                 }}
               >
-                {displayLabel}
-              </li>
+                {tab.label}
+                {count !== null && count !== undefined && count > 0 && (
+                  <span style={{
+                    marginLeft: '6px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    color: isActive ? 'var(--text)' : 'var(--text-muted)',
+                    background: 'var(--surface)',
+                    borderRadius: '10px',
+                    padding: '1px 6px',
+                    border: '1px solid var(--border-light)',
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </button>
             );
           })}
-        </ul>
+        </div>
       </div>
 
       {/* Tab Content */}
@@ -175,7 +225,6 @@ export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
             vehicle={vehicle}
             onCountChange={(count) => {
               setCompsCount(count);
-              // Reload count when tab is viewed
               if (activeTab === 'comps') {
                 loadComparablesCount();
               }
@@ -214,4 +263,3 @@ export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
 };
 
 export default VehicleProfileTabs;
-

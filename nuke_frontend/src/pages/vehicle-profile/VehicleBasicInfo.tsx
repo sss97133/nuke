@@ -759,12 +759,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               {vehicle.transmission ? (
                 vehicle.transmission
               ) : (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span className="badge badge-danger">MISSING</span>
-                  <button className="button button-small button-secondary" onClick={scrollToProofTasks}>
-                    Add proof
-                  </button>
-                </span>
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '8pt' }}>Unknown</span>
               )}
             </span>
           </div>
@@ -782,12 +777,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               {typeof vehicle.mileage === 'number' && Number.isFinite(vehicle.mileage) && vehicle.mileage > 0 ? (
                 `${vehicle.mileage.toLocaleString()} miles`
               ) : (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span className="badge badge-danger">MISSING</span>
-                  <button className="button button-small button-secondary" onClick={scrollToProofTasks}>
-                    Add proof
-                  </button>
-                </span>
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '8pt' }}>Unknown</span>
               )}
             </span>
           </div>
@@ -836,7 +826,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {sanitizeInlineValue(vehicle.color) || 'Not specified'}
+              {sanitizeInlineValue(vehicle.color) || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '8pt' }}>Unknown</span>}
             </span>
           </div>
 

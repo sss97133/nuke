@@ -186,7 +186,7 @@ const VehicleTaxonomyTab: React.FC<VehicleTaxonomyTabProps> = ({
                         color: 'var(--text)',
                         margin: 0
                       }}>
-                        {typeof item.value === 'boolean' ? (item.value ? 'Yes' : 'No') : String(item.value || 'Not specified')}
+                        {typeof item.value === 'boolean' ? (item.value ? 'Yes' : 'No') : (item.value ? String(item.value) : '—')}
                       </dd>
                     </div>
                   ))}

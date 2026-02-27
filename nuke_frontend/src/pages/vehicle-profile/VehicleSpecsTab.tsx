@@ -50,7 +50,7 @@ const VehicleSpecsTab: React.FC<VehicleSpecsTabProps> = ({
   };
 
   const formatValue = (value: string | number | null | undefined): string => {
-    if (value === null || value === undefined) return 'Not specified';
+    if (value === null || value === undefined || value === '') return '—';
     if (typeof value === 'number') {
       if (value > 1000 && value < 1000000) {
         return value.toLocaleString();

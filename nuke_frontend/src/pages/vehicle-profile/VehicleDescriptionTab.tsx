@@ -29,9 +29,9 @@ const VehicleDescriptionTab: React.FC<VehicleDescriptionTabProps> = ({
   onReferenceLibraryRefresh
 }) => {
   return (
-    <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: '320px 1fr' }}>
+    <div className="vehicle-profile-two-column vehicle-profile-buyer-view">
       {/* Left Column: Vehicle Info & Tools */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div className="vehicle-profile-left-column" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {/* Basic Info */}
         <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
           <VehicleBasicInfo
