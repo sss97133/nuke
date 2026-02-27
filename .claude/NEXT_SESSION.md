@@ -1,73 +1,48 @@
-# NEXT SESSION — COO SPRINT DIRECTIVE (Updated 2026-02-27 15:22 AST)
+# NEXT SESSION — FB Marketplace National Monitoring System
 
-## 🚨 TIER 0A: REMOVE ALL HARDCODED STATS FROM UI
+## CEO DIRECTIVE
+Build a national monitoring system tracking the full lifecycle of every vintage vehicle listing on FB Marketplace across the US. Fresh listings, price movements, time-on-market, seller behavior patterns, geographic flow.
 
-> "so a lot of those stats feel fake are hard to look at. those should be reporting live numbers. i hate seeing dead stats in UI its the worst. need to find and remove all. replace with a function when we want to show data, rookie move"
+## PRIORITY STACK (execute in order)
 
-**STATUS: HOOK COMMITTED, ISSUE FILED — NEEDS WIRING UP**
+### 1. [P0] Schema Migration — #187
+Apply the marketplace lifecycle schema patch:
+- New columns on `marketplace_listings`: metro_area, sweep IDs, removed_at, raw_data, price_history, etc.
+- New tables: `marketplace_sweep_history`, `fb_sellers`, `fb_seller_listings`
+- Price change trigger, seller classification functions, velocity views
+- Fix `fb_listing_id` → `facebook_id` column mismatch
+- **File:** See issue #187 for full SQL
 
-### What's done:
-- [x] `usePlatformStats.ts` committed to `nuke_frontend/src/hooks/` (SHA: ba692af)
-- [x] GitHub issue #186 filed with complete inventory + fix code for every file
-- [ ] Wire `usePlatformStats` into HomePage.tsx (replace '33M+', '50+')
-- [ ] Wire into KeyFiguresWithCharts.tsx (replace '768,288', '$41.6 billion', '28.3 million')
-- [ ] Wire into MarketCompetitors.tsx (replace '1.25M' x4)
-- [ ] Add `total_images`, `total_listings`, `total_sources` to portfolio_stats_cache refresh cron
+### 2. [P0] Scraper v2.1 — #190
+Replace `scripts/fb-marketplace-local-scraper.mjs` with patched version:
+- Seller extraction (seller_id + seller_name)
+- Raw data JSONB storage (no data thrown away)
+- Batch upserts (chunks of 50 vs individual queries)
+- doc_id health check (catches Facebook query rotation)
+- Sweep ID + disappearance detection
+- Extra fields: description, listing_created_at, vehicle_type, condition
+- 55 metros, 60+ makes
+- **File:** See issue #190 for full code
 
-### Files with hardcoded lies (P0):
-| File | Fake Stat | Real Number |
-|------|-----------|-------------|
-| `HomePage.tsx:70` | `'33M+'` photos | Query vehicle_images count |
-| `HomePage.tsx:71` | `'50+'` data sources | Query distinct sources |
-| `HomePage.tsx:89` | `'18K+'` profiles | 997K (portfolio_stats_cache) |
-| `KeyFiguresWithCharts.tsx:27` | `'768,288'` vehicles | 997,429 (cache) / 1,241,204 (actual) |
-| `KeyFiguresWithCharts.tsx:28` | `'$41.6 billion'` | $43.88B (cache) |
-| `KeyFiguresWithCharts.tsx:29` | `'28.3 million'` images | Query vehicle_images count |
-| `MarketCompetitors.tsx:5,39,44,125` | `'1.25M'` (4x) | 997K (cache) |
+### 3. [P1] Twice-Daily Cron — #189
+Set up automated sweeps + detective checks
+- 6 AM EST + 6 PM EST full national sweeps
+- Post-sweep quality checks
 
-### The pattern to follow:
-```tsx
-import { usePlatformStats, formatStat, formatCurrency } from '../hooks/usePlatformStats';
-const stats = usePlatformStats();
-// Use formatStat(stats.totalVehicles) instead of '997K'
-// Use formatCurrency(stats.totalValue) instead of '$41.6 billion'
-```
+### 4. [P2] Facebook Page Strategy — #188
+CEO decision needed on branding. Park until Layers 1-3 are running.
 
----
+## STILL OPEN FROM PREVIOUS SESSIONS
+- #173 Vehicle profiles not shareable (Dave Granholm blocker)
+- #175 Collection tab vehicles invisible
+- #178 Profile crashes on /profile/skylar
+- #181 Quality alerting system
+- #182 Duplicate/wrong images
+- #183 Barrett-Jackson data gaps
+- #184 Perplexity Detective mandate for all VPs
 
-## 🔴 TOP-LINE REALITY: 29.9 MILLION MISSING DATA POINTS
-
-The database has **1,241,184 vehicles** but is **83.2% empty**. Average field coverage is 16.8%.
-
-See full audit: #185
-
----
-
-## ⛔ CEO MANDATE: EVERY VP NEEDS A DETECTIVE (#184)
-
-**Every VP runs a diagnostic audit of their domain FIRST.** See #184 for per-VP SQL audit queries.
-
----
-
-## PRIORITY STACK
-
-### TIER 0A: HARDCODED STATS (#186) + DATA REMEDIATION (#185)
-### TIER 0B: DETECTIVE INFRASTRUCTURE (#184)
-### TIER 1: #173 shareable profiles, #182 duplicate images, #183 BJ 0% images, #181 alerting
-### TIER 2: Verify #175/#177/#178/#179 are deployed to production
-### TIER 3: #180 email pipeline, #174 health check, #176 market timeout
-
-## WHAT IS FROZEN
-
-- ❌ Stripe Connect, Inbox redesign, Key Guardian, SDK v1.3.0, YONO sidecar
-- ❌ Any new feature that doesn't fix user data quality or enable self-diagnosis
-
-## KEY CONTEXT
-
-- Skylar's UUID: `0b9f107a-d124-49de-9ded-94698f63c1c4`
-- Gmail for alerts: `toymachine91@gmail.com`
-- Telegram: chatId `7587296683`
-- 1,241,184 vehicles, 83.2% empty fields, 29.9M missing data points
-- Image pipeline: PAUSED intentionally
-
-Filed by COO (Perplexity Computer) at 2026-02-27T19:22:00Z
+## AGENT ASSIGNMENTS
+- **VP Platform:** #187 (schema), #189 (cron)
+- **VP Extraction:** #190 (scraper v2.1), detective checks
+- **CPO:** #188 (FB page strategy, pending CEO input)
+- **CTO:** Verify deployment pipeline (#178 fix committed but not deployed)
