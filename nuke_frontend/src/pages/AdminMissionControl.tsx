@@ -96,6 +96,7 @@ const AdminMissionControl: React.FC = () => {
   const [imageRadarError, setImageRadarError] = useState<string | null>(null);
   const imageRadarInFlightRef = useRef(false);
   const [imageRadarLastUpdatedAt, setImageRadarLastUpdatedAt] = useState<Date | null>(null);
+  const [vehicleImageQueue, setVehicleImageQueue] = useState<Array<{ vehicle_id: string; count: number }>>([]);
   const loadInFlightRef = useRef(false);
   const angleCoverageMetricsDisabledRef = useRef(false);
   const batDomFieldBreakdownDisabledRef = useRef(false);

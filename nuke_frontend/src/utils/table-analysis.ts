@@ -79,7 +79,7 @@ export async function analyzeExistingTables(): Promise<TableAnalysis[]> {
   return results;
 }
 
-function analyzeTableStructure(_tableName: string, columns: ColumnInfo[], _sampleData: any[]): {
+function analyzeTableStructure(tableName: string, columns: ColumnInfo[], _sampleData: any[]): {
   conflicts: string[];
   recommendations: string[];
   compatibility: 'compatible' | 'needs-modification' | 'incompatible';

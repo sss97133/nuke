@@ -75,7 +75,7 @@ function HoverCard({ children, content }: { children: React.ReactElement; conten
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const handleEnter = (e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -223,7 +223,7 @@ export default function BidMarketDashboard() {
   const [weekVehicles, setWeekVehicles] = useState<any[]>([]);
   const [weekVehiclesLoading, setWeekVehiclesLoading] = useState(false);
   const weekVehicleCache = useRef<Map<string, any[]>>(new Map());
-  const weekQueryTimer = useRef<ReturnType<typeof setTimeout>>();
+  const weekQueryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Load static data: filter options, treemap, bidders, hottest auctions
   const loadData = useCallback(async () => {

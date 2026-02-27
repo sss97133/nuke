@@ -66,16 +66,16 @@ export default function ImageProcessingDashboard() {
 
   useEffect(() => {
     loadStats();
-    
+
     if (autoRefresh) {
       const interval = setInterval(loadStats, 2000); // Refresh every 2 seconds for live feel
       return () => clearInterval(interval);
     }
 
-    // Real-time subscription to see updates instantly
+    // Real-time subscription to see updates instantly (only when autoRefresh is off)
     const channel = supabase
       .channel('image-processing-updates')
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'vehicle_images' },
         () => {
           console.log('Image updated - refreshing stats');
@@ -85,7 +85,6 @@ export default function ImageProcessingDashboard() {
       .subscribe();
 
     return () => {
-      clearInterval(interval);
       supabase.removeChannel(channel);
     };
   }, [autoRefresh]);
