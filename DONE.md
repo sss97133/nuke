@@ -84,6 +84,20 @@ Agents read this to avoid rebuilding things that already exist.
   - Similar Sales section not wired/visible (task e0433594, P68)
 - All 13 tasks filed to agent_tasks as vp-platform, status=pending
 
+### [frontend-ux] Global UX Pass 2 — typography normalization + loading states + empty states
+- **pt→px font unit purge**: Eliminated ALL `pt` font-size units across entire frontend (~1900+ occurrences in pages, ~232 component files with pt units). All converted to px with correct pt→px ratios (8pt→11px, 9pt→12px, 10pt→13px, 14pt→19px, 16pt→21px, etc.)
+- **AuctionMarketplace**: Replaced bare "Loading auctions..." with 6-card skeleton grid (pulse animation). Fixed 32 pt units.
+- **MarketSegments**: Replaced bare "Loading market segments..." with full-page skeleton grid (6 cards with pulse). Fixed 14 pt units.
+- **Dashboard**: Replaced bare "Loading..." text with 4 skeleton rows.
+- **CursorHomepage**: Replaced "Loading vehicles..." with 6-card skeleton grid.
+- **NukeEstimatePanel**: Replaced "Loading..." text with 2-line skeleton.
+- **ServiceVehicleCardRich**: Replaced "Loading..." text with skeleton placeholder.
+- **MarketFundDetail**: Improved "Fund not found" error state copy.
+- **Search.tsx**: Fixed 42px "N" logo on empty state (was 32pt = 42.67px).
+- **About.tsx**: Fixed final "NUKE Platform" → "Nuke" branding instance in footer.
+- Files changed: ~300+ frontend files. Zero TypeScript errors throughout.
+- Commits: 944ba7704 (bulk), 10c63847c (TeamInbox).
+
 ## 2026-02-27
 
 ### [market] Market Exchange, Fund Detail, Portfolio — comprehensive UX overhaul

@@ -19,6 +19,14 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ## CURRENTLY ACTIVE
 
+### VP Platform — Resend Inbound Email Audit + alerts@nuke.ag wiring — 2026-02-27 12:00 UTC — COMPLETED
+- Audited Resend inbound config: pipeline IS working (5 real emails in contact_inbox)
+- Root issue: RESEND_API_KEY is send-only (restricted_api_key scope) — inbound routing configured in Resend dashboard, not discoverable via API
+- Fixed inbound-email: now uses webhook payload body as fallback when Resend API content fetch fails
+- Added alerts@nuke.ag to VALID_ADDRESSES + routing to process-alert-email → import_queue
+- Verified full pipeline: email.received → inbound-email → process-alert-email → import_queue (BMW M3 test: 1 URL queued)
+- Inserted test record in contact_inbox (email_id: test-001, from: someone@example.com)
+- REMOVED: session complete
 
 ### VP AI — Zone Classifier + Bearer Auth + interior_quality — 2026-02-27 11:20 UTC — COMPLETE
 - Zone classifier: uploaded safetensors to Modal, redeployed, live (72.8% val_acc, 41 classes)

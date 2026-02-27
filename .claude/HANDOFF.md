@@ -1,7 +1,8 @@
-# Auto-Checkpoint — 2026-02-27 07:46:19
+# Auto-Checkpoint — 2026-02-27 07:46:43
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
+973eee1d1 chore: update ACTIVE_AGENTS + DONE for VP Orgs session
 a044ec665 feat: CPO audit filed, archiveFetch fixes, deal-flow wiring, Resend inbound check
 22bc26633 chore: redact OAuth credentials from gmail migration comments
 20ecbcdec fix(market): live Market Dashboard, Exchange polish, Portfolio UX
@@ -19,8 +20,8 @@ d24aa0ad0 fix(pages): org profile + offering page UX improvements
 a5ebb07b8 fix(ux): global navigation, homepage, mobile, loading states polish
 
 ## Uncommitted Changes
-.claude/ACTIVE_AGENTS.md
 mcp-server
+nuke_frontend/src/pages/TeamInbox.tsx
 
 ## Staged
 none
