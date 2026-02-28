@@ -40,6 +40,7 @@ const ProfileCommentsTab = React.lazy(() => import('../components/profile/Profil
 const ProfileSuccessStoriesTab = React.lazy(() => import('../components/profile/ProfileSuccessStoriesTab').then(m => ({ default: m.ProfileSuccessStoriesTab })));
 const ConnectedPlatforms = React.lazy(() => import('../components/bidding/ConnectedPlatforms'));
 const SocialConnections = React.lazy(() => import('../components/profile/SocialConnections'));
+const UserDiscoveries = React.lazy(() => import('../components/profile/UserDiscoveries'));
 
 const Profile: React.FC = () => {
   const { userId, externalIdentityId } = useParams<{ userId?: string; externalIdentityId?: string }>();
@@ -51,6 +52,7 @@ const Profile: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     'overview' |
+    'discoveries' |
     'collection' |
     'gallery' |
     'professional' |
@@ -750,6 +752,7 @@ const Profile: React.FC = () => {
         }}>
           {[
             { key: 'overview', label: 'Overview' },
+            { key: 'discoveries', label: 'Discoveries', public: true },
             { key: 'collection', label: 'Collection', public: true },
             { key: 'gallery', label: 'Gallery', public: true },
             { key: 'professional', label: 'Professional' },
@@ -878,6 +881,12 @@ const Profile: React.FC = () => {
                   </div>
                 )}
 
+              </div>
+            )}
+
+            {activeTab === 'discoveries' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <UserDiscoveries userId={profile.id} isOwnProfile={isOwnProfile} />
               </div>
             )}
 
