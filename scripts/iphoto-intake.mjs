@@ -20,6 +20,7 @@ import os from 'os';
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const BUCKET = 'vehicle-photos';
 const BATCH_SIZE = 10;
+const USER_ID = '0b9f107a-d124-49de-9ded-94698f63c1c4'; // skylar's user_id
 
 // ─── CLI args ────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,96 @@ async function findVehicle(year, make, model) {
   return null;
 }
 
+// ─── Photo metadata from osxphotos ──────────────────────────────────────────
+
+function queryAlbumMetadata(albumName) {
+  console.log(`  Querying osxphotos metadata for "${albumName}"...`);
+  const result = spawnSync('osxphotos', [
+    'query', '--album', albumName, '--json',
+  ], { encoding: 'utf8', stdio: 'pipe', maxBuffer: 100 * 1024 * 1024 });
+
+  if (result.status !== 0) {
+    console.error('  osxphotos query error:', result.stderr?.slice(0, 200));
+    return new Map();
+  }
+
+  let photos;
+  try {
+    photos = JSON.parse(result.stdout);
+  } catch (e) {
+    console.error('  Failed to parse osxphotos JSON');
+    return new Map();
+  }
+
+  // Build lookup by base filename (no extension) since HEIC→JPG conversion changes extension.
+  // Map both `filename` (Photos library name, often UUID-based) and `original_filename`.
+  const metaMap = new Map();
+  let withGps = 0;
+  for (const p of photos) {
+    const meta = extractPhotoMeta(p);
+    if (meta.latitude) withGps++;
+
+    // Key by base name without extension (handles HEIC→JPG renaming)
+    const keys = new Set();
+    if (p.filename) keys.add(baseName(p.filename));
+    if (p.original_filename) keys.add(baseName(p.original_filename));
+    for (const k of keys) {
+      metaMap.set(k, meta);
+    }
+  }
+  console.log(`  Metadata: ${photos.length} photos, ${withGps} with GPS`);
+  return metaMap;
+}
+
+function baseName(filename) {
+  return filename.replace(/\.[^.]+$/, '').toLowerCase();
+}
+
+function extractPhotoMeta(p) {
+  // osxphotos place is a nested object: { name, address_str, address: { city, state_province, street, ... } }
+  const place = p.place || {};
+  let locationName = null;
+  if (typeof place === 'string') {
+    locationName = place;
+  } else if (place.address_str) {
+    locationName = place.address_str;
+  } else if (place.name) {
+    locationName = place.name;
+  } else {
+    const addr = place.address || {};
+    const parts = [addr.street, addr.city, addr.state_province, addr.country].filter(Boolean);
+    if (parts.length > 0) locationName = parts.join(', ');
+  }
+
+  // Build EXIF-style metadata object
+  const exifData = {};
+  const exif = p.exif_info || {};
+  if (exif.camera_make) exifData.camera_make = exif.camera_make;
+  if (exif.camera_model) exifData.camera_model = exif.camera_model;
+  if (exif.lens_model) exifData.lens_model = exif.lens_model;
+  if (exif.focal_length) exifData.focal_length = exif.focal_length;
+  if (exif.aperture) exifData.aperture = exif.aperture;
+  if (exif.iso) exifData.iso = exif.iso;
+  if (exif.shutter_speed) exifData.shutter_speed = exif.shutter_speed;
+  if (exif.flash_fired != null) exifData.flash_fired = exif.flash_fired;
+  // GPS data stored in exif for downstream processing
+  if (p.latitude != null) exifData.location = { latitude: p.latitude, longitude: p.longitude };
+  // Dimensions
+  if (p.height) exifData.height = p.height;
+  if (p.width) exifData.width = p.width;
+  // osxphotos-specific enrichments
+  if (p.score) exifData.score = p.score;
+  if (p.labels) exifData.labels = p.labels;
+
+  return {
+    latitude: p.latitude || null,
+    longitude: p.longitude || null,
+    taken_at: p.date || null,
+    location_name: locationName,
+    exif_data: Object.keys(exifData).length > 0 ? exifData : null,
+  };
+}
+
 // ─── Photo export ────────────────────────────────────────────────────────────
 
 function exportAlbum(albumName, destDir) {
@@ -146,7 +237,7 @@ function convertHeicToJpeg(srcDir, destDir) {
 
 // ─── Supabase upload ─────────────────────────────────────────────────────────
 
-async function uploadPhotos(vehicleId, jpegDir) {
+async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map()) {
   const files = readdirSync(jpegDir).filter(f => /\.(jpg|jpeg|png)$/i.test(f));
   console.log(`  Uploading ${files.length} images for vehicle ${vehicleId}...`);
 
@@ -161,7 +252,7 @@ async function uploadPhotos(vehicleId, jpegDir) {
   const toUpload = files.filter(f => !existingNames.has(f));
   console.log(`  Skipping ${files.length - toUpload.length} already uploaded`);
 
-  let uploaded = 0, errors = 0;
+  let uploaded = 0, errors = 0, gpsCount = 0;
   for (let i = 0; i < toUpload.length; i += BATCH_SIZE) {
     const batch = toUpload.slice(i, i + BATCH_SIZE);
     await Promise.all(batch.map(async (filename) => {
@@ -179,7 +270,11 @@ async function uploadPhotos(vehicleId, jpegDir) {
 
       const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
 
-      const { error: insertError } = await supabase.from('vehicle_images').insert({
+      // Look up GPS/EXIF metadata from osxphotos
+      const meta = metaMap.get(baseName(filename)) || {};
+      if (meta.latitude) gpsCount++;
+
+      const row = {
         vehicle_id: vehicleId,
         image_url: publicUrl,
         storage_path: storagePath,
@@ -189,14 +284,25 @@ async function uploadPhotos(vehicleId, jpegDir) {
         file_size: fileSize,
         is_external: false,
         ai_processing_status: 'pending',
-      });
+        documented_by_user_id: USER_ID,
+        // GPS fields
+        ...(meta.latitude != null && { latitude: meta.latitude }),
+        ...(meta.longitude != null && { longitude: meta.longitude }),
+        ...(meta.location_name && { location_name: meta.location_name }),
+        // Temporal
+        ...(meta.taken_at && { taken_at: meta.taken_at }),
+        // EXIF blob
+        ...(meta.exif_data && { exif_data: meta.exif_data }),
+      };
+
+      const { error: insertError } = await supabase.from('vehicle_images').insert(row);
       if (insertError && !insertError.message.includes('duplicate') && !insertError.message.includes('unique')) {
         errors++;
       } else {
         uploaded++;
       }
     }));
-    process.stdout.write(`\r  ${i + batch.length}/${toUpload.length} (${uploaded} new, ${errors} err)  `);
+    process.stdout.write(`\r  ${i + batch.length}/${toUpload.length} (${uploaded} new, ${gpsCount} GPS, ${errors} err)  `);
   }
   process.stdout.write('\n');
 
@@ -249,13 +355,16 @@ async function processAlbum(albumName, vehicleId = null) {
   const tmpJpeg = join(os.tmpdir(), `iphoto_jpeg_${Date.now()}`);
 
   try {
+    // Query GPS + EXIF metadata from osxphotos BEFORE export
+    const metaMap = queryAlbumMetadata(albumName);
+
     const ok = exportAlbum(albumName, tmpExport);
     if (!ok) return null;
 
     const count = convertHeicToJpeg(tmpExport, tmpJpeg);
     console.log(`  Converted: ${count} images`);
 
-    const result = await uploadPhotos(vehicleId, tmpJpeg);
+    const result = await uploadPhotos(vehicleId, tmpJpeg, metaMap);
     console.log(`  Done: ${result.uploaded} uploaded, ${result.errors} errors`);
     return result;
   } finally {
@@ -264,9 +373,80 @@ async function processAlbum(albumName, vehicleId = null) {
   }
 }
 
+// ─── GPS Backfill for existing images ────────────────────────────────────────
+
+async function backfillAlbumGps(albumName, vehicleId = null) {
+  console.log(`\nBackfill GPS: "${albumName}"`);
+
+  if (!vehicleId) {
+    const parsed = parseAlbumName(albumName);
+    if (!parsed) { console.log('  Could not parse album name, skipping'); return 0; }
+    const match = await findVehicle(parsed.year, parsed.make, parsed.model);
+    if (!match) { console.log('  No vehicle match found in DB — skipping'); return 0; }
+    vehicleId = match.id;
+    console.log(`  Vehicle: ${match.year} ${match.make} ${match.model} → ${match.id}`);
+  }
+
+  // Get existing iphoto images missing GPS
+  const { data: images, error } = await supabase
+    .from('vehicle_images')
+    .select('id, file_name')
+    .eq('vehicle_id', vehicleId)
+    .eq('source', 'iphoto')
+    .is('latitude', null);
+
+  if (error || !images?.length) {
+    console.log(`  ${images?.length === 0 ? 'All images already have GPS' : 'Error fetching images'}`);
+    return 0;
+  }
+  console.log(`  ${images.length} images missing GPS`);
+
+  // Query osxphotos metadata
+  const metaMap = queryAlbumMetadata(albumName);
+  if (metaMap.size === 0) { console.log('  No metadata available'); return 0; }
+
+  let updated = 0, noMatch = 0;
+  for (const img of images) {
+    const key = baseName(img.file_name);
+    const meta = metaMap.get(key);
+    if (!meta || meta.latitude == null) { noMatch++; continue; }
+
+    const patch = {
+      latitude: meta.latitude,
+      longitude: meta.longitude,
+      documented_by_user_id: USER_ID,
+    };
+    if (meta.location_name) patch.location_name = meta.location_name;
+    if (meta.taken_at) patch.taken_at = meta.taken_at;
+    if (meta.exif_data) patch.exif_data = meta.exif_data;
+
+    const { error: upErr } = await supabase.from('vehicle_images').update(patch).eq('id', img.id);
+    if (!upErr) updated++;
+  }
+  console.log(`  Updated ${updated}/${images.length} images with GPS (${noMatch} no metadata match)`);
+  return updated;
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-if (flag('--list')) {
+if (flag('--backfill-gps')) {
+  const albumName = arg('--album');
+  const vehicleId = arg('--vehicle-id');
+  if (albumName) {
+    await backfillAlbumGps(albumName, vehicleId);
+  } else {
+    // Backfill ALL albums
+    const albums = listAlbums();
+    console.log(`Backfilling GPS for ${albums.length} vehicle albums...`);
+    let total = 0;
+    for (const a of albums) {
+      const count = await backfillAlbumGps(a.name);
+      total += count;
+    }
+    console.log(`\nTotal backfilled: ${total} images`);
+  }
+
+} else if (flag('--list')) {
   const albums = listAlbums();
   console.log(`\n${albums.length} vehicle albums:\n`);
   for (const a of albums) {
@@ -301,5 +481,9 @@ Usage:
   node scripts/iphoto-intake.mjs --album "1977 K5 Chevrolet Blazer"
   node scripts/iphoto-intake.mjs --album "..." --vehicle-id <uuid>
   node scripts/iphoto-intake.mjs --all
+
+GPS backfill (update existing images with GPS from Apple Photos):
+  node scripts/iphoto-intake.mjs --backfill-gps                          # all albums
+  node scripts/iphoto-intake.mjs --backfill-gps --album "1984 Chevrolet K20 LWB "
   `);
 }
