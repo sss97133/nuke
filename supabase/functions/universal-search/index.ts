@@ -122,7 +122,7 @@ serve(async (req) => {
     const urlParams = url.searchParams;
     const body: SearchRequest = req.method === 'GET' ? {} as any : await req.json().catch(() => ({} as any));
 
-    const query: string = urlParams.get('query') ?? body.query ?? '';
+    const query: string = urlParams.get('query') || urlParams.get('q') || body.query || '';
     const limitRaw = urlParams.get('limit') ?? body.limit;
     const limit: number = limitRaw ? Number(limitRaw) : 20;
     const types: string[] | undefined = urlParams.get('types')?.split(',') ?? body.types;
