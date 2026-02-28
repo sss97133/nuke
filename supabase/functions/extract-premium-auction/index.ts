@@ -115,6 +115,38 @@ serve(async (req) => {
           } else if (data?.success) {
             successCount++;
             results.push({ url: listingUrl, vehicle_id: data.vehicle_id });
+
+            // For Cars & Bids, also trigger comment and bid extraction (non-blocking)
+            if (detectedSiteType === 'carsandbids' && data.vehicle_id) {
+              // Trigger comments extraction
+              fetch(`${supabaseUrl}/functions/v1/extract-cars-and-bids-comments`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceRoleKey}`,
+                },
+                body: JSON.stringify({
+                  auction_url: listingUrl,
+                  vehicle_id: data.vehicle_id,
+                }),
+                signal: AbortSignal.timeout(120000),
+              }).catch((e: any) => console.warn(`[extract-premium-auction] Comments extraction trigger failed for ${listingUrl}:`, e instanceof Error ? e.message : String(e)));
+
+              // Trigger bids extraction
+              fetch(`${supabaseUrl}/functions/v1/extract-cab-bids`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceRoleKey}`,
+                },
+                body: JSON.stringify({
+                  url: listingUrl,
+                  vehicle_id: data.vehicle_id,
+                  mode: 'single',
+                }),
+                signal: AbortSignal.timeout(120000),
+              }).catch((e: any) => console.warn(`[extract-premium-auction] Bids extraction trigger failed for ${listingUrl}:`, e instanceof Error ? e.message : String(e)));
+            }
           } else {
             errorCount++;
           }
@@ -147,6 +179,38 @@ serve(async (req) => {
 
     if (error) {
       throw new Error(`Extractor ${extractorFunction} failed: ${error?.message || error}`);
+    }
+
+    // For Cars & Bids, also trigger comment and bid extraction (non-blocking)
+    if (detectedSiteType === 'carsandbids' && data?.success && data?.vehicle_id) {
+      // Trigger comments extraction
+      fetch(`${supabaseUrl}/functions/v1/extract-cars-and-bids-comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          auction_url: url,
+          vehicle_id: data.vehicle_id,
+        }),
+        signal: AbortSignal.timeout(120000),
+      }).catch((e: any) => console.warn(`[extract-premium-auction] Comments extraction trigger failed for ${url}:`, e instanceof Error ? e.message : String(e)));
+
+      // Trigger bids extraction
+      fetch(`${supabaseUrl}/functions/v1/extract-cab-bids`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          url,
+          vehicle_id: data.vehicle_id,
+          mode: 'single',
+        }),
+        signal: AbortSignal.timeout(120000),
+      }).catch((e: any) => console.warn(`[extract-premium-auction] Bids extraction trigger failed for ${url}:`, e instanceof Error ? e.message : String(e)));
     }
 
     return new Response(JSON.stringify({

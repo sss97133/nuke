@@ -430,6 +430,38 @@ serve(async (req) => {
                   signal: AbortSignal.timeout(120000),
                 }).catch((e: any) => console.warn(`[queue] Comment extraction trigger failed for ${item.id}:`, e instanceof Error ? e.message : String(e)));
               }
+
+              // For Cars & Bids, also extract comments and bids (non-blocking)
+              if (sourceName === "carsandbids" && vehicleId) {
+                // Extract comments
+                fetch(`${supabaseUrl}/functions/v1/extract-cars-and-bids-comments`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: authHeader,
+                  },
+                  body: JSON.stringify({
+                    auction_url: item.listing_url,
+                    vehicle_id: vehicleId,
+                  }),
+                  signal: AbortSignal.timeout(120000),
+                }).catch((e: any) => console.warn(`[queue] C&B comment extraction trigger failed for ${item.id}:`, e instanceof Error ? e.message : String(e)));
+
+                // Extract bids
+                fetch(`${supabaseUrl}/functions/v1/extract-cab-bids`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: authHeader,
+                  },
+                  body: JSON.stringify({
+                    url: item.listing_url,
+                    vehicle_id: vehicleId,
+                    mode: "single",
+                  }),
+                  signal: AbortSignal.timeout(120000),
+                }).catch((e: any) => console.warn(`[queue] C&B bid extraction trigger failed for ${item.id}:`, e instanceof Error ? e.message : String(e)));
+              }
             } else {
               // Propagate the real error from the extractor
               const errDetail = typeof extractResult.error === 'string'
