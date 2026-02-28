@@ -12,24 +12,30 @@ export type LiveStatus = {
 // This keeps the app from failing hard while remaining functionally harmless.
 export const LiveStatus: LiveStatus = { live: false, nextStart: null };
 
+// Toggle this to true once the live-admin edge function is deployed with proper CORS.
+// While false, all methods skip the broken edge function call entirely to avoid
+// CORS-induced delays on the profile page.
+const LIVE_ADMIN_ENABLED = false;
+
 export const LiveService = {
   async getStatus(userId: string): Promise<LiveStatus> {
-    // Prefer edge function; fallback to local storage if unavailable
-    try {
-      const { data, error } = await supabase.functions.invoke('live-admin', {
-        body: { action: 'status', userId },
-      });
-      if (error) throw error;
-      if (data && typeof data.live === 'boolean') {
-        return {
-          live: !!data.live,
-          startedAt: data.startedAt ?? null,
-          nextStart: data.nextStart ?? null,
-          viewerCount: data.viewerCount ?? undefined,
-        } as LiveStatus;
+    if (LIVE_ADMIN_ENABLED) {
+      try {
+        const { data, error } = await supabase.functions.invoke('live-admin', {
+          body: { action: 'status', userId },
+        });
+        if (error) throw error;
+        if (data && typeof data.live === 'boolean') {
+          return {
+            live: !!data.live,
+            startedAt: data.startedAt ?? null,
+            nextStart: data.nextStart ?? null,
+            viewerCount: data.viewerCount ?? undefined,
+          } as LiveStatus;
+        }
+      } catch (e) {
+        // fall through to local fallback
       }
-    } catch (e) {
-      // fall through to local fallback
     }
     try {
       const raw = typeof window !== 'undefined' ? localStorage.getItem(`live_status_${userId}`) : null;
@@ -39,20 +45,23 @@ export const LiveService = {
   },
 
   async getPlaybackUrl(userId: string): Promise<string | null> {
-    try {
-      const { data, error } = await supabase.functions.invoke('live-admin', {
-        body: { action: 'playback', userId },
-      });
-      if (error) throw error;
-      if (data && typeof data.playbackUrl === 'string') return data.playbackUrl as string;
-    } catch (e) {
-      // fallback
+    if (LIVE_ADMIN_ENABLED) {
+      try {
+        const { data, error } = await supabase.functions.invoke('live-admin', {
+          body: { action: 'playback', userId },
+        });
+        if (error) throw error;
+        if (data && typeof data.playbackUrl === 'string') return data.playbackUrl as string;
+      } catch (e) {
+        // fallback
+      }
     }
     const raw = typeof window !== 'undefined' ? localStorage.getItem(`live_playback_${userId}`) : null;
     return raw || null;
   },
 
   async start(userId: string): Promise<{ ok: boolean; message?: string }> {
+    if (!LIVE_ADMIN_ENABLED) return { ok: false, message: 'Live streaming is not yet available' };
     const { data, error } = await supabase.functions.invoke('live-admin', {
       body: { action: 'start', userId },
     });
@@ -61,6 +70,7 @@ export const LiveService = {
   },
 
   async stop(userId: string): Promise<{ ok: boolean; message?: string }> {
+    if (!LIVE_ADMIN_ENABLED) return { ok: false, message: 'Live streaming is not yet available' };
     const { data, error } = await supabase.functions.invoke('live-admin', {
       body: { action: 'stop', userId },
     });
@@ -69,6 +79,7 @@ export const LiveService = {
   },
 
   async getSettings(userId: string): Promise<any> {
+    if (!LIVE_ADMIN_ENABLED) return {};
     const { data, error } = await supabase.functions.invoke('live-admin', {
       body: { action: 'settings', userId },
     });
@@ -77,6 +88,7 @@ export const LiveService = {
   },
 
   async updateSettings(userId: string, payload: Record<string, any>): Promise<{ ok: boolean; message?: string }> {
+    if (!LIVE_ADMIN_ENABLED) return { ok: false, message: 'Live streaming is not yet available' };
     const { data, error } = await supabase.functions.invoke('live-admin', {
       body: { action: 'update-settings', userId, payload },
     });
