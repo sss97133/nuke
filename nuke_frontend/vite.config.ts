@@ -45,7 +45,7 @@ export default defineConfig({
             if (id.includes('three')) return 'three';
             if (id.includes('exceljs')) return 'exceljs';
             if (id.includes('tesseract')) return 'tesseract';
-            if (id.includes('leaflet')) return 'maps';
+            if (id.includes('leaflet') || id.includes('maplibre-gl') || id.includes('deck.gl') || id.includes('@deck.gl/') || id.includes('react-map-gl')) return 'maps';
           }
         },
       },
@@ -64,6 +64,16 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       '**/_archived/**',
+    ],
+  },
+  optimizeDeps: {
+    include: [
+      'maplibre-gl',
+      'deck.gl',
+      '@deck.gl/core',
+      '@deck.gl/layers',
+      '@deck.gl/react',
+      'react-map-gl/maplibre',
     ],
   },
   server: {
