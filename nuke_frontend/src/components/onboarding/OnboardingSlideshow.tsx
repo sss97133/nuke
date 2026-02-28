@@ -1,6 +1,6 @@
 /**
- * OnboardingSlideshow - Marketing pitch modal for non-logged-in users
- * 5-frame slideshow showcasing platform integrations and features
+ * OnboardingSlideshow - 3-slide "How It Works" modal for first-time visitors.
+ * Triggered from homepage "Take a Tour" CTA.
  */
 
 import React, { useState } from 'react';
@@ -13,60 +13,65 @@ interface OnboardingSlideshowProps {
 
 const slides = [
   {
-    title: "AI-Powered Image Analysis",
-    description: "Upload photos and our AI automatically detects damage, identifies parts, extracts text from receipts, and organizes everything into a searchable timeline.",
+    title: "Drop a URL",
+    description: "Paste any vehicle listing URL — Bring a Trailer, eBay, Cars & Bids, Craigslist, Facebook Marketplace, or dozens more. We extract every data point automatically: price, specs, images, seller history, auction results.",
     features: [
-      "Automatic damage detection and severity scoring",
-      "Parts identification with cross-references to manuals",
-      "OCR for receipts, titles, and documents",
-      "Smart categorization (exterior, interior, engine, etc.)"
+      "Instant extraction from 50+ platforms",
+      "AI-powered field parsing (VIN, mileage, options, history)",
+      "Every page archived — re-extract anytime without re-crawling",
+      "Cross-reference against existing vehicle profiles"
     ],
-    visual: "AI" // Will be replaced with actual screenshots
+    visual: `  URL ──────────────────────────────────────┐
+  bringatrailer.com/listing/1973-porsche   │
+  ─────────────────────────────────────────┘
+       │
+       ▼
+  ┌─ EXTRACT ──────────────────────────────┐
+  │  Year: 1973        Make: Porsche       │
+  │  Model: 911T       VIN: 9113101784     │
+  │  Sale: $87,000     Bids: 47            │
+  │  Images: 64        Seller: 3 sales     │
+  └────────────────────────────────────────┘`
   },
   {
-    title: "Professional Vehicle Profiles",
-    description: "Build comprehensive digital dossiers for every vehicle with full history tracking, documentation, and collaborative contributions.",
+    title: "Explore the Database",
+    description: "Browse canonical profiles for hundreds of thousands of real vehicles. Every profile aggregates auction results, pricing history, comparable sales, and provenance data from every source we've ever seen that vehicle.",
     features: [
-      "VIN decoding with factory specs and recall data",
-      "Timeline of all work, modifications, and events",
-      "Title verification and ownership claims",
-      "Multi-user collaboration on shared vehicles"
+      "998K+ vehicle profiles with real data",
+      "34M+ photos indexed and searchable",
+      "Market comps and deal scoring on every listing",
+      "Data quality tiers from F (stub) to SSS (museum-grade)"
     ],
-    visual: "📊"
+    visual: `  ┌─ VEHICLE PROFILE ────────────────────────┐
+  │  1967 PORSCHE 911S                       │
+  │  VIN: 308081S  ·  TIER: A               │
+  │──────────────────────────────────────────│
+  │  SOURCES: BaT, Hagerty, PCarMarket      │
+  │  IMAGES: 142  ·  EVENTS: 23             │
+  │  LAST SALE: $285,000 (2024)             │
+  │  NUKE ESTIMATE: $267,000                │
+  │  DEAL SCORE: 94 — STRONG BUY            │
+  └──────────────────────────────────────────┘`
   },
   {
-    title: "Smart Receipt & Document Management",
-    description: "Never lose another receipt. AI extracts labor, parts, costs, and links everything to your vehicle timeline automatically.",
+    title: "Track and Score",
+    description: "Add vehicles to your garage, get instant deal scores on active listings, and monitor values over time. Know whether a listing is priced right before you bid — backed by real transaction data, not guesses.",
     features: [
-      "Automatic receipt parsing (parts, labor, tax)",
-      "Links receipts to timeline events and images",
-      "Secure sensitive document storage (titles, registrations)",
-      "Export reports for insurance and resale"
+      "Garage: track your vehicles and watchlist",
+      "Deal scoring: is this listing priced right?",
+      "Value alerts when vehicles you watch come to market",
+      "API access to build on top of the dataset"
     ],
-    visual: "📝"
+    visual: `  ┌─ YOUR GARAGE ─────────────────────────────┐
+  │                                           │
+  │  1973 Porsche 911T          ▲ +12% YoY   │
+  │  1988 BMW M3 E30            ▲  +8% YoY   │
+  │  1967 Ford Mustang GT       ▼  -3% YoY   │
+  │                                           │
+  │  ACTIVE ALERT:                            │
+  │  "1973 911T on BaT — $62K — DEAL: 91"   │
+  └───────────────────────────────────────────┘`
   },
-  {
-    title: "Real-Time Market Intelligence",
-    description: "Track your vehicle's value with live auction data, market comps, and investment-grade analytics.",
-    features: [
-      "Live auction tracking from Bring a Trailer",
-      "Comparable sales analysis and pricing trends",
-      "Portfolio valuation and ROI tracking",
-      "Market sentiment and demand indicators"
-    ],
-    visual: "💰"
-  },
-  {
-    title: "Organization & Team Collaboration",
-    description: "Perfect for shops, dealers, and collectors. Manage inventory, track work orders, and collaborate with your team in real-time.",
-    features: [
-      "Multi-vehicle inventory management",
-      "Team member roles and permissions",
-      "Work order tracking and invoicing",
-      "Customer vehicle access and sharing"
-    ],
-    visual: "🏢"
-  }
 ];
 
 export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen, onClose }) => {
@@ -137,8 +142,8 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
             alignItems: 'center'
           }}
         >
-          <div style={{ fontSize: '13px', fontWeight: 700 }}>
-            NUKE PLATFORM - FEATURE SHOWCASE
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.5px' }}>
+            HOW IT WORKS
           </div>
           <button
             onClick={onClose}
@@ -182,18 +187,20 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
 
         {/* Slide Content */}
         <div style={{ padding: 'var(--space-6)' }}>
-          {/* Visual Placeholder */}
+          {/* ASCII Visual */}
           <div
             style={{
               width: '100%',
-              height: '200px',
-              backgroundColor: 'var(--grey-100)',
-              border: '2px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              backgroundColor: '#1a1a1a',
+              border: '1px solid #333',
+              padding: '20px 16px',
               marginBottom: 'var(--space-4)',
-              fontSize: '85px'
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              lineHeight: '1.5',
+              color: '#ccc',
+              whiteSpace: 'pre',
+              overflow: 'auto',
             }}
           >
             {slide.visual}

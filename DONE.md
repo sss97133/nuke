@@ -1,5 +1,35 @@
 # DONE — Completed Work Log
 
+## 2026-02-28 (First-Touch User Engagement Overhaul)
+- [frontend] Homepage: Live vehicle showcase strip (8 real vehicles with images, auto-refresh 60s)
+- [frontend] Homepage: Inline search preview dropdown (debounced 300ms, 5 results)
+- [frontend] Homepage: "Take a Tour" button wired to OnboardingSlideshow
+- [frontend] OnboardingSlideshow: Trimmed 5→3 slides, emoji→ASCII art, renamed "HOW IT WORKS"
+- [frontend] VehicleCardDense: No-image fallback → text-based identity card (year/make/model + data points)
+- [frontend] CursorHomepage: First-visit context banner (dismissible, localStorage-persisted)
+- [frontend] Login/Signup: Added "WHY SIGN UP" value proposition column for signup mode
+- [docs] Created FIRST_TOUCH_FIX_MAP.md (audit) and FIRST_TOUCH_REPORT.md (implementation report)
+
+## 2026-02-28 (Theme System Audit & Fix)
+- [frontend] Phase 1-2: Full theme audit — found 1,709 inline violations, 97 undefined CSS vars, 3 CSS files broken
+- [frontend] Phase 3: Added ~90 new CSS variables to unified-design-system.css (both light/dark blocks)
+- [frontend] Phase 3: Fixed 80+ TSX files (~800+ hardcoded colors → CSS variables)
+- [frontend] Phase 3: Fixed 3 CSS files (AnnotatedField, ProfessionalToolbox, MergeProposalsDashboard) — zero violations
+- [frontend] Phase 4: Updated index.css compat layer with audit stats and documentation
+- [frontend] Phase 6: Wrote THEME_AUDIT_REPORT.md — full stats, remaining debt, recommendations
+- [frontend] Result: 47% reduction in inline violations (1,709→902), 100% of undefined CSS vars resolved
+
+## 2026-02-28 (Automated Labor Estimation Pipeline)
+- [labor] Phase 1: YONO fabrication stage head — 10-stage taxonomy (raw→complete), auto_label_stages.py, train_stage_classifier.py, StageClassifier in server.py
+- [labor] Phase 2: Auto work session detection — detect_work_sessions() SQL + auto-detect-sessions edge function
+- [labor] Phase 3: Delta-to-labor mapping — stage_transition_labor_map (15 seed transitions), estimate_labor_from_delta() SQL, compute-labor-estimate edge function
+- [labor] Phase 4: Unarchived detect-before-after, replaced OpenAI GPT-4O with callTierVision (Sonnet)
+- [labor] Phase 5: YONO active learning — yono-escalation-router (confidence tiers), yono_training_queue, yono-export-training, retrain_from_queue.py
+- [labor] Phase 6: Photo coaching — photoCoaching.ts, wired into sms-work-intake + sms-reminder-scheduler (photo_gap_nudge)
+- [labor] Phase 7: Full pipeline wiring — progress_shot → yono-analyze → escalation → sessions → before/after → labor estimate → coaching
+- [labor] DB: fabrication_stage/stage_confidence columns, work_sessions/labor_estimates extensions, stage_transition_labor_map, yono_training_queue
+- [labor] 9 edge functions deployed: auto-detect-sessions, compute-labor-estimate, detect-before-after, yono-escalation-router, yono-export-training, yono-analyze (updated), photo-pipeline-orchestrator (updated), sms-work-intake (updated), sms-reminder-scheduler (updated)
+
 ### [VP Extraction] P0: Fix Cars & Bids extraction pipeline — 2026-02-27 21:30 UTC
 **Task ID:** 200cba73-c5b7-4cc5-a5a2-4a77791ffe62 (RESOLVED)
 

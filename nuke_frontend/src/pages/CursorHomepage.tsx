@@ -81,6 +81,9 @@ const CursorHomepage: React.FC = () => {
   const [filteredRenderLimit, setFilteredRenderLimit] = useState<number>(DEFAULT_FILTERED_RENDER_LIMIT);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [infoDense, setInfoDense] = useState<boolean>(false);
+  const [firstVisitDismissed, setFirstVisitDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem('nuke_visited') === '1'; } catch { return true; }
+  });
 
   // Some environments may not have `vehicles.listing_kind` yet (migration not applied).
   // We optimistically use it, but fall back automatically if PostgREST reports it missing.
@@ -1757,6 +1760,51 @@ const CursorHomepage: React.FC = () => {
         margin: '0 auto',
         padding: '0 16px'
       }}>
+        {/* First-visit context banner */}
+        {!firstVisitDismissed && (
+          <div style={{
+            background: '#f5f5f5',
+            border: '2px solid #ccc',
+            padding: '12px 16px',
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+          }}>
+            <div style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              color: '#333',
+              lineHeight: 1.6,
+            }}>
+              YOU'RE LOOKING AT {displayStats.totalVehicles?.toLocaleString() || '998,000+'} VEHICLES FROM 50+ SOURCES.
+              EVERY CARD IS A REAL VEHICLE WITH AUCTION DATA, PRICING, AND PROVENANCE. CLICK ANY CARD TO EXPLORE.
+            </div>
+            <button
+              onClick={() => {
+                try { localStorage.setItem('nuke_visited', '1'); } catch {}
+                setFirstVisitDismissed(true);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: 16,
+                color: '#999',
+                cursor: 'pointer',
+                padding: '0 4px',
+                flexShrink: 0,
+                lineHeight: 1,
+              }}
+              aria-label="Dismiss banner"
+            >
+              &#10005;
+            </button>
+          </div>
+        )}
+
         {/* Sticky Minimized Filter Bar */}
         {filterBarMinimized && (
           <FeedStatsBar

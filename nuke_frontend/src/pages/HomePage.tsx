@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
+import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 
 /** Simple stats loader for the public landing page — no auth or complex fallbacks needed. */
 function useLandingStats() {
@@ -35,6 +36,114 @@ function useLandingStats() {
   return stats;
 }
 
+interface ShowcaseVehicle {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  primary_image_url: string | null;
+  sale_price: number | null;
+  asking_price: number | null;
+}
+
+/** Loads 8 recent vehicles that have images for the live showcase strip. */
+function useLiveShowcase() {
+  const [vehicles, setVehicles] = useState<ShowcaseVehicle[]>([]);
+  const [error, setError] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const { data, error: err } = await supabase
+        .from('vehicles')
+        .select('id, year, make, model, primary_image_url, sale_price, asking_price')
+        .not('primary_image_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(8);
+      if (err) throw err;
+      if (data && data.length > 0) {
+        setVehicles(data);
+        setError(false);
+      }
+    } catch {
+      setError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  return { vehicles, error };
+}
+
+interface SearchPreviewResult {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  sale_price: number | null;
+  asking_price: number | null;
+}
+
+/** Inline search preview hook — debounced 300ms. */
+function useSearchPreview(query: string) {
+  const [results, setResults] = useState<SearchPreviewResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [noResults, setNoResults] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      setNoResults(false);
+      return;
+    }
+
+    setLoading(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(async () => {
+      try {
+        // Split query into words for flexible matching
+        const words = q.split(/\s+/).filter(w => w.length > 0);
+        let builder = supabase
+          .from('vehicles')
+          .select('id, year, make, model, sale_price, asking_price');
+
+        // Apply ilike for each word across make+model concatenation
+        for (const word of words) {
+          builder = builder.or(`make.ilike.%${word}%,model.ilike.%${word}%,vin.ilike.%${word}%`);
+        }
+
+        // If query looks like a year, also filter by year
+        const yearMatch = q.match(/\b(19|20)\d{2}\b/);
+        if (yearMatch) {
+          builder = builder.eq('year', parseInt(yearMatch[0]));
+        }
+
+        const { data, error } = await builder.limit(5);
+        if (error) throw error;
+        setResults(data || []);
+        setNoResults((data || []).length === 0);
+      } catch {
+        setResults([]);
+        setNoResults(false);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [query]);
+
+  return { results, loading, noResults };
+}
+
 const CursorHomepage = lazy(() => import('./CursorHomepage'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
 const UnifiedMap = lazy(() => import('../components/map/UnifiedMap'));
@@ -54,6 +163,12 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   usePageTitle('Nuke — Vehicle Intelligence');
   const landingStats = useLandingStats();
   const [searchInput, setSearchInput] = useState('');
+  const [showTour, setShowTour] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  const { vehicles: showcaseVehicles } = useLiveShowcase();
+  const { results: searchResults, noResults } = useSearchPreview(searchInput);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,11 +177,30 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     else navigate('/search');
   };
 
+  // Close search dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const formatNum = (n: number | null | undefined) => {
     if (n == null) return '—';
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
     if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
     return n.toLocaleString();
+  };
+
+  const formatPrice = (v: { sale_price?: number | null; asking_price?: number | null }) => {
+    const p = v.sale_price || v.asking_price;
+    if (!p) return null;
+    if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(1)}M`;
+    if (p >= 1_000) return `$${Math.round(p / 1_000)}K`;
+    return `$${p.toLocaleString()}`;
   };
 
   const statItems = [
@@ -94,17 +228,17 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     },
   ];
 
+  const showDropdown = searchFocused && searchInput.trim().length >= 2 && (searchResults.length > 0 || noResults);
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 'calc(100vh - 80px)',
         padding: '40px 24px',
-        background: '#111',
-        color: '#e5e7eb',
+        background: 'var(--bg)',
+        color: 'var(--text)',
         fontFamily: 'Arial, sans-serif',
       }}
     >
@@ -117,7 +251,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             letterSpacing: '-0.03em',
             lineHeight: 1.05,
             margin: '0 0 12px',
-            color: '#fff',
+            color: 'var(--surface)',
           }}
         >
           Nuke
@@ -126,7 +260,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           style={{
             fontSize: 'clamp(15px, 2.5vw, 20px)',
             lineHeight: 1.5,
-            color: '#9ca3af',
+            color: 'var(--text-disabled)',
             margin: '0 0 6px',
             fontWeight: 500,
           }}
@@ -137,7 +271,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           style={{
             fontSize: 'clamp(13px, 2vw, 15px)',
             lineHeight: 1.7,
-            color: '#6b7280',
+            color: 'var(--text-secondary)',
             margin: '0 0 32px',
             maxWidth: 520,
             marginLeft: 'auto',
@@ -148,53 +282,108 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           auction history, and provenance across hundreds of thousands of vehicles.
         </p>
 
-        {/* Search bar */}
-        <form
-          onSubmit={handleSearch}
-          style={{
-            display: 'flex',
-            gap: 0,
-            maxWidth: 520,
-            margin: '0 auto 24px',
-            boxShadow: '0 0 0 2px #fff',
-          }}
-        >
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search: 1967 Porsche 911, VIN, make, model..."
-            aria-label="Search vehicles"
+        {/* Search bar with inline preview */}
+        <div ref={searchContainerRef} style={{ position: 'relative', maxWidth: 520, margin: '0 auto 24px' }}>
+          <form
+            onSubmit={handleSearch}
             style={{
-              flex: 1,
-              padding: '12px 16px',
-              fontSize: 14,
-              border: 'none',
-              background: '#1a1a1a',
-              color: '#fff',
-              outline: 'none',
-              minWidth: 0,
-            }}
-          />
-          <button
-            type="submit"
-            style={{
-              padding: '12px 24px',
-              fontSize: 13,
-              fontWeight: 700,
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-              border: 'none',
-              background: '#fff',
-              color: '#111',
-              cursor: 'pointer',
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
+              display: 'flex',
+              gap: 0,
+              boxShadow: '0 0 0 2px var(--surface)',
             }}
           >
-            Search
-          </button>
-        </form>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              placeholder="Search: 1967 Porsche 911, VIN, make, model..."
+              aria-label="Search vehicles"
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                fontSize: 14,
+                border: 'none',
+                background: 'var(--surface)',
+                color: 'var(--text)',
+                outline: 'none',
+                minWidth: 0,
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                padding: '12px 24px',
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                border: 'none',
+                background: 'var(--surface)',
+                color: 'var(--text)',
+                cursor: 'pointer',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Search
+            </button>
+          </form>
+
+          {/* Inline search preview dropdown */}
+          {showDropdown && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              background: '#1a1a1a',
+              border: '1px solid #333',
+              zIndex: 100,
+            }}>
+              {searchResults.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    setSearchFocused(false);
+                    navigate(`/vehicle/${v.id}`);
+                  }}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    width: '100%',
+                    padding: '10px 16px',
+                    border: 'none',
+                    borderBottom: '1px solid #333',
+                    background: 'transparent',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: 13,
+                    fontFamily: 'Arial, sans-serif',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#2a2a2a'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span>
+                    {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle'}
+                  </span>
+                  {formatPrice(v) && (
+                    <span style={{ fontFamily: 'monospace', color: '#888', fontSize: 12 }}>
+                      {formatPrice(v)}
+                    </span>
+                  )}
+                </button>
+              ))}
+              {noResults && (
+                <div style={{ padding: '10px 16px', color: '#666', fontSize: 12 }}>
+                  No vehicles found for "{searchInput.trim()}"
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* CTAs */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -206,9 +395,9 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               fontWeight: 600,
               letterSpacing: '0.5px',
               textTransform: 'uppercase',
-              border: '2px solid #fff',
-              background: '#fff',
-              color: '#111',
+              border: '2px solid var(--surface)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
               cursor: 'pointer',
             }}
           >
@@ -222,13 +411,29 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               fontWeight: 600,
               letterSpacing: '0.5px',
               textTransform: 'uppercase',
-              border: '2px solid #444',
+              border: '2px solid var(--border)',
               background: 'transparent',
-              color: '#9ca3af',
+              color: 'var(--text-disabled)',
               cursor: 'pointer',
             }}
           >
             Browse the feed
+          </button>
+          <button
+            onClick={() => setShowTour(true)}
+            style={{
+              padding: '10px 28px',
+              fontSize: 13,
+              fontWeight: 600,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              border: '2px solid var(--border)',
+              background: 'transparent',
+              color: 'var(--text-disabled)',
+              cursor: 'pointer',
+            }}
+          >
+            Take a tour
           </button>
         </div>
       </div>
@@ -239,8 +444,8 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           display: 'flex',
           gap: 0,
           marginBottom: 40,
-          background: '#1a1a1a',
-          border: '1px solid #333',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
         }}
       >
         {statItems.map((s, i) => (
@@ -249,26 +454,126 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             style={{
               padding: '16px 28px',
               textAlign: 'center',
-              borderRight: i < statItems.length - 1 ? '1px solid #333' : 'none',
+              borderRight: i < statItems.length - 1 ? '1px solid var(--border)' : 'none',
             }}
           >
             <div
               style={{
                 fontSize: 'clamp(20px, 3vw, 28px)',
                 fontWeight: 700,
-                color: '#fff',
+                color: 'var(--surface)',
                 letterSpacing: '-0.02em',
                 fontFamily: 'monospace',
               }}
             >
               {s.value}
             </div>
-            <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 2 }}>
               {s.label}
             </div>
           </div>
         ))}
       </div>
+
+      {/* Live Vehicle Showcase */}
+      {showcaseVehicles.length > 0 && (
+        <div style={{ width: '100%', maxWidth: 900, marginBottom: 40 }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 12,
+          }}>
+            <div style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: '#22c55e',
+              animation: 'livePulse 2s ease-in-out infinite',
+            }} />
+            <span style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              color: 'var(--text-secondary)',
+            }}>
+              LIVE FEED — LATEST ARRIVALS
+            </span>
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: 8,
+            overflowX: 'auto',
+            paddingBottom: 8,
+            scrollbarWidth: 'thin',
+          }}>
+            {showcaseVehicles.map((v) => (
+              <Link
+                key={v.id}
+                to={`/vehicle/${v.id}`}
+                style={{
+                  flexShrink: 0,
+                  width: 160,
+                  background: '#1a1a1a',
+                  border: '1px solid #333',
+                  textDecoration: 'none',
+                  color: '#fff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{
+                  width: '100%',
+                  height: 100,
+                  overflow: 'hidden',
+                  background: '#111',
+                }}>
+                  <img
+                    src={v.primary_image_url || ''}
+                    alt={`${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim()}
+                    loading="lazy"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </div>
+                <div style={{ padding: '8px 10px' }}>
+                  <div style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    lineHeight: 1.3,
+                    marginBottom: 4,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle'}
+                  </div>
+                  {formatPrice(v) && (
+                    <div style={{
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      color: '#888',
+                    }}>
+                      {formatPrice(v)}
+                    </div>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+          <style>{`
+            @keyframes livePulse {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0.3; }
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* Feature grid */}
       <div
@@ -278,8 +583,8 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           gap: 1,
           maxWidth: 720,
           width: '100%',
-          background: '#333',
-          border: '1px solid #333',
+          background: 'var(--border)',
+          border: '1px solid var(--border)',
           marginBottom: 32,
         }}
       >
@@ -288,7 +593,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             key={feature.title}
             style={{
               padding: '20px 16px',
-              background: '#1a1a1a',
+              background: 'var(--surface)',
             }}
           >
             <div
@@ -297,7 +602,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                 fontWeight: 700,
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',
-                color: '#e5e7eb',
+                color: 'var(--text)',
                 marginBottom: 6,
               }}
             >
@@ -307,7 +612,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               style={{
                 fontSize: 12,
                 lineHeight: 1.6,
-                color: '#6b7280',
+                color: 'var(--text-secondary)',
               }}
             >
               {feature.desc}
@@ -327,12 +632,15 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           textTransform: 'uppercase',
         }}
       >
-        <Link to="/api" style={{ color: '#6b7280', textDecoration: 'none' }}>API</Link>
-        <Link to="/developers" style={{ color: '#6b7280', textDecoration: 'none' }}>SDK</Link>
-        <Link to="/about" style={{ color: '#6b7280', textDecoration: 'none' }}>About</Link>
-        <Link to="/search" style={{ color: '#6b7280', textDecoration: 'none' }}>Search</Link>
-        <Link to="/offering" style={{ color: '#6b7280', textDecoration: 'none' }}>Investors</Link>
+        <Link to="/api" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>API</Link>
+        <Link to="/developers" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>SDK</Link>
+        <Link to="/about" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>About</Link>
+        <Link to="/search" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Search</Link>
+        <Link to="/offering" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Investors</Link>
       </div>
+
+      {/* Onboarding Tour Modal */}
+      <OnboardingSlideshow isOpen={showTour} onClose={() => setShowTour(false)} />
     </div>
   );
 }
@@ -416,10 +724,10 @@ export default function HomePage() {
         style={{
           display: 'flex',
           alignItems: 'stretch',
-          background: '#1a1a1a',
+          background: 'var(--surface)',
           flexShrink: 0,
-          borderTop: '1px solid #333',
-          borderBottom: '2px solid #000',
+          borderTop: '1px solid var(--border)',
+          borderBottom: '2px solid var(--text)',
           height: 30,
         }}
       >
@@ -438,15 +746,15 @@ export default function HomePage() {
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',
                 border: 'none',
-                borderBottom: active ? '2px solid #fff' : '2px solid transparent',
-                background: active ? '#2a2a2a' : 'transparent',
-                color: active ? '#fff' : '#999',
+                borderBottom: active ? '2px solid var(--surface)' : '2px solid transparent',
+                background: active ? 'var(--bg)' : 'transparent',
+                color: active ? 'var(--surface)' : 'var(--text-disabled)',
                 cursor: 'pointer',
                 transition: 'color 0.1s, background 0.1s',
                 marginBottom: '-2px',
               }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = '#bbb'; }}
-              onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = '#999'; }}
+              onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
+              onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-disabled)'; }}
             >
               {tab.label}
             </button>
@@ -472,7 +780,7 @@ export default function HomePage() {
               letterSpacing: '0.5px',
               textTransform: 'uppercase',
               textDecoration: 'none',
-              color: '#7eb8da',
+              color: 'var(--accent)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -491,7 +799,7 @@ export default function HomePage() {
               letterSpacing: '0.5px',
               textTransform: 'uppercase',
               textDecoration: 'none',
-              color: '#7eb8da',
+              color: 'var(--accent)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
