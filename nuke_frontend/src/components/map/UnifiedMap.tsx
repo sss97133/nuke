@@ -5,8 +5,27 @@ import { Map } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { supabase } from '../../lib/supabase';
 import '../../design-system.css';
+import ZIP_DB from './us-zips.json';
 
-// --- State centroid geocoding ---
+// --- ZIP code geocoding (city-level accuracy) ---
+const ZIPS: Record<string, [number, number]> = ZIP_DB as any;
+
+// State abbreviations → full name for fallback matching
+const ST_ABBR: Record<string, string> = {
+  'al':'alabama','ak':'alaska','az':'arizona','ar':'arkansas','ca':'california',
+  'co':'colorado','ct':'connecticut','de':'delaware','fl':'florida','ga':'georgia',
+  'hi':'hawaii','id':'idaho','il':'illinois','in':'indiana','ia':'iowa',
+  'ks':'kansas','ky':'kentucky','la':'louisiana','me':'maine','md':'maryland',
+  'ma':'massachusetts','mi':'michigan','mn':'minnesota','ms':'mississippi','mo':'missouri',
+  'mt':'montana','ne':'nebraska','nv':'nevada','nh':'new hampshire','nj':'new jersey',
+  'nm':'new mexico','ny':'new york','nc':'north carolina','nd':'north dakota','oh':'ohio',
+  'ok':'oklahoma','or':'oregon','pa':'pennsylvania','ri':'rhode island','sc':'south carolina',
+  'sd':'south dakota','tn':'tennessee','tx':'texas','ut':'utah','vt':'vermont',
+  'va':'virginia','wa':'washington','wv':'west virginia','wi':'wisconsin','wy':'wyoming',
+  'dc':'district of columbia',
+};
+
+// State centroids — fallback only when ZIP + abbreviation both miss
 const ST: Record<string, [number, number]> = {
   'alabama': [32.8, -86.8], 'alaska': [64.2, -152.5], 'arizona': [34.0, -111.1],
   'arkansas': [35.0, -92.4], 'california': [36.8, -119.4], 'colorado': [39.1, -105.4],
@@ -34,7 +53,35 @@ function simpleHash(s: string): number {
 }
 
 function geo(loc: string): [number, number] | null {
+  // 1) Try ZIP code — gives city-level accuracy
+  const zipMatch = loc.match(/\b(\d{5})\b/);
+  if (zipMatch) {
+    const coords = ZIPS[zipMatch[1]];
+    if (coords) {
+      // Tiny deterministic spread (±0.02° ≈ 2km) so same-ZIP vehicles don't stack
+      const h = simpleHash(loc);
+      const latOff = ((h & 0xff) / 255 - 0.5) * 0.04;
+      const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * 0.04;
+      return [coords[0] + latOff, coords[1] + lngOff];
+    }
+  }
+
   const l = loc.toLowerCase();
+
+  // 2) Try state abbreviation match (e.g. "Phoenix, AZ")
+  const abbrMatch = loc.match(/,\s*([A-Z]{2})\s*$/);
+  if (abbrMatch) {
+    const fullState = ST_ABBR[abbrMatch[1].toLowerCase()];
+    if (fullState && ST[fullState]) {
+      const c = ST[fullState];
+      const h = simpleHash(loc);
+      const latOff = ((h & 0xff) / 255 - 0.5) * 1.0;
+      const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * 1.0;
+      return [c[0] + latOff, c[1] + lngOff];
+    }
+  }
+
+  // 3) Try full state name match — fallback with wider spread
   for (const [s, c] of Object.entries(ST)) {
     if (l.includes(s)) {
       const h = simpleHash(loc);
@@ -43,6 +90,20 @@ function geo(loc: string): [number, number] | null {
       return [c[0] + latOff, c[1] + lngOff];
     }
   }
+
+  // 4) International — try known country patterns
+  if (l.includes('canada')) return [45.4 + (simpleHash(loc) & 0xf) * 0.3, -75.7 - (simpleHash(loc) >> 4 & 0xf) * 0.5];
+  if (l.includes('uk') || l.includes('england') || l.includes('london')) return [51.5, -0.1];
+  if (l.includes('germany') || l.includes('deutschland')) return [50.1, 8.7];
+  if (l.includes('netherlands') || l.includes('amsterdam')) return [52.4, 4.9];
+  if (l.includes('japan') || l.includes('tokyo')) return [35.7, 139.7];
+  if (l.includes('australia') || l.includes('sydney') || l.includes('melbourne')) return [-33.9, 151.2];
+  if (l.includes('italy') || l.includes('roma') || l.includes('milan')) return [41.9, 12.5];
+  if (l.includes('france') || l.includes('paris')) return [48.9, 2.3];
+  if (l.includes('spain') || l.includes('madrid')) return [40.4, -3.7];
+  if (l.includes('sweden') || l.includes('stockholm')) return [59.3, 18.1];
+  if (l.includes('switzerland') || l.includes('zurich')) return [47.4, 8.5];
+
   return null;
 }
 
