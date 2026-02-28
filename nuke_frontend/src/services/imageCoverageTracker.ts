@@ -1,15 +1,42 @@
 /**
  * Image Coverage Tracker
- * 
- * Analyzes vehicle image coverage to determine completeness:
+ *
+ * Analyzes vehicle image coverage using the vehicle_zone system:
  * - "Every inch of this thing has been photographed"
- * - Tracks which angles/parts/areas are documented
- * - Calculates coverage percentage
+ * - Tracks which zones have documented images
+ * - Calculates coverage percentage against essential zones
  * - Identifies missing coverage areas
+ *
+ * Uses `vehicle_zone` (41-zone taxonomy) as the primary classification.
+ * Falls back to legacy `angle_family` / `angle_name` data where zone has
+ * not yet been populated. Legacy paths are marked DEPRECATED.
  */
 
 import { supabase } from '../lib/supabase';
+import {
+  ZONE_CATEGORIES,
+  ZONE_LABELS,
+  ESSENTIAL_ZONES,
+  ZONE_DISPLAY_PRIORITY,
+  ANGLE_FAMILY_TO_ZONE_MAP,
+  resolveToZone,
+  getZoneLabel,
+  getZoneCategory,
+} from '../constants/vehicleZones';
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface CoverageZone {
+  zone: string;
+  label: string;
+  category: string;
+  is_essential: boolean;
+}
+
+// DEPRECATED: Keep CoverageAngle as an alias for backward compatibility
+/** @deprecated Use CoverageZone instead */
 export interface CoverageAngle {
   angle_name: string;
   category: 'exterior' | 'interior' | 'engine' | 'undercarriage' | 'detail' | 'document';
@@ -18,7 +45,8 @@ export interface CoverageAngle {
 }
 
 export interface CoverageStatus {
-  angle_name: string;
+  zone: string;
+  label: string;
   category: string;
   is_essential: boolean;
   has_coverage: boolean;
@@ -29,8 +57,11 @@ export interface CoverageStatus {
     id: string;
     image_url: string;
     confidence: number;
-    angle_family: string;
+    zone: string;
   }>;
+  // DEPRECATED: kept for backward compatibility
+  angle_name: string;
+  angle_family: string;
 }
 
 export interface VehicleCoverageReport {
@@ -45,20 +76,29 @@ export interface VehicleCoverageReport {
   category_coverage: {
     exterior: { covered: number; total: number; percentage: number };
     interior: { covered: number; total: number; percentage: number };
+    mechanical: { covered: number; total: number; percentage: number };
+    detail: { covered: number; total: number; percentage: number };
+    // DEPRECATED: legacy categories kept for backward compat
     engine: { covered: number; total: number; percentage: number };
     undercarriage: { covered: number; total: number; percentage: number };
-    detail: { covered: number; total: number; percentage: number };
     document: { covered: number; total: number; percentage: number };
   };
-  angle_statuses: CoverageStatus[];
+  zone_statuses: CoverageStatus[];
   missing_essential: string[];
   recommendations: string[];
+  // DEPRECATED: alias
+  angle_statuses: CoverageStatus[];
 }
 
+// ---------------------------------------------------------------------------
+// Essential zones
+// ---------------------------------------------------------------------------
+
 /**
- * Get all essential angles that should be photographed
+ * Get essential zones for coverage checking.
+ * Tries the DB table first (image_coverage_angles), falls back to constants.
  */
-export async function getEssentialAngles(): Promise<CoverageAngle[]> {
+export async function getEssentialZones(): Promise<CoverageZone[]> {
   try {
     const { data, error } = await supabase
       .from('image_coverage_angles')
@@ -69,279 +109,168 @@ export async function getEssentialAngles(): Promise<CoverageAngle[]> {
       .order('angle_name', { ascending: true });
 
     if (error) throw error;
-    
+
     if (data && data.length > 0) {
-      return data.map(angle => ({
-        angle_name: angle.display_name || angle.angle_name, // Use display_name if available
-        category: angle.category as CoverageAngle['category'],
-        is_essential: angle.is_essential,
-        description: angle.description
-      }));
+      return data.map((row) => {
+        const zoneName = resolveToZone(row.angle_name);
+        return {
+          zone: zoneName,
+          label: row.display_name || getZoneLabel(zoneName),
+          category: getZoneCategory(zoneName) || row.category,
+          is_essential: row.is_essential,
+        };
+      });
     }
-    
-    // Fallback to hardcoded essential angles
-    return getDefaultEssentialAngles();
-  } catch (error) {
-    console.error('Error loading essential angles:', error);
-    // Fallback to hardcoded essential angles
-    return getDefaultEssentialAngles();
+
+    return getDefaultEssentialZones();
+  } catch {
+    return getDefaultEssentialZones();
   }
 }
 
-/**
- * Get default essential angles if table doesn't exist
- */
-function getDefaultEssentialAngles(): CoverageAngle[] {
-  return [
-    // Exterior essentials
-    { angle_name: 'Front Quarter (Driver)', category: 'exterior', is_essential: true },
-    { angle_name: 'Front Quarter (Passenger)', category: 'exterior', is_essential: true },
-    { angle_name: 'Rear Quarter (Driver)', category: 'exterior', is_essential: true },
-    { angle_name: 'Rear Quarter (Passenger)', category: 'exterior', is_essential: true },
-    { angle_name: 'Profile (Driver Side)', category: 'exterior', is_essential: true },
-    { angle_name: 'Profile (Passenger Side)', category: 'exterior', is_essential: true },
-    { angle_name: 'Front Straight', category: 'exterior', is_essential: true },
-    { angle_name: 'Rear Straight', category: 'exterior', is_essential: true },
-    
-    // Interior essentials
-    { angle_name: 'Dashboard (Full View)', category: 'interior', is_essential: true },
-    { angle_name: 'Driver Seat', category: 'interior', is_essential: true },
-    
-    // Engine essentials
-    { angle_name: 'Engine (Full View)', category: 'engine', is_essential: true },
-    
-    // Document essentials
-    { angle_name: 'VIN (Door Jamb)', category: 'document', is_essential: true },
-    { angle_name: 'VIN (Dashboard)', category: 'document', is_essential: true },
-  ];
+/** @deprecated Use getEssentialZones instead */
+export async function getEssentialAngles(): Promise<CoverageAngle[]> {
+  const zones = await getEssentialZones();
+  // DEPRECATED: migrate to vehicle_zone
+  return zones.map((z) => ({
+    angle_name: z.label,
+    category: mapCategoryToLegacy(z.category),
+    is_essential: z.is_essential,
+  }));
+}
+
+function mapCategoryToLegacy(category: string): CoverageAngle['category'] {
+  const map: Record<string, CoverageAngle['category']> = {
+    EXTERIOR: 'exterior',
+    INTERIOR: 'interior',
+    MECHANICAL: 'engine',
+    DETAIL: 'detail',
+    PANELS: 'exterior',
+    WHEELS: 'exterior',
+    OTHER: 'document',
+  };
+  return map[category] || 'exterior';
 }
 
 /**
- * Analyze coverage for a specific vehicle
+ * Default essential zones from constants (no DB required)
+ */
+function getDefaultEssentialZones(): CoverageZone[] {
+  return ESSENTIAL_ZONES.map((zone) => ({
+    zone,
+    label: getZoneLabel(zone),
+    category: getZoneCategory(zone) || 'OTHER',
+    is_essential: true,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Coverage analysis
+// ---------------------------------------------------------------------------
+
+/**
+ * Analyze coverage for a specific vehicle using vehicle_zone data.
  */
 export async function analyzeVehicleCoverage(vehicleId: string): Promise<VehicleCoverageReport> {
   try {
-    // Get all essential angles
-    const essentialAngles = await getEssentialAngles();
-    
-    // Get all images for this vehicle
+    const essentialZones = await getEssentialZones();
+
+    // Get all images for this vehicle, including vehicle_zone
     const { data: images, error: imagesError } = await supabase
       .from('vehicle_images')
-      .select('id, image_url, thumbnail_url, created_at')
+      .select('id, image_url, thumbnail_url, created_at, vehicle_zone, zone_confidence, photo_quality_score')
       .eq('vehicle_id', vehicleId);
 
     if (imagesError) throw imagesError;
 
-    // Get all classifications for this vehicle
-    const { data: classifications, error: classError } = await supabase
-      .from('ai_angle_classifications_audit')
-      .select('*')
-      .eq('vehicle_id', vehicleId);
+    // Count images that have a vehicle_zone assigned
+    const classifiedImages = (images || []).filter(
+      (img) => img.vehicle_zone && img.vehicle_zone !== 'other',
+    );
 
-    if (classError) throw classError;
-
-    // Get angle mappings
-    const { data: angleMappings, error: mappingError } = await supabase
-      .from('vehicle_image_angles')
-      .select(`
-        image_id,
-        angle_id,
-        confidence_score,
-        image_coverage_angles (
-          angle_name,
-          category,
-          is_essential
-        )
-      `)
-      .eq('vehicle_id', vehicleId);
-
-    if (mappingError) {
-      console.warn('Error loading angle mappings:', mappingError);
-    }
-
-    // Build coverage status for each essential angle
-    const angleStatuses: CoverageStatus[] = essentialAngles.map(angle => {
-      // Find images that match this angle
+    // Build coverage status for each essential zone
+    const zoneStatuses: CoverageStatus[] = essentialZones.map((essential) => {
+      // Find images matching this zone
       const matchingImages: CoverageStatus['images'] = [];
-      
-      // Check angle mappings first
-      const mappedImages = (angleMappings || []).filter(m => 
-        m.image_coverage_angles?.angle_name === angle.angle_name
-      );
-      
-      mappedImages.forEach(m => {
-        const img = images?.find(i => i.id === m.image_id);
-        if (img) {
+
+      // Primary path: match on vehicle_zone
+      (images || []).forEach((img) => {
+        const imgZone = (img.vehicle_zone || '').trim().toLowerCase();
+        if (imgZone === essential.zone) {
           matchingImages.push({
             id: img.id,
             image_url: img.image_url || img.thumbnail_url || '',
-            confidence: m.confidence_score || 0,
-            angle_family: angle.category
-          });
-        }
-      });
-
-      // Also check classifications by angle_family and view_axis
-      // Map angle_family + view_axis to angle_name (matching the backfill function logic)
-      const classMatches = (classifications || []).filter(c => {
-        const primaryLabel = c.primary_label?.toLowerCase() || '';
-        const angleFamily = c.angle_family?.toLowerCase() || '';
-        const viewAxis = c.view_axis?.toLowerCase() || '';
-        const partName = (c.raw_classification as any)?.part_name?.toLowerCase() || '';
-        
-        // Map angle_family + view_axis to display names (matching database display_name)
-        const matchesAngle = (() => {
-          const angleNameLower = angle.angle_name.toLowerCase();
-          
-          // Exterior mappings
-          if (angleFamily === 'front_corner' || angleFamily === 'front') {
-            if ((viewAxis.includes('left') || viewAxis.includes('driver')) && 
-                (angleNameLower.includes('front quarter') && angleNameLower.includes('driver'))) {
-              return true;
-            }
-            if ((viewAxis.includes('right') || viewAxis.includes('passenger')) && 
-                (angleNameLower.includes('front quarter') && angleNameLower.includes('passenger'))) {
-              return true;
-            }
-            if (!viewAxis && angleNameLower.includes('front straight')) {
-              return true;
-            }
-          }
-          
-          if (angleFamily === 'rear_corner' || angleFamily === 'rear') {
-            if ((viewAxis.includes('left') || viewAxis.includes('driver')) && 
-                (angleNameLower.includes('rear quarter') && angleNameLower.includes('driver'))) {
-              return true;
-            }
-            if ((viewAxis.includes('right') || viewAxis.includes('passenger')) && 
-                (angleNameLower.includes('rear quarter') && angleNameLower.includes('passenger'))) {
-              return true;
-            }
-            if (!viewAxis && angleNameLower.includes('rear straight')) {
-              return true;
-            }
-          }
-          
-          if (angleFamily === 'side') {
-            if ((viewAxis.includes('left') || viewAxis.includes('driver')) && 
-                angleNameLower.includes('profile') && angleNameLower.includes('driver')) {
-              return true;
-            }
-            if ((viewAxis.includes('right') || viewAxis.includes('passenger')) && 
-                angleNameLower.includes('profile') && angleNameLower.includes('passenger')) {
-              return true;
-            }
-          }
-          
-          // Interior mappings
-          if ((angleFamily === 'interior' || angleFamily === 'dash') && 
-              angleNameLower.includes('dashboard')) {
-            return true;
-          }
-          if (angleFamily === 'interior' && angleNameLower.includes('driver seat')) {
-            return true;
-          }
-          if (angleFamily === 'interior' && angleNameLower.includes('passenger seat')) {
-            return true;
-          }
-          
-          // Engine mappings
-          if (angleFamily === 'engine_bay') {
-            if (angleNameLower.includes('engine') && angleNameLower.includes('full')) {
-              return true;
-            }
-            if (angleNameLower.includes('engine') && (viewAxis.includes('driver') || viewAxis.includes('left'))) {
-              return true;
-            }
-            if (angleNameLower.includes('engine') && (viewAxis.includes('passenger') || viewAxis.includes('right'))) {
-              return true;
-            }
-          }
-          
-          // VIN/document mappings
-          if ((angleFamily === 'vin_plate' || angleFamily === 'document') && 
-              angleNameLower.includes('vin')) {
-            return true;
-          }
-          
-          // Fallback: check if primary_label matches
-          if (primaryLabel.includes(angleNameLower.split(' ')[0])) {
-            return true;
-          }
-          
-          return false;
-        })();
-        
-        return matchesAngle;
-      });
-
-      classMatches.forEach(c => {
-        const img = images?.find(i => i.id === c.image_id);
-        if (img && !matchingImages.find(m => m.id === img.id)) {
-          matchingImages.push({
-            id: img.id,
-            image_url: img.image_url || img.thumbnail_url || '',
-            confidence: c.confidence || 0,
-            angle_family: c.angle_family || ''
+            confidence: typeof img.zone_confidence === 'number' ? img.zone_confidence : 0,
+            zone: imgZone,
           });
         }
       });
 
       // Find best image (highest confidence)
-      const bestImage = matchingImages.length > 0
-        ? matchingImages.reduce((best, current) => 
-            current.confidence > (best.confidence || 0) ? current : best
-          )
-        : undefined;
+      const bestImage =
+        matchingImages.length > 0
+          ? matchingImages.reduce((best, current) =>
+              current.confidence > (best.confidence || 0) ? current : best,
+            )
+          : undefined;
 
       return {
-        angle_name: angle.angle_name,
-        category: angle.category,
-        is_essential: angle.is_essential,
+        zone: essential.zone,
+        label: essential.label,
+        category: essential.category,
+        is_essential: essential.is_essential,
         has_coverage: matchingImages.length > 0,
         image_count: matchingImages.length,
         best_image_id: bestImage?.id,
         best_confidence: bestImage?.confidence,
-        images: matchingImages
+        images: matchingImages,
+        // DEPRECATED: backward compat aliases
+        angle_name: essential.label,
+        angle_family: essential.zone,
       };
     });
 
     // Calculate coverage statistics
-    const essentialStatuses = angleStatuses.filter(s => s.is_essential);
-    const essentialCovered = essentialStatuses.filter(s => s.has_coverage).length;
+    const essentialStatuses = zoneStatuses.filter((s) => s.is_essential);
+    const essentialCovered = essentialStatuses.filter((s) => s.has_coverage).length;
     const essentialTotal = essentialStatuses.length;
 
     // Category coverage
     const categoryCoverage = {
-      exterior: calculateCategoryCoverage(angleStatuses, 'exterior'),
-      interior: calculateCategoryCoverage(angleStatuses, 'interior'),
-      engine: calculateCategoryCoverage(angleStatuses, 'engine'),
-      undercarriage: calculateCategoryCoverage(angleStatuses, 'undercarriage'),
-      detail: calculateCategoryCoverage(angleStatuses, 'detail'),
-      document: calculateCategoryCoverage(angleStatuses, 'document')
+      exterior: calculateZoneCategoryCoverage(images || [], 'EXTERIOR'),
+      interior: calculateZoneCategoryCoverage(images || [], 'INTERIOR'),
+      mechanical: calculateZoneCategoryCoverage(images || [], 'MECHANICAL'),
+      detail: calculateZoneCategoryCoverage(images || [], 'DETAIL'),
+      // DEPRECATED: legacy category aliases
+      engine: calculateZoneCategoryCoverage(images || [], 'MECHANICAL'),
+      undercarriage: calculateSingleZoneCoverage(images || [], 'ext_undercarriage'),
+      document: calculateZoneCategoryCoverage(images || [], 'OTHER'),
     };
 
-    // Missing essential angles
+    // Missing essential zones
     const missingEssential = essentialStatuses
-      .filter(s => !s.has_coverage)
-      .map(s => s.angle_name);
+      .filter((s) => !s.has_coverage)
+      .map((s) => s.label);
 
     // Generate recommendations
-    const recommendations = generateRecommendations(angleStatuses, missingEssential);
+    const recommendations = generateRecommendations(zoneStatuses, missingEssential);
 
     return {
       vehicle_id: vehicleId,
       total_images: images?.length || 0,
-      classified_images: classifications?.length || 0,
+      classified_images: classifiedImages.length,
       essential_coverage: {
         covered: essentialCovered,
         total: essentialTotal,
-        percentage: essentialTotal > 0 ? Math.round((essentialCovered / essentialTotal) * 100) : 0
+        percentage:
+          essentialTotal > 0 ? Math.round((essentialCovered / essentialTotal) * 100) : 0,
       },
       category_coverage: categoryCoverage,
-      angle_statuses: angleStatuses,
+      zone_statuses: zoneStatuses,
       missing_essential: missingEssential,
-      recommendations
+      recommendations,
+      // DEPRECATED: alias
+      angle_statuses: zoneStatuses,
     };
   } catch (error) {
     console.error('Error analyzing vehicle coverage:', error);
@@ -349,60 +278,100 @@ export async function analyzeVehicleCoverage(vehicleId: string): Promise<Vehicle
   }
 }
 
-function calculateCategoryCoverage(
-  statuses: CoverageStatus[],
-  category: string
+/**
+ * Calculate coverage for a zone category using vehicle_zone data.
+ */
+function calculateZoneCategoryCoverage(
+  images: Array<{ vehicle_zone?: string }>,
+  categoryKey: string,
 ): { covered: number; total: number; percentage: number } {
-  const categoryStatuses = statuses.filter(s => s.category === category);
-  const covered = categoryStatuses.filter(s => s.has_coverage).length;
-  const total = categoryStatuses.length;
-  
+  const categoryZones = ZONE_CATEGORIES[categoryKey as keyof typeof ZONE_CATEGORIES];
+  if (!categoryZones) return { covered: 0, total: 0, percentage: 0 };
+
+  const total = categoryZones.length;
+  const coveredZones = new Set<string>();
+
+  for (const img of images) {
+    const zone = (img.vehicle_zone || '').trim().toLowerCase();
+    if ((categoryZones as readonly string[]).includes(zone)) {
+      coveredZones.add(zone);
+    }
+  }
+
+  const covered = coveredZones.size;
   return {
     covered,
     total,
-    percentage: total > 0 ? Math.round((covered / total) * 100) : 0
+    percentage: total > 0 ? Math.round((covered / total) * 100) : 0,
+  };
+}
+
+/**
+ * Calculate coverage for a single specific zone.
+ */
+function calculateSingleZoneCoverage(
+  images: Array<{ vehicle_zone?: string }>,
+  targetZone: string,
+): { covered: number; total: number; percentage: number } {
+  const hasImage = images.some(
+    (img) => (img.vehicle_zone || '').trim().toLowerCase() === targetZone,
+  );
+  return {
+    covered: hasImage ? 1 : 0,
+    total: 1,
+    percentage: hasImage ? 100 : 0,
   };
 }
 
 function generateRecommendations(
   statuses: CoverageStatus[],
-  missingEssential: string[]
+  missingEssential: string[],
 ): string[] {
   const recommendations: string[] = [];
 
   if (missingEssential.length > 0) {
-    recommendations.push(`Missing ${missingEssential.length} essential angle${missingEssential.length !== 1 ? 's' : ''}: ${missingEssential.slice(0, 3).join(', ')}${missingEssential.length > 3 ? '...' : ''}`);
+    recommendations.push(
+      `Missing ${missingEssential.length} essential zone${missingEssential.length !== 1 ? 's' : ''}: ${missingEssential.slice(0, 3).join(', ')}${missingEssential.length > 3 ? '...' : ''}`,
+    );
   }
 
   // Check for low confidence images
-  const lowConfidence = statuses.filter(s => 
-    s.has_coverage && s.best_confidence && s.best_confidence < 70
+  const lowConfidence = statuses.filter(
+    (s) => s.has_coverage && s.best_confidence != null && s.best_confidence < 70,
   );
   if (lowConfidence.length > 0) {
-    recommendations.push(`${lowConfidence.length} angle${lowConfidence.length !== 1 ? 's' : ''} have low confidence scores - consider retaking photos`);
+    recommendations.push(
+      `${lowConfidence.length} zone${lowConfidence.length !== 1 ? 's' : ''} have low confidence scores - consider retaking photos`,
+    );
   }
 
   // Category-specific recommendations
-  const categoryStatuses = {
-    exterior: statuses.filter(s => s.category === 'exterior'),
-    interior: statuses.filter(s => s.category === 'interior'),
-    engine: statuses.filter(s => s.category === 'engine')
-  };
+  const categoryChecks = [
+    { name: 'Exterior', category: 'EXTERIOR', statuses: statuses.filter((s) => s.category === 'EXTERIOR') },
+    { name: 'Interior', category: 'INTERIOR', statuses: statuses.filter((s) => s.category === 'INTERIOR') },
+    { name: 'Mechanical', category: 'MECHANICAL', statuses: statuses.filter((s) => s.category === 'MECHANICAL') },
+  ];
 
-  Object.entries(categoryStatuses).forEach(([category, angles]) => {
-    const covered = angles.filter(a => a.has_coverage).length;
-    const total = angles.length;
-    if (covered < total * 0.5) {
-      recommendations.push(`${category.charAt(0).toUpperCase() + category.slice(1)} coverage is incomplete (${covered}/${total} angles)`);
+  for (const check of categoryChecks) {
+    const covered = check.statuses.filter((a) => a.has_coverage).length;
+    const total = check.statuses.length;
+    if (total > 0 && covered < total * 0.5) {
+      recommendations.push(
+        `${check.name} coverage is incomplete (${covered}/${total} zones)`,
+      );
     }
-  });
+  }
 
   if (recommendations.length === 0) {
-    recommendations.push('Excellent coverage! All essential angles are documented.');
+    recommendations.push('Excellent coverage! All essential zones are documented.');
   }
 
   return recommendations;
 }
+
+// ---------------------------------------------------------------------------
+// Summary helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Get coverage summary for quick display
@@ -416,7 +385,6 @@ export async function getCoverageSummary(vehicleId: string): Promise<{
   return {
     essential_percentage: report.essential_coverage.percentage,
     total_images: report.total_images,
-    missing_count: report.missing_essential.length
+    missing_count: report.missing_essential.length,
   };
 }
-

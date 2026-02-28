@@ -149,10 +149,17 @@ export interface VehicleHeaderProps {
   } | null;
 }
 
+export interface HeroMeta {
+  camera?: string;
+  location?: string;
+  date?: string;
+}
+
 export interface VehicleHeroImageProps {
   leadImageUrl: string | null;
   vehicleId?: string;
   overlayNode?: React.ReactNode;
+  heroMeta?: HeroMeta | null;
 }
 
 export interface VehiclePricingSectionProps {

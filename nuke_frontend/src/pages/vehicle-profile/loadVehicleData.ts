@@ -8,6 +8,121 @@
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { isMismatchedVehicleImage } from './imageFilterUtils';
 
+// ----- Hero Image Auto-Selection -----
+
+export interface HeroImageMeta {
+  camera?: string;
+  location?: string;
+  date?: string;
+}
+
+export interface HeroImageResult {
+  url: string;
+  meta: HeroImageMeta;
+}
+
+/**
+ * Select the best hero image for a vehicle based on zone, quality, and confidence scores.
+ *
+ * Priority:
+ *  1. Front-facing exterior zones with completed AI processing, scored by
+ *     (photo_quality_score * 2) + (zone_confidence * 3)
+ *  2. Fallback: highest photo_quality_score from any zone
+ *  3. Fallback: existing primary_image_url from the vehicle record
+ *
+ * Returns the best image URL (large > medium > image_url) and metadata
+ * extracted from exif_data and taken_at.
+ */
+export async function selectBestHeroImage(
+  vehicleId: string,
+  supabase: any,
+  primaryImageUrl?: string | null,
+): Promise<HeroImageResult | null> {
+  try {
+    // Attempt 1: front-facing exterior zones with completed AI processing
+    const { data: frontImages, error: frontErr } = await supabase
+      .from('vehicle_images')
+      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at')
+      .eq('vehicle_id', vehicleId)
+      .eq('ai_processing_status', 'completed')
+      .in('vehicle_zone', ['ext_front', 'ext_front_driver', 'ext_front_passenger'])
+      .order('photo_quality_score', { ascending: false })
+      .limit(20);
+
+    if (!frontErr && frontImages && frontImages.length > 0) {
+      // Score: (photo_quality_score * 2) + (zone_confidence * 3), highest wins
+      const scored = frontImages.map((img: any) => ({
+        ...img,
+        _score: ((img.photo_quality_score || 0) * 2) + ((img.zone_confidence || 0) * 3),
+      }));
+      scored.sort((a: any, b: any) => b._score - a._score);
+      return buildHeroResult(scored[0]);
+    }
+
+    // Attempt 2: any zone, highest photo_quality_score
+    const { data: anyImages, error: anyErr } = await supabase
+      .from('vehicle_images')
+      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at')
+      .eq('vehicle_id', vehicleId)
+      .not('photo_quality_score', 'is', null)
+      .order('photo_quality_score', { ascending: false })
+      .limit(1);
+
+    if (!anyErr && anyImages && anyImages.length > 0) {
+      return buildHeroResult(anyImages[0]);
+    }
+
+    // Attempt 3: fall back to primary_image_url
+    if (primaryImageUrl) {
+      return { url: primaryImageUrl, meta: {} };
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('[selectBestHeroImage] error:', err);
+    // Non-fatal — fall back to primary
+    if (primaryImageUrl) {
+      return { url: primaryImageUrl, meta: {} };
+    }
+    return null;
+  }
+}
+
+/** Extract the best URL and metadata from a vehicle_images row. */
+function buildHeroResult(row: any): HeroImageResult {
+  const url = row.large_url || row.medium_url || row.image_url || '';
+  const meta: HeroImageMeta = {};
+
+  // Camera model from EXIF
+  if (row.exif_data) {
+    const exif = typeof row.exif_data === 'string' ? JSON.parse(row.exif_data) : row.exif_data;
+    const cam = exif?.Model || exif?.model || exif?.camera_model || exif?.CameraModel;
+    if (cam) meta.camera = String(cam);
+
+    // GPS city/state
+    const city = exif?.City || exif?.city || exif?.GPSCity;
+    const state = exif?.State || exif?.state || exif?.Province || exif?.province || exif?.GPSState;
+    const parts: string[] = [];
+    if (city) parts.push(String(city));
+    if (state) parts.push(String(state));
+    if (parts.length > 0) meta.location = parts.join(', ');
+  }
+
+  // Taken date
+  if (row.taken_at) {
+    try {
+      const d = new Date(row.taken_at);
+      if (!isNaN(d.getTime())) {
+        meta.date = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return { url, meta };
+}
+
 export interface LoadVehicleParams {
   vehicleId: string | undefined;
   session: any;

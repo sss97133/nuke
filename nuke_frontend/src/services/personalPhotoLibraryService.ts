@@ -241,6 +241,7 @@ export class PersonalPhotoLibraryService {
    */
   static async getLibraryStats(): Promise<LibraryStats & {
     ai_status_breakdown?: { complete: number; pending: number; processing: number; failed: number };
+    /** @deprecated Use vehicle_zone-based breakdown instead. These legacy angle keys will be removed. */
     angle_breakdown?: { front: number; rear: number; side: number; interior: number; engine_bay: number; undercarriage: number; detail: number };
     vehicle_detection?: { found: number; not_found: number };
   }> {
