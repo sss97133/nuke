@@ -6,9 +6,10 @@ import { supabase } from '../lib/supabase';
 
 /** Simple stats loader for the public landing page — no auth or complex fallbacks needed. */
 function useLandingStats() {
-  const [stats, setStats] = useState<{ totalVehicles: number | null; totalImages: number | null }>({
+  const [stats, setStats] = useState<{ totalVehicles: number | null; totalImages: number | null; totalSources: number | null }>({
     totalVehicles: null,
     totalImages: null,
+    totalSources: null,
   });
 
   useEffect(() => {
@@ -22,11 +23,15 @@ function useLandingStats() {
       supabase
         .from('vehicle_images')
         .select('*', { count: 'estimated', head: true }),
-    ]).then(([cacheRes, imagesRes]) => {
+      supabase
+        .from('observation_sources')
+        .select('*', { count: 'exact', head: true }),
+    ]).then(([cacheRes, imagesRes, sourcesRes]) => {
       if (cancelled) return;
       setStats({
         totalVehicles: cacheRes.data ? Number(cacheRes.data.total_vehicles) || null : null,
         totalImages: imagesRes.count != null ? imagesRes.count : null,
+        totalSources: sourcesRes.count != null ? sourcesRes.count : null,
       });
     });
     return () => { cancelled = true; };
@@ -204,7 +209,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   const statItems = [
     { value: formatNum(landingStats.totalVehicles), label: 'vehicles tracked' },
     { value: formatNum(landingStats.totalImages), label: 'photos indexed' },
-    { value: '50+', label: 'data sources' },
+    { value: formatNum(landingStats.totalSources), label: 'data sources' },
   ];
 
   const features = [
@@ -222,7 +227,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     },
     {
       title: 'API & SDK',
-      desc: `Programmatic access to ${formatNum(landingStats.totalVehicles) !== '—' ? formatNum(landingStats.totalVehicles) : '1M+'} vehicle profiles. Build your own tools on top of the Nuke dataset.`,
+      desc: `Programmatic access to ${formatNum(landingStats.totalVehicles)} vehicle profiles. Build your own tools on top of the Nuke dataset.`,
     },
   ];
 
