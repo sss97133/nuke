@@ -152,6 +152,21 @@ interface VPin {
 interface ColPin { id: string; name: string; slug: string; ig: string | null; country: string; city: string; lat: number; lng: number; totalInventory: number; }
 interface BizPin { id: string; name: string; lat: number; lng: number; type: string | null; }
 
+interface PhotoPin {
+  id: string;
+  lat: number;
+  lng: number;
+  img: string;
+  thumb: string | null;
+  vehicleId: string | null;
+  vehicleTitle: string;
+  locationName: string | null;
+  takenAt: string | null;
+  takenLabel: string;
+  source: string;
+  cameraModel: string | null;
+}
+
 interface LiveEvent { id: string; lat: number; lng: number; ts: number; }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -268,10 +283,12 @@ export default function UnifiedMap() {
   const [showCollections, setShowCollections] = useState(true);
   const [showVehicles, setShowVehicles] = useState(true);
   const [showBusinesses, setShowBusinesses] = useState(true);
+  const [showPhotos, setShowPhotos] = useState(true);
 
   const [collections, setCollections] = useState<ColPin[]>([]);
   const [vehicles, setVehicles] = useState<VPin[]>([]);
   const [businesses, setBiz] = useState<BizPin[]>([]);
+  const [photos, setPhotos] = useState<PhotoPin[]>([]);
   const [vehLoading, setVehLoading] = useState(true);
 
   const [searchText, setSearchText] = useState('');
@@ -285,7 +302,7 @@ export default function UnifiedMap() {
   const [viewState, setViewState] = useState(INITIAL_VIEW);
 
   // Side panel popup (replaces floating popup that overlapped data)
-  const [selectedPin, setSelectedPin] = useState<{ pin: VPin | ColPin | BizPin; type: 'vehicle' | 'collection' | 'business' } | null>(null);
+  const [selectedPin, setSelectedPin] = useState<{ pin: VPin | ColPin | BizPin | PhotoPin; type: 'vehicle' | 'collection' | 'business' | 'photo' } | null>(null);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
 
   // Slider controls — defaults tuned so data is visible immediately at zoom 4.5
@@ -350,6 +367,51 @@ export default function UnifiedMap() {
       .then(({ data }) => {
         if (data) setBiz(data.map((b: any) => ({ id: b.id, name: b.business_name || 'Business', lat: b.latitude, lng: b.longitude, type: b.entity_type })));
       });
+  }, []);
+
+  // ---- Load GPS-tagged photos ----
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('vehicle_images')
+        .select('id, latitude, longitude, image_url, thumbnail_url, vehicle_id, location_name, taken_at, source, exif_data')
+        .not('latitude', 'is', null).not('longitude', 'is', null)
+        .order('taken_at', { ascending: false })
+        .limit(5000);
+      if (!data) return;
+
+      // Get vehicle titles for linked photos
+      const vehicleIds = [...new Set(data.map(d => d.vehicle_id).filter(Boolean))];
+      const vehicleTitles: Record<string, string> = {};
+      if (vehicleIds.length > 0) {
+        const { data: vehs } = await supabase.from('vehicles')
+          .select('id, year, make, model')
+          .in('id', vehicleIds.slice(0, 200));
+        for (const v of vehs || []) {
+          vehicleTitles[v.id] = [v.year, v.make, v.model].filter(Boolean).join(' ');
+        }
+      }
+
+      setPhotos(data.map(d => {
+        const dt = d.taken_at ? new Date(d.taken_at) : null;
+        const exif = d.exif_data as any;
+        return {
+          id: d.id,
+          lat: Number(d.latitude),
+          lng: Number(d.longitude),
+          img: d.image_url,
+          thumb: d.thumbnail_url || (d.image_url?.includes('/storage/v1/object/public/')
+            ? d.image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=200&height=140&quality=70&resize=cover'
+            : null),
+          vehicleId: d.vehicle_id,
+          vehicleTitle: d.vehicle_id ? (vehicleTitles[d.vehicle_id] || 'Vehicle') : '',
+          locationName: d.location_name,
+          takenAt: d.taken_at,
+          takenLabel: dt ? `${dt.toLocaleString('en', { month: 'short', day: 'numeric', year: 'numeric' })}` : '',
+          source: d.source || 'unknown',
+          cameraModel: exif?.camera_model || null,
+        };
+      }));
+    })();
   }, []);
 
   // ---- Load base vehicle layer — progressive cursor pagination ----
@@ -525,13 +587,15 @@ export default function UnifiedMap() {
       collections: collections.length,
       vehicles: vehCount,
       businesses: businesses.length,
+      photos: photos.length,
       query: queryResults.length,
       total: (showCollections && !hasQuery ? collections.length : 0)
            + (showVehicles && !hasQuery ? vehCount : 0)
            + (showBusinesses && !hasQuery ? businesses.length : 0)
+           + (showPhotos && !hasQuery ? photos.length : 0)
            + queryResults.length,
     };
-  }, [showCollections, showVehicles, showBusinesses, collections, filteredVehicles, businesses, queryResults, hasQuery]);
+  }, [showCollections, showVehicles, showBusinesses, showPhotos, collections, filteredVehicles, businesses, photos, queryResults, hasQuery]);
 
   // --- deck.gl layers ---
   const zoom = viewState.zoom;
@@ -725,6 +789,49 @@ export default function UnifiedMap() {
       }));
     }
 
+    // --- Photo Glow (magenta) ---
+    if (showPhotos && !hasQuery && photos.length > 0 && glowFade > 0) {
+      result.push(new ScatterplotLayer({
+        id: 'photo-glow',
+        data: photos,
+        getPosition: (d: PhotoPin) => [d.lng, d.lat],
+        getRadius: 400,
+        getFillColor: [217, 70, 239, Math.round(glowAlpha * 0.7)] as [number, number, number, number],
+        radiusMinPixels: Math.max(8, 10 * zoomScale),
+        radiusMaxPixels: Math.max(20, 35 * zoomScale),
+        opacity: glowFade * 0.7,
+        pickable: false,
+      }));
+    }
+
+    // --- Photo Points (magenta dots, pickable) ---
+    if (showPhotos && !hasQuery && photos.length > 0) {
+      result.push(new ScatterplotLayer({
+        id: 'photo-points',
+        data: photos,
+        getPosition: (d: PhotoPin) => [d.lng, d.lat],
+        getRadius: 60,
+        getFillColor: [217, 70, 239, 230] as [number, number, number, number],
+        radiusMinPixels: Math.max(3, ptMin * 1.2),
+        radiusMaxPixels: Math.max(6, ptMax * 1.2),
+        pickable: true,
+        onClick: ({ object }: any) => {
+          if (object) setSelectedPin({ pin: object, type: 'photo' as any });
+        },
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const label = object.vehicleTitle || 'Photo';
+            const loc = object.locationName ? ` · ${object.locationName.split(',')[0]}` : '';
+            const date = object.takenLabel ? ` · ${object.takenLabel}` : '';
+            setHoverInfo({ x, y, text: `📷 ${label}${loc}${date}` });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { radiusMinPixels: [ptMin], radiusMaxPixels: [ptMax] },
+      }));
+    }
+
     // --- Live Event Rings (animated) ---
     const liveEvents = liveEventsRef.current.filter(e => now - e.ts < 2500);
     if (liveEvents.length > 0) {
@@ -761,8 +868,8 @@ export default function UnifiedMap() {
     }
 
     return result;
-  }, [filteredVehicles, collections, businesses, queryResults, showVehicles, showCollections, showBusinesses,
-      hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, tick]);
+  }, [filteredVehicles, collections, businesses, photos, queryResults, showVehicles, showCollections, showBusinesses,
+      showPhotos, hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, tick]);
 
   const panelW = 320; // side panel width
   const hasSidePanel = selectedPin !== null;
@@ -859,6 +966,10 @@ export default function UnifiedMap() {
                 <span style={{ color: '#EC4899' }}>{counts.collections.toLocaleString()}</span>
                 {' / '}
                 <span style={{ color: '#14B8A6' }}>{counts.businesses.toLocaleString()}</span>
+                {counts.photos > 0 && <>
+                  {' / '}
+                  <span style={{ color: '#D946EF' }}>{counts.photos.toLocaleString()}</span>
+                </>}
               </span>
             </button>
           ) : (
@@ -872,6 +983,7 @@ export default function UnifiedMap() {
               <LT label="Vehicles" color="#3B82F6" checked={showVehicles} set={setShowVehicles} n={counts.vehicles} dim={hasQuery} loading={vehLoading} />
               <LT label="Collections" color="#EC4899" checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
               <LT label="Businesses" color="#14B8A6" checked={showBusinesses} set={setShowBusinesses} n={counts.businesses} dim={hasQuery} />
+              <LT label="Photos" color="#D946EF" checked={showPhotos} set={setShowPhotos} n={counts.photos} dim={hasQuery} />
               {activeQuery && <>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '6px 0' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
@@ -1054,6 +1166,48 @@ export default function UnifiedMap() {
                   <a href={`/org/${b.id}`} style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
                     background: 'rgba(20,184,166,0.2)', color: '#14B8A6', textDecoration: 'none', fontWeight: 600, fontSize: '12px',
                     border: '1px solid rgba(20,184,166,0.3)' }}>View Profile</a>
+                </div>
+              );
+            })()}
+
+            {type === 'photo' && (() => {
+              const p = pin as PhotoPin;
+              const imgSrc = p.thumb || p.img;
+              return (
+                <div>
+                  {imgSrc && <img src={imgSrc} alt="Photo" style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', background: '#000' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                  <div style={{ padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#D946EF', flexShrink: 0 }} />
+                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#D946EF' }}>Photo</span>
+                      <span style={{ fontSize: '10px', color: '#666', marginLeft: 'auto', textTransform: 'uppercase' }}>{p.source}</span>
+                    </div>
+                    {p.vehicleTitle && (
+                      <a href={p.vehicleId ? `/vehicle/${p.vehicleId}` : '#'} style={{
+                        color: '#3B82F6', textDecoration: 'none', fontWeight: 600, fontSize: '14px', display: 'block', marginBottom: 8,
+                      }}>{p.vehicleTitle}</a>
+                    )}
+                    {p.locationName && (
+                      <div style={{ color: '#e0e0e0', fontSize: '12px', marginBottom: 6, lineHeight: 1.5 }}>
+                        {p.locationName}
+                      </div>
+                    )}
+                    <div style={{ color: '#999', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                      {p.takenLabel && <div>Taken: <span style={{ color: '#e0e0e0' }}>{p.takenLabel}</span></div>}
+                      {p.cameraModel && <div>Camera: <span style={{ color: '#e0e0e0' }}>{p.cameraModel}</span></div>}
+                      <div>GPS: <span style={{ color: '#e0e0e0', fontFamily: 'monospace', fontSize: '10px' }}>
+                        {p.lat.toFixed(5)}, {p.lng.toFixed(5)}
+                      </span></div>
+                    </div>
+                    {p.vehicleId && (
+                      <a href={`/vehicle/${p.vehicleId}`} style={{
+                        display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
+                        background: 'rgba(217,70,239,0.15)', color: '#D946EF', textDecoration: 'none',
+                        fontWeight: 600, fontSize: '12px', border: '1px solid rgba(217,70,239,0.3)',
+                      }}>View Vehicle</a>
+                    )}
+                  </div>
                 </div>
               );
             })()}
