@@ -467,6 +467,14 @@ async function routeByType(
     case "detail_closeup":
     case "undercarriage":
     case "other": {
+      // Run YONO zone + stage analysis in background (cheap, local)
+      if (vehicleId) {
+        callEdgeFunction("yono-analyze", {
+          image_url: imageUrl,
+          image_id: imageId,
+        }).catch((e: any) => console.warn("[photo-pipeline] yono-analyze:", e.message));
+      }
+
       // Only call expensive analyze-image if we have a vehicle to enrich
       if (vehicleId) {
         return await callAnalyzeImage(imageId, imageUrl, vehicleId, userId);
@@ -528,8 +536,77 @@ async function routeByType(
     }
 
     case "progress_shot": {
-      // Work documentation → generate work logs
-      return await callGenerateWorkLogs(imageId, imageUrl, vehicleId, userId);
+      // Work documentation → generate work logs + labor estimation pipeline
+      const workLogResult = await callGenerateWorkLogs(imageId, imageUrl, vehicleId, userId);
+
+      // Run YONO analysis for zone + stage classification (non-blocking pipeline)
+      if (vehicleId) {
+        try {
+          // 1. YONO analyze for zone + stage
+          const yonoResp = await callEdgeFunction("yono-analyze", {
+            image_url: imageUrl,
+            image_id: imageId,
+          });
+
+          // 2. Escalation router — validates YONO if confidence is low
+          if (yonoResp?.available && yonoResp?.vehicle_zone) {
+            callEdgeFunction("yono-escalation-router", {
+              image_id: imageId,
+              image_url: imageUrl,
+              yono_result: {
+                vehicle_zone: yonoResp.vehicle_zone,
+                zone_confidence: yonoResp.zone_confidence,
+                fabrication_stage: yonoResp.fabrication_stage,
+                stage_confidence: yonoResp.stage_confidence,
+                condition_score: yonoResp.condition_score,
+                damage_flags: yonoResp.damage_flags,
+                modification_flags: yonoResp.modification_flags,
+                photo_quality: yonoResp.photo_quality,
+              },
+              prediction_type: "all",
+            }).catch((e: any) => console.warn("[photo-pipeline] escalation-router:", e.message));
+          }
+
+          // 3. Auto-detect sessions
+          callEdgeFunction("auto-detect-sessions", {
+            vehicle_id: vehicleId,
+          }).catch((e: any) => console.warn("[photo-pipeline] auto-detect-sessions:", e.message));
+
+          // 4. Before/after detection (if prior zone images exist)
+          if (yonoResp?.vehicle_zone) {
+            const { data: priorImages } = await supabase
+              .from("vehicle_images")
+              .select("id")
+              .eq("vehicle_id", vehicleId)
+              .eq("vehicle_zone", yonoResp.vehicle_zone)
+              .neq("id", imageId)
+              .not("taken_at", "is", null)
+              .order("taken_at", { ascending: false })
+              .limit(5);
+
+            if (priorImages && priorImages.length > 0) {
+              const allIds = [
+                ...priorImages.map((p: any) => p.id),
+                imageId,
+              ];
+              callEdgeFunction("detect-before-after", {
+                vehicleId,
+                imageIds: allIds,
+              }).catch((e: any) => console.warn("[photo-pipeline] detect-before-after:", e.message));
+            }
+          }
+
+          // 5. Compute labor estimate
+          callEdgeFunction("compute-labor-estimate", {
+            vehicle_id: vehicleId,
+          }).catch((e: any) => console.warn("[photo-pipeline] compute-labor-estimate:", e.message));
+
+        } catch (e: any) {
+          console.warn("[photo-pipeline] Labor estimation pipeline error:", e.message);
+        }
+      }
+
+      return workLogResult;
     }
 
     default: {

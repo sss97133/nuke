@@ -12,6 +12,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { shouldSendPhotoGapNudge, generatePhotoGapNudge } from "../_shared/photoCoaching.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -101,6 +102,17 @@ async function generateReminders(): Promise<number> {
         break;
     }
 
+    // Photo gap nudge — separate from regular reminder frequency
+    // If they have active vehicles and no photo in >4 hours during work hours (8am-6pm)
+    if (
+      !shouldRemind &&
+      now.getHours() >= 8 && now.getHours() <= 18 &&
+      shouldSendPhotoGapNudge(lastSubmission, (tech.assigned_vehicles?.length || 0) > 0)
+    ) {
+      shouldRemind = true;
+      reminderType = "photo_gap_nudge";
+    }
+
     if (!shouldRemind) continue;
 
     // Get template
@@ -111,10 +123,31 @@ async function generateReminders(): Promise<number> {
       .eq("personality", tech.ai_personality || "friendly")
       .maybeSingle();
 
-    if (!template) continue;
+    if (!template && reminderType !== "photo_gap_nudge") continue;
 
     // Fill in variables
-    let message = template.template_text;
+    let message = template?.template_text || "";
+
+    // Photo gap nudge uses generated message instead of template
+    if (reminderType === "photo_gap_nudge") {
+      let vehicleName: string | null = null;
+      if (tech.assigned_vehicles?.length > 0) {
+        const { data: vehicle } = await supabase
+          .from("vehicles")
+          .select("year, make, model")
+          .eq("id", tech.assigned_vehicles[0])
+          .maybeSingle();
+        if (vehicle) vehicleName = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+      }
+      message = generatePhotoGapNudge(
+        tech.display_name,
+        vehicleName,
+        hoursSinceSubmission,
+      );
+    }
+
+    if (!message) continue;
+
     message = message.replace("{name}", tech.display_name || "Hey");
 
     // If vehicle followup, get vehicle info

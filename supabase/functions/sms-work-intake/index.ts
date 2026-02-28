@@ -12,6 +12,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { evaluatePhotoCoaching, formatCoachingForSms } from "../_shared/photoCoaching.ts";
+import type { PhotoCoachingContext } from "../_shared/photoCoaching.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -770,10 +772,39 @@ serve(async (req) => {
             ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
             : "your vehicle";
 
-          const response = fillTemplate(template, {
+          let response = fillTemplate(template, {
             work_type: analysis.workType.replace(/_/g, " "),
             vehicle: vehicleName,
           });
+
+          // Photo coaching: evaluate and append tips
+          try {
+            // Kick off YONO analysis + session detection in background (non-blocking)
+            fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/auto-detect-sessions`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ vehicle_id: vehicleId }),
+            }).catch(() => {});
+
+            // Build coaching context from available analysis data
+            const coachingCtx: PhotoCoachingContext = {
+              currentPhoto: {
+                photoQuality: analysis.confidence >= 0.7 ? 4 : analysis.confidence >= 0.4 ? 3 : 2,
+                vehicleZone: null,
+                fabricationStage: null,
+                stageConfidence: null,
+                zoneConfidence: null,
+              },
+            };
+            const coachingMessages = evaluatePhotoCoaching(coachingCtx);
+            const coachingText = formatCoachingForSms(coachingMessages);
+            if (coachingText) {
+              response += coachingText;
+            }
+          } catch (_) { /* coaching is non-blocking */ }
 
           return twimlResponse(response);
         }

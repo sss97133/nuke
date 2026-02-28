@@ -65,6 +65,8 @@ function sidecarHeaders(extra: Record<string, string> = {}): Record<string, stri
 interface AnalysisResult {
   vehicle_zone: string;
   zone_confidence: number | null;
+  fabrication_stage: string | null;
+  stage_confidence: number | null;
   surface_coord_u: number | null;
   surface_coord_v: number | null;
   condition_score: number;
@@ -118,6 +120,9 @@ async function writeToDb(
       // Zone (L0 coordinate)
       vehicle_zone: result.vehicle_zone,
       zone_confidence: result.zone_confidence,
+      // Fabrication stage (labor estimation)
+      fabrication_stage: result.fabrication_stage ?? null,
+      stage_confidence: result.stage_confidence ?? null,
       // Surface coordinates (L2, populated by COLMAP — keep null until then)
       surface_coord_u: result.surface_coord_u ?? null,
       surface_coord_v: result.surface_coord_v ?? null,
