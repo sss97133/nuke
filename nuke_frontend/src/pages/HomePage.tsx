@@ -3,7 +3,6 @@ import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
-import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 
 /** Simple stats loader for the public landing page — no auth or complex fallbacks needed. */
 function useLandingStats() {
@@ -163,7 +162,6 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   usePageTitle('Nuke — Vehicle Intelligence');
   const landingStats = useLandingStats();
   const [searchInput, setSearchInput] = useState('');
-  const [showTour, setShowTour] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -419,22 +417,6 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           >
             Browse the feed
           </button>
-          <button
-            onClick={() => setShowTour(true)}
-            style={{
-              padding: '10px 28px',
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-              border: '2px solid var(--border)',
-              background: 'transparent',
-              color: 'var(--text-disabled)',
-              cursor: 'pointer',
-            }}
-          >
-            Take a tour
-          </button>
         </div>
       </div>
 
@@ -639,8 +621,6 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         <Link to="/offering" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Investors</Link>
       </div>
 
-      {/* Onboarding Tour Modal */}
-      <OnboardingSlideshow isOpen={showTour} onClose={() => setShowTour(false)} />
     </div>
   );
 }

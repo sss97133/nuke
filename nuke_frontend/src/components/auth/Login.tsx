@@ -220,76 +220,7 @@ const Login = () => {
     <div className="layout">
       <div className="container">
         <div className="main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-          <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start', maxWidth: '720px', width: '100%' }}>
-
-            {/* Value proposition — left column */}
-            {mode === 'signup' && (
-              <div style={{
-                flex: '0 0 280px',
-                background: '#f5f5f5',
-                border: '2px solid #ccc',
-                padding: '28px 24px',
-                fontFamily: 'Arial, sans-serif',
-              }}>
-                <div style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  color: '#333',
-                  marginBottom: '24px',
-                }}>
-                  WHY SIGN UP
-                </div>
-
-                {[
-                  { title: 'TRACK YOUR VEHICLES', desc: 'Add vehicles to your garage, monitor values over time, get alerts when market conditions change.' },
-                  { title: 'DEAL SCORING', desc: 'See if listings are priced right before you bid — backed by real transaction data from 998K+ vehicles.' },
-                  { title: 'MARKET ALERTS', desc: 'Get notified when vehicles you watch come to market across BaT, eBay, C&B, and 50+ sources.' },
-                  { title: 'API ACCESS', desc: 'Programmatic access to vehicle profiles, pricing data, and market intelligence. Build your own tools.' },
-                ].map((item) => (
-                  <div key={item.title} style={{ marginBottom: '20px' }}>
-                    <div style={{
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      letterSpacing: '0.5px',
-                      color: '#333',
-                      marginBottom: '4px',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                    }}>
-                      <span style={{ color: '#333', fontSize: '8px', marginTop: '2px' }}>&#9632;</span>
-                      {item.title}
-                    </div>
-                    <div style={{
-                      fontSize: '12px',
-                      color: '#666',
-                      lineHeight: 1.5,
-                      paddingLeft: '16px',
-                    }}>
-                      {item.desc}
-                    </div>
-                  </div>
-                ))}
-
-                <div style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  color: '#333',
-                  borderTop: '1px solid #ccc',
-                  paddingTop: '16px',
-                  marginTop: '8px',
-                }}>
-                  FREE FOREVER FOR COLLECTORS
-                </div>
-              </div>
-            )}
-
-            {/* Auth form — right column */}
-            <div style={{ width: '320px', flexShrink: 0 }}>
+          <div style={{ width: '320px' }}>
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <h1 className="heading-1" style={{ marginBottom: '8px' }}>Nuke</h1>
@@ -559,7 +490,6 @@ const Login = () => {
                 Phone sign-in creates an account if you don't have one.
               </p>
             )}
-          </div>
           </div>
         </div>
       </div>
