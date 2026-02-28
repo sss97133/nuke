@@ -448,7 +448,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               style={{
                 fontSize: 'clamp(20px, 3vw, 28px)',
                 fontWeight: 700,
-                color: 'var(--surface)',
+                color: 'var(--text-primary)',
                 letterSpacing: '-0.02em',
                 fontFamily: 'monospace',
               }}
