@@ -35,20 +35,20 @@ interface ImageLocationMapProps {
   height?: number;
 }
 
-// Small white-bordered dot marker
+// Small dot marker — minimal footprint, data-point aesthetic
 const IMAGE_DOT = L.divIcon({
   className: '',
-  html: `<div style="background:#3B82F6;width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>`,
-  iconSize: [10, 10],
-  iconAnchor: [5, 5],
-  popupAnchor: [0, -5],
+  html: `<div style="background:#3B82F6;width:5px;height:5px;border-radius:50%;border:1px solid rgba(255,255,255,.7);box-shadow:0 0 3px rgba(59,130,246,.6)"></div>`,
+  iconSize: [5, 5],
+  iconAnchor: [2.5, 2.5],
+  popupAnchor: [0, -3],
 });
 
 // Cluster icon -- matches project dark/utilitarian aesthetic
 function createClusterIcon(cluster: any): L.DivIcon {
   const count: number = cluster.getChildCount();
-  const size = count < 10 ? 30 : count < 100 ? 38 : 46;
-  const fontSize = count < 100 ? 12 : 10;
+  const size = count < 10 ? 20 : count < 100 ? 26 : 32;
+  const fontSize = count < 100 ? 10 : 8;
   return L.divIcon({
     html: `<div style="
       background:rgba(59,130,246,0.9);
