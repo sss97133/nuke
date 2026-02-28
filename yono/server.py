@@ -48,12 +48,15 @@ VISION_HEAD_PATH = MODELS_DIR / "yono_vision_v2_head.safetensors"
 VISION_CONFIG_PATH = MODELS_DIR / "yono_vision_v2_config.json"
 ZONE_HEAD_PATH = MODELS_DIR / "yono_zone_head.safetensors"
 ZONE_CONFIG_PATH = MODELS_DIR / "yono_zone_config.json"
+STAGE_HEAD_PATH = MODELS_DIR / "yono_stage_head.safetensors"
+STAGE_CONFIG_PATH = MODELS_DIR / "yono_stage_config.json"
 
 # Loaded at startup
 _hier: Optional[HierarchicalYONO] = None
 _flat: Optional[YONOClassifier] = None
 _vision_analyzer: Optional["VisionAnalyzer"] = None
 _zone_classifier: Optional["ZoneClassifier"] = None
+_stage_classifier: Optional["StageClassifier"] = None
 _started_at = time.time()
 
 
@@ -218,6 +221,141 @@ class ZoneClassifier:
                 return zone, 0.6  # 0.6 = moderate confidence for caption-derived
 
         return "other", 0.4
+
+
+# ============================================================
+# StageClassifier — Florence-2 based fabrication stage prediction
+# ============================================================
+
+class StageClassifier:
+    """
+    Fabrication stage classifier: image → fabrication_stage (10-class).
+
+    10-stage taxonomy:
+      raw → disassembled → stripped → fabricated → primed →
+      blocked → basecoated → clearcoated → assembled → complete
+
+    Loads fine-tuned head from yono_stage_head.safetensors.
+    Falls back to caption-based stage inference if head not available.
+    """
+
+    STAGE_KEYWORDS = {
+        "raw": ["barn find", "neglected", "abandoned", "untouched", "as found", "original condition", "sitting for years", "patina"],
+        "disassembled": ["disassembled", "taken apart", "engine removed", "doors off", "gutted", "pulling", "removed"],
+        "stripped": ["stripped", "bare metal", "media blasted", "sandblasted", "paint removed", "bare steel", "shell"],
+        "fabricated": ["welded", "patch panel", "metal work", "fabricat", "cut out", "new panel", "rust repair"],
+        "primed": ["primer", "primed", "epoxy", "etch primer", "high build", "gray primer", "red oxide"],
+        "blocked": ["body filler", "bondo", "block sand", "filler", "sanded smooth", "guide coat"],
+        "basecoated": ["base coat", "basecoat", "color applied", "painted flat", "matte paint", "base color"],
+        "clearcoated": ["clear coat", "clearcoat", "glossy", "wet look", "shiny paint", "fresh paint", "just painted"],
+        "assembled": ["reassembl", "installing", "trim", "weatherstrip", "wiring", "putting back", "fitting"],
+        "complete": ["finished", "complete", "ready to drive", "restored", "concours", "show quality", "fully assembled"],
+    }
+
+    def __init__(self, model, processor, device):
+        self.model = model
+        self.processor = processor
+        self.device = device
+        self._head = None
+        self._stage_codes = None
+        self._loaded = False
+
+        if STAGE_HEAD_PATH.exists() and STAGE_CONFIG_PATH.exists():
+            self._load_head()
+
+    def _load_head(self):
+        """Load fine-tuned stage head."""
+        try:
+            import torch
+            from torch import nn
+            from safetensors.torch import load_file as safetensors_load
+
+            with open(STAGE_CONFIG_PATH) as f:
+                config = json.load(f)
+
+            self._stage_codes = config["stage_codes"]
+            n_stages = config["n_stages"]
+            hidden_size = config.get("hidden_size", 768)
+
+            class StageHead(nn.Module):
+                def __init__(self, hidden_size, n_stages):
+                    super().__init__()
+                    self.net = nn.Sequential(
+                        nn.LayerNorm(hidden_size),
+                        nn.Linear(hidden_size, 512),
+                        nn.GELU(),
+                        nn.Dropout(0.2),
+                        nn.Linear(512, n_stages),
+                    )
+                def forward(self, x):
+                    return self.net(x.mean(dim=1))
+
+            head = StageHead(hidden_size, n_stages)
+            state = safetensors_load(STAGE_HEAD_PATH)
+            head.load_state_dict(state)
+            self._head = head.to(self.device)
+            self._head.eval()
+            self._loaded = True
+            print(f"StageClassifier: fine-tuned head loaded (val_acc={config.get('best_val_acc', '?'):.1%})")
+        except Exception as e:
+            print(f"StageClassifier: head load failed: {e} — using caption fallback")
+
+    def classify(self, image_path: str) -> dict:
+        """
+        Classify fabrication stage for an image.
+
+        Returns:
+          {fabrication_stage: str, stage_confidence: float}
+        """
+        import torch
+        from PIL import Image
+
+        image = Image.open(image_path).convert("RGB")
+        inputs = self.processor(text="<DETAILED_CAPTION>", images=image, return_tensors="pt").to(self.device)
+
+        if self._loaded and self._head is not None:
+            with torch.no_grad():
+                features = self.model._encode_image(inputs["pixel_values"])
+                logits = self._head(features)
+                probs = logits.softmax(dim=-1)[0]
+                top_idx = int(probs.argmax().item())
+                stage = self._stage_codes[top_idx]
+                confidence = float(probs[top_idx].item())
+        else:
+            stage, confidence = self._caption_to_stage(inputs)
+
+        return {
+            "fabrication_stage": stage,
+            "stage_confidence": round(confidence, 3),
+        }
+
+    def _caption_to_stage(self, inputs) -> tuple:
+        """Zero-shot stage inference from Florence-2 caption."""
+        import torch
+        with torch.no_grad():
+            generated_ids = self.model.generate(
+                input_ids=inputs["input_ids"],
+                pixel_values=inputs["pixel_values"],
+                max_new_tokens=80,
+                do_sample=False,
+                num_beams=2,
+            )
+        text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0].lower()
+
+        # Score each stage by keyword hits
+        best_stage = "raw"
+        best_score = 0
+
+        for stage, keywords in self.STAGE_KEYWORDS.items():
+            score = sum(1 for kw in keywords if kw in text)
+            if score > best_score:
+                best_score = score
+                best_stage = stage
+
+        # Confidence: 0.5 base + 0.1 per keyword match, cap at 0.8
+        confidence = min(0.8, 0.5 + best_score * 0.1) if best_score > 0 else 0.3
+
+        return best_stage, confidence
 
 
 # ============================================================
@@ -590,6 +728,21 @@ async def lifespan(app: FastAPI):
         print(f"ZoneClassifier load failed: {e}")
         _zone_classifier = None
 
+    # Load stage classifier (shares Florence-2 model with VisionAnalyzer)
+    try:
+        if _vision_analyzer is not None:
+            _stage_classifier = StageClassifier(
+                model=_vision_analyzer.model,
+                processor=_vision_analyzer.processor,
+                device=_vision_analyzer.device,
+            )
+            print(f"StageClassifier: {'fine-tuned' if _stage_classifier._loaded else 'caption-fallback'}")
+        else:
+            print("StageClassifier: skipped (VisionAnalyzer not loaded)")
+    except Exception as e:
+        print(f"StageClassifier load failed: {e}")
+        _stage_classifier = None
+
     print("Ready.")
     yield
 
@@ -677,6 +830,8 @@ def health():
         "vision_mode": _vision_analyzer._mode if _vision_analyzer else None,
         "zone_available": _zone_classifier is not None,
         "zone_mode": "finetuned" if (_zone_classifier and _zone_classifier._loaded) else "caption_fallback",
+        "stage_available": _stage_classifier is not None,
+        "stage_mode": "finetuned" if (_stage_classifier and _stage_classifier._loaded) else "caption_fallback",
         "uptime_s": round(time.time() - _started_at, 1),
     }
 
@@ -773,6 +928,11 @@ def analyze(req: AnalyzeRequest):
         if _zone_classifier:
             zone_result = _zone_classifier.classify(tmp_path)
 
+        # Run stage classification (fabrication stage)
+        stage_result = {}
+        if _stage_classifier:
+            stage_result = _stage_classifier.classify(tmp_path)
+
         # Run condition/damage analysis (Phase 2)
         condition_result = _vision_analyzer.analyze(tmp_path)
 
@@ -780,6 +940,8 @@ def analyze(req: AnalyzeRequest):
         result = {
             "vehicle_zone": zone_result.get("vehicle_zone", "other"),
             "zone_confidence": zone_result.get("zone_confidence", None),
+            "fabrication_stage": stage_result.get("fabrication_stage", None),
+            "stage_confidence": stage_result.get("stage_confidence", None),
             "surface_coord_u": None,  # null until COLMAP Phase 1
             "surface_coord_v": None,
             **condition_result,
