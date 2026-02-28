@@ -187,7 +187,7 @@ export default function Organizations() {
           is_tradable, stock_symbol, created_at,
           total_vehicles, total_images, total_events, total_inventory,
           total_listings, total_sold,
-          total_revenue, gmv, gross_margin_pct,
+          gmv, gross_margin_pct,
           inventory_turnover, avg_days_to_sell, estimated_value, labor_rate,
           repeat_customer_rate, repeat_customer_count,
           total_reviews, average_project_rating
