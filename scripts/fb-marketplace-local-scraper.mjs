@@ -959,8 +959,11 @@ async function main() {
   }
 
   // Disappearance detection — compare DB active vs what we saw
+  // Only run if we actually scanned enough data (>50% of locations had results)
   let disappeared = 0;
-  if (!DRY_RUN && !SKIP_DISAPPEARANCE && ALL) {
+  const successfulLocations = locationsToScrape.length - totals.errors;
+  const minLocationsForDisappearance = Math.floor(locationsToScrape.length * 0.5);
+  if (!DRY_RUN && !SKIP_DISAPPEARANCE && ALL && successfulLocations >= minLocationsForDisappearance) {
     // Get all facebook_ids we just upserted
     const { data: justSeen } = await supabase
       .from("marketplace_listings")
@@ -980,6 +983,8 @@ async function main() {
         disappeared_detected: disappeared,
       });
     }
+  } else if (!DRY_RUN && !SKIP_DISAPPEARANCE && ALL) {
+    console.log(`\nSkipping disappearance detection — only ${successfulLocations}/${locationsToScrape.length} locations succeeded (need ${minLocationsForDisappearance}+)`);
   }
 
   // Complete sweep job
