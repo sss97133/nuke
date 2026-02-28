@@ -290,15 +290,27 @@ export default function UnifiedMap() {
   const liveEventsRef = useRef<LiveEvent[]>([]);
   const [tick, setTick] = useState(0);
 
-  // Animation loop
+  // Animation loop — only runs when live events exist (saves CPU)
   useEffect(() => {
     let raf: number;
+    let running = false;
     const loop = () => {
-      setTick(t => t + 1);
-      raf = requestAnimationFrame(loop);
+      const hasActive = liveEventsRef.current.some(e => Date.now() - e.ts < 2500);
+      if (hasActive) {
+        setTick(t => t + 1);
+        raf = requestAnimationFrame(loop);
+      } else {
+        running = false;
+      }
     };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    // Check every 2s if we need to start the loop
+    const interval = setInterval(() => {
+      if (!running && liveEventsRef.current.length > 0) {
+        running = true;
+        raf = requestAnimationFrame(loop);
+      }
+    }, 2000);
+    return () => { cancelAnimationFrame(raf); clearInterval(interval); };
   }, []);
 
   // ---- Load collections from DB ----
@@ -327,13 +339,15 @@ export default function UnifiedMap() {
       });
   }, []);
 
-  // ---- Load base vehicle layer — cursor-based pagination ----
+  // ---- Load base vehicle layer — progressive cursor pagination ----
+  // Renders first batch immediately, then streams in background
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setVehLoading(true);
       const all: VPin[] = [];
       const seen = new Set<string>();
+      let batchesSinceRender = 0;
 
       const addRows = (rows: any[]) => {
         for (const v of rows) {
@@ -361,8 +375,11 @@ export default function UnifiedMap() {
           addRows(data);
           lastId = data[data.length - 1].id;
           fetched += data.length;
-          if (all.length % 5000 < 1000) {
-            setVehicles([...all]);
+          batchesSinceRender++;
+
+          // Progressive render: first batch immediately, then every 3 batches (3k rows)
+          if (batchesSinceRender === 1 || batchesSinceRender % 3 === 0) {
+            if (!cancelled) setVehicles([...all]);
           }
         }
       };
@@ -467,35 +484,42 @@ export default function UnifiedMap() {
 
   // --- deck.gl layers ---
   const zoom = viewState.zoom;
-  const now = Date.now();
 
   const layers = useMemo(() => {
     const result: any[] = [];
+    const now = Date.now();
+
+    // Zoom-proportional sizing: tiny at z3, grows smoothly to large at z15
+    const zoomScale = Math.pow(2, (zoom - 3) / 3); // doubles every 3 zoom levels
+    const ptMin = Math.max(0.5, pointSize * 0.3 * zoomScale);
+    const ptMax = Math.max(1, pointSize * 2 * zoomScale);
+    const glowMin = Math.max(2, glowRadius * 0.2 * zoomScale);
+    const glowMax = Math.max(4, glowRadius * 1.5 * zoomScale);
 
     const showGlow = mode === 'density';
     const vehColor: [number, number, number] = hasQuery ? [245, 158, 11] : [59, 130, 246];
     const glowAlpha = Math.max(0, Math.min(255, glowIntensity));
 
-    // Glow fades out as you zoom past z6
-    const glowOpacity = showGlow ? Math.max(0, Math.min(1, (7 - zoom) / 4)) : 0;
+    // Glow intensity fades as you zoom in past z10 (data separates naturally)
+    const glowFade = showGlow ? Math.max(0, Math.min(1, (12 - zoom) / 6)) : 0;
 
     // --- Vehicle Glow ---
-    if (showVehicles && !hasQuery && glowOpacity > 0) {
+    if (showVehicles && !hasQuery && glowFade > 0) {
       result.push(new ScatterplotLayer({
         id: 'vehicle-glow',
         data: vehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
         getRadius: (d: VPin) => d.weight * 800,
         getFillColor: [...vehColor, glowAlpha] as [number, number, number, number],
-        radiusMinPixels: glowRadius * 0.5,
-        radiusMaxPixels: glowRadius * 2,
-        opacity: glowOpacity,
+        radiusMinPixels: glowMin,
+        radiusMaxPixels: glowMax,
+        opacity: glowFade,
         pickable: false,
-        updateTriggers: { getFillColor: [glowAlpha], getRadius: [glowRadius] },
+        updateTriggers: { getFillColor: [glowAlpha], radiusMinPixels: [glowMin], radiusMaxPixels: [glowMax] },
       }));
     }
 
-    // --- Vehicle Points ---
+    // --- Vehicle Points — always pickable, always clickable ---
     if (showVehicles && !hasQuery) {
       result.push(new ScatterplotLayer({
         id: 'vehicle-points',
@@ -503,35 +527,36 @@ export default function UnifiedMap() {
         getPosition: (d: VPin) => [d.lng, d.lat],
         getRadius: 50,
         getFillColor: [...vehColor, 200] as [number, number, number, number],
-        radiusMinPixels: pointSize * 0.5,
-        radiusMaxPixels: pointSize * 3,
-        pickable: zoom >= 8,
+        radiusMinPixels: ptMin,
+        radiusMaxPixels: ptMax,
+        pickable: true,
         onClick: ({ object, x, y }: any) => {
           if (object) setPopup({ x, y, pin: object, type: 'vehicle' });
         },
         onHover: ({ object, x, y }: any) => {
-          if (object && zoom >= 8) {
+          if (object) {
             const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-            setHoverInfo({ x, y, text: t || 'Vehicle' });
+            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
           } else {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { radiusMinPixels: [pointSize], pickable: [zoom] },
+        updateTriggers: { radiusMinPixels: [ptMin], radiusMaxPixels: [ptMax] },
       }));
     }
 
     // --- Query Glow ---
-    if (hasQuery && queryResults.length > 0 && glowOpacity > 0) {
+    if (hasQuery && queryResults.length > 0 && glowFade > 0) {
       result.push(new ScatterplotLayer({
         id: 'query-glow',
         data: queryResults,
         getPosition: (d: VPin) => [d.lng, d.lat],
         getRadius: (d: VPin) => d.weight * 800,
         getFillColor: [245, 158, 11, glowAlpha] as [number, number, number, number],
-        radiusMinPixels: glowRadius * 0.5,
-        radiusMaxPixels: glowRadius * 2,
-        opacity: glowOpacity,
+        radiusMinPixels: glowMin,
+        radiusMaxPixels: glowMax,
+        opacity: glowFade,
         pickable: false,
       }));
     }
@@ -544,8 +569,8 @@ export default function UnifiedMap() {
         getPosition: (d: VPin) => [d.lng, d.lat],
         getRadius: 80,
         getFillColor: [245, 158, 11, 220] as [number, number, number, number],
-        radiusMinPixels: pointSize,
-        radiusMaxPixels: pointSize * 4,
+        radiusMinPixels: ptMin * 1.2,
+        radiusMaxPixels: ptMax * 1.5,
         pickable: true,
         onClick: ({ object, x, y }: any) => {
           if (object) setPopup({ x, y, pin: object, type: 'vehicle' });
@@ -553,7 +578,8 @@ export default function UnifiedMap() {
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-            setHoverInfo({ x, y, text: t || 'Vehicle' });
+            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
           } else {
             setHoverInfo(null);
           }
@@ -561,78 +587,85 @@ export default function UnifiedMap() {
       }));
     }
 
-    // Collections appear at z3+
-    const colOpacity = Math.max(0, Math.min(1, (zoom - 2) / 2));
+    // Collections + Businesses visible at all zooms
+    const colPtMin = Math.max(2, 1.5 * zoomScale);
+    const colPtMax = Math.max(4, 6 * zoomScale);
+    const colGlowMin = Math.max(4, 8 * zoomScale);
+    const colGlowMax = Math.max(10, 30 * zoomScale);
 
     // --- Collection Glow ---
-    if (showCollections && !hasQuery && colOpacity > 0 && showGlow) {
+    if (showCollections && !hasQuery && showGlow) {
       result.push(new ScatterplotLayer({
         id: 'collection-glow',
         data: collections,
         getPosition: (d: ColPin) => [d.lng, d.lat],
         getRadius: 600,
         getFillColor: (d: ColPin) => [...colColor(d.country), glowAlpha * 0.8] as [number, number, number, number],
-        radiusMinPixels: 20,
-        radiusMaxPixels: 60,
-        opacity: colOpacity * glowOpacity,
+        radiusMinPixels: colGlowMin,
+        radiusMaxPixels: colGlowMax,
+        opacity: glowFade * 0.8,
         pickable: false,
       }));
     }
 
     // --- Collection Points ---
-    if (showCollections && !hasQuery && colOpacity > 0) {
+    if (showCollections && !hasQuery) {
       result.push(new ScatterplotLayer({
         id: 'collection-points',
         data: collections,
         getPosition: (d: ColPin) => [d.lng, d.lat],
         getRadius: 50,
         getFillColor: (d: ColPin) => [...colColor(d.country), 220] as [number, number, number, number],
-        radiusMinPixels: 3,
-        radiusMaxPixels: 8,
-        opacity: colOpacity,
+        radiusMinPixels: colPtMin,
+        radiusMaxPixels: colPtMax,
         pickable: true,
         onClick: ({ object, x, y }: any) => {
           if (object) setPopup({ x, y, pin: object, type: 'collection' });
         },
         onHover: ({ object, x, y }: any) => {
-          if (object) setHoverInfo({ x, y, text: object.name });
+          if (object) {
+            const inv = object.totalInventory ? ` (${object.totalInventory})` : '';
+            setHoverInfo({ x, y, text: object.name + inv });
+          }
           else setHoverInfo(null);
         },
       }));
     }
 
     // --- Business Glow ---
-    if (showBusinesses && !hasQuery && colOpacity > 0 && showGlow) {
+    if (showBusinesses && !hasQuery && showGlow) {
       result.push(new ScatterplotLayer({
         id: 'business-glow',
         data: businesses,
         getPosition: (d: BizPin) => [d.lng, d.lat],
         getRadius: 500,
         getFillColor: [20, 184, 166, glowAlpha * 0.6] as [number, number, number, number],
-        radiusMinPixels: 15,
-        radiusMaxPixels: 50,
-        opacity: colOpacity * glowOpacity,
+        radiusMinPixels: colGlowMin * 0.7,
+        radiusMaxPixels: colGlowMax * 0.7,
+        opacity: glowFade * 0.6,
         pickable: false,
       }));
     }
 
     // --- Business Points ---
-    if (showBusinesses && !hasQuery && colOpacity > 0) {
+    if (showBusinesses && !hasQuery) {
       result.push(new ScatterplotLayer({
         id: 'business-points',
         data: businesses,
         getPosition: (d: BizPin) => [d.lng, d.lat],
         getRadius: 50,
         getFillColor: [20, 184, 166, 200] as [number, number, number, number],
-        radiusMinPixels: 2,
-        radiusMaxPixels: 6,
-        opacity: colOpacity,
+        radiusMinPixels: colPtMin * 0.8,
+        radiusMaxPixels: colPtMax * 0.8,
         pickable: true,
         onClick: ({ object, x, y }: any) => {
           if (object) setPopup({ x, y, pin: object, type: 'business' });
         },
         onHover: ({ object, x, y }: any) => {
-          if (object) setHoverInfo({ x, y, text: object.name });
+          if (object) {
+            const t = object.type ? ` · ${object.type}` : '';
+            setHoverInfo({ x, y, text: object.name + t });
+          }
           else setHoverInfo(null);
         },
       }));
@@ -675,7 +708,7 @@ export default function UnifiedMap() {
 
     return result;
   }, [vehicles, collections, businesses, queryResults, showVehicles, showCollections, showBusinesses,
-      hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, tick, now]);
+      hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, tick]);
 
   // --- Render popup content ---
   const renderPopup = () => {
