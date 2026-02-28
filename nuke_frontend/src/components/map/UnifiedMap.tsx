@@ -252,7 +252,7 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
 // MAIN COMPONENT
 // ===========================================
 
-const INITIAL_VIEW = { longitude: -50, latitude: 35, zoom: 3, pitch: 0, bearing: 0 };
+const INITIAL_VIEW = { longitude: -98, latitude: 39, zoom: 4.5, pitch: 0, bearing: 0 };
 
 const CARTO_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
@@ -280,11 +280,12 @@ export default function UnifiedMap() {
   const [popup, setPopup] = useState<{ x: number; y: number; pin: VPin | ColPin | BizPin; type: 'vehicle' | 'collection' | 'business' } | null>(null);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
 
-  // Slider controls
-  const [glowRadius, setGlowRadius] = useState(40);
-  const [glowIntensity, setGlowIntensity] = useState(12);
-  const [pointSize, setPointSize] = useState(1.5);
+  // Slider controls — defaults tuned so data is visible immediately at zoom 4.5
+  const [glowRadius, setGlowRadius] = useState(60);
+  const [glowIntensity, setGlowIntensity] = useState(25);
+  const [pointSize, setPointSize] = useState(4);
   const [mode, setMode] = useState<'density' | 'points'>('density');
+  const [controlsOpen, setControlsOpen] = useState(false);
 
   // Live events
   const liveEventsRef = useRef<LiveEvent[]>([]);
@@ -489,19 +490,22 @@ export default function UnifiedMap() {
     const result: any[] = [];
     const now = Date.now();
 
-    // Zoom-proportional sizing: tiny at z3, grows smoothly to large at z15
-    const zoomScale = Math.pow(2, (zoom - 3) / 3); // doubles every 3 zoom levels
-    const ptMin = Math.max(0.5, pointSize * 0.3 * zoomScale);
-    const ptMax = Math.max(1, pointSize * 2 * zoomScale);
-    const glowMin = Math.max(2, glowRadius * 0.2 * zoomScale);
-    const glowMax = Math.max(4, glowRadius * 1.5 * zoomScale);
+    // Zoom-proportional sizing: visible at z4, grows smoothly to large at z15
+    // At z4.5 (default): zoomScale≈1.1, points are ~2px, glow is ~8px — clearly visible
+    // At z8: zoomScale≈2.5, points are ~5px, glow is ~20px — easily clickable
+    // At z12: zoomScale≈6.3, points are ~12px, glow is ~50px — large and detailed
+    const zoomScale = Math.pow(2, (zoom - 4) / 3); // doubles every 3 zoom levels, 1.0 at z4
+    const ptMin = Math.max(1.5, pointSize * 0.5 * zoomScale);
+    const ptMax = Math.max(4, pointSize * 3 * zoomScale);
+    const glowMin = Math.max(6, glowRadius * 0.15 * zoomScale);
+    const glowMax = Math.max(15, glowRadius * 1.2 * zoomScale);
 
     const showGlow = mode === 'density';
     const vehColor: [number, number, number] = hasQuery ? [245, 158, 11] : [59, 130, 246];
     const glowAlpha = Math.max(0, Math.min(255, glowIntensity));
 
-    // Glow intensity fades as you zoom in past z10 (data separates naturally)
-    const glowFade = showGlow ? Math.max(0, Math.min(1, (12 - zoom) / 6)) : 0;
+    // Glow fades as you zoom in past z12 (data separates naturally), but never fully disappears
+    const glowFade = showGlow ? Math.max(0.15, Math.min(1, (14 - zoom) / 8)) : 0;
 
     // --- Vehicle Glow ---
     if (showVehicles && !hasQuery && glowFade > 0) {
@@ -587,11 +591,11 @@ export default function UnifiedMap() {
       }));
     }
 
-    // Collections + Businesses visible at all zooms
-    const colPtMin = Math.max(2, 1.5 * zoomScale);
-    const colPtMax = Math.max(4, 6 * zoomScale);
-    const colGlowMin = Math.max(4, 8 * zoomScale);
-    const colGlowMax = Math.max(10, 30 * zoomScale);
+    // Collections + Businesses — larger than vehicle dots, always prominent
+    const colPtMin = Math.max(4, 3 * zoomScale);
+    const colPtMax = Math.max(8, 12 * zoomScale);
+    const colGlowMin = Math.max(8, 12 * zoomScale);
+    const colGlowMax = Math.max(20, 40 * zoomScale);
 
     // --- Collection Glow ---
     if (showCollections && !hasQuery && showGlow) {
@@ -716,24 +720,26 @@ export default function UnifiedMap() {
     const { x, y, pin, type } = popup;
 
     // Position popup near click, clamped to viewport
-    const left = Math.min(x, window.innerWidth - 290);
-    const top = Math.min(y, window.innerHeight - 300);
+    const left = Math.min(x + 8, window.innerWidth - 300);
+    const top = Math.max(8, Math.min(y - 20, window.innerHeight - 360));
 
     return (
       <div
         style={{
-          position: 'absolute', left, top: top - 10, zIndex: 2000,
-          background: 'var(--bg)', border: '1px solid var(--border)',
-          boxShadow: '0 4px 16px rgba(0,0,0,.5)', maxWidth: 280,
+          position: 'absolute', left, top, zIndex: 2000,
+          background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,.6)', maxWidth: 280,
+          overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={() => setPopup(null)}
           style={{
-            position: 'absolute', top: 2, right: 4, background: 'none',
-            border: 'none', color: 'var(--text-disabled)', cursor: 'pointer',
-            fontSize: '14px', lineHeight: 1, padding: '2px 4px',
+            position: 'absolute', top: 6, right: 8, background: 'rgba(255,255,255,0.1)',
+            border: 'none', color: '#999', cursor: 'pointer',
+            fontSize: '12px', lineHeight: 1, padding: '2px 6px', borderRadius: 4,
+            zIndex: 1,
           }}
         >
           x
@@ -742,23 +748,22 @@ export default function UnifiedMap() {
         {type === 'collection' && (() => {
           const c = pin as ColPin;
           return (
-            <div style={{ padding: '8px 10px', fontFamily: 'Arial, sans-serif', fontSize: '11px', lineHeight: 1.4 }}>
-              <strong>{c.name}</strong><br />
-              {c.city}, {c.country}<br />
-              {c.totalInventory > 0 && <span style={{ color: '#3B82F6' }}>{c.totalInventory} vehicles</span>}
-              {c.totalInventory > 0 && <br />}
-              <a href={`/org/${c.slug}`} style={{ color: '#3B82F6' }}>View collection</a>
-              {c.ig && <> · <a href={`https://instagram.com/${c.ig}`} target="_blank" rel="noreferrer" style={{ color: '#EC4899' }}>@{c.ig}</a></>}
+            <div style={{ padding: 12, fontSize: '12px', lineHeight: 1.5, color: '#e0e0e0' }}>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: 4, color: '#fff' }}>{c.name}</div>
+              <div style={{ color: '#999', fontSize: '11px', marginBottom: 6 }}>{c.city}, {c.country}</div>
+              {c.totalInventory > 0 && <div style={{ color: '#3B82F6', fontWeight: 600, marginBottom: 6 }}>{c.totalInventory} vehicles</div>}
+              <a href={`/org/${c.slug}`} style={{ color: '#3B82F6', textDecoration: 'none', fontWeight: 600, fontSize: '11px' }}>View collection</a>
+              {c.ig && <> &middot; <a href={`https://instagram.com/${c.ig}`} target="_blank" rel="noreferrer" style={{ color: '#EC4899', textDecoration: 'none', fontSize: '11px' }}>@{c.ig}</a></>}
             </div>
           );
         })()}
         {type === 'business' && (() => {
           const b = pin as BizPin;
           return (
-            <div style={{ padding: '8px 10px', fontFamily: 'Arial, sans-serif', fontSize: '11px', lineHeight: 1.4 }}>
-              <strong>{b.name}</strong><br />
-              {b.type && <span style={{ color: 'var(--text-secondary)' }}>{b.type}</span>}{b.type && <br />}
-              <a href={`/org/${b.id}`} style={{ color: '#22C55E' }}>View profile</a>
+            <div style={{ padding: 12, fontSize: '12px', lineHeight: 1.5, color: '#e0e0e0' }}>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: 4, color: '#fff' }}>{b.name}</div>
+              {b.type && <div style={{ color: '#999', fontSize: '11px', marginBottom: 6 }}>{b.type}</div>}
+              <a href={`/org/${b.id}`} style={{ color: '#14B8A6', textDecoration: 'none', fontWeight: 600, fontSize: '11px' }}>View profile</a>
             </div>
           );
         })()}
@@ -766,13 +771,8 @@ export default function UnifiedMap() {
     );
   };
 
-  const sliderStyle: React.CSSProperties = {
-    width: 80, height: 4, WebkitAppearance: 'none' as any, appearance: 'none' as any,
-    background: '#333', outline: 'none', cursor: 'pointer',
-  };
-
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, flex: 1 }} onClick={() => setPopup(null)}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, flex: 1, background: '#0d1117' }} onClick={() => setPopup(null)}>
       <div style={{ position: 'absolute', inset: 0 }}>
         <DeckGL
           viewState={viewState}
@@ -786,13 +786,32 @@ export default function UnifiedMap() {
         </DeckGL>
       </div>
 
+      {/* Loading overlay — shows while vehicles stream in */}
+      {vehLoading && (
+        <div style={{
+          position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 1100,
+          background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(59,130,246,0.3)',
+          borderRadius: 8, padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 10,
+          backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%', background: '#3B82F6',
+            animation: 'pulse 1.5s ease-in-out infinite',
+          }} />
+          <span style={{ color: '#e0e0e0', fontSize: '12px', fontWeight: 500, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            Loading {vehicles.length.toLocaleString()} vehicles...
+          </span>
+        </div>
+      )}
+
       {/* Hover tooltip */}
       {hoverInfo && (
         <div style={{
-          position: 'absolute', left: hoverInfo.x + 12, top: hoverInfo.y - 20, zIndex: 1500,
-          background: 'rgba(0,0,0,.85)', color: '#fff', padding: '3px 8px',
-          fontSize: '10px', fontFamily: 'Arial, sans-serif', pointerEvents: 'none',
-          whiteSpace: 'nowrap',
+          position: 'absolute', left: hoverInfo.x + 14, top: hoverInfo.y - 24, zIndex: 1500,
+          background: 'rgba(13,17,23,.92)', color: '#fff', padding: '5px 10px',
+          fontSize: '11px', fontFamily: 'system-ui, -apple-system, sans-serif', pointerEvents: 'none',
+          whiteSpace: 'nowrap', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(4px)',
         }}>
           {hoverInfo.text}
         </div>
@@ -801,115 +820,212 @@ export default function UnifiedMap() {
       {/* Popup */}
       {renderPopup()}
 
-      {/* Query bar */}
-      <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {/* Search bar — top left */}
+      <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           <input
             type="text"
-            placeholder="red porsche, 1966 mustang, v8 swap, k03 tires..."
+            placeholder="Search: red porsche, 1966 mustang, v8 swap..."
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            style={{ width: 340, padding: '6px 8px', fontSize: '11px', fontFamily: 'Arial, sans-serif', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+            style={{
+              width: 300, padding: '8px 12px', fontSize: '12px',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
+              background: 'rgba(13,17,23,0.85)', color: '#e0e0e0',
+              backdropFilter: 'blur(8px)', outline: 'none',
+            }}
           />
-          <button onClick={handleSearch} disabled={searching} style={{ padding: '6px 12px', fontSize: '11px', fontFamily: 'Arial, sans-serif', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer', fontWeight: 600 }}>
-            {searching ? '...' : 'Query'}
+          <button
+            onClick={handleSearch} disabled={searching}
+            style={{
+              padding: '8px 16px', fontSize: '12px', fontWeight: 600,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              background: searching ? 'rgba(59,130,246,0.3)' : 'rgba(59,130,246,0.8)',
+              color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            {searching ? '...' : 'Search'}
           </button>
           {activeQuery && (
-            <button onClick={clearSearch} style={{ padding: '6px 8px', fontSize: '11px', fontFamily: 'Arial, sans-serif', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+            <button
+              onClick={clearSearch}
+              style={{
+                padding: '8px 12px', fontSize: '12px',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                background: 'rgba(255,255,255,0.08)', color: '#999',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, cursor: 'pointer',
+              }}
+            >
               Clear
             </button>
           )}
         </div>
         {activeQuery && !searching && (
-          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '4px 8px', fontSize: '10px', color: 'var(--text-disabled)', fontFamily: 'Arial, sans-serif' }}>
-            <strong style={{ color: '#F59E0B' }}>{queryTotal.toLocaleString()}</strong> match "{activeQuery}" — <strong>{queryResults.length.toLocaleString()}</strong> mapped
-            {queryNoLoc.length > 0 && <>, <span style={{ color: 'var(--text-secondary)' }}>{queryNoLoc.length.toLocaleString()} no location</span></>}
+          <div style={{
+            background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(245,158,11,0.3)',
+            borderRadius: 6, padding: '6px 12px', fontSize: '11px', color: '#999',
+            fontFamily: 'system-ui, -apple-system, sans-serif', backdropFilter: 'blur(8px)',
+          }}>
+            <strong style={{ color: '#F59E0B' }}>{queryTotal.toLocaleString()}</strong> match &ldquo;{activeQuery}&rdquo; &mdash; <strong style={{ color: '#e0e0e0' }}>{queryResults.length.toLocaleString()}</strong> mapped
+            {queryNoLoc.length > 0 && <span style={{ color: '#666' }}> &middot; {queryNoLoc.length.toLocaleString()} no location</span>}
           </div>
         )}
       </div>
 
-      {/* Layer toggles + controls */}
-      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'var(--bg)', padding: '8px 10px', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'Arial, sans-serif', color: 'var(--text)', minWidth: 160 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-disabled)' }}>Layers</div>
-        <LT label="Collections" color="#EC4899" checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
-        <LT label="Vehicles" color="#3B82F6" checked={showVehicles} set={setShowVehicles} n={counts.vehicles} dim={hasQuery} loading={vehLoading} />
-        <LT label="Businesses" color="#22C55E" checked={showBusinesses} set={setShowBusinesses} n={counts.businesses} dim={hasQuery} />
-        {activeQuery && <>
-          <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
-            <span style={{ color: '#F59E0B', fontWeight: 600 }}>Query</span>
-            <span style={{ color: '#F59E0B', marginLeft: 'auto' }}>{counts.query.toLocaleString()}</span>
-          </div>
-        </>}
-
-        {/* Mode toggle */}
-        <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0 4px' }} />
-        <div style={{ display: 'flex', gap: 4 }}>
+      {/* Controls panel — bottom right, collapsible */}
+      <div style={{
+        position: 'absolute', bottom: 12, right: 12, zIndex: 1000,
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+      }}>
+        {/* Collapsed state: just a button */}
+        {!controlsOpen && (
           <button
-            onClick={() => setMode('density')}
+            onClick={(e) => { e.stopPropagation(); setControlsOpen(true); }}
             style={{
-              flex: 1, padding: '3px 0', fontSize: '9px', fontWeight: mode === 'density' ? 700 : 400,
-              background: mode === 'density' ? 'var(--surface)' : 'transparent',
-              color: mode === 'density' ? 'var(--text)' : 'var(--text-disabled)',
-              border: '1px solid var(--border)', cursor: 'pointer',
+              background: 'rgba(13,17,23,0.85)', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8, padding: '8px 14px', color: '#e0e0e0', cursor: 'pointer',
+              fontSize: '11px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8,
+              backdropFilter: 'blur(8px)',
             }}
           >
-            Density
+            <span style={{ fontSize: '14px' }}>&#9881;</span>
+            <span>
+              <span style={{ color: '#3B82F6' }}>{counts.vehicles.toLocaleString()}</span>
+              {' / '}
+              <span style={{ color: '#EC4899' }}>{counts.collections.toLocaleString()}</span>
+              {' / '}
+              <span style={{ color: '#14B8A6' }}>{counts.businesses.toLocaleString()}</span>
+            </span>
           </button>
-          <button
-            onClick={() => setMode('points')}
+        )}
+
+        {/* Expanded panel */}
+        {controlsOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
             style={{
-              flex: 1, padding: '3px 0', fontSize: '9px', fontWeight: mode === 'points' ? 700 : 400,
-              background: mode === 'points' ? 'var(--surface)' : 'transparent',
-              color: mode === 'points' ? 'var(--text)' : 'var(--text-disabled)',
-              border: '1px solid var(--border)', cursor: 'pointer',
+              background: 'rgba(13,17,23,0.92)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 10, padding: 14, minWidth: 200, backdropFilter: 'blur(12px)',
+              color: '#e0e0e0', fontSize: '12px',
             }}
           >
-            Points
-          </button>
-        </div>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#999' }}>Layers</span>
+              <button
+                onClick={() => setControlsOpen(false)}
+                style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '14px', padding: '0 2px' }}
+              >
+                x
+              </button>
+            </div>
 
-        {/* Sliders */}
-        {mode === 'density' && (
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <SliderControl label="Glow" value={glowRadius} min={5} max={100} onChange={setGlowRadius} style={sliderStyle} />
-            <SliderControl label="Intensity" value={glowIntensity} min={1} max={40} onChange={setGlowIntensity} style={sliderStyle} />
+            {/* Layer toggles */}
+            <LT label="Vehicles" color="#3B82F6" checked={showVehicles} set={setShowVehicles} n={counts.vehicles} dim={hasQuery} loading={vehLoading} />
+            <LT label="Collections" color="#EC4899" checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
+            <LT label="Businesses" color="#14B8A6" checked={showBusinesses} set={setShowBusinesses} n={counts.businesses} dim={hasQuery} />
+            {activeQuery && <>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '6px 0' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
+                <span style={{ color: '#F59E0B', fontWeight: 600 }}>Query results</span>
+                <span style={{ color: '#F59E0B', marginLeft: 'auto' }}>{counts.query.toLocaleString()}</span>
+              </div>
+            </>}
+
+            {/* Display mode */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '8px 0 6px' }} />
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+              <button
+                onClick={() => setMode('density')}
+                style={{
+                  flex: 1, padding: '5px 0', fontSize: '11px', fontWeight: mode === 'density' ? 600 : 400,
+                  background: mode === 'density' ? 'rgba(59,130,246,0.2)' : 'transparent',
+                  color: mode === 'density' ? '#3B82F6' : '#666',
+                  border: `1px solid ${mode === 'density' ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  borderRadius: 5, cursor: 'pointer',
+                }}
+              >
+                Glow + Points
+              </button>
+              <button
+                onClick={() => setMode('points')}
+                style={{
+                  flex: 1, padding: '5px 0', fontSize: '11px', fontWeight: mode === 'points' ? 600 : 400,
+                  background: mode === 'points' ? 'rgba(59,130,246,0.2)' : 'transparent',
+                  color: mode === 'points' ? '#3B82F6' : '#666',
+                  border: `1px solid ${mode === 'points' ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  borderRadius: 5, cursor: 'pointer',
+                }}
+              >
+                Points Only
+              </button>
+            </div>
+
+            {/* Sliders */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <SliderControl label="Size" value={pointSize} min={1} max={10} step={0.5} onChange={setPointSize} />
+              {mode === 'density' && <>
+                <SliderControl label="Glow" value={glowRadius} min={10} max={100} onChange={setGlowRadius} />
+                <SliderControl label="Brightness" value={glowIntensity} min={5} max={50} onChange={setGlowIntensity} />
+              </>}
+            </div>
           </div>
         )}
-        <div style={{ marginTop: mode === 'density' ? 0 : 6 }}>
-          <SliderControl label="Pt Size" value={pointSize} min={0.5} max={5} step={0.5} onChange={setPointSize} style={sliderStyle} />
-        </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 1000, background: 'var(--bg)', padding: '4px 8px', border: '1px solid var(--border)', fontSize: '10px', fontFamily: 'Arial, sans-serif', color: 'var(--text-disabled)' }}>
+      {/* Stats bar — bottom left */}
+      <div style={{
+        position: 'absolute', bottom: 12, left: 12, zIndex: 1000,
+        background: 'rgba(13,17,23,0.85)', border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 6, padding: '6px 12px', fontSize: '11px', color: '#999',
+        fontFamily: 'system-ui, -apple-system, sans-serif', backdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        {vehLoading && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B82F6', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />}
         {hasQuery
-          ? <>{counts.query.toLocaleString()} mapped / {queryTotal.toLocaleString()} total</>
-          : <>{counts.total.toLocaleString()} items on map</>}
+          ? <><strong style={{ color: '#F59E0B' }}>{counts.query.toLocaleString()}</strong> mapped / {queryTotal.toLocaleString()} total</>
+          : <><strong style={{ color: '#e0e0e0' }}>{counts.total.toLocaleString()}</strong> items on map</>}
       </div>
 
       {/* Unmapped sidebar */}
       {queryNoLoc.length > 0 && (
-        <div style={{ position: 'absolute', top: 80, left: 10, zIndex: 1000, width: 340, maxHeight: '50vh', overflowY: 'auto', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'Arial, sans-serif', color: 'var(--text)' }}>
-          <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text-disabled)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div style={{
+          position: 'absolute', top: 70, left: 12, zIndex: 1000, width: 300, maxHeight: '45vh',
+          overflowY: 'auto', background: 'rgba(13,17,23,0.92)', borderRadius: 8,
+          border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px',
+          fontFamily: 'system-ui, -apple-system, sans-serif', color: '#e0e0e0',
+          backdropFilter: 'blur(12px)',
+        }}>
+          <div style={{
+            padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+            color: '#999', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px',
+            fontWeight: 600, position: 'sticky', top: 0, background: 'rgba(13,17,23,0.95)',
+          }}>
             No location ({queryNoLoc.length})
           </div>
           {queryNoLoc.slice(0, 50).map(r => (
-            <a key={r.id} href={`/vehicle/${r.id}`} style={{ display: 'block', padding: '5px 8px', borderBottom: '1px solid var(--border)', textDecoration: 'none', color: 'var(--text)' }}>
+            <a key={r.id} href={`/vehicle/${r.id}`} style={{
+              display: 'block', padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)',
+              textDecoration: 'none', color: '#e0e0e0', fontSize: '11px',
+            }}>
               {r.title}
-              {r.loc && <span style={{ color: 'var(--text-disabled)', marginLeft: 8, fontSize: '10px' }}>{r.loc}</span>}
+              {r.loc && <span style={{ color: '#666', marginLeft: 8, fontSize: '10px' }}>{r.loc}</span>}
             </a>
           ))}
-          {queryNoLoc.length > 50 && <div style={{ padding: '4px 8px', color: 'var(--text-disabled)', fontSize: '10px' }}>+{queryNoLoc.length - 50} more</div>}
+          {queryNoLoc.length > 50 && <div style={{ padding: '6px 12px', color: '#666', fontSize: '10px' }}>+{queryNoLoc.length - 50} more</div>}
         </div>
       )}
 
-      {/* Attribution */}
-      <div style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 900, fontSize: '9px', color: 'var(--text-disabled)', fontFamily: 'Arial, sans-serif' }}>
-        <a href="https://carto.com" target="_blank" rel="noreferrer" style={{ color: 'var(--text-disabled)' }}>CARTO</a>
-      </div>
+      {/* CSS animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -920,22 +1036,27 @@ function LT({ label, color, checked, set, n, dim, loading }: {
   label: string; color: string; checked: boolean; set: (v: boolean) => void; n: number; dim?: boolean; loading?: boolean;
 }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '2px 0', opacity: dim ? 0.4 : 1 }}>
-      <input type="checkbox" checked={checked} onChange={e => set(e.target.checked)} />
-      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
-      <span>{label}</span>
-      <span style={{ color: 'var(--text-secondary)', marginLeft: 'auto' }}>{loading ? '...' : n.toLocaleString()}</span>
+    <label style={{
+      display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+      padding: '4px 0', opacity: dim ? 0.4 : 1, fontSize: '12px',
+    }}>
+      <input type="checkbox" checked={checked} onChange={e => set(e.target.checked)} style={{ accentColor: color }} />
+      <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+      <span style={{ color: '#e0e0e0' }}>{label}</span>
+      <span style={{ color: '#666', marginLeft: 'auto', fontSize: '11px', fontVariantNumeric: 'tabular-nums' }}>
+        {loading ? <span style={{ color: color, animation: 'pulse 1.5s ease-in-out infinite' }}>loading</span> : n.toLocaleString()}
+      </span>
     </label>
   );
 }
 
-function SliderControl({ label, value, min, max, step, onChange, style }: {
+function SliderControl({ label, value, min, max, step, onChange }: {
   label: string; value: number; min: number; max: number; step?: number;
-  onChange: (v: number) => void; style: React.CSSProperties;
+  onChange: (v: number) => void;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '9px' }}>
-      <span style={{ color: 'var(--text-disabled)', width: 44, textAlign: 'right' }}>{label}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '11px' }}>
+      <span style={{ color: '#999', width: 56, textAlign: 'right', flexShrink: 0 }}>{label}</span>
       <input
         type="range"
         min={min}
@@ -943,9 +1064,13 @@ function SliderControl({ label, value, min, max, step, onChange, style }: {
         step={step || 1}
         value={value}
         onChange={e => onChange(Number(e.target.value))}
-        style={style}
+        style={{
+          flex: 1, height: 4, WebkitAppearance: 'none' as any, appearance: 'none' as any,
+          background: 'rgba(255,255,255,0.15)', outline: 'none', cursor: 'pointer',
+          borderRadius: 2,
+        }}
       />
-      <span style={{ color: 'var(--text-disabled)', width: 24, fontSize: '8px' }}>{value}</span>
+      <span style={{ color: '#666', width: 28, fontSize: '10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
     </div>
   );
 }
