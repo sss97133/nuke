@@ -19,6 +19,7 @@ interface VehicleEnrichment {
 }
 
 interface VehicleFilters {
+  make: string;
   priceMin: string;
   priceMax: string;
   yearMin: string;
@@ -30,6 +31,7 @@ interface VehicleFilters {
 }
 
 const DEFAULT_FILTERS: VehicleFilters = {
+  make: '',
   priceMin: '',
   priceMax: '',
   yearMin: '',
@@ -37,7 +39,7 @@ const DEFAULT_FILTERS: VehicleFilters = {
   mileageMax: '',
   transmission: '',
   listingStatus: '',
-  showFilters: false,
+  showFilters: true,
 };
 
 export default function Search() {
@@ -574,6 +576,7 @@ export default function Search() {
 
     // Apply vehicle filters
     const anyFilterActive =
+      vFilters.make ||
       vFilters.priceMin || vFilters.priceMax ||
       vFilters.yearMin || vFilters.yearMax ||
       vFilters.mileageMax || vFilters.transmission ||
@@ -585,6 +588,11 @@ export default function Search() {
       if (r.type !== 'vehicle') return true; // non-vehicle results pass through unfiltered
       const e = r.metadata as any;
 
+      if (vFilters.make) {
+        const makeLower = vFilters.make.trim().toLowerCase();
+        const resultMake = String(e.make || '').toLowerCase();
+        if (!resultMake.includes(makeLower)) return false;
+      }
       if (vFilters.priceMin) {
         const min = parseInt(vFilters.priceMin, 10);
         if (!isNaN(min) && (e.sale_price === null || e.sale_price === undefined || e.sale_price < min)) return false;
@@ -620,6 +628,7 @@ export default function Search() {
   }, [results, vehicleEnrichment, vFilters]);
 
   const activeFilterCount = [
+    vFilters.make,
     vFilters.priceMin, vFilters.priceMax,
     vFilters.yearMin, vFilters.yearMax,
     vFilters.mileageMax, vFilters.transmission, vFilters.listingStatus
@@ -738,8 +747,8 @@ export default function Search() {
             fontSize: '7.5pt',
             fontWeight: 600,
             border: '1px solid #ccc',
-            background: showVinSearch ? '#111' : 'transparent',
-            color: showVinSearch ? '#fff' : '#666',
+            background: showVinSearch ? 'var(--text)' : 'transparent',
+            color: showVinSearch ? 'var(--surface)' : 'var(--text-secondary)',
             cursor: 'pointer',
             borderRadius: '2px',
           }}
@@ -773,7 +782,7 @@ export default function Search() {
                   fontSize: '13px',
                   fontFamily: 'monospace',
                   border: '2px solid #000',
-                  background: '#fff',
+                  background: 'var(--surface)',
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase'
                 }}
@@ -795,7 +804,7 @@ export default function Search() {
                 {vinSearching ? 'Searching...' : 'Look up'}
               </button>
             </form>
-            <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
               VIN characters: A–H, J–N, P, R–Z, 0–9 (no I, O, Q)
             </div>
 
@@ -821,9 +830,9 @@ export default function Search() {
                         gap: '12px',
                         padding: '8px 10px',
                         border: '1px solid var(--border)',
-                        background: '#fff',
+                        background: 'var(--surface)',
                         textDecoration: 'none',
-                        color: '#000'
+                        color: 'var(--text)'
                       }}
                     >
                       {v.primary_image_url && (
@@ -837,8 +846,8 @@ export default function Search() {
                         <div style={{ fontSize: '12px', fontWeight: 700 }}>
                           {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown vehicle'}
                         </div>
-                        <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#666' }}>{v.vin || '—'}</div>
-                        {v.color && <div style={{ fontSize: '9px', color: '#999' }}>{v.color}{v.mileage ? ` · ${v.mileage.toLocaleString()} mi` : ''}</div>}
+                        <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{v.vin || '—'}</div>
+                        {v.color && <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{v.color}{v.mileage ? ` · ${v.mileage.toLocaleString()} mi` : ''}</div>}
                       </div>
                     </a>
                   ))}
@@ -867,8 +876,8 @@ export default function Search() {
                     fontSize: '11px',
                     fontWeight: 700,
                     border: '2px solid #000',
-                    background: vFilters.showFilters ? '#000' : '#fff',
-                    color: vFilters.showFilters ? '#fff' : '#000',
+                    background: vFilters.showFilters ? 'var(--text)' : 'var(--surface)',
+                    color: vFilters.showFilters ? 'var(--surface)' : 'var(--text)',
                     cursor: 'pointer',
                   }}
                 >
@@ -883,8 +892,8 @@ export default function Search() {
                       fontSize: '9px',
                       fontWeight: 700,
                       border: '1px solid #999',
-                      background: '#fff',
-                      color: '#666',
+                      background: 'var(--surface)',
+                      color: 'var(--text-secondary)',
                       cursor: 'pointer',
                     }}
                   >
@@ -892,7 +901,7 @@ export default function Search() {
                   </button>
                 )}
               </div>
-              <div style={{ fontSize: '11px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 {activeFilterCount > 0
                   ? `${displayVehicleCount} of ${vehicleCount} vehicles match filters`
                   : `${vehicleCount} vehicle${vehicleCount === 1 ? '' : 's'}`
@@ -903,25 +912,37 @@ export default function Search() {
             {vFilters.showFilters && (
               <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }}>
 
+                {/* Make */}
+                <div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Make</div>
+                  <input
+                    type="text"
+                    placeholder="e.g. Porsche"
+                    value={vFilters.make}
+                    onChange={e => setVFilters(prev => ({ ...prev, make: e.target.value }))}
+                    style={{ width: '110px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
+                  />
+                </div>
+
                 {/* Price range */}
                 <div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price ($)</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price ($)</div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <input
                       type="number"
                       placeholder="Min"
                       value={vFilters.priceMin}
                       onChange={e => setVFilters(prev => ({ ...prev, priceMin: e.target.value }))}
-                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
+                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
                       min={0}
                     />
-                    <span style={{ fontSize: '11px', color: '#999' }}>–</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>–</span>
                     <input
                       type="number"
                       placeholder="Max"
                       value={vFilters.priceMax}
                       onChange={e => setVFilters(prev => ({ ...prev, priceMax: e.target.value }))}
-                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
+                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
                       min={0}
                     />
                   </div>
@@ -929,24 +950,24 @@ export default function Search() {
 
                 {/* Year range */}
                 <div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Year</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Year</div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <input
                       type="number"
                       placeholder="From"
                       value={vFilters.yearMin}
                       onChange={e => setVFilters(prev => ({ ...prev, yearMin: e.target.value }))}
-                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
+                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
                       min={1886}
                       max={new Date().getFullYear() + 2}
                     />
-                    <span style={{ fontSize: '11px', color: '#999' }}>–</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>–</span>
                     <input
                       type="number"
                       placeholder="To"
                       value={vFilters.yearMax}
                       onChange={e => setVFilters(prev => ({ ...prev, yearMax: e.target.value }))}
-                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
+                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
                       min={1886}
                       max={new Date().getFullYear() + 2}
                     />
@@ -955,24 +976,24 @@ export default function Search() {
 
                 {/* Mileage max */}
                 <div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Max Mileage</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Max Mileage</div>
                   <input
                     type="number"
                     placeholder="e.g. 50000"
                     value={vFilters.mileageMax}
                     onChange={e => setVFilters(prev => ({ ...prev, mileageMax: e.target.value }))}
-                    style={{ width: '100px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: '#fff' }}
+                    style={{ width: '100px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
                     min={0}
                   />
                 </div>
 
                 {/* Transmission */}
                 <div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Transmission</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Transmission</div>
                   <select
                     value={vFilters.transmission}
                     onChange={e => setVFilters(prev => ({ ...prev, transmission: e.target.value }))}
-                    style={{ padding: '4px 8px', fontSize: '11px', border: '2px solid #000', background: '#fff', cursor: 'pointer' }}
+                    style={{ padding: '4px 8px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)', cursor: 'pointer' }}
                   >
                     <option value="">Any</option>
                     <option value="automatic">Automatic</option>
@@ -982,7 +1003,7 @@ export default function Search() {
 
                 {/* For sale / sold */}
                 <div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {[
                       { val: '', label: 'All' },
@@ -998,8 +1019,8 @@ export default function Search() {
                           fontSize: '11px',
                           fontWeight: 700,
                           border: '2px solid #000',
-                          background: vFilters.listingStatus === opt.val ? '#000' : '#fff',
-                          color: vFilters.listingStatus === opt.val ? '#fff' : '#000',
+                          background: vFilters.listingStatus === opt.val ? 'var(--text)' : 'var(--surface)',
+                          color: vFilters.listingStatus === opt.val ? 'var(--surface)' : 'var(--text)',
                           cursor: 'pointer',
                         }}
                       >
@@ -1081,13 +1102,13 @@ export default function Search() {
                   fontSize: '11px',
                   fontWeight: 600,
                   border: '2px solid #e5e7eb',
-                  background: '#fff',
-                  color: '#444',
+                  background: 'var(--surface)',
+                  color: 'var(--text-secondary)',
                   textDecoration: 'none',
                   cursor: 'pointer',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#000'; e.currentTarget.style.color = '#000'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = '#444'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#000'; e.currentTarget.style.color = 'var(--text)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
               >
                 {term}
               </a>
@@ -1097,7 +1118,7 @@ export default function Search() {
           {/* Featured vehicles grid */}
           {featuredVehicles.length > 0 && (
             <div>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
                 Top Vehicles by Value
               </div>
               <div style={{
@@ -1143,7 +1164,7 @@ export default function Search() {
               fontWeight: 600,
               border: '1px solid #ccc',
               background: 'transparent',
-              color: '#666',
+              color: 'var(--text-secondary)',
               cursor: 'pointer',
               borderRadius: '2px',
             }}
@@ -1155,7 +1176,7 @@ export default function Search() {
             <div style={{ marginTop: '12px' }}>
               {focusQuery && laneFilters.filter(l => l.count > 0).length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '7.5pt', fontWeight: 700, color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Jump to lane</div>
+                  <div style={{ fontSize: '7.5pt', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Jump to lane</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {laneFilters.filter((lane) => lane.count > 0).map((lane) => (
                       <button
@@ -1167,7 +1188,7 @@ export default function Search() {
                           fontSize: '11px',
                           fontWeight: 700,
                           border: '2px solid #000',
-                          background: '#fff',
+                          background: 'var(--surface)',
                           cursor: 'pointer'
                         }}
                       >
@@ -1179,9 +1200,9 @@ export default function Search() {
               )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
                 {workspaceSections.map((section) => (
-                  <div key={section.title} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
+                  <div key={section.title} style={{ border: '1px solid var(--border)', padding: '10px', background: 'var(--surface)' }}>
                     <div style={{ fontSize: '12px', fontWeight: 700 }}>{section.title}</div>
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>{section.helper}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{section.helper}</div>
                     <div style={{ display: 'grid', gap: '6px' }}>
                       {section.actions.map((action) => (
                         <a
@@ -1193,7 +1214,7 @@ export default function Search() {
                             alignItems: 'center',
                             gap: '8px',
                             textDecoration: 'none',
-                            color: '#000',
+                            color: 'var(--text)',
                             border: '1px solid var(--border)',
                             padding: '6px 8px',
                             background: 'var(--surface)'
@@ -1201,7 +1222,7 @@ export default function Search() {
                         >
                           <span style={{ fontSize: '11px', fontWeight: 600 }}>{action.label}</span>
                           {typeof action.badge === 'number' && action.badge > 0 && (
-                            <span style={{ fontSize: '9px', color: '#666' }}>{action.badge}</span>
+                            <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{action.badge}</span>
                           )}
                         </a>
                       ))}

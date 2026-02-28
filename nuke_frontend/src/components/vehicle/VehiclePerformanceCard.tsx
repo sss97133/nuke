@@ -181,9 +181,9 @@ function StatBar({ label, value, max, unit, precision, invert }: {
       <div style={{ marginBottom: '6px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: 600 }}>
           <span>{label}</span>
-          <span style={{ color: '#999' }}>--</span>
+          <span style={{ color: 'var(--text-muted)' }}>--</span>
         </div>
-        <div style={{ height: '4px', background: '#f0f0f0', marginTop: '2px' }} />
+        <div style={{ height: '4px', background: 'var(--bg)', marginTop: '2px' }} />
       </div>
     );
   }
@@ -200,7 +200,7 @@ function StatBar({ label, value, max, unit, precision, invert }: {
         <span>{label}</span>
         <span>{displayVal}{unit || ''}</span>
       </div>
-      <div style={{ height: '4px', background: '#f0f0f0', marginTop: '2px', position: 'relative' }}>
+      <div style={{ height: '4px', background: 'var(--bg)', marginTop: '2px', position: 'relative' }}>
         <div
           style={{
             height: '100%',
@@ -221,7 +221,7 @@ function ScoreBadge({ score, label, size = 'md', onClick }: { score: number | nu
   const labelSize = size === 'lg' ? '8pt' : '7pt';
 
   const bg = score == null
-    ? '#f0f0f0'
+    ? 'var(--bg)'
     : score >= 80
       ? '#000'
       : score >= 60
@@ -230,7 +230,7 @@ function ScoreBadge({ score, label, size = 'md', onClick }: { score: number | nu
           ? '#666'
           : '#999';
 
-  const color = score == null ? '#999' : '#fff';
+  const color = score == null ? 'var(--text-muted)' : '#fff';
 
   return (
     <div style={{ textAlign: 'center', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
@@ -267,7 +267,7 @@ function SocialBar({ label, value }: { label: string; value: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
       <span style={{ fontSize: '9px', fontWeight: 600, width: '90px', textAlign: 'right' }}>{label}</span>
-      <div style={{ flex: 1, height: '6px', background: '#f0f0f0', position: 'relative' }}>
+      <div style={{ flex: 1, height: '6px', background: 'var(--bg)', position: 'relative' }}>
         <div
           style={{
             height: '100%',
@@ -350,8 +350,8 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
 
   if (loading) {
     return (
-      <div style={{ padding: '16px', border: '2px solid #000', background: '#fff' }}>
-        <div style={{ fontSize: '11px', color: '#999' }}>Loading performance data...</div>
+      <div style={{ padding: '16px', border: '2px solid #000', background: 'var(--surface)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading performance data...</div>
       </div>
     );
   }
@@ -368,7 +368,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
   const social = data.social_positioning_breakdown;
 
   return (
-    <div style={{ border: '2px solid #000', background: '#fff' }}>
+    <div style={{ border: '2px solid #000', background: 'var(--surface)' }}>
       {/* Header */}
       <div style={{
         padding: '10px 14px',
@@ -381,7 +381,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
           <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
             Performance Profile
           </div>
-          <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
             {data.engine_liters ? `${data.engine_liters}L` : ''}{' '}
             {data.engine_type || ''}{' '}
             {data.drivetrain ? `· ${data.drivetrain}` : ''}{' '}
@@ -419,8 +419,8 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
         {/* Raw specs */}
         <div style={{
           padding: '10px 12px',
-          background: '#fafafa',
-          border: '1px solid #e5e5e5',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
           marginBottom: '12px',
         }}>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
@@ -444,8 +444,8 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
         {(data.tire_condition_score != null || data.brake_condition_score != null || data.suspension_condition_score != null) && (
           <div style={{
             padding: '10px 12px',
-            background: '#fafafa',
-            border: '1px solid #e5e5e5',
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
             marginBottom: '12px',
           }}>
             <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
@@ -460,7 +460,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
         {/* Social positioning (collapsible) */}
         {social && (
           <div style={{
-            border: '1px solid #e5e5e5',
+            border: '1px solid var(--border)',
             marginBottom: '12px',
           }}>
             <button
@@ -468,7 +468,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                background: '#fafafa',
+                background: 'var(--bg)',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
@@ -513,7 +513,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                background: '#fafafa',
+                background: 'var(--bg)',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
@@ -533,49 +533,49 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
                 {data.suspension_front && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Suspension (F)</div>
-                    <div style={{ color: '#666' }}>{data.suspension_front}</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{data.suspension_front}</div>
                   </div>
                 )}
                 {data.suspension_rear && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Suspension (R)</div>
-                    <div style={{ color: '#666' }}>{data.suspension_rear}</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{data.suspension_rear}</div>
                   </div>
                 )}
                 {data.brake_type_front && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Brakes (F)</div>
-                    <div style={{ color: '#666' }}>{data.brake_type_front}</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{data.brake_type_front}</div>
                   </div>
                 )}
                 {data.brake_type_rear && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Brakes (R)</div>
-                    <div style={{ color: '#666' }}>{data.brake_type_rear}</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{data.brake_type_rear}</div>
                   </div>
                 )}
                 {data.tire_spec_front && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Tires (F)</div>
-                    <div style={{ color: '#666' }}>{data.tire_spec_front}</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{data.tire_spec_front}</div>
                   </div>
                 )}
                 {data.tire_spec_rear && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Tires (R)</div>
-                    <div style={{ color: '#666' }}>{data.tire_spec_rear}</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{data.tire_spec_rear}</div>
                   </div>
                 )}
                 {data.wheel_diameter_front && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Wheels (F)</div>
-                    <div style={{ color: '#666' }}>{data.wheel_diameter_front}"</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{data.wheel_diameter_front}"</div>
                   </div>
                 )}
                 {data.wheel_diameter_rear && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: '2px' }}>Wheels (R)</div>
-                    <div style={{ color: '#666' }}>{data.wheel_diameter_rear}"</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{data.wheel_diameter_rear}"</div>
                   </div>
                 )}
               </div>
@@ -587,15 +587,15 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
         {!hasAnyScore && (
           <div style={{
             padding: '12px',
-            background: '#fafafa',
-            border: '1px solid #e5e5e5',
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
             textAlign: 'center',
             marginTop: '12px',
           }}>
             <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
               Performance data needed
             </div>
-            <div style={{ fontSize: '9px', color: '#666' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
               Add horsepower, torque, weight, and 0-60 time to unlock full performance scoring.
             </div>
           </div>
