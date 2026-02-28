@@ -30,6 +30,11 @@ interface InsightResponse {
   results: ImageInsightResult[];
 }
 
+// Toggle this to true once the profile-image-analyst edge function is deployed
+// with proper CORS headers. While false, AI insights are skipped entirely to
+// avoid CORS-induced delays on the profile page.
+const PROFILE_IMAGE_ANALYST_ENABLED = false;
+
 const getFunctionsUrl = () => {
   if (!SUPABASE_URL) {
     throw new Error('Missing VITE_SUPABASE_URL environment variable');
@@ -39,7 +44,7 @@ const getFunctionsUrl = () => {
 
 export const AIInsightsService = {
   async analyzeImageGroups(batches: ImageInsightRequest[]): Promise<ImageInsightResult[]> {
-    if (!batches.length) return [];
+    if (!batches.length || !PROFILE_IMAGE_ANALYST_ENABLED) return [];
 
     const endpoint = getFunctionsUrl();
 
@@ -62,4 +67,3 @@ export const AIInsightsService = {
     return data.results || [];
   }
 };
-
