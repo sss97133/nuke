@@ -50,6 +50,7 @@ const ClaimExternalIdentity: React.FC = () => {
   const [importedMetadata, setImportedMetadata] = React.useState<any>(null);
   const [platformCounts, setPlatformCounts] = React.useState<Record<string, number>>({});
   const logRef = React.useRef<HTMLDivElement>(null);
+  const hasLoggedProcessing = React.useRef(false);
 
   const addLog = React.useCallback((text: string, type: 'info' | 'success' | 'dim' = 'info') => {
     setImportLog(prev => [...prev, { time: new Date(), text, type }]);
@@ -100,7 +101,8 @@ const ClaimExternalIdentity: React.FC = () => {
 
           if (!data || cancelled) break;
 
-          if (data.status === 'processing' && queueStatus !== 'processing') {
+          if (data.status === 'processing' && !hasLoggedProcessing.current) {
+            hasLoggedProcessing.current = true;
             setQueueStatus('processing');
             addLog('Extracting profile data from page...', 'info');
           }
@@ -241,6 +243,7 @@ const ClaimExternalIdentity: React.FC = () => {
     setImportStep('submitting');
     setImportError('');
     setImportLog([]);
+    hasLoggedProcessing.current = false;
     addLog(`Importing ${username.trim()} from ${plat.label}...`);
 
     try {
@@ -508,24 +511,65 @@ const ClaimExternalIdentity: React.FC = () => {
               </div>
             )}
 
-            {/* Imported metadata summary */}
+            {/* Imported data summary */}
             {importStep === 'done' && importedMetadata && (
               <div style={{
                 marginTop: 'var(--space-3)',
-                padding: 'var(--space-3) var(--space-4)',
                 border: '1px solid #4ade8040',
                 borderRadius: '6px',
                 backgroundColor: '#4ade8008',
-                display: 'flex',
-                gap: 'var(--space-4)',
-                alignItems: 'center',
-                fontSize: '13px',
+                overflow: 'hidden',
               }}>
-                {importedMetadata.listings_found != null && (
-                  <div><strong>{importedMetadata.listings_found}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>listings</span></div>
-                )}
+                <div style={{
+                  padding: 'var(--space-3) var(--space-4)',
+                  display: 'flex',
+                  gap: 'var(--space-4)',
+                  alignItems: 'center',
+                  fontSize: '13px',
+                }}>
+                  {importedMetadata.listings_found != null && (
+                    <div><strong>{importedMetadata.listings_found}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>listings found</span></div>
+                  )}
+                  {importedMetadata.listing_urls?.length > 0 && (
+                    <div><strong>{importedMetadata.listing_urls.length}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>vehicles queued for import</span></div>
+                  )}
+                </div>
                 {importedMetadata.listing_urls?.length > 0 && (
-                  <div><strong>{importedMetadata.listing_urls.length}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>vehicles queued</span></div>
+                  <div style={{
+                    padding: '0 var(--space-4) var(--space-3)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    maxHeight: 200,
+                    overflowY: 'auto',
+                  }}>
+                    {importedMetadata.listing_urls.map((url: string, i: number) => {
+                      const slug = url.replace(/^https?:\/\/bringatrailer\.com\/listing\//, '').replace(/\/$/, '');
+                      const title = slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                      return (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: '12px',
+                            color: 'var(--text)',
+                            textDecoration: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '3px',
+                            backgroundColor: 'rgba(255,255,255,0.5)',
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {title}
+                        </a>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}
