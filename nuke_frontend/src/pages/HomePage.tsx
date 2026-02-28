@@ -340,8 +340,8 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               top: '100%',
               left: 0,
               right: 0,
-              background: '#1a1a1a',
-              border: '1px solid #333',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
               zIndex: 100,
             }}>
               {searchResults.map((v) => (
@@ -358,29 +358,29 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                     width: '100%',
                     padding: '10px 16px',
                     border: 'none',
-                    borderBottom: '1px solid #333',
+                    borderBottom: '1px solid var(--border)',
                     background: 'transparent',
-                    color: '#fff',
+                    color: 'var(--text)',
                     cursor: 'pointer',
                     textAlign: 'left',
                     fontSize: 13,
                     fontFamily: 'Arial, sans-serif',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#2a2a2a'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   <span>
                     {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle'}
                   </span>
                   {formatPrice(v) && (
-                    <span style={{ fontFamily: 'monospace', color: '#888', fontSize: 12 }}>
+                    <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)', fontSize: 12 }}>
                       {formatPrice(v)}
                     </span>
                   )}
                 </button>
               ))}
               {noResults && (
-                <div style={{ padding: '10px 16px', color: '#666', fontSize: 12 }}>
+                <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 12 }}>
                   No vehicles found for "{searchInput.trim()}"
                 </div>
               )}
@@ -475,7 +475,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               width: 6,
               height: 6,
               borderRadius: '50%',
-              background: '#22c55e',
+              background: 'var(--success)',
               animation: 'livePulse 2s ease-in-out infinite',
             }} />
             <span style={{
@@ -502,10 +502,10 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                 style={{
                   flexShrink: 0,
                   width: 160,
-                  background: '#1a1a1a',
-                  border: '1px solid #333',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
                   textDecoration: 'none',
-                  color: '#fff',
+                  color: 'var(--text)',
                   display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden',
@@ -515,7 +515,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                   width: '100%',
                   height: 100,
                   overflow: 'hidden',
-                  background: '#111',
+                  background: 'var(--bg)',
                 }}>
                   <img
                     src={v.primary_image_url || ''}
@@ -544,7 +544,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                     <div style={{
                       fontSize: 11,
                       fontFamily: 'monospace',
-                      color: '#888',
+                      color: 'var(--text-muted)',
                     }}>
                       {formatPrice(v)}
                     </div>
@@ -797,7 +797,7 @@ export default function HomePage() {
       </div>
 
       {/* Tab content */}
-      <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg)' }}>
+      <div style={{ flex: 1, overflow: activeTab === 'map' ? 'hidden' : 'auto', background: 'var(--bg)', position: 'relative' }}>
         <Suspense fallback={<TabSkeleton />}>
           {activeTab === 'garage' && <GarageTab />}
           {activeTab === 'feed' && <CursorHomepage />}
