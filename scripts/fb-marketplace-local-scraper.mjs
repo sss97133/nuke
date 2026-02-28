@@ -28,6 +28,91 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
+import { Resolver } from "dns";
+import https from "https";
+
+// Custom DNS resolver — bypasses broken macOS getaddrinfo()
+// Uses Google/Cloudflare DNS servers directly via c-ares
+const dnsResolver = new Resolver();
+dnsResolver.setServers(["8.8.8.8", "1.1.1.1"]);
+
+function customLookup(hostname, opts, cb) {
+  if (typeof opts === "function") { cb = opts; opts = {}; }
+  dnsResolver.resolve4(hostname, (err, addrs) => {
+    if (err || !addrs || addrs.length === 0) {
+      dnsResolver.resolve6(hostname, (err6, addrs6) => {
+        if (err6) return cb(err || err6);
+        if (opts && opts.all) {
+          cb(null, addrs6.map(a => ({ address: a, family: 6 })));
+        } else {
+          cb(null, addrs6[0], 6);
+        }
+      });
+      return;
+    }
+    if (opts && opts.all) {
+      cb(null, addrs.map(a => ({ address: a, family: 4 })));
+    } else {
+      cb(null, addrs[0], 4);
+    }
+  });
+}
+
+// fetch() replacement using https.request with custom DNS lookup
+function dnsFetch(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(typeof url === "string" ? url : url.url || url.href || String(url));
+
+    // Handle Headers objects, plain objects, or arrays
+    const flatHeaders = {};
+    const h = options.headers;
+    if (h) {
+      if (typeof h.entries === "function") {
+        for (const [k, v] of h.entries()) flatHeaders[k] = v;
+      } else if (typeof h === "object") {
+        Object.assign(flatHeaders, h);
+      }
+    }
+    flatHeaders["Host"] = parsed.hostname;
+
+    const reqOptions = {
+      hostname: parsed.hostname,
+      port: parsed.port || 443,
+      path: parsed.pathname + parsed.search,
+      method: options.method || "GET",
+      headers: flatHeaders,
+      lookup: customLookup,
+    };
+
+    const req = https.request(reqOptions, (res) => {
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        const body = Buffer.concat(chunks).toString();
+        const headers = new Map(Object.entries(res.headers));
+        resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          statusText: res.statusMessage || "",
+          headers: {
+            get: (k) => res.headers[k.toLowerCase()] || null,
+            has: (k) => k.toLowerCase() in res.headers,
+            entries: () => Object.entries(res.headers),
+          },
+          text: () => Promise.resolve(body),
+          json: () => Promise.resolve(JSON.parse(body)),
+          body: null,
+          url,
+        });
+      });
+    });
+
+    req.on("error", reject);
+    req.setTimeout(30000, () => { req.destroy(new Error("Request timeout")); });
+    if (options.body) req.write(typeof options.body === "string" ? options.body : options.body.toString());
+    req.end();
+  });
+}
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -37,7 +122,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  global: { fetch: dnsFetch },
+});
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
@@ -51,6 +138,9 @@ const SKIP_VEHICLES = args.includes("--skip-vehicles");
 
 const YEAR_MIN = 1960;
 const YEAR_MAX = 1999;
+
+// Global rate limit flag — abort sweep if Facebook rate limits us
+let RATE_LIMITED = false;
 
 // US metros: slug -> {lat, lng, label}
 const METRO_AREAS = {
@@ -143,7 +233,7 @@ async function fetchPage(location, lat, lng, cursor = null) {
     server_timestamps: "true",
   });
 
-  const resp = await fetch("https://www.facebook.com/api/graphql/", {
+  const resp = await dnsFetch("https://www.facebook.com/api/graphql/", {
     method: "POST",
     headers: {
       "User-Agent": CHROME_UA,
@@ -565,6 +655,11 @@ async function detectDisappearances(sweepId, seenFacebookIds) {
 }
 
 async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
+  // Abort immediately if we've been rate limited
+  if (RATE_LIMITED) {
+    return { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 1, sellers: 0, vehicles: 0, images: 0 };
+  }
+
   console.log(`\n[${label}] Starting scrape...`);
 
   let cursor = null;
@@ -599,8 +694,8 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
       stats.errors++;
 
       if (e.message.includes("1675004") || e.message.includes("Rate limit")) {
-        console.log(`  Rate limited — waiting 30s before retry...`);
-        await sleep(30000);
+        console.log(`  Rate limited — waiting 60s before retry...`);
+        await sleep(60000);
         try {
           const { edges, nextCursor } = await fetchPage(slug, lat, lng, cursor);
           page++;
@@ -617,6 +712,10 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
           await sleep(3000);
         } catch (retryErr) {
           console.error(`  Retry failed: ${retryErr.message}`);
+          if (retryErr.message.includes("1675004") || retryErr.message.includes("Rate limit")) {
+            console.error(`\n  *** GLOBAL RATE LIMIT DETECTED — aborting remaining cities ***`);
+            RATE_LIMITED = true;
+          }
           break;
         }
       } else {
@@ -714,8 +813,8 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
         image_url: imageUrl,
         location: city && state ? `${city}, ${state}` : city || null,
         parsed_year: year,
-        parsed_make: make?.toLowerCase() || null,
-        parsed_model: model?.toLowerCase() || null,
+        parsed_make: make || null,
+        parsed_model: model || null,
         status: isSold ? "sold" : isPending ? "pending" : "active",
         seller_name: sellerName,
         fb_seller_id: fbSellerDbId,
@@ -853,9 +952,9 @@ async function main() {
       });
     }
 
-    // Inter-city delay
-    if (locationsToScrape.length > 1) {
-      await sleep(4000 + Math.random() * 3000);
+    // Inter-city delay (8-15s to avoid rate limiting)
+    if (locationsToScrape.length > 1 && !RATE_LIMITED) {
+      await sleep(8000 + Math.random() * 7000);
     }
   }
 
