@@ -1,10 +1,38 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import DeckGL from '@deck.gl/react';
-import { ScatterplotLayer } from '@deck.gl/layers';
-import { Map } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+import 'leaflet/dist/leaflet.css';
 import { supabase } from '../../lib/supabase';
 import '../../design-system.css';
+
+// Fix Leaflet default marker icons
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// @ts-expect-error - Leaflet internal property access needed to fix default icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({ iconUrl: markerIcon, iconRetinaUrl: markerIcon2x, shadowUrl: markerShadow });
+
+// --- Icons ---
+const dot = (color: string, size = 12) =>
+  L.divIcon({
+    className: '',
+    html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
+  });
+
+const VEHICLE_ICON = dot('#3B82F6', 12);
+const BUSINESS_ICON = dot('#22C55E', 12);
+const QUERY_ICON = dot('#F59E0B', 16);
+
+const COUNTRY_COLORS: Record<string, string> = {
+  'USA': '#3B82F6', 'UK': '#EF4444', 'Italy': '#22C55E', 'Germany': '#F59E0B',
+  'France': '#8B5CF6', 'Monaco': '#EC4899', 'Switzerland': '#14B8A6', 'Japan': '#F97316',
+  'UAE': '#6366F1', 'Australia': '#FBBF24', 'Canada': '#DC2626', 'default': '#EC4899',
+};
+const colIcon = (country: string) => dot(COUNTRY_COLORS[country] || COUNTRY_COLORS['default'], 10);
 
 // --- State centroid geocoding ---
 const ST: Record<string, [number, number]> = {
@@ -27,6 +55,7 @@ const ST: Record<string, [number, number]> = {
   'wisconsin': [43.8, -88.8], 'wyoming': [43.1, -107.6], 'district of columbia': [38.9, -77.0],
 };
 
+// Deterministic hash — same string always produces the same number
 function simpleHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
@@ -37,6 +66,10 @@ function geo(loc: string): [number, number] | null {
   const l = loc.toLowerCase();
   for (const [s, c] of Object.entries(ST)) {
     if (l.includes(s)) {
+      // Deterministic offset based on location string so the same city/state
+      // always renders at the same spot. No more jitter on reload.
+      // Offset range: ±0.75° (~83 km at equator) — enough to spread same-state
+      // vehicles across a visible area while staying within state boundaries.
       const h = simpleHash(loc);
       const latOff = ((h & 0xff) / 255 - 0.5) * 1.5;
       const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * 1.5;
@@ -46,18 +79,30 @@ function geo(loc: string): [number, number] | null {
   return null;
 }
 
-// --- Country colors ---
-const COUNTRY_COLORS: Record<string, [number, number, number]> = {
-  'USA': [59, 130, 246], 'UK': [239, 68, 68], 'Italy': [34, 197, 94], 'Germany': [245, 158, 11],
-  'France': [139, 92, 246], 'Monaco': [236, 72, 153], 'Switzerland': [20, 184, 166], 'Japan': [249, 115, 22],
-  'UAE': [99, 102, 241], 'Australia': [251, 191, 36], 'Canada': [220, 38, 38], 'default': [236, 72, 153],
-};
-const colColor = (country: string): [number, number, number] => COUNTRY_COLORS[country] || COUNTRY_COLORS['default'];
+// --- Custom cluster icon — white count on blue pill, visible on dark basemap ---
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeClusterIcon(bg: string, textColor: string) {
+  return (cluster: any): L.DivIcon => {
+    const count: number = cluster.getChildCount();
+    const size = count < 10 ? 32 : count < 100 ? 40 : 48;
+    const fontSize = count < 100 ? 13 : 11;
+    return L.divIcon({
+      html: `<div style="background:${bg};color:${textColor};width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-family:Arial,sans-serif;line-height:1">${count}</div>`,
+      className: '',
+      iconSize: [size, size] as [number, number],
+      iconAnchor: [size / 2, size / 2] as [number, number],
+    });
+  };
+}
+
+const createClusterCustomIcon = makeClusterIcon('rgba(59,130,246,0.92)', '#ffffff');
+const createQueryClusterIcon  = makeClusterIcon('rgba(245,158,11,0.92)', '#000000');
 
 // --- Vehicle fields for display ---
 const BASE_FIELDS = 'id,year,make,model,trim,listing_location,bat_location,location,gps_latitude,gps_longitude,primary_image_url';
 const RICH_FIELDS = `${BASE_FIELDS},sale_price,asking_price,current_value,nuke_estimate,mileage,color,interior_color,engine_type,engine_size,horsepower,transmission,drivetrain,body_style,condition_rating,deal_score,heat_score`;
 
+// Search filter builder
 function buildOr(q: string): string {
   const escaped = q.replace(/'/g, "''");
   return ['make', 'model', 'trim', 'color', 'interior_color', 'engine_type', 'engine_code',
@@ -66,7 +111,7 @@ function buildOr(q: string): string {
   ].map(c => `${c}.ilike.%${escaped}%`).join(',');
 }
 
-// --- Pin types ---
+// --- Vehicle pin with rich data ---
 interface VPin {
   id: string; year: number | null; make: string | null; model: string | null; trim: string | null;
   lat: number; lng: number; loc: string;
@@ -83,15 +128,11 @@ interface VPin {
   condition: number | null;
   deal: number | null;
   heat: number | null;
-  weight: number;
 }
 
 interface ColPin { id: string; name: string; slug: string; ig: string | null; country: string; city: string; lat: number; lng: number; totalInventory: number; }
 interface BizPin { id: string; name: string; lat: number; lng: number; type: string | null; }
 
-interface LiveEvent { id: string; lat: number; lng: number; ts: number; }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function pinFromRow(v: any): VPin | null {
   let lat: number, lng: number;
   const locStr = v.listing_location || v.bat_location || v.location || '';
@@ -106,13 +147,11 @@ function pinFromRow(v: any): VPin | null {
     return null;
   }
 
-  const price = v.sale_price || v.asking_price || v.current_value || v.nuke_estimate || null;
-
   return {
     id: v.id, year: v.year, make: v.make, model: v.model, trim: v.trim,
     lat, lng, loc: locStr,
     img: v.primary_image_url || null,
-    price,
+    price: v.sale_price || v.asking_price || v.current_value || v.nuke_estimate || null,
     mileage: v.mileage || null,
     color: v.color || null,
     intColor: v.interior_color || null,
@@ -124,14 +163,20 @@ function pinFromRow(v: any): VPin | null {
     condition: v.condition_rating || null,
     deal: v.deal_score || null,
     heat: v.heat_score || null,
-    weight: price ? Math.min(Math.max(price / 100000, 0.3), 3) : 1,
   };
 }
 
 // --- Helpers ---
+function FlyTo({ center, zoom }: { center: [number, number] | null; zoom?: number }) {
+  const map = useMap();
+  useEffect(() => { if (center) map.flyTo(center, zoom || 5, { duration: 0.8 }); }, [center]);
+  return null;
+}
+
 const fmtPrice = (p: number) => '$' + p.toLocaleString();
 const fmtMiles = (m: number) => m.toLocaleString() + ' mi';
 
+// Optimized Supabase image URL
 function thumbUrl(url: string | null): string | null {
   if (!url) return null;
   if (url.includes('/storage/v1/object/public/')) {
@@ -149,6 +194,7 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
 
   return (
     <div style={{ width: 260, fontFamily: 'Arial, sans-serif', fontSize: '11px', lineHeight: 1.4 }}>
+      {/* Image */}
       {thumb && (
         <a href={`/vehicle/${v.id}`}>
           <img
@@ -159,21 +205,31 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
           />
         </a>
       )}
+
       <div style={{ padding: '6px 2px 2px' }}>
+        {/* Title */}
         <a href={`/vehicle/${v.id}`} style={{ color: accent, textDecoration: 'none', fontWeight: 700, fontSize: '12px', display: 'block' }}>
           {title}
         </a>
         {subtitle && <div style={{ color: 'var(--text-secondary)', fontSize: '10px', marginBottom: 2 }}>{subtitle}</div>}
+
+        {/* Price + Mileage row */}
         <div style={{ display: 'flex', gap: 8, marginTop: 3, marginBottom: 3, alignItems: 'baseline' }}>
           {v.price && <span style={{ color: '#4ade80', fontWeight: 700, fontSize: '13px', fontFamily: 'monospace' }}>{fmtPrice(v.price)}</span>}
           {v.mileage && <span style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>{fmtMiles(v.mileage)}</span>}
         </div>
+
+        {/* Specs row */}
         {specs.length > 0 && (
           <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 3 }}>
             {specs.join(' · ')}
           </div>
         )}
+
+        {/* Interior color */}
         {v.intColor && <div style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>Int: {v.intColor}</div>}
+
+        {/* Scores */}
         {(v.deal || v.heat || v.condition) && (
           <div style={{ display: 'flex', gap: 8, marginTop: 3, fontSize: '10px' }}>
             {v.deal != null && <span style={{ color: v.deal >= 70 ? '#4ade80' : v.deal >= 40 ? '#facc15' : '#f87171' }}>Deal: {v.deal}</span>}
@@ -181,6 +237,8 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
             {v.condition != null && <span style={{ color: '#60a5fa' }}>Cond: {v.condition}/10</span>}
           </div>
         )}
+
+        {/* Location */}
         {v.loc && <div style={{ color: 'var(--text-disabled)', fontSize: '9px', marginTop: 3 }}>{v.loc}</div>}
       </div>
     </div>
@@ -190,11 +248,6 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
 // ===========================================
 // MAIN COMPONENT
 // ===========================================
-
-const INITIAL_VIEW = { longitude: -50, latitude: 35, zoom: 3, pitch: 0, bearing: 0 };
-
-const CARTO_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-
 export default function UnifiedMap() {
   const [showCollections, setShowCollections] = useState(true);
   const [showVehicles, setShowVehicles] = useState(true);
@@ -210,35 +263,8 @@ export default function UnifiedMap() {
   const [queryNoLoc, setQueryNoLoc] = useState<{ id: string; title: string; loc: string }[]>([]);
   const [queryTotal, setQueryTotal] = useState(0);
   const [searching, setSearching] = useState(false);
+  const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null);
   const [activeQuery, setActiveQuery] = useState('');
-
-  // deck.gl viewState
-  const [viewState, setViewState] = useState(INITIAL_VIEW);
-
-  // Popup / hover state
-  const [popup, setPopup] = useState<{ x: number; y: number; pin: VPin | ColPin | BizPin; type: 'vehicle' | 'collection' | 'business' } | null>(null);
-  const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
-
-  // Slider controls
-  const [glowRadius, setGlowRadius] = useState(40);
-  const [glowIntensity, setGlowIntensity] = useState(12);
-  const [pointSize, setPointSize] = useState(1.5);
-  const [mode, setMode] = useState<'density' | 'points'>('density');
-
-  // Live events
-  const liveEventsRef = useRef<LiveEvent[]>([]);
-  const [tick, setTick] = useState(0);
-
-  // Animation loop
-  useEffect(() => {
-    let raf: number;
-    const loop = () => {
-      setTick(t => t + 1);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, []);
 
   // ---- Load collections from DB ----
   useEffect(() => {
@@ -266,7 +292,7 @@ export default function UnifiedMap() {
       });
   }, []);
 
-  // ---- Load base vehicle layer — cursor-based pagination ----
+  // ---- Load base vehicle layer — cursor-based pagination (fast at any depth) ----
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -283,6 +309,7 @@ export default function UnifiedMap() {
         }
       };
 
+      // Cursor-based pagination: use id > lastId for O(1) page fetches
       const paginate = async (
         buildQuery: (q: any) => any,
         maxRows: number,
@@ -300,6 +327,7 @@ export default function UnifiedMap() {
           addRows(data);
           lastId = data[data.length - 1].id;
           fetched += data.length;
+          // Progressive render: update every ~5k pins
           if (all.length % 5000 < 1000) {
             setVehicles([...all]);
           }
@@ -313,7 +341,7 @@ export default function UnifiedMap() {
       );
       if (!cancelled) setVehicles([...all]);
 
-      // 2) bat_location vehicles (no listing_location)
+      // 2) bat_location vehicles (no listing_location) — skip "United States" only entries
       await paginate(
         (q: any) => q.is('listing_location', null).not('bat_location', 'is', null).neq('bat_location', 'United States'),
         10000,
@@ -377,7 +405,7 @@ export default function UnifiedMap() {
       if (pins.length > 0) {
         const avgLat = pins.reduce((s, p) => s + p.lat, 0) / pins.length;
         const avgLng = pins.reduce((s, p) => s + p.lng, 0) / pins.length;
-        setViewState(vs => ({ ...vs, latitude: avgLat, longitude: avgLng, zoom: 5 }));
+        setFlyTarget([avgLat, avgLng]);
       }
     } catch (err) {
       console.error('Map query error:', err);
@@ -388,7 +416,7 @@ export default function UnifiedMap() {
 
   const clearSearch = () => {
     setSearchText(''); setQueryResults([]); setQueryNoLoc([]);
-    setQueryTotal(0); setActiveQuery('');
+    setQueryTotal(0); setFlyTarget(null); setActiveQuery('');
   };
 
   const hasQuery = activeQuery.length > 0;
@@ -404,308 +432,81 @@ export default function UnifiedMap() {
          + queryResults.length,
   }), [showCollections, showVehicles, showBusinesses, collections, vehicles, businesses, queryResults, hasQuery]);
 
-  // --- deck.gl layers ---
-  const zoom = viewState.zoom;
-  const now = Date.now();
-
-  const layers = useMemo(() => {
-    const result: any[] = [];
-
-    const showGlow = mode === 'density';
-    const vehColor: [number, number, number] = hasQuery ? [245, 158, 11] : [59, 130, 246];
-    const glowAlpha = Math.max(0, Math.min(255, glowIntensity));
-
-    // Glow fades out as you zoom past z6
-    const glowOpacity = showGlow ? Math.max(0, Math.min(1, (7 - zoom) / 4)) : 0;
-
-    // --- Vehicle Glow ---
-    if (showVehicles && !hasQuery && glowOpacity > 0) {
-      result.push(new ScatterplotLayer({
-        id: 'vehicle-glow',
-        data: vehicles,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * 800,
-        getFillColor: [...vehColor, glowAlpha] as [number, number, number, number],
-        radiusMinPixels: glowRadius * 0.5,
-        radiusMaxPixels: glowRadius * 2,
-        opacity: glowOpacity,
-        pickable: false,
-        updateTriggers: { getFillColor: [glowAlpha], getRadius: [glowRadius] },
-      }));
-    }
-
-    // --- Vehicle Points ---
-    if (showVehicles && !hasQuery) {
-      result.push(new ScatterplotLayer({
-        id: 'vehicle-points',
-        data: vehicles,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: 50,
-        getFillColor: [...vehColor, 200] as [number, number, number, number],
-        radiusMinPixels: pointSize * 0.5,
-        radiusMaxPixels: pointSize * 3,
-        pickable: zoom >= 8,
-        onClick: ({ object, x, y }: any) => {
-          if (object) setPopup({ x, y, pin: object, type: 'vehicle' });
-        },
-        onHover: ({ object, x, y }: any) => {
-          if (object && zoom >= 8) {
-            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-            setHoverInfo({ x, y, text: t || 'Vehicle' });
-          } else {
-            setHoverInfo(null);
-          }
-        },
-        updateTriggers: { radiusMinPixels: [pointSize], pickable: [zoom] },
-      }));
-    }
-
-    // --- Query Glow ---
-    if (hasQuery && queryResults.length > 0 && glowOpacity > 0) {
-      result.push(new ScatterplotLayer({
-        id: 'query-glow',
-        data: queryResults,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * 800,
-        getFillColor: [245, 158, 11, glowAlpha] as [number, number, number, number],
-        radiusMinPixels: glowRadius * 0.5,
-        radiusMaxPixels: glowRadius * 2,
-        opacity: glowOpacity,
-        pickable: false,
-      }));
-    }
-
-    // --- Query Points ---
-    if (hasQuery && queryResults.length > 0) {
-      result.push(new ScatterplotLayer({
-        id: 'query-points',
-        data: queryResults,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: 80,
-        getFillColor: [245, 158, 11, 220] as [number, number, number, number],
-        radiusMinPixels: pointSize,
-        radiusMaxPixels: pointSize * 4,
-        pickable: true,
-        onClick: ({ object, x, y }: any) => {
-          if (object) setPopup({ x, y, pin: object, type: 'vehicle' });
-        },
-        onHover: ({ object, x, y }: any) => {
-          if (object) {
-            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-            setHoverInfo({ x, y, text: t || 'Vehicle' });
-          } else {
-            setHoverInfo(null);
-          }
-        },
-      }));
-    }
-
-    // Collections appear at z3+
-    const colOpacity = Math.max(0, Math.min(1, (zoom - 2) / 2));
-
-    // --- Collection Glow ---
-    if (showCollections && !hasQuery && colOpacity > 0 && showGlow) {
-      result.push(new ScatterplotLayer({
-        id: 'collection-glow',
-        data: collections,
-        getPosition: (d: ColPin) => [d.lng, d.lat],
-        getRadius: 600,
-        getFillColor: (d: ColPin) => [...colColor(d.country), glowAlpha * 0.8] as [number, number, number, number],
-        radiusMinPixels: 20,
-        radiusMaxPixels: 60,
-        opacity: colOpacity * glowOpacity,
-        pickable: false,
-      }));
-    }
-
-    // --- Collection Points ---
-    if (showCollections && !hasQuery && colOpacity > 0) {
-      result.push(new ScatterplotLayer({
-        id: 'collection-points',
-        data: collections,
-        getPosition: (d: ColPin) => [d.lng, d.lat],
-        getRadius: 50,
-        getFillColor: (d: ColPin) => [...colColor(d.country), 220] as [number, number, number, number],
-        radiusMinPixels: 3,
-        radiusMaxPixels: 8,
-        opacity: colOpacity,
-        pickable: true,
-        onClick: ({ object, x, y }: any) => {
-          if (object) setPopup({ x, y, pin: object, type: 'collection' });
-        },
-        onHover: ({ object, x, y }: any) => {
-          if (object) setHoverInfo({ x, y, text: object.name });
-          else setHoverInfo(null);
-        },
-      }));
-    }
-
-    // --- Business Glow ---
-    if (showBusinesses && !hasQuery && colOpacity > 0 && showGlow) {
-      result.push(new ScatterplotLayer({
-        id: 'business-glow',
-        data: businesses,
-        getPosition: (d: BizPin) => [d.lng, d.lat],
-        getRadius: 500,
-        getFillColor: [20, 184, 166, glowAlpha * 0.6] as [number, number, number, number],
-        radiusMinPixels: 15,
-        radiusMaxPixels: 50,
-        opacity: colOpacity * glowOpacity,
-        pickable: false,
-      }));
-    }
-
-    // --- Business Points ---
-    if (showBusinesses && !hasQuery && colOpacity > 0) {
-      result.push(new ScatterplotLayer({
-        id: 'business-points',
-        data: businesses,
-        getPosition: (d: BizPin) => [d.lng, d.lat],
-        getRadius: 50,
-        getFillColor: [20, 184, 166, 200] as [number, number, number, number],
-        radiusMinPixels: 2,
-        radiusMaxPixels: 6,
-        opacity: colOpacity,
-        pickable: true,
-        onClick: ({ object, x, y }: any) => {
-          if (object) setPopup({ x, y, pin: object, type: 'business' });
-        },
-        onHover: ({ object, x, y }: any) => {
-          if (object) setHoverInfo({ x, y, text: object.name });
-          else setHoverInfo(null);
-        },
-      }));
-    }
-
-    // --- Live Event Rings (animated) ---
-    const liveEvents = liveEventsRef.current.filter(e => now - e.ts < 2500);
-    if (liveEvents.length > 0) {
-      // Expanding ring
-      result.push(new ScatterplotLayer({
-        id: 'live-rings',
-        data: liveEvents,
-        getPosition: (d: LiveEvent) => [d.lng, d.lat],
-        getRadius: (d: LiveEvent) => {
-          const age = (now - d.ts) / 2500;
-          return age * 2000;
-        },
-        getFillColor: (d: LiveEvent) => {
-          const age = (now - d.ts) / 2500;
-          return [74, 222, 128, Math.round(180 * (1 - age))] as [number, number, number, number];
-        },
-        radiusMinPixels: 2,
-        radiusMaxPixels: 40,
-        pickable: false,
-        updateTriggers: { getRadius: [tick], getFillColor: [tick] },
-      }));
-
-      // Center dot
-      result.push(new ScatterplotLayer({
-        id: 'live-dots',
-        data: liveEvents,
-        getPosition: (d: LiveEvent) => [d.lng, d.lat],
-        getRadius: 100,
-        getFillColor: [74, 222, 128, 255] as [number, number, number, number],
-        radiusMinPixels: 2,
-        radiusMaxPixels: 4,
-        pickable: false,
-      }));
-    }
-
-    return result;
-  }, [vehicles, collections, businesses, queryResults, showVehicles, showCollections, showBusinesses,
-      hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, tick, now]);
-
-  // --- Render popup content ---
-  const renderPopup = () => {
-    if (!popup) return null;
-    const { x, y, pin, type } = popup;
-
-    // Position popup near click, clamped to viewport
-    const left = Math.min(x, window.innerWidth - 290);
-    const top = Math.min(y, window.innerHeight - 300);
-
-    return (
-      <div
-        style={{
-          position: 'absolute', left, top: top - 10, zIndex: 2000,
-          background: 'var(--bg)', border: '1px solid var(--border)',
-          boxShadow: '0 4px 16px rgba(0,0,0,.5)', maxWidth: 280,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={() => setPopup(null)}
-          style={{
-            position: 'absolute', top: 2, right: 4, background: 'none',
-            border: 'none', color: 'var(--text-disabled)', cursor: 'pointer',
-            fontSize: '14px', lineHeight: 1, padding: '2px 4px',
-          }}
-        >
-          x
-        </button>
-        {type === 'vehicle' && <VehicleCard v={pin as VPin} accent={hasQuery ? '#F59E0B' : '#3B82F6'} />}
-        {type === 'collection' && (() => {
-          const c = pin as ColPin;
-          return (
-            <div style={{ padding: '8px 10px', fontFamily: 'Arial, sans-serif', fontSize: '11px', lineHeight: 1.4 }}>
-              <strong>{c.name}</strong><br />
-              {c.city}, {c.country}<br />
-              {c.totalInventory > 0 && <span style={{ color: '#3B82F6' }}>{c.totalInventory} vehicles</span>}
-              {c.totalInventory > 0 && <br />}
-              <a href={`/org/${c.slug}`} style={{ color: '#3B82F6' }}>View collection</a>
-              {c.ig && <> · <a href={`https://instagram.com/${c.ig}`} target="_blank" rel="noreferrer" style={{ color: '#EC4899' }}>@{c.ig}</a></>}
-            </div>
-          );
-        })()}
-        {type === 'business' && (() => {
-          const b = pin as BizPin;
-          return (
-            <div style={{ padding: '8px 10px', fontFamily: 'Arial, sans-serif', fontSize: '11px', lineHeight: 1.4 }}>
-              <strong>{b.name}</strong><br />
-              {b.type && <span style={{ color: 'var(--text-secondary)' }}>{b.type}</span>}{b.type && <br />}
-              <a href={`/org/${b.id}`} style={{ color: '#22C55E' }}>View profile</a>
-            </div>
-          );
-        })()}
-      </div>
-    );
-  };
-
-  const sliderStyle: React.CSSProperties = {
-    width: 80, height: 4, WebkitAppearance: 'none' as any, appearance: 'none' as any,
-    background: '#333', outline: 'none', cursor: 'pointer',
-  };
-
   return (
-    <div style={{ position: 'relative', height: '100%', width: '100%' }} onClick={() => setPopup(null)}>
-      <DeckGL
-        viewState={viewState}
-        onViewStateChange={({ viewState: vs }: any) => setViewState(vs)}
-        controller={true}
-        layers={layers}
-        getCursor={({ isHovering }: { isHovering: boolean }) => isHovering ? 'pointer' : 'grab'}
-      >
-        <Map mapStyle={CARTO_DARK} attributionControl={false} />
-      </DeckGL>
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      <MapContainer center={[35, -50]} zoom={3} style={{ height: '100%', width: '100%' }} zoomControl={true}>
+        <TileLayer
+          attribution='&copy; <a href="https://carto.com">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        />
+        <FlyTo center={flyTarget} />
 
-      {/* Hover tooltip */}
-      {hoverInfo && (
-        <div style={{
-          position: 'absolute', left: hoverInfo.x + 12, top: hoverInfo.y - 20, zIndex: 1500,
-          background: 'rgba(0,0,0,.85)', color: '#fff', padding: '3px 8px',
-          fontSize: '10px', fontFamily: 'Arial, sans-serif', pointerEvents: 'none',
-          whiteSpace: 'nowrap',
-        }}>
-          {hoverInfo.text}
-        </div>
-      )}
+        {/* Collections */}
+        {showCollections && !hasQuery && collections.map((c, i) => (
+          <Marker key={`c${i}`} position={[c.lat, c.lng]} icon={colIcon(c.country)}>
+            <Popup>
+              <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px', minWidth: 160 }}>
+                <strong>{c.name}</strong><br />
+                {c.city}, {c.country}<br />
+                {c.totalInventory > 0 && <span style={{ color: '#3B82F6' }}>{c.totalInventory} vehicles</span>}
+                {c.totalInventory > 0 && <br />}
+                <a href={`/org/${c.slug}`} style={{ color: '#3B82F6' }}>View collection</a>
+                {c.ig && <> · <a href={`https://instagram.com/${c.ig}`} target="_blank" rel="noreferrer" style={{ color: '#EC4899' }}>@{c.ig}</a></>}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
 
-      {/* Popup */}
-      {renderPopup()}
+        {/* Base vehicles */}
+        {showVehicles && !hasQuery && (
+          <MarkerClusterGroup
+            chunkedLoading
+            maxClusterRadius={60}
+            showCoverageOnHover={false}
+            disableClusteringAtZoom={13}
+            iconCreateFunction={createClusterCustomIcon}
+          >
+            {vehicles.map(v => (
+              <Marker key={`v${v.id}`} position={[v.lat, v.lng]} icon={VEHICLE_ICON}>
+                <Popup maxWidth={280} minWidth={260}><VehicleCard v={v} accent="#3B82F6" /></Popup>
+              </Marker>
+            ))}
+          </MarkerClusterGroup>
+        )}
+
+        {/* Businesses */}
+        {showBusinesses && !hasQuery && businesses.map(b => (
+          <Marker key={`b${b.id}`} position={[b.lat, b.lng]} icon={BUSINESS_ICON}>
+            <Popup>
+              <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px' }}>
+                <strong>{b.name}</strong><br />
+                {b.type && <span style={{ color: 'var(--text-secondary)' }}>{b.type}</span>}{b.type && <br />}
+                <a href={`/org/${b.id}`} style={{ color: '#22C55E' }}>View profile</a>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* Query results */}
+        {queryResults.length > 0 && (
+          <MarkerClusterGroup
+            chunkedLoading
+            maxClusterRadius={50}
+            showCoverageOnHover={false}
+            disableClusteringAtZoom={13}
+            iconCreateFunction={createQueryClusterIcon}
+          >
+            {queryResults.map(v => (
+              <Marker key={`q${v.id}`} position={[v.lat, v.lng]} icon={QUERY_ICON}>
+                <Popup maxWidth={280} minWidth={260}><VehicleCard v={v} accent="#F59E0B" /></Popup>
+              </Marker>
+            ))}
+          </MarkerClusterGroup>
+        )}
+      </MapContainer>
 
       {/* Query bar */}
-      <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ position: 'absolute', top: 10, left: 54, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           <input
             type="text"
@@ -732,8 +533,8 @@ export default function UnifiedMap() {
         )}
       </div>
 
-      {/* Layer toggles + controls */}
-      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'var(--bg)', padding: '8px 10px', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'Arial, sans-serif', color: 'var(--text)', minWidth: 160 }}>
+      {/* Layer toggles */}
+      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'var(--bg)', padding: '8px 10px', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'Arial, sans-serif', color: 'var(--text)' }}>
         <div style={{ fontWeight: 600, marginBottom: 4, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-disabled)' }}>Layers</div>
         <LT label="Collections" color="#EC4899" checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
         <LT label="Vehicles" color="#3B82F6" checked={showVehicles} set={setShowVehicles} n={counts.vehicles} dim={hasQuery} loading={vehLoading} />
@@ -746,44 +547,6 @@ export default function UnifiedMap() {
             <span style={{ color: '#F59E0B', marginLeft: 'auto' }}>{counts.query.toLocaleString()}</span>
           </div>
         </>}
-
-        {/* Mode toggle */}
-        <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0 4px' }} />
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            onClick={() => setMode('density')}
-            style={{
-              flex: 1, padding: '3px 0', fontSize: '9px', fontWeight: mode === 'density' ? 700 : 400,
-              background: mode === 'density' ? 'var(--surface)' : 'transparent',
-              color: mode === 'density' ? 'var(--text)' : 'var(--text-disabled)',
-              border: '1px solid var(--border)', cursor: 'pointer',
-            }}
-          >
-            Density
-          </button>
-          <button
-            onClick={() => setMode('points')}
-            style={{
-              flex: 1, padding: '3px 0', fontSize: '9px', fontWeight: mode === 'points' ? 700 : 400,
-              background: mode === 'points' ? 'var(--surface)' : 'transparent',
-              color: mode === 'points' ? 'var(--text)' : 'var(--text-disabled)',
-              border: '1px solid var(--border)', cursor: 'pointer',
-            }}
-          >
-            Points
-          </button>
-        </div>
-
-        {/* Sliders */}
-        {mode === 'density' && (
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <SliderControl label="Glow" value={glowRadius} min={5} max={100} onChange={setGlowRadius} style={sliderStyle} />
-            <SliderControl label="Intensity" value={glowIntensity} min={1} max={40} onChange={setGlowIntensity} style={sliderStyle} />
-          </div>
-        )}
-        <div style={{ marginTop: mode === 'density' ? 0 : 6 }}>
-          <SliderControl label="Pt Size" value={pointSize} min={0.5} max={5} step={0.5} onChange={setPointSize} style={sliderStyle} />
-        </div>
       </div>
 
       {/* Stats */}
@@ -795,7 +558,7 @@ export default function UnifiedMap() {
 
       {/* Unmapped sidebar */}
       {queryNoLoc.length > 0 && (
-        <div style={{ position: 'absolute', top: 80, left: 10, zIndex: 1000, width: 340, maxHeight: '50vh', overflowY: 'auto', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'Arial, sans-serif', color: 'var(--text)' }}>
+        <div style={{ position: 'absolute', top: 80, left: 54, zIndex: 1000, width: 340, maxHeight: '50vh', overflowY: 'auto', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'Arial, sans-serif', color: 'var(--text)' }}>
           <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text-disabled)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             No location ({queryNoLoc.length})
           </div>
@@ -808,16 +571,9 @@ export default function UnifiedMap() {
           {queryNoLoc.length > 50 && <div style={{ padding: '4px 8px', color: 'var(--text-disabled)', fontSize: '10px' }}>+{queryNoLoc.length - 50} more</div>}
         </div>
       )}
-
-      {/* Attribution */}
-      <div style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 900, fontSize: '9px', color: 'var(--text-disabled)', fontFamily: 'Arial, sans-serif' }}>
-        <a href="https://carto.com" target="_blank" rel="noreferrer" style={{ color: 'var(--text-disabled)' }}>CARTO</a>
-      </div>
     </div>
   );
 }
-
-// --- Sub-components ---
 
 function LT({ label, color, checked, set, n, dim, loading }: {
   label: string; color: string; checked: boolean; set: (v: boolean) => void; n: number; dim?: boolean; loading?: boolean;
@@ -829,26 +585,5 @@ function LT({ label, color, checked, set, n, dim, loading }: {
       <span>{label}</span>
       <span style={{ color: 'var(--text-secondary)', marginLeft: 'auto' }}>{loading ? '...' : n.toLocaleString()}</span>
     </label>
-  );
-}
-
-function SliderControl({ label, value, min, max, step, onChange, style }: {
-  label: string; value: number; min: number; max: number; step?: number;
-  onChange: (v: number) => void; style: React.CSSProperties;
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '9px' }}>
-      <span style={{ color: 'var(--text-disabled)', width: 44, textAlign: 'right' }}>{label}</span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step || 1}
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        style={style}
-      />
-      <span style={{ color: 'var(--text-disabled)', width: 24, fontSize: '8px' }}>{value}</span>
-    </div>
   );
 }

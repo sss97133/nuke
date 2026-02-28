@@ -72,6 +72,19 @@
   --warning: #b05a00;
   --error: #d13438;
 
+  /* Chart Palette — semantic colors for data visualization */
+  --chart-purple: #7d6b91;
+  --chart-green: #6b9d7d;
+  --chart-gold: #9d8b6b;
+  --chart-teal: #6b8b9d;
+  --chart-mauve: #8b6b7d;
+  --chart-lime: #7d9d6b;
+  --chart-rose: #9d6b6b;
+  --chart-slate: #6b7d9d;
+  --chart-amber: #9d7d6b;
+  --chart-sage: #6b9d8b;
+  --chart-olive: #8b9d6b;
+
   /* Unified token aliases (for compatibility with newer theme system) */
   --bg: var(--grey-100);
   --surface: var(--grey-200);
@@ -3865,5 +3878,24 @@ button:focus-visible {
   .vehicle-header-badges .badge-priority-2 {
     display: none !important;
   }
+}
+
+/* Map slider thumbs */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  background: #666;
+  border: none;
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  background: #666;
+  border: none;
+  cursor: pointer;
+  border-radius: 0;
 }
 
